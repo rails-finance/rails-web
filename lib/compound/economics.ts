@@ -476,6 +476,63 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
   return sawAny ? raw : null;
 }
 
+/** The interest inside today's debt: the debt now less what was borrowed and
+ *  repaid since the balance last stood at zero or above. Null where the
+ *  events never show the balance at zero or above (a window that starts
+ *  mid-debt), or where the figure falls outside (0, debt). `since` is the
+ *  first borrow after that point, unix seconds. */
+export function compoundInterestInDebt(
+  events: BaseActivityEvent[],
+  market: string,
+  debtNow: number,
+): { amount: number; since: number } | null {
+  if (!(debtNow > 0)) return null;
+  const rows = events
+    .filter(isCompoundEvent)
+    .filter((e) => e.context.data.market === market && e.context.data.isBase)
+    .map((e) => ({
+      block: e.blockNumber,
+      log: Number(/-(\d+)-[a-z_]+$/.exec(e.id)?.[1] ?? 0),
+      ts: e.timestamp,
+      delta: Number(e.context.data.assetsDelta),
+      after: e.context.data.baseAfter,
+    }))
+    .sort((a, b) => a.block - b.block || a.log - b.log);
+  let seenZero = false;
+  let borrowed = 0;
+  let repaid = 0;
+  let since: number | null = null;
+  for (const r of rows) {
+    if (r.after == null || !Number.isFinite(r.delta)) return null;
+    const after = Number(r.after);
+    const before = after - r.delta;
+    if (before >= 0) {
+      seenZero = true;
+      borrowed = 0;
+      repaid = 0;
+      since = null;
+    }
+    if (r.delta < 0) {
+      const borrow = -r.delta - Math.max(0, before);
+      if (borrow > 0) {
+        borrowed += borrow;
+        since ??= r.ts;
+      }
+    } else if (r.delta > 0 && before < 0) {
+      repaid += Math.min(r.delta, -before);
+    }
+    if (after >= 0) {
+      seenZero = true;
+      borrowed = 0;
+      repaid = 0;
+      since = null;
+    }
+  }
+  if (!seenZero || since == null) return null;
+  const amount = debtNow - (borrowed - repaid);
+  return amount > 0 && amount < debtNow ? { amount, since } : null;
+}
+
 /**
  * The lifetime flows for a WINDOWED page: the opening balance seeded first, the
  * loaded rows added on top.
@@ -737,8 +794,12 @@ export function computeCompoundEconomics(
     ...collFlows.flatMap(([addr, c]) =>
       withLabel(flowLine("transferred collateral", c.symbol, addr, c.sent, `cs-${addr}`), "Transferred out"),
     ),
+    // The lent base's withdrawals are not collateral: their own row.
     ...(lifetime
-      ? flowLine("withdrawn", view.base.symbol, view.base.address, lifetime.withdrawn, "base-withdrawn")
+      ? withLabel(
+          flowLine("withdrawn", view.base.symbol, view.base.address, lifetime.withdrawn, "base-withdrawn"),
+          `Withdrawn (lent ${view.base.symbol})`,
+        )
       : []),
   ];
   // Custody received from another account — an inflow that is NOT a fresh
@@ -778,7 +839,7 @@ export function computeCompoundEconomics(
           flowLine("absorb credit", view.base.symbol, view.base.address, lifetime.absorbCredit ?? 0, "base-credit"),
           absorbUsd?.credit,
         ),
-        "Credited by the absorb",
+        `Left over after the absorb (lent ${view.base.symbol})`,
       )
     : [];
 
@@ -824,8 +885,16 @@ export function computeCompoundEconomics(
   // `current + interest` as the total, so when the split engages the current
   // line DROPS to the net event principal — the live borrowBalanceOf already
   // includes the interest (principal + accrued = balanceOf).
+  // Where each row carries the interest since the one before (the Ethereum
+  // index), the interest the debt or lent balance has taken since the last
+  // row joins those rows' sum, and the columns read top to bottom: borrowed +
+  // interest charged − repaid − cleared = owed now. The live split below is
+  // for the lane whose rows carry no interest.
+  const rowsCarryInterest = vocab.baseAtLastEvent;
+  const sinceLastEvent = lifetime && chain && rowsCarryInterest ? Math.abs(chain.amount) - Math.abs(netBase) : 0;
+  const accrualSince = sinceLastEvent > DUST ? sinceLastEvent : 0;
   let interest: TowerLine | null = null;
-  if (lifetime && chain && baseSide === "borrow" && debtLines.length === 1) {
+  if (lifetime && chain && !rowsCarryInterest && baseSide === "borrow" && debtLines.length === 1) {
     const netPrincipal = -netFlow; // borrower: the net of its moves is negative
     const amt = legInterest(Math.abs(chain.amount), netPrincipal, lifetime.borrowed);
     if (amt > 0) {
@@ -848,7 +917,13 @@ export function computeCompoundEconomics(
   // The lender's twin: supply interest earned over the position's life, the
   // live balance less the net of its moves, on top of that net.
   let earned: TowerLine | null = null;
-  if (lifetime && chain && baseSide === "lend" && collateralLines[0]?.key === `base:${view.base.address}`) {
+  if (
+    lifetime &&
+    chain &&
+    !rowsCarryInterest &&
+    baseSide === "lend" &&
+    collateralLines[0]?.key === `base:${view.base.address}`
+  ) {
     const amt = legInterest(chain.amount, netFlow, lifetime.deposited);
     if (amt > 0) {
       earned = {
@@ -878,7 +953,7 @@ export function computeCompoundEconomics(
             "interest charged",
             view.base.symbol,
             view.base.address,
-            lifetime.interestCharged ?? 0,
+            (lifetime.interestCharged ?? 0) + (baseSide === "borrow" ? accrualSince : 0),
             "base-int-charged",
           ),
           "Interest charged",
@@ -891,7 +966,7 @@ export function computeCompoundEconomics(
             "interest earned",
             view.base.symbol,
             view.base.address,
-            lifetime.interestEarned ?? 0,
+            (lifetime.interestEarned ?? 0) + (baseSide === "lend" ? accrualSince : 0),
             "base-int-earned",
           ),
           "Interest earned",

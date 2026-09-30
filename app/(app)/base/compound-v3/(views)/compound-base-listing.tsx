@@ -75,7 +75,8 @@ export function CompoundBaseListing({
           peaks={false}
         />
       )}
-      hrefFor={(p) => `/base/compound-v3/${p.account}`}
+      // One page per wallet, one card per market: the row opens on its own card.
+      hrefFor={(p) => `/base/compound-v3/${p.account}#market-${p.market}`}
       keyFor={(p) => `${p.market}:${p.account}`}
       strategy={serverStrategy<CompoundPositionSummary, CompoundListFilters>({
         dimensions: compoundBaseListDimensions(),

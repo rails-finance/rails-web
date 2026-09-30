@@ -152,7 +152,7 @@ function CollateralRow({
           NEW borrowing while it stays liquidation-eligible. */}
       <span
         className="min-w-36 flex-1 text-right text-rb-500"
-        title={`Borrow ${pctText(c.borrowCollateralFactor, 0)}: the share of its value that can be borrowed against. Liquidate ${pctText(c.liquidateCollateralFactor, 0)}: the share that counts toward the liquidation line. Credit ${pctText(c.liquidationFactor, 0)}: the share of its value an account is credited if it is liquidated.`}
+        title={`Borrow ${pctText(c.borrowCollateralFactor, 0)}: the share of its value that can be borrowed against. Liquidate ${pctText(c.liquidateCollateralFactor, 0)}: the share that counts toward the liquidation line. Credited at ${pctText(c.liquidationFactor, 0)} of value (liquidation factor) if the account is absorbed; the protocol keeps ${pctText(1 - c.liquidationFactor, 0)}.`}
       >
         {c.borrowCollateralFactor === 0 ? (
           <span className="text-foreground">borrowing switched off</span>
@@ -161,8 +161,9 @@ function CollateralRow({
         )}
         {" · liquidate "}
         <Prov info={cvCollateralFactorProv("liquidate", cc)}>{pctText(c.liquidateCollateralFactor, 0)}</Prov>
-        {" · credit "}
+        {" · credited at "}
         <Prov info={cvCollateralFactorProv("liquidation", cc)}>{pctText(c.liquidationFactor, 0)}</Prov>
+        {" (liquidation factor)"}
       </span>
     </div>
   );
@@ -314,7 +315,9 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
           The collateral the market accepts, as its contract lists it. Each bar is the amount supplied against the
           asset&rsquo;s supply cap, in the asset&rsquo;s units. Three factors follow each asset: borrow (the share of
           its value that can be borrowed against), liquidate (the share that counts toward the liquidation line) and
-          credit (the share of its value an account is credited if it is liquidated).
+          credited at (the liquidation factor: the share of its value an account is credited at if it is absorbed; the
+          protocol keeps the rest). A cap set to zero or lowered below what is supplied means no more of that asset can
+          be added; what is in stays.
         </p>
         <div className="mt-1 divide-y divide-rb-300/25 dark:divide-rb-700/25">
           {m.collateral.map((c) => (
@@ -456,6 +459,14 @@ export function CompoundMarketsView({
         }
       />
 
+      <p className="mb-3 text-xs leading-relaxed text-rb-500" data-markets-glossary="">
+        How to read a market: <span className="text-foreground">utilised</span> is the share of the lent base that is
+        borrowed. The <span className="text-foreground">kink</span> is the utilisation where the rate curves turn steep,
+        so rates climb fast above it. <span className="text-foreground">Reserves</span> are the base the protocol holds
+        in the market; below the <span className="text-foreground">target</span> it sells seized collateral to refill
+        them. <span className="text-foreground">Min borrow</span> is the smallest debt a new borrow may leave. A market{" "}
+        <span className="text-foreground">quoted in ETH</span> prices its assets in ETH, so its values are in ETH.
+      </p>
       <div className="grid gap-3">
         {data.markets.map((m) => (
           <MarketCard key={m.comet} m={m} block={data.blockNumber} chainId={chainId} />

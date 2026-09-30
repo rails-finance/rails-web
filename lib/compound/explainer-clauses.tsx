@@ -63,7 +63,7 @@ import { formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/fo
 import { compoundAbsorbSplit, compoundAmount } from "@/lib/compound/row-facts";
 import { AmountText } from "@/components/shared/amount-text";
 import { externalActor } from "@/lib/shared/external-actor";
-import { LinkedAddress } from "@/components/shared/linked-address";
+import { CompoundTxSenderNote } from "@/components/protocol/compound/compound-tx-sender-note";
 
 /** Below this magnitude a leg reads as zero — the sub-precision residual a
  *  crossed base balance or a fully spent balance leaves behind. */
@@ -126,11 +126,7 @@ function Fig({
  *  explorer: adding value needs no permission at all, and removing it needs a
  *  manager authorisation that is a single all-or-nothing boolean — no
  *  per-asset and no per-amount cap, unlike Aave's capped delegation. */
-function fundedByOtherMechanic(
-  ctx: CompoundContext,
-  owner: string,
-  chainId?: CompoundCoords["chainId"],
-): ClauseInput[] {
+function fundedByOtherMechanic(ctx: CompoundContext, owner: string, coords: CompoundCoords): ClauseInput[] {
   const isBaseSupply = ctx.eventType === "supply";
   if (!isBaseSupply && ctx.eventType !== "supply_collateral") return [];
   // Only where the owner neither signed the transaction nor provided the
@@ -138,22 +134,16 @@ function fundedByOtherMechanic(
   // that names it as the funder) is its own actor.
   const actor = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.funder }, owner);
   if (!actor) return [];
-  const funderIsSigner = ctx.funder === actor;
   return [
     clause(
-      <>
-        Another account, <LinkedAddress address={actor} chainId={chainId} />, sent this transaction
-        {funderIsSigner ? (
-          <> and provided the tokens</>
-        ) : (
-          <>
-            , and the tokens came from <LinkedAddress address={ctx.funder!} chainId={chainId} />
-          </>
-        )}
-        . {isBaseSupply ? "Anyone may repay or add to a Comet account" : "Anyone may add collateral to a Comet account"}{" "}
-        without the owner&rsquo;s consent; taking value out needs the owner&rsquo;s authorisation, which the ? on this
-        row explains.
-      </>,
+      <CompoundTxSenderNote
+        txHash={coords.txHash}
+        account={owner}
+        actor={actor}
+        funder={ctx.funder!}
+        chainId={coords.chainId}
+        isBaseSupply={isBaseSupply}
+      />,
     ),
   ];
 }
@@ -166,7 +156,7 @@ export function compoundEventSlots(
   market: CometMarket = marketOf(ctx.market),
 ): EventProseSlots {
   const slots = compoundEventSlotsBase(ctx, coords, siblings, self, market);
-  const funded = fundedByOtherMechanic(ctx, self.wallet, coords.chainId);
+  const funded = fundedByOtherMechanic(ctx, self.wallet, coords);
   if (funded.length === 0) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), ...funded] };
 }
@@ -314,7 +304,7 @@ function compoundEventSlotsBase(
           clause(
             <>
               At the absorb&rsquo;s prices the seized collateral was worth {seizedFig}, and the account was credited{" "}
-              {creditedFig} for it: each asset&rsquo;s value times its liquidation factor.
+              {creditedFig} for it: each asset at its liquidation factor, a share of its value.
             </>,
           ),
           clause(<>The protocol kept the other {keptFig}, which is what the absorb cost the account.</>),
@@ -471,8 +461,8 @@ function compoundEventSlotsBase(
           credit > COMPOUND_EPS
             ? clause(
                 <>
-                  It cleared {clearedFig()} of debt, and the credit for the seized collateral left {creditFig()} past
-                  the debt, which the account keeps as a lent balance.
+                  It cleared {clearedFig()} of debt, and {creditFig()} was left over after the debt, which stays in the
+                  account as a lent balance.
                 </>,
               )
             : clause(<>It cleared {clearedFig()} of debt.</>),

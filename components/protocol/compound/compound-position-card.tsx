@@ -32,7 +32,7 @@ import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatCompact, formatExactDecimal } from "@/lib/utils/format";
 import {
   compoundUsdProvOnchain,
   peakBaseProv,
@@ -385,6 +385,10 @@ function CompoundIdentity({ v, session }: { v: CompoundPositionView; session: Se
   );
 }
 
+/** What the card's count counts, beside the timeline's event count. */
+const COUNT_TIP =
+  "Every transaction on this position except absorbs, which another account sends. The timeline counts events, and one transaction can write two or more: an absorb writes one for each seized asset and one for the debt, and one transaction can add collateral and borrow.";
+
 export function CompoundPositionCard({
   v,
   receipts = false,
@@ -447,18 +451,18 @@ export function CompoundPositionCard({
       <div className="text-xs mt-0.5 text-rb-500">principal only — accrued interest not included</div>
     );
     const supplyLines: ReactNode[] = [];
-    if (v.peak.lentBase > 0) {
-      supplyLines.push(
+    // A wallet that only ever lent the base posted no collateral — label its peak
+    // "supply", not "collateral" (the Aave V4 spoke-card grammar).
+    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
+    const lentLine =
+      v.peak.lentBase > 0 ? (
         <StatValue key="lent-base">
           <Prov info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}>
             <AssetAmount value={v.peak.lentBase} symbol={v.base.symbol} />
           </Prov>
-        </StatValue>,
-      );
-    }
-    // A wallet that only ever lent the base posted no collateral — label its peak
-    // "supply", not "collateral" (the Aave V4 spoke-card grammar).
-    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
+        </StatValue>
+      ) : null;
+    if (supplyOnly && lentLine) supplyLines.push(lentLine);
     for (const c of v.peak.collateral) {
       supplyLines.push(
         <StatValue key={c.address}>
@@ -470,6 +474,15 @@ export function CompoundPositionCard({
             )}
           </Prov>
         </StatValue>,
+      );
+    }
+    // The lent base is not collateral: under its own caption.
+    if (!supplyOnly && lentLine) {
+      supplyLines.push(
+        <div key="lent-caption" className="mt-1 text-xs text-rb-500">
+          Highest lent {v.base.symbol} (earns interest)
+        </div>,
+        lentLine,
       );
     }
     return (
@@ -486,6 +499,7 @@ export function CompoundPositionCard({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt ?? undefined}
               eventCount={v.txCount}
+              countTip={COUNT_TIP}
               liquidationCount={v.liquidationCount}
               liquidated={v.everLiquidated}
             />
@@ -513,9 +527,12 @@ export function CompoundPositionCard({
   }
   // Footnote: chain value already includes interest; without it, Ethereum
   // shows the balance at the last event and Base the replayed principal.
-  const lentNote = eff.isChain ? "incl. interest" : "earns supply rate";
+  // A live balance ticks with interest between loads: the block it was read
+  // at is stated once, on the base's footnote.
+  const liveAt = eff.isChain && v.current?.block ? ` · live at block ${v.current.block.toLocaleString("en-US")}` : "";
+  const lentNote = eff.isChain ? `incl. interest${liveAt}` : "earns supply rate";
   const borrowNote = eff.isChain
-    ? "incl. interest"
+    ? `incl. interest${liveAt}`
     : vocab.baseAtLastEvent
       ? "at the last event"
       : "principal (ex-interest)";
@@ -542,9 +559,8 @@ export function CompoundPositionCard({
     asset: v.base.address,
     blockNumber: v.atBlock,
   };
-  const baseExact = formatUnitsExact(eff.isChain ? v.current!.amountRaw : v.base.amountRaw, v.base.decimals).replace(
-    /^-/,
-    "",
+  const baseExact = formatExactDecimal(
+    formatUnitsExact(eff.isChain ? v.current!.amountRaw : v.base.amountRaw, v.base.decimals).replace(/^-/, ""),
   );
   // Dust lines (under a cent) leave the icon stack and its "+N"; the lines
   // put them behind the "N dust reserves hidden" control.
@@ -579,6 +595,7 @@ export function CompoundPositionCard({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            countTip={COUNT_TIP}
             liquidationCount={v.liquidationCount}
             liquidated={v.everLiquidated}
           />

@@ -6,6 +6,7 @@
 // spec; traces via <Prov>. No health factor, no USD — those are layers, absent.
 
 import type { AssetFlow, CompoundContext } from "@/lib/shared/types/event-shape";
+import { isCompoundBulker } from "@/lib/compound/bulkers";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import {
@@ -77,7 +78,20 @@ export function CompoundEventHeader({
         })
       : movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
     if (prov)
-      deltas.push({ value: d, symbol: ctx.assetSymbol, address: soleFlowAddress(flows, ctx.assetSymbol), prov });
+      deltas.push({
+        value: d,
+        symbol: ctx.assetSymbol,
+        address: soleFlowAddress(flows, ctx.assetSymbol),
+        prov,
+        // The spine's flank direction (compound-event-card DIRECTION): a
+        // supply leaves the wallet, a withdraw arrives in it.
+        phoneArrow:
+          ctx.eventType === "supply" || ctx.eventType === "supply_collateral"
+            ? "out"
+            : ctx.eventType === "withdraw" || ctx.eventType === "withdraw_collateral"
+              ? "in"
+              : undefined,
+      });
   }
 
   // Position transfers carry a true counterparty (the other account) — the
@@ -105,6 +119,9 @@ export function CompoundEventHeader({
         // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
         // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
         custody: transferOut || transferIn,
+        // The verb carries the direction at every width (the SparkLend rule,
+        // TO-DO 184); an absorb keeps its signs.
+        unsignedDeltas: !critical,
         deltas,
         party,
         externalActor:
@@ -115,6 +132,11 @@ export function CompoundEventHeader({
                   { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, funder: ctx.funder },
                   coords,
                 ),
+                ...(isCompoundBulker(ctx.funder, coords.chainId)
+                  ? {
+                      tip: "This account sent the transaction, and the tokens came through Compound's Bulker. Open the row to see whether the wallet acted.",
+                    }
+                  : {}),
               }
             : undefined,
       }}

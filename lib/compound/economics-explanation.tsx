@@ -9,6 +9,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 import { formatCompact } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 
 const COMPOUND_DOC_URLS = {
   OVERVIEW: "https://docs.compound.finance/",
@@ -94,7 +95,12 @@ function todayUsd(lines: TowerLine[], priceOf: (l: TowerLine) => number | null):
 
 export function compoundEconomicsExplanation(
   data: ChainTruthTowerData,
-  opts?: CompoundEconomicsOpts & { todayPrice?: (address: string) => number | null },
+  opts?: CompoundEconomicsOpts & {
+    todayPrice?: (address: string) => number | null;
+    /** The interest inside today's debt (compoundInterestInDebt): the debt
+     *  less what was borrowed and repaid since the balance last stood at zero. */
+    interestInDebt?: { amount: number; since: number } | null;
+  },
 ): ReactNode {
   const name = protocolName(opts);
   const valued = data.valued;
@@ -121,7 +127,23 @@ export function compoundEconomicsExplanation(
       ? describeLines([data.collateral.interest], valued)
       : null;
   const currentCollText = describeLines(data.collateral.current, valued);
-  const currentDebtText = describeLines(data.debt.current, valued);
+  // Today's debt is the principal and the interest together where the tower
+  // splits them.
+  const currentDebtText = describeLines(
+    [...data.debt.current, ...(data.debt.interest ? [data.debt.interest] : [])],
+    valued,
+  );
+  const basePrice =
+    data.debt.current[0] && data.debt.current[0].usd != null && data.debt.current[0].amount > 0
+      ? data.debt.current[0].usd / data.debt.current[0].amount
+      : null;
+  const inDebt = opts?.interestInDebt;
+  const inDebtText =
+    inDebt && baseSym
+      ? valued && basePrice != null
+        ? formatCompactUsd(inDebt.amount * basePrice)
+        : `${formatCompact(inDebt.amount)} ${baseSym}`
+      : null;
   const seized = data.collateral.liquidated;
   const seizedText = describeLines(seized, valued);
   const clearedText = describeLines(data.debt.liquidated, valued);
@@ -158,14 +180,18 @@ export function compoundEconomicsExplanation(
 
   if (borrowedText) {
     bullets.push(
-      `Borrowed ${borrowedText} against it${chargedText ? `, was charged ${chargedText} of interest` : ""}${repaidText ? `, and repaid ${repaidText}` : ""}.`,
+      `Borrowed ${borrowedText} against it${chargedText ? `${repaidText ? "," : " and"} was charged ${chargedText} of interest over the position's life` : ""}${repaidText ? `, and repaid ${repaidText}` : ""}.`,
     );
   } else if (repaidText) {
     bullets.push(`Repaid ${repaidText} of debt over its recorded history.`);
   }
 
-  if (interestText) {
-    bullets.push(`About ${interestText} of the current debt is interest charged over the position's life.`);
+  if (inDebtText && inDebt) {
+    bullets.push(
+      `Of today's debt, ${inDebtText} is interest charged since ${formatDate(inDebt.since)}, when the debt last started from zero.`,
+    );
+  } else if (interestText) {
+    bullets.push(`About ${interestText} of the current debt is interest.`);
   }
 
   if (earnedText) {
@@ -175,7 +201,7 @@ export function compoundEconomicsExplanation(
   if (seizedText || clearedText) {
     const priceNote = seizedToday != null ? ` (${formatCompactUsd(seizedToday)} at today's prices)` : "";
     bullets.push(
-      `Liquidation seized ${seizedText ?? "no collateral"}${atAbsorb ? " at the absorb's prices" : ""}${priceNote} and cleared ${clearedText ?? "no"} of debt${creditText ? `; the value credited past the debt, ${creditText}, was left to the account as a lent balance` : ""}.`,
+      `Liquidation seized ${seizedText ?? "no collateral"}${atAbsorb ? " at the absorb's prices" : ""}${priceNote} and cleared ${clearedText ?? "no"} of debt${creditText ? `; ${creditText} was left over after the debt and stayed in the account as a lent balance` : ""}.`,
     );
   }
 
@@ -190,7 +216,7 @@ export function compoundEconomicsExplanation(
   }
 
   bullets.push(
-    `${name} lends and borrows one base asset per market; every other asset held here is collateral, which earns nothing and cannot be borrowed.`,
+    `${name} lends and borrows one base asset per market${baseSym ? ` (${baseSym} here)` : ""}. A lent balance of it earns interest; the other assets are collateral, which earns nothing and cannot be borrowed.`,
   );
 
   if (valued) {

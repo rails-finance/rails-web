@@ -78,3 +78,51 @@ export function compoundAmount(n: number): string {
   }
   return formatNumber(n);
 }
+
+/** Where an event sits in its block: the log index Comet ids carry
+ *  ("<tx>-<log>-<kind>"). */
+function logIndexOf(id: string): number {
+  return Number(/-(\d+)-[a-z_]+$/.exec(id)?.[1] ?? 0);
+}
+
+/** Each row's previous row in the same market, keyed by event id: what a
+ *  row's interest since the previous one is measured over. */
+export function previousEventById<E extends { id: string; blockNumber: number; context: { data: { market: string } } }>(
+  events: readonly E[],
+): Map<string, E> {
+  const sorted = [...events].sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a.id) - logIndexOf(b.id));
+  const lastByMarket = new Map<string, E>();
+  const out = new Map<string, E>();
+  for (const e of sorted) {
+    const last = lastByMarket.get(e.context.data.market);
+    if (last) out.set(e.id, last);
+    lastByMarket.set(e.context.data.market, e);
+  }
+  return out;
+}
+
+/** Each transaction's previous row in the same market: the latest event of
+ *  an earlier transaction, keyed by tx hash. What an absorb row reads the
+ *  prices and rate "at the previous event" from. */
+export function previousEventByTx<
+  E extends { id: string; txHash: string; blockNumber: number; context: { data: { market: string } } },
+>(events: readonly E[]): Map<string, E> {
+  const sorted = [...events].sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a.id) - logIndexOf(b.id));
+  const lastByMarket = new Map<string, E>();
+  const out = new Map<string, E>();
+  for (const e of sorted) {
+    const market = e.context.data.market;
+    const last = lastByMarket.get(market);
+    if (!out.has(e.txHash) && last && last.txHash !== e.txHash) out.set(e.txHash, last);
+    lastByMarket.set(market, e);
+  }
+  return out;
+}
+
+/** The yearly rate a balance's growth between two rows implies: interest
+ *  over the balance before it, scaled from the seconds between them. Null for
+ *  a gap under an hour or a zero balance. */
+export function impliedYearlyRate(interest: number, balanceBefore: number, seconds: number): number | null {
+  if (!(seconds >= 3600) || !(Math.abs(balanceBefore) > 0) || !Number.isFinite(interest)) return null;
+  return (Math.abs(interest) / Math.abs(balanceBefore)) * ((365 * 24 * 3600) / seconds);
+}

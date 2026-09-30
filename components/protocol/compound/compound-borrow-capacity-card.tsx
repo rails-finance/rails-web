@@ -51,7 +51,7 @@ export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketCha
         {share.ofThe}{" "}
         <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords)}>liquidation line</Prov>
       </RiskFigure>
-      <RiskFigure>
+      <RiskFigure label="Can borrow">
         <Prov
           info={capacityProv(
             "Available to borrow",
@@ -61,14 +61,13 @@ export function CompoundBorrowCapacityView({ chain }: { chain: CompoundMarketCha
         >
           <AmountText value={headroomBase} /> {chain.baseSymbol}
         </Prov>{" "}
-        more to borrow
+        more
       </RiskFigure>
-      <RiskFigure>
-        liquidation at{" "}
+      <RiskFigure label="Absorbed at">
         <Prov info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}>
           <AmountText value={liqAtBase} /> {chain.baseSymbol}
         </Prov>{" "}
-        debt
+        of debt
       </RiskFigure>
     </>
   );

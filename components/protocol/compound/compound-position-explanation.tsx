@@ -88,18 +88,20 @@ export function CompoundClosedPositionExplanation({
 
   // The card's own peak lines, joined: supply side (lent base and/or collateral
   // assets), then the borrowed base.
-  const supplyPeaks = [
-    ...(v.peak.lentBase > 0 ? [{ amount: v.peak.lentBase, symbol: v.base.symbol }] : []),
-    ...v.peak.collateral.map((c) => ({ amount: c.amount, symbol: c.symbol })),
-  ];
+  // Collateral and the lent base are named apart: the lent base earns
+  // interest and backs nothing.
+  const supplyPeaks = v.peak.collateral.map((c) => ({ amount: c.amount, symbol: c.symbol }));
+  const lentPeak = v.peak.lentBase > 0 ? [{ amount: v.peak.lentBase, symbol: v.base.symbol }] : [];
   const list: React.ReactNode[] = [];
-  const peakFigures = supplyPeaks.length + (v.peak.borrowedBase > 0 ? 1 : 0);
+  const peakFigures = supplyPeaks.length + lentPeak.length + (v.peak.borrowedBase > 0 ? 1 : 0);
   if (peakFigures > 0) {
     list.push(
       <>
         At its height the position
-        {supplyPeaks.length > 0 && <> held up to {peakText(supplyPeaks)}</>}
-        {supplyPeaks.length > 0 && v.peak.borrowedBase > 0 && <> and</>}
+        {supplyPeaks.length > 0 && <> held up to {peakText(supplyPeaks)} of collateral</>}
+        {supplyPeaks.length > 0 && lentPeak.length > 0 && <>,</>}
+        {lentPeak.length > 0 && <> lent up to {peakText(lentPeak)}</>}
+        {(supplyPeaks.length > 0 || lentPeak.length > 0) && v.peak.borrowedBase > 0 && <> and</>}
         {v.peak.borrowedBase > 0 && (
           <>
             {" "}
@@ -126,8 +128,8 @@ export function CompoundClosedPositionExplanation({
     list.push(
       <>
         The protocol absorbed the position <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}, taking
-        its collateral, clearing the whole debt and crediting the account each asset&rsquo;s value times its liquidation
-        factor.
+        its collateral, clearing the whole debt and crediting each asset at its liquidation factor, a share of its
+        value; the protocol keeps the rest.
         {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
       </>,
     );
@@ -222,17 +224,27 @@ export function CompoundPositionExplanation({
     // The absorb mechanic rides figure-bearing bullets (never a figure-free
     // rule sentence of its own): on the drop bullet for a healthy account, or
     // on the verdict itself once the account is absorbable.
-    const absorbTail = (
-      <>
-        the protocol takes the collateral and clears the whole debt, crediting back its value minus each asset&rsquo;s
-        liquidation penalty
-      </>
-    );
+    const lf = chain.collateral.map((c) => c.liquidationFactor);
+    const oneLf = lf.length > 0 && lf.every((f) => f === lf[0]) ? lf[0] : null;
+    const pctOf = (f: number) => `${Math.round(f * 1000) / 10}%`;
+    const absorbTail =
+      oneLf != null ? (
+        <>
+          the protocol takes the collateral and clears the whole debt, crediting it at {pctOf(oneLf)} of value
+          (liquidation factor); the protocol keeps {pctOf(1 - oneLf)}
+        </>
+      ) : (
+        <>
+          the protocol takes the collateral and clears the whole debt, crediting each asset at its share of value
+          (liquidation factor) and keeping the rest
+        </>
+      );
     bullets.push(
       <span key="verdict">
-        Comet&rsquo;s own account check reports it <H>{chain.isLiquidatable ? "liquidatable" : "not liquidatable"}</H>
+        The market&rsquo;s check (isLiquidatable) says it{" "}
+        <H>{chain.isLiquidatable ? "can be absorbed now" : "cannot be absorbed now"}</H>
         {!chain.isLiquidatable && !chain.isBorrowCollateralized
-          ? ", though under-collateralised for new borrowing"
+          ? ", though it is over its borrow limit, so it cannot borrow more"
           : ""}
         {chain.isLiquidatable ? <> — anyone may now trigger an absorb, where {absorbTail}</> : null}.
       </span>,

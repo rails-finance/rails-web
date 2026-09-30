@@ -88,6 +88,8 @@ export function EventCardFooter({ txHash, extra, learnMore, shareHref }: EventCa
   return (
     <div className="pt-1 px-4 pb-2 flex flex-wrap justify-between items-center gap-2">
       <div className="flex items-center gap-2">
+        {/* The hash alone reads as an unlabelled code. */}
+        <span className="text-xs text-rb-500">Transaction</span>
         <TxHashBadge txHash={txHash} />
         <a
           href={explorerUrl(chainId, "tx-logs", txHash)}

@@ -31,6 +31,7 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { Icon } from "@/components/icons/icon";
 import { EventTime } from "@/components/shared/event-time";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
@@ -105,6 +106,10 @@ export interface ChainTruthDelta {
   address?: string;
   prov: Provenance;
   suffix?: string;
+  /** Below sm the spine (and its arrows) is hidden: where the deltas are
+   *  unsigned, this draws the spine's arrow beside the amount there — "out"
+   *  of the wallet into the protocol (→), "in" to the wallet (←). */
+  phoneArrow?: "in" | "out";
   /** Optional leading label (e.g. "Cleared" / "Reduced" on a redemption). When
    *  set, the value renders as a bare magnitude — the label carries the
    *  direction, so no +/− sign is shown. Mirrors the Liquity V2 redemption /
@@ -518,6 +523,12 @@ export function ChainTruthRow({
         <span
           className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
         >
+          {/* The spine's warning triangle is hidden below sm: the row keeps it. */}
+          {spec.critical && (
+            <span className="mr-1 inline-block align-[-1px] sm:hidden" aria-hidden="true">
+              <Icon name="triangle" size={12} />
+            </span>
+          )}
           {spec.label}
         </span>
       ) : // A combined adjust omits the row label — the per-axis delta labels carry
@@ -600,6 +611,14 @@ export function ChainTruthRow({
               </span>
               <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
               {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
+              {d.phoneArrow && spec.unsignedDeltas && (
+                <span
+                  className="text-rb-500 sm:hidden"
+                  title={d.phoneArrow === "out" ? "Into the protocol" : "Out to the wallet"}
+                >
+                  {d.phoneArrow === "out" ? "→" : "←"}
+                </span>
+              )}
             </span>
           </Prov>
         );

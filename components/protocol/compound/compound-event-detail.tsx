@@ -9,8 +9,11 @@
 
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
-import { CompoundAbsorbBreakdown } from "@/components/protocol/compound/compound-absorb-breakdown";
-import { compoundAmount, compoundBaseCaption } from "@/lib/compound/row-facts";
+import {
+  CompoundAbsorbBreakdown,
+  type CompoundPreviousRow,
+} from "@/components/protocol/compound/compound-absorb-breakdown";
+import { compoundAmount, compoundBaseCaption, impliedYearlyRate } from "@/lib/compound/row-facts";
 import { decimalSub } from "@/lib/utils/format";
 import {
   baseAfterProv,
@@ -34,11 +37,25 @@ export interface CompoundEventDetailProps {
   ctx: CompoundContext;
   txHash?: string;
   blockNumber?: number;
+  /** The row's time, unix seconds. */
+  timestamp?: number;
+  /** The account's previous row in this market, where the page has it: the
+   *  interest line's yearly rate reads from it. */
+  previous?: CompoundPreviousRow;
+  /** The last row of the previous transaction: the absorb's "what moved". */
+  previousTx?: CompoundPreviousRow;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : compoundAmount(Number(human)));
 
-export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventDetailProps) {
+export function CompoundEventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  timestamp,
+  previous,
+  previousTx,
+}: CompoundEventDetailProps) {
   const m = useCometMarket(ctx.market);
   const coords: CompoundCoords = {
     comet: m.comet,
@@ -55,7 +72,22 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
     if (ctx.baseInterest == null) return undefined;
     const signed = ctx.baseInterest;
     const mag = signed.startsWith("-") ? signed.slice(1) : signed;
-    return { value: mag, prov: baseInterestProv(sym, signed.startsWith("-") ? "borrow" : "lend", coords) };
+    // The yearly rate that growth works out to, over the balance the
+    // previous row left and the time between the two.
+    const rate =
+      previous?.baseAfter != null && timestamp != null
+        ? impliedYearlyRate(Number(mag), Number(previous.baseAfter), timestamp - previous.timestamp)
+        : null;
+    const days = previous && timestamp != null ? (timestamp - previous.timestamp) / 86400 : null;
+    return {
+      value: mag,
+      prov: baseInterestProv(sym, signed.startsWith("-") ? "borrow" : "lend", coords),
+      ...(rate != null && days != null && Number(mag) > 0
+        ? {
+            after: `, over ${days < 10 ? days.toFixed(1) : Math.round(days).toLocaleString("en-US")} days: about ${(rate * 100).toFixed(1)}% a year`,
+          }
+        : {}),
+    };
   };
 
   if (ctx.isBase) {
@@ -129,7 +161,15 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
   return (
     <>
       <ChainTruthDetail stats={stats} />
-      {ctx.eventType === "absorb_debt" && <CompoundAbsorbBreakdown ctx={ctx} coords={coords} marketKey={m.key} />}
+      {ctx.eventType === "absorb_debt" && (
+        <CompoundAbsorbBreakdown
+          ctx={ctx}
+          coords={coords}
+          marketKey={m.key}
+          timestamp={timestamp}
+          previous={previousTx}
+        />
+      )}
     </>
   );
 }

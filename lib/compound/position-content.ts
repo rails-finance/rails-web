@@ -93,7 +93,7 @@ export function compoundPositionContent(opts: {
     opts.side === "borrow"
       ? {
           bold: "Absorb liquidation",
-          text: "past the liquidate collateral factor the protocol itself absorbs the account — seizing the collateral and clearing the whole base debt in one step, crediting back the difference minus a penalty.",
+          text: "past the liquidate collateral factor the protocol absorbs the account — seizing the collateral and clearing the whole base debt in one step, crediting each asset at its liquidation factor, a share of its value; the protocol keeps the rest.",
         }
       : {
           bold: "No borrowing, no liquidation risk",

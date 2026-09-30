@@ -13,7 +13,10 @@
 // against the debt. The dollar figures are the absorb events' own usdValue
 // (the prices of the absorb block); the factors are read from the Comet one
 // block before (app/api/chain/compound/absorb-factors), since Comet emits
-// neither and governance can move them.
+// neither and governance can move them. With the account's previous event in
+// hand, the same read gives the prices then and the borrow rate at both ends,
+// so the row says what moved the account over the line and what its debt's
+// interest cost a year.
 
 import { useEffect, useState } from "react";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
@@ -33,25 +36,53 @@ import {
   absorbSeizedUsdProv,
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
-import { compoundAbsorbSplit, compoundAmount } from "@/lib/compound/row-facts";
+import { compoundAbsorbSplit, compoundAmount, impliedYearlyRate } from "@/lib/compound/row-facts";
 import { formatExactDecimal, formatUsdValue } from "@/lib/utils/format";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { formatDate } from "@/lib/date";
 
 interface Factors {
   readBlock: number;
   factors: Record<string, { borrow: number; liquidate: number; liquidation: number }>;
+  prevBlock?: number;
+  /** Oracle prices at the previous event, by asset address; the base as "base". */
+  prevPrices?: Record<string, number>;
+  /** Borrow rate (yearly fraction) at the previous event and the block before the absorb. */
+  borrowRate?: { prev: number | null; read: number | null };
 }
 
-const pct = (f: number) => `${(f * 100).toFixed(f * 100 === Math.round(f * 100) ? 0 : 1)}%`;
+/** The account's previous row, where the page has it. */
+export interface CompoundPreviousRow {
+  blockNumber: number;
+  timestamp: number;
+  /** The signed base balance after it. */
+  baseAfter?: string;
+}
+
+const pct = (f: number) => `${Math.round(f * 1000) / 10}%`;
+const ratePct = (f: number) => `${(f * 100).toFixed(2)}%`;
+
+/** A price to the digits the sums use: five decimals under $10, so a
+ *  stablecoin at $0.99992 does not print as $1.00. */
+export function absorbPrice(n: number): string {
+  if (n >= 10) return formatUsdValue(n);
+  const [whole, frac = ""] = n.toFixed(5).replace(/0+$/, "").split(".");
+  return `$${whole}.${frac.padEnd(2, "0")}`;
+}
 
 export function CompoundAbsorbBreakdown({
   ctx,
   coords,
   marketKey,
+  timestamp,
+  previous,
 }: {
   ctx: CompoundContext;
   coords: CompoundCoords;
   marketKey: string;
+  /** The absorb's time, unix seconds. */
+  timestamp?: number;
+  previous?: CompoundPreviousRow;
 }) {
   const split = compoundAbsorbSplit(ctx);
   const legs = (ctx.absorbedCollateral ?? []).filter((l) => Number.isFinite(Number(l.usdValue)));
@@ -64,8 +95,9 @@ export function CompoundAbsorbBreakdown({
     if (!coords.blockNumber || !addrKey) return;
     const ac = new AbortController();
     const deployment = coords.chainId === BASE_CHAIN_ID ? "base" : "ethereum";
+    const prev = previous?.blockNumber ? `&prev=${previous.blockNumber}` : "";
     fetch(
-      `/api/chain/compound/absorb-factors?deployment=${deployment}&market=${marketKey}&block=${coords.blockNumber}&assets=${addrKey}`,
+      `/api/chain/compound/absorb-factors?deployment=${deployment}&market=${marketKey}&block=${coords.blockNumber}&assets=${addrKey}${prev}`,
       { signal: ac.signal },
     )
       .then((r) => (r.ok ? r.json() : null))
@@ -74,7 +106,7 @@ export function CompoundAbsorbBreakdown({
       })
       .catch(() => {});
     return () => ac.abort();
-  }, [coords.blockNumber, coords.chainId, marketKey, addrKey]);
+  }, [coords.blockNumber, coords.chainId, marketKey, addrKey, previous?.blockNumber]);
 
   if (!split || legs.length === 0 || !Number.isFinite(creditedUsd) || creditedUsd <= 0) return null;
   const sym = ctx.assetSymbol;
@@ -139,6 +171,41 @@ export function CompoundAbsorbBreakdown({
       note: "price at the absorb",
     });
 
+  // One liquidation factor for every seized asset (the usual case): the credit
+  // and the protocol's share read as N% and 100 − N%.
+  const oneFactor =
+    allFactors &&
+    priced.length > 0 &&
+    priced.every((l) => factorOf(l.address)!.liquidation === factorOf(priced[0].address)!.liquidation)
+      ? factorOf(priced[0].address)!.liquidation
+      : null;
+
+  // What moved between the previous event and the absorb: each seized asset's
+  // price, the base's where it is not a dollar token, and the debt's interest.
+  const prevPrices = factors?.prevPrices;
+  const moves: string[] = [];
+  if (prevPrices && previous) {
+    for (const l of priced) {
+      const then = l.address ? prevPrices[l.address.toLowerCase()] : undefined;
+      const now = Number(l.usdValue) / Number(l.amount);
+      if (then != null && Number.isFinite(now)) moves.push(`${l.symbol} ${absorbPrice(then)} → ${absorbPrice(now)}`);
+    }
+    const baseThen = prevPrices.base;
+    if (baseThen != null && basePrice > 0 && Math.abs(basePrice / baseThen - 1) > 0.01)
+      moves.push(`${sym}, the debt's asset, ${absorbPrice(baseThen)} → ${absorbPrice(basePrice)}`);
+  }
+  const prevAfter = previous?.baseAfter != null ? Number(previous.baseAfter) : null;
+  const debtBefore = Number(split.before);
+  const interestSince =
+    prevAfter != null && prevAfter < 0 && debtBefore < 0 ? Math.abs(debtBefore) - Math.abs(prevAfter) : null;
+  const seconds = previous && timestamp ? timestamp - previous.timestamp : null;
+  const days = seconds != null ? seconds / 86400 : null;
+  const avgRate =
+    interestSince != null && interestSince > 0 && prevAfter != null && seconds != null
+      ? impliedYearlyRate(interestSince, prevAfter, seconds)
+      : null;
+  const rates = factors?.borrowRate;
+
   return (
     <div className="px-5 pb-2 space-y-2.5" data-absorb-breakdown="">
       <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">
@@ -154,7 +221,7 @@ export function CompoundAbsorbBreakdown({
             {baseAmt(split.cleared)}
           </Prov>
         </StatCard>
-        <StatCard label="Credited past the debt">
+        <StatCard label="Left over after the absorb (lent)">
           <Prov
             info={absorbCreditProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
             value={split.credit}
@@ -162,7 +229,7 @@ export function CompoundAbsorbBreakdown({
           >
             {baseAmt(split.credit)}
           </Prov>
-          <div className="mt-1 text-xs text-rb-500">left to the account as a lent balance</div>
+          <div className="mt-1 text-xs text-rb-500">stays in the account as a lent balance</div>
         </StatCard>
         <StatCard label="Total credited">
           <Prov
@@ -171,6 +238,7 @@ export function CompoundAbsorbBreakdown({
           >
             {baseAmt(split.paidOut)} <span className="text-sm text-rb-500">≈ {formatUsdValue(creditedUsd)}</span>
           </Prov>
+          <div className="mt-1 text-xs text-rb-500">debt cleared + left over</div>
         </StatCard>
       </div>
       <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">
@@ -201,7 +269,12 @@ export function CompoundAbsorbBreakdown({
           </Prov>
           {creditCheck != null && (
             <div className="mt-1 text-xs text-rb-500">
-              each asset&rsquo;s value × its liquidation factor: {joinTerms("liquidation")}
+              {oneFactor != null ? (
+                <>credited at {pct(oneFactor)} of value (liquidation factor): </>
+              ) : (
+                <>each asset credited at its share of value (liquidation factor): </>
+              )}
+              {joinTerms("liquidation")}
             </div>
           )}
         </StatCard>
@@ -217,7 +290,9 @@ export function CompoundAbsorbBreakdown({
           </Prov>
           <div className="mt-1 text-xs text-rb-500">
             {keptUsd >= 0
-              ? `${seizedUsd > 0 ? `${((keptUsd / seizedUsd) * 100).toFixed(2)}% of the seized value; ` : ""}what the absorb cost the account`
+              ? oneFactor != null
+                ? `the protocol keeps 100% − ${pct(oneFactor)} = ${pct(1 - oneFactor)} of the seized value; what the absorb cost the account`
+                : `${seizedUsd > 0 ? `${((keptUsd / seizedUsd) * 100).toFixed(2)}% of the seized value; ` : ""}what the absorb cost the account`
               : "the debt was worth more than the credited collateral, and the reserves took the difference"}
           </div>
         </StatCard>
@@ -240,14 +315,42 @@ export function CompoundAbsorbBreakdown({
             value={formatUsdValue(debtUsd)}
           >
             <strong className="font-semibold text-foreground tabular-nums">{formatUsdValue(debtUsd)}</strong>
-          </Prov>
-          ,{" "}
+          </Prov>{" "}
+          ({compoundAmount(Number(split.cleared))} {sym} at {absorbPrice(basePrice)}),{" "}
           {debtUsd > line ? `${formatUsdValue(debtUsd - line)} over it` : `${formatUsdValue(line - debtUsd)} under it`}.
-          Values are at the absorb&rsquo;s prices; the factors were read from the market at block{" "}
-          {factors.readBlock.toLocaleString("en-US")}, the block before.
+          Values are at the absorb&rsquo;s prices. The factors were read at block{" "}
+          {factors.readBlock.toLocaleString("en-US")}, the block before, so they are the ones in force when the absorb
+          ran.
         </p>
       )}
-      <AtBlockPriceFootnote pills={pills} />
+      {moves.length > 0 && previous && (
+        <p className="text-xs leading-relaxed text-rb-500" data-absorb-why="">
+          What moved it over: from the previous event ({formatDate(previous.timestamp)}) to the absorb,{" "}
+          {moves.join("; ")}
+          {interestSince != null && interestSince > 0 ? (
+            <>
+              , and the debt grew by {compoundAmount(interestSince)} {sym} of interest
+            </>
+          ) : null}
+          .
+        </p>
+      )}
+      {avgRate != null && interestSince != null && days != null && (
+        <p className="text-xs leading-relaxed text-rb-500" data-absorb-rate="">
+          Interest since the previous event: {compoundAmount(interestSince)} {sym} on{" "}
+          {compoundAmount(Math.abs(prevAfter!))} {sym} over {days.toFixed(1)} days, an average of about{" "}
+          {(avgRate * 100).toFixed(1)}% a year.
+          {rates && rates.prev != null && rates.read != null ? (
+            <>
+              {" "}
+              The borrow rate moves with how much of the market is lent out: it was {ratePct(rates.prev)} a year at the
+              previous event and {ratePct(rates.read)} at the absorb
+              {avgRate > Math.max(rates.prev, rates.read) * 1.5 ? ", so it ran well above both in between" : ""}.
+            </>
+          ) : null}
+        </p>
+      )}
+      <AtBlockPriceFootnote pills={pills} format={absorbPrice} />
     </div>
   );
 }

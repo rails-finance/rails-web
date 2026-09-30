@@ -2642,7 +2642,7 @@ export function compoundCollateralContent(eventType: "supply_collateral" | "with
     details: [
       {
         bold: "Three factors per asset",
-        text: "each collateral asset carries a borrow factor (the share of its value that can be borrowed against), a higher liquidate factor (the share that counts before the account can be liquidated; the gap between the two is the safety margin) and a liquidation factor (the share of its value the account is credited if it is liquidated). Governance sets all three.",
+        text: "each collateral asset carries a borrow factor (the share of its value that can be borrowed against), a higher liquidate factor (the share that counts before the account can be liquidated; the gap between the two is the safety margin) and a liquidation factor (the share of its value the account is credited at if it is absorbed; the protocol keeps the rest). Governance sets all three.",
       },
       {
         bold: "Non-earning",
@@ -2670,9 +2670,9 @@ export function compoundLiquidationContent(): LearnMoreContent {
     intro:
       "Compound V3 calls its liquidation an absorb. An account can be absorbed once its debt is larger than its liquidation line: each collateral asset's value times its liquidate factor, added up. Anyone may then trigger the absorb, and the protocol takes over the account; nobody repays part of the debt.",
     extraParagraphs: [
-      "The absorb takes all of the account's collateral and clears all of its debt in one step. The account is credited each seized asset's value times its liquidation factor (0.90 means 90%), paid in the base asset. The credit first cancels the debt; anything past it is left to the account as a lent balance, which earns interest and can be withdrawn.",
+      "The absorb takes all of the account's collateral and clears all of its debt in one step. Each seized asset is credited at its liquidation factor, a share of its value, paid in the base asset. In April 2025, for example, WETH in Ethereum's USDC market was credited at 95% of value, and the protocol kept 100% − 95% = 5%. The credit first cancels the debt; what is left over after the debt stays in the account as a lent balance, which earns interest and can be withdrawn.",
       "The part of the collateral's value the account is not credited stays with the protocol. The protocol later sells the seized collateral to anyone who pays in the base asset, at a discount to the oracle price, and the proceeds go to its reserves. None of that sale appears on the account's timeline.",
-      "The liquidation row shows the line at the absorb block: the collateral's value, each asset's factor, and the debt that crossed it.",
+      "The liquidation row shows the line at the absorb block: the collateral's value, each asset's factor, and the debt that crossed it. The factors are read at the block before the absorb, the ones in force when it ran; governance can change them later.",
     ],
     links: [
       { label: "Liquidation", url: COMPOUND_DOC_URLS.LIQUIDATION },
@@ -2728,7 +2728,7 @@ export function compoundEventFallbackContent(): LearnMoreContent {
       },
       {
         bold: "Absorb liquidation",
-        text: "the protocol takes over an account past its liquidation line: it seizes the collateral, clears the whole debt, and credits the account the collateral's value times each asset's liquidation factor.",
+        text: "the protocol takes over an account past its liquidation line: it seizes the collateral, clears the whole debt, and credits each asset at its liquidation factor, a share of its value; the protocol keeps the rest.",
       },
     ],
     links: [

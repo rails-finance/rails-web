@@ -71,6 +71,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import type { CompoundBaseMarketRows } from "@/lib/compound-base/timeline-folders";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
+import { previousEventById, previousEventByTx } from "@/lib/compound/row-facts";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { computeCompoundEconomics } from "@/lib/compound/economics";
 import { compoundEconomicsExplanation, compoundEconomicsContent } from "@/lib/compound/economics-explanation";
@@ -169,6 +170,10 @@ function MarketSection({
   const { market, chain, replay } = section;
   const compoundEvents = useMemo(() => events.filter(isCompoundEvent), [events]);
   const siblingsByTx = useMemo(() => groupEventsByTx(compoundEvents), [compoundEvents]);
+  // Each row's previous row in this market: the interest line's yearly rate
+  // and the absorb's "what moved" read from them.
+  const previousById = useMemo(() => previousEventById(compoundEvents), [compoundEvents]);
+  const previousByTx = useMemo(() => previousEventByTx(compoundEvents), [compoundEvents]);
 
   // This market's share of a grouped answer: its rows, interleaving its
   // folders with its own ungrouped events.
@@ -269,7 +274,7 @@ function MarketSection({
   const holds = holdsSomething(live);
 
   return (
-    <section className="space-y-6">
+    <section id={`market-${market.key}`} className="scroll-mt-20 space-y-6">
       <CompoundPositionCard
         v={view}
         receipts
@@ -366,6 +371,8 @@ function MarketSection({
                 isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                previous={previousById.get(event.id)}
+                previousTx={previousByTx.get(event.txHash)}
               />
             ) : null
           }
@@ -581,6 +588,18 @@ export default function CompoundBaseWalletView({
     ? sectionsWithViews.filter(({ s }) => s.market.key === pinnedMarketKey)
     : sectionsWithViews;
 
+  // A listing row links to its market's card (#market-<key>); the cards
+  // render after the Comet read lands, too late for the browser's own jump.
+  const sectionCount = renderedSectionsWithViews.length;
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (jumped.current || sectionCount === 0) return;
+    const id = window.location.hash.slice(1);
+    if (!id.startsWith("market-")) return;
+    jumped.current = true;
+    document.getElementById(id)?.scrollIntoView({ block: "start" });
+  }, [sectionCount]);
+
   // Silence is only evidence of absence when someone actually listened: a
   // sweep that could not read the chain also comes back with no events, and a
   // Comet read that failed also holds nothing.
@@ -705,12 +724,13 @@ export default function CompoundBaseWalletView({
           ) : (
             <div className="space-y-10">
               <p className="text-[11px] text-rb-500">
-                {sections.length === 1 ? "One market" : `${sections.length} markets`} of{" "}
+                This wallet has a position in{" "}
                 <span className="text-foreground">
-                  {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
-                </span>
-                , every one of them asked. Each market stands on its own: nothing is cross-collateralised between them,
-                so there is no combined health factor here and no total — the markets do not all price in the same unit.
+                  {sections.length} of Base&rsquo;s {data?.marketsScanned ?? COMPOUND_BASE_DEPLOYMENT.markets.length}
+                </span>{" "}
+                Compound markets; the others hold nothing for it. Each market is separate: nothing is
+                cross-collateralised between them, so there is no combined health factor here and no total — the markets
+                do not all price in the same unit.
               </p>
               {renderedSectionsWithViews.map(({ s, view }) => (
                 <MarketSection
