@@ -11,20 +11,23 @@ export const metadata = infoMetadata("polaris");
 const intro = (
   <>
     <p>
-      Polaris is a Liquity-lineage CDP protocol running on the Sepolia testnet. A borrower posts pETH — the
-      protocol&rsquo;s bonding-curve wrapper of ETH — into a CDP in one of two markets and mints that market&rsquo;s
-      stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. The CDP is an NFT, so a position can change
-      hands without being closed. Rates are algorithmic: the market sets a primary rate and adds a utilisation-driven
-      secondary one, and no holder ever chooses a rate.
+      Polaris is a Liquity-lineage CDP protocol running on the Sepolia testnet. A borrower posts pETH into a CDP in one
+      of two markets and mints that market&rsquo;s stablecoin against it: USDp tracks the dollar, GOLDp tracks gold.
+      pETH is the protocol&rsquo;s own collateral token, bought with ETH from its bonding curve at a price that rises as
+      ETH enters the curve. The CDP is an NFT, so a position can change hands without being closed. Rates are
+      algorithmic and no holder chooses one: a primary rate that moves with the PSM&rsquo;s mints and redemptions, plus
+      a secondary rate that rises with the market&rsquo;s debt-to-reserve ratio.
     </p>
     <p>
       Each row of the listing is one CDP: its pETH collateral, its debt in the market&rsquo;s stablecoin, and its
       current holder. Opening one shows every touch the market&rsquo;s own contracts recorded for it — what the holder
-      moved, and every leg the protocol applied at the same moment: interest written into the debt, stability-pool gains
+      moved, and every leg the protocol applied at the same moment: interest written into the debt, stability gains
       credited against it, reward pETH added to the collateral, and the CDP&rsquo;s pro-rata share of the PSM&rsquo;s
-      mints and redemptions. The live figures — the collateral ratio against the minimum in force, the rate, and what is
-      pending since the last touch — come from the contracts at the latest block, and the collateral&rsquo;s dollar
-      value from the protocol&rsquo;s own price feed. The{" "}
+      mints and redemptions. The PSM is the protocol&rsquo;s peg module, where a trader mints USDp or GOLDp directly
+      against pETH or redeems it for pETH; nobody picks a CDP, and every open CDP takes a share. The live figures — the
+      collateral ratio against the minimum in force, the rate, and what is pending since the last touch — come from the
+      contracts at the latest block, and the collateral&rsquo;s dollar value from the protocol&rsquo;s own price feed.
+      The{" "}
       <Link href={POLARIS_MARKETS_PATH} className="text-blue-500 hover:underline">
         markets view
       </Link>{" "}
@@ -34,8 +37,8 @@ const intro = (
     <p>
       Every number on this explorer is a Sepolia testnet number: the tokens are test tokens and the ETH and gold prices
       come from the protocol&rsquo;s own testnet medianisers, so none of it is money. Two things the protocol has are
-      not shown yet — the reserve loans against POLAR, which the index captures but no page renders, and the
-      stability-pool deposits, which are positions of their own kind.
+      not shown yet — the reserve loans, which lend ETH against fpETH (the floor part of pETH) and which the index
+      captures but no page renders, and the stability-pool deposits, which are positions of their own kind.
     </p>
   </>
 );

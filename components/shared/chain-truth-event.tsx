@@ -134,6 +134,10 @@ export interface ChainTruthDelta {
    *  (formatNumber) rather than the exact decimal: for dust, where the exact
    *  decimal is eighteen digits no one reads aloud. */
   readableLabel?: boolean;
+  /** The magnitude as shown, where the family states amounts at its own
+   *  precision (Polaris: every figure in full, to three decimals). Unsigned:
+   *  the sign rule above still applies. Default: the compact header form. */
+  display?: string;
 }
 
 /** "−0.00534 wstETH": a figure's accessible name in the site's number format. */
@@ -524,7 +528,7 @@ export function ChainTruthRow({
         // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
         // keeps the sign from running into the "<" ("− <0.01").
         const bare = Boolean(d.label) || Boolean(spec.custody);
-        const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
+        const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
         const text =
           bare || spec.unsignedDeltas
             ? magnitude

@@ -4574,7 +4574,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
           },
           {
             bold: "The interest figure",
-            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary, utilisation-driven rate is added on top by the protocol and is not on this log.",
+            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary rate, which rises with the market's debt-to-reserve ratio, is added on top by the protocol and is not on this log.",
           },
           {
             bold: "A live note",
@@ -4590,39 +4590,47 @@ export function polarisCdpContent(): LearnMoreContent {
   return {
     title: "How Polaris CDPs Work",
     intro:
-      "Polaris is a Liquity-lineage CDP protocol on the Sepolia testnet. A borrower posts pETH — the protocol's bonding-curve wrapper of ETH — into a CDP in one of two markets and mints that market's stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. The CDP is an NFT, so the position can change hands without being closed.",
+      "Polaris is a Liquity-lineage CDP protocol on the Sepolia testnet. A borrower posts pETH into a CDP in one of two markets and mints that market's stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. pETH is the protocol's own collateral token: ETH paid into its bonding curve mints pETH, and pETH returned to the curve is burned for ETH. The curve's price per pETH rises as ETH enters it, which is why one pETH costs more than one ETH. The CDP is an NFT, so the position can change hands without being closed.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Algorithmic rates",
-        text: "the market sets a primary rate on nearly every touch and adds a utilisation-driven secondary rate. Nobody chooses a rate; the rate in force is a fact of the market at that moment.",
+        bold: "Touch",
+        text: "any transaction on the CDP: an open, a deposit, a borrow, a repayment, a close or a liquidation. Every touch writes the pending legs below into the CDP's stated collateral and debt.",
       },
       {
-        bold: "Interest charged at each touch",
-        text: "interest accrues continuously and is written into the debt whenever the CDP is touched — the touch's own figure states how much.",
+        bold: "Two rates, set by the market",
+        text: "the primary rate (the docs' Peg Stability Rate) rises as traders redeem through the PSM and falls as they mint. The secondary rate (the Protocol Safety Rate) rises with the market's debt-to-reserve ratio. A CDP pays both on its debt; nobody chooses a rate.",
       },
       {
-        bold: "Shared PSM adjustments",
-        text: "when the market's PSM mints or redeems, every CDP takes a pro-rata share of the collateral and debt that moved, credited or debited at its next touch.",
+        bold: "The PSM",
+        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint share raises a CDP's debt and collateral; a redemption share lowers both. The trade's fees go to the CDPs, so the net share can move the two sides by different amounts. It is not a Liquity redemption, and no one chose this CDP.",
       },
       {
-        bold: "Stability-pool rewards",
-        text: "a share of the market's revenue is credited against each CDP's debt, and reward pETH is added to its collateral, both applied at the next touch.",
+        bold: "Stability gain",
+        text: "the CDP's share of the secondary-rate interest the market's CDPs pay, credited against its debt in proportion to the collateral it holds. A CDP with little debt for its collateral receives more than it pays.",
+      },
+      {
+        bold: "Reward pETH",
+        text: "a share of the pETH yield Polaris pays to minters, added to the collateral in proportion to the debt the CDP holds.",
       },
       {
         bold: "Minimum collateral ratio",
-        text: "a CDP must hold collateral worth at least 115% of its debt at the protocol's own price; in defensive mode the floor rises to 150%.",
+        text: "a CDP must hold collateral worth at least 115% of its debt at the protocol's price. When the market's reserve-to-debt ratio falls below 1.10 it enters defensive mode and the minimum rises to 150%; above that it is in normal mode.",
+      },
+      {
+        bold: "The feed",
+        text: "the protocol's price for pETH: the bonding curve's price in ETH times an ETH/USD price. That price comes from the protocol's medianiser, which reads up to three oracles and takes their median. GOLDp divides by a gold price read the same way.",
       },
       {
         bold: "Equity at the feed",
-        text: "an open CDP's collateral valued at the protocol's own price for pETH, minus its debt — a valuation at the block the three figures were read at, not a profit. Turning it into a realised profit or loss needs a price for each of the holder's own deposits, which is a decision about basis rather than a fact the chain states.",
+        text: "an open CDP's collateral at the feed's price, minus its debt: a valuation at the block the figures were read at. A profit or loss would need a price for each of the holder's deposits (a basis), which the chain does not state.",
       },
     ],
     links: [
-      POLARIS_DOC_LINKS.passetMarkets,
+      POLARIS_DOC_LINKS.pegDefence,
       POLARIS_DOC_LINKS.interestRates,
+      POLARIS_DOC_LINKS.bondingCurve,
       POLARIS_DOC_LINKS.defensiveMode,
-      POLARIS_DOC_LINKS.peth,
       POLARIS_APP_LINK,
     ],
   };
@@ -4644,12 +4652,20 @@ export function polarisLiquidationContent(): LearnMoreContent {
         text: "debt and collateral the pool cannot absorb are spread pro rata across every other CDP in the market, arriving at each one's next touch.",
       },
       {
+        bold: "What the pool takes",
+        text: "collateral worth the debt plus the protocol's 5% liquidation penalty, at the feed's price at that block.",
+      },
+      {
         bold: "Gas compensation",
-        text: "the liquidator receives the fixed gas compensation the CDP escrowed at open plus a share of its collateral.",
+        text: "the fixed 0.0375 pETH the CDP set aside at opening, paid to the liquidator. It sits outside the seized collateral.",
+      },
+      {
+        bold: "Collateral compensation",
+        text: "0.5% of the seized collateral, also paid to the liquidator.",
       },
       {
         bold: "Collateral surplus",
-        text: "collateral left over after the debt is covered is set aside for the CDP's owner to claim.",
+        text: "the seized collateral left after the pool's take and the liquidator's share, set aside for the CDP's owner to claim from the protocol's surplus pool. This page does not show claims.",
       },
     ],
     links: [

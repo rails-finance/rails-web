@@ -1712,7 +1712,8 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
           <>
             {" "}
             The interest figures hold this CDP&rsquo;s own debt at that touch fixed and move only the rate; the
-            secondary, utilisation-driven rate is added on top by the protocol and is not on this log.
+            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
+            and is not on this log.
           </>
         )}
       </>
@@ -1741,7 +1742,8 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
           <>
             {" "}
             The interest figures hold this CDP&rsquo;s own debt at the earlier touch fixed and move only the rate; the
-            secondary, utilisation-driven rate is added on top by the protocol and is not on this log.
+            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
+            and is not on this log.
           </>
         )}
       </>
