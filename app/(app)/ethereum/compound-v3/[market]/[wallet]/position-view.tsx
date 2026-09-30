@@ -57,7 +57,7 @@ import { interleaveRowPlan, servedFoldersEnabled, type ServedFolder } from "@/li
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
-import { previousEventById, previousEventByTx } from "@/lib/compound/row-facts";
+import { previousEventById, previousEventByTx, previousPastFolders } from "@/lib/compound/row-facts";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -226,7 +226,7 @@ function Position({
           todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
           interestInDebt:
             lifetimeEvents && view.current?.side === "borrow"
-              ? compoundInterestInDebt(lifetimeEvents, view.market, Math.abs(view.current.amount))
+              ? compoundInterestInDebt(lifetimeEvents, view.market, Math.abs(view.current.amount), folders)
               : null,
         })}
         learnMore={compoundEconomicsContent()}
@@ -565,8 +565,8 @@ export default function CompoundPositionView({
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                  previous={previousById.get(event.id)}
-                  previousTx={previousByTx.get(event.txHash)}
+                  previous={previousPastFolders(event, previousById.get(event.id), servedFolders)}
+                  previousTx={previousPastFolders(event, previousByTx.get(event.txHash), servedFolders)}
                 />
               ) : null
             }

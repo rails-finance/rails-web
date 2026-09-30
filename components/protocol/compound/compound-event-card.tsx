@@ -16,6 +16,7 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 import { compoundExplainerTeaser, type CompoundEvent } from "@/lib/compound/explainer-clauses";
 import { CompoundEventHeader } from "./compound-event-header";
 import { CompoundEventDetail } from "./compound-event-detail";
+import type { CompoundPreviousRow } from "./compound-absorb-breakdown";
 import { CompoundEventExplainer, compoundLearnMoreContent } from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { compoundRowLabel } from "@/lib/compound/row-facts";
@@ -27,10 +28,12 @@ export interface CompoundEventCardProps {
   eventNumber?: number;
   /** Same-tx sibling events — the absorb-leg seam (defaults to just this one). */
   siblings?: CompoundEvent[];
-  /** The account's previous row in this market (previousEventById). */
-  previous?: CompoundEvent;
-  /** The last row of the previous transaction (previousEventByTx). */
-  previousTx?: CompoundEvent;
+  /** The account's previous row in this market (previousEventById), or — where
+   *  it sits inside a folder the page has not opened — that folder's last
+   *  block and time, with no balance. */
+  previous?: CompoundEvent | CompoundPreviousRow;
+  /** The last row of the previous transaction (previousEventByTx), the same way. */
+  previousTx?: CompoundEvent | CompoundPreviousRow;
 }
 
 // direction "right" = token leaves the account (supply / add collateral),
@@ -58,8 +61,12 @@ export function CompoundEventCard({
   previous,
   previousTx,
 }: CompoundEventCardProps) {
-  const prevRow = (e?: CompoundEvent) =>
-    e ? { blockNumber: e.blockNumber, timestamp: e.timestamp, baseAfter: e.context.data.baseAfter } : undefined;
+  const prevRow = (e?: CompoundEvent | CompoundPreviousRow): CompoundPreviousRow | undefined =>
+    e == null
+      ? undefined
+      : "context" in e
+        ? { blockNumber: e.blockNumber, timestamp: e.timestamp, baseAfter: e.context.data.baseAfter }
+        : e;
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isLiq = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
@@ -131,6 +138,7 @@ export function CompoundEventCard({
               address: soleFlowAddress(event.flows, ctx.assetSymbol),
               direction: DIRECTION[kind],
               value: mag,
+              unit: ctx.assetSymbol,
               prov: spineProv,
             },
           ];
@@ -160,7 +168,7 @@ export function CompoundEventCard({
       iconColumn={iconSlot}
       header={
         <CompoundEventHeader
-          actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "")}
+          actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals)}
           ctx={ctx}
           timestamp={event.timestamp}
           txHash={event.txHash}

@@ -168,6 +168,7 @@ export function cometViewFromChain(
     // not the rest of its life was read — the same stance the Aave family's
     // view takes, counting liquidations off the events it holds.
     liquidationCount: replay?.liquidationCount ?? 0,
+    lastLiquidationAt: replay?.lastLiquidationAt ?? null,
     txCount: lifeReplay?.txCount ?? 0,
     lastActivityAt: lifeReplay?.lastActivityAt ?? null,
     atBlock: live?.blockNumber,

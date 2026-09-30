@@ -13,7 +13,13 @@ import {
   CompoundAbsorbBreakdown,
   type CompoundPreviousRow,
 } from "@/components/protocol/compound/compound-absorb-breakdown";
-import { compoundAmount, compoundBaseCaption, impliedYearlyRate } from "@/lib/compound/row-facts";
+import {
+  compoundAmount,
+  compoundBaseBefore,
+  compoundBaseCaption,
+  impliedYearlyRate,
+  isBaseDust,
+} from "@/lib/compound/row-facts";
 import { decimalSub } from "@/lib/utils/format";
 import {
   baseAfterProv,
@@ -29,6 +35,7 @@ import {
   collateralBeforeProv,
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
+import { CompoundRateNote } from "@/components/protocol/compound/compound-rate-note";
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -44,6 +51,27 @@ export interface CompoundEventDetailProps {
   previous?: CompoundPreviousRow;
   /** The last row of the previous transaction: the absorb's "what moved". */
   previousTx?: CompoundPreviousRow;
+}
+
+/** A before within one unit of zero is Comet's rounding: it reads as zero,
+ *  and its receipt says why. */
+function dustBefore(
+  t: ChainTruthStat["transition"],
+  isDust: boolean,
+  sym: string,
+  decimals: number,
+): ChainTruthStat["transition"] {
+  if (!t || !isDust) return t;
+  const unit = (10 ** -decimals).toFixed(decimals);
+  return {
+    ...t,
+    before: "0",
+    beforeExact: "0",
+    beforeProv: {
+      ...t.beforeProv,
+      summary: `Balance before — 0. After minus the change lands within one unit (${unit} ${sym}) of zero: Comet rounds a balance's present value down, so a flat balance reads one unit either side of zero. Shown as 0.`,
+    },
+  };
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : compoundAmount(Number(human)));
@@ -69,13 +97,17 @@ export function CompoundEventDetail({
   // Interest since the account's previous row (Ethereum rows carry it; the
   // Base sweep's do not), stated under the base balance as a magnitude.
   const interestSincePrevious = (sym: string): ChainTruthStat["interestSincePrevious"] => {
-    if (ctx.baseInterest == null) return undefined;
+    // One unit either way is Comet's rounding, not interest.
+    if (ctx.baseInterest == null || isBaseDust(ctx.baseInterest, m.baseDecimals)) return undefined;
     const signed = ctx.baseInterest;
     const mag = signed.startsWith("-") ? signed.slice(1) : signed;
     // The yearly rate that growth works out to, over the balance the
     // previous row left and the time between the two.
+    // Interest is rounded to the token's last unit, so under a thousand units
+    // the rate it works out to is mostly rounding: not stated.
+    const meaningful = Number(mag) >= 1000 * 10 ** -m.baseDecimals;
     const rate =
-      previous?.baseAfter != null && timestamp != null
+      meaningful && previous?.baseAfter != null && timestamp != null
         ? impliedYearlyRate(Number(mag), Number(previous.baseAfter), timestamp - previous.timestamp)
         : null;
     const days = previous && timestamp != null ? (timestamp - previous.timestamp) / 86400 : null;
@@ -99,19 +131,24 @@ export function CompoundEventDetail({
         : ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out"
           ? transferBaseProv(ctx.assetSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : baseDeltaProv(ctx.assetSymbol, ctx.eventType === "supply" ? "supply" : "withdraw", coords);
-    const before = ctx.baseAfter != null ? decimalSub(ctx.baseAfter, ctx.assetsDelta) : null;
+    const before = compoundBaseBefore(ctx, m.baseDecimals);
     stats.push({
       label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
       value: fmt(ctx.baseAfter),
       symbol: ctx.assetSymbol,
       prov: baseAfterProv(ctx.assetSymbol, coords),
       interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
-      transition: reconstructTransition({
-        after: ctx.baseAfter,
-        change: ctx.assetsDelta,
-        changeProv,
-        beforeProv: baseBeforeProv(ctx.assetSymbol, coords),
-      }),
+      transition: dustBefore(
+        reconstructTransition({
+          after: ctx.baseAfter,
+          change: ctx.assetsDelta,
+          changeProv,
+          beforeProv: baseBeforeProv(ctx.assetSymbol, coords),
+        }),
+        before === "0" && decimalSub(ctx.baseAfter ?? "0", ctx.assetsDelta) !== "0",
+        ctx.assetSymbol,
+        m.baseDecimals,
+      ),
     });
   } else {
     const collCoords: CompoundCoords = { ...coords, asset: undefined };
@@ -158,9 +195,25 @@ export function CompoundEventDetail({
     }
   }
 
+  const averageStated = stats.some((st) => st.interestSincePrevious?.after != null);
+  const showRates =
+    ctx.eventType !== "absorb_debt" &&
+    stats.some((st) => st.interestSincePrevious != null) &&
+    previous != null &&
+    blockNumber != null &&
+    previous.blockNumber < blockNumber;
   return (
     <>
       <ChainTruthDetail stats={stats} />
+      {showRates && (
+        <CompoundRateNote
+          chainId={coords.chainId}
+          marketKey={m.key}
+          prevBlock={previous!.blockNumber}
+          block={blockNumber!}
+          hasAverage={averageStated}
+        />
+      )}
       {ctx.eventType === "absorb_debt" && (
         <CompoundAbsorbBreakdown
           ctx={ctx}

@@ -83,6 +83,7 @@ export function CompoundEventHeader({
         symbol: ctx.assetSymbol,
         address: soleFlowAddress(flows, ctx.assetSymbol),
         prov,
+        suffix: ctx.assetSymbol,
         // The spine's flank direction (compound-event-card DIRECTION): a
         // supply leaves the wallet, a withdraw arrives in it.
         phoneArrow:

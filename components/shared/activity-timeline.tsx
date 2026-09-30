@@ -93,9 +93,12 @@ export function SpineVal({
   decimals = 4,
   max,
   prov,
+  unit,
 }: {
   value?: string | number;
   side: "left" | "right";
+  /** A symbol printed after the figure, smaller and muted. */
+  unit?: string;
   onChange?: (v: number) => void;
   decimals?: number;
   max?: number;
@@ -121,6 +124,7 @@ export function SpineVal({
       ) : (
         txt
       )}
+      {unit ? <span className="ml-1 text-xs font-normal text-rb-500">{unit}</span> : null}
     </span>
   );
 }

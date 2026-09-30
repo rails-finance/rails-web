@@ -53,6 +53,10 @@ export interface ClosedPositionStatsProps {
   outcomeLabel?: string;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
+  /** Unix timestamp of the outcome itself (the last liquidation), where it
+   *  differs from the closure: its date leads beneath Outcome and the
+   *  closing date follows on its own line. */
+  outcomeAt?: number;
   /** Optional 4th column (rate slot) — keeps closed cards the same width as open */
   extra?: { label: string; value: ReactNode };
   /** Optional desktop-only left column (e.g. PositionPairIcons) */
@@ -86,6 +90,7 @@ export function ClosedPositionStats({
   collateralFootnote,
   debtFootnote,
   closedAt,
+  outcomeAt,
   extra,
   icons,
   identity,
@@ -93,6 +98,7 @@ export function ClosedPositionStats({
 }: ClosedPositionStatsProps) {
   const { label, color, badge } = OUTCOME[outcome];
   const closure = closedAt ? formatClosureDate(closedAt) : null;
+  const outcomeDate = outcomeAt ? formatClosureDate(outcomeAt) : null;
   const showDebt = debt !== undefined;
   const hasInColumnAssets = collateralAssetIcons != null || debtAssetIcons != null;
   const useLeadingIcons = !!icons && !hasInColumnAssets;
@@ -155,7 +161,14 @@ export function ClosedPositionStats({
             <TipLabel text="Outcome" tip={labelTips?.outcome} />
           </div>
           <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
-          {closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
+          {outcomeDate ? (
+            <>
+              <div className="text-xs text-rb-500 mt-0.5">{outcomeDate}</div>
+              {closure && closure !== outcomeDate && <div className="text-xs text-rb-500 mt-0.5">Closed {closure}</div>}
+            </>
+          ) : (
+            closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>
+          )}
         </div>
         {extra ? (
           <div>

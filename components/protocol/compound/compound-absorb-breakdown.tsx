@@ -88,6 +88,9 @@ export function CompoundAbsorbBreakdown({
   const legs = (ctx.absorbedCollateral ?? []).filter((l) => Number.isFinite(Number(l.usdValue)));
   const creditedUsd = Number(ctx.usdValue);
   const [factors, setFactors] = useState<Factors | null>(null);
+  // The factors are an archive read, which can take a few seconds cold: the
+  // row says it is reading them, and says so if the read fails.
+  const [factorsState, setFactorsState] = useState<"loading" | "ready" | "failed">("loading");
   const addrs = legs.map((l) => l.address).filter((a): a is string => !!a);
   const addrKey = addrs.join(",");
 
@@ -96,15 +99,26 @@ export function CompoundAbsorbBreakdown({
     const ac = new AbortController();
     const deployment = coords.chainId === BASE_CHAIN_ID ? "base" : "ethereum";
     const prev = previous?.blockNumber ? `&prev=${previous.blockNumber}` : "";
-    fetch(
-      `/api/chain/compound/absorb-factors?deployment=${deployment}&market=${marketKey}&block=${coords.blockNumber}&assets=${addrKey}${prev}`,
-      { signal: ac.signal },
-    )
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: Factors | null) => {
-        if (d && d.factors && Object.keys(d.factors).length > 0) setFactors(d);
-      })
-      .catch(() => {});
+    const url = `/api/chain/compound/absorb-factors?deployment=${deployment}&market=${marketKey}&block=${coords.blockNumber}&assets=${addrKey}${prev}`;
+    setFactorsState("loading");
+    // One retry: a cold archive read is the usual failure, and the second
+    // attempt finds the node warm.
+    const attempt = (left: number): Promise<void> =>
+      fetch(url, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: Factors | null) => {
+          if (d && d.factors && Object.keys(d.factors).length > 0) {
+            setFactors(d);
+            setFactorsState("ready");
+          } else if (left > 0) return attempt(left - 1);
+          else setFactorsState("failed");
+        })
+        .catch(() => {
+          if (ac.signal.aborted) return;
+          if (left > 0) return attempt(left - 1);
+          setFactorsState("failed");
+        });
+    void attempt(1);
     return () => ac.abort();
   }, [coords.blockNumber, coords.chainId, marketKey, addrKey, previous?.blockNumber]);
 
@@ -321,6 +335,13 @@ export function CompoundAbsorbBreakdown({
           Values are at the absorb&rsquo;s prices. The factors were read at block{" "}
           {factors.readBlock.toLocaleString("en-US")}, the block before, so they are the ones in force when the absorb
           ran.
+        </p>
+      )}
+      {line == null && priced.length > 0 && coords.blockNumber != null && addrKey !== "" && (
+        <p className="text-xs leading-relaxed text-rb-500" data-absorb-line-state={factorsState}>
+          {factorsState === "failed"
+            ? `The line it crossed needs each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb, and that read failed on this load. Reload the page to try again.`
+            : `Reading the line it crossed: each asset's factors at block ${(coords.blockNumber! - 1).toLocaleString("en-US")}, the block before the absorb…`}
         </p>
       )}
       {moves.length > 0 && previous && (

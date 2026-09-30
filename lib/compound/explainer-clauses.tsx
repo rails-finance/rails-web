@@ -59,8 +59,8 @@ import {
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
 import { marketOf, type CometMarket } from "@/lib/compound/asset-catalog";
-import { formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/format";
-import { compoundAbsorbSplit, compoundAmount } from "@/lib/compound/row-facts";
+import { decimalSub, formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { compoundAbsorbSplit, compoundAmount, compoundBaseBefore } from "@/lib/compound/row-facts";
 import { AmountText } from "@/components/shared/amount-text";
 import { externalActor } from "@/lib/shared/external-actor";
 import { CompoundTxSenderNote } from "@/components/protocol/compound/compound-tx-sender-note";
@@ -345,11 +345,33 @@ function compoundEventSlotsBase(
     );
   };
 
+  // A call for nothing moves nothing.
+  if ((ctx.eventType === "supply" || ctx.eventType === "withdraw") && /^-?0(\.0*)?$/.test(ctx.assetsDelta)) {
+    return {
+      happened: [
+        clause(
+          <>
+            A {ctx.eventType} call for 0 {sym} on the {market} market: nothing moved, and the balance did not change.
+          </>,
+        ),
+      ],
+      changed: [],
+    };
+  }
+
   switch (ctx.eventType) {
     case "supply": {
-      const before = ctx.baseAfter != null ? Number(ctx.baseAfter) - signedDelta : null;
+      // The balance before, exact, with Comet's one-unit rounding read as zero.
+      const beforeStr = compoundBaseBefore(ctx, cometMarket.baseDecimals);
+      const before = beforeStr != null ? Number(beforeStr) : null;
       const repay = before != null && signedDelta > 0 ? Math.min(signedDelta, Math.max(0, -before)) : 0;
       const lent = signedDelta - repay;
+      const repayText =
+        beforeStr != null && beforeStr.startsWith("-") ? compoundAmount(Number(beforeStr.slice(1))) : "0";
+      const lentText =
+        beforeStr != null && beforeStr.startsWith("-")
+          ? compoundAmount(Number(decimalSub(ctx.assetsDelta, beforeStr.slice(1)) ?? lent))
+          : compoundAmount(lent);
       const happened =
         repay > COMPOUND_EPS && lent > COMPOUND_EPS
           ? clause(
@@ -372,8 +394,8 @@ function compoundEventSlotsBase(
         repay > COMPOUND_EPS && lent > COMPOUND_EPS
           ? clause(
               <>
-                <AmountText value={repay} /> {sym} cleared the outstanding base debt, and the remaining{" "}
-                <AmountText value={lent} /> {sym} is lent out to earn the supply rate.
+                {repayText} {sym} cleared the outstanding base debt, and the remaining {lentText} {sym} is lent out to
+                earn the supply rate.
               </>,
             )
           : repay > COMPOUND_EPS
@@ -384,7 +406,8 @@ function compoundEventSlotsBase(
 
     case "withdraw": {
       const mag = Math.abs(signedDelta);
-      const before = ctx.baseAfter != null ? Number(ctx.baseAfter) - signedDelta : null;
+      const wBefore = compoundBaseBefore(ctx, cometMarket.baseDecimals);
+      const before = wBefore != null ? Number(wBefore) : null;
       const fromSavings = before != null ? Math.min(mag, Math.max(0, before)) : mag;
       const borrowed = mag - fromSavings;
       const happened =

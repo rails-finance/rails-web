@@ -111,7 +111,20 @@ export function compoundEconomicsExplanation(
   // balance, its withdrawals): the collateral sentences leave them out.
   const isBase = (l: TowerLine) => baseSym != null && l.symbol === baseSym;
 
-  const suppliedText = fmtScalar(data.collateral.lifetimeInflow, valued, collSymbol);
+  const collOnlySymbols = new Set(
+    [...data.collateral.current, ...data.collateral.exited, ...data.collateral.liquidated]
+      .filter((l) => !(baseSym != null && l.symbol === baseSym))
+      .map((l) => l.symbol),
+  );
+  const suppliedText = fmtScalar(
+    data.collateral.lifetimeInflow,
+    valued,
+    collOnlySymbols.size === 1 ? [...collOnlySymbols][0] : collSymbol,
+  );
+  const lentInText = describeLines(
+    (data.collateral.received ?? []).filter((l) => l.key === "base-lent"),
+    valued,
+  );
   const collWithdrawn = data.collateral.exited.filter((l) => !isBase(l));
   const baseWithdrawn = data.collateral.exited.filter(isBase);
   const withdrawnText = describeLines(collWithdrawn, valued);
@@ -137,7 +150,13 @@ export function compoundEconomicsExplanation(
     data.debt.current[0] && data.debt.current[0].usd != null && data.debt.current[0].amount > 0
       ? data.debt.current[0].usd / data.debt.current[0].amount
       : null;
-  const inDebt = opts?.interestInDebt;
+  const chargedTotal = (data.debt.earned ?? []).reduce((t, l) => t + l.amount, 0);
+  // Interest inside today's debt is part of the lifetime interest charged;
+  // a larger figure means the walk missed rows, and it is not stated.
+  const inDebt =
+    opts?.interestInDebt && (chargedTotal <= 0 || opts.interestInDebt.amount <= chargedTotal * 1.0001)
+      ? opts.interestInDebt
+      : null;
   const inDebtText =
     inDebt && baseSym
       ? valued && basePrice != null
@@ -205,9 +224,14 @@ export function compoundEconomicsExplanation(
     );
   }
 
-  if (earnedLifeText || baseWithdrawnText) {
+  if (lentInText || earnedLifeText || baseWithdrawnText) {
+    const parts = [
+      earnedLifeText ? `earned ${earnedLifeText} of interest on it` : null,
+      baseWithdrawnText ? `withdrew ${baseWithdrawnText}` : null,
+    ].filter((p): p is string => p != null);
+    const tail = parts.length === 0 ? "" : parts.length === 1 ? `, and ${parts[0]}` : `, ${parts[0]}, and ${parts[1]}`;
     bullets.push(
-      `${earnedLifeText ? `The lent ${baseSym ?? "base"} earned ${earnedLifeText} of interest` : `The account lent ${baseSym ?? "base"}`}${baseWithdrawnText ? `, and ${baseWithdrawnText} of it was withdrawn` : ""}.`,
+      `${lentInText ? `The account lent ${lentInText} of ${baseSym ?? "base"}` : `The account lent ${baseSym ?? "base"}`}${tail}. Lent ${baseSym ?? "base"} is not collateral, so it sits on separate rows.`,
     );
   }
 
@@ -226,9 +250,20 @@ export function compoundEconomicsExplanation(
         : "Dollar figures use Comet's oracle price today, so they move with prices.",
     );
   } else {
-    bullets.push(
-      "Bars are in token units, not dollars, because Comet's oracle gives no price for one or more of the assets here.",
-    );
+    // Only where it is so: name the assets the oracle read left unpriced.
+    const allLines = [data.collateral, data.debt].flatMap((side) => [
+      ...side.current,
+      ...(side.received ?? []),
+      ...side.exited,
+      ...side.liquidated,
+      ...(side.earned ?? []),
+      ...(side.interest ? [side.interest] : []),
+    ]);
+    const unpriced = [...new Set(allLines.filter((l) => l.amount > 0 && l.usd == null).map((l) => l.symbol))];
+    if (unpriced.length > 0)
+      bullets.push(
+        `Figures are in token units because Comet's oracle gave no price for ${joinNames(unpriced)} on this load.`,
+      );
   }
 
   return (

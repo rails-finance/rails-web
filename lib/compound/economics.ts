@@ -480,38 +480,77 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
  *  repaid since the balance last stood at zero or above. Null where the
  *  events never show the balance at zero or above (a window that starts
  *  mid-debt), or where the figure falls outside (0, debt). `since` is the
- *  first borrow after that point, unix seconds. */
+ *  first borrow after that point, unix seconds.
+ *
+ *  A grouped page holds some rows only as folders: each folder's base legs
+ *  join the walk at its place in time. A folder with a lent leg (deposited
+ *  or withdrawn) stood at zero or above somewhere inside, at a point the
+ *  folder does not say, so the figure is withheld unless a later row stands
+ *  at zero again. */
 export function compoundInterestInDebt(
   events: BaseActivityEvent[],
   market: string,
   debtNow: number,
+  folders?: readonly ServedFolder[] | null,
 ): { amount: number; since: number } | null {
   if (!(debtNow > 0)) return null;
-  const rows = events
+  type Item =
+    | { kind: "row"; block: number; log: number; ts: number; delta: number; after: string | undefined }
+    | { kind: "folder"; block: number; log: number; ts: number; folder: ServedFolder };
+  const rows: Item[] = events
     .filter(isCompoundEvent)
     .filter((e) => e.context.data.market === market && e.context.data.isBase)
     .map((e) => ({
+      kind: "row" as const,
       block: e.blockNumber,
       log: Number(/-(\d+)-[a-z_]+$/.exec(e.id)?.[1] ?? 0),
       ts: e.timestamp,
       delta: Number(e.context.data.assetsDelta),
       after: e.context.data.baseAfter,
-    }))
-    .sort((a, b) => a.block - b.block || a.log - b.log);
+    }));
+  const folderItems: Item[] = (folders ?? []).map((f) => ({
+    kind: "folder" as const,
+    block: f.firstBlock,
+    log: -1,
+    ts: f.firstAt,
+    folder: f,
+  }));
+  const items = [...rows, ...folderItems].sort((a, b) => a.block - b.block || a.log - b.log);
   let seenZero = false;
+  let unknown = false;
   let borrowed = 0;
   let repaid = 0;
   let since: number | null = null;
-  for (const r of rows) {
+  const reset = () => {
+    seenZero = true;
+    unknown = false;
+    borrowed = 0;
+    repaid = 0;
+    since = null;
+  };
+  for (const r of items) {
+    if (r.kind === "folder") {
+      const bucket = (r.folder.flows ?? []).find((b) => !b.sourceKey && b.key === market);
+      if (!bucket) continue;
+      if (bucket.decimals == null) return null;
+      const scale = 10 ** bucket.decimals;
+      const leg = (k: string) => (bucket.legs[k] != null ? Number(bucket.legs[k]) / scale : 0);
+      if (leg("deposited") > 0 || leg("withdrawn") > 0 || leg("absorbedDebt") > 0) {
+        // It stood at zero or above inside: where is not known.
+        unknown = true;
+        continue;
+      }
+      if (leg("borrowed") > 0) {
+        borrowed += leg("borrowed");
+        since ??= r.ts;
+      }
+      repaid += leg("repaid");
+      continue;
+    }
     if (r.after == null || !Number.isFinite(r.delta)) return null;
     const after = Number(r.after);
     const before = after - r.delta;
-    if (before >= 0) {
-      seenZero = true;
-      borrowed = 0;
-      repaid = 0;
-      since = null;
-    }
+    if (before >= 0) reset();
     if (r.delta < 0) {
       const borrow = -r.delta - Math.max(0, before);
       if (borrow > 0) {
@@ -521,14 +560,9 @@ export function compoundInterestInDebt(
     } else if (r.delta > 0 && before < 0) {
       repaid += Math.min(r.delta, -before);
     }
-    if (after >= 0) {
-      seenZero = true;
-      borrowed = 0;
-      repaid = 0;
-      since = null;
-    }
+    if (after >= 0) reset();
   }
-  if (!seenZero || since == null) return null;
+  if (!seenZero || unknown || since == null) return null;
   const amount = debtNow - (borrowed - repaid);
   return amount > 0 && amount < debtNow ? { amount, since } : null;
 }
@@ -972,7 +1006,15 @@ export function computeCompoundEconomics(
           "Interest earned",
         )
       : [];
-  const received = [...collReceived, ...creditReceived];
+  // The base the account lent in is not collateral either: its own row, the
+  // twin of the lent base's withdrawals.
+  const lentIn = lifetime
+    ? withLabel(
+        flowLine("deposited", view.base.symbol, view.base.address, lifetime.deposited, "base-lent"),
+        `Lent (${view.base.symbol})`,
+      )
+    : [];
+  const received = [...lentIn, ...collReceived, ...creditReceived];
 
   // Value the tower only when EVERY contributing line is oracle-priced — a strict
   // per-total guard (Aave's rule). A single unpriced leg drops it to the token
@@ -996,10 +1038,7 @@ export function computeCompoundEconomics(
   // Lifetime inflow (the faded side bar) — USD when valued; a token amount is
   // only meaningful when one token flowed in, else suppressed.
   const collInflows: Array<{ addr: string; amount: number }> = lifetime
-    ? [
-        ...collFlows.map(([addr, c]) => ({ addr, amount: c.supplied })),
-        { addr: view.base.address, amount: lifetime.deposited },
-      ].filter((f) => f.amount > DUST)
+    ? collFlows.map(([addr, c]) => ({ addr, amount: c.supplied })).filter((f) => f.amount > DUST)
     : [];
   const collInflow = valued
     ? collInflows.reduce((s, f) => s + (usdOf(f.addr, f.amount) ?? 0), 0)

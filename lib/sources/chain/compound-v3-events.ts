@@ -197,6 +197,9 @@ export interface CometMarketReplay {
   };
   /** Absorptions (one AbsorbDebt per absorption). */
   liquidationCount: number;
+  /** Unix seconds of the last absorption this walk saw; null where none was
+   *  seen (or its block could not be dated). */
+  lastLiquidationAt: number | null;
   everLiquidated: boolean;
   /** Distinct transactions of the account's own — the absorb legs, done TO the
    *  account, are excluded. */
@@ -809,6 +812,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     peakBorrow: bigint;
     peakColl: Map<string, bigint>;
     absorbs: number;
+    lastAbsorb: CometDecodedRow | null;
     /** The own transactions THIS walk saw. A seeded market's count is this
      *  set's size plus `seededTxs`: the cut is a transaction boundary, so no
      *  member of the seed's set can reappear here. */
@@ -848,6 +852,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         peakBorrow: ZERO,
         peakColl: new Map(),
         absorbs: 0,
+        lastAbsorb: null,
         txs: new Set(),
         seededTxs: 0,
         first: null,
@@ -1094,7 +1099,10 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       if (b > s.peakLend) s.peakLend = b;
       if (-b > s.peakBorrow) s.peakBorrow = -b;
     }
-    if (d.kind === "absorb_debt") s.absorbs++;
+    if (d.kind === "absorb_debt") {
+      s.absorbs++;
+      s.lastAbsorb = d;
+    }
     if (d.kind !== "absorb_debt" && d.kind !== "absorb_collateral") s.txs.add(d.txHash);
     if (!s.first) s.first = d;
     s.last = d;
@@ -1263,6 +1271,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
             : [...s.peakColl.entries()].filter(([, v]) => v > ZERO).map(([a, v]) => assetLine(a, v)),
         },
         liquidationCount: s.absorbs,
+        lastLiquidationAt: s.lastAbsorb ? (tsOf.get(s.lastAbsorb.blockNumber) ?? null) : null,
         everLiquidated: s.absorbs > 0,
         txCount: s.seededTxs + s.txs.size,
         // The position's own first and last event. A seed carries both from

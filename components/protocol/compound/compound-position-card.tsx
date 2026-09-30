@@ -79,6 +79,8 @@ export interface CompoundPositionView {
   peak: CompoundPeak;
   everLiquidated: boolean;
   liquidationCount: number;
+  /** Unix seconds of the last absorb, where known. */
+  lastLiquidationAt?: number | null;
   /** Non-liquidation transaction count (activity-meta). */
   txCount: number;
   /** Unix seconds of the most recent event (activity-meta). */
@@ -505,6 +507,7 @@ export function CompoundPositionCard({
             />
           }
           closedAt={v.lastActivityAt ?? undefined}
+          outcomeAt={v.status === "liquidated" ? (v.lastLiquidationAt ?? undefined) : undefined}
           collateralLabel={supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
           collateral={supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : <StatDash />}
           collateralFootnote={noPeaksNote}
@@ -682,6 +685,7 @@ export function viewFromSummary(s: CompoundPositionSummary): CompoundPositionVie
     peak: { collateral: s.peak.collateral, lentBase: s.peak.lentBase, borrowedBase: s.peak.borrowedBase },
     everLiquidated: s.everLiquidated,
     liquidationCount: s.liquidationCount,
+    lastLiquidationAt: s.lastLiquidationAt,
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,

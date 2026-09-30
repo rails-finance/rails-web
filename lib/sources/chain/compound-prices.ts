@@ -28,6 +28,8 @@ const COMET_ABI = parseAbi([
   "function baseTokenPriceFeed() view returns (address)",
   "function getAssetInfoByAddress(address asset) view returns ((uint8 offset, address asset, address priceFeed, uint64 scale, uint64 borrowCollateralFactor, uint64 liquidateCollateralFactor, uint64 liquidationFactor, uint128 supplyCap))",
   "function getPrice(address priceFeed) view returns (uint256)",
+  "function numAssets() view returns (uint8)",
+  "function getAssetInfo(uint8 i) view returns ((uint8 offset, address asset, address priceFeed, uint64 scale, uint64 borrowCollateralFactor, uint64 liquidateCollateralFactor, uint64 liquidationFactor, uint128 supplyCap))",
 ]);
 
 /** Comet `getPrice` returns the market's quote unit with 8 decimals (PRICE_SCALE). */
@@ -55,6 +57,62 @@ export interface CometPriceRequest {
   comet: string;
   baseToken: string;
   collateral: string[];
+  /** Price every asset the Comet lists as well: a wallet's page, whose
+   *  lifetime flows can name collateral it no longer holds. */
+  wholeRoster?: boolean;
+}
+
+// Each Comet's collateral roster (numAssets / getAssetInfo), cached for an
+// hour: governance adds an asset rarely, and a stale roster only leaves the
+// new asset unpriced until the next read.
+const ROSTER_TTL_MS = 60 * 60 * 1000;
+const rosterCache = new Map<string, { at: number; assets: string[] }>();
+
+/** The roster last read for a Comet (lowercased token addresses), if any. */
+export function cometRosterOf(comet: string): string[] {
+  return rosterCache.get(comet.toLowerCase())?.assets ?? [];
+}
+
+async function readRosters(client: ReturnType<typeof chainClient>, comets: string[]): Promise<void> {
+  const stale = comets.filter((c) => {
+    const hit = rosterCache.get(c);
+    return !hit || Date.now() - hit.at > ROSTER_TTL_MS;
+  });
+  if (stale.length === 0) return;
+  try {
+    const counts = (await client.multicall({
+      allowFailure: true,
+      contracts: stale.map(
+        (c) => ({ address: c as `0x${string}`, abi: COMET_ABI, functionName: "numAssets" }) as const,
+      ),
+    })) as { status: string; result?: unknown }[];
+    const calls: { comet: string; i: number }[] = [];
+    stale.forEach((c, k) => {
+      const n = counts[k]?.status === "success" ? Number(counts[k].result) : 0;
+      for (let i = 0; i < n; i++) calls.push({ comet: c, i });
+    });
+    const infos = (await client.multicall({
+      allowFailure: true,
+      contracts: calls.map(
+        (x) =>
+          ({ address: x.comet as `0x${string}`, abi: COMET_ABI, functionName: "getAssetInfo", args: [x.i] }) as const,
+      ),
+    })) as { status: string; result?: { asset?: string; priceFeed?: string } }[];
+    const byComet = new Map<string, string[]>();
+    calls.forEach((x, k) => {
+      const r = infos[k];
+      if (r?.status !== "success" || !r.result?.asset) return;
+      const token = r.result.asset.toLowerCase();
+      (byComet.get(x.comet) ?? byComet.set(x.comet, []).get(x.comet)!).push(token);
+      const feed = r.result.priceFeed?.toLowerCase();
+      if (feed && feed !== ZERO_ADDR) feedCache.set(priceKey(x.comet, token), feed);
+    });
+    stale.forEach((c, k) => {
+      if (counts[k]?.status === "success") rosterCache.set(c, { at: Date.now(), assets: byComet.get(c) ?? [] });
+    });
+  } catch {
+    // No roster: only the assets asked for are priced.
+  }
 }
 
 /** Keyed by `${comet}:${token}` (both lowercased) → USD price per whole token.
@@ -96,6 +154,7 @@ export async function resolveCometPrices(
     return out; // The chain's RPC var is unset — no on-chain USD; callers stay token-only.
   }
   const conv = ethConversion(deployment);
+  await readRosters(client, [...new Set(reqs.filter((r) => r.wholeRoster).map((r) => r.comet.toLowerCase()))]);
 
   // The distinct (market, token) pairs we need a price for, tagged base vs collateral.
   const pairs: Pair[] = [];
@@ -112,6 +171,7 @@ export async function resolveCometPrices(
     };
     add(r.baseToken, true);
     for (const c of r.collateral) add(c, false);
+    if (r.wholeRoster) for (const c of cometRosterOf(comet)) add(c, false);
   }
 
   // The cWETHv3 market quotes in ETH — its prices need Comet's own WETH/USD
