@@ -8,7 +8,8 @@
 //     where one is evidenced, and the truncated 0x1234…abcd where none is
 //   · its address matches the manager the API row carries
 //   · it is SCOPED: present on the batch-JOIN rows (openTroveAndJoinBatch /
-//     setInterestBatchManager), absent on plain adjustTrove rows of the SAME
+//     setInterestBatchManager) and the manager's rate-change rows that stand
+//     outside a folder, absent on plain adjustTrove rows of the SAME
 //     batched trove, and absent on the liquidation row (is_batched=false there)
 //   · it carries a provenance receipt (the chip is <Prov>-wrapped, not an orphan)
 //
@@ -73,6 +74,10 @@ const CHIP_EVENTS = new Set([
   "adjustTroveInterestRate",
   "setInterestBatchManager",
   "removeFromBatch",
+  // A batch manager's rate change carries the chip since web 555b2b2 (server
+  // mig 342): "Adjusted 3.20% → 3.60% Bolder".
+  "setBatchManagerAnnualInterestRate",
+  "lowerBatchManagerAnnualFee",
 ]);
 
 let failures = 0;
@@ -84,10 +89,20 @@ function assert(c, m) {
   }
 }
 
+// The page reads the grouped history, where three or more batch-manager rate
+// changes back to back sit in a closed `batch_rate` folder and redemption runs
+// in a `redemption` folder. A row inside a closed folder draws no header, so the
+// expectation counts the rows that stand outside a folder, from the same grouped
+// read the page makes.
 async function apiRows(path) {
-  const res = await fetch(API + path, { headers: { Authorization: `Bearer ${TOKEN}` } });
+  const res = await fetch(`${API}${path}?group=1&shapes=1`, { headers: { Authorization: `Bearer ${TOKEN}` } });
   if (!res.ok) throw new Error(`api ${res.status}`);
-  return (await res.json()).rows;
+  const body = await res.json();
+  if (body.grouped !== true) throw new Error("api answered ungrouped");
+  return {
+    rows: body.rows.flatMap((r) => (r.kind === "event" ? [r.event] : [])),
+    folders: body.rows.filter((r) => r.kind === "folder").length,
+  };
 }
 
 const trunc = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -175,9 +190,9 @@ console.log("\n════ §1 — chip presence, colour, scope, receipt (1280p
 
 for (const spec of SPECIMENS) {
   console.log(`\n[${spec.name}]`);
-  let rows;
+  let rows, folders;
   try {
-    rows = await apiRows(spec.api);
+    ({ rows, folders } = await apiRows(spec.api));
   } catch (e) {
     console.log(`  ❌ FAIL: API unreachable (${e.message})`);
     failures++;
@@ -189,7 +204,7 @@ for (const spec of SPECIMENS) {
   const suppressed = rows.filter((r) => r.batch_manager && !CHIP_EVENTS.has(r.action));
   const managers = [...new Set(expected.map((r) => r.batch_manager))];
   console.log(
-    `    api: ${rows.length} rows · ${expected.length} chip-bearing · ${suppressed.length} manager-carrying but out of scope`,
+    `    api: ${rows.length} standing rows, ${folders} folders · ${expected.length} chip-bearing · ${suppressed.length} manager-carrying but out of scope`,
   );
 
   for (const scheme of ["light", "dark"]) {
@@ -329,7 +344,7 @@ const NARROW = [
 // Asymmetry setInterestBatchManager row.
 const NARROW_SPECIMENS = [
   { name: "ebisu WBTC — openTroveAndJoinBatch (widest header)", path: SPECIMENS[0].path },
-  { name: "asymmetry ysyBOLD — setInterestBatchManager", path: SPECIMENS[3].path },
+  { name: "asymmetry ysyBOLD — openTroveAndJoinBatch", path: SPECIMENS[3].path },
 ];
 
 // Measure the chip's header row: page overflow, the chip's box against its
@@ -337,7 +352,15 @@ const NARROW_SPECIMENS = [
 async function geometry(page) {
   return page.evaluate(() => {
     const de = document.documentElement;
-    const chip = [...document.querySelectorAll("span")].find((e) => (e.textContent || "").trim() === "delegate");
+    // The chip in the most crowded header row: a batch manager's rate-change
+    // row is newer and carries fewer children than the join row this pass is
+    // about, so the first chip on the page is not the one to measure.
+    const chip = [...document.querySelectorAll("span")]
+      .filter((e) => (e.textContent || "").trim() === "delegate" && e.closest("div.flex.flex-wrap"))
+      .reduce((best, e) => {
+        const n = e.closest("div.flex.flex-wrap").children.length;
+        return best && best.n >= n ? best : { e, n };
+      }, null)?.e;
     if (!chip) return { found: false, pageScroll: de.scrollWidth, pageClient: de.clientWidth };
     const box = chip.parentElement; // the Prov locate-box wrapping prefix + address
     const row = chip.closest("div.flex.flex-wrap");

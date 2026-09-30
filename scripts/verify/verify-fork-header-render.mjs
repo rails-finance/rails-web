@@ -1,5 +1,4 @@
 import { chromium } from "playwright";
-import { TIMELINE_WINDOW_ROWS } from "./_timeline-window.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const SPECIMENS = {
@@ -41,23 +40,10 @@ async function load(page, url) {
   return false;
 }
 
-// ── The run folder's expectation, derived from the served timeline ─────────
-// Each constant below is the web's own, named where it lives, because this
-// script replays the page's grouping over the page's own history.
-
-/** lib/shared/timeline-chunks.ts — events one folder aims to hold. */
-const CHUNK_TARGET = 100;
-/** lib/shared/liquity-fork-timeline-runs.tsx — shorter stretches stay as cards. */
-const MIN_REDEMPTION_RUN = 4;
-
-/** The transaction a wire event belongs to (lib/shared/timeline-wire.ts): the
- *  envelope names the separator and which segment of `id` is the hash, and a
- *  row the pair does not reconstruct carries its own `h`. */
-function txOf(event, wire) {
-  if (event.h) return event.h;
-  const seg = event.id.split(wire?.hs ?? "-")[wire?.hp ?? 0] ?? event.id;
-  return wire?.hx ? `0x${seg}` : seg;
-}
+// ── The run folder's expectation, read off the served folders ──────────────
+// Since row-cut batch 7 (web 2026-09-28) rails-server groups the fork
+// timelines: the page draws the folders the grouped answer's `rowPlan` names,
+// each carrying its member count and its Cleared / Reduced legs in raw units.
 
 /** fmtSpine + fmtHeaderMagnitude (components/shared/activity-timeline.tsx,
  *  lib/shared/header-values.ts) — the compact form the folder header draws. */
@@ -74,60 +60,20 @@ function fmtHeaderMagnitude(n) {
   return parseFloat(a.toFixed(4)).toString();
 }
 
-/** chunkByTransaction (lib/shared/timeline-chunks.ts): ~target events per
- *  folder, the boundary always between transactions, a remnant shorter than
- *  the run floor joining the folder before it. */
-function chunkByTransaction(items, wire) {
-  const chunks = [];
-  let current = [];
-  let i = 0;
-  while (i < items.length) {
-    const tx = txOf(items[i], wire);
-    let j = i + 1;
-    while (j < items.length && txOf(items[j], wire) === tx) j++;
-    for (let k = i; k < j; k++) current.push(items[k]);
-    if (current.length >= CHUNK_TARGET) {
-      chunks.push(current);
-      current = [];
-    }
-    i = j;
-  }
-  if (current.length > 0) {
-    if (chunks.length > 0 && current.length < MIN_REDEMPTION_RUN) chunks[chunks.length - 1].push(...current);
-    else chunks.push(current);
-  }
-  return chunks;
-}
+/** A leg's raw amount at its decimals, as a float for the compact form. */
+const legValue = (leg) => Number(BigInt(leg.amount)) / 10 ** leg.decimals;
 
-/** Every redemption run folder the page would draw from this history, in
- *  display order (newest first), each with the two Σs its header carries —
- *  Σ |collDelta| cleared to redeemers, Σ |debtDelta| reduced. */
+/** Every redemption folder in the grouped answer, newest first (the page's
+ *  order), each with the two sums its header carries. */
 function redemptionFolders(served) {
-  const events = [...(served.events ?? [])].sort((a, b) => a.timestamp - b.timestamp).reverse();
-  const isRedemption = (e) => e?.context?.data?.eventType === "redeemCollateral";
-  const folders = [];
-  let i = 0;
-  while (i < events.length) {
-    if (!isRedemption(events[i])) {
-      i++;
-      continue;
-    }
-    let j = i + 1;
-    while (j < events.length && isRedemption(events[j])) j++;
-    if (j - i >= MIN_REDEMPTION_RUN) {
-      for (const chunk of chunkByTransaction(events.slice(i, j), served.wire)) {
-        let cleared = 0;
-        let reduced = 0;
-        for (const e of chunk) {
-          cleared += Math.abs(Number(e.context.data.collDelta) || 0);
-          reduced += Math.abs(Number(e.context.data.debtDelta) || 0);
-        }
-        folders.push({ count: chunk.length, cleared, reduced });
-      }
-    }
-    i = j;
-  }
-  return folders;
+  return (served.rowPlan ?? [])
+    .filter((r) => r.kind === "folder" && r.folder.kind === "redemption")
+    .map((r) => r.folder)
+    .sort((a, b) => b.ordinalLast - a.ordinalLast)
+    .map((f) => {
+      const leg = (verb) => f.legs.find((l) => l.verb === verb);
+      return { count: f.count, cleared: legValue(leg("Cleared")), reduced: legValue(leg("Reduced")) };
+    });
 }
 
 // Scan every span for a rate-pill: text like "4.30%" / "2.3%", report computed colours.
@@ -220,7 +166,7 @@ await run("ebisu individual pill + detail", async (page) => {
   assert(stat230 > 0, "detail rate stat shows 2.30% (matches the pill's echo key)");
 });
 
-// ── 3. Redemption run folder — its header's Σ against the served timeline ──
+// ── 3. Redemption run folder — its header's Σ against the grouped answer ──
 //
 // A redemption run is a FOLDER row: a Σ glyph, the summed Cleared / Reduced
 // pairs, the folder's date range, and an aria-label naming the members and the
@@ -232,28 +178,25 @@ await run("ebisu individual pill + detail", async (page) => {
 // the Finder-style chevron beside its glyph.
 //
 // NOTHING BELOW IS PINNED. The trove is live and collects redemptions, so the
-// expectation is derived from the same history the page reads and grouped the
-// way the page groups it: consecutive `redeemCollateral` events, stretches of
-// ≥ MIN_REDEMPTION_RUN, sliced into folders of ~CHUNK_TARGET that never split
-// a transaction, newest first. A drift between the two is the finding.
+// expectation is the newest redemption folder of the grouped answer the page
+// reads. A drift between the two is the finding.
 await run("asymmetry run folder", async (page) => {
-  console.log("\n[asymmetry redemption run folder — header Σ against the served timeline]");
+  console.log("\n[asymmetry redemption run folder — header Σ against the grouped answer]");
   const ok = await load(page, SPECIMENS.asymRun.url);
   assert(ok, "page rendered cards");
 
   // Read the history AFTER the page has it, so both sides see the same head.
   const [, , , branch, troveId] = SPECIMENS.asymRun.url.split("/");
-  const res = await fetch(
-    `${BASE}/api/asymmetry/${branch}/${encodeURIComponent(troveId)}/timeline?recent=${TIMELINE_WINDOW_ROWS}`,
-  );
+  const res = await fetch(`${BASE}/api/asymmetry/${branch}/${encodeURIComponent(troveId)}/timeline?group=1`);
   assert(res.ok, `served timeline answered (${res.status})`);
   const served = await res.json();
+  assert(served.grouped === true, "the timeline answers grouped");
   const expected = redemptionFolders(served);
   console.log(
-    "    folders from the served timeline:",
+    "    folders from the grouped answer:",
     JSON.stringify(expected.slice(0, 3).map((f) => ({ n: f.count, cleared: f.cleared, reduced: f.reduced }))),
   );
-  assert(expected.length > 0, `the served window holds at least one redemption run folder (${expected.length})`);
+  assert(expected.length > 0, `the grouped answer holds at least one redemption folder (${expected.length})`);
 
   const rows = page.locator('[aria-label*="consecutive redemptions"]');
   assert((await rows.count()) > 0, `run folder rows rendered, named by their members (${await rows.count()})`);

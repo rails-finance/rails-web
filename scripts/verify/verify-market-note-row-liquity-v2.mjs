@@ -559,19 +559,23 @@ const copyMarkdown = async () => {
   return exportPage.evaluate(() => navigator.clipboard.readText());
 };
 const tableRows = (md) => (md.match(/^\| \d+ \| /gm) ?? []).length;
+// A surplus claim is a row the page adds from the chain read after a
+// liquidation (web cce8cb8); the route does not carry it. Trove A's owner
+// claimed 2.556053 WETH at block 26,062,950 (tx 0xc46595dc…).
+const claimRows = (md) => (md.match(/^\| \d+ \| [^|]+\| Claim collateral/gm) ?? []).length;
 const md = await copyMarkdown();
 // The event table's row count is the trove's own event count as the ROUTE
-// states it — the notes must have added nothing to it, and the heading must
-// still name that number.
+// states it, plus its claim rows — the notes must have added nothing to it,
+// and the heading must name the table's count.
 const heading = md.match(/^## Activity timeline \((\d[\d,]*) events?, oldest first\)$/m);
 check(
   "10. the markdown export carries the note and adds no row to the event table",
   md.includes("## Market notes") &&
     wantGap != null &&
     md.includes(wantGap.change) &&
-    tableRows(md) === a.count &&
-    Number((heading?.[1] ?? "").replace(/,/g, "")) === a.count,
-  `${tableRows(md)} table rows, route states ${a.count} events, heading says ${heading?.[1] ?? "(none)"}; "## Market notes" ${md.includes("## Market notes") ? "present" : "absent"}`,
+    tableRows(md) - claimRows(md) === a.count &&
+    Number((heading?.[1] ?? "").replace(/,/g, "")) === tableRows(md),
+  `${tableRows(md)} table rows (${claimRows(md)} claim), route states ${a.count} events, heading says ${heading?.[1] ?? "(none)"}; "## Market notes" ${md.includes("## Market notes") ? "present" : "absent"}`,
 );
 await exportPage.close();
 
