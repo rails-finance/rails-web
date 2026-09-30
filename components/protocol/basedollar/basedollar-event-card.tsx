@@ -6,7 +6,13 @@
 // (branch collateral + BD debt); a liquidation shows the critical warning
 // spine, a redemption the external-party (pink) one.
 
-import { forkDebtMove, forkDebtMoveOps, FORK_DEBT_DUST_FLOAT } from "@/lib/shared/liquity-fork-ops";
+import {
+  forkDebtMove,
+  forkDebtMoveOps,
+  FORK_DEBT_DUST_FLOAT,
+  forkCollMove,
+  forkCollMoveOps,
+} from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -41,14 +47,17 @@ import {
   collRatioProv,
   costPerYearProv,
   batchFeeShareProv,
+  redistProv,
+  liqPenaltyProv,
   type BasedollarCoords,
 } from "@/lib/basedollar/event-provenance";
-import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
+import { DEBT_SYMBOL, MIN_DEBT } from "@/lib/basedollar/asset-catalog";
 
 // The one live-verified Basedollar link (docs.basedollar.money doesn't answer).
 export const BASEDOLLAR_FORK = {
   protocolName: "Basedollar",
   stablecoin: DEBT_SYMBOL,
+  minDebt: MIN_DEBT,
   docsLink: { label: "Basedollar", url: "https://basedollar.money" },
 };
 
@@ -73,6 +82,8 @@ const BASEDOLLAR_EXPLAINER_PROVS = {
   collRatioProv,
   costPerYearProv,
   batchFeeShareProv,
+  redistProv,
+  liqPenaltyProv,
 };
 
 export interface BasedollarEventCardProps {
@@ -95,7 +106,9 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
   // header suppresses its sub-epsilon dust chip.
   const isNoChange = event.actionType === "adjustTrove_noChange";
 
-  const collDelta = Number(ctx.collDelta) || 0;
+  // The collateral the act moved; a redistribution landing on the same touch
+  // is the header's own figure and moves no token, so the spine leaves it out.
+  const collDelta = forkCollMove(ctx);
   // The debt the act moved (TroveOperation), the figure the header states.
   const debtDelta = forkDebtMove(ctx).value;
 
@@ -115,11 +128,7 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
   const collProv: SpineValProv | undefined =
     collDelta !== 0
       ? {
-          info: collDeltaProv(
-            coords,
-            { after: ctx.collAfter, before: ctx.collAfter != null ? Number(ctx.collAfter) - collDelta : null },
-            ctx.origin?.coll,
-          ),
+          info: collDeltaProv(coords, forkCollMoveOps(ctx), ctx.origin?.coll),
           value: chainTruthDeltaValue(collDelta, labeled),
           symbol: ctx.collateralSymbol,
         }
@@ -202,6 +211,8 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
             rateAtEventProv,
             batchManagerProv,
             batchFeeShareProv,
+            redistProv,
+            minDebt: MIN_DEBT,
           }}
           flows={event.flows}
         />

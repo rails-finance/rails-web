@@ -88,17 +88,17 @@ import {
   MARKET_NOTE_ITEMS,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
-import { MarketNoteRow } from "@/components/shared/market-note-row";
+import { LiveNoteGroupRow, MarketNoteRow } from "@/components/shared/market-note-row";
 import {
   PhoneNoteLine,
   PhoneNoteRun,
   type PhoneNoteLineWords,
   type PhoneNoteRunWords,
 } from "@/components/shared/phone-note-run";
-import { ListNoteGap, SpineNoteGap } from "@/components/shared/spine-note-markers";
+import { ListNoteGap, SpineNoteGap, type GapItem } from "@/components/shared/spine-note-markers";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { anchorMarketNotes, type MarketNote } from "@/lib/shared/market-note";
+import { anchorMarketNotes, isLiveNoteGroup, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
@@ -673,7 +673,7 @@ function ChainTruthTimelineBody({
   useEffect(() => {
     if (!openAll) setOpenNoteIds(NO_OPEN_NOTES);
   }, [openAll]);
-  const toggleNote = useCallback((note: MarketNote) => {
+  const toggleNote = useCallback((note: GapItem) => {
     setOpenNoteIds((cur) => {
       const next = new Set(cur);
       if (next.has(note.id)) next.delete(note.id);
@@ -1001,12 +1001,19 @@ function ChainTruthTimelineBody({
   // takes the spine's lead-in dot and the `isFirst` flag, and every other
   // claim on them is suppressed below, so no two rows draw either.
   const liveRowsShown = showMarketNotes ? (liveNotes ?? NO_NOTES) : NO_NOTES;
-  /** Everything in the head slot's note stack: the live notes, then the
-   *  historical notes a filter left above the newest row. */
-  const topNotes = useMemo(
-    () => (!showMarketNotes || headNotes.length === 0 ? liveRowsShown : [...liveRowsShown, ...headNotes]),
-    [showMarketNotes, headNotes, liveRowsShown],
-  );
+  /** Two or more live notes stand as one card (`liveNoteGroup`); one keeps
+   *  its own row. */
+  const liveGroup = useMemo(() => liveNoteGroup(liveRowsShown), [liveRowsShown]);
+  /** Everything in the head slot's note stack: the live notes (as one group
+   *  where there are several), then the historical notes a filter left above
+   *  the newest row. */
+  const topNotes = useMemo<GapItem[]>(() => {
+    const live: GapItem[] = liveGroup ? [liveGroup, ...liveRowsShown.filter((n) => !n.live)] : liveRowsShown;
+    return !showMarketNotes || headNotes.length === 0 ? live : [...live, ...headNotes];
+  }, [showMarketNotes, headNotes, liveRowsShown, liveGroup]);
+  /** The head slot's plain notes, for the phone list view, which draws the
+   *  group on its own above them. */
+  const topPlainNotes = useMemo(() => topNotes.filter((n): n is MarketNote => !isLiveNoteGroup(n)), [topNotes]);
   const liveSlotAtTop = topNotes.length > 0;
   /** The live WINDOW's own occupancy of the head slot — read off the prop, not
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
@@ -1535,18 +1542,23 @@ function ChainTruthTimelineBody({
                   }}
                 />
               )}
+              {liveSlotAtTop && !spineActive && phone && liveGroup && (
+                <SpineTipContext.Provider value={!liveWindowAtTop ? tipSide : null}>
+                  <LiveNoteGroupRow group={liveGroup} isFirst={!tipBoundaryAtTop && !liveWindowAtTop} />
+                </SpineTipContext.Provider>
+              )}
               {liveSlotAtTop &&
                 !spineActive &&
                 phone &&
-                phoneNoteRows(topNotes, "head", (note, i) => (
+                phoneNoteRows(topPlainNotes, "head", (note, i) => (
                   <SpineTipContext.Provider
                     key={`live_${note.id}`}
-                    value={i === 0 && !liveWindowAtTop ? tipSide : null}
+                    value={i === 0 && !liveGroup && !liveWindowAtTop ? tipSide : null}
                   >
                     <MarketNoteRow
                       note={note}
                       datePrefix={headDatePrefix(note)}
-                      isFirst={i === 0 && !tipBoundaryAtTop && !liveWindowAtTop}
+                      isFirst={i === 0 && !liveGroup && !tipBoundaryAtTop && !liveWindowAtTop}
                       isLast={false}
                     />
                   </SpineTipContext.Provider>
@@ -1734,9 +1746,12 @@ function ChainTruthTimelineBody({
                         head={{ tip: null, above: false, below: false }}
                       />
                     ) : (
-                      phoneNoteRows(topNotes, "filtered", (note) => (
-                        <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={headDatePrefix(note)} />
-                      ))
+                      <>
+                        {liveGroup && <LiveNoteGroupRow group={liveGroup} />}
+                        {phoneNoteRows(topPlainNotes, "filtered", (note) => (
+                          <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={headDatePrefix(note)} />
+                        ))}
+                      </>
                     )}
                   </div>
                 )}

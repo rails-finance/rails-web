@@ -27,8 +27,8 @@ const intro = (
       for whatever the pool can&apos;t cover.
     </p>
     <p>
-      Drawing new ebUSD, whether at open or on a later adjustment, pays a one-time upfront fee — about a week of the
-      Trove&apos;s own interest — added straight to the debt.
+      Drawing new ebUSD, whether at open or on a later adjustment, pays a one-time upfront fee: a week of interest on
+      the new debt at the branch&apos;s average rate, added to the debt.
     </p>
     <p>
       Each row of the listing is one Trove: its collateral, its ebUSD debt, its collateral ratio, its dollar value, the

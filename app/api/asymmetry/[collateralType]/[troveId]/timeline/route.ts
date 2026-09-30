@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { attachForkRedistSources } from "@/lib/sources/api/liquity-fork-redist-sources";
+import { resolveBranch } from "@/lib/asymmetry/asset-catalog";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache";
@@ -97,6 +99,13 @@ export async function GET(
         upstream.collateralType ?? collateralType,
         upstream.troveId ?? troveId,
       );
+      await attachForkRedistSources(data.events, {
+        fork: "asymmetry",
+        branch: resolveBranch(collateralType)?.key ?? collateralType,
+        collDecimals: resolveBranch(collateralType)?.decimals ?? 18,
+        boundaries: upstream.rows.flatMap((r) => (r.kind === "event" ? [] : [r.folder.lastBlock])),
+        readerIp,
+      });
       const rowPlan: TimelineRowPlanEntry[] = upstream.rows.map((r) =>
         r.kind === "event"
           ? { kind: "event" }
@@ -118,6 +127,12 @@ export async function GET(
     }
     const raw = (await response.json()) as TimelineBackendResponse;
     const result = buildAsymmetryTimeline(raw.rows ?? [], raw.collateralType ?? collateralType, raw.troveId ?? troveId);
+    await attachForkRedistSources(result.events, {
+      fork: "asymmetry",
+      branch: resolveBranch(collateralType)?.key ?? collateralType,
+      collDecimals: resolveBranch(collateralType)?.decimals ?? 18,
+      readerIp,
+    });
     // The ceiling and the window are different claims and both can be absent.
     // A windowed fetch is never truncated — it asked for a window and got one —
     // so `withRowCeiling` stays exactly as it was and simply never fires.

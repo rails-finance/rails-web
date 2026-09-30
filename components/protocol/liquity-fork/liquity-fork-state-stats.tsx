@@ -29,7 +29,8 @@ import {
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { AmountText } from "@/components/shared/amount-text";
 
 /** The fork vocabulary's builders the cells read (lib/<fork>/event-provenance.ts). */
@@ -74,8 +75,41 @@ export interface LiquityForkStateProvs {
   ) => Provenance;
 }
 
-/** A figure as the grid prints it — the echo key the explainer builds too. */
-export const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
+/** A figure as the grid prints it — the echo key the explainer builds too.
+ *  The fork's one precision rule (forkAmount), shared with the header. */
+export const fmt = (human?: string): string => (human == null ? "—" : forkAmount(Number(human)));
+/** A collateral figure as the grid prints it (forkCollAmount). */
+export const fmtColl = (human?: string): string => (human == null ? "—" : forkCollAmount(Number(human)));
+
+/** The headline figure of a cell: thousands in the grid's compact form, the
+ *  smaller figures at the fork's rule, so 0.0115 reads as it does in the row
+ *  header. */
+const gridFigure = (human?: string, small: (n: number) => string = forkAmount): string => {
+  if (human == null) return "—";
+  const n = Number(human);
+  return Math.abs(n) >= 1000 ? formatCompact(n) : small(n);
+};
+
+/** A reconstructed transition restated at the same rule, so the grid's
+ *  before and change read like the header and the prose. */
+function atForkPrecision(
+  t: ChainTruthTransition | undefined,
+  after: string | undefined,
+  change: string | undefined,
+  small: (n: number) => string = forkAmount,
+) {
+  if (!t || after == null || change == null) return t;
+  const c = Number(change);
+  const before = Number(after) - c;
+  // Thousands keep the grid's compact form; the smaller figures take the rule.
+  const f = (x: number) => (Math.abs(x) >= 1000 ? formatCompact(x) : small(x));
+  return {
+    ...t,
+    before: f(before),
+    change: `${c >= 0 ? "+" : "−"}${f(Math.abs(c))}`,
+    shownAsIs: true,
+  };
+}
 export const forkCrText = (cr: number): string => `${cr.toFixed(2)}%`;
 export const forkRateText = (rate: number): string => `${rate.toFixed(2)}%`;
 
@@ -277,17 +311,29 @@ export function liquityForkStateStats(
   }
 
   // ── The Trove's operation ─────────────────────────────────────────────────
+  const redist = forkRedistArrival(ctx);
   stats.push({
     label: "Collateral",
-    value: fmt(ctx.collAfter),
+    value: fmtColl(ctx.collAfter),
+    display: gridFigure(ctx.collAfter, forkCollAmount),
     symbol: ctx.collateralSymbol,
     prov: p.collAfterProv(coords, ctx.origin?.coll),
-    transition: reconstructTransition({
-      after: ctx.collAfter,
-      change: ctx.collDelta,
-      changeProv: p.collDeltaProv(coords, undefined, ctx.origin?.coll),
-      beforeProv: p.collBeforeProv(coords, ctx.originBefore?.coll),
-    }),
+    transition: atForkPrecision(
+      reconstructTransition({
+        after: ctx.collAfter,
+        change: ctx.collDelta,
+        changeProv: p.collDeltaProv(coords, undefined, ctx.origin?.coll),
+        beforeProv: p.collBeforeProv(coords, ctx.originBefore?.coll),
+      }),
+      ctx.collAfter,
+      ctx.collDelta,
+      forkCollAmount,
+    ),
+    ...(redist && redist.coll > 0
+      ? {
+          sub: <>incl. +{forkCollAmount(redist.coll)} from a liquidation</>,
+        }
+      : {}),
     ...(f.collUsdAfter != null && f.price != null
       ? {
           usd: {
@@ -304,6 +350,10 @@ export function liquityForkStateStats(
   // move (V2's "incl. +X interest + Y fee").
   const op = ctx.operation;
   const accrued = op?.accruedInterest;
+  // What a liquidated neighbour's redistribution added on this touch, and on a
+  // redemption the amount redeemed, each as its own part of the change.
+  const redistDebt = redist && redist.debt >= 0.01 ? redist.debt : 0;
+  const redeemed = ctx.eventType === "redeemCollateral" ? Math.abs(forkDebtMove(ctx).value) : 0;
   const feeN = op?.debtUpfrontFee != null ? Number(op.debtUpfrontFee) : 0;
   const hasFee = Number.isFinite(feeN) && feeN > 0;
   const debtSub =
@@ -337,19 +387,33 @@ export function liquityForkStateStats(
             fee
           </>
         )}
+        {redistDebt > 0 && (
+          <>
+            {accrued != null || hasFee ? " + " : "incl. +"}
+            {forkAmount(redistDebt)} from a liquidation
+          </>
+        )}
+        {redeemed > 0.01 && accrued != null && <>, then −{forkAmount(redeemed)} redeemed</>}
       </>
+    ) : redistDebt > 0 ? (
+      <>incl. +{forkAmount(redistDebt)} from a liquidation</>
     ) : undefined;
   stats.push({
     label: "Debt",
     value: fmt(ctx.debtAfter),
+    display: gridFigure(ctx.debtAfter),
     symbol: debtSymbol,
     prov: p.debtAfterProv(coords, ctx.origin?.debt),
-    transition: reconstructTransition({
-      after: ctx.debtAfter,
-      change: ctx.debtDelta,
-      changeProv: p.debtDeltaProv(coords, undefined, ctx.origin?.debt),
-      beforeProv: p.debtBeforeProv(coords, ctx.originBefore?.debt, ctx.originBefore != null),
-    }),
+    transition: atForkPrecision(
+      reconstructTransition({
+        after: ctx.debtAfter,
+        change: ctx.debtDelta,
+        changeProv: p.debtDeltaProv(coords, undefined, ctx.origin?.debt),
+        beforeProv: p.debtBeforeProv(coords, ctx.originBefore?.debt, ctx.originBefore != null),
+      }),
+      ctx.debtAfter,
+      ctx.debtDelta,
+    ),
     ...(debtSub ? { sub: debtSub } : {}),
   });
 

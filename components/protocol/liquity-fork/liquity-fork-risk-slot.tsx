@@ -84,6 +84,11 @@ function LiquityForkDetailsBand({ chain }: { chain: LiquityForkTroveChainRespons
               {chain.trovesAhead}
             </span>
           )}
+          {/* Nothing sits at a lower or equal rate: this Trove is the head of
+              the redemption queue, whatever rate it chose. */}
+          {chain.debtInFront < 0.01 && (chain.trovesAhead == null || chain.trovesAhead === 0) && (
+            <div>Lowest rate on the branch now: next in line</div>
+          )}
         </div>
       )}
     </>

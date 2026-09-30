@@ -31,6 +31,7 @@ import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { isCollSurplusClaimEvent, isAsymmetryEvent } from "@/lib/shared/types/event-shape";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { collSurplusClaimEvent } from "@/lib/shared/liquity-coll-surplus-claim";
@@ -262,6 +263,22 @@ export default function AsymmetryTroveDetail({
   );
 
   const lastLiq = asymmetryEvents.find((e) => e.context.data.eventType === "liquidate");
+  // Redistributions this life received, stated on the card only when the
+  // whole history is loaded, so the count is the life's.
+  const redistTally = useMemo(() => {
+    if (historyWindow.state !== "whole" || (servedFolders?.length ?? 0) > 0) return null;
+    let count = 0;
+    let debt = 0;
+    let coll = 0;
+    for (const e of asymmetryEvents) {
+      const r = forkRedistArrival(e.context.data);
+      if (!r) continue;
+      count += 1;
+      debt += r.debt;
+      coll += r.coll;
+    }
+    return { count, debt, coll };
+  }, [asymmetryEvents, historyWindow.state, servedFolders]);
   // The liquidation's surplus at the head: claimable or claimed (the index
   // records the credit, never the claim).
   const surplus = useLiquityCollSurplus({
@@ -423,11 +440,13 @@ export default function AsymmetryTroveDetail({
         debtSymbol={DEBT_SYMBOL}
         peakCollateral={view.peakCollateral}
         peakDebt={view.peakDebt}
+        redist={redistTally}
         surplus={surplus}
         seizure={
           lastLiq
             ? {
                 coll: Number(lastLiq.context.data.collBefore) || 0,
+                surplus: Number(lastLiq.context.data.liquidation?.collSurplus ?? 0) || 0,
                 debt: Number(lastLiq.context.data.debtBefore) || 0,
               }
             : null
@@ -489,7 +508,11 @@ export default function AsymmetryTroveDetail({
               explanation={
                 terminalPane ??
                 (liveRisk ? (
-                  <LiquityForkPositionExplanation chain={chain} isBatched={view?.isBatched ?? false} />
+                  <LiquityForkPositionExplanation
+                    chain={chain}
+                    isBatched={view?.isBatched ?? false}
+                    redist={redistTally}
+                  />
                 ) : undefined)
               }
             />
