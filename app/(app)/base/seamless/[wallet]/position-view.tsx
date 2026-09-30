@@ -42,6 +42,7 @@ import { AaveV3PoolNotes, type AaveV3FrozenMarket } from "@/components/protocol/
 import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import {
   emodeSwitchEvents,
   fetchAccountSwitches,
@@ -705,6 +706,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           sw={event.context.data.emodeSwitch}
                           pool={POOL_IDENTITY}
                           persistPrefix="aave-v3"
+                          hfFormat={hfLabelV3}
                           eventNumber={meta.eventNumber}
                           isFirst={meta.isFirst}
                           isLast={meta.isLast}

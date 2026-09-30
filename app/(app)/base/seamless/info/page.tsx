@@ -14,10 +14,11 @@ export const metadata = infoMetadata("seamless");
 const intro = (
   <>
     <p>
-      Seamless is an Aave V3 market on Base, winding down. One Pool, every reserve, one health factor per wallet. Each
-      row of the listing is one wallet&apos;s account: what it still holds and what it still owes, every figure read
-      from the Pool itself at the block the row names, and dollar values from the oracle the Pool liquidates with. How
-      far an account sits from liquidation, its health factor, is on its position page, read live from the Pool.
+      Seamless is a lending market on Base, run on Aave V3 code under Seamless&apos;s own governance, and winding down.
+      One Pool, every reserve, one health factor per wallet. Each row of the listing is one wallet&apos;s account: what
+      it still holds and what it still owes, every figure read from the Pool itself at the block the row names, and
+      dollar values from the oracle the Pool liquidates with. How far an account sits from liquidation, its health
+      factor, is on its position page, read live from the Pool.
     </p>
     <p>
       <span className="font-medium text-foreground">This market is closed to new positions.</span> All eighteen reserves

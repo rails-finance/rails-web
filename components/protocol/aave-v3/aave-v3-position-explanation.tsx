@@ -18,8 +18,9 @@
 import type { AaveV3CountNote } from "@/lib/aave-v3/event-neighbours";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
-import { fmtUsd, hfLabel, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { fmtUsd, fmtLiqPrice } from "@/lib/aave-v4/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -65,6 +66,7 @@ export function AaveV3PositionExplanation({
   /** Why the timeline lists more events than the count (aaveV3CountSentence). */
   countNote?: AaveV3CountNote | null;
 }) {
+  const brand = v3Brand(v3Protocol(useV3Pool()));
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   if (!chain) return null;
@@ -96,7 +98,8 @@ export function AaveV3PositionExplanation({
     <>This position supplies collateral only and carries no debt, so none of it can be liquidated:</>
   ) : hf != null ? (
     <>
-      This position borrows against its supplied collateral, held at a <H>{hfLabel(hf)}</H> health factor:
+      This position borrows against its supplied collateral, held at a <H>{hf >= 100 ? "∞" : hfLabelV3(hf)}</H> health
+      factor:
     </>
   ) : (
     <>This position borrows against its supplied collateral:</>
@@ -152,7 +155,7 @@ export function AaveV3PositionExplanation({
           )}
           <H>{pct(chain.avgLiquidationThreshold)}</H>
           {blended}), so the collateral can carry up to {fmtUsd(debtCeilingUsd).display} of debt before the position is
-          liquidatable. The loan-to-value cap and the threshold are today&rsquo;s settings; Aave governance changes
+          liquidatable. The loan-to-value cap and the threshold are today&rsquo;s settings; {brand} governance changes
           them, and each event&rsquo;s details show the values at its block.
         </span>,
       );
@@ -160,8 +163,8 @@ export function AaveV3PositionExplanation({
     if (hf != null) {
       bullets.push(
         <span key="hf">
-          Risk-adjusted collateral covers the debt {hf.toFixed(2)}× over; at a health factor of 1.00 the position
-          becomes liquidatable.
+          Risk-adjusted collateral covers the debt {hfLabelV3(hf)}× over; at a health factor of 1 the position becomes
+          liquidatable.
         </span>,
       );
     }
@@ -324,7 +327,7 @@ import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 import { isWethGateway } from "@/lib/aave-v3/chain-truth-tower";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
-import { v3Protocol } from "@/lib/aave-v3/protocol-name";
+import { v3Brand, v3Protocol } from "@/lib/aave-v3/protocol-name";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
