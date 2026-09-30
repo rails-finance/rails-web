@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readCTokenLiquidityAt } from "@/lib/sources/chain/ctoken-liquidity-at";
+import { readCTokenLiquidityAt, readCTokenMembershipAt } from "@/lib/sources/chain/ctoken-liquidity-at";
 import type { CTokenProtocol } from "@/lib/api/fetch-ctoken-liquidity-at";
 
 // Why a Compound V2, Moonwell or Moonwell Base account could be liquidated:
@@ -22,6 +22,15 @@ export async function GET(request: NextRequest) {
   if (!protocol || !PROTOCOLS.includes(protocol) || !ADDRESS.test(wallet) || !Number.isInteger(block) || block < 2)
     return NextResponse.json({ error: "protocol, wallet and block are required" }, { status: 400 });
   try {
+    // ?membership=<market>: whether that market was entered as collateral at
+    // the block (a supply row's line), in place of the liquidation reads.
+    const membership = q.get("membership");
+    if (membership) {
+      const m = await readCTokenMembershipAt(protocol, wallet.toLowerCase(), block, membership);
+      return NextResponse.json(m, {
+        headers: m ? { "cache-control": "public, max-age=86400, s-maxage=31536000, immutable" } : {},
+      });
+    }
     const data = await readCTokenLiquidityAt(
       protocol,
       wallet.toLowerCase(),

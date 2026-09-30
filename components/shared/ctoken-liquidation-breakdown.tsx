@@ -51,6 +51,11 @@ export interface CTokenLiquidationBreakdownProps {
 }
 
 const pct = (f: number, digits = 1) => `${(f * 100).toFixed(digits)}%`;
+/** A collateral factor as set: 75%, or 82.5% where it has a half. */
+const factorPct = (f: number) => {
+  const p = Math.round(f * 1000) / 10;
+  return `${Number.isInteger(p) ? p.toFixed(0) : p.toFixed(1)}%`;
+};
 
 /** Small amounts keep four significant figures: a 0.0058 ETH repayment is
  *  the figure the story turns on. */
@@ -68,7 +73,7 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
       wallet: p.wallet,
       block: p.block,
       collateral: p.collateralKey,
-      debtMarket: p.debtBefore == null ? p.debtKey : undefined,
+      debtMarket: p.debtKey,
     }).then((r) => {
       if (live) setAt(r);
     });
@@ -87,11 +92,34 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
   });
 
   const lines: React.ReactNode[] = [];
+  const money = (n: number) => (p.format ? p.format(n) : usdSmall(n));
+  const collLabel = p.seizeSymbol.replace(/^[cm]/, "");
+  const deprecated = at?.debtMarketDeprecated === true;
+  const counted = at?.counted ?? null;
+  const collCf = counted?.find((c) => c.market === at?.collateralMarket)?.collateralFactor ?? null;
 
   const before = at?.before;
-  if (before && at) {
+  if (at && deprecated) {
     lines.push(
-      before.shortfallUsd > 0 ? (
+      <>
+        The {p.debtSymbol} market was deprecated at this block (collateral factor 0, borrowing paused, reserve factor
+        100%). For a deprecated market the Comptroller skips the shortfall check and the close factor, so anyone could
+        repay the whole {p.debtSymbol} borrow.
+        {before && (
+          <>
+            {" "}
+            The account was healthy: at block {(at.block - 1).toLocaleString("en-US")} it had{" "}
+            <Prov info={read("Liquidity", "getAccountLiquidity", at.block - 1)}>
+              <strong>{money(before.liquidityUsd)}</strong>
+            </Prov>{" "}
+            of borrowing room.
+          </>
+        )}
+      </>,
+    );
+  } else if (before && at) {
+    if (before.shortfallUsd > 0) {
+      lines.push(
         <>
           At block {(at.block - 1).toLocaleString("en-US")}, just before, the account had a{" "}
           <Prov
@@ -102,26 +130,73 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
               "A shortfall above zero means the debt was worth more than the borrow limit (collateral × each market's collateral factor), which is what lets anyone liquidate.",
             )}
           >
-            <strong>{usdSmall(before.shortfallUsd)}</strong>
+            <strong>{money(before.shortfallUsd)}</strong>
           </Prov>{" "}
           shortfall: its debt was worth more than its borrow limit, so anyone could liquidate it.
           {at.after && at.after.shortfallUsd === 0 && (
             <>
               {" "}
               After the liquidation it had{" "}
-              <Prov info={read("Liquidity", "getAccountLiquidity", at.block)}>
-                {usdSmall(at.after.liquidityUsd)}
-              </Prov>{" "}
-              of borrowing room left.
+              <Prov info={read("Liquidity", "getAccountLiquidity", at.block)}>{money(at.after.liquidityUsd)}</Prov> of
+              borrowing room left.
             </>
           )}
-        </>
-      ) : (
+        </>,
+      );
+    } else {
+      // No shortfall at the block before: a price or interest update inside
+      // this block made the account liquidatable. The shortfall it met is the
+      // Comptroller's figure after the liquidation, less the debt repaid, plus
+      // the seized collateral at its factor — each at this block's prices.
+      const metShortfall =
+        at.after && at.after.shortfallUsd === 0 && p.clearedValue != null && p.seizedValue != null && collCf != null
+          ? p.clearedValue - p.seizedValue * collCf - at.after.liquidityUsd
+          : null;
+      lines.push(
         <>
-          At block {(at.block - 1).toLocaleString("en-US")} the Comptroller reported no shortfall; the price or interest
-          update that made this account liquidatable happened inside block {at.block.toLocaleString("en-US")}.
-        </>
-      ),
+          At block {(at.block - 1).toLocaleString("en-US")} the account had{" "}
+          <Prov info={read("Liquidity", "getAccountLiquidity", at.block - 1)}>{money(before.liquidityUsd)}</Prov> of
+          borrowing room and no shortfall. A price or interest update inside block {at.block.toLocaleString("en-US")}{" "}
+          pushed the debt past the limit
+          {metShortfall != null && metShortfall > 0 ? (
+            <>
+              : at that block&rsquo;s prices the account was <strong>{money(metShortfall)}</strong> short when it was
+              liquidated (its {money(at.after!.liquidityUsd)} of room after the liquidation, less the{" "}
+              {money(p.clearedValue!)} repaid, plus the {money(p.seizedValue!)} seized × {factorPct(collCf!)})
+            </>
+          ) : null}
+          .
+        </>,
+      );
+    }
+  }
+
+  // What the borrow limit counted: each entered market holding a supply, at
+  // its collateral factor. A seized market left out of that list was supplied
+  // but never entered as collateral.
+  if (counted && counted.length > 0) {
+    const limit = counted.reduce(
+      (a, c) => (c.value == null || a == null ? null : a + c.value * c.collateralFactor),
+      0 as number | null,
+    );
+    lines.push(
+      <>
+        The borrow limit at block {(at!.block - 1).toLocaleString("en-US")} counted{" "}
+        {counted.map((c, i) => (
+          <span key={c.market}>
+            {i > 0 ? (i === counted.length - 1 ? " and " : ", ") : ""}
+            {c.label} {c.value != null ? money(c.value) : ""} × {factorPct(c.collateralFactor)}
+          </span>
+        ))}
+        {limit != null && counted.length > 0 ? <> = {money(limit)}</> : null}.
+        {at?.collateralEntered === false && (
+          <>
+            {" "}
+            {collLabel} was supplied but not used as collateral (its market was not entered), so it did not count. A
+            liquidation can still seize it: the Comptroller lets a liquidator take any market the account supplies.
+          </>
+        )}
+      </>,
     );
   }
 
@@ -133,7 +208,14 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
     (at?.debtBeforeRaw && p.repaidRaw && BigInt(p.repaidRaw) > BigInt(0)
       ? (p.repaid * Number((BigInt(at.debtBeforeRaw) * BigInt(1_000_000)) / BigInt(p.repaidRaw))) / 1_000_000
       : null);
-  if (cf != null && debtBefore != null && debtBefore > 0) {
+  if (deprecated && debtBefore != null && debtBefore > 0) {
+    lines.push(
+      <>
+        No close factor applied: the liquidator repaid {amt(p.repaid)} of the {amt(debtBefore)} {p.debtSymbol} debt (
+        {pct(p.repaid / debtBefore)}).
+      </>,
+    );
+  } else if (cf != null && debtBefore != null && debtBefore > 0) {
     const max = debtBefore * cf;
     lines.push(
       <>
@@ -158,9 +240,17 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
       lines.push(
         <>
           {gross} The market kept {pct(share, 2)} of the seized {p.seizeSymbol} ({amt(shareTokens)} {p.seizeSymbol},
-          about {fmt(p.seizedValue * share)}) as reserves: that is the &ldquo;{p.protocolShareRow}
-          &rdquo; row. The liquidator received {amt(p.seizeTokens - shareTokens)} {p.seizeSymbol}, about {fmt(kept)}:{" "}
+          about {money(p.seizedValue * share)}) as reserves: that is the &ldquo;{p.protocolShareRow}&rdquo; row. The
+          liquidator received {amt(p.seizeTokens - shareTokens)} {p.seizeSymbol}, about {money(kept)}:{" "}
           {pct(kept / p.clearedValue - 1)} over the debt it repaid, before gas.
+        </>,
+      );
+    } else if (share === 0) {
+      lines.push(
+        <>
+          {gross} The {p.seizeSymbol} market takes no protocol share of a seizure, so the liquidator received all{" "}
+          {amt(p.seizeTokens)} {p.seizeSymbol}: {pct(p.seizedValue / p.clearedValue - 1)} over the debt it repaid,
+          before gas.
         </>,
       );
     } else lines.push(gross);

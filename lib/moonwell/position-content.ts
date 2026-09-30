@@ -47,7 +47,7 @@ export function moonwellPositionContent(opts: {
       details: [
         {
           bold: "Account liquidity",
-          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account.",
+          text: "the Comptroller (Moonwell's risk contract) adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account. A supply in a market the account never entered does not count, but can still be seized.",
         },
         {
           bold: "Partial and repeatable",
@@ -95,11 +95,11 @@ export function moonwellPositionContent(opts: {
     opts.hasDebt
       ? {
           bold: "Account liquidity",
-          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt) per call.",
+          text: "the Comptroller (Moonwell's risk contract) adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt) per call.",
         }
       : {
           bold: "Supply only",
-          text: "a supply is not collateral until the wallet enters its market (enterMarkets); only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
+          text: "a supply is not collateral until the wallet enters its market; only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
         },
     rosterDetail(deployment),
   ];

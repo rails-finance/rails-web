@@ -59,6 +59,7 @@ function stub(wallet: string): MoonwellChainResponse {
     healthFactor: null,
     closeFactor: 0,
     liquidationIncentive: 0,
+    entered: null,
     chainStale: true,
   };
 }
@@ -126,6 +127,19 @@ export async function loadMoonwellPositionFromChain(
     const liquidationIncentive = Number(results[3] as unknown as bigint) / FACTOR;
     const entered = new Set(assetsIn.map((a) => a.toLowerCase()));
 
+    // Every entered market, held or not: a closed card splits its peaks by
+    // membership, and the card states each entered market's factor.
+    const enteredMarkets: NonNullable<MoonwellChainResponse["entered"]> = [];
+    roster.markets.forEach((m, i) => {
+      if (!entered.has(m.mtoken)) return;
+      const [, cf] = results[4 + i * PER_MARKET + 6] as unknown as [boolean, bigint];
+      enteredMarkets.push({
+        underlying: m.underlying.toLowerCase(),
+        symbol: m.symbol,
+        collateralFactor: Number(cf) / FACTOR,
+      });
+    });
+
     let collateralValueUsd = 0;
     let collateralCapacityUsd = 0;
     let debtValueUsd = 0;
@@ -182,6 +196,7 @@ export async function loadMoonwellPositionFromChain(
       healthFactor: debtValueUsd > 0 ? collateralCapacityUsd / debtValueUsd : null,
       closeFactor,
       liquidationIncentive,
+      entered: enteredMarkets,
       chainStale: false,
     };
   } catch (error) {

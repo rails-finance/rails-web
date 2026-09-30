@@ -91,6 +91,9 @@ export interface MoonwellChainResponse {
   /** Protocol constants at the same head. */
   closeFactor: number;
   liquidationIncentive: number;
+  /** Every market the account has entered as collateral (getAssetsIn at
+   *  head), held or not, with its live collateral factor. Null on a stub. */
+  entered: { underlying: string; symbol: string; collateralFactor: number }[] | null;
   /** True when the chain RPC read failed and we returned an empty stub. */
   chainStale: boolean;
 }

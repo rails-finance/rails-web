@@ -9,6 +9,12 @@ import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/expla
 import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { indefiniteArticle } from "@/lib/utils/format";
+import {
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  isCompoundV2Deprecated,
+} from "@/lib/compound-v2/deprecated-markets";
+import { COMPOUND_V2_NO_SEIZE_SHARE } from "@/lib/compound-v2/asset-catalog";
 
 // ── CoW Protocol ─────────────────────────────────────────────────────────────
 
@@ -1686,16 +1692,16 @@ export function moonwellBorrowRepayContent(
         bold: "Borrowing power",
         text:
           deployment === "base"
-            ? "how much can be borrowed depends on the supplied value weighted by each market's collateral factor — set by governance per market, and shown on the position card as the Comptroller states it."
+            ? "how much can be borrowed depends on the supplied value in entered markets, weighted by each market's collateral factor. Governance sets the factors; the position card shows the entered markets' factors."
             : "how much can be borrowed depends on the supplied value weighted by each market's collateral factor (0.80 for WETH and cbBTC, 0.85 for USDC and USDT, as set by governance).",
       },
       {
         bold: "Account liquidity",
-        text: "the Comptroller tracks one liquidity figure across the whole account; when it turns to shortfall, the account can be liquidated.",
+        text: "the Comptroller (Moonwell's risk contract) keeps one figure for the whole account: the borrow limit (each entered market's value × its collateral factor) minus the debt. Below zero it is a shortfall, and the account can be liquidated.",
       },
       {
         bold: "The emitted debt figure",
-        text: "every borrow and repay event carries the borrower's total debt after it (accountBorrows) — the contract's own reckoning, interest included to that moment. The timeline shows that figure verbatim.",
+        text: "every borrow and repay event carries the borrower's total debt after it, as the market reckons it, interest included to that moment. The timeline shows that figure as emitted.",
       },
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -1735,7 +1741,7 @@ export function moonwellLiquidationContent(): LearnMoreContent {
     intro:
       "A Moonwell account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt (up to the close factor, 50% per liquidation) and, in return, seizes the borrower's mTokens in a collateral market of the liquidator's choosing — worth the repaid debt plus a 10% liquidation incentive. The seize is an mToken transfer from borrower to liquidator, so it shows on the collateral market's balance lane too.",
+      "A liquidator repays part of one debt (up to the close factor, 50% per liquidation) and in return seizes the borrower's mTokens in a market of its choosing, worth the repaid debt plus a 10% liquidation incentive. The market keeps 3% of the seized mTokens as reserves; the liquidator gets the rest. Any supplied market can be seized, including one the account never entered as collateral.",
       "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency rather than closing it outright.",
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -1797,7 +1803,7 @@ export function compoundV2SupplyWithdrawContent(eventType: "mint" | "redeem"): L
       },
       {
         bold: "Cross-collateralisation",
-        text: "the Comptroller pools every entered market into one account per wallet — supplied value across markets backs borrowing across markets, weighted by each market's collateral factor. Eight of the twenty markets have collateral disabled entirely (a zero factor): supply there earns but backs nothing.",
+        text: "the Comptroller (Compound's risk contract, which decides what an account may borrow) pools every entered market into one account per wallet: supplied value across markets backs borrowing across markets, weighted by each market's collateral factor. Eight of the twenty markets have collateral disabled (a factor of 0): supply there backs nothing.",
       },
       {
         bold: supplying ? "Transferable positions" : "Effect on liquidity",
@@ -1810,26 +1816,31 @@ export function compoundV2SupplyWithdrawContent(eventType: "mint" | "redeem"): L
   };
 }
 
-export function compoundV2BorrowRepayContent(eventType: "borrow" | "repay"): LearnMoreContent {
+export function compoundV2BorrowRepayContent(eventType: "borrow" | "repay", market?: string): LearnMoreContent {
   const borrowing = eventType === "borrow";
+  // Maximillion is the helper contract that repays a cETH borrow in native
+  // ETH; it only ever appears on ETH repays.
+  const ethRepay = !borrowing && market === "eth";
   return {
     title: borrowing ? "How Borrowing Works" : "How Repaying Works",
     intro: borrowing
       ? "Borrowing draws an asset against the account's supplied collateral, accruing interest every block — Compound V2 accrues per block, and each market's own interest rate model sets the rate from utilisation."
-      : "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party — on the cETH market, the Maximillion helper fronts native-ETH repays.",
+      : ethRepay
+        ? "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party. ETH repays often go through Maximillion, a Compound helper contract that takes native ETH and repays the cETH borrow with it."
+        : "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Borrowing power",
-        text: "how much can be borrowed depends on the supplied value in ENTERED markets, weighted by each market's governance-set collateral factor. Supplying alone does not enter a market.",
+        text: "how much can be borrowed depends on the supplied value in entered markets, weighted by each market's governance-set collateral factor. Supplying alone does not enter a market: the wallet enters it in a separate call.",
       },
       {
         bold: "Account liquidity",
-        text: "the Comptroller tracks one liquidity figure across the whole account (getAccountLiquidity); when it turns to shortfall, the account can be liquidated.",
+        text: "the Comptroller keeps one figure for the whole account: the borrow limit (each entered market's value × its collateral factor) minus the debt. Above zero it is room to borrow more; below zero it is a shortfall, and the account can be liquidated.",
       },
       {
         bold: "The emitted debt figure",
-        text: "every borrow and repay event carries the borrower's total debt after it (accountBorrows) — the contract's own reckoning, interest included to that moment. The gap between one event's debt-after and the next event's debt-before is the interest that accrued between them.",
+        text: "every borrow and repay event carries the borrower's total debt after it, as the market reckons it, interest included to that moment. The gap between one event's debt after and the next event's debt before is the interest that accrued between them.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
@@ -1863,20 +1874,28 @@ export function compoundV2TransferContent(direction: "transfer_in" | "transfer_o
   };
 }
 
-export function compoundV2LiquidationContent(): LearnMoreContent {
+export function compoundV2LiquidationContent(market?: string): LearnMoreContent {
+  const deprecated = isCompoundV2Deprecated(market);
   return {
     title: "How Liquidations Work",
     intro:
-      "A Compound V2 account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
+      "A Compound V2 account can be liquidated when its account liquidity turns to a shortfall: the Comptroller (Compound's risk contract) values each entered market's collateral × its collateral factor, and the debt is worth more than that. Once it is, anyone (in practice an automated bot) can step in. A deprecated market is the exception: there, any borrow can be liquidated with no shortfall.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt — at most the close factor, 50% of one borrowed market per liquidation — and in return seizes the borrower's cTokens in a collateral market of the liquidator's choosing, worth the repaid debt plus the liquidation incentive. The seizure splits in two: most goes to the liquidator, and the protocol keeps its own share (protocolSeizeShare, 2.8%), burned out of the borrower's balance.",
-      "Liquidation is partial and repeatable, and borrowers commonly survive it: Compound V2's 26,639 liquidations land on 5,864 distinct borrowers — about 4.5 each. An account liquidated years ago can still be open today; the timeline shows each liquidation as one event in the account's life.",
+      "A liquidator repays part of one debt, at most the close factor: 50% of that borrowed market per call, or the whole borrow in a deprecated market. In return it seizes the borrower's cTokens in a collateral market of its choosing, worth the repaid debt plus the 8% liquidation incentive. In thirteen markets the protocol keeps 2.8% of the seized cTokens as its share; cETH, cUSDC, cBAT, cREP, cZRX, cSAI and the first cWBTC take none, so the liquidator gets the whole seizure.",
+      deprecated
+        ? `A deprecated market has ${DEPRECATED_CONDITIONS}. The Comptroller skips the shortfall check and the close factor for a borrow in one, so ${DEPRECATED_CONSEQUENCE}.`
+        : `A deprecated market has ${DEPRECATED_CONDITIONS}. The Comptroller skips the shortfall check and the close factor for a borrow in one, so ${DEPRECATED_CONSEQUENCE}. Eight markets are deprecated: USDT, ZRX, COMP, TUSD, USDP, FEI, SAI and REP.`,
+      "Otherwise liquidation is partial and repeatable, and borrowers often survive it: Compound V2's 26,639 liquidations fall on 5,864 borrowers, about 4.5 each.",
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
   };
 }
 
-export function compoundV2SeizeContent(kind: "seize_out" | "seize_in" | "seize_burn"): LearnMoreContent {
+export function compoundV2SeizeContent(
+  kind: "seize_out" | "seize_in" | "seize_burn",
+  collateralMarket?: string,
+): LearnMoreContent {
+  const noShare = collateralMarket != null && COMPOUND_V2_NO_SEIZE_SHARE.has(collateralMarket);
   return {
     title:
       kind === "seize_in"
@@ -1886,23 +1905,25 @@ export function compoundV2SeizeContent(kind: "seize_out" | "seize_in" | "seize_b
           : "How Collateral Seizure Works",
     intro:
       kind === "seize_out"
-        ? "When a liquidator repays part of an account's debt, the protocol moves collateral-market cTokens out of the borrower's balance. This is a seizure — collateral being taken under the protocol's liquidation rules — not a transfer the borrower made."
+        ? "When a liquidator repays part of an account's debt, the protocol moves cTokens in a collateral market out of the borrower's balance. This is a seizure under the protocol's liquidation rules; the borrower did not send them."
         : kind === "seize_in"
-          ? "The cTokens a liquidator receives for repaying part of an underwater account's debt — the liquidator's side of a seizure, worth the repaid debt plus the liquidation incentive."
-          : "Every seizure splits in two: the liquidator's share, and the protocol's own cut (protocolSeizeShare, 2.8%) — transferred from the borrower to the cToken contract and burned out of total supply. The tokens cease to exist; no wallet receives them.",
+          ? "The cTokens a liquidator receives for repaying part of a liquidatable account's debt: its side of a seizure, worth the repaid debt plus the liquidation incentive."
+          : "The protocol's share of a seizure: 2.8% of the seized cTokens are taken from the borrower and burned, and their underlying is added to the market's reserves. No wallet receives them.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "One seizure, two legs",
-        text: "the LiquidateBorrow event's seizeTokens is the SUM of the liquidator's leg and the protocol's burned cut — reading only the liquidator's leg understates what the borrower lost.",
+        bold: "One seizure, two parts",
+        text: noShare
+          ? "this market takes no protocol share, so the liquidator receives every seized cToken."
+          : "the seized total is the liquidator's part plus the protocol's 2.8% share: reading only the liquidator's part understates what the borrower lost.",
       },
       {
         bold: "cTokens, not underlying",
         text: "a seizure moves the receipt tokens; the seized value follows the collateral market's exchange rate like any other cToken holding.",
       },
       {
-        bold: "Partial by design",
-        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives — seizures appear alongside continued activity.",
+        bold: "Partial, outside deprecated markets",
+        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives. In a deprecated market the whole borrow can go in one call.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],

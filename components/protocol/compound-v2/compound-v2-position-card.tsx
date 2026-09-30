@@ -36,6 +36,12 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
+import { TipLabel } from "@/components/shared/tip-label";
+import {
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  isCompoundV2Deprecated,
+} from "@/lib/compound-v2/deprecated-markets";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
   positionSupplyCurrentProv,
@@ -307,6 +313,22 @@ function PeakStack({ lines, side }: { lines: CompoundV2PeakAmount[]; side: "supp
   );
 }
 
+/** A borrow in a deprecated market can be repaid in full by any liquidator,
+ *  however healthy the account (lib/compound-v2/deprecated-markets.ts). */
+function DeprecatedBorrowNote({ v }: { v: CompoundV2PositionView }) {
+  const hit = v.borrows.filter((b) => isCompoundV2Deprecated(b.market));
+  if (hit.length === 0) return null;
+  return (
+    <div className="text-xs mt-1 text-amber-700 dark:text-amber-400" data-compound-v2-deprecated-borrow="">
+      <TipLabel
+        text={`${hit.map((b) => b.symbol).join(" and ")} market deprecated`}
+        tip={`A deprecated market has ${DEPRECATED_CONDITIONS}: ${DEPRECATED_CONSEQUENCE}.`}
+      />
+      : this borrow can be liquidated in full at any time.
+    </div>
+  );
+}
+
 export function CompoundV2PositionCard({
   v,
   receipts = false,
@@ -500,6 +522,7 @@ export function CompoundV2PositionCard({
                   usd={captions?.debtInterestUsd}
                   live={v.borrows.length > 0 && v.borrows.every((b) => b.live)}
                 />
+                <DeprecatedBorrowNote v={v} />
               </>
             ),
           },
