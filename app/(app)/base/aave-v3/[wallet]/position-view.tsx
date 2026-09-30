@@ -49,7 +49,8 @@ import {
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
 import { AaveV3PoolNotes } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
-import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
@@ -436,7 +437,10 @@ export default function AaveV3BasePositionView({
   // and only when the sweep read every block, because an attribution against
   // a partial history would call missed principal "interest".
   const captions = useMemo(
-    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents) : null),
+    () =>
+      view && data
+        ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents)
+        : null,
     [view, data, sweptClean, lifetime, aaveEvents],
   );
 
@@ -584,15 +588,13 @@ export default function AaveV3BasePositionView({
                   deployment={AAVE_V3_BASE_LIVE_CARD_DEPLOYMENT}
                   pricesPending={!pricesSettled}
                   captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the L1
-                  // treatment): the liquidation runway and the loan-to-value
-                  // lines, every figure the Pool's own read. Shown only with
-                  // debt — both views need it.
-                  rowExtra={
-                    view.status === "open" && view.borrows.length > 0 && view.healthFactor != null ? (
-                      <AaveV3RiskSlot chain={data} />
-                    ) : undefined
-                  }
+                  // Closed by default, remembered per viewer and position (ui-jobs
+                  // 209), as on Ethereum. The room left to borrow and the
+                  // distance bar from the Pool read sit in the opened layer
+                  // under Debt and Health factor, inside the card's receipts scope.
+                  disclosureKey={`aave-v3:base:${wallet.toLowerCase()}`}
+                  debtDetail={<AaveV3BorrowRoom chain={data} />}
+                  riskDetail={<AaveV3RiskDetail chain={data} />}
                   // The Explanation is layman prose about the face figures,
                   // plus the two facts about THIS Pool that change how they
                   // read — eMode and a supply that backs nothing — which the

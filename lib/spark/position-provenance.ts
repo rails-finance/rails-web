@@ -33,39 +33,6 @@ export function accountDataProv(what: string, field: string): Provenance {
   };
 }
 
-/** The wallet's e-mode category at head: Pool.getUserEMode, the category's
- *  label and figures from Pool.getEModeCategoryData. */
-export function emodeProv(label: string, ltv: number | null, lt: number | null): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: STATE_VERIFY,
-    summary: `E-mode category — ${label}: the category of price-correlated assets this wallet chose, read from SparkLend's Pool at the latest block. Collateral inside it counts at the category's figures${ltv != null && lt != null ? ` (loan-to-value ${(ltv * 100).toFixed(2)}%, liquidation threshold ${(lt * 100).toFixed(2)}%)` : ""}, higher than each asset's figures outside it.`,
-    contract: POOL_CONTRACT,
-    via: "Pool.getUserEMode · Pool.getEModeCategoryData @ head",
-  };
-}
-
-/** A ratio derived from the account's oracle-priced USD totals (current LTV =
- *  debt ÷ collateral). Both totals are themselves getUserAccountData @ head
- *  reads and the division mirrors the protocol's own account math, so the ratio
- *  is chain-derived (it survives the on-chain-only gate) and exact at that block. */
-export function accountRatioProv(what: string, formula: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: STATE_VERIFY,
-    summary: `${what} — computed from the wallet's oracle-priced USD totals (Pool.getUserAccountData @ head).`,
-    contract: POOL_CONTRACT,
-    via: `${ACCOUNT_VIA} · derived ratio`,
-    formula,
-    inputs: [
-      { label: "total debt (USD)", kind: "chain", pclass: "state", note: "getUserAccountData @ head" },
-      { label: "total collateral (USD)", kind: "chain", pclass: "state", note: "getUserAccountData @ head" },
-    ],
-  };
-}
-
 /** A reserve-level economics field read from Pool.getReserveData @ head — the
  *  current supply / variable-borrow APR, the reserve factor, or the reserve's
  *  utilization. Pool-wide reserve state at the latest block, not the wallet's
