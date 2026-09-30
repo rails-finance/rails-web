@@ -517,7 +517,7 @@ function SourceLine({
           {coll ? "Came in" : "Owed in all"}{" "}
           {fig(t.total, {
             kind: "chain-derived",
-            summary: `The bar's whole length at ${when}: everything that came in on this side, the sources after it added up.`,
+            summary: `Came in by ${when}. The bar's whole length: everything that came in on this side, the sources after it added up.`,
             formula: "Σ sources",
           })}
           :{" "}
@@ -556,7 +556,7 @@ function SourceLine({
           ) : (
             fig(t.now, {
               kind: "chain-derived",
-              summary: `What this side ${coll ? "holds" : "owes"} at ${when}.`,
+              summary: `${coll ? "Held" : "Owed"} at ${when}. The solid part of the bar: what this side ${coll ? "holds" : "owes"} at that date.`,
               formula: "Σ balance × price",
             })
           )}
