@@ -29,6 +29,7 @@ import {
   daiDebtProv,
   drawnDaiProv,
   lifetimeFeeProv,
+  repaidPartProv,
   collateralFlowAtEventsProv,
   returnedCollateralProv,
   collateralPriceChangeProv,
@@ -73,6 +74,20 @@ export interface MakerLifetimeFlows {
   /** The collateral flows valued at the OSM price at each event's block, when
    *  every collateral-moving event has one; null otherwise. */
   atEvents: { deposited: number; withdrawn: number; liquidated: number; returned: number } | null;
+  /** Collateral deposited and withdrawn inside one transaction, left out of
+   *  both rows: amount and the transaction's time. */
+  netted: { amount: number; at: number }[];
+  /** Each collateral move valued at its event's price, in chain order. */
+  legs: MakerCollateralLeg[];
+}
+
+export interface MakerCollateralLeg {
+  kind: "deposited" | "returned" | "withdrawn" | "liquidated";
+  amount: number;
+  price: number | null;
+  at: number;
+  /** A withdrawal that took out collateral an auction handed back. */
+  leftoverOut?: boolean;
 }
 
 /** What the page knows beyond the rows: each block's OSM price and the rows
@@ -110,11 +125,36 @@ function replayMakerLifetime(events: BaseActivityEvent[], inputs: MakerHistoryIn
     haveRate: events.length > 0,
     returned: 0,
     atEvents: null,
+    netted: [],
+    legs: [],
   };
+  // A deposit and a withdrawal inside one transaction (a flash loan through
+  // the vault) add nothing: the smaller side comes out of both rows.
+  const inOut = new Map<string, { dep: number; wd: number; at: number }>();
+  for (const ev of events) {
+    if (!isMakerDAOEvent(ev)) continue;
+    const d = ev.context.data;
+    if (d.eventType !== "frob" || inputs.leftover?.has(ev.id)) continue;
+    const dink = Number(d.dink) || 0;
+    const tx = ev.id.split(":")[1] ?? "";
+    const t = inOut.get(tx) ?? { dep: 0, wd: 0, at: ev.timestamp };
+    if (dink > 0) t.dep += dink;
+    else t.wd += -dink;
+    inOut.set(tx, t);
+  }
+  const nettable = new Map<string, number>();
+  for (const [tx, t] of inOut) {
+    const n = Math.min(t.dep, t.wd);
+    if (n > DUST) {
+      nettable.set(tx, n);
+      f.netted.push({ amount: n, at: t.at });
+    }
+  }
   // Valued at each event's price only while every collateral-moving row has
   // one; a single unpriced row sends the whole layer back to today's price.
   let priced = inputs.priceAt != null;
   const at = { deposited: 0, withdrawn: 0, liquidated: 0, returned: 0 };
+  const nettedLeft = new Map<string, number>();
   for (const ev of events) {
     if (!isMakerDAOEvent(ev)) continue;
     const d = ev.context.data;
@@ -140,13 +180,39 @@ function replayMakerLifetime(events: BaseActivityEvent[], inputs: MakerHistoryIn
         } else if (dink > 0 && inputs.leftover?.get(ev.id)?.role === "in") {
           f.returned += dink;
           at.returned += usd;
-        } else if (dink > 0) {
-          f.deposited += dink;
-          at.deposited += usd;
         } else {
-          f.withdrawn += -dink;
-          at.withdrawn += usd;
+          // Net the in-and-out of one transaction: each side gives up the
+          // netted amount once.
+          const tx = ev.id.split(":")[1] ?? "";
+          const key = `${tx}:${dink > 0 ? "in" : "out"}`;
+          const left = nettedLeft.has(key) ? nettedLeft.get(key)! : (nettable.get(tx) ?? 0);
+          const take = Math.min(Math.abs(dink), left);
+          nettedLeft.set(key, left - take);
+          const kept = Math.abs(dink) - take;
+          const keptUsd = kept * (price ?? 0);
+          if (dink > 0) {
+            f.deposited += kept;
+            at.deposited += keptUsd;
+          } else {
+            f.withdrawn += kept;
+            at.withdrawn += keptUsd;
+          }
         }
+        const kind =
+          d.eventType === "grab"
+            ? "liquidated"
+            : dink > 0 && inputs.leftover?.get(ev.id)?.role === "in"
+              ? "returned"
+              : dink > 0
+                ? "deposited"
+                : "withdrawn";
+        f.legs.push({
+          kind,
+          amount: Math.abs(dink),
+          price,
+          at: ev.timestamp,
+          ...(inputs.leftover?.get(ev.id)?.role === "out" ? { leftoverOut: true } : {}),
+        });
       }
     }
     const dart = Number(d.dart);
@@ -211,12 +277,13 @@ export function makerLifetimeWithOpening(
   const f = replayMakerLifetime(events);
   // Summarised history carries no per-event price.
   f.atEvents = null;
+  f.legs = [];
   for (const bucket of mergeFlowBuckets(opening?.flows, folderFlows(folders))) {
     for (const [leg, raw] of Object.entries(bucket.legs)) {
-      if (!(leg in f) || leg === "haveRate" || leg === "atEvents") continue;
+      if (!(leg in f) || leg === "haveRate" || leg === "atEvents" || leg === "netted" || leg === "legs") continue;
       const value = scaleBaseUnits(raw, bucket.decimals);
       if (value == null) return undefined;
-      f[leg as Exclude<keyof MakerLifetimeFlows, "haveRate" | "atEvents">] += value;
+      f[leg as Exclude<keyof MakerLifetimeFlows, "haveRate" | "atEvents" | "netted" | "legs">] += value;
     }
   }
   return f;
@@ -238,6 +305,10 @@ export type MakerTowerData = ChainTruthTowerData & {
   /** Today's OSM price. */
   priceNow?: number | null;
   collateralSymbol?: string;
+  /** Deposited-and-withdrawn-in-one-transaction amounts left out of both rows. */
+  netted?: { amount: number; at: number }[];
+  /** Each collateral move at its event's price, when the flows are valued so. */
+  legs?: MakerCollateralLeg[];
 };
 
 /** Build the USD dual-tower data for a Maker vault from its (chain-state) view.
@@ -300,6 +371,8 @@ export function computeMakerEconomics(
     daiMovedOut,
     haveRate,
     atEvents,
+    netted,
+    legs,
   } = precomputedLifetime ?? replayMakerLifetime(events, inputs);
   const usd = (amt: number) => (price != null ? amt * price : null);
   // Only surface lifetime flows when the captured events reconcile to the live
@@ -419,6 +492,42 @@ export function computeMakerEconomics(
         ]
       : [];
 
+  // The repayments split principal-first: the fee paid inside them is the
+  // lifetime fee less the fee owed now and the fee a liquidation cleared, so
+  // Borrowed − Repaid: principal lands on the Principal row and the fee rows
+  // close the same way. Unsplit where a liquidation's fee is not known.
+  const feeInRepaid =
+    lifetimeInterest != null && feeOwed != null && (daiLiquidated <= DUST || inputs.feeLiquidated != null)
+      ? Math.max(0, lifetimeInterest - feeOwed - (inputs.feeLiquidated ?? 0))
+      : null;
+  const repaidLines: TowerLine[] =
+    debtComplete && daiRepaid > DUST && feeInRepaid != null && feeInRepaid > 0.005 && feeInRepaid < daiRepaid
+      ? [
+          {
+            key: "debt-repaid",
+            symbol: debtSym,
+            amount: daiRepaid - feeInRepaid,
+            usd: daiRepaid - feeInRepaid,
+            prov: repaidPartProv("principal", {
+              repaid: `${formatNumber(daiRepaid)} ${debtSym}`,
+              fee: `${formatNumber(feeInRepaid)} ${debtSym}`,
+            }),
+            flowLabel: "Repaid: principal",
+          },
+          {
+            key: "debt-repaid-fee",
+            symbol: debtSym,
+            amount: feeInRepaid,
+            usd: feeInRepaid,
+            prov: repaidPartProv("fee", {
+              repaid: `${formatNumber(daiRepaid)} ${debtSym}`,
+              fee: `${formatNumber(feeInRepaid)} ${debtSym}`,
+            }),
+            flowLabel: "Repaid: fee",
+          },
+        ]
+      : debtFlowLine("debt-repaid", daiRepaid, "repaid");
+
   return {
     ...(lifetimeInterest != null ? { lifetimeInterest } : {}),
     ...(feeOwed != null ? { feeOwed } : {}),
@@ -426,6 +535,10 @@ export function computeMakerEconomics(
     ...(price != null && liquidated > DUST ? { liquidatedNowUsd: liquidated * price } : {}),
     priceNow: price,
     collateralSymbol: collSym,
+    ...(collComplete && netted.length > 0 ? { netted } : {}),
+    ...(atEventPrices ? { legs } : {}),
+    // Labels print whole: "Deposited (all time)", "Returned by auction".
+    wrapFlowLabels: true,
     valued: true,
     // The USD scale is the on-chain OSM price (Spotter spot × mat), so the valued
     // bars are chain-derived and survive On-chain-values mode.
@@ -466,7 +579,7 @@ export function computeMakerEconomics(
                     amount: drawn,
                     // DAI valued at $1 — the same axis as the OSM-priced collateral.
                     usd: drawn,
-                    heldLabel: "Drawn",
+                    heldLabel: "Principal",
                     prov: drawnDaiProv({ drawn: `${formatNumber(drawn)} ${debtSym}`, since }),
                   }
                 : {
@@ -493,10 +606,7 @@ export function computeMakerEconomics(
             }
           : null,
       ...(feeEarned.length > 0 ? { earned: feeEarned } : {}),
-      exited: [
-        ...debtFlowLine("debt-repaid", daiRepaid, "repaid"),
-        ...debtFlowLine("debt-moved-out", daiMovedOut, "moved out", "Moved out"),
-      ],
+      exited: [...repaidLines, ...debtFlowLine("debt-moved-out", daiMovedOut, "moved out", "Moved out")],
       liquidated: debtFlowLine("debt-liquidated", daiLiquidated, "liquidated"),
       lifetimeInflow: debtComplete ? daiGenerated + daiMovedIn : 0,
     },

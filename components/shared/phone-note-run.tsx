@@ -55,3 +55,48 @@ export function PhoneNoteRun({
     </div>
   );
 }
+
+/** A timeline's words for one note drawn as a line on the phone: the rate's
+ *  name ("stability fee"). */
+export interface PhoneNoteLineWords {
+  rate: string;
+}
+
+/** One note as a single line in the phone list view, where a full row per
+ *  note outnumbers the events around it: "◇ stability fee 10.13% → 7.49%".
+ *  A tap opens the note's own row beneath it. Rate-step notes only; any
+ *  other note draws its row. */
+export function PhoneNoteLine({
+  note,
+  words,
+  renderNote,
+}: {
+  note: MarketNote;
+  words: PhoneNoteLineWords;
+  renderNote: (note: MarketNote) => ReactNode;
+}) {
+  const scale = useTimelineScale();
+  const [open, setOpen] = useState(false);
+  if (note.kind !== "rate-step") return <>{renderNote(note)}</>;
+  const pct = (v: number) =>
+    `${(v * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+  const label = `${words.rate} ${pct(note.from.value)} → ${pct(note.to.value)}`;
+  return (
+    <div data-phone-note-line="">
+      <div style={{ paddingLeft: scale.cardPad, paddingRight: scale.cardPad }}>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          className="group/evt flex w-full cursor-pointer items-center gap-2 rounded-md px-5 py-1 text-left text-xs text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
+        >
+          <span aria-hidden>&#9671;</span>
+          <span className="min-w-0 grow">{label}</span>
+          {note.to.timestamp > 0 ? <span className="shrink-0">{stamp(note.to.timestamp)}</span> : null}
+          <ExpandChevron isOpen={open} group="evt" />
+        </button>
+      </div>
+      {open && renderNote(note)}
+    </div>
+  );
+}

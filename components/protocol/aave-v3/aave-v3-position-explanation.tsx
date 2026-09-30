@@ -18,8 +18,9 @@
 import type { AaveV3CountNote } from "@/lib/aave-v3/event-neighbours";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import type { AaveV3PositionView } from "@/components/protocol/aave-v3/aave-v3-position-card";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
-import { fmtUsd, hfLabel, fmtLiqPrice } from "@/lib/aave-v4/format";
+import { fmtUsd, fmtLiqPrice } from "@/lib/aave-v4/format";
 import { formatUsd } from "@/lib/shared/format-event";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -34,6 +35,9 @@ function joinSymbols(syms: string[]): string {
   if (syms.length === 2) return `${syms[0]} and ${syms[1]}`;
   return `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`;
 }
+
+/** " since 12 Sep 2026", or nothing without a date. */
+const sinceWords = (since: number | null | undefined): string => (since != null ? ` since ${formatDate(since)}` : "");
 
 export function AaveV3PositionExplanation({
   chain,
@@ -62,6 +66,7 @@ export function AaveV3PositionExplanation({
   /** Why the timeline lists more events than the count (aaveV3CountSentence). */
   countNote?: AaveV3CountNote | null;
 }) {
+  const brand = v3Brand(v3Protocol(useV3Pool()));
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   if (!chain) return null;
@@ -93,7 +98,8 @@ export function AaveV3PositionExplanation({
     <>This position supplies collateral only and carries no debt, so none of it can be liquidated:</>
   ) : hf != null ? (
     <>
-      This position borrows against its supplied collateral, held at a <H>{hfLabel(hf)}</H> health factor:
+      This position borrows against its supplied collateral, held at a <H>{hf >= 100 ? "∞" : hfLabelV3(hf)}</H> health
+      factor:
     </>
   ) : (
     <>This position borrows against its supplied collateral:</>
@@ -149,7 +155,7 @@ export function AaveV3PositionExplanation({
           )}
           <H>{pct(chain.avgLiquidationThreshold)}</H>
           {blended}), so the collateral can carry up to {fmtUsd(debtCeilingUsd).display} of debt before the position is
-          liquidatable. The loan-to-value cap and the threshold are today&rsquo;s settings; Aave governance changes
+          liquidatable. The loan-to-value cap and the threshold are today&rsquo;s settings; {brand} governance changes
           them, and each event&rsquo;s details show the values at its block.
         </span>,
       );
@@ -157,8 +163,8 @@ export function AaveV3PositionExplanation({
     if (hf != null) {
       bullets.push(
         <span key="hf">
-          Risk-adjusted collateral covers the debt {hf.toFixed(2)}× over; at a health factor of 1.00 the position
-          becomes liquidatable.
+          Risk-adjusted collateral covers the debt {hfLabelV3(hf)}× over; at a health factor of 1 the position becomes
+          liquidatable.
         </span>,
       );
     }
@@ -194,8 +200,8 @@ export function AaveV3PositionExplanation({
     }
   }
 
-  // Accrued interest — the same aggregates the stat captions show ("incl. $X
-  // interest", hidden there below a cent), already included in the balances.
+  // The interest inside today's balances — the stat captions' figures ("incl.
+  // $X interest since …", hidden there below a cent).
   {
     const s = supplyInterestUsd != null && supplyInterestUsd >= 0.01;
     const d = hasDebt && debtInterestUsd != null && debtInterestUsd >= 0.01;
@@ -204,16 +210,19 @@ export function AaveV3PositionExplanation({
         <span key="interest">
           {s && (
             <>
-              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is accrued supply interest
+              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is supply interest added
+              {sinceWords(captions?.supplyInterestSince)}
             </>
           )}
           {s && d && <> and </>}
           {d && (
             <>
-              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is accrued borrow interest
+              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is borrow interest added
+              {sinceWords(captions?.debtInterestSince)}
             </>
-          )}{" "}
-          — already included in the figures above.
+          )}
+          , counted from when each balance last started from zero; the Lifetime flows panel counts the interest of the
+          whole life.
         </span>,
       );
     }
@@ -316,6 +325,9 @@ import { MARKET_NAME } from "@/lib/aave-v3/asset-catalog";
 import { formatDate } from "@/lib/date";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
+import { isWethGateway } from "@/lib/aave-v3/chain-truth-tower";
+import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { v3Brand, v3Protocol } from "@/lib/aave-v3/protocol-name";
 
 function closureDate(unix: number): string {
   return formatDate(unix);
@@ -369,6 +381,7 @@ export function AaveV3ClosedPositionExplanation({
    *  market", "Seamless market") so the pane never calls a Base Pool "Core". */
   marketPhrase?: string;
 }) {
+  const protocol = v3Protocol(useV3Pool());
   if (v.status === "open") return null;
 
   const aave = events.filter(isAaveV3Event);
@@ -380,7 +393,13 @@ export function AaveV3ClosedPositionExplanation({
   // The newest activity overall — a served folder's last member when it is
   // newer than every loaded row, the loaded row otherwise.
   const newestFolder = newestActivityFolder(aave, folders);
-  const lastType = newestFolder ? null : aave.length > 0 ? aave[aave.length - 1].context.data.eventType : null;
+  const lastRow = newestFolder ? null : aave.length > 0 ? aave[aave.length - 1].context.data : null;
+  // A transfer to a WETH gateway is a withdrawal as ETH (the gateway withdraws
+  // it in the same transaction), and ends the record as a withdrawal does.
+  const lastType =
+    lastRow?.eventType === "transfer_out" && isWethGateway(lastRow.counterparty)
+      ? "withdraw"
+      : (lastRow?.eventType ?? null);
   // How the record actually ended — the truthful closure attribution. The
   // liquidated STATUS only says seizures exist somewhere in the record; the
   // ending is a separate fact (1,438 of 4,369 liquidated-status accounts ended
@@ -466,12 +485,13 @@ export function AaveV3ClosedPositionExplanation({
   if (everLiquidated) {
     bullets.push(
       <span key="seizures">
-        Liquidation seized it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — an Aave V3
-        liquidation is by parts: a liquidator repays a slice of one borrowed reserve and takes collateral from one
-        supplied reserve at that pair&rsquo;s liquidation bonus, so a single call need not empty the account.{" "}
+        Liquidation seized it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} —{" "}
+        {protocol === "Aave V3" ? "an" : "a"} {protocol} liquidation is by parts: a liquidator repays a slice of one
+        borrowed reserve and takes collateral from one supplied reserve at that pair&rsquo;s liquidation bonus, so a
+        single call need not empty the account.{" "}
         {endedBySeizure
           ? "Here the final seizure emptied it entirely."
-          : "What remained after the seizures left by the account's own transactions."}{" "}
+          : "The account's own transactions then took out what the seizures left."}{" "}
         Seizures in the record are what mark the outcome Liquidated.
       </span>,
     );

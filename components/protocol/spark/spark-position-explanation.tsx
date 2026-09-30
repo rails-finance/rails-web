@@ -23,6 +23,33 @@ import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
 
+/** The page's rows counted by act; a withdrawal as ETH through the gateway
+ *  counts as a withdrawal. */
+export interface SparkActivityCounts {
+  supply: number;
+  withdraw: number;
+  borrow: number;
+  repay: number;
+}
+
+/** Where a long record is mostly repeated borrowing and repaying, one clause
+ *  saying so with the counts. Null under 50 transactions. */
+function activityWords(a: SparkActivityCounts, txCount: number): React.ReactNode | null {
+  if (txCount < 50) return null;
+  const parts = [
+    `${a.borrow} borrows`,
+    `${a.repay} repayments`,
+    `${a.supply} supplies`,
+    `${a.withdraw} withdrawals`,
+  ];
+  const cycling = a.borrow + a.repay >= 0.5 * (a.borrow + a.repay + a.supply + a.withdraw);
+  return (
+    <>
+      , {cycling ? "mostly repeated borrowing and repaying" : "mostly supplying and withdrawing"} ({parts.join(", ")})
+    </>
+  );
+}
+
 /** Oxford-join asset symbols ("wstETH, WBTC and USDC"). */
 function joinSymbols(syms: string[]): string {
   if (syms.length === 0) return "";
@@ -31,11 +58,15 @@ function joinSymbols(syms: string[]): string {
   return `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`;
 }
 
+/** " since 12 Sep 2026", or nothing without a date. */
+const sinceWords = (since: number | null | undefined): string => (since != null ? ` since ${formatDate(since)}` : "");
+
 export function SparkPositionExplanation({
   chain,
   captions,
   view,
   externalActivity,
+  activity,
 }: {
   /** The live Pool read. Null until it lands (or when it came back stale):
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
@@ -50,6 +81,9 @@ export function SparkPositionExplanation({
    *  history. The page derives it from the events already on the page; omit to
    *  skip the operator bullet. */
   externalActivity?: ExternalActorSummary;
+  /** Row counts by act over the whole history, where the page holds it all:
+   *  a long record gets one line on what the wallet mostly did. */
+  activity?: SparkActivityCounts | null;
 }) {
   // Hooks first — a name is spoken only where one resolves, and the two most
   // active actors are the only ones the bullet can name without turning into a
@@ -140,6 +174,15 @@ export function SparkPositionExplanation({
         </span>,
       );
     }
+    if (emode && emode.id === 0 && chain.ltv > 0) {
+      bullets.push(
+        <span key="emode-off">
+          The account uses no e-mode category, so those limits are
+          {collateralSyms.length === 1 ? <> {collateralSyms[0]}&rsquo;s own figures</> : <> each asset&rsquo;s own figures, weighted by value</>}
+          ; e-mode would raise them for assets that move together, such as ETH and staked ETH.
+        </span>,
+      );
+    }
     if (emode && emode.id > 0) {
       const own = chain.reserves.filter(
         (r) => r.inEmode && r.isCollateral && r.supplyBalanceRaw !== "0" && r.ltv != null && r.lt != null,
@@ -193,8 +236,8 @@ export function SparkPositionExplanation({
     }
   }
 
-  // Accrued interest — the same aggregates the stat captions show ("incl. $X
-  // interest", hidden there below a cent), already included in the balances.
+  // The interest inside today's balances — the stat captions' figures ("incl.
+  // $X interest since …", hidden there below a cent).
   {
     const s = supplyInterestUsd != null && supplyInterestUsd >= 0.01;
     const d = hasDebt && debtInterestUsd != null && debtInterestUsd >= 0.01;
@@ -203,25 +246,30 @@ export function SparkPositionExplanation({
         <span key="interest">
           {s && (
             <>
-              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is accrued supply interest
+              <H>{formatUsd(supplyInterestUsd as number)}</H> of the collateral is supply interest added
+              {sinceWords(captions?.supplyInterestSince)}
             </>
           )}
           {s && d && <> and </>}
           {d && (
             <>
-              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is accrued borrow interest
+              <H>{formatUsd(debtInterestUsd as number)}</H> of the debt is borrow interest added
+              {sinceWords(captions?.debtInterestSince)}
             </>
-          )}{" "}
-          — already included in the figures above.
+          )}
+          , counted from when each balance last started from zero; the Lifetime flows panel counts the interest of
+          the whole life.
         </span>,
       );
     }
   }
 
   if (view != null && view.txCount > 0) {
+    const mostly = activity ? activityWords(activity, view.txCount) : null;
     bullets.push(
       <span key="tx-count">
-        The position has recorded <H>{view.txCount}</H> transaction{view.txCount === 1 ? "" : "s"} to date.
+        The position has recorded <H>{view.txCount}</H> transaction{view.txCount === 1 ? "" : "s"} to date
+        {mostly}.
       </span>,
     );
   }

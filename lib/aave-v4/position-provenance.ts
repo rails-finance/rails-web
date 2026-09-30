@@ -499,6 +499,21 @@ export function interestProv(what: string): Provenance {
   };
 }
 
+/** The card's "incl." interest: added since each balance last started from
+ *  zero (lib/shared/interest-since-zero.ts), valued at the current price. */
+export function interestSinceZeroProv(what: string): Provenance {
+  return {
+    kind: "derived",
+    summary: `${what} — the interest added since the balance last started from zero. Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance the spoke reports now less the last row's after is the interest since; valued at the price Aave's oracle answers. The Lifetime flows count the interest of the whole life.`,
+    via: "Σ (row before − previous row after) + (spoke balance now − last row after) · Aave's oracle price",
+    inputs: [
+      { label: "current balance", kind: "chain", pclass: "state", note: "spoke-position read" },
+      { label: "row balances", kind: "chain", pclass: "indexed", note: "each row's balance before and after" },
+      { label: "price", kind: "chain", pclass: "oracle", note: "Aave's oracle (getReservePrice)" },
+    ],
+  };
+}
+
 /** True when a price source is an on-chain read (Chainlink family, IAaveOracle,
  *  or Pendle's on-chain TWAP) rather than an off-chain pin/aggregate — the
  *  chain-derived vs off-chain distinction the chain-state gate keys on. */

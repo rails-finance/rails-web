@@ -71,6 +71,8 @@ export function SparkEventHeader({
         symbol: ctx.collateralSymbol,
         address: soleFlowAddress(flows, ctx.collateralSymbol),
         prov: seizedCollateralProv(ctx.collateralSymbol, coords),
+        // The pair reads as collateral taken and debt repaid.
+        label: "Collateral",
       });
     const debt = Number(ctx.debtDelta ?? "0") || 0;
     if (debt !== 0)
@@ -79,6 +81,7 @@ export function SparkEventHeader({
         symbol: ctx.reserveSymbol,
         address: soleFlowAddress(flows, ctx.reserveSymbol),
         prov: debtRepaidProv(ctx.reserveSymbol, coords),
+        label: "Debt",
       });
   } else {
     const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";

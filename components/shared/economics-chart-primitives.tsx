@@ -159,7 +159,11 @@ export function computeTowerLayout(
   chartHeight = CHART_HEIGHT,
 ): PositionedSegment[] {
   if (!maxValue || !isFinite(maxValue)) return [];
-  const visible = segments.filter((s) => s.value > 0 && isFinite(s.value));
+  // Dust draws no bar: a segment under a hundredth of a pixel's worth of the
+  // tallest would show at MIN_SEGMENT_PX beside a legend reading $0.
+  const visible = segments.filter(
+    (s) => s.value > 0 && isFinite(s.value) && (s.value / maxValue) * chartHeight >= 0.01,
+  );
   if (visible.length === 0) return [];
   const totalGapPx = Math.max(0, visible.length - 1) * SEGMENT_GAP_PX;
   const availableHeight = chartHeight - totalGapPx;
@@ -372,9 +376,23 @@ export function BreakdownTable({ rows }: { rows: BreakdownRow[] }) {
                     it inside the ellipsizing cell). */}
                 {row.wrapLabel ? (
                   // A wrapping label keeps the chip beside its last word.
-                  <span className="min-w-0">
-                    {row.label}
-                    {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
+                  // One line from sm up; on a phone it wraps, and the last word
+                  // and the chip wrap together.
+                  <span className="min-w-0 sm:whitespace-nowrap">
+                    {typeof row.label === "string" && row.icon && row.label.includes(" ") ? (
+                      <>
+                        {row.label.slice(0, row.label.lastIndexOf(" ") + 1)}
+                        <span className="whitespace-nowrap">
+                          {row.label.slice(row.label.lastIndexOf(" ") + 1)}
+                          <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {row.label}
+                        {row.icon && <span className="ml-1 inline-flex shrink-0 align-middle">{row.icon}</span>}
+                      </>
+                    )}
                   </span>
                 ) : (
                   <span className="flex min-w-0 items-center">

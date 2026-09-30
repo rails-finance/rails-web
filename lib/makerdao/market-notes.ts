@@ -30,12 +30,7 @@
 
 import type { MakerRateLogResponse, MakerRateSet } from "@/lib/api/fetch-makerdao-rate-log";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
-import {
-  RATE_STEP_MIN_PP,
-  collapseSameDirectionRateSteps,
-  type RateSetLog,
-  type RateStepNote,
-} from "@/lib/shared/market-note";
+import { collapseSameDirectionRateSteps, type RateSetLog, type RateStepNote } from "@/lib/shared/market-note";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 
 /** The ilk a note is read in, as the vault page names it. */
@@ -203,35 +198,69 @@ function ratedRows(events: readonly BaseActivityEvent[], sets: readonly MakerRat
 }
 
 /**
- * The truncation slack on the threshold, in percentage points.
- *
- * Maker's `duty` is a per-second ray the spell TRUNCATED when it was filed, so
- * compounding it back over a year lands within about 5e-7 pp of the round
- * figure governance chose — sometimes above it, sometimes below. Measured on
- * ETH-A (2026-09-06): 8.25 reads 8.250000099 and 9.25 reads 9.249999966, so a
- * strict `≥ 1` on the confirmed figures drops that genuine one-point move by
- * 1.3e-7 pp; the same happens to 7.00 → 8.00 (7.000000516 → 7.999999747). It
- * does NOT happen to 8.50 → 9.50 (8.499999 → 9.500000), so a strict comparison
- * would show one of three identical-looking "+1.00 pp" moves on the same vault
- * and withhold the other two — a distinction no reader could account for and
- * the chain never made.
- *
- * The slack is five orders of magnitude under the threshold it guards and well
- * under the two decimals every figure on the row is stated to, so it can only
- * ever admit a move governance meant as a whole point. It cannot admit
- * anything else: the finest step the roster has taken is 0.25 pp, which is a
- * quarter of the threshold away from this boundary.
+ * Maker's threshold: any change governance made. A Maker fee is a governance
+ * setting, not a floating rate, so a 0.25-point move is as much a decision as
+ * a whole point, and a note chain that skipped it would end at one fee and the
+ * next note start at another (WSTETH-B 8.50% → 8.75% on 28 Oct 2025, vault
+ * 28670). The floor sits far above the duty's truncation (~5e-7 pp) and at or
+ * below the finest step governance has filed (0.25 pp).
  */
-export const RATE_TRUNCATION_SLACK_PP = 1e-6;
+export const MAKER_RATE_STEP_MIN_PP = 0.01;
 
 /** The threshold, applied to the confirmed figures. */
-const isStretch = (deltaPp: number): boolean => Math.abs(deltaPp) >= RATE_STEP_MIN_PP - RATE_TRUNCATION_SLACK_PP;
+const isStretch = (deltaPp: number): boolean => Math.abs(deltaPp) >= MAKER_RATE_STEP_MIN_PP;
+
+/**
+ * The fee over one stretch, from the ilk's rate log: the lowest and highest
+ * rate in force between (from) and (to), and the time-weighted yearly average
+ * (compounded, as the Jug compounds it). Null where the log has no set in
+ * force at the earlier end or the stretch has no length.
+ */
+export function makerFeePath(
+  sets: readonly MakerRateSet[],
+  from: { block: number; logIndex: number; timestamp: number },
+  to: { block: number; logIndex: number; timestamp: number },
+): { min: number; max: number; average: number } | null {
+  const start = rateSetInForce(sets, from.block, from.logIndex);
+  if (!start || !(to.timestamp > from.timestamp)) return null;
+  let rate = asFraction(start.aprPct);
+  let min = rate;
+  let max = rate;
+  let t = from.timestamp;
+  let acc = 0;
+  for (const s of sets) {
+    const after = s.block > from.block || (s.block === from.block && s.logIndex > from.logIndex);
+    const upTo = s.block < to.block || (s.block === to.block && s.logIndex <= to.logIndex);
+    if (!after) continue;
+    if (!upTo) break;
+    const at = Math.min(Math.max(s.timestamp, t), to.timestamp);
+    acc += (at - t) * Math.log1p(rate);
+    t = at;
+    rate = asFraction(s.aprPct);
+    min = Math.min(min, rate);
+    max = Math.max(max, rate);
+  }
+  acc += (to.timestamp - t) * Math.log1p(rate);
+  // Each rate is already yearly: the time-weighted mean of ln(1 + r).
+  const average = Math.expm1(acc / (to.timestamp - from.timestamp));
+  return { min, max, average };
+}
+
+/** A stretch's path, read at its two ends. */
+function pathOf(sets: readonly MakerRateSet[], note: RateStepNote): RateStepNote["path"] | undefined {
+  const p = makerFeePath(
+    sets,
+    { block: note.from.block, logIndex: note.from.logIndex ?? -1, timestamp: note.from.timestamp },
+    { block: note.to.block, logIndex: note.to.logIndex ?? Number.MAX_SAFE_INTEGER, timestamp: note.to.timestamp },
+  );
+  return p ?? undefined;
+}
 
 const unitLabel = "% per year";
 
 /**
  * The stretches between two of this vault's own touches where the ilk's
- * stability fee moved at least `RATE_STEP_MIN_PP`.
+ * stability fee changed (`MAKER_RATE_STEP_MIN_PP`).
  *
  * Both ends are the vault's own rows, as on a polaris rate step — what differs
  * is that the fee is not ON the row: it is the last rate set at or before it,
@@ -268,6 +297,7 @@ export function makerRateStepNotesFor(
     // same "what that state came to be worth" framing the price gap's crAfter
     // uses. A's debt is its own recorded `art × rate_at_block`.
     const debt = debtAt(a.d);
+    const owedNothing = !(Number(a.d.artAfter) > 0);
     const interest =
       debt != null
         ? { debt, before: debt * rateA, after: debt * rateB, atBlock: a.e.blockNumber, symbol: debtSymbol }
@@ -287,6 +317,7 @@ export function makerRateStepNotesFor(
       setsBetween: b.set.ordinal - a.set.ordinal,
       observed: { from: setLog(a.set), to: setLog(b.set) },
       ...(interest ? { interest } : {}),
+      ...(owedNothing ? { owedNothing: true } : {}),
     });
   }
   // Consecutive stretches that moved the fee the same way are one note, as on
@@ -302,7 +333,31 @@ export function makerRateStepNotesFor(
   // export receipt (lib/shared/market-note.ts). A home adopting the collapse
   // owes all three: a merged row states a span no single member states, so the
   // steps it stands for have to be recoverable.
-  return collapseSameDirectionRateSteps(out);
+  //
+  // A stretch the vault began owing nothing stands alone: the fee cost it
+  // nothing there, and a run through it would state one debt's interest over
+  // a stretch in which that debt did not exist (vault 19103, 28 Feb to 23 May
+  // 2021).
+  const merged: RateStepNote[] = [];
+  let run: RateStepNote[] = [];
+  for (const n of out) {
+    if (n.owedNothing) {
+      merged.push(...collapseSameDirectionRateSteps(run), n);
+      run = [];
+    } else run.push(n);
+  }
+  merged.push(...collapseSameDirectionRateSteps(run));
+  const byTo = new Map(out.map((n) => [n.to.block, n]));
+  return merged.map((n) => {
+    const path = pathOf(log.sets, n);
+    const last = n.steps != null ? byTo.get(n.to.block) : undefined;
+    const lastPath = last ? pathOf(log.sets, last) : undefined;
+    return {
+      ...n,
+      ...(path ? { path } : {}),
+      ...(last && lastPath ? { lastPath: { from: last.from.timestamp, ...lastPath } } : {}),
+    };
+  });
 }
 
 /**
@@ -333,6 +388,8 @@ export function liveMakerRateStepNote(
 
   const a = rated[rated.length - 1];
   const rateA = asFraction(a.set.aprPct);
+  // The fee today equals the fee at the last event: no note (the 0.01 pp floor).
+  if (Math.abs(live.aprPct - rateA) * 100 < 0.005) return null;
   // Today's debt when the overlay has it: the fee is read now, so the yearly
   // figure is what it costs on what the vault owes now.
   const today = live.debtNow != null && live.debtNow > 0 ? live.debtNow : null;
@@ -348,7 +405,7 @@ export function liveMakerRateStepNote(
         }
       : undefined;
 
-  return {
+  const note: RateStepNote = {
     id: `rate-step:makerdao-${market.ilk.toLowerCase()}:${a.e.blockNumber}-head`,
     kind: "rate-step",
     protocol: "makerdao",
@@ -368,8 +425,11 @@ export function liveMakerRateStepNote(
     },
     deltaPp: (live.aprPct - rateA) * 100,
     setsBetween: null,
+    ...(debt == null && !(Number(a.d.artAfter) > 0) ? { owedNothing: true } : {}),
     observed: { from: setLog(a.set), to: null },
     ...(interest ? { interest } : {}),
     live: true,
   };
+  const path = pathOf(log.sets, { ...note, to: { ...note.to, logIndex: Number.MAX_SAFE_INTEGER } });
+  return path ? { ...note, path } : note;
 }

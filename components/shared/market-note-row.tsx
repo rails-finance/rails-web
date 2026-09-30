@@ -128,6 +128,7 @@ import {
   priceGapFigures,
   priceGapReason,
   rateStepFigures,
+  formatRatePercent,
   type MarketNote,
   type MarketNotePoint,
   type PriceGapNote,
@@ -462,6 +463,12 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
   if (note.kind === "vault-terms") {
     const text = note.tip ?? `${sym} ${noun}`;
     return { tip: text, spoken: text };
+  }
+  // MakerDAO's fee notes state the ilk's fee both ends: "ETH-A fee 2.00% → 9.50%".
+  if (note.kind === "rate-step" && note.protocol === "makerdao") {
+    const f = rateStepFigures(note);
+    const text = `${note.marketName ?? sym} fee ${f.fromRate} → ${f.toRate}`;
+    return { tip: text, spoken: `${note.marketName ?? sym} fee from ${f.fromRate} to ${f.toRate}` };
   }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
@@ -1786,9 +1793,9 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   ];
   if (f.steps && note.steps != null) {
     stats.push({
-      label: "Stated over",
+      label: "Covers",
       figure: {
-        text: `${f.steps} of the vault's touches`,
+        text: `${f.steps} gaps between the vault's events, as one note`,
         prov: makerRateStepProv(note, "steps"),
         exact: String(note.steps),
       },
@@ -1796,7 +1803,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Fee resets in between",
+      label: "Times governance changed the fee",
       figure: { text: f.sets, prov: makerRateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }
@@ -1806,7 +1813,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       label:
         note.live && interest.atBlock === note.to.block
           ? "Yearly interest on today's debt"
-          : `Yearly interest on the debt recorded at block ${f.fromBlock}`,
+          : `Yearly interest on the debt on ${formatDate(note.from.timestamp)}`,
       transition: {
         before: {
           text: f.before,
@@ -1836,12 +1843,17 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     stats.push({ label: "Elapsed", figure: elapsedFigure(note, f.elapsed, makerRateStepProv(note, "elapsed")) });
   }
 
+  const lifted = liftTimeCells(stats);
   return {
     label: `${ilk} stability fee`,
     measure: { kind: "protocol", id: "makerdao" },
     headline: { text: f.toRate, prov: makerRateStepProv(note, "rate"), exact: String(note.to.value) },
     quantity: "stability fee",
-    ...liftTimeCells(stats),
+    ...lifted,
+    intro: {
+      ...lifted.intro,
+      lead: `Governance ${note.setsBetween != null && note.setsBetween > 1 ? `changed ${ilk}'s fee ${f.sets} times` : `changed ${ilk}'s fee`} since ${note.steps != null ? `the vault's event on ${formatDate(note.from.timestamp)}` : `the vault's ${note.live ? "last event" : "previous event"}`}`,
+    },
     learnMore: marketNoteRateStepContent("makerdao"),
     // T3 in plain words. How the fee at each touch is found (the Jug.drip
     // derivation) is the receipts' job: makerRateStepProv.
@@ -1872,12 +1884,30 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
             the debt continuously; nothing is billed.{" "}
           </>
         ) : null}
+        {note.owedNothing ? <>The vault owed nothing across this stretch, so the change cost it nothing. </> : null}
+        {note.path && (note.setsBetween == null || note.setsBetween > 1 || note.steps != null) ? (
+          <>
+            Across the stretch the fee ranged from {formatRatePercent(note.path.min)} to{" "}
+            {formatRatePercent(note.path.max)} and averaged about <H>{formatRatePercent(note.path.average)}</H> a year,
+            weighted by how long each rate was in force.{" "}
+            {note.lastPath ? (
+              <>
+                Since the vault&rsquo;s previous event, on {formatDate(note.lastPath.from)}, it ranged from{" "}
+                {formatRatePercent(note.lastPath.min)} to {formatRatePercent(note.lastPath.max)} and averaged about{" "}
+                <H>{formatRatePercent(note.lastPath.average)}</H> a year.{" "}
+              </>
+            ) : null}
+          </>
+        ) : null}
         {note.steps != null && (
-          <>The fee moved the same way across {f.steps} of the vault&rsquo;s touches, so they make one note. </>
+          <>
+            The fee moved the same way over {f.steps} stretches between the vault&rsquo;s events, so they make one
+            note.{" "}
+          </>
         )}
         {note.live
           ? "Governance sets this fee for every vault of the type; the vault's owner did nothing to change it."
-          : "A note appears where the fee moved at least one percentage point between two of the vault's touches."}
+          : "A note appears wherever governance changed the fee between two of the vault's events."}
       </>
     ),
   };
@@ -1977,7 +2007,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
   if (note.interest && f.debt && f.before && f.after) {
     const interest = note.interest;
     stats.push({
-      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} recorded at block ${f.fromBlock}`,
+      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} held on ${formatDate(note.from.timestamp)}`,
       transition: {
         before: {
           text: f.before,

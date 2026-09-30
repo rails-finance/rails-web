@@ -66,6 +66,12 @@ const INTEREST_FLOOR = 0.000001;
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
+/** A row whose balance before is exactly zero opens the lane: "before" reads
+ *  0, not the after − change float residue (0xf00a…c853's first supply read
+ *  0.00000000000000022 wstETH; the spToken's balanceOf at the block before is
+ *  0). */
+const opensLane = (before: string | undefined): boolean => before != null && before !== "" && Number(before) === 0;
+
 /** The after-balance USD chip payload — after × the reserve's captured
  *  at-block oracle price (spark_historic_prices, mig 092: SparkLend's own
  *  IAaveOracle read at the EVENT's block, never today's price). Undefined
@@ -226,6 +232,7 @@ export function SparkEventDetail({
           ? transferDeltaProv(ctx.reserveSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : assetsDeltaProv(ctx.reserveSymbol, "supply", coords, ctx.raw?.amount, ctx.origin?.amount),
         beforeProv: beforeProv(ctx.reserveSymbol, "supply"),
+        opening: opensLane(ctx.supplyBefore),
       }),
       interestSincePrevious: interestOf(ctx.reserveSymbol, "supply"),
     });
@@ -243,6 +250,7 @@ export function SparkEventDetail({
         change: ctx.assetsDelta,
         changeProv: assetsDeltaProv(ctx.reserveSymbol, "debt", coords, ctx.raw?.amount, ctx.origin?.amount),
         beforeProv: beforeProv(ctx.reserveSymbol, "debt"),
+        opening: opensLane(ctx.debtBefore),
       }),
       interestSincePrevious: interestOf(ctx.reserveSymbol, "debt"),
     });
@@ -290,7 +298,14 @@ export function SparkEventDetail({
           Reading the account before and after this transaction…
         </div>
       ) : null}
-      {forensics && <LiquidationForensics {...forensics} />}
+      {forensics && (
+        <LiquidationForensics
+          {...forensics}
+          seizedLabel="Seized, to the liquidator"
+          clearedLabel="Debt repaid by the liquidator"
+          premiumLabel="Liquidator's premium over the debt"
+        />
+      )}
       {pricePills.length > 0 && (
         <div className="px-5 pb-2">
           <AtBlockPriceFootnote pills={pricePills} />

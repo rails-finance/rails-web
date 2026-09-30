@@ -19,6 +19,13 @@ import {
 } from "@/lib/seamless/list-filter-dimensions";
 import { AAVE_V3_ITEMS_PER_PAGE, type AaveV3ListFilters } from "@/lib/aave-v3/list-filter-dimensions";
 
+/** What the listing's counts count, in their tips. The listing counts the
+ *  wallet's Pool calls; the position page also counts its aToken transfers. */
+const LISTING_COUNT_RULE =
+  "Pool calls only. aToken transfers, withdrawals as ETH through the WETH gateway among them, count on the position page";
+const LIQUIDATION_RULE =
+  "Each time a liquidator repaid part of the account's debt and took collateral in return. An account that is still open can be liquidated again";
+
 export interface SeamlessListingProps {
   initialItems?: AaveV3PositionRow[];
   initialTotal?: number;
@@ -39,7 +46,11 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
       // No replay lane behind a listing row: a closed row's "highest recorded"
       // says so rather than dashing as if nothing was ever held.
       renderCard={(p) => (
-        <AaveV3PositionCard v={viewFromSummary(p)} deployment={SEAMLESS_CARD_DEPLOYMENT} peaks={false} />
+        <AaveV3PositionCard
+          v={{ ...viewFromSummary(p), countRule: LISTING_COUNT_RULE, liquidationRule: LIQUIDATION_RULE }}
+          deployment={SEAMLESS_CARD_DEPLOYMENT}
+          peaks={false}
+        />
       )}
       hrefFor={(p) => `/base/seamless/${p.wallet}`}
       keyFor={(p) => p.wallet}

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { loadAaveMarketOverview } from "@/lib/sources/chain/aave-market-overview";
 import { CHAIN_MARKET_CACHE_CONTROL } from "@/lib/api/proxy-cache";
-import { SEAMLESS_CHAIN_ID, SEAMLESS_ORACLE, SEAMLESS_POOL } from "@/lib/seamless/asset-catalog";
+import {
+  SEAMLESS_CHAIN_ID,
+  SEAMLESS_FIXED_PRICE_RESERVES,
+  SEAMLESS_FIXED_PRICE_SOURCE,
+  SEAMLESS_ORACLE,
+  SEAMLESS_POOL,
+} from "@/lib/seamless/asset-catalog";
 
 // Seamless on Base — every reserve on the Pool with its size, rates, risk
 // configuration and the market's own oracle price. The same reader that serves
@@ -29,7 +35,14 @@ export async function GET() {
       oracle: SEAMLESS_ORACLE,
       chainId: SEAMLESS_CHAIN_ID,
     });
-    return NextResponse.json(data, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
+    // A reserve the oracle prices at a fixed $1.00 has no market price: the
+    // figure moves to `fixedOraclePrice` and the reserve stays out of the totals.
+    const reserves = data.reserves.map((r) =>
+      SEAMLESS_FIXED_PRICE_RESERVES.has(r.address.toLowerCase()) && r.priceUsd != null
+        ? { ...r, priceUsd: null, fixedOraclePrice: { usd: r.priceUsd, source: SEAMLESS_FIXED_PRICE_SOURCE } }
+        : r,
+    );
+    return NextResponse.json({ ...data, reserves }, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
   } catch (error) {
     console.error("Error reading Seamless market overview:", error);
     return NextResponse.json(

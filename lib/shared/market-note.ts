@@ -1490,6 +1490,18 @@ export interface RateStepNote extends MarketNoteBase {
    *  the receipt can list each step the reader is no longer shown a row for.
    *  Set exactly where `steps` is. */
   members?: RateStepMember[];
+  /** MakerDAO only: the vault owed nothing at the stretch's earlier end, so
+   *  the fee cost it nothing across the stretch. Such a stretch carries no
+   *  `interest` and never merges with a neighbour. */
+  owedNothing?: boolean;
+  /** MakerDAO only: the fee over the whole stretch, from the ilk's rate log —
+   *  the lowest and highest rate in force and the time-weighted yearly
+   *  average (each a FRACTION, like `from.value`). */
+  path?: { min: number; max: number; average: number };
+  /** MakerDAO only, on a merged note: the same over its LAST member, the
+   *  stretch since the vault's previous event, which is what that row's
+   *  "fee since previous event" accrued at. */
+  lastPath?: { from: number; min: number; max: number; average: number };
 }
 
 /** One stretch inside a merged run, as it was selected before the run took

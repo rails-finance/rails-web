@@ -33,7 +33,7 @@ import { formatTinyNonZero } from "@/lib/utils/format";
 import Link from "next/link";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { shortAddress, MOONWELL_ADDRESSES } from "@/lib/moonwell/asset-catalog";
-import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { BASE_CHAIN_ID, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
@@ -60,7 +60,12 @@ const LINK = "text-blue-500 hover:underline";
 // A one-base-unit cap is the fork's closed door (see MoonwellMarketRow's
 // supplyCapOneUnit): named, not quoted as an amount or a share.
 const ONE_UNIT_TITLE =
-  "A cap of exactly one base unit of the token. In this fork a cap of 0 means no cap, so governance closes a market to new activity by setting the smallest positive amount instead. The share used says nothing here and is not quoted.";
+  "A cap of one base unit of the token (the smallest amount it has). In Moonwell a cap of 0 means no cap, so a market is closed to new activity by setting the cap to the smallest positive amount.";
+
+const SUPPLY_CAP_TITLE =
+  "Supply cap: the most this market accepts in deposits. A new supply that would take it past the cap is refused; withdrawing still works.";
+const BORROW_CAP_TITLE =
+  "Borrow cap: the most that can be borrowed from this market. A new borrow that would take it past the cap is refused; repaying and withdrawing still work.";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -138,6 +143,7 @@ function MarketCard({
             target="_blank"
             rel="noopener noreferrer"
             className="link-external text-[11px] text-rb-500"
+            title="The mToken: the receipt this market gives suppliers. Its exchange rate for the underlying rises as borrowers pay interest."
           >
             {m.mTokenSymbol} · {shortAddress(m.mToken)}
           </a>
@@ -166,9 +172,10 @@ function MarketCard({
             figures rather than a distinct chain read. */}
         <span
           data-prov-exempt=""
-          title="Utilisation is borrowed ÷ supplied — both traced on this card (USD supplied and USD borrowed). A ratio of two receipted figures."
+          title="Utilisation = borrowed ÷ (cash + borrowed − reserves), Moonwell's formula. The denominator is what suppliers are owed, so the figure passes 100% when the market's reserves are larger than the cash it holds."
         >
           <span className="text-foreground">{pctText(m.utilisation)}</span> utilised
+          {m.utilisation != null && m.utilisation > 1 && <> (reserves exceed the cash left)</>}
         </span>
         <span>
           {borrowLink ? (
@@ -181,7 +188,7 @@ function MarketCard({
           borrowed
         </span>
         {m.kink != null && (
-          <span>
+          <span title="The kink is the utilisation at which this market's borrow rate starts climbing much faster, to pull borrowers back and suppliers in.">
             kink <Prov info={mwKinkProv(coords)}>{pctText(m.kink, 0)}</Prov>
           </span>
         )}
@@ -191,7 +198,7 @@ function MarketCard({
         {m.collateralDisabled ? (
           <span
             className="text-foreground"
-            title="The Comptroller's collateral factor for this market is zero: nothing supplied here backs any borrowing. It is not a 0% limit — the market is switched off as collateral."
+            title="The Comptroller's collateral factor for this market is zero: nothing supplied here backs any borrowing."
           >
             disabled as collateral
           </span>
@@ -217,7 +224,7 @@ function MarketCard({
         >
           {m.supplyCap != null && (
             <span>
-              supply cap{" "}
+              <span title={SUPPLY_CAP_TITLE}>supply cap</span>{" "}
               <Prov info={mwCapProv("supply", coords)}>
                 {m.supplyCapOneUnit ? (
                   <span title={ONE_UNIT_TITLE}>one base unit</span>
@@ -229,6 +236,12 @@ function MarketCard({
                 <span title={ONE_UNIT_TITLE}>
                   {" "}
                   · <span className="text-caution-500">closed to new supply</span>
+                </span>
+              ) : m.supplyCapUsed != null && m.supplyCapUsed >= 1 ? (
+                <span title="Governance lowered this cap below what the market already holds, so no new supply is accepted.">
+                  {" "}
+                  · cap lowered below the {tokenAmount(m.totalSupplyUnderlying, m.underlyingSymbol)} already supplied ·{" "}
+                  <span className="text-caution-500">closed to new supply</span>
                 </span>
               ) : (
                 m.supplyCapUsed != null && (
@@ -254,7 +267,7 @@ function MarketCard({
           )}
           {m.borrowCap != null && (
             <span>
-              borrow cap{" "}
+              <span title={BORROW_CAP_TITLE}>borrow cap</span>{" "}
               <Prov info={mwCapProv("borrow", coords)}>
                 {m.borrowCapOneUnit ? (
                   <span title={ONE_UNIT_TITLE}>one base unit</span>
@@ -266,6 +279,12 @@ function MarketCard({
                 <span title={ONE_UNIT_TITLE}>
                   {" "}
                   · <span className="text-caution-500">closed to new borrowing</span>
+                </span>
+              ) : m.borrowCapUsed != null && m.borrowCapUsed >= 1 ? (
+                <span title="Governance set this cap at or below what is already borrowed, so no new borrowing is accepted.">
+                  {" "}
+                  · cap lowered below what is borrowed ·{" "}
+                  <span className="text-caution-500">closed to new borrowing</span>
                 </span>
               ) : (
                 m.borrowCapUsed != null && (
@@ -326,6 +345,7 @@ export function MoonwellMarketsStamp({
             target="_blank"
             rel="noopener noreferrer"
             className="link-external"
+            title="Moonwell's oracle contract: it reads Chainlink price feeds and returns each market's price in the form the Comptroller uses."
           >
             Chainlink wrapper it reads
           </a>
@@ -458,6 +478,14 @@ export function MoonwellMarketsView({
           </>
         }
       />
+
+      {chainId === BASE_CHAIN_ID && data.markets.length > 0 && data.markets.every((m) => m.borrowCapOneUnit) && (
+        <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-borrow-cap-note="">
+          Every Base market is closed to new borrowing: Moonwell&rsquo;s borrow-cap guardian set all{" "}
+          {data.markets.length} borrow caps to one base unit on 27 Aug 2026 (block 50,519,338). Repaying and withdrawing
+          still work.
+        </p>
+      )}
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         {data.markets.map((m) => (

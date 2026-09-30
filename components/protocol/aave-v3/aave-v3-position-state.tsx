@@ -34,8 +34,8 @@ import { DustToggle, isDustUsd, useDustOpen } from "@/components/shared/dust-res
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
-import { hfLabelV4 } from "@/lib/aave-v4/format";
 import { formatUsdValue } from "@/lib/utils/format";
+import { v3Brand, v3Protocol } from "@/lib/aave-v3/protocol-name";
 import {
   accountRatioProv,
   accountTotalProv,
@@ -51,10 +51,12 @@ import {
 } from "@/lib/aave-v3/event-provenance";
 import {
   baseToUsd,
+  beforeAtBlockPrices,
   big,
   bpsPct,
   emodeName,
   groupExact,
+  hfLabelV3,
   humanOf,
   legChange,
   legHeld,
@@ -357,19 +359,51 @@ function ReserveList({
   );
 }
 
+/** The at-call health factor's receipt: the balances before the liquidation
+ *  valued at the oracle prices of its block. */
+function hfAtCallProv(coords: V3Coords, hf: number, endOfPrevious: number | null): Provenance {
+  const brand = v3Brand(v3Protocol(coords.pool));
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `Health factor at the moment of the liquidation — the account's balances before the call, valued at the ${brand} oracle's prices in the liquidation's block, each collateral counted up to its liquidation threshold, divided by the debt. The liquidation ran at these prices.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, the factor was ${hfLabelV3(endOfPrevious)}.` : ""}`,
+    contract: coords.pool ? { name: coords.pool.name, address: coords.pool.address } : undefined,
+    via: `Σ collateral before × price at block ${coords.blockNumber ?? "N"} × threshold ÷ Σ debt before × price = ${hf.toFixed(6)}`,
+    formula: "collateral × threshold ÷ debt",
+  };
+}
+
+/** The at-call loan-to-value's receipt. */
+function ltvAtCallProv(coords: V3Coords, ltv: number, endOfPrevious: number | null): Provenance {
+  const brand = v3Brand(v3Protocol(coords.pool));
+  return {
+    kind: "chain-derived",
+    pclass: "oracle",
+    summary: `Loan-to-value at the moment of the liquidation — the account's debt before the call divided by its collateral before the call, both valued at the ${brand} oracle's prices in the liquidation's block.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, it was ${(endOfPrevious * 100).toFixed(2)}%.` : ""}`,
+    contract: coords.pool ? { name: coords.pool.name, address: coords.pool.address } : undefined,
+    via: `Σ debt before × price at block ${coords.blockNumber ?? "N"} ÷ Σ collateral before × price = ${(ltv * 100).toFixed(2)}%`,
+    formula: "debt ÷ collateral",
+  };
+}
+
 export function AaveV3PositionStateBlock({
   state,
   coords,
   touched = [],
+  liquidation = false,
 }: {
   state: AaveV3PositionState;
   coords: V3Coords;
   /** Reserves the event touched: the grid above gives way to their row for
    *  the same balance (§47), so the dust rule here never hides it (§52). */
   touched?: TouchedLeg[];
+  /** The event is a liquidation: a line under the grid states the before
+   *  figures at the prices the call ran at (block N), beside the end of N−1. */
+  liquidation?: boolean;
 }) {
   const { account, emode, sources } = state;
   const touchedOn = (side: Side): Set<string> => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
+  const atCall = liquidation ? beforeAtBlockPrices(state) : null;
 
   const accountCard = (figure: (side: AaveV3AccountSide, when: When) => Figure, always = false) =>
     account ? (
@@ -424,16 +458,26 @@ export function AaveV3PositionStateBlock({
       key: "health-factor",
       label: "Health factor",
       body: accountCard(
-        (a, when) => ({
-          text: hfLabelV4(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
-          value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
-          prov: healthFactorProv(when, coords, {
-            wad: a.healthFactor,
-            collateralBase: a.totalCollateralBase,
-            debtBase: a.totalDebtBase,
-            thresholdBps: a.liquidationThresholdBps,
-          }),
-        }),
+        (a, when) =>
+          // A liquidation's before is the health factor at the prices the call
+          // ran at (block N), the figure the prose states; the note under the
+          // grid gives the end of N−1.
+          when === "before" && atCall?.hf != null
+            ? {
+                text: hfLabelV3(atCall.hf),
+                value: hfLabelV3(atCall.hf),
+                prov: hfAtCallProv(coords, atCall.hf, a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
+              }
+            : {
+                text: hfLabelV3(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
+                value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
+                prov: healthFactorProv(when, coords, {
+                  wad: a.healthFactor,
+                  collateralBase: a.totalCollateralBase,
+                  debtBase: a.totalDebtBase,
+                  thresholdBps: a.liquidationThresholdBps,
+                }),
+              },
         account?.before.healthFactor != null && account.after.healthFactor != null,
       ),
     },
@@ -444,6 +488,10 @@ export function AaveV3PositionStateBlock({
       body: accountCard((a, when) => {
         const coll = baseToUsd(a.totalCollateralBase);
         const debt = baseToUsd(a.totalDebtBase);
+        if (when === "before" && atCall?.ltv != null) {
+          const text = `${(atCall.ltv * 100).toFixed(2)}%`;
+          return { text, value: text, prov: ltvAtCallProv(coords, atCall.ltv, coll > 0 ? debt / coll : null) };
+        }
         const text = coll > 0 ? `${((debt / coll) * 100).toFixed(2)}%` : "—";
         return { text, value: text, prov: currentLtvProv(when, coords, { debtUsd: debt, collateralUsd: coll }) };
       }),
@@ -494,8 +542,24 @@ export function AaveV3PositionStateBlock({
         {account && (
           <p>
             Current LTV is the debt divided by the collateral. Max LTV and the liquidation threshold are each collateral
-            asset&rsquo;s setting at this block averaged by its value, so they move when the mix of collateral changes;
-            Aave governance changes the settings over time.
+            asset&rsquo;s setting at this block averaged by its value, so they move when the mix of collateral changes;{" "}
+            {v3Brand(v3Protocol(coords.pool))} governance changes the settings over time.
+          </p>
+        )}
+        {account && liquidation && atCall?.hf != null && (
+          <p data-liq-basis>
+            Before: the health factor and loan-to-value at the oracle prices the liquidation ran at (block{" "}
+            {state.block.toLocaleString("en-US")}); the other before figures are the account at the end of block{" "}
+            {(state.block - 1).toLocaleString("en-US")}
+            {account.before.healthFactor != null ? (
+              <>
+                , where the health factor was {hfLabelV3(wadToNumber(account.before.healthFactor))}
+                {hfLabelV3(wadToNumber(account.before.healthFactor)) === hfLabelV3(atCall.hf)
+                  ? " as well: the prices did not move between the two blocks"
+                  : ""}
+              </>
+            ) : null}
+            .
           </p>
         )}
         {missing && <p>{missing}</p>}

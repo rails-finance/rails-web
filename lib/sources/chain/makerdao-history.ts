@@ -23,7 +23,8 @@
 
 import { decodeEventLog, formatUnits, getAddress, parseAbi, stringToHex } from "viem";
 import { alchemyClient, chainBatchClient } from "./rpc";
-import { MAKER_ADDRESSES } from "@/lib/makerdao/asset-catalog";
+import { MAKER_ADDRESSES, isLseIlk } from "@/lib/makerdao/asset-catalog";
+import { readPriceCap } from "./makerdao-lse-oracle";
 import type {
   MakerAuctionRead,
   MakerAuctionTake,
@@ -70,9 +71,12 @@ async function readIlkAtOnce(ilk: string, block: number): Promise<MakerIlkAt> {
   const mat = spotIlk[1];
   const priceUsd =
     mat > BigInt(0) && spot > BigInt(0) ? Number(formatUnits((((spot * par) / RAY) * mat) / RAY, 27)) : null;
+  // LockStake: the pip is a capped wrapper; say what the cap and the OSM were.
+  const priceCap = isLseIlk(ilk) ? await readPriceCap(client, spotIlk[0], blockNumber) : null;
   return {
     block,
     priceUsd,
+    ...(priceCap ? { priceCap } : {}),
     mat: mat > BigInt(0) ? Number(formatUnits(mat, 27)) : null,
     dustDai: Number(formatUnits(dust, 45)),
   };

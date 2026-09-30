@@ -365,7 +365,6 @@ function SideBlock({
   motion,
   when,
   assets,
-  first,
   atLive,
 }: {
   side: FlowSide;
@@ -378,7 +377,7 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
-  /** The first bar drawn: the axis labels sit over it. */
+  /** The first bar drawn. Each bar carries the axis labels over it. */
   first: boolean;
   /** The last stop, where no "today" outline is drawn (`isLive` there is
    *  false on a closed position: its receipts read as the close's). */
@@ -418,7 +417,7 @@ function SideBlock({
         {heldTokens.length > 0 && <InlineAssetCluster symbols={heldTokens} size={16} overlap={5} max={3} />}
         <span className="text-xs text-rb-500">{word}</span>
       </div>
-      {first && <AxisLabels model={model} />}
+      <AxisLabels model={model} />
       <Strip
         side={side}
         segments={st.bar}
@@ -542,16 +541,21 @@ function PipTip({ at }: { at: PipOpen }) {
   );
 }
 
-/** The shared axis's labels, over the first bar. */
+/** The shared axis's labels, over the first bar. Below the sm breakpoint an
+ *  axis of more than five labels keeps the first, the last and every other
+ *  one between that sits two steps clear of the last ("$12.5M$15.0M" ran
+ *  together at 390px). */
 function AxisLabels({ model }: { model: FlowModel }) {
+  const last = model.axis.ticks.length - 1;
+  const phoneHidden = (i: number) => last > 4 && i !== 0 && i !== last && (i % 2 === 1 || last - i < 2);
   return (
     <div className="relative mb-1 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
-      {model.axis.ticks.map((t) => {
+      {model.axis.ticks.map((t, i) => {
         const at = t / model.axis.max;
         return (
           <span
             key={t}
-            className="absolute top-0"
+            className={`absolute top-0${phoneHidden(i) ? " max-sm:hidden" : ""}`}
             style={{
               left: `${at * 100}%`,
               transform: at === 0 ? "none" : at > 0.9 ? "translateX(-100%)" : "translateX(-50%)",

@@ -53,6 +53,7 @@ import {
   MoonwellClosedPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
 import { MoonwellRiskSlot } from "@/components/protocol/moonwell/moonwell-risk-slot";
+import { moonwellLedger } from "@/lib/moonwell/ledger";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import {
   computeMoonwellEconomics,
@@ -64,7 +65,9 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
+import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
+import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
+import { balancePeaks, withBalancePeaks } from "@/lib/shared/ctoken-peaks";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
@@ -390,6 +393,64 @@ export default function MoonwellPositionView({
     [moonwellEvents, opening],
   );
 
+  // Each flow at its own block's price, the transfers, seizures and interest
+  // on both sides — only when the page holds every row.
+  const ledger = useMemo(
+    () =>
+      historyWindow.state === "whole" && moonwellEvents.length > 0
+        ? moonwellLedger(moonwellEvents, {
+            mtokenOf: (m) => MOONWELL_MARKET_BY_KEY[m]?.mtoken,
+            addressOf: (m) => MOONWELL_MARKET_BY_KEY[m]?.underlying,
+          })
+        : null,
+    [historyWindow.state, moonwellEvents],
+  );
+
+  // What each liquidation did, and a closed card's peaks as each row's balance
+  // before and after it (interest included), where the page holds every row.
+  const cardView = useMemo<MoonwellPositionView | null>(() => {
+    if (!liveView) return liveView;
+    const counted = { ...liveView, eventTotal: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : undefined };
+    if (historyWindow.state !== "whole" || moonwellEvents.length === 0) return counted;
+    const liquidations = liquidationStories(
+      moonwellEvents.map((e) => {
+        const d = e.context.data;
+        return {
+          timestamp: e.timestamp,
+          txHash: e.txHash,
+          kind: d.eventType === "liquidation" ? "liquidation" : d.eventType === "repay" ? "repay" : "other",
+          market: d.market,
+          symbol: d.marketSymbol,
+          amount: d.assetsDelta != null ? Math.abs(Number(d.assetsDelta)) : undefined,
+          debtBefore: d.debtBefore != null ? Number(d.debtBefore) : undefined,
+          debtAfter: d.debtAfter != null ? Number(d.debtAfter) : undefined,
+          byOwner: externalActor({ txFrom: d.txFrom, poolCaller: d.caller }, e.wallet) == null,
+        };
+      }),
+    );
+    if (liveView.status === "open") return { ...counted, liquidations };
+    const peaks = balancePeaks(
+      moonwellEvents.map((e) => {
+        const d = e.context.data;
+        return {
+          market: d.market,
+          decimals: MOONWELL_MARKET_BY_KEY[d.market]?.decimals ?? 18,
+          side: d.side,
+          supplyBefore: d.supplyBefore,
+          supplyAfter: d.supplyAfter,
+          debtBefore: d.debtBefore,
+          debtAfter: d.debtAfter,
+        };
+      }),
+    );
+    return {
+      ...counted,
+      liquidations,
+      peakSupplies: withBalancePeaks(liveView.peakSupplies, peaks, "supply"),
+      peakBorrows: withBalancePeaks(liveView.peakBorrows, peaks, "debt"),
+    };
+  }, [liveView, historyWindow, moonwellEvents, tl.totalCount]);
+
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest splits; the rates ride the listing row's per-market chain read.
   const captions = liveView ? computeMoonwellCardCaptions(liveView, lifetimeEvents, precomputedLifetime) : null;
@@ -438,9 +499,9 @@ export default function MoonwellPositionView({
         <DetailBodySkeleton />
       ) : (
         <>
-          {liveView && (
+          {liveView && cardView && (
             <MoonwellPositionCard
-              v={liveView}
+              v={cardView}
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
@@ -464,7 +525,7 @@ export default function MoonwellPositionView({
               // on the chain lane.
               explanation={
                 liveView.status !== "open" ? (
-                  <MoonwellClosedPositionExplanation v={liveView} />
+                  <MoonwellClosedPositionExplanation v={cardView} />
                 ) : (
                   // Passed before the chain read lands (the Fluid treatment):
                   // the pane, and the copy-view link at its foot, mount with
@@ -482,7 +543,13 @@ export default function MoonwellPositionView({
           )}
           {liveView &&
             (() => {
-              const towerData = computeMoonwellEconomics(liveView, lifetimeEvents, undefined, precomputedLifetime);
+              const towerData = computeMoonwellEconomics(
+                liveView,
+                lifetimeEvents,
+                undefined,
+                precomputedLifetime,
+                ledger,
+              );
               return (
                 <ChainTruthTower
                   data={towerData}

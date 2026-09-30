@@ -12,6 +12,7 @@
 // and, from the auction's own logs, what it had to raise, what it sold and what
 // it handed back (MakerdaoAuctionOutcome). Each figure traces via <Prov>.
 
+import { collAmount, debtDigits, usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { Prov } from "@/components/shared/provenance";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
@@ -40,11 +41,18 @@ import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
 import { useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
 import type { MakerAuctionRead, MakerIlkAt } from "@/lib/makerdao/chain-history-types";
 import { formatDate } from "@/lib/date";
+import type { MakerTxContext } from "@/lib/makerdao/chain-history-types";
+import type { MakerOwnerRef, MakerOwnershipStep } from "@/lib/makerdao/vault-history";
+import { knownContract } from "@/lib/makerdao/known-contracts";
+import { shortAddr } from "@/lib/makerdao/ownership-prose";
+import { giveDstProv, giveOwnerProv, ownerBeforeProv } from "@/lib/makerdao/event-provenance";
 
 export interface MakerDAOEventDetailProps {
   ctx: MakerDAOContext;
   txHash?: string;
   blockNumber?: number;
+  /** The row's id, which the page's history is keyed by. */
+  eventId?: string;
 }
 
 const fmt = (human: string): string => formatNumber(Number(human));
@@ -58,6 +66,22 @@ export const fmtRatio = (r: number): string =>
   `${(r * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 /** A minimum ratio at its own grain: 145%, 170%, 175%. */
 export const fmtMat = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
+
+/** The collateral transition at the Maker grain (collAmount), where the
+ *  shared form would state 0.254 beside a row header of 0.2538. */
+function collTransition<T extends { before: string; beforeExact?: string; change: string; changeExact?: string }>(
+  t: T | undefined,
+): T | undefined {
+  if (!t) return t;
+  const num = (x: string | undefined) => (x == null ? NaN : Number(x.replace(/[^0-9.eE-]/g, "")));
+  const b = num(t.beforeExact);
+  const c = num(t.changeExact);
+  return {
+    ...t,
+    ...(Number.isFinite(b) && Math.abs(b) < 1 ? { before: collAmount(b) } : {}),
+    ...(Number.isFinite(c) && Math.abs(c) < 1 ? { change: `${t.change.slice(0, 1)}${collAmount(c)}` } : {}),
+  };
+}
 
 /** The ilk at this row's block: the page's read when it holds one, else, with
  *  `readOwn`, this row's own. The opened card's grid and explanation pass it
@@ -92,7 +116,7 @@ export function rowRatios(ctx: MakerDAOContext, price: number | null) {
   };
 }
 
-export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventDetailProps) {
+export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: MakerDAOEventDetailProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const debtSym = ilkDebtSymbol(ctx.ilk);
   const collSym = ctx.collateralSymbol;
@@ -104,20 +128,43 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
   const mat = ilkAt?.mat ?? null;
   const ratios = ctx.eventType === "frob" ? rowRatios(ctx, price) : null;
   const inkAfter = ctx.inkAfter != null ? Number(ctx.inkAfter) : null;
+  const dink = Number(ctx.dink) || 0;
+  const debtMove = Number(ctx.debtChange) || 0;
+  const isFrob = ctx.eventType === "frob";
+  // The row's own amount under the box it moved, and "unchanged" under the
+  // one it did not, so the grid states what this event did without the toggle.
+  const collSub = isFrob
+    ? dink > 0
+      ? `deposited ${collAmount(dink)} ${collSym}`
+      : dink < 0
+        ? `withdrew ${collAmount(-dink)} ${collSym}`
+        : "unchanged"
+    : undefined;
+  const debtSub = isFrob
+    ? debtMove > 0
+      ? `drew ${fmtDai(debtMove)} ${debtSym}`
+      : debtMove < 0
+        ? `repaid ${debtDigits(-debtMove)} ${debtSym}`
+        : "unchanged by this event"
+    : undefined;
 
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
       value: fmtAfter(ctx.inkAfter),
+      ...(ctx.inkAfter != null ? { display: collAmount(Number(ctx.inkAfter)) } : {}),
       symbol: collSym,
       prov: inkAfterProv(collSym, coords),
-      transition: reconstructTransition({
-        after: ctx.inkAfter,
-        change: ctx.dink,
-        changeProv: dinkProv(collSym, coords),
-        beforeProv: inkBeforeProv(collSym, coords),
-      }),
+      transition: collTransition(
+        reconstructTransition({
+          after: ctx.inkAfter,
+          change: ctx.dink,
+          changeProv: dinkProv(collSym, coords),
+          beforeProv: inkBeforeProv(collSym, coords),
+        }),
+      ),
       changed: Number(ctx.dink) !== 0,
+      ...(collSub ? { sub: <>{collSub}</> } : {}),
       // The collateral's value at this block's OSM price.
       ...(ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
         ? {
@@ -144,12 +191,15 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
         beforeProv: debtBeforeProv(debtSym, coords),
       }),
       changed: Number(ctx.dart) !== 0,
+      ...(debtSub ? { sub: <>{debtSub}</> } : {}),
       ...(ctx.interestSincePrevious
         ? {
             interestSincePrevious: {
               value: ctx.interestSincePrevious,
               prov: interestSincePreviousProv(debtSym, coords),
               label: "Stability fee since previous event",
+              labelTip:
+                "Fee added to the debt since the previous event. Maker adds it only when someone updates the collateral type's rate (a call to Jug.drip), so it lands in lumps: a row can carry fee that built up before the previous event, and the second row of one transaction can carry a little.",
             },
           }
         : {}),
@@ -213,22 +263,41 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber }: MakerDAOEventD
   }
 
   if (ctx.eventType === "frob" && price != null) {
+    // LockStake's feed is capped: the price is the lower of the cap and the OSM.
+    const cap = ilkAt?.priceCap;
+    const atCap = cap != null && cap.oracleUsd != null && cap.oracleUsd > cap.capUsd;
     stats.push({
-      label: `${collSym} price (OSM)`,
+      label: atCap ? `${collSym} price (capped)` : `${collSym} price (OSM)`,
       value: String(price),
-      display: `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      display: usdPrice(price),
       symbol: "",
       prov: eventPriceProv(collSym, coords, price),
       changed: false,
-      sub: blockNumber != null ? <>at block {blockNumber.toLocaleString("en-US")}</> : undefined,
+      sub: (
+        <>
+          {atCap ? (
+            <>the cap governance set on Maker&rsquo;s price; the oracle read {usdPrice(cap.oracleUsd as number)}</>
+          ) : (
+            <>Maker&rsquo;s oracle price, one hour behind the market</>
+          )}
+          {blockNumber != null ? <> · block {blockNumber.toLocaleString("en-US")}</> : null}
+        </>
+      ),
     });
   }
 
   const auction = isGrab && txHash ? history.auctions.get(txHash.toLowerCase()) : undefined;
 
+  const step = ctx.eventType === "give" && eventId ? history.ownership.get(eventId) : undefined;
+  const idTx = eventId?.split(":")[1];
+  const txCtx = history.txContext.get((txHash || idTx || "").toLowerCase());
+
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail
+        stats={stats}
+        extra={step ? <MakerdaoOwnerCell step={step} ctx={ctx} coords={coords} txCtx={txCtx} /> : undefined}
+      />
       {isGrab && <MakerdaoAuctionOutcome ctx={ctx} coords={coords} price={price} auction={auction} />}
     </>
   );
@@ -393,5 +462,57 @@ function MakerdaoAuctionOutcome({
         />
       )}
     </div>
+  );
+}
+
+/** A give's owner before → after: the account, and under it what the CDP
+ *  manager records (a DSProxy, an Instadapp account, a known contract). */
+function MakerdaoOwnerCell({
+  step,
+  ctx,
+  coords,
+  txCtx,
+}: {
+  step: MakerOwnershipStep;
+  ctx: MakerDAOContext;
+  coords: MakerCoords;
+  txCtx?: MakerTxContext;
+}) {
+  const side = (ref: MakerOwnerRef, after: boolean) => {
+    const holder = ref.holder;
+    const known = knownContract(holder);
+    const party = holder ? txCtx?.parties[holder] : undefined;
+    const head = known ? known.short : shortAddr(party?.kind === "instadapp-account" ? holder : (ref.owner ?? holder));
+    const sub = known
+      ? shortAddr(holder)
+      : party?.kind === "instadapp-account"
+        ? `Instadapp account${ref.owner ? ` for ${shortAddr(ref.owner)}` : ""}`
+        : holder && ref.owner && holder !== ref.owner
+          ? `through ${party?.kind === "dsproxy" ? "DSProxy" : "proxy"} ${shortAddr(holder)}`
+          : party?.kind === "eoa"
+            ? "a wallet"
+            : null;
+    const prov = after ? (ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords)) : ownerBeforeProv(coords);
+    return (
+      <span className="inline-flex flex-col">
+        <Prov info={prov} value={ref.owner ?? holder ?? ""}>
+          <span className={`text-sm font-semibold ${after ? "text-foreground" : "text-rb-500"}`}>{head}</span>
+        </Prov>
+        {sub && <span className={`text-xs ${after ? "text-foreground/80" : "text-rb-500"}`}>{sub}</span>}
+      </span>
+    );
+  };
+  return (
+    <StatCard label="Owner">
+      <StateTransition>
+        {side(step.before, false)}
+        <span className="inline-flex items-start gap-2">
+          <span aria-hidden="true" className="text-rb-500">
+            →
+          </span>
+          {side(step.after, true)}
+        </span>
+      </StateTransition>
+    </StatCard>
   );
 }

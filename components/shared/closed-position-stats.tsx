@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { TipLabel } from "@/components/shared/tip-label";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatDate } from "@/lib/date";
 
@@ -32,6 +34,10 @@ export interface ClosedPositionStatsProps {
   outcomeFollows?: boolean;
   collateralLabel?: string;
   debtLabel?: string;
+  /** What each heading means, shown on hover or tap (MakerDAO). */
+  labelTips?: { collateral?: string; debt?: string; outcome?: string };
+  /** A hover/tap tip on the CLOSED badge (opt-in). */
+  badgeTip?: string;
   /** Token icon shown after the collateral column label */
   collateralIcon?: ReactNode;
   /** Token icon shown after the debt column label */
@@ -50,6 +56,10 @@ export interface ClosedPositionStatsProps {
   outcomeLabel?: string;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
+  /** Dated lines beneath Outcome in place of the one closure date, where the
+   *  outcome and the closing happened on different days ("Liquidated
+   *  16 Sep 2025", "Closed 26 Sep 2026"). */
+  outcomeDates?: { label: string; at: number }[];
   /** Optional 4th column (rate slot) — keeps closed cards the same width as open */
   extra?: { label: string; value: ReactNode };
   /** Optional desktop-only left column (e.g. PositionPairIcons) */
@@ -73,6 +83,7 @@ export function ClosedPositionStats({
   debt,
   outcomeFollows,
   outcomeLabel,
+  labelTips,
   collateralLabel = CARD_VOCAB.peakCollateral,
   debtLabel = CARD_VOCAB.peakDebt,
   collateralIcon,
@@ -82,10 +93,12 @@ export function ClosedPositionStats({
   collateralFootnote,
   debtFootnote,
   closedAt,
+  outcomeDates,
   extra,
   icons,
   identity,
   leadingIdentity,
+  badgeTip,
 }: ClosedPositionStatsProps) {
   const { label, color, badge } = OUTCOME[outcome];
   const closure = closedAt ? formatClosureDate(closedAt) : null;
@@ -105,7 +118,13 @@ export function ClosedPositionStats({
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+          {badgeTip ? (
+            <RevealTip tip={badgeTip} label={`Closed: ${badgeTip}`} focusable className="focus-ring rounded-xs">
+              <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+            </RevealTip>
+          ) : (
+            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+          )}
           {leadingIdentity}
         </span>
         {identity}
@@ -114,7 +133,7 @@ export function ClosedPositionStats({
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         <div>
           <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-            {collateralLabel}
+            <TipLabel text={collateralLabel} tip={labelTips?.collateral} />
             {collateralIcon}
           </div>
           {collateralAssetIcons ? (
@@ -130,7 +149,7 @@ export function ClosedPositionStats({
         {showDebt ? (
           <div>
             <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-              {debtLabel}
+              <TipLabel text={debtLabel} tip={labelTips?.debt} />
               {debtIcon}
             </div>
             {debtAssetIcons ? (
@@ -147,9 +166,17 @@ export function ClosedPositionStats({
           <div className="hidden sm:block" />
         )}
         <div>
-          <div className="text-rb-500 text-xs font-semibold">Outcome</div>
+          <div className="text-rb-500 text-xs font-semibold">
+            <TipLabel text="Outcome" tip={labelTips?.outcome} />
+          </div>
           <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
-          {closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
+          {outcomeDates && outcomeDates.length > 0
+            ? outcomeDates.map((d) => (
+                <div key={d.label} className="text-xs text-rb-500 mt-0.5">
+                  {d.label} {formatClosureDate(d.at)}
+                </div>
+              ))
+            : closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
         </div>
         {extra ? (
           <div>

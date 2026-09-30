@@ -436,8 +436,8 @@ export default function AaveV3BasePositionView({
   // and only when the sweep read every block, because an attribution against
   // a partial history would call missed principal "interest".
   const captions = useMemo(
-    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined) : null),
-    [view, data, sweptClean, lifetime],
+    () => (view && data ? computeAaveV3CardCaptions(view, undefined, data, sweptClean ? lifetime : undefined, aaveEvents) : null),
+    [view, data, sweptClean, lifetime, aaveEvents],
   );
 
   // An address that has never touched the Pool answers successfully with zeros,

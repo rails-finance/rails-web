@@ -11,6 +11,9 @@ export interface MakerIlkAt {
   mat: number | null;
   /** The ilk's minimum debt per vault, DAI. */
   dustDai: number | null;
+  /** LockStake's capped feed at the block: the cap and the OSM price behind
+   *  it; `priceUsd` is the lower. Absent for a plain OSM. */
+  priceCap?: { capUsd: number; oracleUsd: number | null };
 }
 
 export interface MakerIlkAtResponse {
@@ -79,3 +82,67 @@ export interface MakerAuctionNotRead {
 }
 
 export type MakerAuctionRead = MakerAuctionOutcome | MakerAuctionNotRead;
+
+/** What a chain read shows one address in a vault's transaction to be. */
+export interface MakerParty {
+  address: string;
+  /** "eoa": no code. "dsproxy": a DSProxy (owner() answers and the Proxy
+   *  Registry maps that owner to it). "instadapp-account": an Instadapp smart
+   *  account (instaIndex() answers the Instadapp index). "contract": code with
+   *  none of those. */
+  kind: "eoa" | "dsproxy" | "instadapp-account" | "contract";
+  /** The DSProxy's owner(), or the Instadapp account's creator when the
+   *  account was created in this transaction (the index's LogAccountCreated). */
+  owner: string | null;
+  /** Created in this transaction. */
+  createdInTx: boolean;
+}
+
+/** One ERC-20 amount a listed address received in the transaction. */
+export interface MakerTokenIn {
+  to: string;
+  from: string;
+  token: string;
+  /** The token's symbol at the transaction's block. */
+  symbol: string;
+  amount: string;
+}
+
+/** What one transaction around a vault's ownership did, read from its
+ *  receipt and calldata (lib/sources/chain/makerdao-tx-context.ts). */
+export interface MakerTxContext {
+  txHash: string;
+  block: number;
+  from: string;
+  to: string | null;
+  parties: Record<string, MakerParty>;
+  /** Known tools whose contracts logged in the transaction (DeFi Saver). */
+  tools: string[];
+  /** A DeFi Saver recipe's name, from the calldata. */
+  recipe: string | null;
+  /** A flash loan taken in the transaction: the lender and what it lent. */
+  flashLoan: { lender: string; symbol: string; amount: string } | null;
+  /** The Single-Collateral Dai CDP handed to Maker's migration contract. */
+  migratedCup: string | null;
+  /** ERC-20 received by an Instadapp account listed in `parties`. */
+  tokensIn: MakerTokenIn[];
+  /** DSProxies Maker's ProxyFactory built in the transaction, with the
+   *  account each was built for (its Created log). */
+  proxiesBuilt?: { owner: string; proxy: string }[];
+}
+
+/** A change to an ilk's minimum collateral ratio (Spotter file "mat"). */
+export interface MakerMatChange {
+  block: number;
+  timestamp: number;
+  txHash: string;
+  /** The new minimum as a multiplier (1.45 = 145%). */
+  mat: number;
+}
+
+export interface MakerMatChangesResponse {
+  ilk: string;
+  fromBlock: number;
+  toBlock: number;
+  changes: MakerMatChange[];
+}

@@ -29,12 +29,12 @@ export function makerdaoPositionContent(opts: {
   if (status === "liquidated") {
     return {
       title: "About This Position",
-      intro: `This ${noun} was liquidated when its collateral value fell below the ${ilk} ilk's liquidation ratio. The panel above reconstructs its final state — the highest recorded collateral and ${debtSymbol} debt it ever held.`,
+      intro: `This ${noun} was liquidated when its collateral value fell below the minimum ratio of ${ilk}, its collateral type (Maker calls it an ilk). The panel above reconstructs its final state — the highest recorded collateral and ${debtSymbol} debt it ever held.`,
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Liquidation ratio",
-          text: `each ilk sets its own liquidation ratio (mat), checked against its own OSM oracle price — delayed by one hour by design, so owners have a window to react before a price move becomes liquidatable.`,
+          text: `each collateral type sets a minimum ratio (mat), checked against the type's oracle price (the OSM, Oracle Security Module), delayed by one hour by design, so owners have a window to react before a price move becomes liquidatable.`,
         },
         {
           bold: "Seizure, not closure",
@@ -60,7 +60,7 @@ export function makerdaoPositionContent(opts: {
         },
         {
           bold: "Normalized debt",
-          text: `the ${debtSymbol} figure is the vault's art × the ${ilk} ilk's rate accumulator, which grows at the stability fee — so it was measured at each recorded event, not continuously.`,
+          text: `the ${debtSymbol} figure is the vault's art × the rate accumulator of ${ilk} (its collateral type, which Maker calls an ilk), which grows at the stability fee; it was measured at each recorded event.`,
         },
       ],
       links: [
@@ -78,19 +78,23 @@ export function makerdaoPositionContent(opts: {
     details: [
       {
         bold: "Collateral ratio",
-        text: `collateral value relative to ${debtSymbol} debt. Must stay above the ${ilk} ilk's own liquidation ratio (mat) — a per-ilk governance parameter, read live on this card.`,
+        text: `collateral value relative to ${debtSymbol} debt. It must stay above the minimum ratio (mat) of ${ilk}, the vault's collateral type (Maker calls a collateral type an ilk). Governance sets the minimum per type; this card reads it live.`,
       },
       {
         bold: "Stability fee",
-        text: `debt is stored normalized (art); the ${debtSymbol} figure is art × the ilk's rate accumulator, which compounds continuously at the stability fee.`,
+        text: `debt is stored normalized (art); the ${debtSymbol} figure is art × the collateral type's rate accumulator, which compounds continuously at the stability fee.`,
       },
       {
-        bold: "Ilk isolation",
-        text: `every ilk (${ilk} and each other collateral type) has its own oracle, liquidation ratio and debt ceiling — one ilk's stress does not liquidate another's vaults.`,
+        bold: "Collateral types",
+        text: `every collateral type (${ilk} and each other) has a separate oracle, minimum ratio and debt ceiling; stress in one type does not liquidate another type's vaults.`,
+      },
+      {
+        bold: "Debt ceiling",
+        text: `the most all ${ilk} vaults together may owe. At the ceiling no ${ilk} vault can draw more until the ceiling is raised; repaying and adding collateral still work.`,
       },
       {
         bold: "Dust floor",
-        text: "each ilk sets a minimum debt (dust) — a repayment may not leave a smaller remainder, only exactly zero.",
+        text: "each collateral type sets a minimum debt (dust): a repayment may not leave a smaller remainder, only zero.",
       },
     ],
     links: [

@@ -3,6 +3,7 @@
 // Ethereum (four markets) and Moonwell on Base (twenty-one markets).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { liquidatedIntro, type LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 
 const MOONWELL_DOC_URL = "https://docs.moonwell.fi";
 
@@ -28,23 +29,29 @@ export function moonwellPositionContent(opts: {
   status: "open" | "closed" | "liquidated" | "unread";
   deployment?: MoonwellPositionDeployment;
   hasDebt?: boolean;
+  /** Each liquidation as the rows tell it (the detail page). */
+  liquidations?: LiquidationStory[];
+  liquidationCount?: number;
 }): LearnMoreContent {
   const deployment = opts.deployment ?? "ethereum";
 
   if (opts.status === "liquidated") {
     return {
       title: "About This Position",
-      intro:
-        "This account was liquidated when the Comptroller's account liquidity turned to shortfall. The panel above reconstructs its final state — the highest recorded supply and debt for each market it held.",
+      intro: `${
+        opts.liquidations && opts.liquidations.length > 0
+          ? liquidatedIntro(opts.liquidations, opts.liquidationCount ?? opts.liquidations.length)
+          : "This account was liquidated at least once and has since closed: nothing remains supplied or borrowed."
+      } The panel above shows the highest supply and debt each market reached.`,
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Account liquidity",
-          text: "the Comptroller tracks one liquidity figure across the whole account; once it turns to shortfall, the account becomes liquidatable.",
+          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account.",
         },
         {
           bold: "Partial and repeatable",
-          text: "each liquidation clears at most half the debt (the close factor, 50%) and seizes mTokens in a collateral market worth that plus a 10% incentive.",
+          text: "each liquidation repays at most half of one debt (the close factor, 50%) and seizes mTokens in a collateral market worth that plus a 10% incentive; the market keeps 3% of the seized mTokens as reserves and the liquidator gets the rest.",
         },
         {
           bold: "mTokens & the exchange rate",
@@ -88,11 +95,11 @@ export function moonwellPositionContent(opts: {
     opts.hasDebt
       ? {
           bold: "Account liquidity",
-          text: "the Comptroller tracks one liquidity figure across the whole account; when it turns to shortfall, the account can be liquidated.",
+          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt) per call.",
         }
       : {
           bold: "Supply only",
-          text: "supplying alone does not enter a market or carry liquidation risk — that requires borrowing against the collateral factor.",
+          text: "a supply is not collateral until the wallet enters its market (enterMarkets); only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
         },
     rosterDetail(deployment),
   ];

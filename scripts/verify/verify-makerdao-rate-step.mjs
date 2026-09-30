@@ -772,12 +772,13 @@ check("3b. every historical note row is present in the timeline's own DOM order"
 
 const headLocator = page.locator(`[data-market-note$="-head"]`).first();
 const headFlat = ((await headLocator.count()) ? ((await headLocator.textContent()) ?? "") : "").replace(/\s+/g, " ");
-// 2026-09-10: the header states the LATER fee, not the move — and on a flat
-// live note the later fee IS 10.25%, so the row's own figure is the assertion
-// here; the move ("0.00 points") moved into the panel under the fee card.
+// 2026-09-30 (MakerDAO newcomer r4, P5): a live note whose fee equals the fee
+// at the vault's last event states no change, so it is not drawn. 28699's fee
+// is 10.25% at its last event and now: no head row.
+const flatLive = near(live28699.stabilityFeeApr * 100, 10.25, 0.01);
 check(
-  "3c. the live row states 10.25% — the vault route's own stabilityFeeApr — and it RENDERS despite a flat move",
-  headFlat.includes(ratePct(0.1025)) && !/\bpp\b/.test(headFlat) && near(live28699.stabilityFeeApr * 100, 10.25, 0.01),
+  "3c. the fee now equals the fee at the last event (10.25%, the vault route's stabilityFeeApr), so no live row is drawn",
+  flatLive && headFlat === "",
   `head row "${headFlat.slice(0, 120)}"; route stabilityFeeApr ${live28699.stabilityFeeApr}`,
 );
 const opened = await openNotesAndDerivations(page);
@@ -805,13 +806,14 @@ const openHead = ((await openHeadLocator.count()) ? ((await openHeadLocator.text
 const headBlocks = [...openHead.matchAll(/2[0-9],[0-9]{3},[0-9]{3}/g)].map((m) => Number(m[0].replace(/,/g, "")));
 const headStated = headBlocks.length ? Math.max(...headBlocks) : null;
 check(
-  "3d. the live row states a block within 200 of the vault route's own atBlock, re-read in this run",
-  live28699.atBlock > 0 && headStated != null && Math.abs(headStated - live28699.atBlock) < 200,
+  "3d. the live row states a block within 200 of the vault route's own atBlock, re-read in this run (no row to read while the fee is flat)",
+  live28699.atBlock > 0 &&
+    ((flatLive && headStated == null) || (headStated != null && Math.abs(headStated - live28699.atBlock) < 200)),
   `row states ${headStated ?? "(none)"}, route atBlock ${live28699.atBlock}, blockTimestamp ${live28699.blockTimestamp}`,
 );
 check(
-  "3d1. the live row carries an Elapsed figure — only possible because the overlay returns the head block's own timestamp",
-  /Elapsed/.test(openHead) && live28699.blockTimestamp > 1_700_000_000,
+  "3d1. the live row carries an Elapsed figure — only possible because the overlay returns the head block's own timestamp (no row while the fee is flat)",
+  (flatLive && openHead === "" ? true : /Elapsed/.test(openHead)) && live28699.blockTimestamp > 1_700_000_000,
   `Elapsed ${/Elapsed/.test(openHead)}, blockTimestamp ${live28699.blockTimestamp}`,
 );
 

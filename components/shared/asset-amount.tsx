@@ -36,6 +36,9 @@ export interface AssetAmountProps {
   /** Name the ticker after the number ("83.173 sUSDS"), for a headline whose
    *  glyph alone reads as a dollar figure. */
   unit?: boolean;
+  /** The figure as shown, where the family states amounts at its own
+   *  precision. Default: formatCompact of `value`. */
+  display?: string;
 }
 
 export function AssetAmount({
@@ -46,12 +49,14 @@ export function AssetAmount({
   address,
   signed = false,
   unit = false,
+  display,
 }: AssetAmountProps) {
   // Full pipeline precision (String(n) round-trip, no 3-dp re-rounding) — the
   // strict-truth figure behind the compact headline, for both the hover tip and
   // the provenance trace.
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
-  const compact = signed ? withRealMinus(formatCompact(value)) : formatCompact(value);
+  const shown = display ?? formatCompact(value);
+  const compact = signed ? withRealMinus(shown) : shown;
   return (
     <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`} className="gap-2">
       {/* data-prov-exact: the provenance inspector reads the exact figure from

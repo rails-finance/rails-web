@@ -15,8 +15,12 @@ import {
   externalActorProv,
   giveDstProv,
   giveOwnerProv,
+  ownerBeforeProv,
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
+import type { MakerTxContext } from "@/lib/makerdao/chain-history-types";
+import type { MakerOwnershipStep } from "@/lib/makerdao/vault-history";
+import { ownerChipText } from "@/lib/makerdao/ownership-prose";
 
 export interface MakerDAOEventHeaderProps {
   actionLabel: string;
@@ -37,6 +41,9 @@ export interface MakerDAOEventHeaderProps {
    *  flow carries no token to pass on, and that chip goes on resolving from its
    *  symbol exactly as it does today. */
   flows?: AssetFlow[];
+  /** A give row: the owner before and after, and its transaction's read. */
+  ownership?: MakerOwnershipStep;
+  txContext?: MakerTxContext;
 }
 
 export function MakerDAOEventHeader({
@@ -49,6 +56,8 @@ export function MakerDAOEventHeader({
   externalBy,
   wallet,
   flows,
+  ownership,
+  txContext,
 }: MakerDAOEventHeaderProps) {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const dink = Number(ctx.dink) || 0;
@@ -100,6 +109,8 @@ export function MakerDAOEventHeader({
   // give rows: the new owner as a neutral "to 0x…" chip. Prefer the resolved
   // EOA (the person); fall back to the dst holder (often a proxy).
   const giveTo = ctx.eventType === "give" ? (ctx.giveDstOwner ?? ctx.giveDst) : undefined;
+  const toChip = ownership ? ownerChipText(ownership.after, txContext) : null;
+  const fromChip = ownership ? ownerChipText(ownership.before, txContext) : null;
 
   return (
     <ChainTruthRow
@@ -108,10 +119,15 @@ export function MakerDAOEventHeader({
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "grab" || ctx.eventType.startsWith("lse-"),
         deltas,
+        fromParty:
+          fromChip && fromChip.address
+            ? { prefix: "from", address: fromChip.address, name: fromChip.name, prov: ownerBeforeProv(coords) }
+            : undefined,
         party: giveTo
           ? {
               prefix: "to",
-              address: giveTo,
+              address: toChip?.address || giveTo,
+              ...(toChip?.name ? { name: toChip.name } : {}),
               prov: ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords),
             }
           : undefined,

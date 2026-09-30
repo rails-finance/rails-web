@@ -241,8 +241,7 @@ function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
         <Prov info={reconcileProv(data.reconciles, data.ilks.length)}>
           {data.reconciles ? (
             <span className="text-rb-500">
-              Reconciles exactly — residual <span className="tabular-nums text-foreground">0</span>, checked in rad (10
-              <sup>−45</sup> DAI) before anything is rounded.
+              The parts add up to the total, checked to the last unit before anything is rounded.
             </span>
           ) : (
             <span className="text-red-500">
@@ -563,9 +562,10 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
           </div>
 
           <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-            The rest is minted by modules — the Peg Stability Module swapping DAI for stablecoins it holds, the
-            Allocators funding protocol-owned strategies. Those are Maker positions, but they are nobody&apos;s
-            position: there is no owner, no health, nothing to explore. So{" "}
+            The rest is minted by modules. A Peg Stability Module (PSM) swaps DAI one for one with another stablecoin it
+            holds. An Allocator is a credit line governance gives a Sky project to fund what it runs. A real-world-asset
+            (RWA) type backs DAI with an off-chain loan, valued by governance. Those are Maker positions, but they are
+            nobody&apos;s position: there is no owner, no health, nothing to explore. So{" "}
             <Link href="/ethereum/makerdao" className="text-blue-500 hover:underline">
               the vault roster
             </Link>{" "}
@@ -590,6 +590,10 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
           lending it out, so nothing here responds to how much is drawn — and where the DssAutoLine manages the ceiling
           it holds <code>line</code> just above current debt, which would make <code>debt ÷ line</code> a restatement of
           the gap.
+        </p>
+        <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+          Ceiling: Auto means the DssAutoLine raises and lowers it as debt moves; Fixed means governance set it and only
+          a vote moves it; Closed means it is zero with debt still owed; Dormant means no ceiling and no debt.
         </p>
 
         <div className="mt-3 space-y-3">

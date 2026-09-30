@@ -46,6 +46,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
+import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -179,6 +180,9 @@ export interface ChainTruthRowSpec {
    *  (degrading to the address before it does); `tone: "party"` tints the chip
    *  party-pink for a delegate the owner handed control to (the fork batch
    *  manager). */
+  /** A second neutral chip before `party`, same shape: the earlier side of a
+   *  handover ("from 0x… to 0x…", MakerDAO's give). */
+  fromParty?: NonNullable<ChainTruthRowSpec["party"]>;
   party?: {
     prefix: string;
     address: string;
@@ -318,6 +322,8 @@ export interface ChainTruthStat {
     /** The line's words where the gap is not interest alone (f(x): funding,
      *  rebalances). Default "Interest since previous event". */
     label?: string;
+    /** A hover/tap tip on the label (opt-in). */
+    labelTip?: string;
     /** The figure as shown, where the family states its amounts at its own
      *  precision. Default: formatNumber of `value`. */
     display?: string;
@@ -621,6 +627,11 @@ export function ChainTruthRow({
           );
         })()}
 
+      {spec.fromParty && (
+        <span className="-ml-1.5 inline-flex items-center">
+          <PartyChip party={spec.fromParty} />
+        </span>
+      )}
       {spec.party && (
         <span className="-ml-1.5 inline-flex items-center">
           <PartyChip party={spec.party} />
@@ -823,7 +834,11 @@ export function ChainTruthDetail({
               </StateTransition>
               {s.interestSincePrevious && (
                 <StatSubline>
-                  {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
+                  <TipLabel
+                    text={s.interestSincePrevious.label ?? "Interest since previous event"}
+                    tip={s.interestSincePrevious.labelTip}
+                  />
+                  :{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <ExactTip
                       always

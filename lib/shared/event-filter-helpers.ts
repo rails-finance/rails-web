@@ -57,8 +57,18 @@ export function getEventActionKey(e: BaseActivityEvent): string {
   }
   if (isSparkEvent(e)) {
     // Spark's eventType is already a clean per-action bucket (supply, withdraw,
-    // borrow, repay, liquidation), so it doubles as the filter key.
-    return e.context.data.eventType ?? e.actionType ?? "unknown";
+    // borrow, repay, liquidation), so it doubles as the filter key — except
+    // for the two spToken transfers each row names as an act: one to the Spark
+    // WETH gateway is a withdrawal as ETH (the row reads "Withdraw"), one to
+    // the Spark treasury is a liquidation's fee (the row reads "Liquidation
+    // fee"). "Transfer out" is left to transfers between accounts.
+    const d = e.context.data;
+    if (d.eventType === "transfer_out") {
+      const to = d.counterparty?.toLowerCase();
+      if (to === SPARK_WETH_GATEWAY_ADDRESS) return "withdraw";
+      if (to === SPARK_TREASURY_ADDRESS) return "liquidation_fee";
+    }
+    return d.eventType ?? e.actionType ?? "unknown";
   }
   if (isMapleEvent(e)) {
     // Maple's eventType is already a clean per-action bucket (deposit,
@@ -293,7 +303,16 @@ const SPARK_OP_LABELS: Record<string, string> = {
   borrow: "Borrow",
   repay: "Repay",
   liquidation: "Liquidated",
+  liquidation_fee: "Liquidation fee",
+  transfer_in: "Transfer in",
+  transfer_out: "Transfer out",
+  emode: "E-mode",
 };
+
+/** SparkLend's WETH gateway and treasury (lib/spark/flows-timeline.ts names
+ *  them; repeated here so the filter keys import nothing of the tower). */
+const SPARK_WETH_GATEWAY_ADDRESS = "0xbd7d6a9ad7865463de44b05f04559f65e3b11704";
+const SPARK_TREASURY_ADDRESS = "0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5";
 
 // Moonwell (Compound v2 fork) — mint/redeem are the supply side (deposit
 // underlying ↔ mTokens), borrow/repay the debt side; transfer_in/out are

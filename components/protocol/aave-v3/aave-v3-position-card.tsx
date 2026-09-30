@@ -16,6 +16,7 @@
 // getUserAccountData read is the only HF this card ever shows.
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
+import { formatDate } from "@/lib/date";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
@@ -29,6 +30,7 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { reserveDataProv, avgBorrowRateProv, type V3PoolLane } from "@/lib/aave-v3/position-provenance";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { aaveV3LiquidationRead, type AaveV3CardCaptions } from "@/lib/aave-v3/chain-truth-tower";
 import {
   AaveV3CardDeploymentProvider,
@@ -79,6 +81,12 @@ export interface AaveV3PositionView {
   txCount: number;
   /** The position's events, where the page knows them: the count's tip gives both. */
   eventTotal?: number | null;
+  /** Why the events and the transactions differ, after both in the count's tip. */
+  countNote?: string;
+  /** What the transaction count counts, added to its tip. */
+  countRule?: string;
+  /** What the liquidation count counts, added to its tip. */
+  liquidationRule?: string;
   /** Unix seconds of the most recent event (activity-meta). */
   lastActivityAt: number;
   /** On-chain oracle USD (IAaveOracle, chain-derived) per reserve, keyed by
@@ -184,15 +192,24 @@ function ReserveFootnoteLines({
   );
 }
 
-/** "incl. $X interest" — accrued interest already included in the column's
- *  balance above (it grew it), computed with the strict attribution gates
+/** "incl. $X interest since 12 Sep 2026" — the interest inside the column's
+ *  balance above: added since the balance last started from zero
  *  (computeAaveV3CardCaptions). Hidden below a cent — dust isn't worth a line. */
-function InterestCaption({ side, usd }: { side: "supply" | "debt"; usd: number | null | undefined }) {
+function InterestCaption({
+  side,
+  usd,
+  since,
+}: {
+  side: "supply" | "debt";
+  usd: number | null | undefined;
+  since?: number | null;
+}) {
   const receipt = useAaveV3CardDeployment().interestCaption;
   if (usd == null || usd < 0.01 || !receipt) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500">
       incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest
+      {since != null ? ` since ${formatDate(since)}` : ""}
     </div>
   );
 }
@@ -247,9 +264,10 @@ function LiquidationFootnote({ v }: { v: AaveV3PositionView }) {
 }
 
 /** Neutral HF headline (Rails doesn't color-code risk): "∞" above 100 — the
- *  figure stops meaning anything as a ratio there — else two decimals. */
+ *  figure stops meaning anything as a ratio there — else the family's format
+ *  (four decimals below 1.1, as the event tiles and the prose). */
 function hfLabel(hf: number): string {
-  return hf >= 100 ? "∞" : hf.toFixed(2);
+  return hf >= 100 ? "∞" : hfLabelV3(hf);
 }
 
 function rawBigInt(raw: string | null | undefined): bigint {
@@ -493,6 +511,9 @@ function AaveV3PositionCardBody({
               eventCount={v.txCount}
               eventTotal={v.eventTotal}
               liquidationCount={v.liquidationCount}
+              countNote={v.countNote}
+              countRule={v.countRule}
+              liquidationRule={v.liquidationRule}
             />
           }
           closedAt={v.lastActivityAt}
@@ -572,6 +593,9 @@ function AaveV3PositionCardBody({
             eventCount={v.txCount}
             eventTotal={v.eventTotal}
             liquidationCount={v.liquidationCount}
+            countNote={v.countNote}
+            countRule={v.countRule}
+            liquidationRule={v.liquidationRule}
           />
         }
         columns={[
@@ -613,7 +637,11 @@ function AaveV3PositionCardBody({
                     <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
+                <InterestCaption
+                  side="supply"
+                  usd={captions?.supplyInterestUsd}
+                  since={captions?.supplyInterestSince}
+                />
               </>
             ),
           },
@@ -651,7 +679,7 @@ function AaveV3PositionCardBody({
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} pool={captions?.pool} />
-                <InterestCaption side="debt" usd={captions?.debtInterestUsd} />
+                <InterestCaption side="debt" usd={captions?.debtInterestUsd} since={captions?.debtInterestSince} />
                 {/* The rate and interest captions weigh by price: their two
                     lines are held while the prices load. */}
                 {debtPending && captions?.borrowRate == null && (

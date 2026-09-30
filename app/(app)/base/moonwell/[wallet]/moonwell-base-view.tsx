@@ -526,7 +526,13 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   // current state comes from the Comptroller, not the logs) and drops the flows.
   const towerData = useMemo(() => {
     if (!view) return null;
-    const built = computeMoonwellEconomics(view, undefined, VOCAB, sweptClean ? timeline?.lifetime : undefined);
+    const built = computeMoonwellEconomics(
+      view,
+      undefined,
+      VOCAB,
+      sweptClean ? timeline?.lifetime : undefined,
+      sweptClean ? timeline?.ledger : undefined,
+    );
     return sweptClean
       ? built
       : {

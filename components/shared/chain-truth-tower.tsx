@@ -396,6 +396,8 @@ function buildSide(
     wrapLabels?: boolean;
     /** Every token-mode row names its token (ChainTruthTowerData.unitOnEveryRow). */
     unitAll?: boolean;
+    /** USD rows in whole dollars (ChainTruthTowerData.fullUsdAmounts). */
+    fullUsd?: boolean;
   },
 ): TowerSide {
   const {
@@ -413,6 +415,9 @@ function buildSide(
     height,
   } = opts;
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
+  // Compact dollars ("$6.4M"), or whole dollars where the feeder asks for a
+  // column that adds up on its face.
+  const usdRow = (n: number) => (opts.fullUsd ? `$${Math.round(n).toLocaleString("en-US")}` : formatCompactUsd(n));
   const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
   // Full token amounts (a Morpho-only opt-in) name their token on every row,
   // as does a tower that opts into `unitOnEveryRow`.
@@ -526,7 +531,7 @@ function buildSide(
   // Display compact ("11M"); the exact figure rides the tooltip + provenance
   // trace (view-tiers.md — compact is the one-step readability leeway the tier
   // allows). USD (valued) rows are already compact via formatCompactUsd.
-  const fmt = (l: TowerLine) => (valued && l.usd != null ? formatCompactUsd(l.usd) : `${cmp(l.amount)} ${l.symbol}`);
+  const fmt = (l: TowerLine) => (valued && l.usd != null ? usdRow(l.usd) : `${cmp(l.amount)} ${l.symbol}`);
   const fmtExact = (l: TowerLine): string | undefined =>
     valued && l.usd != null ? undefined : `${formatNumber(l.amount)} ${l.symbol}`;
   // The denomination rule: a row about ONE token carries the chip (even when
@@ -565,7 +570,7 @@ function buildSide(
       rows.push({
         sign: "",
         label: inflowLines.length === 1 ? `${inflowLabel} (all time)` : inflowLabel,
-        amount: l.mergedParts && !l.symbol ? formatCompactUsd(l.usd ?? 0) : fmt(l),
+        amount: l.mergedParts && !l.symbol ? usdRow(l.usd ?? 0) : fmt(l),
         exact: l.mergedParts && !l.symbol ? formatUsdValue(l.usd ?? 0) : fmtExact(l),
         icon: flowIcon(l),
         swatchStyle: { backgroundColor: flowColor },
@@ -579,7 +584,7 @@ function buildSide(
       label: `${inflowLabel} (all\u00a0time)`,
       // Full token amounts (a Morpho-only opt-in) name their token, as the
       // other rows do, and the label wraps rather than clipping beside them.
-      amount: valued ? formatCompactUsd(side.lifetimeInflow) : cmpUnit(side.lifetimeInflow, sideSymbol ?? undefined),
+      amount: valued ? usdRow(side.lifetimeInflow) : cmpUnit(side.lifetimeInflow, sideSymbol ?? undefined),
       exact: valued ? undefined : formatNumber(side.lifetimeInflow),
       icon: sideSymbol ? chip(sideSymbol, sideAddress) : undefined,
       swatchStyle: { backgroundColor: flowColor },
@@ -616,12 +621,16 @@ function buildSide(
     );
   // "+ Interest earned" — what the side gained over its life, part of the
   // same faded reference bar, so it wears the flow swatch like `received`.
+  // A whole-dollar column prints interest under half a dollar as "<$1" beside
+  // its token amount, where "$0" would read as none earned.
+  const underDollar = (l: TowerLine) => valued && opts.fullUsd && l.usd != null && l.usd > 0 && l.usd < 0.5;
   if (hasFlows)
     earnedLines.forEach((l) =>
       rows.push({
         sign: "+",
         label: l.flowLabel ?? "Interest earned",
-        amount: fmt(l),
+        amount: underDollar(l) ? "<$1" : fmt(l),
+        usdHint: underDollar(l) && l.symbol ? `${formatNumber(l.amount)} ${l.symbol}` : undefined,
         exact: fmtExact(l),
         icon: flowIcon(l),
         swatchStyle: { backgroundColor: flowColor },
@@ -661,7 +670,7 @@ function buildSide(
     rows.push({
       sign: (priceLine.usd ?? 0) < 0 ? "−" : "+",
       label: priceLine.flowLabel ?? "Price change",
-      amount: formatCompactUsd(Math.abs(priceLine.usd ?? 0)),
+      amount: usdRow(Math.abs(priceLine.usd ?? 0)),
       exact: formatUsdValue(Math.abs(priceLine.usd ?? 0)),
       swatchStyle: { backgroundColor: flowColor },
       prov: priceLine.prov,
@@ -676,7 +685,7 @@ function buildSide(
       rows.push({
         sign: "",
         label: l.mergedLabel ?? `${l.mergedParts.length} assets`,
-        amount: formatCompactUsd(l.usd ?? 0),
+        amount: usdRow(l.usd ?? 0),
         exact: formatUsdValue(l.usd ?? 0),
         swatchClass: solid,
         prov: l.prov,
@@ -690,7 +699,7 @@ function buildSide(
       exact: formatNumber(l.amount),
       symbol: l.symbol,
       icon: chip(l.symbol, l.address),
-      usdHint: hintUsd(l) != null ? formatCompactUsd(hintUsd(l)!) : undefined,
+      usdHint: hintUsd(l) != null ? usdRow(hintUsd(l)!) : undefined,
       usdProv: hintUsd(l) != null ? usdHintProv(l) : undefined,
       usdExact: hintUsd(l) != null ? formatUsdValue(hintUsd(l)!) : undefined,
       swatchClass: solid,
@@ -719,7 +728,7 @@ function buildSide(
     rows.push({
       sign: "+",
       label: opts.interestLabel ?? "Accrued interest",
-      amount: formatCompactUsd(interestLine.usd ?? 0),
+      amount: usdRow(interestLine.usd ?? 0),
       exact: formatUsdValue(interestLine.usd ?? 0),
       swatchClass: FEE_SOLID,
       prov: interestLine.prov,
@@ -732,7 +741,7 @@ function buildSide(
       amount: cmpUnit(interestLine.amount, interestLine.symbol),
       exact: formatNumber(interestLine.amount),
       symbol: interestLine.symbol,
-      usdHint: hintUsd(interestLine) != null ? formatCompactUsd(hintUsd(interestLine)!) : undefined,
+      usdHint: hintUsd(interestLine) != null ? usdRow(hintUsd(interestLine)!) : undefined,
       usdProv: hintUsd(interestLine) != null ? usdHintProv(interestLine) : undefined,
       usdExact: hintUsd(interestLine) != null ? formatUsdValue(hintUsd(interestLine)!) : undefined,
       swatchClass: FEE_SOLID,
@@ -750,7 +759,7 @@ function buildSide(
     exact: formatNumber(l.amount),
     symbol: l.symbol,
     icon: flowIcon(l),
-    usdHint: hintUsd(l) != null ? formatCompactUsd(hintUsd(l)!) : undefined,
+    usdHint: hintUsd(l) != null ? usdRow(hintUsd(l)!) : undefined,
     usdProv: hintUsd(l) != null ? usdHintProv(l) : undefined,
     usdExact: hintUsd(l) != null ? formatUsdValue(hintUsd(l)!) : undefined,
     ...swatch,
@@ -774,7 +783,7 @@ function buildSide(
         amount: cmp(l.amount),
         exact: formatNumber(l.amount),
         symbol: l.symbol,
-        usdHint: hintUsd(l) != null ? formatCompactUsd(hintUsd(l)!) : undefined,
+        usdHint: hintUsd(l) != null ? usdRow(hintUsd(l)!) : undefined,
         usdProv: hintUsd(l) != null ? usdHintProv(l) : undefined,
         usdExact: hintUsd(l) != null ? formatUsdValue(hintUsd(l)!) : undefined,
         swatchClass: FEE_SOLID,
@@ -791,7 +800,7 @@ function buildSide(
     rows.push({
       sign: "",
       label: resultLabel,
-      amount: formatCompactUsd(total),
+      amount: usdRow(total),
       exact: formatUsdValue(total),
       isResult: true,
       prov: {
@@ -921,6 +930,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
     unitAll: data.unitOnEveryRow,
+    fullUsd: data.fullUsdAmounts,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -937,6 +947,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     fullAmounts: data.fullTokenAmounts,
     wrapLabels: data.wrapFlowLabels,
     unitAll: data.unitOnEveryRow,
+    fullUsd: data.fullUsdAmounts,
   });
   // A position with no debt axis (a lender, a saver) draws its one tower.
   const noDebt = data.debtAxisAbsent && data.debt.current.length === 0 && data.debt.exited.length === 0;

@@ -107,9 +107,16 @@ export function AaveV3PoolNotes({
         >
           one transaction
         </a>{" "}
-        at block {frozen.block.toLocaleString("en-US")} ({frozen.date}). Interest still accrues and the account is still
-        liquidatable below a health factor of 1.000, so the figures above are live — but nothing can be supplied or
-        borrowed here, and this position can only be repaid, withdrawn or liquidated.
+        at block {frozen.block.toLocaleString("en-US")} ({frozen.date}).{" "}
+        {held.length === 0 && !chain.reserves.some((r) => r.debtBalanceRaw !== "0") ? (
+          <>This position is closed, and nothing new can be supplied or borrowed on this Pool.</>
+        ) : (
+          <>
+            Interest still accrues and the account is still liquidatable below a health factor of 1.000, so the figures
+            above are live. Nothing new can be supplied or borrowed, so this position can only be repaid, withdrawn or
+            liquidated.
+          </>
+        )}
       </span>,
     );
   }

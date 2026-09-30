@@ -17,6 +17,8 @@ import { MakerDAOEventHeader } from "./makerdao-event-header";
 import { MakerDAOEventDetail } from "./makerdao-event-detail";
 import { MakerDAOEventExplainer, makerdaoLearnMoreContent, useMakerRowExtras } from "./makerdao-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { openedForSigner, useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 
 export interface MakerDAOEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "makerdao"; data: MakerDAOContext } };
@@ -42,7 +44,12 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
   // glyph replaces the token flow, and the header keeps the moved amounts
   // plus the "by 0x…" chip. Judged against the owner IN FORCE at the event's
   // block (ownerAt, era-aware) — the current owner may postdate a give.
-  const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.txTo }, ctx.ownerAt ?? event.wallet);
+  const history = useMakerVaultHistory();
+  // A vault a contract created and handed to the signer in the same
+  // transaction was opened by that signer, not by a third party.
+  const extBy = openedForSigner(event, history.txRows)
+    ? null
+    : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.txTo }, ctx.ownerAt ?? event.wallet);
 
   // Echo: the header registers dinkProv/dartProv on every frob/fork/grab with
   // a nonzero delta (makerdao-event-header.tsx pushes unconditionally; the debt
@@ -144,9 +151,13 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
           externalBy={extBy ?? undefined}
           wallet={event.wallet}
           flows={event.flows}
+          ownership={isGive ? history.ownership.get(event.id) : undefined}
+          txContext={isGive ? history.txContext.get(makerTxHashOf(event)) : undefined}
         />
       }
-      detail={<MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
+      detail={
+        <MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
+      }
       detailLabel="Vault state"
       explainer={
         <MakerDAOEventExplainer

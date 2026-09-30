@@ -87,6 +87,16 @@ function answer(f: Fixture, c: Case): { legs: Record<string, Leg[]>; days?: DayS
   };
 }
 
+/** Every number to 12 significant figures, for a comparison that ignores the
+ *  order floating-point sums were added in. */
+function roundDeep<T>(v: T): T {
+  if (typeof v === "number") return (Number.isFinite(v) ? Number(v.toPrecision(12)) : v) as T;
+  if (Array.isArray(v)) return v.map(roundDeep) as T;
+  if (v && typeof v === "object")
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, roundDeep(x)])) as T;
+  return v;
+}
+
 if (process.env.WRITE === "1") {
   const input = JSON.parse(readFileSync(process.env.FIXTURE_IN ?? FIXTURE, "utf8")) as Fixture;
   for (const c of input.cases) Object.assign(c, answer(input, c));
@@ -104,7 +114,12 @@ if (process.env.WRITE === "1") {
     test(`legs: ${c.name} (${c.about})`, () => {
       const got = answer(fixture, c);
       assert.deepEqual(got.legs, c.legs);
-      if (c.whole) assert.deepEqual(got.days, c.days);
+      // The day sums are compared to a relative 1e-12: the web runs a
+      // liquidation's fee after its seizure, as the chain does
+      // (lib/sources/api/spark-timeline.ts feeAfterSeizure), while the index
+      // serves the fee first, so the two add the same legs in a different order
+      // and can differ in the last bit.
+      if (c.whole) assert.deepEqual(roundDeep(got.days), roundDeep(c.days));
     });
   }
 
