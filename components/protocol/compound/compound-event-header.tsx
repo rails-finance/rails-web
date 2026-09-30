@@ -10,6 +10,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import {
   movedDeltaProv,
+  absorbDebtClearedProv,
   externalActorProv,
   transferCounterpartyProv,
   type CompoundCoords,
@@ -17,6 +18,8 @@ import {
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
+import { compoundAbsorbSplit } from "@/lib/compound/row-facts";
+import { formatExactDecimal } from "@/lib/utils/format";
 
 export interface CompoundEventHeaderProps {
   actionLabel: string;
@@ -61,9 +64,18 @@ export function CompoundEventHeader({
   const critical = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
   const deltas: ChainTruthDelta[] = [];
 
-  const d = Number(ctx.assetsDelta) || 0;
+  // An absorb's debt row states the debt it cleared, as a fall in the debt,
+  // with the same sign as the collateral it seized: both are what the absorb
+  // took off the account. Its credit past the debt is in the row's detail.
+  const split = compoundAbsorbSplit(ctx);
+  const d = split ? -Number(split.cleared) : Number(ctx.assetsDelta) || 0;
   if (d !== 0) {
-    const prov = movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
+    const prov = split
+      ? absorbDebtClearedProv(ctx.assetSymbol, coords, {
+          paidOut: formatExactDecimal(split.paidOut),
+          before: formatExactDecimal(split.before),
+        })
+      : movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
     if (prov)
       deltas.push({ value: d, symbol: ctx.assetSymbol, address: soleFlowAddress(flows, ctx.assetSymbol), prov });
   }

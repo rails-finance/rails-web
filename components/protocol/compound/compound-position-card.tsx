@@ -88,6 +88,10 @@ export interface CompoundPositionView {
    *  the detail page (the shared `/api/prices` cache). Feeds the valued economics
    *  tower; absent on the listing (the card itself shows no USD). */
   priceByAddress?: Record<string, number>;
+  /** Set when the account still holds balances but every one is worth under
+   *  a cent at the oracle and nothing is borrowed: the card reads it as
+   *  closed, and these are the amounts left behind. */
+  dustLeft?: { symbol: string; amount: number }[];
 }
 
 /** The base figure to display: the live CURRENT value (incl. interest) when the

@@ -177,3 +177,33 @@ export const formatApproximate = (value: number): string => {
 const CONSONANT_SOUND_VOWEL_SPELLING = new Set(["USDaf"]);
 export const indefiniteArticle = (word: string): "A" | "An" =>
   CONSONANT_SOUND_VOWEL_SPELLING.has(word) || !/^[aeiou]/i.test(word) ? "A" : "An";
+
+const PLAIN_DECIMAL = /^-?\d+(\.\d+)?$/;
+
+/** a − b on plain decimal strings, exactly (no float in the path). Null when
+ *  either is not a plain decimal. */
+export function decimalSub(a: string, b: string): string | null {
+  if (!PLAIN_DECIMAL.test(a) || !PLAIN_DECIMAL.test(b)) return null;
+  const scale = Math.max(a.split(".")[1]?.length ?? 0, b.split(".")[1]?.length ?? 0);
+  const toInt = (s: string): bigint => {
+    const neg = s.startsWith("-");
+    const [i, f = ""] = (neg ? s.slice(1) : s).split(".");
+    const v = BigInt(i + f.padEnd(scale, "0"));
+    return neg ? -v : v;
+  };
+  const d = toInt(a) - toInt(b);
+  const neg = d < BigInt(0);
+  const abs = (neg ? -d : d).toString().padStart(scale + 1, "0");
+  const whole = scale > 0 ? abs.slice(0, -scale) : abs;
+  const frac = scale > 0 ? abs.slice(-scale).replace(/0+$/, "") : "";
+  const out = frac ? `${whole}.${frac}` : whole;
+  return neg && out !== "0" ? `-${out}` : out;
+}
+
+/** An exact plain-decimal string grouped with thousands separators
+ *  ("-5205.71498" → "-5,205.71498"): the string's own digits, no float. */
+export const formatExactDecimal = (s: string): string => {
+  const neg = s.startsWith("-");
+  const [int, frac] = (neg ? s.slice(1) : s).split(".");
+  return `${neg ? "-" : ""}${BigInt(int).toLocaleString("en-US")}${frac ? `.${frac}` : ""}`;
+};

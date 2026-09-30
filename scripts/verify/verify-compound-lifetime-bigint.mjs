@@ -561,7 +561,15 @@ function checkSeededReplay(name, rows) {
     JSON.stringify(m.lifetimeRaw.collateral) === JSON.stringify(w.lifetimeRaw.collateral),
     "every collateral lifetime leg, raw ===",
   );
-  assert(JSON.stringify(m.lifetime) === JSON.stringify(w.lifetime), "the scaled lifetime, bit for bit");
+  // Absorb prices (`absorbUsd`) ride only rows the replay walks: a seed
+  // carries none, so a seeded market states none and the whole list does.
+  // Every flow compares bit for bit without them.
+  const noAbsorbUsd = (lt) => ({ ...lt, absorbUsd: undefined });
+  assert(m.lifetime.absorbUsd === undefined, "a seeded market states no absorb prices");
+  assert(
+    JSON.stringify(noAbsorbUsd(m.lifetime)) === JSON.stringify(noAbsorbUsd(w.lifetime)),
+    "the scaled lifetime, bit for bit",
+  );
   // The two per-asset lists are Map insertion order — the whole walk lists a
   // peak from the first row that lifted the balance above zero, a seed from
   // the asset's first touch — so they are compared by address; every figure
@@ -578,6 +586,7 @@ function checkSeededReplay(name, rows) {
     summary && typeof summary === "object" ? { ...summary, byType: undefined, byAsset: undefined } : summary;
   const normalised = (pos) => ({
     ...pos,
+    lifetime: noAbsorbUsd(pos.lifetime),
     collateral: JSON.parse(byAddr(pos.collateral)),
     peak: { ...pos.peak, collateral: JSON.parse(byAddr(pos.peak.collateral)) },
     ...(pos.omitted ? { omitted: { ...pos.omitted, summary: withheldHistogram(pos.omitted.summary) } } : {}),

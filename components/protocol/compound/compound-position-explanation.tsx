@@ -60,12 +60,30 @@ export function CompoundClosedPositionExplanation({
     ));
   const closedDate = v.lastActivityAt != null ? formatDate(v.lastActivityAt) : null;
 
+  const dust = v.dustLeft ?? [];
+  const nothingLeft =
+    dust.length > 0 ? (
+      <>
+        nothing is borrowed, and all that is left is dust worth under a cent:{" "}
+        {dust.map((d, i) => (
+          <span key={d.symbol + i}>
+            {i > 0 ? (i === dust.length - 1 ? " and " : ", ") : ""}
+            <AmountText value={d.amount} /> {d.symbol}
+          </span>
+        ))}
+        .
+      </>
+    ) : (
+      <>nothing is lent, borrowed or posted now.</>
+    );
   const lead = liquidated ? (
     <>
-      This {v.marketLabel} position closed with an absorption in its record — nothing remains lent, borrowed or posted:
+      This {v.marketLabel} position is closed, with an absorption in its record; {nothingLeft}
     </>
   ) : (
-    <>This {v.marketLabel} position ran its course and closed — nothing remains lent, borrowed or posted:</>
+    <>
+      This {v.marketLabel} position is closed; {nothingLeft}
+    </>
   );
 
   // The card's own peak lines, joined: supply side (lent base and/or collateral
@@ -80,12 +98,12 @@ export function CompoundClosedPositionExplanation({
     list.push(
       <>
         At its height the position
-        {supplyPeaks.length > 0 && <> held as much as {peakText(supplyPeaks)}</>}
+        {supplyPeaks.length > 0 && <> held up to {peakText(supplyPeaks)}</>}
         {supplyPeaks.length > 0 && v.peak.borrowedBase > 0 && <> and</>}
         {v.peak.borrowedBase > 0 && (
           <>
             {" "}
-            owed as much as{" "}
+            owed up to{" "}
             <H>
               <AmountText value={v.peak.borrowedBase} /> {v.base.symbol}
             </H>
@@ -95,10 +113,11 @@ export function CompoundClosedPositionExplanation({
         {peakFigures > 1 ? (
           <>
             {" "}
-            — each figure its own highest point across the position&rsquo;s life, so they need not have stood together.
+            — each the most that amount reached, counted before and after every event, so the figures need not have
+            stood together.
           </>
         ) : (
-          <> — its highest point across the position&rsquo;s life.</>
+          <> — the most it reached, counted before and after every event.</>
         )}
       </>,
     );
@@ -106,9 +125,9 @@ export function CompoundClosedPositionExplanation({
   if (v.liquidationCount > 0) {
     list.push(
       <>
-        The protocol absorbed the position <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} —
-        taking its collateral and clearing the whole debt against it, crediting back the value minus each asset&rsquo;s
-        liquidation penalty.
+        The protocol absorbed the position <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}, taking
+        its collateral, clearing the whole debt and crediting the account each asset&rsquo;s value times its liquidation
+        factor.
         {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
       </>,
     );
@@ -116,8 +135,8 @@ export function CompoundClosedPositionExplanation({
   if (closedDate != null) {
     list.push(
       <>
-        Its last activity landed on <H>{closedDate}</H>, after <H>{v.txCount}</H> transaction
-        {v.txCount === 1 ? "" : "s"} of its own.
+        Its last activity was on <H>{closedDate}</H>, after <H>{v.txCount}</H> transaction
+        {v.txCount === 1 ? "" : "s"}.
       </>,
     );
   }

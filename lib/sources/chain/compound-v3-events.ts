@@ -77,6 +77,7 @@ import {
   newCompoundLifetimeRaw,
   scaleCompoundLifetime,
   splitCompoundBaseFlow,
+  addCompoundAbsorbUsd,
   type CompoundLifetimeFlows,
   type CompoundLifetimeRaw,
   type CompoundLifetimeRawWire,
@@ -758,6 +759,8 @@ export interface CometReplaySeed {
     borrowed: bigint;
     repaid: bigint;
     absorbedDebt: bigint;
+    /** Absent on a seed written before the absorb split. */
+    absorbCredit?: bigint;
     collateral: Record<
       string,
       { supplied: bigint; withdrawn: bigint; absorbed: bigint; received: bigint; sent: bigint }
@@ -919,6 +922,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     s.lifetime.base.borrowed = lt.borrowed;
     s.lifetime.base.repaid = lt.repaid;
     s.lifetime.base.absorbedDebt = lt.absorbedDebt;
+    s.lifetime.base.absorbCredit = lt.absorbCredit ?? ZERO;
     for (const [addr, c] of Object.entries(lt.collateral)) {
       const meta = metas.get(addr) ?? fallback(addr);
       const acc = compoundCollateralFlowsOf(s.lifetime, addr, meta.symbol, meta.decimals);
@@ -1045,8 +1049,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         ? cometPresentValue(s.prevPrincipal, at.supplyIndex, at.borrowIndex) - s.prevAfter
         : null;
     const off = gap - (pure ?? ZERO);
-    const baseInterest =
-      off >= -TWO && off <= TWO ? gap : pure != null ? pure : s.prevAfter == null ? ZERO : gap;
+    const baseInterest = off >= -TWO && off <= TWO ? gap : pure != null ? pure : s.prevAfter == null ? ZERO : gap;
     const baseUnlogged = gap - baseInterest;
     s.prevAfter = baseAfter;
     s.prevRead = at != null;
@@ -1068,6 +1071,8 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       // economics.ts runs over the rendered events on Ethereum, here over
       // every row.
       splitCompoundBaseFlow(s.lifetime.base, d.kind, before, d.delta);
+      if (d.kind === "absorb_debt" && d.usdValue != null)
+        addCompoundAbsorbUsd(s.lifetime, d.kind, d.usdValue, { before, delta: d.delta });
     } else {
       const before = s.coll.get(d.asset) ?? ZERO;
       const raw = before + d.delta;
@@ -1078,11 +1083,17 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         d.kind,
         d.delta,
       );
+      if (d.kind === "absorb_collateral" && d.usdValue != null)
+        addCompoundAbsorbUsd(s.lifetime, d.kind, d.usdValue, { asset: d.asset });
       const peak = s.peakColl.get(d.asset) ?? ZERO;
       if (collAfter > peak) s.peakColl.set(d.asset, collAfter);
     }
-    if (baseAfter > s.peakLend) s.peakLend = baseAfter;
-    if (-baseAfter > s.peakBorrow) s.peakBorrow = -baseAfter;
+    // Each row's balance before it counts as well as after: the interest a
+    // debt accrued up to a repayment is part of the most the account owed.
+    for (const b of [baseBefore, baseAfter]) {
+      if (b > s.peakLend) s.peakLend = b;
+      if (-b > s.peakBorrow) s.peakBorrow = -b;
+    }
     if (d.kind === "absorb_debt") s.absorbs++;
     if (d.kind !== "absorb_debt" && d.kind !== "absorb_collateral") s.txs.add(d.txHash);
     if (!s.first) s.first = d;
@@ -1134,7 +1145,14 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
               const legMeta = metaOf(leg);
               const legUsd = usdOf(leg.usdValue);
               if (legUsd == null) return [];
-              return [{ symbol: legMeta.symbol, amount: fmtUnits(-leg.delta, legMeta.decimals), usdValue: legUsd }];
+              return [
+                {
+                  symbol: legMeta.symbol,
+                  address: leg.asset,
+                  amount: fmtUnits(-leg.delta, legMeta.decimals),
+                  usdValue: legUsd,
+                },
+              ];
             }),
           }
         : {}),
@@ -1253,7 +1271,9 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         lastActivityAt: s.last ? (tsOf.get(s.last.blockNumber) ?? null) : (s.seed?.lastTimestamp ?? null),
         // Scaled ONCE here, at the edge; the raw twin is the exact total.
         lifetime: (() => {
-          const scaled = scaleCompoundLifetime(s.lifetime);
+          // A seed carries no absorb prices, so a seeded market's absorbs
+          // are not all priced: it states none rather than a part.
+          const scaled = scaleCompoundLifetime(s.seed ? { ...s.lifetime, absorbUsd8: undefined } : s.lifetime);
           for (const [addr, c] of Object.entries(scaled.collateral)) if (collUnread(addr)) c.decimalsUnread = true;
           return scaled;
         })(),

@@ -298,7 +298,10 @@ function MarketSection({
       {timelineState === "ready" && (
         <ChainTruthTower
           data={towerData}
-          explanation={compoundEconomicsExplanation(towerData, { onBase: true })}
+          explanation={compoundEconomicsExplanation(towerData, {
+            onBase: true,
+            todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
+          })}
           learnMore={compoundEconomicsContent({ onBase: true })}
         />
       )}
@@ -332,6 +335,7 @@ function MarketSection({
               folders={servedFolders}
               closed={view.status !== "open"}
               firstAt={replay?.firstEventAt ?? null}
+              labelLastActivity
             />
           }
           emptyLabel={

@@ -193,7 +193,9 @@ function Position({
       />
       <ChainTruthTower
         data={towerData}
-        explanation={compoundEconomicsExplanation(towerData)}
+        explanation={compoundEconomicsExplanation(towerData, {
+          todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
+        })}
         learnMore={compoundEconomicsContent()}
       />
     </div>
@@ -515,6 +517,7 @@ export default function CompoundPositionView({
                 // because its oldest loaded card is.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                labelLastActivity
               />
             }
             renderCard={(event, meta) =>

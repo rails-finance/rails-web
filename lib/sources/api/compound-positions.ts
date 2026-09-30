@@ -181,7 +181,13 @@ export async function buildCompoundPositionRows(
   // the chain-state view. Degrades to an empty map (token-only) if RPC is down.
   const priceReqs: CometPriceRequest[] = raw.map((p) => {
     const m = market(p.market);
-    return { comet: m.comet, baseToken: m.baseToken, collateral: p.collateral.map((c) => c.asset) };
+    // The peaks too: a closed position's only collateral lives there, and its
+    // lifetime flows are valued at these prices.
+    return {
+      comet: m.comet,
+      baseToken: m.baseToken,
+      collateral: [...p.collateral.map((c) => c.asset), ...(p.peakCollateral ?? []).map((c) => c.asset)],
+    };
   });
   const cometPrices = await resolveCometPrices(priceReqs, deployment);
 

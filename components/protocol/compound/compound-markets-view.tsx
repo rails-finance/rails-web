@@ -136,7 +136,15 @@ function CollateralRow({
         <Prov info={cvCollateralValueProv(cc)}>{val(c.suppliedValue, unit)}</Prov>
       </span>
       <span className="w-24 shrink-0 text-right text-rb-500">
-        {c.capUsed != null ? `${pctText(c.capUsed, 0)} of cap` : "cap set to zero"}
+        {c.capUsed == null ? (
+          "cap set to zero"
+        ) : c.capUsed > 1 ? (
+          <span title="Governance lowered the supply cap below what is already supplied. Nothing more of this asset can enter until supply falls under the cap; what is in stays.">
+            {pctText(c.capUsed, 0)} of cap (cap lowered)
+          </span>
+        ) : (
+          `${pctText(c.capUsed, 0)} of cap`
+        )}
       </span>
 
       {/* The factors, stated — never drawn on the utilisation bar (different
@@ -144,16 +152,16 @@ function CollateralRow({
           NEW borrowing while it stays liquidation-eligible. */}
       <span
         className="min-w-36 flex-1 text-right text-rb-500"
-        title={`getAssetInfo — borrowCollateralFactor ${pctText(c.borrowCollateralFactor, 0)} (what new borrowing can be drawn against it) · liquidateCollateralFactor ${pctText(c.liquidateCollateralFactor, 0)} (where a position becomes absorbable) · liquidationFactor ${pctText(c.liquidationFactor, 0)} (the share of its value the absorbed account is credited).`}
+        title={`Borrow ${pctText(c.borrowCollateralFactor, 0)}: the share of its value that can be borrowed against. Liquidate ${pctText(c.liquidateCollateralFactor, 0)}: the share that counts toward the liquidation line. Credit ${pctText(c.liquidationFactor, 0)}: the share of its value an account is credited if it is liquidated.`}
       >
         {c.borrowCollateralFactor === 0 ? (
           <span className="text-foreground">borrowing switched off</span>
         ) : (
-          <Prov info={cvCollateralFactorProv("borrow", cc)}>CF {pctText(c.borrowCollateralFactor, 0)}</Prov>
+          <Prov info={cvCollateralFactorProv("borrow", cc)}>borrow {pctText(c.borrowCollateralFactor, 0)}</Prov>
         )}
-        {" · liq "}
+        {" · liquidate "}
         <Prov info={cvCollateralFactorProv("liquidate", cc)}>{pctText(c.liquidateCollateralFactor, 0)}</Prov>
-        {" · factor "}
+        {" · credit "}
         <Prov info={cvCollateralFactorProv("liquidation", cc)}>{pctText(c.liquidationFactor, 0)}</Prov>
       </span>
     </div>
@@ -244,7 +252,10 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
           </span>
         )}
         <span>
-          kink <Prov info={cvKinkProv("borrow", coords)}>{pctText(m.borrowKink, 0)}</Prov>
+          <span title="The kink is the utilisation where the rate curves turn steep: above it, borrowing costs rise fast to draw lenders in and borrowers out.">
+            kink
+          </span>{" "}
+          <Prov info={cvKinkProv("borrow", coords)}>{pctText(m.borrowKink, 0)}</Prov>
           {!sameKink && (
             <>
               {" / supply "}
@@ -282,11 +293,14 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
           target
           {m.reservesOfTarget != null && <> ({pctText(m.reservesOfTarget, 0)})</>}
         </span>
-        <span title="Comet.baseBorrowMin — the smallest borrow the market accepts.">
+        <span title="The smallest debt a new borrow may leave; repayments may leave less.">
           min borrow{" "}
           <Prov info={cvBaseBorrowMinProv(coords)}>
             {qty(m.baseBorrowMin)} {m.baseSymbol}
           </Prov>
+          {/* One base unit (1e-6 USDC on Base's cUSDCv3, the deployment's own
+              borrowMin of 1e0) is a minimum in name only. */}
+          {m.baseBorrowMin > 0 && m.baseBorrowMin <= 1e-6 && <> (no practical minimum)</>}
         </span>
       </div>
 
@@ -297,9 +311,10 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
           <Prov info={cvMarketValueProv("borrowed", coords)}>{val(m.totalBorrowValue, m.quoteUnit)}</Prov> borrowed
         </div>
         <p className="mt-0.5 text-[11px] leading-relaxed text-rb-500">
-          The market&rsquo;s own roster (numAssets / getAssetInfo). Each mini-bar is supplied ÷ supply cap — the
-          asset&rsquo;s own units, one axis. The factors are stated here because they measure a borrower&rsquo;s debt
-          against their collateral, a different axis from the utilisation bar above.
+          The collateral the market accepts, as its contract lists it. Each bar is the amount supplied against the
+          asset&rsquo;s supply cap, in the asset&rsquo;s units. Three factors follow each asset: borrow (the share of
+          its value that can be borrowed against), liquidate (the share that counts toward the liquidation line) and
+          credit (the share of its value an account is credited if it is liquidated).
         </p>
         <div className="mt-1 divide-y divide-rb-300/25 dark:divide-rb-700/25">
           {m.collateral.map((c) => (
@@ -328,12 +343,12 @@ export function CompoundMarketsStamp({
   return (
     <p className="mt-2 text-[11px] text-rb-500">
       Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · each market&rsquo;s state read from its
-      own Comet contract ·{" "}
+      contract (Compound calls each market a Comet) ·{" "}
       {rosterNote ?? (
         <>
           the roster is the{" "}
-          <span className="text-foreground">{data.summary.total} Ethereum markets the explorer indexes</span> — Comet
-          exposes no call that enumerates its markets, so the roster is stated, not read
+          <span className="text-foreground">{data.summary.total} Ethereum markets the explorer indexes</span>; no
+          contract lists the markets, so the roster is stated, not read
         </>
       )}
     </p>

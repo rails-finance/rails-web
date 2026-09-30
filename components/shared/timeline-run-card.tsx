@@ -434,7 +434,16 @@ export function TimelineRunCard({
       // Undefined members and no error means the read is still out. There is
       // no spinner: a spinner implies a fast answer is coming, and a first
       // open on a cold position pays for the whole grouping pass.
-      body = <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />;
+      // The line says what the shape is, so the opened folder never reads
+      // as empty while its events are on their way.
+      body = (
+        <>
+          <p role="status" className="px-5 text-[11px] leading-relaxed text-rb-500">
+            Loading this folder&rsquo;s {count.toLocaleString("en-US")} event{count === 1 ? "" : "s"}…
+          </p>
+          <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
+        </>
+      );
     }
   }
 

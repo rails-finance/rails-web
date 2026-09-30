@@ -50,6 +50,7 @@ export function DustToggle({ count, open, onToggle }: { count: number; open: boo
       type="button"
       className="self-start text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
       data-dust-hidden={count}
+      title="Dust: a balance worth under a cent at the oracle price, usually the last units a withdrawal or repayment left behind. Open to see it."
       aria-expanded={open}
       onClick={onToggle}
     >

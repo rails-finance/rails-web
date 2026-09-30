@@ -1579,7 +1579,7 @@ export interface CompoundContext {
    *  absorbs the whole account: one debt clear + every collateral seized).
    *  Per asset: the seized amount and the log's own usdValue, both
    *  human-readable. Lets the debt card state the full absorption. */
-  absorbedCollateral?: { symbol: string; amount: string; usdValue: string }[];
+  absorbedCollateral?: { symbol: string; address?: string; amount: string; usdValue: string }[];
 }
 
 // ───────────────────────── PWN (P2P fixed-term loans) detail types ─────────────────────────

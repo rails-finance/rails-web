@@ -44,7 +44,14 @@ import {
 } from "@/components/shared/state-transition";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
-import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import {
+  decimalSub,
+  formatCompact,
+  formatExact,
+  formatExactDecimal,
+  formatNumber,
+  formatUsdValue,
+} from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
@@ -431,16 +438,21 @@ export function reconstructTransition(args: {
   const changeN = Number(change);
   const afterN = Number(after);
   if (!Number.isFinite(changeN) || !Number.isFinite(afterN) || changeN === 0) return undefined;
-  const beforeN = opening ? 0 : afterN - changeN;
+  // The before figure from the two decimal strings exactly, where both are
+  // plain decimals: a float subtraction leaves noise in the last places
+  // ("-5,205.714980000001") that the exact reveal would print.
+  const beforeStr = opening ? "0" : decimalSub(after, change);
+  const beforeN = beforeStr != null ? Number(beforeStr) : afterN - changeN;
+  const beforeExact = beforeStr != null ? formatExactDecimal(beforeStr) : formatExact(beforeN);
   const sign = changeN >= 0 ? "+" : "−";
   const vals = {
     after: formatExact(afterN),
-    before: formatExact(beforeN),
+    before: beforeExact,
     change: `${sign}${formatExact(Math.abs(changeN))}`,
   };
   return {
     before: formatCompact(beforeN),
-    beforeExact: formatExact(beforeN),
+    beforeExact,
     beforeProv: opening ? openingBeforeProv(beforeProv) : fillFormulaOperands(beforeProv, vals),
     change: `${sign}${formatCompact(Math.abs(changeN))}`,
     changeExact: `${sign}${formatExact(Math.abs(changeN))}`,

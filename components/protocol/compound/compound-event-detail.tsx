@@ -9,11 +9,9 @@
 
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
-import {
-  LiquidationForensics,
-  type LiquidationForensicsProps,
-  type AtBlockPricePill,
-} from "@/components/shared/liquidation-forensics";
+import { CompoundAbsorbBreakdown } from "@/components/protocol/compound/compound-absorb-breakdown";
+import { compoundAmount, compoundBaseCaption } from "@/lib/compound/row-facts";
+import { decimalSub } from "@/lib/utils/format";
 import {
   baseAfterProv,
   baseInterestProv,
@@ -24,10 +22,6 @@ import {
   transferCollateralProv,
   absorbDebtProv,
   absorbCollateralProv,
-  absorbDebtUsdProv,
-  absorbSeizedUsdProv,
-  absorbPriceProv,
-  absorbMarginProv,
   baseBeforeProv,
   collateralBeforeProv,
   type CompoundCoords,
@@ -35,7 +29,6 @@ import {
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 
 export interface CompoundEventDetailProps {
   ctx: CompoundContext;
@@ -43,59 +36,7 @@ export interface CompoundEventDetailProps {
   blockNumber?: number;
 }
 
-const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
-
-/** The absorption forensics for an absorb_debt card — Comet's model of the
- *  Aave two-leg breakdown. Both legs are the absorb events' OWN usdValue
- *  figures (the protocol's oracle reckoning, emitted in the logs), so no
- *  overlay price walk is involved: an absorption is always fully valued.
- *  The margin is what the protocol absorbed — the account's remaining
- *  cushion (or, negative, its bad-debt gap) — not a liquidator's bonus. */
-function buildAbsorbForensics(ctx: CompoundContext, coords: CompoundCoords): LiquidationForensicsProps | undefined {
-  const legs = ctx.absorbedCollateral;
-  const clearedUsd = Number(ctx.usdValue);
-  const clearedAmt = Number(ctx.assetsDelta);
-  if (!legs?.length || !Number.isFinite(clearedUsd) || clearedUsd <= 0) return undefined;
-  const seizedUsd = legs.reduce((sum, l) => sum + Number(l.usdValue), 0);
-  if (!Number.isFinite(seizedUsd)) return undefined;
-
-  // One at-fire price pill per asset with a usable amount (usdValue ÷ amount;
-  // a dust leg with a zero-rounded amount gets no pill, its USD still counts).
-  const pills: AtBlockPricePill[] = [];
-  for (const l of [
-    { symbol: ctx.assetSymbol, amount: String(Math.abs(clearedAmt)), usdValue: ctx.usdValue as string },
-    ...legs,
-  ]) {
-    const amt = Number(l.amount);
-    if (!Number.isFinite(amt) || amt <= 0) continue;
-    pills.push({
-      symbol: l.symbol,
-      priceUsd: Number(l.usdValue) / amt,
-      priceProv: absorbPriceProv(l.symbol, coords, { amount: l.amount, usdValue: l.usdValue }),
-      note: "protocol price at absorption",
-    });
-  }
-
-  return {
-    seized: {
-      symbol: legs.length === 1 ? legs[0].symbol : undefined,
-      usd: seizedUsd,
-      usdProv: absorbSeizedUsdProv(coords, legs),
-    },
-    cleared: {
-      symbol: ctx.assetSymbol,
-      usd: clearedUsd,
-      usdProv: absorbDebtUsdProv(ctx.assetSymbol, coords, { amount: `${Math.abs(clearedAmt)} ${ctx.assetSymbol}` }),
-    },
-    premium: seizedUsd / clearedUsd - 1,
-    premiumProv: absorbMarginProv(coords, {
-      seizedUsd: formatUsdValue(seizedUsd),
-      clearedUsd: formatUsdValue(clearedUsd),
-    }),
-    premiumLabel: "Absorption margin",
-    pricePills: pills,
-  };
-}
+const fmt = (human?: string): string => (human == null ? "—" : compoundAmount(Number(human)));
 
 export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventDetailProps) {
   const m = useCometMarket(ctx.market);
@@ -118,7 +59,6 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
   };
 
   if (ctx.isBase) {
-    const n = Number(ctx.baseAfter ?? "0");
     // The moved-amount provenance depends on the event: an ordinary Supply /
     // Withdraw cites the base delta; an AbsorbDebt liquidation cites basePaidOut.
     const changeProv =
@@ -127,8 +67,9 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
         : ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out"
           ? transferBaseProv(ctx.assetSymbol, ctx.eventType === "transfer_in" ? "in" : "out", coords)
           : baseDeltaProv(ctx.assetSymbol, ctx.eventType === "supply" ? "supply" : "withdraw", coords);
+    const before = ctx.baseAfter != null ? decimalSub(ctx.baseAfter, ctx.assetsDelta) : null;
     stats.push({
-      label: n < 0 ? "Borrowed (base)" : "Lent (base)",
+      label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
       value: fmt(ctx.baseAfter),
       symbol: ctx.assetSymbol,
       prov: baseAfterProv(ctx.assetSymbol, coords),
@@ -176,7 +117,7 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
     if (ctx.baseAfter != null) {
       const b = Number(ctx.baseAfter);
       stats.push({
-        label: b < 0 ? "Borrowed (base)" : "Lent (base)",
+        label: b < 0 ? "Borrowed (base)" : b > 0 ? "Lent (base)" : "Base balance",
         value: fmt(ctx.baseAfter),
         symbol: m.baseSymbol,
         prov: baseAfterProv(m.baseSymbol, coords),
@@ -185,12 +126,10 @@ export function CompoundEventDetail({ ctx, txHash, blockNumber }: CompoundEventD
     }
   }
 
-  const forensics = ctx.eventType === "absorb_debt" ? buildAbsorbForensics(ctx, coords) : undefined;
-
   return (
     <>
       <ChainTruthDetail stats={stats} />
-      {forensics && <LiquidationForensics {...forensics} />}
+      {ctx.eventType === "absorb_debt" && <CompoundAbsorbBreakdown ctx={ctx} coords={coords} marketKey={m.key} />}
     </>
   );
 }

@@ -11,6 +11,7 @@
 // identity, so a fresh one per render would recompute every row.
 
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
+import { compoundAbsorbSplit } from "@/lib/compound/row-facts";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
 import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
@@ -36,7 +37,8 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
         const repaid = sumBySymbol(
           debtLegs.map((e) => ({
             symbol: e.context.data.assetSymbol,
-            amount: String(Math.abs(Number(e.context.data.assetsDelta) || 0)),
+            amount:
+              compoundAbsorbSplit(e.context.data)?.cleared ?? String(Math.abs(Number(e.context.data.assetsDelta) || 0)),
           })),
         );
         const seized = sumBySymbol(
@@ -48,7 +50,7 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             })),
         );
         const aggregates: RunAggregate[] = [
-          ...[...repaid].map(([symbol, value]) => ({ verb: "Absorbed", value, symbol, provWhat: "Debt absorbed" })),
+          ...[...repaid].map(([symbol, value]) => ({ verb: "Debt cleared", value, symbol, provWhat: "Debt cleared" })),
           ...[...seized].map(([symbol, value]) => ({ verb: "Seized", value, symbol, provWhat: "Collateral seized" })),
         ];
         // The header counts ABSORPTIONS (debt legs), not rows — a collateral leg

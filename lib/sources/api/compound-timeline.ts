@@ -231,7 +231,14 @@ export async function buildCompoundTimeline(
               const sUsd = usdOf(s.usd_value);
               if (sUsd == null) return [];
               const seized = -bigintOf(s.coll_delta); // coll_delta is negative on a seize
-              return [{ symbol: sMeta.symbol, amount: fmtUnits(seized, sMeta.decimals), usdValue: sUsd }];
+              return [
+                {
+                  symbol: sMeta.symbol,
+                  address: (s.asset ?? "").toLowerCase(),
+                  amount: fmtUnits(seized, sMeta.decimals),
+                  usdValue: sUsd,
+                },
+              ];
             }),
           }
         : {}),

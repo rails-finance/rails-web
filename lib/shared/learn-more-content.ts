@@ -2619,6 +2619,10 @@ export function compoundBaseContent(eventType: "supply" | "withdraw"): LearnMore
           ? "the lent base earns interest but is NOT collateral — borrowing is backed only by the separate collateral stack."
           : "borrowing must stay under the account's borrow capacity: each collateral asset's value counts up to its borrow collateral factor.",
       },
+      {
+        bold: "Who may act",
+        text: "anyone may supply to any account, so another wallet can repay a debt or add collateral unasked. Taking value out (a withdrawal, a borrow, a transfer) needs the owner to have named that wallet a manager first: one switch that covers every asset and sets no amount limit.",
+      },
     ],
     links: [
       { label: "Collateral & borrowing", url: COMPOUND_DOC_URLS.COLLATERAL_BORROWING },
@@ -2637,16 +2641,20 @@ export function compoundCollateralContent(eventType: "supply_collateral" | "with
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Two factors per asset",
-        text: "each collateral asset carries a governance-set borrow collateral factor (how much can be borrowed against it) and a higher liquidate collateral factor (where liquidation starts) — the gap between them is the account's safety margin.",
+        bold: "Three factors per asset",
+        text: "each collateral asset carries a borrow factor (the share of its value that can be borrowed against), a higher liquidate factor (the share that counts before the account can be liquidated; the gap between the two is the safety margin) and a liquidation factor (the share of its value the account is credited if it is liquidated). Governance sets all three.",
       },
       {
         bold: "Non-earning",
-        text: "unlike the Aave family, Comet collateral accrues no interest — its amount only changes when the account moves it or a liquidation absorbs it, so the event replay is exact.",
+        text: "collateral earns no interest: its amount changes only when the account moves it or a liquidation takes it, so the event replay is exact.",
       },
       {
         bold: "Deprecated assets",
         text: "governance retires a collateral asset by setting its borrow factor to 0 — it still counts toward the liquidation line but backs no new borrowing.",
+      },
+      {
+        bold: "Who may act",
+        text: "anyone may supply to any account, so another wallet can repay a debt or add collateral unasked. Taking value out (a withdrawal, a borrow, a transfer) needs the owner to have named that wallet a manager first: one switch that covers every asset and sets no amount limit.",
       },
     ],
     links: [
@@ -2660,10 +2668,11 @@ export function compoundLiquidationContent(): LearnMoreContent {
   return {
     title: "How Absorb (Liquidation) Works",
     intro:
-      "A Compound V3 account becomes absorbable when its debt exceeds the sum of each collateral asset's value weighted by its liquidate collateral factor. Liquidation is then an ABSORB: the protocol itself takes over the account, rather than a third party repaying part of the debt.",
+      "Compound V3 calls its liquidation an absorb. An account can be absorbed once its debt is larger than its liquidation line: each collateral asset's value times its liquidate factor, added up. Anyone may then trigger the absorb, and the protocol takes over the account; nobody repays part of the debt.",
     extraParagraphs: [
-      "On absorb, the protocol seizes the account's collateral and clears its entire base debt in one step. The account is credited the collateral's oracle value minus each asset's liquidation penalty (1 − liquidationFactor), paid in the base asset — so an absorbed account can come out of liquidation holding a small positive base balance.",
-      "The seized collateral then belongs to the protocol, which sells it to liquidators at a discount (buyCollateral) to recapitalize its reserves. Keep the account healthy by holding the debt under the liquidate-factor-weighted collateral value — the health factor shown here is exactly that ratio, and 1.0 is the contract's own isLiquidatable line.",
+      "The absorb takes all of the account's collateral and clears all of its debt in one step. The account is credited each seized asset's value times its liquidation factor (0.90 means 90%), paid in the base asset. The credit first cancels the debt; anything past it is left to the account as a lent balance, which earns interest and can be withdrawn.",
+      "The part of the collateral's value the account is not credited stays with the protocol. The protocol later sells the seized collateral to anyone who pays in the base asset, at a discount to the oracle price, and the proceeds go to its reserves. None of that sale appears on the account's timeline.",
+      "The liquidation row shows the line at the absorb block: the collateral's value, each asset's factor, and the debt that crossed it.",
     ],
     links: [
       { label: "Liquidation", url: COMPOUND_DOC_URLS.LIQUIDATION },
@@ -2706,7 +2715,7 @@ export function compoundEventFallbackContent(): LearnMoreContent {
   return {
     title: "How Compound V3 Positions Work",
     intro:
-      "Compound V3 (Comet) runs one market per base asset. A wallet's position in a market is a signed base balance — positive is lending, negative is borrowing — plus a separate stack of non-earning collateral that backs the borrowing.",
+      "Compound V3 runs one market per base asset; each market is a contract Compound calls a Comet. A wallet's position in a market is a signed base balance — positive is lending, negative is borrowing — plus a separate stack of non-earning collateral that backs the borrowing.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -2715,11 +2724,11 @@ export function compoundEventFallbackContent(): LearnMoreContent {
       },
       {
         bold: "Collateral factors",
-        text: "each collateral asset backs borrowing up to its borrow factor and becomes absorbable past its liquidate factor, at the market's own oracle prices.",
+        text: "each collateral asset backs borrowing up to its borrow factor, counts toward the liquidation line up to its higher liquidate factor, and is credited at its liquidation factor if the account is absorbed, all at the market's oracle prices.",
       },
       {
         bold: "Absorb liquidation",
-        text: "the protocol itself absorbs an unhealthy account — seizing the collateral, clearing the whole debt, and crediting back the difference minus a penalty.",
+        text: "the protocol takes over an account past its liquidation line: it seizes the collateral, clears the whole debt, and credits the account the collateral's value times each asset's liquidation factor.",
       },
     ],
     links: [

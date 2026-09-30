@@ -18,6 +18,7 @@ import { CompoundEventHeader } from "./compound-event-header";
 import { CompoundEventDetail } from "./compound-event-detail";
 import { CompoundEventExplainer, compoundLearnMoreContent } from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { compoundRowLabel } from "@/lib/compound/row-facts";
 
 export interface CompoundEventCardProps {
   event: CompoundEvent;
@@ -145,7 +146,7 @@ export function CompoundEventCard({ event, isFirst, isLast, eventNumber, sibling
       iconColumn={iconSlot}
       header={
         <CompoundEventHeader
-          actionLabel={event.actionLabel}
+          actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "")}
           ctx={ctx}
           timestamp={event.timestamp}
           txHash={event.txHash}
