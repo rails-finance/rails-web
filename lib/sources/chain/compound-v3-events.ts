@@ -963,6 +963,8 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     s.lifetime.base.repaid = lt.repaid;
     s.lifetime.base.absorbedDebt = lt.absorbedDebt;
     s.lifetime.base.absorbCredit = lt.absorbCredit ?? ZERO;
+    // A seed without the split holds each absorb's whole basePaidOut.
+    if (lt.absorbCredit == null && lt.absorbedDebt > ZERO) s.lifetime.absorbUnsplit = true;
     for (const [addr, c] of Object.entries(lt.collateral)) {
       const meta = metas.get(addr) ?? fallback(addr);
       const acc = compoundCollateralFlowsOf(s.lifetime, addr, meta.symbol, meta.decimals);

@@ -127,6 +127,9 @@ export interface CompoundLifetimeFlows {
   /** The rest of `basePaidOut`: the seized collateral's credited value past
    *  the debt, left to the account as a lent balance. */
   absorbCredit?: number;
+  /** `absorbedDebt` holds the credit past the debt too (see
+   *  `CompoundLifetimeRaw.absorbUnsplit`); `absorbCredit` is then absent. */
+  absorbUnsplit?: boolean;
   /** Absorb legs valued at the absorb's prices (the events' `usdValue`),
    *  where the walk saw them: the debt cleared, the credit past it, and each
    *  seized collateral asset keyed by lowercase address. */
@@ -221,6 +224,11 @@ export interface CompoundLifetimeRaw {
   /** Absorb legs at the absorb's prices, 8-decimal USD (the events'
    *  `usdValue`): absent where no absorb row was walked. */
   absorbUsd8?: { debtCleared: bigint; credit: bigint; collateral: Record<string, bigint> };
+  /** Set where part of `absorbedDebt` came from a server sum written before
+   *  the absorb split (an opening balance, a folder or a seed with no
+   *  `absorbCredit` leg): that part holds the whole `basePaidOut`, so the
+   *  debt cleared and the credit past it are stated as one figure. */
+  absorbUnsplit?: boolean;
 }
 
 /** Add one absorb row's own USD reckoning (8-decimal, as Comet emits it) to
@@ -341,8 +349,15 @@ export function scaleCompoundLifetime(raw: CompoundLifetimeRaw): CompoundLifetim
     withdrawn: scaleUnits(raw.base.withdrawn, dec),
     borrowed: scaleUnits(raw.base.borrowed, dec),
     repaid: scaleUnits(raw.base.repaid, dec),
-    absorbedDebt: scaleUnits(raw.base.absorbedDebt, dec),
-    ...((raw.base.absorbCredit ?? ZERO) !== ZERO ? { absorbCredit: scaleUnits(raw.base.absorbCredit, dec) } : {}),
+    ...(raw.absorbUnsplit
+      ? {
+          absorbedDebt: scaleUnits(raw.base.absorbedDebt + (raw.base.absorbCredit ?? ZERO), dec),
+          absorbUnsplit: true,
+        }
+      : {
+          absorbedDebt: scaleUnits(raw.base.absorbedDebt, dec),
+          ...((raw.base.absorbCredit ?? ZERO) !== ZERO ? { absorbCredit: scaleUnits(raw.base.absorbCredit, dec) } : {}),
+        }),
     ...(raw.absorbUsd8
       ? {
           absorbUsd: {
@@ -630,6 +645,10 @@ export function compoundLifetimeWithOpening(
     // way `replayCompoundLifetime` scopes its own walk.
     if (!bucket.sourceKey) {
       if (bucket.key !== market) continue;
+      // A sum written before the absorb split carries the whole basePaidOut
+      // as absorbedDebt and no absorbCredit leg.
+      if (bucket.legs.absorbCredit === undefined && (parseUnits(bucket.legs.absorbedDebt ?? "0", 0) ?? ZERO) > ZERO)
+        merged.absorbUnsplit = true;
       for (const leg of BASE_LEGS) {
         const raw = bucket.legs[leg];
         if (raw === undefined) continue;
@@ -735,13 +754,15 @@ export function computeCompoundEconomics(
   // chain's balance (no interest in them), the balance before an absorb is
   // short by the interest, so the split between the debt it cleared and the
   // credit past it cannot be trusted: the two are stated as one figure.
+  // The same where a server sum written before the split fed the figure.
   const replayed =
-    replayedRaw && !vocab.baseAtLastEvent && (replayedRaw.absorbCredit ?? 0) > 0
+    replayedRaw && (replayedRaw.absorbUnsplit || (!vocab.baseAtLastEvent && (replayedRaw.absorbCredit ?? 0) > 0))
       ? {
           ...replayedRaw,
           absorbedDebt: replayedRaw.absorbedDebt + (replayedRaw.absorbCredit ?? 0),
           absorbCredit: 0,
           absorbUsd: undefined,
+          absorbUnsplit: true,
         }
       : replayedRaw;
   // The net of the moves the events made, and the net with the interest the
@@ -863,7 +884,8 @@ export function computeCompoundEconomics(
           flowLine("absorbed debt", view.base.symbol, view.base.address, lifetime.absorbedDebt, "base-absorbed"),
           absorbUsd?.debtCleared,
         ),
-        "Cleared by the absorb",
+        // As one figure it is the whole amount the absorb credited.
+        replayed?.absorbUnsplit ? "Credited by the absorb (debt cleared and any left over)" : "Cleared by the absorb",
       )
     : [];
   // The credited value past the debt: base the account was left lending.
