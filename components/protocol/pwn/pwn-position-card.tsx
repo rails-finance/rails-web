@@ -29,8 +29,11 @@ import {
   positionBundleContentsProv,
   bookDueProv,
   bookPastDueProv,
+  positionInterestProv,
+  extendedDeadlineProv,
 } from "@/lib/pwn/event-provenance";
-import { loanDueAt } from "@/lib/pwn/economics";
+import { formatNumber } from "@/lib/utils/format";
+import { interestRateText, loanDeadlineAt, loanDueAt, loanInterestRate } from "@/lib/pwn/economics";
 import { formatDate } from "@/lib/date";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { pwnPositionContent } from "@/lib/pwn/position-content";
@@ -60,8 +63,22 @@ export interface PwnPositionView {
   /** The loan's most recent on-chain event — the close (repay/claim) when one
    *  is indexed, else the creation. Feeds the shared meta cluster. */
   lastActivityAt?: number | null;
-  /** Indexed event count for the loan (creation + close events). */
+  /** The loan's events (creation, custody, extensions, close). */
   eventCount?: number | null;
+  /** Distinct transactions behind those events — creation and the LOAN note's
+   *  minting share one, as do a claim and the note's burning. Null where the
+   *  source carries no count (the listing, before rails-server mig 370). */
+  txCount?: number | null;
+  /** The deadline the latest extension set (unix seconds); null or absent when
+   *  the parties never moved it. */
+  extendedDueAt?: number | null;
+  /** How many times the deadline moved. */
+  extensionCount?: number;
+  /** Who sent each extension (lowercase), oldest first. */
+  extensionsBy?: string[];
+  /** When the borrower repaid (unix seconds), where the page has the loan's
+   *  rows; absent on the listing. */
+  repaidAt?: number | null;
   /** What a bundle collateral wrapped — resolved by the detail page's chain
    *  overlay (tokensInBundle at the creation block); undefined on the listing
    *  and while the overlay is in flight. */
@@ -163,6 +180,26 @@ function collateralFootnote(v: PwnPositionView) {
   return undefined;
 }
 
+/** The activity cluster: transactions where the count is known, with the events
+ *  beside them in the tip, since one transaction can carry two of the loan's
+ *  events. */
+function LoanActivityMeta({ v }: { v: PwnPositionView }) {
+  const txs = v.txCount ?? null;
+  return (
+    <PositionCardMeta
+      lastActivityAt={v.lastActivityAt}
+      eventCount={txs ?? v.eventCount}
+      eventCountNoun={txs != null ? "transaction" : "event"}
+      eventTotal={txs != null ? v.eventCount : undefined}
+      countNote={
+        txs != null && v.eventCount != null && v.eventCount !== txs
+          ? "a loan is created and its LOAN note minted in one transaction, and a claim burns the note in the same one"
+          : undefined
+      }
+    />
+  );
+}
+
 /** "1 Jan 2024" — the deadline as a date; the title carries the exact moment. */
 const dueDateText = (unix: number): string => formatDate(unix);
 
@@ -177,9 +214,13 @@ export function PwnPositionCard({
   receipts = false,
   explanation,
   viewHref,
+  viewer,
 }: {
   v: PwnPositionView;
   receipts?: boolean;
+  /** The wallet the page is read from (lowercase). The other party's pill
+   *  links to the same loan read from that party's side. */
+  viewer?: string;
   /** The card's Explanation section (the loan narrated as it stands now) —
    *  rendered by the shell on the detail surface. */
   explanation?: React.ReactNode;
@@ -191,8 +232,19 @@ export function PwnPositionCard({
   // The deadline is a struck term like the other three columns, so it renders
   // in every mood. Past-due-ness only matters while the loan stands open —
   // PWN's own default condition, ahead of the lender's claim.
-  const dueAt = loanDueAt(v);
+  const struckDueAt = loanDueAt(v);
+  const dueAt = loanDeadlineAt(v);
+  const extended = v.extendedDueAt != null && struckDueAt != null && v.extendedDueAt !== struckDueAt;
   const pastDue = v.status === "open" && dueAt != null && dueAt < Date.now() / 1000;
+  const rate = loanInterestRate(v);
+  // The same loan read from a party's side; none for the side on screen.
+  const sideHref = (party: string): { href: string; hrefLabel: string } | undefined =>
+    viewer != null && party !== viewer
+      ? {
+          href: `/ethereum/pwn/${party}?loan=${encodeURIComponent(v.loanId)}`,
+          hrefLabel: `Read loan #${v.loanId} from the ${party === v.lender ? "lender" : "borrower"}'s side`,
+        }
+      : undefined;
   const parties =
     v.lender && v.borrower
       ? `${shortAddress(v.lender)} → ${shortAddress(v.borrower)}`
@@ -226,6 +278,7 @@ export function PwnPositionCard({
             ensName={null}
             filterProtocol="pwn"
             bookmarkProtocol={v.borrower ? undefined : "pwn"}
+            {...sideHref(v.lender)}
           />
         )}
         {v.lender && v.borrower && (
@@ -233,17 +286,37 @@ export function PwnPositionCard({
             →
           </span>
         )}
-        {v.borrower && <WalletPill wallet={v.borrower} ensName={null} filterProtocol="pwn" bookmarkProtocol="pwn" />}
-        <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.eventCount} />
+        {v.borrower && (
+          <WalletPill
+            wallet={v.borrower}
+            ensName={null}
+            filterProtocol="pwn"
+            bookmarkProtocol="pwn"
+            {...sideHref(v.borrower)}
+          />
+        )}
+        <LoanActivityMeta v={v} />
       </span>
     ) : (
       <span className="flex items-center gap-2 text-xs text-rb-500 tabular-nums">
         {parties}
         {favWallet && <BookmarkToggle wallet={favWallet} ensName={null} protocol="pwn" />}
-        <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.eventCount} />
+        <LoanActivityMeta v={v} />
       </span>
     );
   const leadingIdentity = <span className="text-xs font-semibold text-rb-500">PWN · Loan #{v.loanId}</span>;
+
+  // The fixed interest and its rate — the cost of the loan, stated where the
+  // other struck terms are.
+  const interestValue =
+    v.fixedInterest != null && v.credit && !v.credit.decimalsUnread ? (
+      <StatValue>
+        <Prov info={positionInterestProv(v.credit.symbol, v.version)}>
+          <AssetAmount value={v.fixedInterest} symbol={v.credit.symbol} />
+        </Prov>
+      </StatValue>
+    ) : null;
+  const interestFootnote = rate ? <StatFootnote>{interestRateText(rate)}</StatFootnote> : undefined;
 
   // REPAID / DEFAULTED: the loan is over, so it draws through the shared
   // terminal-card frame like every other closed position — collateral +
@@ -254,7 +327,7 @@ export function PwnPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={pwnPositionContent({ status: v.status })}
+        learnMore={pwnPositionContent({ status: v.status, struckDueAt, extendedDueAt: v.extendedDueAt })}
       >
         <ClosedPositionStats
           outcome={v.status}
@@ -284,6 +357,20 @@ export function PwnPositionCard({
             )
           }
           debtFootnote={<StatFootnote>credit extended</StatFootnote>}
+          collateralLabel={CARD_VOCAB.collateral}
+          extra={
+            interestValue
+              ? {
+                  label: "Fixed interest",
+                  value: (
+                    <>
+                      {interestValue}
+                      {interestFootnote}
+                    </>
+                  ),
+                }
+              : undefined
+          }
         />
       </PositionCardShell>
     );
@@ -302,7 +389,7 @@ export function PwnPositionCard({
       receipts={receipts}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={pwnPositionContent({ status: "open" })}
+      learnMore={pwnPositionContent({ status: "open", struckDueAt, extendedDueAt: v.extendedDueAt })}
     >
       <OpenPositionStats
         statusPill={
@@ -354,7 +441,10 @@ export function PwnPositionCard({
               ),
             footnote:
               v.fixedInterest != null && v.fixedInterest > 0 ? (
-                <StatFootnote>principal + fixed interest</StatFootnote>
+                <StatFootnote>
+                  principal + {formatNumber(v.fixedInterest)} fixed interest
+                  {rate ? <> · {interestRateText(rate)}</> : null}
+                </StatFootnote>
               ) : undefined,
           },
           {
@@ -362,7 +452,11 @@ export function PwnPositionCard({
             value:
               dueAt != null ? (
                 <StatValue title={dueDateTitle(dueAt)}>
-                  <Prov info={bookDueProv(v.dueKind)}>
+                  <Prov
+                    info={
+                      extended ? extendedDeadlineProv({ loanId: v.loanId, version: v.version }) : bookDueProv(v.dueKind)
+                    }
+                  >
                     <span className="tabular-nums">{dueDateText(dueAt)}</span>
                   </Prov>
                 </StatValue>
@@ -373,6 +467,8 @@ export function PwnPositionCard({
               <StatFootnote>
                 <Prov info={bookPastDueProv()}>past due — claimable by the lender</Prov>
               </StatFootnote>
+            ) : extended && struckDueAt != null ? (
+              <StatFootnote>extended from {dueDateText(struckDueAt)}</StatFootnote>
             ) : undefined,
           },
         ]}
@@ -385,7 +481,10 @@ export function PwnPositionCard({
 export function viewFromSummary(s: PwnPositionSummary): PwnPositionView {
   const fixedInterest =
     s.repayAmount != null && s.credit != null && !s.credit.decimalsUnread
-      ? Math.max(0, s.repayAmount - s.credit.amount)
+      ? // Twelve significant figures: the two scaled amounts are floats, and
+        // 1,490.4 − 1,380 is 110.40000000000009 without it.
+        // exponent-safe: parsed back to a number, never printed
+        Number(Math.max(0, s.repayAmount - s.credit.amount).toPrecision(12))
       : null;
   return {
     loanId: s.loanId,
@@ -405,5 +504,8 @@ export function viewFromSummary(s: PwnPositionSummary): PwnPositionView {
     createdBlock: s.createdBlock,
     lastActivityAt: s.closedAt ?? s.createdAt,
     eventCount: s.eventCount,
+    txCount: s.txCount ?? null,
+    extendedDueAt: s.latestDefaultAt ?? null,
+    extensionCount: s.extensionCount ?? 0,
   };
 }

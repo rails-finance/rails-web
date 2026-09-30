@@ -3712,7 +3712,7 @@ export function pwnRepaymentContent(eventType: "paid_back" | "claimed"): LearnMo
     details: [
       {
         bold: "The amount was never in question",
-        text: "the repayment total is a term of the loan, fixed when it was struck — repaying early doesn't discount it and repaying late isn't possible past the deadline.",
+        text: "the repayment total is a term of the loan, fixed when it was struck — it does not change with the day it is paid. The contract refuses a repayment once the deadline has passed; only an extension moves that deadline.",
       },
       {
         bold: "Escrow does the settling",
@@ -3751,7 +3751,7 @@ export function pwnExtensionContent(): LearnMoreContent {
   return {
     title: "How Loan Extensions Work",
     intro:
-      "The parties can renegotiate the deadline while the loan runs: an extension moves the default timestamp later, giving the borrower more time under the same economics.",
+      "An extension moves a loan's deadline later, giving the borrower more time to repay under the same terms. How it is agreed depends on the loan contract's version.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -3759,8 +3759,12 @@ export function pwnExtensionContent(): LearnMoreContent {
         text: "the collateral, the credit and the repayment total stay exactly as struck — only the clock moves.",
       },
       {
-        bold: "Both sides sign",
-        text: "an extension is a new agreement between the same parties, recorded on-chain like the original terms.",
+        bold: "Version 1.1: the note holder acts alone",
+        text: "only the holder of the LOAN note can extend, to a date at most 30 days after the day it acts, and it can do so again. Nothing is paid for it. It can extend a loan whose deadline has already passed, as long as nobody has claimed it.",
+      },
+      {
+        bold: "Versions 1.2 and 1.3: a proposal",
+        text: "one party proposes an extension of 1 to 90 days and the other accepts it; the proposal can carry a compensation the borrower pays the note holder.",
       },
     ],
     links: [{ label: "PWN docs", url: PWN_DOC_URL }],

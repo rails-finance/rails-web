@@ -14,6 +14,7 @@ import { isPwnEvent } from "@/lib/shared/types/event-shape";
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import { simpleLoanFor } from "@/lib/pwn/asset-catalog";
+import { interestRateText, loanInterestRate } from "@/lib/pwn/economics";
 import { amt, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { markdownTimelineSlice, type MarkdownHistoryScope } from "@/lib/shared/markdown-history";
 
@@ -100,18 +101,28 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
     }
   }
   if (view.credit) lines.push(`- **Credit advanced (principal):** ${assetText(view.credit)}`);
+  const rate = loanInterestRate(view);
   if (view.repayAmount != null) {
     lines.push(
       `- **Repayment owed (fixed):** ${view.credit?.decimalsUnread ? notLoaded(view.credit) : `${amt(view.repayAmount)} ${creditSym}`}`,
     );
     if (view.fixedInterest != null && view.fixedInterest > 0)
       lines.push(
-        `- **Fixed interest (repayment − principal):** ${amt(view.fixedInterest)} ${creditSym} — set when the loan was struck, it does not accrue`,
+        `- **Fixed interest (repayment − principal):** ${amt(view.fixedInterest)} ${creditSym}${rate ? ` (${interestRateText(rate)})` : ""} — set when the loan was struck, it does not accrue`,
       );
   }
   if (view.accruingInterestApr != null && view.accruingInterestApr > 0)
     lines.push(`- **Accruing interest APR:** ${view.accruingInterestApr}`);
-  if (view.dueKind === "expiration" && view.dueValue)
+  if (
+    view.dueKind === "expiration" &&
+    view.dueValue &&
+    view.extendedDueAt != null &&
+    view.extendedDueAt !== Number(view.dueValue)
+  )
+    lines.push(
+      `- **Due (extended):** ${fmtUtc(view.extendedDueAt)}, moved ${view.extensionCount ?? 0} ${(view.extensionCount ?? 0) === 1 ? "time" : "times"} from the struck ${fmtUtc(Number(view.dueValue))} — past this moment an unpaid loan is claimable as defaulted`,
+    );
+  else if (view.dueKind === "expiration" && view.dueValue)
     lines.push(
       `- **Due (expiration):** ${fmtUtc(Number(view.dueValue))} — past this moment an unpaid loan is claimable as defaulted`,
     );
@@ -149,7 +160,7 @@ function eventValue(e: BaseActivityEvent, creditSym: string): string {
           : "repayment collected by the lender";
     case "extended":
       return d.extendedDefaultTimestamp != null
-        ? `default deadline renegotiated to ${fmtUtc(Number(d.extendedDefaultTimestamp))}`
+        ? `deadline moved${d.originalDefaultTimestamp != null ? ` from ${fmtUtc(Number(d.originalDefaultTimestamp))}` : ""} to ${fmtUtc(Number(d.extendedDefaultTimestamp))}${d.extendedBy ? (d.extendedBy === d.lender ? " by the lender" : " by the LOAN note's holder") : ""}`
         : "loan extended";
     case "burned":
       return "LOAN note burned — the claim is settled and the loan retired";

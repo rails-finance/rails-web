@@ -1711,6 +1711,9 @@ export interface PwnContext {
   /** `extended` only — the default timestamp before / after the renegotiation. */
   originalDefaultTimestamp?: string;
   extendedDefaultTimestamp?: string;
+  /** `extended` only — the sender of the extension (lowercase). On v1.1 only
+   *  the LOAN holder can extend, and nothing is paid for it. */
+  extendedBy?: string;
   /** `claimed` only — true when the lender seized collateral (borrower defaulted). */
   defaulted?: boolean;
   /** True for the loan's first event (`created`). */

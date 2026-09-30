@@ -12,7 +12,7 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
-import { loanDueAt } from "@/lib/pwn/economics";
+import { loanDeadlineAt } from "@/lib/pwn/economics";
 import { canonicalStatuses, defaultStatuses, effectiveStatuses, sameStatusSet } from "@/lib/pwn/listing-visibility";
 
 export interface PwnListFilters extends BaseListFilters {
@@ -124,11 +124,12 @@ export const PWN_APPLY: ApplyConfig<PwnPositionSummary> = {
   sort: {
     created: (r) => r.createdAt ?? 0,
     // A loan states its deadline as either an absolute expiry or a duration from
-    // creation, so the sortable moment is derived — `loanDueAt` is the same
-    // function the loan book and the position card resolve it with. A loan whose
+    // creation, and an extension moves it, so the sortable moment is derived —
+    // `loanDeadlineAt` is the function the loan book and the position card
+    // resolve it with. A loan whose
     // terms don't resolve to a deadline sorts LAST on ascending (the book's own
     // convention), never to the front as a 0 would put it.
-    due: (r) => loanDueAt(r) ?? Number.MAX_SAFE_INTEGER,
+    due: (r) => loanDeadlineAt({ ...r, extendedDueAt: r.latestDefaultAt }) ?? Number.MAX_SAFE_INTEGER,
     settled: (r) => r.closedAt ?? 0,
     events: (r) => r.eventCount,
   },

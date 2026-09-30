@@ -34,6 +34,59 @@ export const loanDueAt = (l: {
   return null;
 };
 
+/** The deadline a loan runs to now: the latest extension's, where the parties
+ *  moved it, else the one its terms struck. */
+export const loanDeadlineAt = (l: {
+  dueKind: "expiration" | "duration" | null;
+  dueValue: string | null;
+  createdAt?: number | null;
+  extendedDueAt?: number | null;
+}): number | null => l.extendedDueAt ?? loanDueAt(l);
+
+export interface PwnInterestRate {
+  /** The term the interest was struck for, in whole days. */
+  termDays: number;
+  /** Interest as a share of the principal over that term, in percent. */
+  termPct: number;
+  /** termPct scaled to 365 days, simple (no compounding), in percent. */
+  annualPct: number;
+}
+
+/** The fixed interest as a rate: its share of the principal over the term the
+ *  parties struck (creation to the original deadline — an extension moves the
+ *  deadline, never the repay total), and that share scaled to a year, simple.
+ *  Null when a figure is missing or the term is not positive. */
+export function fixedInterestRate(
+  interest: number | null,
+  principal: number | null,
+  termSeconds: number | null,
+): PwnInterestRate | null {
+  if (interest == null || principal == null || termSeconds == null) return null;
+  if (!(principal > 0) || !(termSeconds > 0) || !(interest >= 0)) return null;
+  const termDays = termSeconds / 86400;
+  const termPct = (interest / principal) * 100;
+  return { termDays: Math.round(termDays), termPct, annualPct: (termPct * 365) / termDays };
+}
+
+const pctText = (p: number): string => {
+  const digits = p >= 100 || Math.abs(p - Math.round(p)) < 0.05 ? 0 : 1;
+  return `${p.toFixed(digits)}%`;
+};
+
+/** "8% for 30 days, 97% a year" — the rate as the card and the rows state it. */
+export const interestRateText = (r: PwnInterestRate): string =>
+  `${pctText(r.termPct)} for ${r.termDays} ${r.termDays === 1 ? "day" : "days"}, ${pctText(r.annualPct)} a year`;
+
+/** The loan's fixed interest as a rate over the term the parties struck. */
+export function loanInterestRate(v: PwnPositionView): PwnInterestRate | null {
+  const struck = loanDueAt(v);
+  return fixedInterestRate(
+    v.fixedInterest,
+    v.credit?.amount ?? null,
+    struck != null && v.createdAt != null ? struck - v.createdAt : null,
+  );
+}
+
 export function computePwnEconomics(view: PwnPositionView): ChainTruthTowerData {
   const open = view.status === "open";
   // A token whose decimals did not load is left out, and the tower names it.

@@ -44,8 +44,10 @@ import {
   repayAmountProv,
   collateralLockedProv,
   collateralSeizedProv,
+  collateralReturnedProv,
   type PwnCoords,
 } from "@/lib/pwn/event-provenance";
+import { fixedInterestRate, interestRateText } from "@/lib/pwn/economics";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
@@ -104,13 +106,16 @@ const isNftCollateral = (ctx: PwnContext): boolean =>
  *  WETH" fungible — echoing the detail grid's Collateral · locked / seized
  *  receipt. Falls back to the muted words "the collateral" when the terms carry
  *  no symbol (the never-empty floor). */
-function collateralFig(ctx: PwnContext, coords: PwnCoords, seized: boolean): ReactNode {
+function collateralFig(ctx: PwnContext, coords: PwnCoords, state: "locked" | "returned" | "claimed"): ReactNode {
   if (!ctx.collateralSymbol) return "the collateral";
   const nft = isNftCollateral(ctx) && ctx.collateralId != null;
   const value = nft ? `#${shortTokenId(ctx.collateralId!)}` : fmt(ctx.collateralAmount);
-  const info = seized
-    ? collateralSeizedProv(ctx.collateralSymbol, coords)
-    : collateralLockedProv(ctx.collateralSymbol, coords);
+  const info =
+    state === "claimed"
+      ? collateralSeizedProv(ctx.collateralSymbol, coords)
+      : state === "returned"
+        ? collateralReturnedProv(ctx.collateralSymbol, coords)
+        : collateralLockedProv(ctx.collateralSymbol, coords);
   return (
     <Fig echo info={info} value={value}>
       {nft ? (
@@ -156,6 +161,14 @@ export function pwnEventSlots(
 ): EventProseSlots {
   const creditSym = ctx.creditSymbol ?? "the credit token";
   const interest = interestOf(ctx);
+  // The creation's term: to the deadline in the terms (v1.1), or the duration.
+  const term =
+    ctx.dueValue == null
+      ? null
+      : ctx.dueKind === "duration"
+        ? Number(ctx.dueValue)
+        : Number(ctx.dueValue) - self.timestamp;
+  const rate = fixedInterestRate(interest, ctx.creditAmount != null ? Number(ctx.creditAmount) : null, term);
   const hasRepay = ctx.loanRepayAmount != null && ctx.creditSymbol != null;
 
   switch (ctx.eventType) {
@@ -167,7 +180,8 @@ export function pwnEventSlots(
             interest != null && interest > 0 ? (
               <>
                 The borrower owes a fixed {repayFig(ctx, coords)} back — the principal plus{" "}
-                <AmountText value={interest} /> {creditSym} of interest.
+                <AmountText value={interest} /> {creditSym} of interest
+                {rate ? <>, {interestRateText(rate)} on the principal</> : null}.
               </>
             ) : (
               <>The borrower owes a fixed {repayFig(ctx, coords)} back.</>
@@ -194,7 +208,7 @@ export function pwnEventSlots(
           clause(
             <>
               A peer-to-peer loan was struck on fixed terms: the lender advanced {creditText} to the borrower against{" "}
-              {collateralFig(ctx, coords, false)}, locked in the loan&rsquo;s escrow.
+              {collateralFig(ctx, coords, "locked")}, locked in the loan&rsquo;s escrow.
             </>,
           ),
         ],
@@ -229,7 +243,7 @@ export function pwnEventSlots(
         ],
         changed: [
           breakdown,
-          clause(<>Repaying released {collateralFig(ctx, coords, false)} from escrow back to the borrower.</>),
+          clause(<>Repaying released {collateralFig(ctx, coords, "returned")} from escrow back to the borrower.</>),
         ],
         meansNow: [clause(<>The repaid credit now sits with the loan contract until the note holder claims it.</>)],
       };
@@ -243,7 +257,7 @@ export function pwnEventSlots(
           changed: [
             clause(
               <>
-                The note holder claimed the escrowed collateral — {collateralFig(ctx, coords, true)} — in place of
+                The note holder claimed the escrowed collateral — {collateralFig(ctx, coords, "claimed")} — in place of
                 repayment.
               </>,
             ),
@@ -274,22 +288,43 @@ export function pwnEventSlots(
 
     case "extended": {
       // status: active — only the deadline moved.
-      const move: ReactNode =
-        ctx.originalDefaultTimestamp && ctx.extendedDefaultTimestamp ? (
-          <>
-            : {fmtTs(ctx.originalDefaultTimestamp)} → {fmtTs(ctx.extendedDefaultTimestamp)}
-          </>
-        ) : null;
+      const from = ctx.originalDefaultTimestamp ? fmtTs(ctx.originalDefaultTimestamp) : null;
+      const to = ctx.extendedDefaultTimestamp ? fmtTs(ctx.extendedDefaultTimestamp) : null;
+      const who =
+        ctx.extendedBy && ctx.extendedBy === ctx.lender
+          ? "The lender, holding the LOAN note,"
+          : "The LOAN note's holder";
+      const v11 = ctx.version === "v11";
       return {
-        happened: [clause(<>The parties renegotiated the loan&rsquo;s default deadline{move}.</>)],
+        happened: [
+          clause(
+            to ? (
+              <>
+                {who} moved the loan&rsquo;s deadline{from ? <> from {from}</> : null} to {to}.
+              </>
+            ) : (
+              <>{who} moved the loan&rsquo;s deadline later.</>
+            ),
+          ),
+        ],
+        changed: [
+          v11
+            ? clause(
+                <>
+                  On this contract only the note&rsquo;s holder can extend, at most 30 days past the day it acts, and
+                  nothing is paid for it.
+                </>,
+              )
+            : null,
+        ],
         meansNow: [
           clause(
             hasRepay ? (
               // The fixed-economics claim rides the same v1.1 proof as the
               // repay figure — a loan whose terms accrue keeps the softer form.
-              <>The borrower gets more time under the same fixed economics — only the deadline moved.</>
+              <>The borrower gets more time to repay the same fixed total.</>
             ) : (
-              <>The borrower gets more time under the terms the parties struck — only the deadline moved.</>
+              <>The borrower gets more time under the terms the parties struck.</>
             ),
           ),
         ],

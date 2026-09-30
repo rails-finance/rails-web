@@ -74,8 +74,9 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
       <h2 className="text-sm font-semibold text-foreground">The open book</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
         Every loan standing open: created, not yet repaid, not yet claimed. Each holds its borrower&rsquo;s collateral
-        in escrow against a fixed repayment in the loan&rsquo;s own credit token. A loan past its deadline has defaulted
-        by the clock, and its lender may claim the collateral at any time.
+        in escrow against a fixed repayment in the loan&rsquo;s own credit token. A loan past its deadline (the latest
+        one, where the note holder extended it) has defaulted by the clock: the borrower can no longer repay, and the
+        lender may claim the collateral at any time.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -442,12 +443,34 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
   );
 }
 
+/** "v11" → "v1.1". */
+const versionName = (v: string): string => (/^v\d\d$/.test(v) ? `v${v[1]}.${v[2]}` : v);
+
 /** The page header's stamp — where the book comes from and how far it runs. */
 export function PwnBookStamp({ book }: { book: PwnLoanBook }) {
   if (book.stale || book.totals.loans === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans · most recent struck at{" "}
+      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans
+      {book.versions.length === 1 ? (
+        <>
+          {" "}
+          through SimpleLoan {versionName(book.versions[0].version)}
+          {book.versions[0].version === "v11" && <> (loans struck through v1.2 and v1.3 are not indexed yet)</>}
+        </>
+      ) : book.versions.length > 1 ? (
+        <>
+          {" "}
+          through SimpleLoan{" "}
+          {book.versions.map((v, i) => (
+            <span key={v.version}>
+              {i > 0 ? ", " : ""}
+              {versionName(v.version)} ({v.loans})
+            </span>
+          ))}
+        </>
+      ) : null}{" "}
+      · most recent struck at{" "}
       {book.latestCreatedBlock != null ? (
         <BlockRef block={book.latestCreatedBlock} chainId={MAINNET_CHAIN_ID} />
       ) : (

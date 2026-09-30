@@ -207,19 +207,36 @@ export default function PwnLoanView({
     };
   }, [bundleKey]);
 
-  const view = selected
-    ? {
-        ...viewFromSummary(selected),
-        bundleContents: bundle && bundle.key === bundleKey ? bundle.assets : undefined,
-      }
-    : null;
-
   // Slice the timeline to the selected loan so each loan shows only its own
   // events; the export serializer wants them oldest-first.
   const pwnEvents = events
     .filter(isPwnEvent)
     .filter((e) => selectedLoanId == null || e.context.data.loanId === selectedLoanId)
     .sort((a, b) => a.blockNumber - b.blockNumber);
+
+  // What the loan's rows say that its listing row may not yet: the
+  // deadline the latest extension set (the timeline carries v1.1 extensions
+  // read from the chain until the index does), and how many transactions
+  // stand behind its events.
+  const extensionRows = pwnEvents.filter((e) => e.context.data.eventType === "extended");
+  const lastExtension = extensionRows[extensionRows.length - 1]?.context.data.extendedDefaultTimestamp;
+  const summaryView = selected ? viewFromSummary(selected) : null;
+  const view = summaryView
+    ? {
+        ...summaryView,
+        bundleContents: bundle && bundle.key === bundleKey ? bundle.assets : undefined,
+        ...(pwnEvents.length > 0
+          ? {
+              eventCount: pwnEvents.length,
+              txCount: new Set(pwnEvents.map((e) => e.txHash)).size,
+              extensionCount: extensionRows.length,
+              extensionsBy: extensionRows.map((e) => e.context.data.extendedBy ?? ""),
+              repaidAt: pwnEvents.find((e) => e.context.data.eventType === "paid_back")?.timestamp ?? null,
+              extendedDueAt: lastExtension != null ? Number(lastExtension) : (summaryView.extendedDueAt ?? null),
+            }
+          : {}),
+      }
+    : null;
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the window
   // under a whole-history filename. It is narrowed to the SAME life/loan the
@@ -316,6 +333,7 @@ export default function PwnLoanView({
         <>
           <PwnPositionCard
             v={view}
+            viewer={wallet}
             receipts
             viewHref={tl.viewHref}
             explanation={<PwnPositionExplanation v={view} wallet={wallet} />}

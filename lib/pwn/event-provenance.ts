@@ -105,6 +105,16 @@ export const collateralSeizedProv = (sym: string, coords: PwnCoords): Provenance
   inputs: eventInputs(coords),
 });
 
+/** The collateral RETURNED to the borrower — the escrow pushes the terms'
+ *  collateral back in the repayment transaction (v1.1 `repayLOAN`). */
+export const collateralReturnedProv = (sym: string, coords: PwnCoords): Provenance => ({
+  kind: "chain",
+  summary: `Collateral returned (${sym}) — the locked collateral, sent back to the borrower by the loan contract when the loan was repaid. No separate amount exists on chain: it is the terms' collateral, released by the repayment.`,
+  contract: contractFor(coords),
+  via: `${PWN_VIA} · LOANPaidBack log · terms.collateral`,
+  inputs: eventInputs(coords),
+});
+
 // ── Position-card / tower provenances (no per-event coords) ──────────────────
 
 /** Position-card collateral line. */
@@ -305,4 +315,20 @@ export const positionInterestProv = (sym: string, version?: string | null): Prov
     { label: "repay", kind: "chain" as const, note: "the terms' loanRepayAmount" },
     { label: "principal", kind: "chain" as const, note: "the terms' credit amount" },
   ],
+});
+
+/** A deadline an extension set. v1.1 logs only the new expiration
+ *  (LOANExpirationDateExtended); the one it replaced is the loan's previous
+ *  extension, else the expiration its terms struck. v1.2+ logs both
+ *  (LOANExtended). Only the deadline moves; principal and repay total do not. */
+export const extendedDeadlineProv = (coords?: PwnCoords): Provenance => ({
+  kind: "chain",
+  summary:
+    "The loan's deadline as an extension moved it. On v1.1 only the LOAN holder can extend, to a date later than the current one and at most 30 days after the call, and nothing is paid for it; the principal and the repay total stay as struck.",
+  contract: contractFor(coords),
+  via:
+    coords?.version === "v12" || coords?.version === "v13"
+      ? "LOANExtended log · originalDefaultTimestamp → extendedDefaultTimestamp"
+      : "LOANExpirationDateExtended log · extendedExpirationDate (the previous deadline: the loan's last extension, else terms.expiration)",
+  inputs: eventInputs(coords),
 });

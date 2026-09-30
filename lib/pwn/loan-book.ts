@@ -25,7 +25,7 @@
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { isPwnBundler } from "@/lib/pwn/asset-catalog";
-import { loanDueAt } from "@/lib/pwn/economics";
+import { loanDeadlineAt, loanDueAt } from "@/lib/pwn/economics";
 import { buildPwnPositionRows, type PwnPositionSummary, type RawPwnPositionRow } from "@/lib/sources/api/pwn-positions";
 import type { PwnTokenCategory } from "@/lib/shared/types/event-shape";
 
@@ -94,6 +94,9 @@ export interface PwnLoanBook {
   latestCreatedBlock: number | null;
   /** When the book was reduced (unix seconds) — the clock pastDue compares to. */
   asOf: number;
+  /** Loans per SimpleLoan version ("v11" → 35), oldest version first: which of
+   *  PWN's loan contracts the index covers. */
+  versions: { version: string; loans: number }[];
 }
 
 const spread = (xs: number[]): PwnBookSpread | null => {
@@ -116,6 +119,7 @@ const emptyBook = (asOf: number): PwnLoanBook => ({
   terms: { loansWithFixedTotal: 0, interestShare: null, termDays: null, accruingLoans: 0 },
   latestCreatedBlock: null,
   asOf,
+  versions: [],
 });
 
 /** Fetch the whole indexed loan set and reduce it to the book. */
@@ -161,14 +165,18 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
   let loansWithFixedTotal = 0;
   let accruingLoans = 0;
   let latestCreatedBlock: number | null = null;
+  const byVersion = new Map<string, number>();
 
   for (const l of loans) {
     totals[l.status] += 1;
+    if (l.version) byVersion.set(l.version, (byVersion.get(l.version) ?? 0) + 1);
     if (l.createdBlock != null && (latestCreatedBlock == null || l.createdBlock > latestCreatedBlock))
       latestCreatedBlock = l.createdBlock;
 
     if (l.status === "open") {
-      const dueAt = loanDueAt(l);
+      // The deadline it runs to now: an extension moves it (the term-length
+      // distribution below keeps the struck one).
+      const dueAt = loanDeadlineAt({ ...l, extendedDueAt: l.latestDefaultAt });
       if (dueAt != null && dueAt < asOf) pastDueOpen += 1;
     }
 
@@ -250,5 +258,8 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
     },
     latestCreatedBlock,
     asOf,
+    versions: [...byVersion.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([version, n]) => ({ version, loans: n })),
   };
 }

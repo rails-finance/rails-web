@@ -20,7 +20,7 @@
 
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
-import { loanDueAt } from "@/lib/pwn/economics";
+import { interestRateText, loanDeadlineAt, loanDueAt, loanInterestRate } from "@/lib/pwn/economics";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -46,8 +46,25 @@ export function PwnPositionExplanation({
   wallet?: string;
 }) {
   const creditSym = v.credit?.symbol ?? "the credit token";
-  const dueAt = loanDueAt(v);
+  const struckDueAt = loanDueAt(v);
+  const dueAt = loanDeadlineAt(v);
+  const extended = v.extendedDueAt != null && struckDueAt != null && v.extendedDueAt !== struckDueAt;
+  const extensions = v.extensionCount ?? 0;
   const pastDue = v.status === "open" && dueAt != null && dueAt < Date.now() / 1000;
+  const rate = loanInterestRate(v);
+  // "moved it twice, to 6 Mar 2024" — the extension history in one phrase.
+  // v1.1 lets only the LOAN note's holder extend; name the lender where the
+  // sender of every extension is the wallet that struck the loan.
+  const extenderText =
+    v.extensionsBy && v.extensionsBy.length > 0 && v.extensionsBy.every((a) => a === v.lender)
+      ? "the lender, holding the LOAN note,"
+      : "the LOAN note's holder";
+  const timesText =
+    extensions === 1
+      ? "once"
+      : extensions === 2
+        ? "twice"
+        : `${["three", "four", "five", "six", "seven", "eight", "nine"][extensions - 3] ?? extensions} times`;
   const hasRepay = v.repayAmount != null && v.credit != null;
   const coll = assetText(v.collateral);
 
@@ -118,8 +135,8 @@ export function PwnPositionExplanation({
       <span key="interest">
         {v.status === "repaid" ? (
           <>
-            Of the amount repaid, <AmountText value={v.fixedInterest} /> {creditSym} was the fixed interest — the
-            loan&rsquo;s whole cost, agreed between the parties at origination and unchanged for its life.
+            Of the amount repaid, <AmountText value={v.fixedInterest} /> {creditSym} was the fixed interest
+            {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
           </>
         ) : v.status === "defaulted" ? (
           <>
@@ -127,8 +144,8 @@ export function PwnPositionExplanation({
             <H>
               <AmountText value={v.repayAmount!} /> {creditSym}
             </H>{" "}
-            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest over the principal; the collateral
-            stood in its place when the loan lapsed.
+            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest
+            {rate ? <> ({interestRateText(rate)})</> : null}; the collateral stood in its place when the loan lapsed.
           </>
         ) : pastDue ? (
           <>
@@ -136,13 +153,13 @@ export function PwnPositionExplanation({
             <H>
               <AmountText value={v.repayAmount!} /> {creditSym}
             </H>{" "}
-            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest, the loan&rsquo;s whole cost
-            agreed at origination.
+            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest
+            {rate ? <> ({interestRateText(rate)})</> : null}, the loan&rsquo;s whole cost agreed at origination.
           </>
         ) : (
           <>
-            Of the repayment, <AmountText value={v.fixedInterest} /> {creditSym} is fixed interest — the loan&rsquo;s
-            whole cost, agreed between the parties at origination and unchanged for its life.
+            Of the repayment, <AmountText value={v.fixedInterest} /> {creditSym} is fixed interest
+            {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
           </>
         )}
       </span>,
@@ -150,28 +167,75 @@ export function PwnPositionExplanation({
   }
 
   // The deadline — the Due column's twin — and the door it opens (§5: a
-  // forward path on the named state, stated as a door, never advice).
+  // forward path on the named state, stated as a door, never advice). Where
+  // the lender moved it, the struck date and the moves come first.
+  const moved: React.ReactNode =
+    extended && struckDueAt != null && dueAt != null ? (
+      <>
+        The parties struck a deadline of {dateOf(struckDueAt)}; {extenderText} moved it {timesText}, to{" "}
+        <H>{dateOf(dueAt)}</H>.{" "}
+      </>
+    ) : null;
   if (dueAt != null) {
+    const repaidAt = v.repaidAt ?? null;
     bullets.push(
       <span key="due">
+        {moved}
         {v.status === "open" && pastDue ? (
           <>
-            The deadline was <H>{dateOf(dueAt)}</H> — crossing it unpaid is itself the default on PWN, and what remains
-            is the lender&rsquo;s move: the loan waits, collateral escrowed, until they claim it.
+            {extended ? (
+              "That deadline"
+            ) : (
+              <>
+                The deadline was <H>{dateOf(dueAt)}</H>
+              </>
+            )}{" "}
+            has passed unpaid: the borrower can no longer repay, and the loan waits, collateral escrowed, until the
+            lender claims it.
           </>
         ) : v.status === "open" ? (
           <>
-            The loan runs to <H>{dateOf(dueAt)}</H>; past that moment an unpaid loan is claimable by the lender as
-            defaulted.
+            The loan runs to {extended ? "that date" : <H>{dateOf(dueAt)}</H>}; past that moment an unpaid loan is
+            claimable by the lender as defaulted.
           </>
         ) : v.status === "defaulted" ? (
           <>
-            The deadline was <H>{dateOf(dueAt)}</H>; it passed with the repayment unmade, and the lender&rsquo;s claim
-            on the collateral followed.
+            {extended ? (
+              "That deadline"
+            ) : (
+              <>
+                The deadline was <H>{dateOf(dueAt)}</H>; it
+              </>
+            )}{" "}
+            passed with the repayment unmade, and the lender&rsquo;s claim on the collateral followed.
+          </>
+        ) : repaidAt != null && repaidAt <= dueAt ? (
+          <>
+            The borrower repaid on {dateOf(repaidAt)}, before{" "}
+            {extended ? (
+              "the extended deadline"
+            ) : (
+              <>
+                its deadline of <H>{dateOf(dueAt)}</H>
+              </>
+            )}
+            .
+          </>
+        ) : repaidAt != null ? (
+          <>
+            The borrower repaid on {dateOf(repaidAt)}, after the deadline of <H>{dateOf(dueAt)}</H>, and the chain shows
+            no extension of it; the contract refuses a repayment past the deadline, so one is missing from this record.
           </>
         ) : (
           <>
-            The parties&rsquo; deadline was <H>{dateOf(dueAt)}</H>; the repayment closed the loan against it.
+            {extended ? (
+              "The loan ran to that deadline"
+            ) : (
+              <>
+                The deadline was <H>{dateOf(dueAt)}</H>
+              </>
+            )}
+            ; the loan was repaid.
           </>
         )}
       </span>,

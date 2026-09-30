@@ -56,6 +56,13 @@ export interface PwnPositionSummary {
   closedBlock: number | null;
   closedAt: number | null;
   eventCount: number;
+  /** Distinct transactions behind `eventCount` (created + minted, and
+   *  claimed + burned, each share one). Null until rails-server mig 370. */
+  txCount?: number | null;
+  /** The deadline the loan's latest extension set (unix seconds); null when it
+   *  was never extended, or before rails-server mig 370. */
+  latestDefaultAt?: number | null;
+  extensionCount?: number;
 }
 
 /** One loan's page-slice row from the rails route (pre-presentation). */
@@ -84,6 +91,10 @@ export interface RawPwnPositionRow {
   closedBlock: number | null;
   closedAt: number | null;
   eventCount: number;
+  /** rails-server mig 370; absent on a backend that predates it. */
+  txCount?: number | null;
+  latestDefaultAt?: number | null;
+  extensionCount?: number;
 }
 
 const ZERO = BigInt(0);
@@ -175,6 +186,9 @@ export async function buildPwnPositionRows(raw: RawPwnPositionRow[]): Promise<Pw
       closedBlock: r.closedBlock,
       closedAt: r.closedAt,
       eventCount: r.eventCount,
+      txCount: r.txCount ?? null,
+      latestDefaultAt: r.latestDefaultAt ?? null,
+      extensionCount: r.extensionCount ?? 0,
     };
   });
 }
