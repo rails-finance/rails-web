@@ -416,6 +416,10 @@ for (const f of FIXTURES) {
 // the step mark (which used to print that same rate again beside it) is gone
 // from this kind. So a row at rest reads: direction, one rate, the quantity
 // word — and the earlier rate is nowhere on it.
+// 2026-09-30 (Polaris final pass): the glyph is gone from this kind and the
+// quantity word carries the direction and the earlier rate ("0.00% primary
+// rate, down from 5.96%"). A newcomer read "↓ 0.00%" on a rate that fell to
+// zero as a move of nothing. The later rate still leads, once.
 
 const page27 = await open(context, polarisUrl("usdp", "27"));
 const rowText = async (page, noteId) =>
@@ -435,15 +439,21 @@ const squash = (t) =>
 const restA = await rowText(page27, want27[0].id);
 const restB = await rowText(page27, want27[1].id);
 check(
-  "2. at rest, each usdp/27 header states the LATER rate and nothing else (0.00%, then 9.39%)",
-  squash(restA) === squash(`down ${ratePct(want27[0].rateB)} primary rate`) &&
-    squash(restB) === squash(`up ${ratePct(want27[1].rateB)} primary rate`),
+  "2. at rest, each usdp/27 header states the LATER rate, then the direction and the earlier rate in words (0.00%, then 9.39%)",
+  squash(restA) === squash(`${ratePct(want27[0].rateB)} primary rate, down from ${ratePct(want27[0].rateA)}`) &&
+    squash(restB) === squash(`${ratePct(want27[1].rateB)} primary rate, up from ${ratePct(want27[1].rateA)}`),
   `first "${restA}", second "${restB}"`,
 );
 check(
-  "2b. neither header states the earlier rate — the later rate appears once in the row",
-  !restA.includes(ratePct(want27[0].rateA)) && !restB.includes(ratePct(want27[1].rateA)),
-  `first wanted no "${ratePct(want27[0].rateA)}", second no "${ratePct(want27[1].rateA)}"`,
+  "2b. each header states the later rate first and the earlier rate once, after it",
+  [
+    [restA, want27[0]],
+    [restB, want27[1]],
+  ].every(
+    ([t, w]) =>
+      t.split(ratePct(w.rateA)).length - 1 === 1 && t.indexOf(ratePct(w.rateB)) < t.indexOf(`from ${ratePct(w.rateA)}`),
+  ),
+  `first "${restA}", second "${restB}"`,
 );
 const glyphOf = async (noteId) => {
   const row = page27.locator(`[data-market-note="${noteId}"]`);
@@ -454,8 +464,8 @@ const glyphOf = async (noteId) => {
 const glyphA = await glyphOf(want27[0].id);
 const glyphB = await glyphOf(want27[1].id);
 check(
-  "2c. the first note's glyph is down (a fall), the second's is up (a rise)",
-  glyphA === "down" && glyphB === "up",
+  "2c. no direction glyph on either header — the words carry it",
+  glyphA === "none" && glyphB === "none",
   `first ${glyphA}, second ${glyphB}`,
 );
 
@@ -588,7 +598,7 @@ for (const key of ["usdp/296"]) {
   const text = historical.length === 1 ? await rowText(page, historical[0]) : "";
   check(
     `5a. ${key}'s header states the run's later rate (${run.toPct.toFixed(2)}%), not a step's`,
-    squash(text) === squash(`down ${run.toPct.toFixed(2)}% primary rate`),
+    squash(text) === squash(`${run.toPct.toFixed(2)}% primary rate, down from ${run.fromPct.toFixed(2)}%`),
     `"${text}"`,
   );
   check(
@@ -628,7 +638,8 @@ for (const key of ["usdp/296"]) {
   const atRest = allIds.length === 1 ? await rowText(page, allIds[0]) : "";
   check(
     `6a. ${CLOSED_FIXTURE.key}'s header states the later rate (${CLOSED_FIXTURE.toPct.toFixed(2)}%)`,
-    squash(atRest) === squash(`down ${CLOSED_FIXTURE.toPct.toFixed(2)}% primary rate`),
+    squash(atRest) ===
+      squash(`${CLOSED_FIXTURE.toPct.toFixed(2)}% primary rate, down from ${CLOSED_FIXTURE.fromPct.toFixed(2)}%`),
     `"${atRest}"`,
   );
   let opened = "";

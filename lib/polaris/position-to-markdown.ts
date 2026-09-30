@@ -75,7 +75,7 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
       `SEPOLIA TESTNET: every figure here is a test figure — the tokens are test tokens and the prices come from ` +
       `the protocol's own testnet oracles. The position is a CDP NFT in the ${stable} market; the holder is whoever ` +
       `holds the NFT. ALL UNITS ARE NATIVE: collateral in pETH (the protocol's own collateral token, bought with ETH from its bonding curve), debt in ` +
-      `${stable}. Rates are algorithmic — set by the market, not chosen by the holder. Interest accrues continuously ` +
+      `${stable}. Rates are algorithmic, set by the market. Interest accrues continuously ` +
       `and is written into the debt at each touch; stability gains, reward pETH and the PSM's pro-rata shares are ` +
       `applied the same way. Not financial advice.`,
   );

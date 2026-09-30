@@ -173,8 +173,9 @@ function valuedLiquidationClauses(ctx: PolarisContext, coords: PolarisCoords, st
     clause(
       <>
         At the feed&rsquo;s price at that block the {holder}&rsquo;s {legFigure} came to {legValueFigure} against{" "}
-        {clearedFigure} of debt cleared — a premium of {premiumFigure}, the protocol&rsquo;s own liquidation penalty of{" "}
-        {constant.label}.
+        {clearedFigure} of debt cleared — a premium of {premiumFigure}, the protocol&rsquo;s liquidation penalty of{" "}
+        {constant.label}. The penalty is the owner&rsquo;s cost: the CDP&rsquo;s collateral pays it to the {holder}, and
+        it comes out of what the owner could have kept as surplus.
       </>,
     ),
     clause(
@@ -323,7 +324,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
             <Fig info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={pct(ctx.primaryRate)}>
               {pct(ctx.primaryRate)}
             </Fig>{" "}
-            per year — set by the market, not chosen by the holder.
+            per year, set by the market.
           </>,
         )
       : null;

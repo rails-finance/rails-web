@@ -77,6 +77,15 @@ const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
 const ETH_USD_TIP =
   "ETH in USD from the protocol's ETH/USD medianiser, the median of its testnet oracles. pETH's USD price is its bonding-curve price in ETH times this.";
 
+/** A figure in the card's cost and debt-sum lines, at the card's grain:
+ *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
+ *  same grain as the Debt figure above it. A magnitude too small for three
+ *  decimals keeps AmountText's floor and tooltip. */
+function CardSumAmount({ value }: { value: number }) {
+  if (value !== 0 && Math.abs(value) < 0.0005) return <AmountText value={value} />;
+  return <>{value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</>;
+}
+
 /** What the trigger's pETH-in-ETH figure is, and why it is above one. */
 const PETH_CURVE_TIP =
   "pETH's price in ETH on the protocol's bonding curve. ETH paid into the curve mints pETH at a price that rises as ETH enters it, so one pETH costs more than one ETH.";
@@ -391,13 +400,13 @@ export default function PolarisPositionView({
           <RiskFigure label="Costs">
             <Prov info={polarisAnnualCostProv(market)} value={String(annualCost)} symbol={stable}>
               <RiskStrong>
-                ~<AmountText value={annualCost} />
+                ~<CardSumAmount value={annualCost} />
               </RiskStrong>
             </Prov>{" "}
             {stable} / year on the{" "}
             <Prov info={liveRecordedDebtProv(market)} value={String(chain?.recordedDebt ?? 0)}>
               <span>
-                <AmountText value={chain?.recordedDebt ?? 0} />
+                <CardSumAmount value={chain?.recordedDebt ?? 0} />
               </span>
             </Prov>{" "}
             {stable} recorded at the last touch
@@ -416,7 +425,7 @@ export default function PolarisPositionView({
               Owed at this block:{" "}
               <Prov info={liveRecordedDebtProv(market)} value={String(chain.recordedDebt)}>
                 <span>
-                  <AmountText value={chain.recordedDebt} />
+                  <CardSumAmount value={chain.recordedDebt} />
                 </span>
               </Prov>{" "}
               recorded at the last touch
@@ -425,7 +434,7 @@ export default function PolarisPositionView({
                   {" + "}
                   <Prov info={livePendingProv("accruedInterest", market)} value={String(chain.accruedInterest)}>
                     <span>
-                      <AmountText value={chain.accruedInterest} />
+                      <CardSumAmount value={chain.accruedInterest} />
                     </span>
                   </Prov>{" "}
                   interest
@@ -436,7 +445,7 @@ export default function PolarisPositionView({
                   {" − "}
                   <Prov info={livePendingProv("accruedStables", market)} value={String(chain.accruedStables)}>
                     <span>
-                      <AmountText value={chain.accruedStables} />
+                      <CardSumAmount value={chain.accruedStables} />
                     </span>
                   </Prov>{" "}
                   stability gain
@@ -447,7 +456,7 @@ export default function PolarisPositionView({
                   {chain.mintRedeemDebtChange < 0 ? " − " : " + "}
                   <Prov info={livePendingProv("mintRedeemDebt", market)} value={String(chain.mintRedeemDebtChange)}>
                     <span>
-                      <AmountText value={Math.abs(chain.mintRedeemDebtChange)} />
+                      <CardSumAmount value={Math.abs(chain.mintRedeemDebtChange)} />
                     </span>
                   </Prov>{" "}
                   net PSM share
@@ -457,7 +466,7 @@ export default function PolarisPositionView({
               <Prov info={liveEntireProv("debt", market)} value={String(chain.entireDebt)}>
                 <RiskStrong>
                   {chain.entireDebt < 0 ? "−" : ""}
-                  <AmountText value={Math.abs(chain.entireDebt)} />
+                  <CardSumAmount value={Math.abs(chain.entireDebt)} />
                 </RiskStrong>
               </Prov>{" "}
               {stable}

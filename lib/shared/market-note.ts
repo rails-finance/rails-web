@@ -2584,7 +2584,9 @@ export function marketNoteSentence(note: MarketNote): string {
       let sentence =
         `Since this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
         `primary rate has moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, at the latest block ${f.toBlock}`;
-      sentence += f.sets ? `; the market set a new primary rate ${f.sets} times since.` : `.`;
+      sentence += f.sets
+        ? `; the market re-set the primary rate ${f.sets} times since, once per PSM mint or redemption.`
+        : `.`;
       if (note.interest && f.debt && f.before && f.after) {
         sentence +=
           ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +
@@ -2603,7 +2605,9 @@ export function marketNoteSentence(note: MarketNote): string {
       : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
         `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
         `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
-    sentence += f.sets ? `; the market set a new primary rate ${f.sets} times in between.` : `.`;
+    sentence += f.sets
+      ? `; the market re-set the primary rate ${f.sets} times in between, once per PSM mint or redemption.`
+      : `.`;
     if (note.interest && f.debt && f.before && f.after) {
       sentence +=
         ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +

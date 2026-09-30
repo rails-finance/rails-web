@@ -185,6 +185,19 @@ const LISTING_ICR_TIP =
  *  child so they win over the bubble's own. */
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
 
+/** Why the highest collateral can exceed every deposit: pETH reaches a CDP
+ *  without the holder depositing it. */
+const PEAK_COLL_ABOVE_DEPOSITS =
+  "It can be more than the holder deposited: the difference is the market's net PSM share and reward pETH, which add collateral at a touch without a deposit.";
+
+/** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
+ *  read at one grain; a magnitude too small for three decimals keeps
+ *  formatNumber's non-zero rule. */
+const cardFigure = (value: number): string =>
+  value !== 0 && Math.abs(value) < 0.0005
+    ? formatNumber(value)
+    : value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
 /** A card headline in full — the row's and the grid's rule, three decimals —
  *  with the token named in words and by its glyph. The word and the glyph
  *  wrap under the figure where the column is too narrow for all three (a
@@ -205,7 +218,7 @@ function CardAmount({
   signed?: boolean;
 }) {
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
-  const shown = signed ? withRealMinus(formatNumber(value)) : formatNumber(value);
+  const shown = signed ? withRealMinus(cardFigure(value)) : cardFigure(value);
   return (
     <span className="inline-flex flex-wrap items-center gap-x-2">
       <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
@@ -399,9 +412,11 @@ export function PolarisPositionCard({
               : undefined
           }
           labelTips={{
-            collateral: v.peaksCountLiquidation
-              ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
-              : "The most pETH the CDP held after any of its touches (a touch is any transaction on it).",
+            collateral: `${
+              v.peaksCountLiquidation
+                ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
+                : "The most pETH the CDP held after any of its touches (a touch is any transaction on it)."
+            } ${PEAK_COLL_ABOVE_DEPOSITS}`,
             debt: v.peaksCountLiquidation
               ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
               : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`,

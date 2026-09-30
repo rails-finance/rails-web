@@ -498,6 +498,14 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
     const text = `${note.marketName ?? sym} fee ${f.fromRate} → ${f.toRate}`;
     return { tip: text, spoken: `${note.marketName ?? sym} fee from ${f.fromRate} to ${f.toRate}` };
   }
+  // Polaris's primary-rate notes state both ends too: "GOLDp primary rate 2.15% → 0.00%".
+  if (note.kind === "rate-step" && note.protocol == null) {
+    const f = rateStepFigures(note);
+    return {
+      tip: `${sym} primary rate ${f.fromRate} → ${f.toRate}`,
+      spoken: `${sym} primary rate from ${f.fromRate} to ${f.toRate}`,
+    };
+  }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
 }
@@ -764,6 +772,12 @@ function Echo({
   );
   return muted ? echoed : <H>{echoed}</H>;
 }
+
+/** "25 Aug" — a touch's day, in UTC, the way the timeline dates a row. */
+const utcDayMonth = (ts: number): string => {
+  const d = new Date(ts * 1000);
+  return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
+};
 
 /** The T3 ratio-pair rule (rails-ops standards/detail-page-anatomy.md, "The
  *  disclosure ladder"): a T3 statement of the collateral ratio states the LTV
@@ -1152,6 +1166,13 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
       stats.push({ label: "Debt", figure: debtFig });
     }
   }
+  // A Polaris ratio here holds the earlier touch's recorded debt and
+  // collateral fixed while the CDP card's ratio adds what is pending since, so
+  // the figure names its basis where it stands.
+  const recordedDebtAt =
+    isPolaris && p && !p.atFire && note.from.timestamp > 0
+      ? `at the recorded debt of the ${utcDayMonth(note.from.timestamp)} touch`
+      : null;
   if (p && f.crBefore && f.crAfter && f.mcr) {
     crFigs = {
       before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
@@ -1159,7 +1180,11 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
     };
     mcrFig = { text: f.mcr, prov: positionProv(note, "mcr"), exact: String(p.mcrPct) };
     stats.push({
-      label: isPolaris ? "Collateral ratio" : "Collateral Ratio",
+      label: isPolaris
+        ? recordedDebtAt
+          ? `Collateral ratio, ${recordedDebtAt}`
+          : "Collateral ratio"
+        : "Collateral Ratio",
       transition: crFigs,
       sub: { text: minimumLabel, figure: mcrFig },
     });
@@ -1255,7 +1280,8 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
     crFigs && mcrFig && p && (
       <>
         The collateral ratio was {ratioPairNote(p.crBefore, crFigs.before, mode)} {thenWord} and{" "}
-        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}, against{" "}
+        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}
+        {recordedDebtAt ? `, ${recordedDebtAt}` : ""}, against{" "}
         {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
       </>
     ),
@@ -1855,7 +1881,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Times the rate was set in between",
+      label: "Rate re-sets in between, one per PSM mint or redemption",
       figure: { text: f.sets, prov: rateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }
@@ -1893,18 +1919,25 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     label: `${note.marketSymbol} primary rate`,
     measure: { kind: "protocol", id: "polaris" },
     headline: { text: f.toRate, prov: rateStepProv(note, "rate"), exact: String(note.to.value) },
-    quantity: "primary rate",
+    // The headline is the later rate, so the earlier one and the direction
+    // ride beside it in words, and no glyph: "↓ 0.00%" read as a move of
+    // nothing on a rate that fell to zero.
+    quantity: `primary rate, ${note.to.value >= note.from.value ? "up" : "down"} from ${f.fromRate}`,
+    direction: false,
     ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent("polaris"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
-        market&rsquo;s own PSM mints and redemptions, never chosen by this CDP&rsquo;s holder. The earlier value is the
-        rate in force at this CDP&rsquo;s own last touch; the later is the cdpManager&rsquo;s own rate read now —{" "}
-        {observation("from")}, {observation("to")}. Shown whenever this CDP is open, whatever the move — nothing having
-        moved is itself the fact this note states.
+        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this CDP&rsquo;s own last
+        touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}. Shown
+        whenever this CDP is open, whatever the move — nothing having moved is itself the fact this note states.
         {note.setsBetween != null && (
-          <> The market has reset the rate {f.sets} times since this CDP&rsquo;s own last touch.</>
+          <>
+            {" "}
+            The market has re-set the rate {f.sets} times since this CDP&rsquo;s last touch: the primary rate is re-set
+            at every PSM mint or redemption in the market.
+          </>
         )}
         {note.interest && (
           <>
@@ -1918,8 +1951,8 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     ) : (
       <>
         The primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the market&rsquo;s own PSM mints
-        and redemptions, never chosen by this CDP&rsquo;s holder. The two values are the rate in force at the two
-        touches this note runs between — {observation("from")}, {observation("to")}.{" "}
+        and redemptions. The two values are the rate in force at the two touches this note runs between —{" "}
+        {observation("from")}, {observation("to")}.{" "}
         {note.steps != null && (
           <>
             Those two ends are {f.steps} of this CDP&rsquo;s touches apart: the rate moved the same way at every step in
@@ -1930,8 +1963,9 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         )}
         {note.setsBetween != null && (
           <>
-            The market reset the rate {f.sets} times in between; nothing between the two touches is drawn, because
-            nothing between them was observed on this CDP.{" "}
+            The market re-set the rate {f.sets} times in between: the primary rate is re-set at every PSM mint or
+            redemption in the market, and {f.sets} of them fell between these two touches. Nothing between the two
+            touches is drawn, because nothing between them was observed on this CDP.{" "}
           </>
         )}
         A stretch is stated only where the primary rate moved at least one percentage point, and consecutive stretches

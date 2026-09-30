@@ -185,7 +185,10 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   if (ctx.newColl != null)
     stats.push({
       label: "Collateral",
-      value: fmt(ctx.newColl),
+      // Shown to three decimals; the tip and the receipt carry the exact
+      // decimal, as the before figure beside it does.
+      value: formatExact(num(ctx.newColl)),
+      display: fmt(ctx.newColl),
       symbol: PETH.symbol,
       address: PETH.address,
       prov: ledgerFieldProv("newColl", coords, ctx.raw?.newColl),
@@ -195,7 +198,10 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   if (ctx.newDebt != null)
     stats.push({
       label: "Debt",
-      value: fmt(ctx.newDebt),
+      // Shown to three decimals; the tip and the receipt carry the exact
+      // decimal, as the before figure beside it does.
+      value: formatExact(num(ctx.newDebt)),
+      display: fmt(ctx.newDebt),
       symbol: stable,
       address: stableAddr,
       prov: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt),

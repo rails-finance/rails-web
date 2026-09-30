@@ -10,6 +10,7 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
+import { polarisFilterKey } from "@/lib/polaris/row-kinds";
 import {
   isLiquityEvent,
   isAaveV4Event,
@@ -25,6 +26,7 @@ import {
   isLiquityV1Event,
   isCompoundV2Event,
   isPwnEvent,
+  isPolarisEvent,
 } from "@/lib/shared/types/event-shape";
 
 /** Get the canonical action key for an event (used for type-level filtering) */
@@ -108,6 +110,12 @@ export function getEventActionKey(e: BaseActivityEvent): string {
     // Liquity V1's eventType is already a clean per-action bucket (openTrove,
     // adjustTrove, closeTrove, liquidation, redemption), so it doubles as the key.
     return e.context.data.eventType ?? e.actionType ?? "unknown";
+  }
+  if (isPolarisEvent(e)) {
+    // An adjust is keyed by the legs its row names ("Deposit, Borrow, Net PSM
+    // share"), so the menu reads the rows' words; open, close, liquidate and
+    // transfer keep their event type.
+    return polarisFilterKey(e.context.data);
   }
   return e.actionType ?? "unknown";
 }
@@ -531,6 +539,8 @@ const LLAMALEND_OP_LABELS: Record<string, string> = {
 // changing hands — custody, never an open or a close.
 const POLARIS_OP_LABELS: Record<string, string> = {
   open: "Open",
+  // An adjust keys by its row's leg names (lib/polaris/row-kinds.ts), which
+  // are their own labels; "adjust" is left for a touch that moved nothing.
   adjust: "Adjust",
   close: "Close",
   liquidate: "Liquidated",
