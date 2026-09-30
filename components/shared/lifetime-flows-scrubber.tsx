@@ -657,8 +657,8 @@ function panelWords(
     key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
     explain: lined
       ? cover +
-        `The line under ${them} draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
-        `${from > 0 ? `, with the ${bs}' window shaded` : ""}, and leaves a gap where a held asset has no price that ${bin}. ` +
+        `The line under ${them} draws ${what} at the end of each ${bin} since the open, ${model.words.linePrices ?? "at the daily prices the index records"}` +
+        `${from > 0 ? `, with the ${bs}' window shaded` : ""}${model.words.linePrices ? "" : `, and leaves a gap where a held asset has no price that ${bin}`}. ` +
         `One cursor moves both. It stops at the end of each ${bin}, on each day with events (tap a tick to go to it) and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
         `${read} The dashed outline is where ${each} ${today}.` +
         (from > 0

@@ -48,6 +48,9 @@ export interface LifetimeFlowsPanelProps {
   /** The collapse store's id; the route's explorer by default, null for none
    *  (lib/shared/flows-collapse-store.ts). */
   collapseKey?: string | null;
+  /** Inline content on the Explanation's heading row (a Liquity Trove's
+   *  redemption outcome strip). */
+  rowExtra?: ReactNode;
 }
 
 export function LifetimeFlowsPanel({
@@ -57,6 +60,7 @@ export function LifetimeFlowsPanel({
   learnMore,
   title = "Lifetime flows",
   collapseKey: collapseKeyProp,
+  rowExtra,
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
@@ -146,6 +150,7 @@ export function LifetimeFlowsPanel({
               )
             }
             learnMore={learnMore}
+            rowExtra={rowExtra}
           />
         </div>
       </section>

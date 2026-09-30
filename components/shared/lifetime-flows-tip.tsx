@@ -407,22 +407,29 @@ function SideSumTable({
     sum.total.dollars,
   );
   const rest = words.rest.toLowerCase();
+  // A family that names what each side's remainder holds (Liquity) states it
+  // on the balancing item.
+  const restSeg = st.sources.find((x) => x.fill === "estimate");
   const sw = (s: FlowSegment | null) => {
     const style = s ? swatch(s) : null;
     return <span aria-hidden className="inline-block size-2.5 shrink-0 rounded-[2px]" style={style ?? undefined} />;
   };
   const provFor = (kind: string, seg: FlowSegment) =>
     kind === "rest"
-      ? flowRemainderProv(seg.label, side, when)
+      ? flowRemainderProv(seg.label, side, when, seg.note)
       : kind === "opening"
         ? flowOpeningProv(seg.label, side)
         : flowSegmentProv(seg, side, when, isLive, daily);
   return (
     <div className="mt-1.5 border-t pt-1.5" style={{ borderColor: "var(--rb-tooltip-border)" }}>
       <p className="mb-1 text-[11px] leading-snug text-rb-500" data-flow-panel-basis="">
-        Each flow is valued at the price on its own day. {words.rest} is the remainder, {coll ? "held" : "owed"} {at}{" "}
-        less the lines above it
-        {rest === "interest earned" ? "." : ", so it holds price changes and interest together."}
+        {restSeg?.basis ?? "Each flow is valued at the price on its own day."} {words.rest} is the remainder,{" "}
+        {coll ? "held" : "owed"} {at} less the lines above it
+        {restSeg?.note
+          ? `, so it is ${restSeg.note}.`
+          : rest === "interest earned"
+            ? "."
+            : ", so it holds price changes and interest together."}
       </p>
       <table className="w-full border-collapse tabular-nums" data-flow-tip-sum={side}>
         <tbody>

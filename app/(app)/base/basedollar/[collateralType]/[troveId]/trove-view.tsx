@@ -70,7 +70,11 @@ import {
   LiquityForkPositionExplanation,
   LiquityForkClosedExplanation,
 } from "@/components/protocol/liquity-fork/liquity-fork-position-explanation";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { useLiquityForkFlows } from "@/hooks/useLiquityForkFlows";
+import { unpricedEvents } from "@/lib/shared/liquity-flows";
+import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { computeBasedollarEconomics, basedollarLifetimeWithOpening } from "@/lib/basedollar/economics";
 import {
@@ -360,6 +364,20 @@ export default function BasedollarTroveDetail({
 
   const liveRisk = chain != null && view?.status === "open";
 
+  // Lifetime flows: the Trove's whole history replayed (lib/shared/liquity-flows.ts).
+  // A windowed or folder-served page reads the flat history once for it.
+  const flows = useLiquityForkFlows({
+    wholeEvents: historyWindow.state === "whole" && !servedFolders?.length ? basedollarEvents : null,
+    fetchAll: fetchAllHistory,
+    is: isBasedollarEvent,
+    collSymbol: view?.collateralType ?? null,
+    debtSymbol: DEBT_SYMBOL,
+    open: view?.status === "open",
+    chain,
+    price: view?.priceUsd ?? null,
+    surplusClaimed: surplus?.claimed != null,
+  });
+
   // The top row's price dropdown: the branch's own oracle
   // price for the collateral — the live chain read when it landed, else the
   // listing route's PriceFeed resolution carried on the view — plus the
@@ -488,9 +506,21 @@ export default function BasedollarTroveDetail({
                 docsLinks: [{ label: "Basedollar", url: "https://basedollar.money" }],
               };
               return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={liquityForkEconomicsExplanation(towerData, forkOpts)}
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      {liquityForkEconomicsExplanation(towerData, forkOpts)}
+                      <LiquityFlowsNote
+                        collSymbol={view.collateralType}
+                        debtSymbol={DEBT_SYMBOL}
+                        unpriced={unpricedEvents(flows.events)}
+                        lives={troveLives(flows.events)}
+                        zombie={chain?.status === "zombie"}
+                      />
+                    </div>
+                  }
                   learnMore={liquityForkEconomicsContent(forkOpts)}
                   rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
                 />
