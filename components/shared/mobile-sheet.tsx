@@ -103,7 +103,9 @@ export function MobileSheet({ label, onClose, mode = "modal", header, children }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      // A press already spent closing an (i) panel inside the sheet
+      // (use-escape-close.ts) leaves the sheet open.
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);

@@ -26,3 +26,15 @@ export function AaveV3RiskSlot({ chain }: { chain: AaveV3PositionChainResponse }
     </RiskFooterStrip>
   );
 }
+
+/** The opened card's distance bar under Health factor (ui-jobs 209), beside
+ *  its "Liquidates on a N% drop". The card carries no loan-to-value line: the
+ *  Explanation states the ratio, the borrow cap and the threshold. */
+export function AaveV3RiskDetail({ chain }: { chain: AaveV3PositionChainResponse }) {
+  if (chain.healthFactor == null || chain.healthFactor <= 0) return null;
+  return (
+    <div className="mt-1.5 max-w-72">
+      <AaveV3Runway compact barOnly healthFactor={chain.healthFactor} />
+    </div>
+  );
+}

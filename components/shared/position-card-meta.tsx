@@ -15,6 +15,7 @@ import { Icon } from "@/components/icons/icon";
 import { formatDuration } from "@/lib/date";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { LiquidatedBadge } from "@/components/shared/liquidated-badge";
+import { PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
 
 export interface PositionCardMetaProps {
   /** Unix epoch of the most recent event. Omit/null when the protocol carries no
@@ -77,7 +78,9 @@ export function PositionCardMeta({
   const hasLiqCount = liquidationCount != null && liquidationCount > 0;
   const showLiquidation = hasLiqCount || liquidated === true;
 
-  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return null;
+  // The disclosure chevron closes the cluster on a card whose shell opted in
+  // (PositionCardShell `disclosureKey`); it renders nothing anywhere else.
+  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return <PositionCardDisclosureToggle />;
 
   return (
     // data-prov-exempt: activity-meta chrome — the time-ago, event count and
@@ -133,6 +136,7 @@ export function PositionCardMeta({
       {showLiquidation && (
         <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} rule={liquidationRule} />
       )}
+      <PositionCardDisclosureToggle />
     </span>
   );
 }

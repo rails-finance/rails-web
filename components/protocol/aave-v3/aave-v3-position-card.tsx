@@ -50,6 +50,8 @@ import {
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { ShareBar } from "@/components/shared/share-bar";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
  *  `amountRaw` integer wei string backs the exact reveal (the raw chain figure). */
@@ -188,6 +190,45 @@ function ReserveFootnoteLines({
         );
       })}
       {control}
+    </div>
+  );
+}
+
+/** The opened layer's per-reserve lines (ui-jobs 209): each amount traced as
+ *  in `ReserveFootnoteLines`, with a bar for its share of the side's oracle
+ *  USD. Drawn only where the side's total is priced (`totalUsd` non-null):
+ *  a share the oracle can't back is not drawn. */
+function ReserveShareLines({
+  reserves,
+  side,
+  atBlock,
+  usdOf,
+  total,
+}: {
+  reserves: AaveV3ReserveAmount[];
+  side: "supply" | "debt";
+  atBlock?: number;
+  usdOf: (r: AaveV3ReserveAmount) => number | null;
+  total: number;
+}) {
+  const dep = useAaveV3CardDeployment();
+  const { lines, control } = useDustLines(reserves, usdOf);
+  if (reserves.length === 0) return null;
+  return (
+    <div className="mt-1.5 grid max-w-72 grid-cols-[auto_minmax(3rem,1fr)] items-center gap-x-3 gap-y-1 text-xs text-rb-500 tabular-nums">
+      {lines.map((r) => (
+        <div key={r.address} className="contents">
+          <div className="whitespace-nowrap">
+            <Prov info={side === "supply" ? dep.supply(r.symbol, atBlock) : dep.debt(r.symbol, atBlock)}>
+              <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                {formatCompact(r.amount)} {r.symbol}
+              </ExactSpan>
+            </Prov>
+          </div>
+          <ShareBar share={(usdOf(r) ?? 0) / total} side={side === "supply" ? "collateral" : "debt"} />
+        </div>
+      ))}
+      {control && <div className="col-span-2">{control}</div>}
     </div>
   );
 }
@@ -353,9 +394,22 @@ export function AaveV3PositionCard({
   deployment,
   peaks = true,
   pricesPending = false,
+  disclosureKey,
+  debtDetail,
+  riskDetail,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail and the Explanation. */
+  disclosureKey?: string;
+  /** Opened-layer lines under Debt from the page's Pool read (the room left
+   *  to borrow). Only drawn on a disclosing card. */
+  debtDetail?: React.ReactNode;
+  /** Opened-layer lines under Health factor from the page's Pool read (the
+   *  distance bar). Only drawn on a disclosing card. */
+  riskDetail?: React.ReactNode;
   /** The page is still reading the oracle prices: the USD headlines hold
    *  their space with a placeholder, so nothing moves when the dollars land. */
   pricesPending?: boolean;
@@ -394,6 +448,9 @@ export function AaveV3PositionCard({
           captions={captions}
           peaks={peaks}
           pricesPending={pricesPending}
+          disclosureKey={disclosureKey}
+          debtDetail={debtDetail}
+          riskDetail={riskDetail}
         />
       </AaveV3CardDeploymentProvider>
     );
@@ -408,6 +465,9 @@ export function AaveV3PositionCard({
       captions={captions}
       peaks={peaks}
       pricesPending={pricesPending}
+      disclosureKey={disclosureKey}
+      debtDetail={debtDetail}
+      riskDetail={riskDetail}
     />
   );
 }
@@ -421,10 +481,16 @@ function AaveV3PositionCardBody({
   captions,
   peaks = true,
   pricesPending = false,
+  disclosureKey,
+  debtDetail,
+  riskDetail,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
   pricesPending?: boolean;
+  disclosureKey?: string;
+  debtDetail?: React.ReactNode;
+  riskDetail?: React.ReactNode;
   rowExtra?: React.ReactNode;
   explanation?: React.ReactNode;
   /** Copy-this-view control, forwarded straight through to `PositionCardShell`
@@ -455,6 +521,10 @@ function AaveV3PositionCardBody({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
+  // The closed/opened card (ui-jobs 209): the per-side reserve chevrons give
+  // way to the card's one header chevron, and every line under a headline
+  // moves into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // Value order for the cluster and the leg lines — the three visible icons
   // are the three largest by oracle USD, and the detail legs match. Dust
   // reserves (under a cent) leave the icon stack, its "+N" and the list
@@ -491,8 +561,12 @@ function AaveV3PositionCardBody({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={aaveV3PositionContent({ status: v.status, deployment: positionDeployment })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
             <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
@@ -555,8 +629,10 @@ function AaveV3PositionCardBody({
         deployment: positionDeployment,
         hasDebt: v.borrows.length > 0,
       })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -610,11 +686,13 @@ function AaveV3PositionCardBody({
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} />
-                  <ReserveDisclosureToggle
-                    disclosure={supplyDisclosure}
-                    count={suppliesShown.length}
-                    closedLabel={splitLabel(suppliesShown)}
-                  />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle
+                      disclosure={supplyDisclosure}
+                      count={suppliesShown.length}
+                      closedLabel={splitLabel(suppliesShown)}
+                    />
+                  )}
                 </span>
               ) : undefined,
             value:
@@ -622,10 +700,24 @@ function AaveV3PositionCardBody({
                 <UsdHeadline usd={collUsd} info={dep.usd("Collateral")} />
               ) : collPending ? (
                 <UsdPlaceholder />
-              ) : supplyDisclosure.collapsible ? null : (
+              ) : supplyDisclosure.collapsible && !disclosing ? null : (
                 <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {collUsd != null ? (
+                  <ReserveShareLines
+                    reserves={suppliesRanked}
+                    side="supply"
+                    atBlock={v.atBlock}
+                    usdOf={usdOf}
+                    total={collUsd}
+                  />
+                ) : collPending ? (
+                  <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
+                ) : null}
+              </PositionCardDetail>
+            ) : (
               <>
                 {collUsd == null && !collPending && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
@@ -651,11 +743,13 @@ function AaveV3PositionCardBody({
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} />
-                  <ReserveDisclosureToggle
-                    disclosure={debtDisclosure}
-                    count={borrowsShown.length}
-                    closedLabel={splitLabel(borrowsShown)}
-                  />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle
+                      disclosure={debtDisclosure}
+                      count={borrowsShown.length}
+                      closedLabel={splitLabel(borrowsShown)}
+                    />
+                  )}
                 </span>
               ) : undefined,
             value:
@@ -663,10 +757,26 @@ function AaveV3PositionCardBody({
                 <UsdHeadline usd={debtUsd} info={dep.usd("Borrowed")} />
               ) : debtPending ? (
                 <UsdPlaceholder />
-              ) : debtDisclosure.collapsible ? null : (
+              ) : debtDisclosure.collapsible && !disclosing ? null : (
                 <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {debtUsd != null ? (
+                  <ReserveShareLines
+                    reserves={borrowsRanked}
+                    side="debt"
+                    atBlock={v.atBlock}
+                    usdOf={usdOf}
+                    total={debtUsd}
+                  />
+                ) : debtPending ? (
+                  <ReserveFootnoteLines reserves={borrowsRanked} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
+                ) : null}
+                <BorrowRateCaption rate={captions?.borrowRate} pool={captions?.pool} />
+                {debtDetail}
+              </PositionCardDetail>
+            ) : (
               <>
                 {debtUsd == null && !debtPending && debtDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
@@ -711,7 +821,14 @@ function AaveV3PositionCardBody({
                   ),
                 // The liquidation read beneath HF — its tangible restatement
                 // (single collateral → oracle liq price, multi → 1 − 1/HF drop).
-                footnote: <LiquidationFootnote v={v} />,
+                footnote: disclosing ? (
+                  <PositionCardDetail>
+                    <LiquidationFootnote v={v} />
+                    {riskDetail}
+                  </PositionCardDetail>
+                ) : (
+                  <LiquidationFootnote v={v} />
+                ),
               },
         ]}
       />

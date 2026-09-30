@@ -63,3 +63,19 @@ export function AaveV3LtvView({ chain }: { chain: AaveV3PositionChainResponse })
     </>
   );
 }
+
+/** The opened card's line under Debt (ui-jobs 209): the room left to borrow,
+ *  from the same Pool read and receipt as the risk-strip line above. */
+export function AaveV3BorrowRoom({ chain }: { chain: AaveV3PositionChainResponse }) {
+  const lane = useV3Pool();
+  const pool: V3PoolLane = lane.positionRoute ? { ...lane, address: chain.pool || lane.address } : chain.pool;
+  if (chain.totalDebtUsd <= 0 || chain.totalCollateralUsd <= 0) return null;
+  return (
+    <div className="text-xs mt-0.5 text-rb-500">
+      <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", pool)}>
+        {fmtUsd(chain.availableBorrowsUsd).display}
+      </Prov>{" "}
+      more to borrow
+    </div>
+  );
+}

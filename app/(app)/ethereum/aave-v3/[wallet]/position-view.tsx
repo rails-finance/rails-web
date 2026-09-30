@@ -68,7 +68,8 @@ import {
   AaveV3PositionExplanation,
   AaveV3ClosedPositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import {
   computeAaveV3Economics,
   isWethGateway,
@@ -694,17 +695,13 @@ export default function AaveV3PositionDetail({
                 receipts
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
-                // The risk slot rides the card's heading-button row (the V2 trove
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway or the loan-to-value bar (LTV/CR framing +
-                // "available to borrow"). Whatever it draws is on the card face and
-                // in the card's receipts scope, so the Provenance list stays 1:1
-                // with the face figures. Shown only with debt (both views need it).
-                rowExtra={
-                  chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                    <AaveV3RiskSlot chain={chain} />
-                  ) : undefined
-                }
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The room left to borrow and the distance bar from the
+                // Pool read sit in the opened layer under Debt and Health
+                // factor, inside the card's receipts scope.
+                disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
+                debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
+                riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
                 // The Explanation is now pure layman prose about those same face
                 // figures — no secondary figure-strips. The LTV strip is absorbed
                 // into the risk slot above; the reserve rates live on the market
