@@ -28,6 +28,9 @@ export interface PwnAsset {
   /** Display amount — scaled by decimals for ERC20, raw integer for NFTs. */
   amount: number;
   amountRaw: string;
+  /** The scale `amount` was read at: the token's decimals for an ERC20, 0 for
+   *  an NFT. Lets a page redo exact integer arithmetic on `amountRaw`. */
+  decimals?: number;
   /** An ERC20 whose `decimals` did not load (the RPC did not answer): `amount`
    *  is scaled by a stand-in and the card states no amount for it. */
   decimalsUnread?: true;
@@ -47,8 +50,12 @@ export interface PwnPositionSummary {
   /** Fixed total the borrower must repay = principal + fixed interest. */
   repayAmount: number | null;
   repayAmountRaw: string | null;
-  /** v1.2+ accruing rate (APR, integer basis); null / 0 for v1.1 fixed-only. */
+  /** v1.2+ accruing rate, APR with two decimals (6000 = 60%); null / 0 for
+   *  v1.1 fixed-only. */
   accruingInterestApr: number | null;
+  /** v1.2+ terms' `fixedInterestAmount` (raw credit units); null on v1.1, whose
+   *  interest is `repayAmount − principal`. */
+  fixedInterestRaw?: string | null;
   dueKind: "expiration" | "duration" | null;
   dueValue: string | null;
   createdBlock: number | null;
@@ -157,6 +164,7 @@ export async function buildPwnPositionRows(raw: RawPwnPositionRow[]): Promise<Pw
       tokenId: cat === "ERC20" ? null : (id ?? null),
       amount: scaleRaw(bigintOf(rawStr), decimals),
       amountRaw: rawStr,
+      decimals,
       ...(cat === "ERC20" && (meta.unresolved || !metas.has(a)) ? { decimalsUnread: true as const } : {}),
     };
   };
@@ -179,6 +187,7 @@ export async function buildPwnPositionRows(raw: RawPwnPositionRow[]): Promise<Pw
       repayAmount: r.loanRepayAmountRaw != null ? scaleRaw(bigintOf(r.loanRepayAmountRaw), repayDecimals) : null,
       repayAmountRaw: r.loanRepayAmountRaw,
       accruingInterestApr: r.accruingInterestApr,
+      fixedInterestRaw: r.version === "v11" ? null : (r.fixedInterestAmountRaw ?? null),
       dueKind: r.dueKind === "expiration" || r.dueKind === "duration" ? r.dueKind : null,
       dueValue: r.dueValue,
       createdBlock: r.createdBlock,

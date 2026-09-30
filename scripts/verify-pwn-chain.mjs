@@ -32,7 +32,16 @@
 //      catalog identity in lib/pwn/asset-catalog.ts).
 //   6. Fixed-interest identity — loanRepayAmount − credit principal equals
 //      the index's fixed interest (the split the card and tower render), ≥ 0.
-//   7. Default timing — a defaulted claim fires only after expiration.
+//   7. Default timing — a defaulted claim fires only after the deadline
+//      (v1.1 expiration; v1.2/v1.3 creation + duration, both moved by any
+//      extension).
+//   8. v1.2 / v1.3 (item 212) — the same scans over the v1.2 and v1.3
+//      SimpleLoan contracts, their LOANCreated terms hand-decoded (duration,
+//      fixedInterestAmount, accruingInterestAPR); a repaid loan's credit
+//      Transfer into the contract equals principal + principal × APR × whole
+//      minutes ÷ 5,256,000,000 (the web's lib/pwn/economics.ts `accrueTo`); an
+//      unsettled loan past its deadline reads status 4 (expired) from getLOAN,
+//      the "defaulted, not yet claimed" the listing and book count.
 //
 // Run:  node scripts/verify-pwn-chain.mjs
 // Env:  .env.local — ALCHEMY_URL (archive reads + pinned logs),
@@ -59,6 +68,11 @@ const client = createPublicClient({ chain: mainnet, transport: http(env.ALCHEMY_
 
 // The protocol's own addresses (lib/pwn/asset-catalog.ts).
 const SIMPLE_LOAN_V11 = "0x57c88d78f6d08b5c88b4a3b7bbb0c1aa34c3280a";
+const SIMPLE_LOAN = {
+  v11: SIMPLE_LOAN_V11,
+  v12: "0x0773d5f2f7b3264a9eb285f085acccc53d5aaa4f",
+  v13: "0x719a69d0dc67bd3aa7648d4694081b3c87952797",
+};
 const LOAN_TOKEN = "0x4440c069272cc34b80c7b11bee657d0349ba9c23";
 const TOKEN_BUNDLER = "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d";
 // Comfortably pre-dates the v1.1 deploy (first seeded loan is mid-2023).
@@ -70,6 +84,19 @@ const CREATED_V11 = parseAbiItem(
   "event LOANCreated(uint256 indexed loanId, (address lender, address borrower, uint40 expiration, (uint8 category, address assetAddress, uint256 id, uint256 amount) collateral, (uint8 category, address assetAddress, uint256 id, uint256 amount) asset, uint256 loanRepayAmount) terms, bytes32 indexed factoryDataHash, address indexed factoryAddress)",
 );
 const TOPIC_CREATED = toEventSelector(CREATED_V11);
+// v1.2 and v1.3 share one Terms struct (pwn_contracts tags v1.2, v1.3).
+const CREATED_V12 = parseAbiItem(
+  "event LOANCreated(uint256 indexed loanId, bytes32 indexed proposalHash, address indexed proposalContract, uint256 refinancingLoanId, (address lender, address borrower, uint32 duration, (uint8 category, address assetAddress, uint256 id, uint256 amount) collateral, (uint8 category, address assetAddress, uint256 id, uint256 amount) credit, uint256 fixedInterestAmount, uint24 accruingInterestAPR, bytes32 lenderSpecHash, bytes32 borrowerSpecHash) terms, (address sourceOfFunds) lenderSpec, bytes extra)",
+);
+const TOPIC_CREATED_V12 = toEventSelector(CREATED_V12);
+const TOPIC_TRANSFER = toEventSelector("Transfer(address,address,uint256)");
+const APR_DENOMINATOR = 100n * 525_600n * 100n;
+const GET_LOAN_V12 = parseAbi([
+  "function getLOAN(uint256 loanId) view returns (uint8 status, uint40 startTimestamp, uint40 defaultTimestamp, address borrower, address originalLender, address loanOwner, uint24 accruingInterestAPR, uint256 fixedInterestAmount, (uint8 category, address assetAddress, uint256 id, uint256 amount) credit, (uint8 category, address assetAddress, uint256 id, uint256 amount) collateral, address originalSourceOfFunds, uint256 repaymentAmount)",
+]);
+const GET_LOAN_V11 = parseAbi([
+  "function getLOAN(uint256 loanId) view returns ((uint8 status, address borrower, uint40 expiration, address loanAssetAddress, uint256 loanRepayAmount, (uint8 category, address assetAddress, uint256 id, uint256 amount) collateral) loan)",
+]);
 const TOPIC_PAID_BACK = toEventSelector("LOANPaidBack(uint256)");
 const TOPIC_CLAIMED = toEventSelector("LOANClaimed(uint256,bool)");
 
@@ -111,8 +138,8 @@ async function holds(holder, cat, asset, id, amount, blockNumber) {
 
 // ── etherscan helper (free tier → serialize with a delay) ───────────────────
 let lastEs = 0;
-async function esLogs(params) {
-  const wait = 260 - (Date.now() - lastEs);
+async function esLogs(params, attempt = 0) {
+  const wait = 400 - (Date.now() - lastEs);
   if (wait > 0) await sleep(wait);
   lastEs = Date.now();
   const url =
@@ -123,6 +150,11 @@ async function esLogs(params) {
     `&apikey=${env.ETHERSCAN_API_KEY}`;
   const res = await (await fetch(url)).json();
   if (res.status === "0" && /No records/i.test(res.message ?? "")) return [];
+  // The free tier's 3-a-second limit is shared with any other script on the key.
+  if (res.status === "0" && /rate limit/i.test(String(res.result)) && attempt < 3) {
+    await sleep(1500);
+    return esLogs(params, attempt + 1);
+  }
   if (!Array.isArray(res.result)) throw new Error(`etherscan: ${JSON.stringify(res).slice(0, 200)}`);
   return res.result;
 }
@@ -141,15 +173,26 @@ const counts = rows.reduce((acc, r) => ((acc[r.status] = (acc[r.status] ?? 0) + 
 info(`status split: ${JSON.stringify(counts)} · versions: ${[...new Set(rows.map((r) => r.version))].join(",")}`);
 
 // ── 2. Completeness + chain-only status re-derivation ────────────────────────
-const scan = (topic0) => esLogs({ address: SIMPLE_LOAN_V11, topic0, fromBlock: WINDOW_FROM, toBlock: "latest" });
-const [createdLogs, paidBackLogs, claimedLogs] = [
-  await scan(TOPIC_CREATED),
-  await scan(TOPIC_PAID_BACK),
-  await scan(TOPIC_CLAIMED),
-];
+const scan = (address, topic0) => esLogs({ address, topic0, fromBlock: WINDOW_FROM, toBlock: "latest" });
+const createdLogs = [];
+const paidBackLogs = [];
+const claimedLogs = [];
+for (const [version, address] of Object.entries(SIMPLE_LOAN)) {
+  const created = await scan(address, version === "v11" ? TOPIC_CREATED : TOPIC_CREATED_V12);
+  const paid = await scan(address, TOPIC_PAID_BACK);
+  const claimed = await scan(address, TOPIC_CLAIMED);
+  info(`${version} ${address}: ${created.length} created · ${paid.length} paid back · ${claimed.length} claimed`);
+  createdLogs.push(...created);
+  paidBackLogs.push(...paid);
+  claimedLogs.push(...claimed);
+}
 const idOf = (topic) => String(BigInt(topic));
 const chainCreated = new Set(createdLogs.map((l) => idOf(l.topics[1])));
 const chainPaidBack = new Set(paidBackLogs.map((l) => idOf(l.topics[1])));
+// loanId → the repayment's tx and time (v1.2/v1.3 accrual check).
+const paidBackAt = new Map(
+  paidBackLogs.map((l) => [idOf(l.topics[1]), { tx: l.transactionHash, ts: Number(l.timeStamp) }]),
+);
 // loanId → { defaulted, ts } from the claim's own topics + block timestamp.
 const chainClaimed = new Map(
   claimedLogs.map((l) => [idOf(l.topics[1]), { defaulted: BigInt(l.topics[2]) === 1n, ts: Number(l.timeStamp) }]),
@@ -170,13 +213,116 @@ for (const row of rows) {
     chainStatus === row.status && (claim?.defaulted === true) === row.defaulted,
     chainStatus,
   );
-  // 7. A default is a clock event: the claim can only fire past expiration.
-  if (claim?.defaulted && row.dueKind === "expiration")
+  // 7. A default is a clock event: the claim can only fire past the deadline
+  // (an extension moves it later, so the struck one is the floor).
+  const struckDue =
+    row.dueKind === "expiration"
+      ? Number(row.dueValue)
+      : row.dueKind === "duration" && row.createdAt != null
+        ? Number(row.createdAt) + Number(row.dueValue)
+        : null;
+  if (claim?.defaulted && struckDue != null)
     check(
-      `loan ${row.loanId}: defaulted claim fired after expiration`,
-      claim.ts >= Number(row.dueValue),
-      `claim ${claim.ts} vs expiry ${row.dueValue}`,
+      `loan ${row.loanId}: defaulted claim fired after the deadline`,
+      claim.ts >= (row.latestDefaultAt ?? struckDue),
+      `claim ${claim.ts} vs deadline ${row.latestDefaultAt ?? struckDue}`,
     );
+}
+
+// ── v1.2 / v1.3 per loan ─────────────────────────────────────────────────────
+
+/** An unsettled loan past its deadline: the contract reads status 4 (expired),
+ *  the listing's "defaulted, not yet claimed". Before it, status 2. */
+async function checkUnclaimed(row, key, contract, abi, statusOf) {
+  const deadline =
+    row.latestDefaultAt ??
+    (row.dueKind === "expiration" ? Number(row.dueValue) : Number(row.createdAt) + Number(row.dueValue));
+  const got = await read(contract, abi, "getLOAN", [BigInt(row.loanId)]).catch(() => null);
+  const status = got == null ? null : Number(statusOf(got));
+  const past = deadline <= Date.now() / 1000;
+  check(
+    `${key}: getLOAN status at head is ${past ? "4 (expired: defaulted, not yet claimed)" : "2 (running)"}`,
+    status === (past ? 4 : 2),
+    `status ${status}, deadline ${deadline}`,
+  );
+}
+
+async function verifyV12(row, key, blk, contract) {
+  const logs = await client.getLogs({
+    address: contract,
+    event: CREATED_V12,
+    args: { loanId: BigInt(row.loanId) },
+    fromBlock: blk,
+    toBlock: blk,
+  });
+  if (logs.length !== 1) {
+    check(`${key}: exactly one ${row.version} LOANCreated log at the index's creation block`, false, `${logs.length}`);
+    return;
+  }
+  const t = logs[0].args.terms;
+  const collCat = CATEGORY[Number(t.collateral.category)];
+  const mismatches = [
+    ["lender", t.lender.toLowerCase(), row.lender],
+    ["borrower", t.borrower.toLowerCase(), row.borrower],
+    ["due kind", "duration", row.dueKind],
+    ["duration", String(t.duration), row.dueValue],
+    ["collateral category", collCat, row.collateralCategory],
+    ["collateral asset", t.collateral.assetAddress.toLowerCase(), row.collateralAsset],
+    ["collateral id", String(t.collateral.id), String(row.collateralId ?? t.collateral.id)],
+    ["collateral amount", String(t.collateral.amount), row.collateralAmountRaw],
+    ["credit asset", t.credit.assetAddress.toLowerCase(), row.creditAsset],
+    ["credit amount", String(t.credit.amount), row.creditAmountRaw],
+    ["fixed interest", String(t.fixedInterestAmount), row.fixedInterestAmountRaw],
+    ["accruing APR", String(t.accruingInterestAPR), String(row.accruingInterestApr)],
+  ].filter(([, chain, idx]) => String(chain) !== String(idx));
+  check(
+    `${key}: raw ${row.version} LOANCreated decode matches the index terms (duration, fixed, APR)`,
+    mismatches.length === 0,
+    mismatches.map(([f, c, i]) => `${f}: chain ${c} vs index ${i}`).join("; "),
+  );
+
+  const noteOwner = await read(LOAN_TOKEN, ERC721_ABI, "ownerOf", [BigInt(row.loanId)], blk).catch(() => null);
+  check(`${key}: LOAN note owned by the lender at creation`, noteOwner?.toLowerCase() === row.lender, noteOwner ?? "");
+
+  const escrowAmount = collCat === "ERC721" ? 1n : BigInt(row.collateralAmountRaw);
+  check(
+    `${key}: ${collCat} collateral escrowed with SimpleLoan ${row.version} at creation`,
+    await holds(contract, collCat, row.collateralAsset, row.collateralId ?? "0", escrowAmount, blk),
+  );
+
+  // The repayment the page states: the credit Transfer into the loan contract
+  // in the LOANPaidBack transaction, against the contract's sum.
+  const paid = paidBackAt.get(row.loanId);
+  if (paid) {
+    const receipt = await client.getTransactionReceipt({ hash: paid.tx });
+    const intoLoan = receipt.logs.filter(
+      (l) =>
+        l.address.toLowerCase() === row.creditAsset &&
+        l.topics[0] === TOPIC_TRANSFER &&
+        `0x${l.topics[2].slice(26)}`.toLowerCase() === contract,
+    );
+    const block = await client.getBlock({ blockNumber: receipt.blockNumber });
+    const minutes = BigInt(Math.floor((Number(block.timestamp) - Number(row.createdAt)) / 60));
+    const principal = BigInt(row.creditAmountRaw);
+    const expected =
+      principal +
+      BigInt(row.fixedInterestAmountRaw ?? "0") +
+      (principal * BigInt(row.accruingInterestApr ?? 0) * minutes) / APR_DENOMINATOR;
+    const transferred = intoLoan.length === 1 ? BigInt(intoLoan[0].data) : null;
+    check(
+      `${key}: repayment transferred == principal + APR × ${minutes} minutes (the page's repaid figure)`,
+      transferred === expected,
+      `chain ${transferred ?? `${intoLoan.length} transfers`} vs sum ${expected}`,
+    );
+  }
+
+  if (row.status === "open") {
+    check(
+      `${key}: open loan still escrowed at head`,
+      await holds(contract, collCat, row.collateralAsset, row.collateralId ?? "0", escrowAmount, head),
+    );
+    await checkUnclaimed(row, key, contract, GET_LOAN_V12, (r) => r[0]);
+  }
 }
 
 // ── Per-loan: terms decode, LOAN-token lane, custody, bundles ────────────────
@@ -185,11 +331,17 @@ let bundleIdentityChecked = false;
 
 for (const row of rows) {
   const key = `loan ${row.loanId} (${row.status})`;
-  if (row.version !== "v11") {
-    info(`${key}: version ${row.version} — v1.1 decode path not applicable, skipped`);
+  const blk = BigInt(row.createdBlock);
+  const loanContract = SIMPLE_LOAN[row.version];
+  if (!loanContract) {
+    check(`${key}: a known SimpleLoan version`, false, String(row.version));
     continue;
   }
-  const blk = BigInt(row.createdBlock);
+  if (row.version !== "v11") {
+    await verifyV12(row, key, blk, loanContract);
+    await sleep(250);
+    continue;
+  }
 
   // 1. The raw log at the index's coordinates, hand-decoded.
   const logs = await client.getLogs({
@@ -249,11 +401,13 @@ for (const row of rows) {
     `${key}: ${collCat} collateral escrowed with SimpleLoan at creation`,
     await holds(SIMPLE_LOAN_V11, collCat, row.collateralAsset, row.collateralId ?? "0", escrowAmount, blk),
   );
-  if (row.status === "open")
+  if (row.status === "open") {
     check(
       `${key}: open loan still escrowed at head`,
       await holds(SIMPLE_LOAN_V11, collCat, row.collateralAsset, row.collateralId ?? "0", escrowAmount, head),
     );
+    await checkUnclaimed(row, key, SIMPLE_LOAN_V11, GET_LOAN_V11, (r) => r.status);
+  }
 
   // 5. Bundle collateral: the "contains …" custody chain.
   if (row.collateralAsset === TOKEN_BUNDLER) {

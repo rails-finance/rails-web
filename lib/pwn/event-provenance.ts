@@ -15,13 +15,13 @@
 // Version caveat: only v1.1 terms carry a single fixed `loanRepayAmount`
 // (economics fully fixed at creation — nothing accrues). v1.2/v1.3 terms state
 // `fixedInterestAmount` directly and can ALSO accrue via `accruingInterestAPR`
-// — they have no repay-total field at all. The repay/interest helpers below
-// describe the v1.1 shape, which is the only one whose repay total the cards
-// currently value (v1.2/v1.3 rows carry no repay figure to trace).
+// — they have no repay-total field at all. Their totals are the contract's
+// accrual sum over the terms (`accruedProv` / `positionAccruedProv`).
 //
 // Replays the captured pwn_* events.
 
 import type { Provenance } from "@/components/shared/provenance";
+import type { PwnAccrual } from "./economics";
 import { simpleLoanFor, PWN_LOAN_TOKEN, PWN_BUNDLER } from "./asset-catalog";
 
 // Custody, not origin — the via line's leading segment only (the embedded
@@ -115,6 +115,66 @@ export const collateralReturnedProv = (sym: string, coords: PwnCoords): Provenan
   inputs: eventInputs(coords),
 });
 
+const utc = (unix: number): string => `${new Date(unix * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+
+/** The v1.2/v1.3 accrual sum's receipt: principal + principal × APR × whole
+ *  minutes ÷ 5,256,000,000, rounded down (PWNSimpleLoan `_loanAccruedInterest`),
+ *  every operand a term of the loan or a block's time. */
+function accrualProv(
+  sym: string,
+  version: string | null | undefined,
+  a: PwnAccrual,
+  basis: "paid" | "at-deadline",
+  extraInputs: Provenance["inputs"] = [],
+): Provenance {
+  const what =
+    basis === "paid"
+      ? `Repaid (${sym}) — what the borrower paid: the principal plus the interest accrued from the loan's start to the repayment's block, counted in whole minutes.`
+      : `Owed at the deadline (${sym}) — the principal plus the interest accrued from the loan's start to its deadline, counted in whole minutes. The contract refuses a repayment after the deadline, so the debt stops there.`;
+  return {
+    kind: "chain-derived",
+    summary: `${what} ${a.apr / 100}% a year over ${a.minutes.toLocaleString("en-US")} minutes on ${a.principal.toLocaleString("en-US", { maximumFractionDigits: 18 })} ${sym} is ${a.interest.toLocaleString("en-US", { maximumFractionDigits: 18 })} ${sym} of interest, ${a.total.toLocaleString("en-US", { maximumFractionDigits: 18 })} ${sym} in all. The same sum the SimpleLoan contract computes.`,
+    contract: simpleLoanFor(version),
+    via: `LOANCreated terms · principal + fixedInterestAmount + principal × accruingInterestAPR × minutes ÷ 5,256,000,000`,
+    formula: "principal + fixed + ⌊principal × APR × minutes ÷ 5,256,000,000⌋",
+    inputs: [
+      ...(extraInputs ?? []),
+      {
+        label: "principal",
+        value: a.principalRaw,
+        kind: "chain" as const,
+        note: `terms.credit.amount (raw ${sym} units)`,
+      },
+      {
+        label: "APR",
+        value: String(a.apr),
+        kind: "chain" as const,
+        note: "terms.accruingInterestAPR, two decimals",
+      },
+      { label: "fixed", value: a.fixedRaw, kind: "chain" as const, note: "terms.fixedInterestAmount (raw)" },
+      {
+        label: "minutes",
+        value: String(a.minutes),
+        kind: "derived" as const,
+        note: `whole minutes from ${utc(a.from)} (the creation block) to ${utc(a.to)} (${basis === "paid" ? "the repayment block" : "the deadline"})`,
+      },
+      { label: "total", value: a.totalRaw, kind: "derived" as const, note: `raw ${sym} units` },
+    ],
+  };
+}
+
+/** A row's accrued total (the repayment, or the debt at the deadline). */
+export const accruedProv = (sym: string, coords: PwnCoords, a: PwnAccrual, basis: "paid" | "at-deadline") =>
+  accrualProv(sym, coords.version, a, basis, eventInputs(coords));
+
+/** The card's accrued total. */
+export const positionAccruedProv = (
+  sym: string,
+  version: string | null | undefined,
+  a: PwnAccrual,
+  basis: "paid" | "at-deadline",
+) => accrualProv(sym, version, a, basis);
+
 // ── Position-card / tower provenances (no per-event coords) ──────────────────
 
 /** Position-card collateral line. */
@@ -178,18 +238,21 @@ export const bookLoanCountProv = (): Provenance => ({
 
 /** The outcome split — open / repaid / defaulted, each a count of loans whose
  *  lifecycle events say so. */
-export const bookStatusCountProv = (status: "open" | "repaid" | "defaulted"): Provenance => {
+export const bookStatusCountProv = (status: "open" | "unclaimed" | "repaid" | "defaulted"): Provenance => {
   const summaries: Record<typeof status, string> = {
-    open: "Loans standing open — created, with no repayment recorded and no lender claim yet. Status re-derives from the loan's own chain events alone: a loan is open exactly while neither LOANPaidBack nor LOANClaimed has fired for its id.",
+    open: "Loans running — created, with no repayment and no lender claim recorded, and the deadline (the latest one, where it was extended) still ahead of the clock.",
+    unclaimed:
+      "Loans defaulted and not yet claimed — no repayment and no claim recorded, and the deadline behind the clock. Every SimpleLoan version refuses a repayment once the deadline passes (LoanDefaulted), so the loan has defaulted; the lender has yet to claim the collateral.",
     repaid:
-      "Loans repaid — the borrower paid the fixed total and reclaimed the collateral: a LOANPaidBack event (or a LOANClaimed with its defaulted flag false, the lender collecting the repayment) closed the loan.",
+      "Loans repaid — the borrower repaid and reclaimed the collateral: a LOANPaidBack event (or a LOANClaimed with its defaulted flag false, the lender collecting the repayment) closed the loan.",
     defaulted:
-      "Loans defaulted — the loan lapsed at its deadline unpaid and the lender claimed the collateral: a LOANClaimed event with its defaulted flag true. On PWN a default is a clock event, not a price event — nothing is liquidated.",
+      "Loans defaulted — the deadline passed unpaid: the lender claimed the collateral (a LOANClaimed event with its defaulted flag true), or no repayment and no claim is recorded and the deadline is behind the clock. On PWN a default is a clock event, not a price event — nothing is liquidated.",
   };
   const vias: Record<typeof status, string> = {
-    open: "no LOANPaidBack / LOANClaimed for the loan id",
+    open: "no LOANPaidBack / LOANClaimed for the loan id · deadline ahead of the clock",
+    unclaimed: "no LOANPaidBack / LOANClaimed for the loan id · deadline behind the clock",
     repaid: "LOANPaidBack (or clean LOANClaimed)",
-    defaulted: "LOANClaimed · defaulted = true",
+    defaulted: "LOANClaimed · defaulted = true, or no close and deadline behind the clock",
   };
   return {
     kind: "chain-derived",
@@ -198,6 +261,14 @@ export const bookStatusCountProv = (status: "open" | "repaid" | "defaulted"): Pr
     formula: `count(status = ${status})`,
   };
 };
+
+/** Accruing-rate distribution over the v1.2/v1.3 loans. */
+export const bookAccruingAprProv = (): Provenance => ({
+  kind: "chain",
+  summary:
+    "Accruing interest a year — each v1.2/v1.3 loan's terms.accruingInterestAPR (two decimals: 6000 = 60%), as the loan was struck. Interest accrues on the principal by the whole minute from origination until repayment. The spread is over every loan whose terms carry a rate above zero.",
+  via: `${PWN_VIA} · LOANCreated log · terms.accruingInterestAPR`,
+});
 
 /** Same-token principal sum — lifetime advanced, or outstanding on the open
  *  loans. Every operand is a terms' credit amount. */
@@ -212,22 +283,27 @@ export const bookPrincipalProv = (sym: string, scope: "advanced" | "outstanding"
   inputs: [{ label: "principal", kind: "chain" as const, note: "each loan's terms credit amount" }],
 });
 
-/** Same-token repay sum over the open loans (principal + fixed interest). */
+/** Same-token sum of what the unsettled loans owe at their deadlines. */
 export const bookRepayOwedProv = (sym: string): Provenance => ({
   kind: "chain-derived",
-  summary: `Repayment owed in ${sym} — the sum of the fixed repay totals (principal + fixed interest) of the ${sym}-denominated loans still open, each set in its loan's on-chain terms at creation. Stated only when every open loan in the token carries a repay total (v1.1 terms do; v1.2/v1.3 terms have no such field).`,
-  via: `${PWN_VIA} · LOANCreated log · Σ terms.loanRepayAmount (open loans)`,
-  formula: "Σ repay",
-  inputs: [{ label: "repay", kind: "chain" as const, note: "each loan's terms loanRepayAmount" }],
+  summary: `Owed at the deadline in ${sym} — the sum, over the ${sym}-denominated loans not yet settled, of what each owes at its deadline: a v1.1 loan's fixed repay total, or a v1.2/v1.3 loan's principal plus the interest its APR accrues from origination to the deadline in whole minutes. A defaulted loan's figure is what went unpaid.`,
+  via: `${PWN_VIA} · LOANCreated log · Σ terms.loanRepayAmount, or principal + principal × APR × minutes ÷ 5,256,000,000 (unsettled loans)`,
+  formula: "Σ owed at deadline",
+  inputs: [
+    { label: "repay", kind: "chain" as const, note: "a v1.1 loan's terms loanRepayAmount" },
+    { label: "principal, APR", kind: "chain" as const, note: "a v1.2/v1.3 loan's terms" },
+    { label: "minutes", kind: "derived" as const, note: "creation to the deadline" },
+  ],
 });
 
 /** Count of loans secured by one collateral asset — the whole line, or one
  *  outcome column of it. */
 export const bookCollateralLineProv = (sym: string, status?: "open" | "repaid" | "defaulted"): Provenance => {
   const outcomes: Record<NonNullable<typeof status>, string> = {
-    open: "still standing open (no repayment recorded and no lender claim yet)",
-    repaid: "repaid — the borrower paid the fixed total and reclaimed this collateral",
-    defaulted: "defaulted — the loan lapsed at its deadline and the lender claimed this collateral",
+    open: "running (no repayment and no lender claim recorded, the deadline still ahead)",
+    repaid: "repaid — the borrower repaid and reclaimed this collateral",
+    defaulted:
+      "defaulted — the loan lapsed at its deadline unpaid; the lender claimed this collateral, or can claim it at any time",
   };
   return {
     kind: "chain-derived",
@@ -332,3 +408,26 @@ export const extendedDeadlineProv = (coords?: PwnCoords): Provenance => ({
       : "LOANExpirationDateExtended log · extendedExpirationDate (the previous deadline: the loan's last extension, else terms.expiration)",
   inputs: eventInputs(coords),
 });
+
+/** The repayment figure a row states, and its receipt: a v1.1 loan's struck
+ *  total, or a v1.2/v1.3 loan's accrued sum (the loan page sets `accrued`).
+ *  Null where the row has neither. */
+export function rowRepay(
+  ctx: {
+    creditSymbol?: string;
+    loanRepayAmount?: string;
+    accrued?: PwnAccrual & { basis: "paid" | "at-deadline" };
+  },
+  coords: PwnCoords,
+): { amount: string; prov: Provenance; accrued: boolean } | null {
+  if (!ctx.creditSymbol) return null;
+  if (ctx.loanRepayAmount != null)
+    return { amount: ctx.loanRepayAmount, prov: repayAmountProv(ctx.creditSymbol, coords), accrued: false };
+  if (ctx.accrued)
+    return {
+      amount: String(ctx.accrued.total),
+      prov: accruedProv(ctx.creditSymbol, coords, ctx.accrued, ctx.accrued.basis),
+      accrued: true,
+    };
+  return null;
+}

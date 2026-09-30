@@ -34,6 +34,15 @@ export function PwnListing({ initialItems, initialTotal, initialKey, initialSear
       sortOptions={PWN_SORT_OPTIONS}
       searchPlaceholder="Search loan #, lender, or borrower"
       renderCard={(p) => <PwnPositionCard v={viewFromSummary(p)} />}
+      // The whole book's size beside the filtered view: the memory tier holds
+      // every loan, so the SSR set is the denominator.
+      renderAbove={({ total }) =>
+        initialItems && initialItems.length > 0 ? (
+          <p className="mb-2 text-[11px] tabular-nums text-rb-500">
+            {total} of {initialItems.length} loans
+          </p>
+        ) : null
+      }
       hrefFor={(p) => `/ethereum/pwn/${p.borrower ?? p.lender ?? ""}?loan=${p.loanId}`}
       keyFor={(p) => p.loanId}
       strategy={memoryStrategy<PwnPositionSummary, PwnListFilters>({

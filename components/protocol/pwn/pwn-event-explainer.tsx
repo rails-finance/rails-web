@@ -39,16 +39,17 @@ export interface PwnEventExplainerProps {
  *  Used by the card composer, which renders the "?" trigger on the footer row
  *  (this pane renders prose only). */
 export function pwnLearnMoreContent(ctx: PwnContext): LearnMoreContent {
+  const accruing = ctx.accruingInterestApr != null && ctx.accruingInterestApr > 0;
   switch (ctx.eventType) {
     case "created":
-      return pwnLoanCreatedContent();
+      return pwnLoanCreatedContent(accruing);
     case "minted":
     case "burned":
       return pwnNoteLifecycleContent(ctx.eventType);
     case "paid_back":
-      return pwnRepaymentContent("paid_back");
+      return pwnRepaymentContent("paid_back", accruing);
     case "claimed":
-      return ctx.defaulted ? pwnDefaultContent() : pwnRepaymentContent("claimed");
+      return ctx.defaulted ? pwnDefaultContent() : pwnRepaymentContent("claimed", accruing);
     case "extended":
       return pwnExtensionContent();
     default:

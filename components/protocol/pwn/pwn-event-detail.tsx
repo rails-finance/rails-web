@@ -17,10 +17,12 @@ import {
   creditAdvancedProv,
   extendedDeadlineProv,
   positionInterestProv,
+  bookDueProv,
   repayAmountProv,
+  rowRepay,
   type PwnCoords,
 } from "@/lib/pwn/event-provenance";
-import { fixedInterestRate, interestRateText } from "@/lib/pwn/economics";
+import { aprText, fixedInterestRate, interestRateText, minutesText } from "@/lib/pwn/economics";
 import { formatNumber } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
@@ -109,16 +111,42 @@ export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings =
       symbol: ctx.creditSymbol,
       prov: creditAdvancedProv(ctx.creditSymbol, coords),
     });
-    stats.push({
-      label: "Repay · total",
-      value: fmt(ctx.loanRepayAmount),
-      display: ctx.loanRepayAmount != null ? `${fmt(ctx.loanRepayAmount)} ${ctx.creditSymbol}` : undefined,
-      symbol: ctx.creditSymbol,
-      prov: repayAmountProv(ctx.creditSymbol, coords),
-      // Muted on a defaulted claim — the borrower never paid; the lender took
-      // the collateral instead of this repayment.
-      changed: !seized,
-    });
+    const r = rowRepay(ctx, coords);
+    if (ctx.accruingInterestApr != null && !r) {
+      // A v1.2/v1.3 loan before it settles: its terms state a rate, and the
+      // total is known only at repayment (or at the deadline, on a default).
+      stats.push({
+        label: "Interest · accruing",
+        value: aprText(ctx.accruingInterestApr),
+        display: aprText(ctx.accruingInterestApr),
+        symbol: "",
+        prov: positionInterestProv(ctx.creditSymbol, ctx.version),
+        sub: "on the principal, by the minute",
+        changed: false,
+      });
+    } else if (r?.accrued && ctx.accrued) {
+      const a = ctx.accrued;
+      stats.push({
+        label: a.basis === "paid" ? "Repaid · principal + interest" : "Owed · at the deadline",
+        value: fmt(r.amount),
+        display: `${fmt(r.amount)} ${ctx.creditSymbol}`,
+        symbol: ctx.creditSymbol,
+        prov: r.prov,
+        sub: `${formatNumber(a.interest)} interest · ${aprText(a.apr)} over ${minutesText(a.minutes)}`,
+        changed: !seized,
+      });
+    } else {
+      stats.push({
+        label: "Repay · total",
+        value: fmt(ctx.loanRepayAmount),
+        display: ctx.loanRepayAmount != null ? `${fmt(ctx.loanRepayAmount)} ${ctx.creditSymbol}` : undefined,
+        symbol: ctx.creditSymbol,
+        prov: repayAmountProv(ctx.creditSymbol, coords),
+        // Muted on a defaulted claim — the borrower never paid; the lender took
+        // the collateral instead of this repayment.
+        changed: !seized,
+      });
+    }
   }
 
   // The creation states the loan's cost: the fixed interest and its rate over
@@ -141,7 +169,32 @@ export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings =
         display: `${formatNumber(interest)} ${ctx.creditSymbol}`,
         symbol: ctx.creditSymbol,
         prov: positionInterestProv(ctx.creditSymbol, ctx.version),
-        sub: rate ? interestRateText(rate) : undefined,
+        sub: rate
+          ? `${interestRateText(rate)}${(ctx.extensionCount ?? 0) > 0 ? ", unchanged by the extensions" : ""}`
+          : undefined,
+      });
+  }
+
+  // The deadline as struck, and where the extensions took it.
+  if (ctx.eventType === "created" && ctx.dueValue != null) {
+    const struck =
+      ctx.dueKind === "duration" ? (timestamp != null ? timestamp + Number(ctx.dueValue) : null) : Number(ctx.dueValue);
+    if (struck != null)
+      stats.push({
+        label: "Deadline · as struck",
+        value: utcMinute(String(struck)),
+        display: formatDate(struck),
+        symbol: "",
+        prov: ctx.dueKind === "duration" ? bookDueProv("duration") : bookDueProv("expiration"),
+        sub:
+          ctx.finalDeadline != null && ctx.finalDeadline !== struck
+            ? `later extended to ${formatDate(ctx.finalDeadline)}${
+                (ctx.extensionCount ?? 0) > 0
+                  ? ` (${ctx.extensionCount} extension${ctx.extensionCount === 1 ? "" : "s"})`
+                  : ""
+              }`
+            : undefined,
+        changed: false,
       });
   }
 

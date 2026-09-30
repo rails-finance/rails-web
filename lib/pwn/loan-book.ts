@@ -25,7 +25,7 @@
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { isPwnBundler } from "@/lib/pwn/asset-catalog";
-import { loanDeadlineAt, loanDueAt } from "@/lib/pwn/economics";
+import { loanCost, loanDueAt, pwnLoanState, viewFromSummary } from "@/lib/pwn/economics";
 import { buildPwnPositionRows, type PwnPositionSummary, type RawPwnPositionRow } from "@/lib/sources/api/pwn-positions";
 import type { PwnTokenCategory } from "@/lib/shared/types/event-shape";
 
@@ -36,14 +36,15 @@ export interface PwnBookCreditLine {
   named: boolean;
   /** Loans ever denominated in this token. */
   loans: number;
+  /** Loans not yet settled: running, or defaulted and not yet claimed. */
   open: number;
   /** Σ principal over every loan in this token (lifetime). */
   principalAdvanced: number;
-  /** Σ principal over the loans still open. */
+  /** Σ principal over the unsettled loans. */
   principalOutstanding: number;
-  /** Σ fixed repay total over the open loans; null when any open loan in this
-   *  token carries no repay figure (v1.2/v1.3 terms have no such field) — a
-   *  partial sum would understate the owed total, so none is stated. */
+  /** Σ owed at the deadline over the unsettled loans: a v1.1 repay total, or a
+   *  v1.2/v1.3 principal plus the interest its rate accrues to the deadline.
+   *  Null when any of them has no figure — a partial sum would understate it. */
   repayOwed: number | null;
 }
 
@@ -56,9 +57,13 @@ export interface PwnBookCollateralLine {
   /** The protocol's own Token Bundler ERC-1155 (multi-asset collateral). */
   isBundle: boolean;
   loans: number;
+  /** Running, before the deadline. */
   open: number;
   repaid: number;
+  /** Defaulted: claimed by the lender, or past the deadline and not yet claimed. */
   defaulted: number;
+  /** Of `defaulted`, the loans not yet claimed. */
+  unclaimed: number;
 }
 
 export interface PwnBookSpread {
@@ -77,16 +82,16 @@ export interface PwnBookTerms {
   termDays: PwnBookSpread | null;
   /** Loans carrying a non-zero accruing APR (v1.2/v1.3 shape). */
   accruingLoans: number;
+  /** Their APR, as a fraction a year (0.6 = 60%). */
+  accruingApr: PwnBookSpread | null;
 }
 
 export interface PwnLoanBook {
   stale: boolean;
-  totals: { loans: number; open: number; repaid: number; defaulted: number };
-  /** Open loans whose deadline is behind the clock with no repayment or claim
-   *  recorded — PWN's own default condition (a clock event), before the lender
-   *  claims. A COUNT, not a list: the loans themselves are the loan listing's
-   *  subject, and the book links there rather than carrying them twice. */
-  pastDueOpen: number;
+  /** One rule (lib/pwn/economics.ts `pwnLoanState`): `open` is running, before
+   *  its deadline; `defaulted` counts every loan whose deadline passed unpaid,
+   *  claimed or not; `unclaimed` is the part of it no one has claimed yet. */
+  totals: { loans: number; open: number; repaid: number; defaulted: number; unclaimed: number };
   credit: PwnBookCreditLine[];
   collateral: PwnBookCollateralLine[];
   terms: PwnBookTerms;
@@ -112,11 +117,10 @@ const spread = (xs: number[]): PwnBookSpread | null => {
 
 const emptyBook = (asOf: number): PwnLoanBook => ({
   stale: true,
-  totals: { loans: 0, open: 0, repaid: 0, defaulted: 0 },
-  pastDueOpen: 0,
+  totals: { loans: 0, open: 0, repaid: 0, defaulted: 0, unclaimed: 0 },
   credit: [],
   collateral: [],
-  terms: { loansWithFixedTotal: 0, interestShare: null, termDays: null, accruingLoans: 0 },
+  terms: { loansWithFixedTotal: 0, interestShare: null, termDays: null, accruingLoans: 0, accruingApr: null },
   latestCreatedBlock: null,
   asOf,
   versions: [],
@@ -156,8 +160,8 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
     return emptyBook(asOf);
   }
 
-  const totals = { loans: loans.length, open: 0, repaid: 0, defaulted: 0 };
-  let pastDueOpen = 0;
+  const totals = { loans: loans.length, open: 0, repaid: 0, defaulted: 0, unclaimed: 0 };
+  const aprs: number[] = [];
   const creditByToken = new Map<string, PwnBookCreditLine & { openMissingRepay: boolean; repaySum: number }>();
   const collByAsset = new Map<string, PwnBookCollateralLine>();
   const interestShares: number[] = [];
@@ -168,17 +172,17 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
   const byVersion = new Map<string, number>();
 
   for (const l of loans) {
-    totals[l.status] += 1;
+    const state = pwnLoanState({ ...l, extendedDueAt: l.latestDefaultAt }, asOf);
+    const unsettled = state === "running" || state === "unclaimed";
+    if (state === "running") totals.open += 1;
+    else if (state === "repaid") totals.repaid += 1;
+    else {
+      totals.defaulted += 1;
+      if (state === "unclaimed") totals.unclaimed += 1;
+    }
     if (l.version) byVersion.set(l.version, (byVersion.get(l.version) ?? 0) + 1);
     if (l.createdBlock != null && (latestCreatedBlock == null || l.createdBlock > latestCreatedBlock))
       latestCreatedBlock = l.createdBlock;
-
-    if (l.status === "open") {
-      // The deadline it runs to now: an extension moves it (the term-length
-      // distribution below keeps the struck one).
-      const dueAt = loanDeadlineAt({ ...l, extendedDueAt: l.latestDefaultAt });
-      if (dueAt != null && dueAt < asOf) pastDueOpen += 1;
-    }
 
     // Credit side — grouped by the token the loan is denominated in.
     if (l.credit) {
@@ -197,10 +201,11 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
       };
       line.loans += 1;
       line.principalAdvanced += l.credit.amount;
-      if (l.status === "open") {
+      if (unsettled) {
         line.open += 1;
         line.principalOutstanding += l.credit.amount;
-        if (l.repayAmount != null) line.repaySum += l.repayAmount;
+        const cost = loanCost(viewFromSummary(l));
+        if (cost != null) line.repaySum += cost.total;
         else line.openMissingRepay = true;
       }
       creditByToken.set(key, line);
@@ -219,9 +224,15 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
         open: 0,
         repaid: 0,
         defaulted: 0,
+        unclaimed: 0,
       };
       line.loans += 1;
-      line[l.status] += 1;
+      if (state === "running") line.open += 1;
+      else if (state === "repaid") line.repaid += 1;
+      else {
+        line.defaulted += 1;
+        if (state === "unclaimed") line.unclaimed += 1;
+      }
       collByAsset.set(key, line);
     }
 
@@ -230,7 +241,10 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
       loansWithFixedTotal += 1;
       interestShares.push(Math.max(0, l.repayAmount - l.credit.amount) / l.credit.amount);
     }
-    if (l.accruingInterestApr != null && l.accruingInterestApr > 0) accruingLoans += 1;
+    if (l.accruingInterestApr != null && l.accruingInterestApr > 0) {
+      accruingLoans += 1;
+      aprs.push(l.accruingInterestApr / 10_000);
+    }
     const dueAt = loanDueAt(l);
     if (dueAt != null && l.createdAt != null && dueAt > l.createdAt) termDaysList.push((dueAt - l.createdAt) / 86400);
   }
@@ -247,7 +261,6 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
   return {
     stale: false,
     totals,
-    pastDueOpen,
     credit,
     collateral,
     terms: {
@@ -255,6 +268,7 @@ export async function loadPwnLoanBook(): Promise<PwnLoanBook> {
       interestShare: spread(interestShares),
       termDays: spread(termDaysList),
       accruingLoans,
+      accruingApr: spread(aprs),
     },
     latestCreatedBlock,
     asOf,

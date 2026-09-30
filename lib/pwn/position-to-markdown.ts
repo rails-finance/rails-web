@@ -14,7 +14,7 @@ import { isPwnEvent } from "@/lib/shared/types/event-shape";
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import { simpleLoanFor } from "@/lib/pwn/asset-catalog";
-import { interestRateText, loanInterestRate } from "@/lib/pwn/economics";
+import { aprText, interestRateText, loanCost, minutesText, pwnLoanState } from "@/lib/pwn/economics";
 import { amt, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { markdownTimelineSlice, type MarkdownHistoryScope } from "@/lib/shared/markdown-history";
 
@@ -32,8 +32,10 @@ export interface PwnPositionMarkdownArgs {
   generatedAt: Date;
 }
 
-const STATUS_LINE: Record<PwnPositionView["status"], string> = {
-  open: "Open — collateral escrowed, repayment outstanding",
+const STATUS_LINE: Record<ReturnType<typeof pwnLoanState>, string> = {
+  running: "Open — collateral escrowed, repayment outstanding",
+  unclaimed:
+    "Defaulted, not yet claimed — the deadline passed unpaid, the contract refuses repayment, and the collateral waits in escrow for the lender's claim",
   repaid: "Repaid — the borrower repaid in full and the collateral was released",
   defaulted: "Defaulted — the loan expired unpaid and the lender claimed the collateral",
 };
@@ -63,7 +65,8 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
   const contract = simpleLoanFor(view.version);
   const lines: string[] = [];
 
-  lines.push(`# PWN loan #${view.loanId} (${view.status})`);
+  const state = pwnLoanState(view);
+  lines.push(`# PWN loan #${view.loanId} (${state === "unclaimed" ? "defaulted, not yet claimed" : view.status})`);
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
@@ -101,7 +104,8 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
     }
   }
   if (view.credit) lines.push(`- **Credit advanced (principal):** ${assetText(view.credit)}`);
-  const rate = loanInterestRate(view);
+  const cost = loanCost(view);
+  const rate = cost?.rate ?? null;
   if (view.repayAmount != null) {
     lines.push(
       `- **Repayment owed (fixed):** ${view.credit?.decimalsUnread ? notLoaded(view.credit) : `${amt(view.repayAmount)} ${creditSym}`}`,
@@ -111,8 +115,19 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
         `- **Fixed interest (repayment − principal):** ${amt(view.fixedInterest)} ${creditSym}${rate ? ` (${interestRateText(rate)})` : ""} — set when the loan was struck, it does not accrue`,
       );
   }
-  if (view.accruingInterestApr != null && view.accruingInterestApr > 0)
-    lines.push(`- **Accruing interest APR:** ${view.accruingInterestApr}`);
+  if (view.accruingInterestApr != null && view.accruingInterestApr > 0) {
+    lines.push(
+      `- **Interest:** accrues ${aprText(view.accruingInterestApr)} on the principal, counted in whole minutes from origination (terms.accruingInterestAPR ${view.accruingInterestApr}, two decimals)`,
+    );
+    if (cost?.accrual && !view.credit?.decimalsUnread) {
+      const a = cost.accrual;
+      lines.push(
+        cost.basis === "paid"
+          ? `- **Repaid:** ${amt(a.total)} ${creditSym} — principal + ${amt(a.interest)} ${creditSym} interest over ${minutesText(a.minutes)} (principal × APR × minutes ÷ 5,256,000,000, as the contract sums it)`
+          : `- **Owed at the deadline:** ${amt(a.total)} ${creditSym} — principal + ${amt(a.interest)} ${creditSym} interest over ${minutesText(a.minutes)} (principal × APR × minutes ÷ 5,256,000,000, as the contract sums it)`,
+      );
+    }
+  }
   if (
     view.dueKind === "expiration" &&
     view.dueValue &&
@@ -127,11 +142,13 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
       `- **Due (expiration):** ${fmtUtc(Number(view.dueValue))} — past this moment an unpaid loan is claimable as defaulted`,
     );
   else if (view.dueKind === "duration" && view.dueValue)
-    lines.push(`- **Duration:** ${Number(view.dueValue).toLocaleString("en-US")} seconds from origination`);
-  lines.push(`- **Status:** ${STATUS_LINE[view.status]}`);
+    lines.push(
+      `- **Duration:** ${Number(view.dueValue).toLocaleString("en-US")} seconds from origination${view.createdAt != null ? `, to ${fmtUtc(view.createdAt + Number(view.dueValue))}` : ""}`,
+    );
+  lines.push(`- **Status:** ${STATUS_LINE[state]}`);
   lines.push("");
 
-  lines.push(...timelineTable(events, creditSym, view.repayAmount != null, args.history));
+  lines.push(...timelineTable(events, creditSym, cost?.shape !== "accruing", args.history));
   return lines.join("\n");
 }
 
@@ -142,22 +159,31 @@ function eventValue(e: BaseActivityEvent, creditSym: string): string {
   // A credit amount whose decimals did not load reads "not loaded".
   const credit = (v: string) => (unreadToken(e, d.creditAsset ?? d.creditSymbol) ? NOT_LOADED_CELL : amt(Number(v)));
   switch (d.eventType) {
-    case "created":
+    case "created": {
+      const back =
+        d.collateralReturn && d.collateralReturn !== "unknown"
+          ? `; the collateral had gone to the lender on loan #${d.collateralReturn.priorLoanId}'s default and came back to the borrower on ${fmtUtc(d.collateralReturn.timestamp)} (tx ${d.collateralReturn.txHash})`
+          : "";
       return d.creditAmount != null
-        ? `${credit(d.creditAmount)} ${d.creditSymbol ?? creditSym} advanced to the borrower`
+        ? `${credit(d.creditAmount)} ${d.creditSymbol ?? creditSym} advanced to the borrower${back}`
         : "loan struck";
+    }
     case "minted":
       return "LOAN note (ERC-721) minted to the lender — the transferable claim on this loan";
     case "paid_back":
       return d.loanRepayAmount != null
         ? `${credit(d.loanRepayAmount)} ${d.creditSymbol ?? creditSym} repaid (principal + fixed interest)`
-        : "repaid";
+        : d.accrued
+          ? `${credit(String(d.accrued.total))} ${d.creditSymbol ?? creditSym} repaid (principal + interest accrued to the minute)`
+          : "repaid";
     case "claimed":
       return d.defaulted
         ? `collateral seized by the lender — the loan expired unpaid`
         : d.loanRepayAmount != null
           ? `${credit(d.loanRepayAmount)} ${d.creditSymbol ?? creditSym} collected by the lender`
-          : "repayment collected by the lender";
+          : d.accrued
+            ? `${credit(String(d.accrued.total))} ${d.creditSymbol ?? creditSym} collected by the lender`
+            : "repayment collected by the lender";
     case "extended":
       return d.extendedDefaultTimestamp != null
         ? `deadline moved${d.originalDefaultTimestamp != null ? ` from ${fmtUtc(Number(d.originalDefaultTimestamp))}` : ""} to ${fmtUtc(Number(d.extendedDefaultTimestamp))}${d.extendedBy ? (d.extendedBy === d.lender ? " by the lender" : " by the LOAN note's holder") : ""}`

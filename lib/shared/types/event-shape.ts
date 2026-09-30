@@ -1718,6 +1718,48 @@ export interface PwnContext {
   defaulted?: boolean;
   /** True for the loan's first event (`created`). */
   isOpen?: boolean;
+  /** v1.2/v1.3 terms' accruing APR, two decimals (6000 = 60%). The loan page
+   *  sets it from the loan's terms; the index's event rows do not carry it. */
+  accruingInterestApr?: number;
+  /** The accrued total this row states, summed by the loan page as the
+   *  contract sums it (lib/pwn/economics.ts `accrueTo`): what a repayment
+   *  paid, or what a defaulted loan owed at its deadline. */
+  accrued?: PwnAccrual & { basis: "paid" | "at-deadline" };
+  /** `created` only, set by the loan page: the deadline the loan ran to after
+   *  its extensions, how many there were, and whether the lender sent all. */
+  finalDeadline?: number;
+  extensionCount?: number;
+  extensionsByLender?: boolean;
+  /** `created` only, set by the loan page: how the collateral came back to the
+   *  borrower after an earlier loan's default passed it to the lender — the
+   *  token's transfer between the two loans, or "unknown" when it can't be read. */
+  collateralReturn?: PwnCollateralReturn | "unknown";
+}
+
+/** One transfer of a loan's NFT collateral, read from its token contract. */
+export interface PwnCollateralReturn {
+  from: string;
+  to: string;
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+  /** The earlier loan whose default passed the collateral to the lender. */
+  priorLoanId: string;
+}
+
+/** A v1.2/v1.3 accrual sum (lib/pwn/economics.ts `accrueTo`). */
+export interface PwnAccrual {
+  principal: number;
+  interest: number;
+  total: number;
+  principalRaw: string;
+  interestRaw: string;
+  totalRaw: string;
+  fixedRaw: string;
+  apr: number;
+  minutes: number;
+  from: number;
+  to: number;
 }
 
 // ───────────────────────── Sky Savings (sUSDS) ─────────────────────────

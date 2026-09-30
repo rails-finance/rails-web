@@ -1,7 +1,9 @@
 // The PWN loan book stopped listing loans on 2026-08-29. The claim that replaced
 // its two per-loan tables is that the LISTING is those tables — status filtered,
-// and sorted by the order each section was in: open loans by deadline, defaulted
-// loans by the date the claim settled.
+// and sorted by the order each section was in: the loans still in escrow by
+// soonest deadline, the defaulted loans (claimed or not yet claimed) by latest
+// deadline. Since item 212 round 2 a loan past its deadline unpaid counts as
+// defaulted everywhere (lib/pwn/economics.ts `pwnLoanState`).
 //
 // Nothing else can catch that link going wrong. Rename a sort value, change a
 // status wire value, and the URL still resolves: the listing ignores the param it
@@ -20,8 +22,10 @@
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const BOOK = "/ethereum/pwn/book";
-const OPEN_HREF = "/ethereum/pwn?status=open&sortBy=due&sortOrder=asc";
-const DEFAULTS_HREF = "/ethereum/pwn?status=defaulted&sortBy=settled&sortOrder=desc";
+// The loans in escrow ARE the listing's resting view (lib/pwn/listing-visibility.ts),
+// so this link names no status and the listing draws no chip for it.
+const OPEN_HREF = "/ethereum/pwn?sortBy=due&sortOrder=asc";
+const DEFAULTS_HREF = "/ethereum/pwn?status=unclaimed,defaulted&sortBy=due&sortOrder=desc";
 /** The listing pages at this size — a full page means there is a page 2 behind it. */
 const PAGE_SIZE = Number(process.env.PAGE_SIZE ?? 20);
 
@@ -38,6 +42,7 @@ function assert(cond, msg) {
  *  here rather than imported: a check that shares the implementation under test
  *  cannot fail when that implementation is wrong. */
 const dueAt = (l) => {
+  if (l.latestDefaultAt != null) return l.latestDefaultAt;
   if (l.dueValue == null) return null;
   const v = Number(l.dueValue);
   if (!Number.isFinite(v)) return null;
@@ -63,14 +68,15 @@ assert(loans.length > 0, "the index answered with loans to check against");
 
 // Nulls sort LAST on the ascending deadline order — the book's own convention,
 // and the reason the accessor uses MAX_SAFE_INTEGER rather than 0.
-const expectedOpen = loans
-  .filter((l) => l.status === "open")
+const now = Date.now() / 1000;
+const inEscrow = loans.filter((l) => l.status === "open");
+const defaulted = loans.filter(
+  (l) => l.status === "defaulted" || (l.status === "open" && dueAt(l) != null && dueAt(l) <= now),
+);
+const expectedOpen = inEscrow
   .sort((a, b) => (dueAt(a) ?? Number.MAX_SAFE_INTEGER) - (dueAt(b) ?? Number.MAX_SAFE_INTEGER))
   .map((l) => l.loanId);
-const expectedDefaulted = loans
-  .filter((l) => l.status === "defaulted")
-  .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))
-  .map((l) => l.loanId);
+const expectedDefaulted = [...defaulted].sort((a, b) => (dueAt(b) ?? 0) - (dueAt(a) ?? 0)).map((l) => l.loanId);
 
 const { chromium } = await import("playwright");
 const browser = await chromium.launch({ channel: "chrome" });
@@ -88,9 +94,9 @@ assert(loanRows === 0, `the book page renders no per-loan rows (found ${loanRows
  *  proves nothing — the page would look identical with the sort dropped. */
 const fetchOrder = (rows) => [...rows].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((l) => l.loanId);
 
-for (const [label, href, expected, sortLabel, universe] of [
-  ["open", OPEN_HREF, expectedOpen, "Due", loans.filter((l) => l.status === "open")],
-  ["defaulted", DEFAULTS_HREF, expectedDefaulted, "Settled", loans.filter((l) => l.status === "defaulted")],
+for (const [label, href, expected, sortLabel, universe, chipWord] of [
+  ["in escrow", OPEN_HREF, expectedOpen, "Due", inEscrow, null],
+  ["defaulted", DEFAULTS_HREF, expectedDefaulted, "Due", defaulted, "defaulted"],
 ]) {
   console.log(`\n-- ${label}`);
   const link = book.locator(`a[href="${href}"]`);
@@ -112,10 +118,12 @@ for (const [label, href, expected, sortLabel, universe] of [
   // The listing must have HONOURED the selection, not fallen back to its default
   // view. Its own chips are the page's statement of what it applied.
   const chips = await listing.locator("text=/Status:/i").allTextContents();
-  assert(
-    chips.some((c) => c.toLowerCase().includes(label)),
-    `${label}: the listing shows a Status chip naming ${label} (link honoured, not ignored)`,
-  );
+  if (chipWord)
+    assert(
+      chips.some((c) => c.toLowerCase().includes(chipWord)),
+      `${label}: the listing shows a Status chip naming ${chipWord} (link honoured, not ignored)`,
+    );
+  else assert(chips.length === 0, `${label}: the listing rests on its default view, no Status chip`);
 
   // The sort control names the sort the listing ACTUALLY applied. This is the
   // assertion that catches a renamed sort value, and it holds however few loans

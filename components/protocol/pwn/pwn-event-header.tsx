@@ -10,9 +10,9 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import {
   creditAdvancedProv,
-  repayAmountProv,
   collateralSeizedProv,
   extendedDeadlineProv,
+  rowRepay,
   type PwnCoords,
 } from "@/lib/pwn/event-provenance";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -69,9 +69,9 @@ export function PwnEventHeader({
     if (v !== 0)
       moved(v, ctx.creditSymbol, creditAddress, creditAdvancedProv(ctx.creditSymbol, coords), "to the borrower");
   } else if (ctx.eventType === "paid_back" && ctx.creditSymbol) {
-    const v = Number(ctx.loanRepayAmount ?? "0") || 0;
-    if (v !== 0)
-      moved(v, ctx.creditSymbol, creditAddress, repayAmountProv(ctx.creditSymbol, coords), "from the borrower");
+    const r = rowRepay(ctx, coords);
+    const v = Number(r?.amount ?? "0") || 0;
+    if (v !== 0 && r) moved(v, ctx.creditSymbol, creditAddress, r.prov, "from the borrower");
   } else if (isSeizure && ctx.collateralSymbol) {
     // The collateral passes to the lender. For an NFT the amount is a unit
     // count (1); the token chip + id carry the identity.
@@ -87,9 +87,9 @@ export function PwnEventHeader({
     // The settle claim: the note holder collects the repaid credit — the
     // amount IS the terms' repay total (the borrower paid exactly it), so the
     // same receipt traces it, matching the paid_back grammar.
-    const v = Number(ctx.loanRepayAmount ?? "0") || 0;
-    if (v !== 0)
-      moved(v, ctx.creditSymbol, creditAddress, repayAmountProv(ctx.creditSymbol, coords), "to the note holder");
+    const r = rowRepay(ctx, coords);
+    const v = Number(r?.amount ?? "0") || 0;
+    if (v !== 0 && r) moved(v, ctx.creditSymbol, creditAddress, r.prov, "to the note holder");
   }
 
   // An extension moves no value: the row states the deadline it moved and who

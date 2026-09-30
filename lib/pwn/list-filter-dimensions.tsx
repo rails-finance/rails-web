@@ -1,6 +1,7 @@
 // PWN listing filter registry (chain-state tier). A PWN position is a DISCRETE
-// fixed-term loan (one loan_id), so the facets are loan-shaped: Status (open /
-// repaid / defaulted, resting on a CONTEXTUAL default — lib/pwn/listing-visibility.ts)
+// fixed-term loan (one loan_id), so the facets are loan-shaped: Status (running /
+// defaulted not yet claimed / repaid / defaulted and claimed, resting on a
+// CONTEXTUAL default — lib/pwn/listing-visibility.ts)
 // and the two asset sides (Credit advanced, Collateral locked),
 // their option lists derived from the loans actually present. All chain-state — the
 // replayed status and the named loan assets. No CR/USD facet: a fixed-term P2P loan
@@ -12,7 +13,7 @@ import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
-import { loanDeadlineAt } from "@/lib/pwn/economics";
+import { loanDeadlineAt, pwnLoanState } from "@/lib/pwn/economics";
 import { canonicalStatuses, defaultStatuses, effectiveStatuses, sameStatusSet } from "@/lib/pwn/listing-visibility";
 
 export interface PwnListFilters extends BaseListFilters {
@@ -47,11 +48,20 @@ export const PWN_SORT_OPTIONS: SortOption[] = [
   { value: "events", label: "Events" },
 ];
 
+// A loan past its deadline has defaulted on chain whether or not the lender has
+// claimed yet, so the two default buckets both say "Defaulted".
 const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
+  { value: "open", label: "Running" },
+  { value: "unclaimed", label: "Defaulted, not yet claimed" },
   { value: "repaid", label: "Repaid" },
-  { value: "defaulted", label: "Defaulted" },
+  { value: "defaulted", label: "Defaulted and claimed" },
 ];
+
+/** The loan's bucket now (lib/pwn/economics.ts `pwnLoanState`, "running" → "open"). */
+export function pwnStatusBucket(row: PwnPositionSummary): string {
+  const s = pwnLoanState({ ...row, extendedDueAt: row.latestDefaultAt });
+  return s === "running" ? "open" : s;
+}
 
 /** Distinct option list keyed by `value`, preserving first-seen order. */
 function distinct<T>(rows: T[], pick: (r: T) => FilterOptionDef | null): FilterOptionDef[] {
@@ -89,7 +99,7 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
         const sel = canonicalStatuses(v);
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
-      matches: (row, v) => v.includes(row.status),
+      matches: (row, v) => v.includes(pwnStatusBucket(row)),
     },
     {
       id: "credit",

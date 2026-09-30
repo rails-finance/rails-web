@@ -45,10 +45,13 @@ import {
   collateralLockedProv,
   collateralSeizedProv,
   collateralReturnedProv,
+  rowRepay,
   type PwnCoords,
 } from "@/lib/pwn/event-provenance";
-import { fixedInterestRate, interestRateText } from "@/lib/pwn/economics";
-import { shortTokenId } from "@/lib/pwn/asset-catalog";
+import { aprText, fixedInterestRate, interestRateText, minutesText } from "@/lib/pwn/economics";
+import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
+import { formatDate } from "@/lib/date";
+import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatNumber } from "@/lib/utils/format";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -188,18 +191,85 @@ export function pwnEventSlots(
             ),
           )
         : null;
-      const fixedNote: ClauseInput = hasRepay
-        ? clause(<>That total is fixed at origination and stays the same for the life of the loan.</>)
-        : null;
-      const dueClause: ClauseInput = ctx.dueValue
-        ? ctx.dueKind === "duration"
+      const accrueClause: ClauseInput =
+        !hasRepay && ctx.accruingInterestApr != null
           ? clause(
               <>
-                The loan runs <AmountText value={Number(ctx.dueValue) / 86400} /> days from origination.
+                The borrower owes the principal back plus interest at {aprText(ctx.accruingInterestApr)} on it, counted
+                by the minute from origination until repayment.
               </>,
             )
-          : clause(<>The loan is due by {fmtTs(ctx.dueValue)}.</>)
+          : null;
+      const extended = ctx.finalDeadline != null && (ctx.extensionCount ?? 0) > 0;
+      const fixedNote: ClauseInput = hasRepay
+        ? clause(
+            extended ? (
+              <>
+                That total is fixed at origination: it stayed {repayFig(ctx, coords)} however long the extensions ran.
+              </>
+            ) : (
+              <>That total is fixed at origination and stays the same for the life of the loan.</>
+            ),
+          )
         : null;
+      const struckAt =
+        ctx.dueValue == null
+          ? null
+          : ctx.dueKind === "duration"
+            ? self.timestamp + Number(ctx.dueValue)
+            : Number(ctx.dueValue);
+      const later: ReactNode = extended ? (
+        <>
+          ; {ctx.extensionsByLender ? "the lender" : "the note holder"} later extended it to{" "}
+          {formatDate(ctx.finalDeadline!)} ({ctx.extensionCount} {ctx.extensionCount === 1 ? "extension" : "extensions"}
+          )
+        </>
+      ) : null;
+      const dueClause: ClauseInput =
+        struckAt != null
+          ? ctx.dueKind === "duration"
+            ? clause(
+                <>
+                  The loan runs <AmountText value={Number(ctx.dueValue) / 86400} /> days from origination, to{" "}
+                  {fmtTs(String(struckAt))}
+                  {later}.
+                </>,
+              )
+            : clause(
+                <>
+                  The parties struck a deadline of {fmtTs(String(struckAt))}
+                  {later}.
+                </>,
+              )
+          : null;
+      const back = ctx.collateralReturn;
+      const returnClause: ClauseInput =
+        back === "unknown"
+          ? clause(
+              <>
+                The same collateral went to the lender when an earlier loan between them defaulted; this page could not
+                read how it came back to the borrower.
+              </>,
+            )
+          : back
+            ? clause(
+                <>
+                  The same collateral went to the lender when loan #{back.priorLoanId} defaulted; it came back to the
+                  borrower from {back.from === ctx.lender ? "the lender" : shortAddress(back.from)} on{" "}
+                  {formatDate(back.timestamp)} (transaction{" "}
+                  <a
+                    href={explorerUrl(MAINNET_CHAIN_ID, "tx", back.txHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link-external font-mono"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {back.txHash.slice(0, 10)}…
+                  </a>
+                  ).
+                </>,
+              )
+            : null;
       const defaultDoor: ClauseInput = ctx.dueValue
         ? clause(<>Once the deadline passes, an unpaid loan can be claimed by the lender as defaulted.</>)
         : null;
@@ -207,20 +277,29 @@ export function pwnEventSlots(
         happened: [
           clause(
             <>
-              A peer-to-peer loan was struck on fixed terms: the lender advanced {creditText} to the borrower against{" "}
-              {collateralFig(ctx, coords, "locked")}, locked in the loan&rsquo;s escrow.
+              A peer-to-peer loan was struck on {ctx.accruingInterestApr != null ? "agreed" : "fixed"} terms: the lender
+              advanced {creditText} to the borrower against {collateralFig(ctx, coords, "locked")}, locked in the
+              loan&rsquo;s escrow.
             </>,
           ),
         ],
-        changed: [repayClause],
+        changed: [repayClause, accrueClause, returnClause],
         meansNow: [fixedNote, dueClause, defaultDoor],
       };
     }
 
     case "paid_back": {
       // status: repaid.
-      const breakdown: ClauseInput =
-        ctx.creditSymbol && interest != null && interest > 0
+      const accrued = ctx.accrued && ctx.accrued.basis === "paid" ? ctx.accrued : null;
+      const paidFig = accrued ? rowRepay(ctx, coords) : null;
+      const breakdown: ClauseInput = accrued
+        ? clause(
+            <>
+              That was {creditFig(ctx, coords)} of principal and <AmountText value={accrued.interest} /> {creditSym} of
+              interest: {aprText(accrued.apr)} over the {minutesText(accrued.minutes)} the loan ran.
+            </>,
+          )
+        : ctx.creditSymbol && interest != null && interest > 0
           ? clause(
               <>
                 That total was {creditFig(ctx, coords)} of principal and <AmountText value={interest} /> {creditSym} of
@@ -236,6 +315,14 @@ export function pwnEventSlots(
               // a loan without one states its cost differently (v1.2+ can
               // accrue), so the fixed-total claim renders only with the figure.
               <>The borrower repaid {repayFig(ctx, coords)}, the fixed total struck at origination.</>
+            ) : accrued && paidFig ? (
+              <>
+                The borrower repaid{" "}
+                <Fig echo info={paidFig.prov} value={fmt(paidFig.amount)}>
+                  {fmt(paidFig.amount)} {creditSym}
+                </Fig>
+                , the principal with the interest accrued to that minute.
+              </>
             ) : (
               <>The borrower repaid the loan in full.</>
             ),
@@ -245,7 +332,11 @@ export function pwnEventSlots(
           breakdown,
           clause(<>Repaying released {collateralFig(ctx, coords, "returned")} from escrow back to the borrower.</>),
         ],
-        meansNow: [clause(<>The repaid credit now sits with the loan contract until the note holder claims it.</>)],
+        meansNow: [
+          siblings.some((e) => e.context.data.eventType === "claimed")
+            ? clause(<>The same transaction passed the repayment on to the note holder.</>)
+            : clause(<>The repaid credit now sits with the loan contract until the note holder claims it.</>),
+        ],
       };
     }
 
@@ -265,7 +356,18 @@ export function pwnEventSlots(
           // The general clock-not-price rule is Layer-2 material — the "?"
           // modal (pwnDefaultContent's intro + "Nothing is liquidated")
           // carries it.
-          meansNow: [clause(<>The collateral passed to the lender exactly as the terms always said it would.</>)],
+          meansNow: [
+            ctx.accrued && ctx.accrued.basis === "at-deadline"
+              ? clause(
+                  <>
+                    At the deadline the loan owed <AmountText value={ctx.accrued.total} /> {creditSym} (
+                    <AmountText value={ctx.accrued.interest} /> of it interest at {aprText(ctx.accrued.apr)}); none of
+                    it was paid.
+                  </>,
+                )
+              : null,
+            clause(<>The collateral passed to the lender exactly as the terms always said it would.</>),
+          ],
         };
       }
       // status: settled — the lender collected the repaid credit.
@@ -274,6 +376,11 @@ export function pwnEventSlots(
           clause(
             hasRepay ? (
               <>The note holder collected the repaid {repayFig(ctx, coords)} from the loan&rsquo;s escrow.</>
+            ) : ctx.accrued && ctx.accrued.basis === "paid" ? (
+              <>
+                The note holder collected the repaid <AmountText value={ctx.accrued.total} /> {creditSym} from the
+                loan&rsquo;s escrow.
+              </>
             ) : (
               <>The note holder collected the repaid credit from the loan&rsquo;s escrow.</>
             ),
@@ -323,6 +430,8 @@ export function pwnEventSlots(
               // The fixed-economics claim rides the same v1.1 proof as the
               // repay figure — a loan whose terms accrue keeps the softer form.
               <>The borrower gets more time to repay the same fixed total.</>
+            ) : ctx.accruingInterestApr != null ? (
+              <>The borrower gets more time to repay; interest keeps accruing through it.</>
             ) : (
               <>The borrower gets more time under the terms the parties struck.</>
             ),

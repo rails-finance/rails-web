@@ -20,7 +20,15 @@
 
 import type { PwnPositionView } from "@/components/protocol/pwn/pwn-position-card";
 import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
-import { interestRateText, loanDeadlineAt, loanDueAt, loanInterestRate } from "@/lib/pwn/economics";
+import {
+  aprText,
+  interestRateText,
+  loanCost,
+  loanDeadlineAt,
+  loanDueAt,
+  minutesText,
+  pwnLoanState,
+} from "@/lib/pwn/economics";
 import { shortAddress, shortTokenId } from "@/lib/pwn/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -50,8 +58,10 @@ export function PwnPositionExplanation({
   const dueAt = loanDeadlineAt(v);
   const extended = v.extendedDueAt != null && struckDueAt != null && v.extendedDueAt !== struckDueAt;
   const extensions = v.extensionCount ?? 0;
-  const pastDue = v.status === "open" && dueAt != null && dueAt < Date.now() / 1000;
-  const rate = loanInterestRate(v);
+  const pastDue = pwnLoanState(v) === "unclaimed";
+  const cost = loanCost(v);
+  const rate = cost?.rate ?? null;
+  const accruing = cost?.shape === "accruing";
   // "moved it twice, to 6 Mar 2024" — the extension history in one phrase.
   // v1.1 lets only the LOAN note's holder extend; name the lender where the
   // sender of every extension is the wallet that struck the loan.
@@ -65,7 +75,7 @@ export function PwnPositionExplanation({
       : extensions === 2
         ? "twice"
         : `${["three", "four", "five", "six", "seven", "eight", "nine"][extensions - 3] ?? extensions} times`;
-  const hasRepay = v.repayAmount != null && v.credit != null;
+  const hasRepay = cost != null && cost.shape === "fixed" && v.credit != null;
   const coll = assetText(v.collateral);
 
   // Subject-first status lead (charter §4): the loan's present state in one
@@ -73,17 +83,22 @@ export function PwnPositionExplanation({
   const lead: React.ReactNode =
     v.status === "open" && pastDue ? (
       <>
-        This loan&rsquo;s deadline has passed unpaid — the escrowed <H>{coll}</H> is claimable by the lender at any
-        time:
+        This loan has defaulted and no one has claimed it yet: its deadline passed unpaid, and the escrowed{" "}
+        <H>{coll}</H> is the lender&rsquo;s to claim at any time:
       </>
     ) : v.status === "open" ? (
       hasRepay ? (
         <>
           This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s own escrow against a fixed repayment of{" "}
           <H>
-            <AmountText value={v.repayAmount!} /> {creditSym}
+            <AmountText value={cost!.total} /> {creditSym}
           </H>
           :
+        </>
+      ) : accruing ? (
+        <>
+          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow while interest accrues at{" "}
+          {aprText(v.accruingInterestApr!)} on the principal:
         </>
       ) : (
         <>
@@ -95,9 +110,17 @@ export function PwnPositionExplanation({
         <>
           This loan settled by repayment: the borrower paid the fixed{" "}
           <H>
-            <AmountText value={v.repayAmount!} /> {creditSym}
+            <AmountText value={cost!.total} /> {creditSym}
           </H>{" "}
           and the escrow released <H>{coll}</H> back:
+        </>
+      ) : accruing && cost ? (
+        <>
+          This loan settled by repayment: the borrower paid{" "}
+          <H>
+            <AmountText value={cost.total} /> {creditSym}
+          </H>
+          , principal and accrued interest, and the escrow released <H>{coll}</H> back:
         </>
       ) : (
         <>
@@ -129,37 +152,79 @@ export function PwnPositionExplanation({
   }
 
   // The cost of the loan — the derived gap between two bold chrome figures,
-  // muted per the highlight rule. Only a v1.1 repay total proves it fixed.
-  if (hasRepay && v.fixedInterest != null && v.fixedInterest > 0) {
+  // muted per the highlight rule. Fixed (a v1.1 repay total) or accruing (a
+  // v1.2/v1.3 rate, summed as the contract sums it).
+  const unchanged =
+    extensions > 0 && hasRepay ? (
+      <>
+        {" "}
+        The total stayed <AmountText value={cost!.total} /> {creditSym} through the{" "}
+        {extensions === 1 ? "extension" : `${extensions} extensions`}: moving the deadline adds no interest.
+      </>
+    ) : null;
+  if (hasRepay && cost!.interest > 0) {
     bullets.push(
       <span key="interest">
         {v.status === "repaid" ? (
           <>
-            Of the amount repaid, <AmountText value={v.fixedInterest} /> {creditSym} was the fixed interest
+            Of the amount repaid, <AmountText value={cost!.interest} /> {creditSym} was the fixed interest
             {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
+            {unchanged}
           </>
         ) : v.status === "defaulted" ? (
           <>
             The unpaid total was{" "}
             <H>
-              <AmountText value={v.repayAmount!} /> {creditSym}
+              <AmountText value={cost!.total} /> {creditSym}
             </H>{" "}
-            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest
+            — <AmountText value={cost!.interest} /> {creditSym} of it fixed interest
             {rate ? <> ({interestRateText(rate)})</> : null}; the collateral stood in its place when the loan lapsed.
           </>
         ) : pastDue ? (
           <>
             The unpaid repayment stands at{" "}
             <H>
-              <AmountText value={v.repayAmount!} /> {creditSym}
+              <AmountText value={cost!.total} /> {creditSym}
             </H>{" "}
-            — <AmountText value={v.fixedInterest} /> {creditSym} of it fixed interest
+            — <AmountText value={cost!.interest} /> {creditSym} of it fixed interest
             {rate ? <> ({interestRateText(rate)})</> : null}, the loan&rsquo;s whole cost agreed at origination.
           </>
         ) : (
           <>
-            Of the repayment, <AmountText value={v.fixedInterest} /> {creditSym} is fixed interest
+            Of the repayment, <AmountText value={cost!.interest} /> {creditSym} is fixed interest
             {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
+            {unchanged}
+          </>
+        )}
+      </span>,
+    );
+  } else if (accruing && cost?.accrual) {
+    const a = cost.accrual;
+    bullets.push(
+      <span key="interest">
+        {cost.basis === "paid" ? (
+          <>
+            The terms charged {aprText(a.apr)} on the principal, by the minute: over {minutesText(a.minutes)} that came
+            to <AmountText value={cost.interest} /> {creditSym} of interest on <AmountText value={a.principal} />{" "}
+            {creditSym}.
+          </>
+        ) : v.status === "open" && !pastDue ? (
+          <>
+            The terms charge {aprText(a.apr)} on the principal, by the minute from origination: repaid at the deadline
+            the loan would cost <AmountText value={cost.interest} /> {creditSym} of interest,{" "}
+            <H>
+              <AmountText value={cost.total} /> {creditSym}
+            </H>{" "}
+            in all, and less for every minute earlier.
+          </>
+        ) : (
+          <>
+            The terms charged {aprText(a.apr)} on the principal, by the minute: at the deadline the loan owed{" "}
+            <H>
+              <AmountText value={cost.total} /> {creditSym}
+            </H>
+            , <AmountText value={cost.interest} /> {creditSym} of it interest over {minutesText(a.minutes)}. Nothing was
+            paid; the collateral {v.status === "defaulted" ? "went to the lender in its place" : "stands in its place"}.
           </>
         )}
       </span>,
@@ -187,11 +252,11 @@ export function PwnPositionExplanation({
               "That deadline"
             ) : (
               <>
-                The deadline was <H>{dateOf(dueAt)}</H>
+                The deadline, <H>{dateOf(dueAt)}</H>,
               </>
             )}{" "}
-            has passed unpaid: the borrower can no longer repay, and the loan waits, collateral escrowed, until the
-            lender claims it.
+            passed unpaid: the loan defaulted then, the contract refuses any repayment since, and the collateral stays
+            in escrow until the lender claims it.
           </>
         ) : v.status === "open" ? (
           <>

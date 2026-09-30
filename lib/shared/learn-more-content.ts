@@ -3653,23 +3653,33 @@ export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): 
 
 const PWN_DOC_URL = "https://docs.pwn.xyz";
 
-export function pwnLoanCreatedContent(): LearnMoreContent {
+/** `accruing`: the loan's terms state interest as a yearly rate (SimpleLoan
+ *  v1.2/v1.3), so nothing about its total is fixed at origination. */
+export function pwnLoanCreatedContent(accruing = false): LearnMoreContent {
   return {
     title: "How a PWN Loan Is Struck",
-    intro:
-      "PWN loans are peer-to-peer on fixed terms: the lender and borrower agree the collateral, the credit, the repayment total and the deadline between themselves — no pool, no oracle, no floating rate. The SimpleLoan contract records those terms on-chain and enforces them.",
+    intro: accruing
+      ? "PWN loans are peer-to-peer on terms the two parties agree: the collateral, the credit, the interest rate and the deadline — no pool, no oracle, no floating rate. The SimpleLoan contract records those terms on-chain and enforces them."
+      : "PWN loans are peer-to-peer on fixed terms: the lender and borrower agree the collateral, the credit, the repayment total and the deadline between themselves — no pool, no oracle, no floating rate. The SimpleLoan contract records those terms on-chain and enforces them.",
     stepsHeading: "What happens at origination:",
     steps: [
       "The borrower's collateral (an ERC-20 amount, an NFT, or a PWN Token Bundler wrapping several assets into one) is transferred into the loan contract's escrow.",
-      "The lender's credit is transferred to the borrower, and the fixed repayment total (principal + fixed interest) plus the deadline are locked into the loan's terms.",
+      accruing
+        ? "The lender's credit is transferred to the borrower, and the yearly interest rate plus the deadline are locked into the loan's terms."
+        : "The lender's credit is transferred to the borrower, and the fixed repayment total (principal + fixed interest) plus the deadline are locked into the loan's terms.",
       "A LOAN note — an ERC-721 — is minted to the lender: the transferable claim on this loan's repayment (or, on default, its collateral).",
     ],
     detailsHeading: "Key concepts:",
     details: [
-      {
-        bold: "Fixed by construction",
-        text: "nothing accrues and nothing floats — the repayment owed on the last day is the number struck on the first.",
-      },
+      accruing
+        ? {
+            bold: "Interest by the minute",
+            text: "the rate is fixed; the interest is the principal times that rate for each whole minute from origination to repayment, so the total is known when the borrower repays.",
+          }
+        : {
+            bold: "Fixed by construction",
+            text: "nothing accrues and nothing floats — the repayment owed on the last day is the number struck on the first.",
+          },
       {
         bold: "The parties set the price",
         text: "there is no protocol oracle and no health factor; whether the terms are fair is the parties' own judgment, made when they signed.",
@@ -3701,22 +3711,31 @@ export function pwnNoteLifecycleContent(eventType: "minted" | "burned"): LearnMo
   };
 }
 
-export function pwnRepaymentContent(eventType: "paid_back" | "claimed"): LearnMoreContent {
+export function pwnRepaymentContent(eventType: "paid_back" | "claimed", accruing = false): LearnMoreContent {
   const paying = eventType === "paid_back";
   return {
     title: paying ? "How Repayment Works" : "How Claiming Works",
     intro: paying
-      ? "The borrower repays the fixed total struck at origination — principal plus fixed interest, in the credit token. Repaying before the deadline releases the escrowed collateral back to the borrower."
+      ? accruing
+        ? "The borrower repays the principal plus the interest accrued to that minute, in the credit token. Repaying before the deadline releases the escrowed collateral back to the borrower."
+        : "The borrower repays the fixed total struck at origination — principal plus fixed interest, in the credit token. Repaying before the deadline releases the escrowed collateral back to the borrower."
       : "Claiming is the note holder collecting what the loan settled to: the repayment if the borrower paid, or the escrowed collateral if the loan defaulted. Claiming burns the LOAN note.",
     detailsHeading: "Key concepts:",
     details: [
-      {
-        bold: "The amount was never in question",
-        text: "the repayment total is a term of the loan, fixed when it was struck — it does not change with the day it is paid. The contract refuses a repayment once the deadline has passed; only an extension moves that deadline.",
-      },
+      accruing
+        ? {
+            bold: "The rate was agreed, the total follows the clock",
+            text: "interest is the principal times the terms' yearly rate for each whole minute the loan ran. The contract refuses a repayment once the deadline has passed, so the deadline caps it.",
+          }
+        : {
+            bold: "The amount was never in question",
+            text: "the repayment total is a term of the loan, fixed when it was struck — it does not change with the day it is paid. The contract refuses a repayment once the deadline has passed; only an extension moves that deadline.",
+          },
       {
         bold: "Escrow does the settling",
-        text: "the loan contract holds the repayment until the note holder claims it — the two legs (borrower pays in, lender collects) are separate transactions.",
+        text: accruing
+          ? "the loan contract passes the repayment straight to the note holder when it can, in the same transaction; otherwise it holds it until the holder claims."
+          : "the loan contract holds the repayment until the note holder claims it — the two legs (borrower pays in, lender collects) are usually separate transactions.",
       },
     ],
     links: [{ label: "PWN docs", url: PWN_DOC_URL }],
@@ -3780,7 +3799,7 @@ export function pwnEventFallbackContent(): LearnMoreContent {
     details: [
       {
         bold: "Fixed terms",
-        text: "principal, interest and deadline are set when the loan is struck — nothing accrues, nothing floats, no oracle is consulted.",
+        text: "principal, interest and deadline are set when the loan is struck — a total on the oldest contract, a yearly rate that accrues by the minute on the newer two; nothing floats and no oracle is consulted.",
       },
       {
         bold: "Escrowed collateral",

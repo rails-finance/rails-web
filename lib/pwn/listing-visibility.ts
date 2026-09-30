@@ -1,12 +1,13 @@
 // Visibility resolution for the PWN listing.
 //
 // The resting view is the MIDDLE PATH (Miles, 2026-09-10, the roster rule): the bare directory
-// shows the loans still open; a search naming a holder or a single position shows every status.
-// The argument for it is written once, on the pilot — lib/liquity-v2/listing-visibility.ts.
+// shows the loans not yet settled; a search naming a holder or a single position shows every
+// status. The argument for it is written once, on the pilot — lib/liquity-v2/listing-visibility.ts.
 //
-// Status is a MULTI-SELECT over the three replayed loan states — open / repaid / defaulted —
-// serialized as one comma-separated `status` URL param. A repaid or defaulted loan is settled:
-// both sit outside the resting view.
+// Status is a MULTI-SELECT over four loan states (lib/pwn/economics.ts `pwnLoanState`): open
+// (running, before its deadline), unclaimed (past its deadline, defaulted, waiting for the
+// lender's claim), repaid, defaulted (claimed) — serialized as one comma-separated `status` URL
+// param. The resting view is the first two: the loans whose collateral is still in escrow.
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
 // at read time, a concrete set is an explicit choice. The default is never written into the
@@ -19,10 +20,13 @@
 import { namesIdentity } from "@/lib/pwn/search";
 
 /** The lifecycle buckets the Status facet exposes. */
-export type PwnStatusBucket = "open" | "repaid" | "defaulted";
+export type PwnStatusBucket = "open" | "unclaimed" | "repaid" | "defaulted";
 
 /** Canonical order — used for stable URL/chip serialization and set compares. */
-export const ALL_PWN_STATUS_BUCKETS: PwnStatusBucket[] = ["open", "repaid", "defaulted"];
+export const ALL_PWN_STATUS_BUCKETS: PwnStatusBucket[] = ["open", "unclaimed", "repaid", "defaulted"];
+
+/** The loans not yet settled: running, or defaulted and waiting for the claim. */
+export const UNSETTLED_PWN_STATUS_BUCKETS: PwnStatusBucket[] = ["open", "unclaimed"];
 
 export function isPwnStatusBucket(v: string): v is PwnStatusBucket {
   return (ALL_PWN_STATUS_BUCKETS as string[]).includes(v);
@@ -48,10 +52,10 @@ export interface PwnVisibilityInput {
   q?: string;
 }
 
-/** The contextual default: the open loans while the search box names no identity, every status
- *  once it does. */
+/** The contextual default: the unsettled loans while the search box names no identity, every
+ *  status once it does. */
 export function defaultStatuses(f: PwnVisibilityInput): PwnStatusBucket[] {
-  return namesIdentity(f.q) ? [...ALL_PWN_STATUS_BUCKETS] : ["open"];
+  return namesIdentity(f.q) ? [...ALL_PWN_STATUS_BUCKETS] : [...UNSETTLED_PWN_STATUS_BUCKETS];
 }
 
 /** The selection actually in effect: an explicit non-empty choice wins; an empty selection

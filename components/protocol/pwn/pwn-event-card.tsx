@@ -9,7 +9,7 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { creditAdvancedProv, repayAmountProv, type PwnCoords } from "@/lib/pwn/event-provenance";
+import { creditAdvancedProv, rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
 import { pwnExplainerTeaser, type PwnEvent } from "@/lib/pwn/explainer-clauses";
 import { PwnEventHeader, fullAmount } from "./pwn-event-header";
 import { PwnEventDetail } from "./pwn-event-detail";
@@ -83,8 +83,9 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
         },
       ];
   } else if (ctx.eventType === "paid_back" && ctx.creditSymbol) {
-    const v = Math.abs(Number(ctx.loanRepayAmount ?? "0"));
-    if (v > 0)
+    const r = rowRepay(ctx, coords);
+    const v = Math.abs(Number(r?.amount ?? "0"));
+    if (v > 0 && r)
       tokens = [
         {
           symbol: ctx.creditSymbol,
@@ -93,9 +94,9 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           value: v,
           display: fullAmount(v),
           unit: ctx.creditSymbol,
-          // Echoes the header's repayAmountProv — same "+"-signed grammar.
+          // Echoes the header's repayment receipt — same "+"-signed grammar.
           prov: {
-            info: repayAmountProv(ctx.creditSymbol, coords),
+            info: r.prov,
             value: chainTruthDeltaValue(v, false),
             symbol: ctx.creditSymbol,
           },
@@ -106,8 +107,9 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
     // to the wallet, mirroring `created` but in the opposite direction of
     // `paid_back`. Echoes the header's repayAmountProv (the collected amount
     // IS the terms' repay total), the same "+"-signed grammar as the others.
-    const v = Math.abs(Number(ctx.loanRepayAmount ?? "0"));
-    if (v > 0)
+    const r = rowRepay(ctx, coords);
+    const v = Math.abs(Number(r?.amount ?? "0"));
+    if (v > 0 && r)
       tokens = [
         {
           symbol: ctx.creditSymbol,
@@ -117,7 +119,7 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           display: fullAmount(v),
           unit: ctx.creditSymbol,
           prov: {
-            info: repayAmountProv(ctx.creditSymbol, coords),
+            info: r.prov,
             value: chainTruthDeltaValue(v, false),
             symbol: ctx.creditSymbol,
           },
@@ -187,6 +189,7 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
       explainerLabel="Plain English"
       explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
       txHash={event.txHash}
+      txHashLabel="Transaction"
       learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
       persistKey={`pwn:${event.id}`}
     />
