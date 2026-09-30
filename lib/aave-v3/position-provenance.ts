@@ -64,26 +64,6 @@ export function accountDataProv(what: string, field: string, pool: V3PoolLane): 
   };
 }
 
-/** A ratio derived from the account's oracle-priced USD totals (current LTV =
- *  debt ÷ collateral). Both totals are themselves getUserAccountData @ head
- *  reads and the division mirrors the protocol's own account math, so the ratio
- *  is chain-derived (it survives the on-chain-only gate) and exact at that block. */
-export function accountRatioProv(what: string, formula: string, pool: V3PoolLane): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: STATE_VERIFY,
-    summary: `${what} — the wallet's total debt in US dollars divided by its total collateral in US dollars, both as the Pool reports them at the latest block. The Pool values each reserve at the price its oracle reports, and answers both totals in US dollars with 8 decimal places; the division leaves a share with no unit.`,
-    contract: poolContractFor(pool),
-    via: `${accountVia(pool)} · derived ratio`,
-    formula,
-    inputs: [
-      { label: "total debt (USD)", kind: "chain", pclass: "state", note: "getUserAccountData @ head" },
-      { label: "total collateral (USD)", kind: "chain", pclass: "state", note: "getUserAccountData @ head" },
-    ],
-  };
-}
-
 /** The scale sentence for a reserve field the Pool answers as a ray. */
 const RAY_SENTENCE = "The Pool writes a rate as a fraction with 27 decimal places, where 10^27 a year means 100%.";
 const RAY_FIELDS = new Set(["currentLiquidityRate", "currentVariableBorrowRate", "currentStableBorrowRate"]);

@@ -53,6 +53,8 @@ import {
 import type { SparkPositionSummary, SparkReserveAmount } from "@/lib/sources/api/spark-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { ShareBar } from "@/components/shared/share-bar";
 
 export interface SparkPositionView {
   wallet: string;
@@ -227,6 +229,46 @@ function ReserveFootnoteLines({
   );
 }
 
+/** The opened layer's per-reserve lines (ui-jobs 209): each amount traced as
+ *  in `ReserveFootnoteLines`, with a bar for its share of the side's oracle
+ *  USD. Drawn only where the side's total is priced (`total` from
+ *  `totalUsd`, which is null the moment a reserve is unpriced or unread). */
+function ReserveShareLines({
+  reserves,
+  side,
+  atBlock,
+  usdOf,
+  total,
+}: {
+  reserves: SparkReserveAmount[];
+  side: "supply" | "debt";
+  atBlock?: number;
+  usdOf: (r: SparkReserveAmount) => number | null;
+  total: number;
+}) {
+  const { lines, control } = useDustLines(reserves, usdOf);
+  if (reserves.length === 0) return null;
+  return (
+    <div className="mt-1.5 grid max-w-72 grid-cols-[auto_minmax(3rem,1fr)] items-center gap-x-3 gap-y-1 text-xs text-rb-500 tabular-nums">
+      {lines.map((r) => (
+        <div key={r.address} className="contents">
+          <div className="whitespace-nowrap">
+            <Prov
+              info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}
+            >
+              <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+                {formatCompact(r.amount)} {r.symbol}
+              </ExactSpan>
+            </Prov>
+          </div>
+          <ShareBar share={(usdOf(r) ?? 0) / total} side={side === "supply" ? "collateral" : "debt"} />
+        </div>
+      ))}
+      {control && <div className="col-span-2">{control}</div>}
+    </div>
+  );
+}
+
 /** "incl. $X interest since 12 Sep 2026" — the interest inside the column's
  *  balance above: added since the balance last started from zero
  *  (computeSparkCardCaptions). Hidden below a cent — dust isn't worth a line. */
@@ -378,8 +420,21 @@ export function SparkPositionCard({
   outcomeAt,
   notCollateral,
   lives,
+  disclosureKey,
+  debtDetail,
+  riskDetail,
 }: {
   v: SparkPositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail and the Explanation. */
+  disclosureKey?: string;
+  /** Opened-layer lines under Debt from the page's Pool read (the room left
+   *  to borrow). Only drawn on a disclosing card. */
+  debtDetail?: React.ReactNode;
+  /** Opened-layer lines under Health factor from the page's Pool read (the
+   *  distance bar). Only drawn on a disclosing card. */
+  riskDetail?: React.ReactNode;
   /** Lowercased reserves the account supplies (or, closed, supplied) that back
    *  no borrowing: the card lists them apart from the collateral. Unset until
    *  the page has read the switches. */
@@ -418,6 +473,10 @@ export function SparkPositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
+  // The closed/opened card (ui-jobs 209): the per-side reserve chevrons give
+  // way to the card's one header chevron, and every line under a headline
+  // moves into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // Value order for the cluster and the leg lines. Dust reserves (under a
   // cent) leave the icon stack, its "+N" and the list count; the lines put
   // them behind the "N dust reserves hidden" control.
@@ -441,8 +500,12 @@ export function SparkPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={sparkPositionContent({ status: v.status })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
             <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
@@ -492,6 +555,34 @@ export function SparkPositionCard({
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
 
+  // Supplied but backing no borrowing: listed apart beneath Collateral (in
+  // the opened layer on a disclosing card).
+  const notCollateralBlock =
+    otherSupplies.length > 0 ? (
+      <div className="mt-2" data-spark-not-collateral="">
+        <div className="text-rb-500 text-xs font-semibold">
+          <TipLabel text="Supplied, not collateral" tip={NOT_COLLATERAL_TIP} />
+        </div>
+        {otherUsd != null ? (
+          <>
+            <div className="text-sm font-semibold tabular-nums">
+              <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
+            </div>
+            {isDetail && (
+              <ReserveFootnoteLines
+                reserves={rankByValue(v, otherSupplies)}
+                side="supply"
+                atBlock={v.atBlock}
+                usdOf={usdOf}
+              />
+            )}
+          </>
+        ) : (
+          <ReserveStack reserves={otherSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
+        )}
+      </div>
+    ) : null;
+
   return (
     <PositionCardShell
       receipts={receipts}
@@ -499,8 +590,10 @@ export function SparkPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={sparkPositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <RevealTip tip={MODE_TIPS[modeWord]} label={`${modeWord}. ${MODE_TIPS[modeWord]}`} focusable>
@@ -542,16 +635,31 @@ export function SparkPositionCard({
               collSupplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={sparkUsdProvOnchain("Collateral")} />
-              ) : supplyDisclosure.collapsible ? null : (
+              ) : supplyDisclosure.collapsible && !disclosing ? null : (
                 <ReserveStack reserves={collSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {collUsd != null && (
+                  <ReserveShareLines
+                    reserves={suppliesRanked}
+                    side="supply"
+                    atBlock={v.atBlock}
+                    usdOf={usdOf}
+                    total={collUsd}
+                  />
+                )}
+                {notCollateralBlock}
+              </PositionCardDetail>
+            ) : (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
@@ -568,30 +676,7 @@ export function SparkPositionCard({
                   usd={captions?.supplyInterestUsd}
                   since={captions?.supplyInterestSince}
                 />
-                {otherSupplies.length > 0 && (
-                  <div className="mt-2" data-spark-not-collateral="">
-                    <div className="text-rb-500 text-xs font-semibold">
-                      <TipLabel text="Supplied, not collateral" tip={NOT_COLLATERAL_TIP} />
-                    </div>
-                    {otherUsd != null ? (
-                      <>
-                        <div className="text-sm font-semibold tabular-nums">
-                          <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
-                        </div>
-                        {isDetail && (
-                          <ReserveFootnoteLines
-                            reserves={rankByValue(v, otherSupplies)}
-                            side="supply"
-                            atBlock={v.atBlock}
-                            usdOf={usdOf}
-                          />
-                        )}
-                      </>
-                    ) : (
-                      <ReserveStack reserves={otherSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
-                    )}
-                  </div>
-                )}
+                {notCollateralBlock}
               </>
             ),
           },
@@ -601,16 +686,32 @@ export function SparkPositionCard({
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={sparkUsdProvOnchain("Borrowed")} />
-              ) : debtDisclosure.collapsible ? null : (
+              ) : debtDisclosure.collapsible && !disclosing ? null : (
                 <ReserveStack reserves={v.borrows} side="debt" atBlock={v.atBlock} usdOf={usdOf} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {debtUsd != null && (
+                  <ReserveShareLines
+                    reserves={borrowsRanked}
+                    side="debt"
+                    atBlock={v.atBlock}
+                    usdOf={usdOf}
+                    total={debtUsd}
+                  />
+                )}
+                <BorrowRateCaption rate={captions?.borrowRate} />
+                {debtDetail}
+              </PositionCardDetail>
+            ) : (
               <>
                 {debtUsd == null && debtDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
@@ -659,7 +760,14 @@ export function SparkPositionCard({
                   ),
                 // The liquidation read beneath HF — its tangible restatement
                 // (single collateral → oracle liq price, multi → 1 − 1/HF drop).
-                footnote: <LiquidationFootnote v={v} />,
+                footnote: disclosing ? (
+                  <PositionCardDetail>
+                    <LiquidationFootnote v={v} />
+                    {riskDetail}
+                  </PositionCardDetail>
+                ) : (
+                  <LiquidationFootnote v={v} />
+                ),
               },
         ]}
       />

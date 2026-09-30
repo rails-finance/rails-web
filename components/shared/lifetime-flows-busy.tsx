@@ -213,7 +213,7 @@ const throughputProv = (what: string, figure: string): Provenance => ({
   formula: "Σ amount × price at block",
 });
 
-function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt: boolean }) {
+export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt: boolean }) {
   const fig = (v: number, what: string) => (
     <Prov info={throughputProv(what, formatFlowUsd(v))}>
       <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v)}</span>
@@ -346,13 +346,14 @@ function NetLine({
   );
 }
 
-function Rescaled({
+export function Rescaled({
   model,
   s,
   hasDebt,
   when,
   isLive,
   assets,
+  headlines = true,
 }: {
   model: FlowModel;
   s: ReturnType<typeof stateAt>;
@@ -360,6 +361,8 @@ function Rescaled({
   when: string;
   isLive: boolean;
   assets: ReturnType<typeof assetsAt>;
+  /** False where the view draws the headlines above (Combined). */
+  headlines?: boolean;
 }) {
   // Fixed per position: the most either side has held or owed at any stop.
   const axis = useMemo(() => {
@@ -370,11 +373,13 @@ function Rescaled({
   const sides: FlowSide[] = hasDebt ? ["collateral", "debt"] : ["collateral"];
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
-        {sides.map((side) => (
-          <Headline key={side} side={side} st={s[side]} model={model} when={when} isLive={isLive} assets={assets} />
-        ))}
-      </div>
+      {headlines && (
+        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+          {sides.map((side) => (
+            <Headline key={side} side={side} st={s[side]} model={model} when={when} isLive={isLive} assets={assets} />
+          ))}
+        </div>
+      )}
       {sides.map((side, i) => {
         const st = s[side];
         return (

@@ -73,7 +73,8 @@ import {
   SparkClosedPositionExplanation,
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
-import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
+import { SparkRiskDetail } from "@/components/protocol/spark/spark-risk-slot";
+import { SparkBorrowRoom } from "@/components/protocol/spark/spark-ltv-card";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
@@ -778,17 +779,13 @@ export default function SparkPositionDetail({
               notCollateral={notCollateral}
               lives={lives}
               captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the V2 trove
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway or the loan-to-value bar (LTV/CR framing +
-              // "available to borrow"). Whatever it draws is on the card face and
-              // in the card's receipts scope, so the Provenance list stays 1:1
-              // with the face figures. Shown only with debt (both views need it).
-              rowExtra={
-                chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                  <SparkRiskSlot chain={chain} />
-                ) : undefined
-              }
+              // Closed by default, remembered per viewer and position (ui-jobs
+              // 209). The room left to borrow and the distance bar from the
+              // Pool read sit in the opened layer under Debt and Health
+              // factor, inside the card's receipts scope.
+              disclosureKey={`spark:${wallet.toLowerCase()}`}
+              debtDetail={chain ? <SparkBorrowRoom chain={chain} /> : undefined}
+              riskDetail={chain ? <SparkRiskDetail chain={chain} /> : undefined}
               // The Explanation is now pure layman prose about those same face
               // figures — no secondary figure-strips. The LTV strip is absorbed
               // into the risk slot above; the reserve rates live on the market

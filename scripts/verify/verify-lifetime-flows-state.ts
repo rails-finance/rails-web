@@ -79,6 +79,7 @@ import {
   windowFromDay,
   type BinInput,
 } from "@/lib/shared/flows-series";
+import { combinedAt, combinedStops } from "@/lib/shared/flows-combined";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -458,6 +459,59 @@ test("the Lifetime series: a bin with no price recorded for a held asset is a ga
     [3, "collateral", "AAA"],
   ]);
   assert.deepEqual(binRanges(monday + 3, monday + 3, "week"), [[monday + 3, monday + 3]]);
+});
+
+test("Combined: the headlines and the bars state one figure at every cursor date, between events and outside the window", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "week")!;
+  // A window opening on the 13th active day, so the early weeks fall before it.
+  const from = full.eventDays[12];
+  const bars = windowModel(full, from);
+  const stops = combinedStops(full, line, from);
+  assert.equal(stops.length, line.points.length, "one cursor stop per point of the line");
+  const last = stops[stops.length - 1];
+  assert.ok(last.live && last.stop === full.liveStop && last.barStop === bars.liveStop, "the last point is today");
+  const events = new Set(full.eventDays);
+  let between = 0;
+  let outside = 0;
+  let lineChecked = 0;
+  stops.forEach((at, i) => {
+    const { head, bars: b } = combinedAt(full, bars, at);
+    if (at.stop < from) {
+      assert.equal(at.barStop, null, `point ${i}: before the window the bars have no stop`);
+      assert.equal(b, null);
+      outside++;
+      return;
+    }
+    assert.equal(at.barStop, at.stop - from);
+    assert.ok(b);
+    for (const side of ["collateral", "debt"] as const)
+      assert.ok(near(head[side].now, b[side].now, 1e-6), `point ${i}: ${side} headline and bar agree`);
+    if (!at.live && !events.has(at.stop)) {
+      // Between events: the last event's balances, valued at the cursor day's prices.
+      const prev = full.eventDays.filter((d) => d < at.stop).pop()!;
+      const amounts = (stop: number) =>
+        full.heldAt[stop]
+          .map((h) => `${h.side}:${h.symbol}:${h.amount}`)
+          .sort()
+          .join("|");
+      assert.equal(amounts(at.stop), amounts(prev), `point ${i}: the makeup is the last event's`);
+      between++;
+    }
+    // The line's point, where priced, is the same figure.
+    const [, , coll, debt] = line.points[i];
+    if (!at.live && coll != null && debt != null) {
+      assert.ok(near(coll, head.collateral.now, Math.max(0.01, coll * 1e-6)), `point ${i}: the line's held`);
+      assert.ok(near(debt, head.debt.now, Math.max(0.01, debt * 1e-6)), `point ${i}: the line's owed`);
+      lineChecked++;
+    }
+  });
+  assert.ok(between > 0, "some cursor dates fall between events");
+  assert.ok(outside > 0, "some cursor dates fall before the window");
+  assert.ok(lineChecked > 0, "some points checked against the line");
+  // Without the series the cursor has today alone.
+  assert.deepEqual(combinedStops(full, null, from), [{ stop: full.liveStop, barStop: bars.liveStop, live: true }]);
 });
 
 // ── the route's day rows ────────────────────────────────────────────────────
