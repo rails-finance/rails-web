@@ -4,9 +4,11 @@
 // Flows bars with the Over time line under them as a short strip, one cursor
 // for both. The strip's horizontal axis is the slider: pointing previews a
 // point, a tap, a drag or the arrow keys move the cursor there, and play walks
-// it along. The cursor stands on the line's points; what the headlines and the
-// bars state there is `combinedAt` (lib/shared/flows-combined.ts). Before the
-// Flows window opens the bars grey out at the window's first day and say so.
+// it along. The cursor stands on the line's points and on every day with
+// events (tapping an event tick jumps to it); what the headlines and the bars
+// state there is `combinedAt` (lib/shared/flows-combined.ts). The dashed
+// outline marks where each bar ends today, as in Flows. Before the Flows window
+// opens the bars grey out at the window's first day and say so.
 
 import {
   useCallback,
@@ -27,7 +29,7 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { assetsAt, axisFor, DAY_MS, dayStart, type FlowModel } from "@/lib/shared/flows-timeline";
 import { throughput } from "@/lib/shared/flows-busy";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
-import { combinedAt, combinedStops, type CombinedStop } from "@/lib/shared/flows-combined";
+import { combinedAt, combinedStops, nearestStop, type CombinedStop } from "@/lib/shared/flows-combined";
 
 /** Tick colours: the side an event moved; a liquidation in the critical red. */
 export const FLOW_TICK: Record<FlowModel["ticks"][number]["tick"], string> = {
@@ -59,8 +61,9 @@ export interface CombinedFlowsProps {
   series: FlowBinSeries | null;
   failed: boolean;
   switcher?: ReactNode;
-  /** The plain bars at a stop of `bars` (the scrubber's). */
-  renderBars: (barStop: number, when: string, isLive: boolean) => ReactNode;
+  /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
+   *  last stop, where no outline of today's length is drawn. */
+  renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
 }
 
 export function CombinedFlows({ model, bars, from, busy, series, failed, switcher, renderBars }: CombinedFlowsProps) {
@@ -120,7 +123,7 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
   const barStop = cur.barStop ?? 0;
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
-  const per = series?.bin === "month" ? "month" : "week";
+  const tickHere = cur.event && !cur.live ? model.ticks.find((t) => t.day === cur.stop) : undefined;
 
   return (
     <div className="text-sm" data-flows-combined="">
@@ -149,15 +152,16 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
             {busy ? (
               <Rescaled
                 model={bars}
-                s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0, live: false }).bars!}
+                s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
                 hasDebt={hasDebt}
                 when={when}
                 isLive={liveReceipts}
                 assets={barAssets}
                 headlines={false}
+                outline={!cur.live}
               />
             ) : (
-              renderBars(barStop, when, liveReceipts)
+              renderBars(barStop, when, liveReceipts, cur.live)
             )}
           </div>
           {outside && (
@@ -180,7 +184,7 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
         head={{ collateral: head.collateral.now, debt: head.debt.now }}
         hasDebt={hasDebt}
         windowFrom={from > 0 ? model.start / DAY_MS + from : null}
-        valueText={dateLine}
+        valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
         onPreview={setPreview}
         onPick={go}
       />
@@ -190,13 +194,13 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
         <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
           <SkipBack size={16} aria-hidden />
         </button>
-        <button type="button" className={btn} aria-label={`Previous ${per}`} onClick={() => go(at - 1)}>
+        <button type="button" className={btn} aria-label="Previous date" onClick={() => go(at - 1)}>
           <ChevronLeft size={18} aria-hidden />
         </button>
         <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
           {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
         </button>
-        <button type="button" className={btn} aria-label={`Next ${per}`} onClick={() => go(at + 1)}>
+        <button type="button" className={btn} aria-label="Next date" onClick={() => go(at + 1)}>
           <ChevronRight size={18} aria-hidden />
         </button>
         <button
@@ -253,9 +257,13 @@ function Steady({ children }: { children: ReactNode }) {
 
 type Point = { to: number; collateral: number | null; debt: number | null };
 
+/** How near, in px, a pointer must be to an event tick to open it. */
+const TICK_REACH = { mouse: 6, touch: 14 };
+
 /** The Over time line, short and unlabelled (the headlines carry the
  *  figures), with the event ticks over it and the Flows window shaded. Its
- *  horizontal axis is the slider. */
+ *  horizontal axis is the slider; the cursor snaps to the nearest stop, and
+ *  tapping a tick jumps to that day's events. */
 function LineStrip({
   model,
   series,
@@ -283,6 +291,8 @@ function LineStrip({
   onPick: (i: number) => void;
 }) {
   const [ref, w] = useWidth();
+  const pipRef = useRef<HTMLDivElement>(null);
+  const [pip, setPip] = useState<{ x: number; text: string; day: number } | null>(null);
   const dragging = useRef(false);
   const startDay = model.start / DAY_MS;
   // The last point is today's, at the live figures.
@@ -296,10 +306,14 @@ function LineStrip({
     return out;
   }, [series, model.live]);
   const n = points.length;
-  const axis = useMemo(
-    () => axisFor(Math.max(0, ...points.map((p) => Math.max(p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0)))),
-    [points, hasDebt],
-  );
+  // Fixed per position: the line's points and every day's figures, so the
+  // cursor's dots stay inside the strip on an event day too.
+  const axis = useMemo(() => {
+    let peak = 0;
+    for (const p of points) peak = Math.max(peak, p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0);
+    for (const v of model.valued) peak = Math.max(peak, v.collateral, hasDebt ? v.debt : 0);
+    return axisFor(peak);
+  }, [points, hasDebt, model.valued]);
   const first = series?.first ?? startDay;
   const today = series?.today ?? startDay + model.liveStop;
   const span = Math.max(1, today - first);
@@ -307,14 +321,20 @@ function LineStrip({
   const xDay = (day: number) => PAD + ((day - first) / span) * inner;
   const x = (i: number) => (n <= 1 ? PAD + inner : xDay(points[i].to));
   const y = (v: number) => STRIP_H - 2 - (v / axis.max) * (STRIP_H - 8);
+  // A stop's place on the line: its day (the live stop at today).
+  const xStop = (s: CombinedStop) => (s.live ? xDay(today) : xDay(startDay + s.stop));
 
+  /** The stop nearest the pointer, on the strip's time axis. */
   const nearest = (clientX: number): number | null => {
     const el = ref.current;
-    if (!el || n === 0) return null;
+    if (!el || n === 0 || inner <= 0) return null;
     const px = clientX - el.getBoundingClientRect().left;
-    let best = 0;
-    for (let i = 1; i < n; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    return best;
+    const day = first + ((px - PAD) / inner) * span;
+    const i = nearestStop(stops, day - startDay);
+    // The live stop sits at today, which may lie past the last event's stop count.
+    const last = stops.length - 1;
+    if (i === last - 1 && Math.abs(xStop(stops[last]) - px) < Math.abs(xStop(stops[i]) - px)) return last;
+    return i;
   };
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
     const i = nearest(e.clientX);
@@ -350,6 +370,44 @@ function LineStrip({
     onPreview(null);
   };
 
+  // The event ticks: the nearest within reach of the pointer names its day's
+  // events; a tap or a click also moves the cursor to that day.
+  const tickText = (t: FlowModel["ticks"][number]) =>
+    `${dayStamp(dayStart(model, t.day))}${t.kinds.length ? `: ${t.kinds.join(", ")}` : ""}`;
+  const tickAt = (clientX: number, reach: number) => {
+    const el = pipRef.current;
+    if (!el) return null;
+    const px = clientX - el.getBoundingClientRect().left;
+    let best: FlowModel["ticks"][number] | null = null;
+    let bestD = Infinity;
+    for (const t of model.ticks) {
+      const d = Math.abs(xDay(startDay + t.day) - px);
+      if (d < bestD) {
+        bestD = d;
+        best = t;
+      }
+    }
+    return best && bestD <= reach ? best : null;
+  };
+  const openTick = (t: FlowModel["ticks"][number]) => ({
+    x: Math.max(80, Math.min(w - 80, xDay(startDay + t.day))),
+    text: tickText(t),
+    day: t.day,
+  });
+  // A tapped tick's tip closes once the cursor moves off its day.
+  const atDay = stops[at]?.stop;
+  useEffect(() => {
+    setPip((p) => (p && p.day !== atDay ? null : p));
+  }, [atDay]);
+  useEffect(() => {
+    if (!pip) return;
+    const away = (e: globalThis.PointerEvent) => {
+      if (!pipRef.current?.contains(e.target as Node)) setPip(null);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [pip]);
+
   const runs = (k: "collateral" | "debt") => {
     const out: number[][] = [];
     let cur: number[] = [];
@@ -368,26 +426,60 @@ function LineStrip({
     `${line(k, run)}L${x(run[run.length - 1])},${STRIP_H}L${x(run[0])},${STRIP_H}Z`;
   const shade = windowFrom != null && windowFrom > first ? xDay(windowFrom) : null;
   const per = series?.bin === "month" ? "month" : "week";
-  const cx = n > 0 ? x(Math.min(at, n - 1)) : PAD + inner;
+  const cx = n > 0 && stops[at] ? xStop(stops[at]) : PAD + inner;
 
   return (
     <div className="mt-4">
-      {/* The event ticks, on the line's time axis. */}
-      <div className="relative h-2.5" aria-hidden data-flow-pips="">
-        {w > 0 &&
-          model.ticks.map((t, i) => (
-            <i
-              key={i}
-              className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] -translate-x-1/2 rounded-[1px]"
-              style={{ left: xDay(startDay + t.day), background: FLOW_TICK[t.tick] }}
-            />
-          ))}
+      {/* The event ticks, on the line's time axis. The keyboard hears each
+          day's events through the slider's value. */}
+      <div
+        ref={pipRef}
+        className="relative h-5 cursor-pointer sm:h-3.5"
+        data-flow-pips=""
+        onPointerMove={(e) => {
+          if (e.pointerType !== "mouse") return;
+          const t = tickAt(e.clientX, TICK_REACH.mouse);
+          setPip(t ? openTick(t) : null);
+        }}
+        onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
+        onClick={(e) => {
+          const t = tickAt(e.clientX, TICK_REACH.touch);
+          if (!t) return setPip(null);
+          setPip(openTick(t));
+          const i = stops.findIndex((s) => !s.live && s.stop === t.day);
+          if (i >= 0) {
+            onPreview(null);
+            onPick(i);
+          }
+        }}
+      >
+        <div aria-hidden>
+          {w > 0 &&
+            model.ticks.map((t, i) => (
+              <i
+                key={i}
+                className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] -translate-x-1/2 rounded-[1px]"
+                style={{ left: xDay(startDay + t.day), background: FLOW_TICK[t.tick] }}
+              />
+            ))}
+        </div>
+        {pip && (
+          <span
+            role="tooltip"
+            data-prov-hidden=""
+            data-flow-pip-tip=""
+            className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+            style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+          >
+            {pip.text}
+          </span>
+        )}
       </div>
       <div
         ref={ref}
         role="slider"
         tabIndex={0}
-        aria-label={`Date, by ${per}: moves the headlines and the bars`}
+        aria-label={`Date, by ${per} and by day with events: moves the headlines and the bars`}
         aria-valuemin={0}
         aria-valuemax={Math.max(0, stops.length - 1)}
         aria-valuenow={at}
