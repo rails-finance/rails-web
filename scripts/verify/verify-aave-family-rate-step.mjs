@@ -22,6 +22,15 @@
 // `aave_family_reserve_data` on the onboarding box, 2026-09-06, and never derived from
 // this code either.
 //
+// RE-PINNED 2026-09-30 (the amounts and the set of held sides). The 09-06 pin
+// took each side's held amount from index rows that have since been settled:
+// the whale's USDe debt at block 24,914,653 was pinned at 589,839 and the
+// archive node reads 514,941; a PYUSD debt of 208,717 pinned there was 0.
+// The rates and the two observations per note were unaffected and are the
+// 09-06 psql values; the amounts are the routes' figures, spot-checked
+// against `balanceOf` at each note's earlier block (72 of 82 changed amounts
+// within 0.1%, the rest a few interest days apart).
+//
 // ⚠️ THE PINS ARE A PAST, AND THESE WALLETS KEEP TRADING. A note whose later
 // end is at or before the pin's newest block (`pinnedThrough`) is history: it
 // must match the pin field for field, forever. Everything after that block is
@@ -189,6 +198,14 @@ function holdings(events) {
       if (own) {
         if (d.supplyAfter != null) at(own).supply = Number(d.supplyAfter);
         if (d.debtAfter != null) at(own).debt = Number(d.debtAfter);
+      }
+      // A swap row (a CoW collateral or debt swap, grouped into one row) also
+      // lands its received reserve, the event's second flow — the other leg is
+      // not a row of its own, so its balance rides here.
+      if (d.eventType === "swap" && d.swap) {
+        const other = (e.flows?.[1]?.token ?? "").toLowerCase();
+        if (other && d.swap.receivedSupplyAfter != null) at(other).supply = Number(d.swap.receivedSupplyAfter);
+        if (other && d.swap.receivedDebtAfter != null) at(other).debt = Number(d.swap.receivedDebtAfter);
       }
     }
     if (!TOUCH.has(d.eventType)) continue;
