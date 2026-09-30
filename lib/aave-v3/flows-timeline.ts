@@ -7,14 +7,21 @@
 // rails-ops reference/lifetime-flows-scrubber.md): the whole history and a
 // daily price per held asset, however the timeline itself is served.
 // `aaveV3FlowSeriesTimeline` maps that answer. The server classifies each
-// event with a port of `aaveV3EventLegs`, held to it by one fixture file
+// event with a port of `aaveV3FlowLegs`, held to it by one fixture file
 // (scripts/verify/verify-aave-v3-flow-legs.ts).
 //
 // `aaveV3FlowTimeline` builds the same day rows from a page's events, with
-// the legs `aaveV3EventLegs` gives: the reference the route is tested against,
+// the legs `aaveV3FlowLegs` gives: the reference the route is tested against,
 // valued the way the ledger values its flows (the oracle price the event
 // carries, else today's). The live stop takes held and owed from the
 // ledger in both, so at the live stop the scrubber states the ledger's figures.
+//
+// A repay made with aTokens (`repayWithATokens`, or Repay with `useATokens`)
+// burns the wallet's aTokens in the debt's asset: the debt side books it as
+// Repaid and the collateral side as "Used to repay". The ledger's classifiers
+// (`aaveV3EventLegs`, `sparkEventLegs`) give the debt leg only;
+// `withATokenRepayLeg` adds the collateral one, and the server's port gives
+// both (`rowLegs`).
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
@@ -51,6 +58,14 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
     side: "collateral",
     dir: "out",
     link: "repay-with-collateral",
+    hatch: "horizontal",
+  },
+  {
+    key: "usedToRepay",
+    label: "Used to repay",
+    event: "Repay",
+    side: "collateral",
+    dir: "out",
     hatch: "horizontal",
   },
   {
@@ -127,12 +142,18 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   },
 ];
 
-const BUCKET_OF: Record<FlowLeg, string> = {
+/** A leg of the scrubber's flows: the ledger's legs, and the collateral a
+ *  repay made with aTokens used, which the ledger does not count. */
+export type SeriesFlowLeg = FlowLeg | "usedToRepay";
+export type FlowEventLeg = Omit<AaveV3EventLeg, "leg"> & { leg: SeriesFlowLeg | null };
+
+const BUCKET_OF: Record<SeriesFlowLeg, string> = {
   supplied: "deposited",
   transferredIn: "received",
   swappedIn: "swappedIn",
   withdrawn: "withdrawn",
   soldToRepay: "soldToRepay",
+  usedToRepay: "usedToRepay",
   withdrawnSwapped: "withdrawnSwapped",
   swappedOut: "swappedOut",
   transferredOut: "sent",
@@ -154,7 +175,8 @@ const BUCKET_OF: Record<FlowLeg, string> = {
 export function lifetimeFromSeries(series: FlowSeries): ReserveFlows[] | undefined {
   if (!series.lifetime?.length) return undefined;
   const legOf: Record<string, FlowLeg> = { repaidWithCollateral: "repaid" };
-  for (const [leg, bucket] of Object.entries(BUCKET_OF)) legOf[bucket] = leg as FlowLeg;
+  // The ledger has no leg for the collateral a repay with aTokens used.
+  for (const [leg, bucket] of Object.entries(BUCKET_OF)) if (leg !== "usedToRepay") legOf[bucket] = leg as FlowLeg;
   const out = new Map<string, ReserveFlows>();
   const get = (asset: string): ReserveFlows => {
     const symbol = series.assets[asset]?.symbol ?? asset.slice(0, 8);
@@ -191,7 +213,7 @@ export function lifetimeFromSeries(series: FlowSeries): ReserveFlows[] | undefin
   return [...out.values()];
 }
 
-const bucketOf = (l: AaveV3EventLeg): string | null =>
+const bucketOf = (l: FlowEventLeg): string | null =>
   l.leg == null ? null : l.fromCollateral ? "repaidWithCollateral" : BUCKET_OF[l.leg];
 
 const sideOf = (bucket: string): FlowSide => AAVE_V3_FLOW_BUCKETS.find((b) => b.key === bucket)?.side ?? "collateral";
@@ -251,7 +273,7 @@ export function aaveV3FlowEvents(
   const liqTxs = aaveV3LiquidationTxs(ordered);
   return flowEventsFromLegs(
     ordered,
-    (ev) => aaveV3EventLegs(ev, liqTxs),
+    (ev) => aaveV3FlowLegs(ev, liqTxs),
     (ev) => {
       const ctx = ev.context.data;
       // The balances the row states after it: a liquidation's supply figures
@@ -282,6 +304,22 @@ export function aaveV3FlowEvents(
     },
     todayPrices,
   );
+}
+
+/** The collateral leg of a repay made with aTokens, added to the ledger's
+ *  legs for that event: the repaid leg's asset, amount and price, on the
+ *  collateral side. A repay-with-collateral swap is a swap event and keeps
+ *  its own legs. */
+export function withATokenRepayLeg(ev: BaseActivityEvent, legs: AaveV3EventLeg[]): FlowEventLeg[] {
+  const ctx = ev.context?.data as { eventType?: string; useATokens?: boolean } | undefined;
+  if (ctx?.eventType !== "repay" || ctx.useATokens !== true) return legs;
+  const repaid = legs.find((l) => l.leg === "repaid" && !l.fromCollateral);
+  return repaid ? [...legs, { ...repaid, leg: "usedToRepay" }] : legs;
+}
+
+/** An Aave V3 event's legs for the scrubber (rails-server `rowLegs`). */
+export function aaveV3FlowLegs(ev: BaseActivityEvent, liqTxs: Set<string | undefined>): FlowEventLeg[] {
+  return withATokenRepayLeg(ev, aaveV3EventLegs(ev, liqTxs));
 }
 
 /** Actions each family's position card leaves out of its transaction count
@@ -328,7 +366,7 @@ export interface StatedBalance {
  */
 export function flowEventsFromLegs<E extends BaseActivityEvent>(
   ordered: E[],
-  legsOf: (ev: E) => AaveV3EventLeg[],
+  legsOf: (ev: E) => FlowEventLeg[],
   statedOf: (ev: E) => StatedBalance[],
   todayPrices: Record<string, number> | undefined,
   opts: {

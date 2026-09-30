@@ -9763,5 +9763,5 @@
    ]
   }
  ],
- "about": "SparkLend flow legs, shared by rails-web scripts/verify/verify-spark-flow-legs.ts and rails-server api/src/services/aave-v3-flow-series.test.ts. Byte-identical in both repos. Rows from victoria's /api/spark/timeline on 2026-09-29; answers from the web's sparkEventLegs."
+ "about": "SparkLend flow legs, shared by rails-web scripts/verify/verify-spark-flow-legs.ts and rails-server api/src/services/aave-v3-flow-series.test.ts. Byte-identical in both repos. Rows from victoria's /api/spark/timeline on 2026-09-29; answers from the web's sparkFlowLegs."
 }

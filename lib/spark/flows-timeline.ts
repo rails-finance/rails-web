@@ -23,6 +23,8 @@ import {
   aaveV3FlowLive,
   flowEventsFromLegs,
   flowSeriesTimeline,
+  withATokenRepayLeg,
+  type FlowEventLeg,
   type StatedBalance,
 } from "@/lib/aave-v3/flows-timeline";
 
@@ -106,6 +108,13 @@ export function sparkEventLegs(ev: BaseActivityEvent, liqTxs: Set<string | undef
   return out;
 }
 
+/** A SparkLend event's legs for the scrubber: the ledger's, with the
+ *  collateral leg of a repay made with spTokens (rails-server `rowLegs` under
+ *  `SPARK_RULES`). */
+export function sparkFlowLegs(ev: BaseActivityEvent, liqTxs: Set<string | undefined>): FlowEventLeg[] {
+  return withATokenRepayLeg(ev, sparkEventLegs(ev, liqTxs));
+}
+
 /** The balances a SparkLend event states after it: a liquidation's supply
  *  figures are the collateral reserve's, its debt figures the debt reserve's. */
 function sparkStated(ev: SparkEvent): StatedBalance[] {
@@ -141,7 +150,7 @@ export function sparkFlowEvents(
     (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber,
   );
   const liqTxs = sparkLiquidationTxs(ordered);
-  return flowEventsFromLegs(ordered, (ev) => sparkEventLegs(ev, liqTxs), sparkStated, todayPrices, {
+  return flowEventsFromLegs(ordered, (ev) => sparkFlowLegs(ev, liqTxs), sparkStated, todayPrices, {
     notCounted: LIQUIDATIONS_NOT_COUNTED,
   });
 }

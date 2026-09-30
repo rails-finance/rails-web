@@ -1378,20 +1378,6 @@
       },
       {
         "reserve": "EURC",
-        "side": "supply",
-        "from": 23457363,
-        "to": 23527191,
-        "fromKind": "repay",
-        "toKind": "supply",
-        "fromRate": 2.6847,
-        "toRate": 4.0799,
-        "deltaPp": 1.3952,
-        "amt": 6.661435,
-        "fromObs": [23457363, 2],
-        "toObs": [23527180, 0]
-      },
-      {
-        "reserve": "EURC",
         "side": "borrow",
         "from": 23457363,
         "to": 23527191,
@@ -1403,20 +1389,6 @@
         "amt": 4817.895642,
         "fromObs": [23457363, 2],
         "toObs": [23527180, 0]
-      },
-      {
-        "reserve": "EURC",
-        "side": "supply",
-        "from": 23527191,
-        "to": 24068611,
-        "fromKind": "supply",
-        "toKind": "supply",
-        "fromRate": 4.0799,
-        "toRate": 2.2889,
-        "deltaPp": -1.791,
-        "amt": 6.661435,
-        "fromObs": [23527180, 0],
-        "toObs": [24068605, 6]
       },
       {
         "reserve": "EURC",
@@ -1447,20 +1419,6 @@
         "toObs": [24385753, 0]
       },
       {
-        "reserve": "RLUSD",
-        "side": "supply",
-        "from": 24558338,
-        "to": 25157446,
-        "fromKind": "supply",
-        "toKind": "supply",
-        "fromRate": 0.8602,
-        "toRate": 2.3904,
-        "deltaPp": 1.5302,
-        "amt": 2384.967758904454,
-        "fromObs": [24558277, 2],
-        "toObs": [25157443, 9]
-      },
-      {
         "reserve": "USDC",
         "side": "supply",
         "from": 24558338,
@@ -1473,48 +1431,6 @@
         "amt": 26803.600413,
         "fromObs": [24558337, 1],
         "toObs": [25157444, 10]
-      },
-      {
-        "reserve": "RLUSD",
-        "side": "supply",
-        "from": 25157446,
-        "to": 25216561,
-        "fromKind": "supply",
-        "toKind": "withdraw",
-        "fromRate": 2.3904,
-        "toRate": 1.1661,
-        "deltaPp": -1.2242,
-        "amt": 2384.967758904454,
-        "fromObs": [25157443, 9],
-        "toObs": [25215067, 2]
-      },
-      {
-        "reserve": "RLUSD",
-        "side": "supply",
-        "from": 25431816,
-        "to": 25540312,
-        "fromKind": "supply",
-        "toKind": "withdraw",
-        "fromRate": 2.4198,
-        "toRate": 0.999,
-        "deltaPp": -1.4208,
-        "amt": 2384.967758904454,
-        "fromObs": [25431431, 2],
-        "toObs": [25537707, 0]
-      },
-      {
-        "reserve": "RLUSD",
-        "side": "supply",
-        "from": 25579610,
-        "to": 25797974,
-        "fromKind": "repay",
-        "toKind": "withdraw",
-        "fromRate": 1.7705,
-        "toRate": 3.1673,
-        "deltaPp": 1.3968,
-        "amt": 2384.967758904454,
-        "fromObs": [25579050, 13],
-        "toObs": [25797918, 2]
       },
       {
         "reserve": "USDe",
