@@ -126,28 +126,17 @@ export function sparkEconomicsExplanation(
   gatewayWithdrawals = false,
   events?: readonly BaseActivityEvent[] | null,
   heldDebts: string[] = [],
-  pricesReading = false,
 ): ReactNode {
   return aaveV3EconomicsExplanation(data, {
     ...SPARK_OPTS,
     liquidationOnCard: true,
     fullUsd: data.fullUsdAmounts === true,
-    pricesReading,
     withdrawnWords: gatewayWithdrawals
       ? "withdrawn, withdrawals as ETH through the Spark WETH gateway included"
       : undefined,
-    extraItems: [...(events ? debtItems(data, events, heldDebts) : []), INTEREST_TWO_WAYS],
+    extraItems: events ? debtItems(data, events, heldDebts) : undefined,
   });
 }
-
-/** The card and this panel count interest over different spans. */
-const INTEREST_TWO_WAYS = (
-  <span key="interest-two-ways">
-    Interest is counted two ways: the card&apos;s &ldquo;incl. interest since&rdquo; figure counts from the day each
-    balance was last opened from nothing, and the interest rows here count the whole life, balances since closed
-    included. With no balance ever closed, the two are equal.
-  </span>
-);
 
 /** The modal names only the rows the panel shows, where it is given the panel's data. */
 export function sparkEconomicsContent(data?: AaveV3TowerData): LearnMoreContent {

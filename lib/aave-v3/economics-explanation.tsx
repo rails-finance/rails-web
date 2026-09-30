@@ -22,9 +22,6 @@ const tokenList = (lines: TowerLine[]): string =>
 export interface AaveV3EconomicsOpts {
   /** How the market names itself in the prose — "Aave V3" when unstated. */
   label?: string;
-  /** The page is still reading prices for unpriced assets: the bars are in
-   *  tokens for now, and the prose says so in place of "no price captured". */
-  pricesReading?: boolean;
   /** Whose treasury takes a liquidation's fee — "Aave" (or "Seamless") when unstated. */
   treasury?: string;
   /** The modal's words where the market is not an Aave deployment: whose
@@ -360,14 +357,10 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
   }
   if (!valued) {
     items.push(
-      opts.pricesReading ? (
-        <span key="token-units">Reading the oracle prices. Until they land, the bars show token units.</span>
-      ) : (
-        <span key="token-units">
-          Bars are shown in token units rather than USD because {label} has no on-chain price captured for one or more
-          of the assets involved.
-        </span>
-      ),
+      <span key="token-units">
+        Bars are shown in token units rather than USD because {label} has no on-chain price captured for one or more of
+        the assets involved.
+      </span>,
     );
   }
 
