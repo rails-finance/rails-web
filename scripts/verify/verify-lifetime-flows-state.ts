@@ -275,6 +275,10 @@ test("the busy treatment: bins, throughput, operations", () => {
     }) as FlowModel;
   assert.equal(isBusy(cycled(1)), false, "deposited once, withdrawn to $20");
   assert.equal(isBusy(cycled(6)), true, "the same $1k in and out six times");
+  // The turnover count takes the same base: held down to $20, the $1k cycled
+  // six times turned over 6 times (against today's $20 it read 300).
+  assert.equal(throughput(cycled(1)).turnover, null, "one deposit is no turnover");
+  assert.equal(throughput(cycled(6)).turnover, 6, "turnover against the peak");
   assert.deepEqual(
     [binUnitFor(90), binUnitFor(91), binUnitFor(1095), binUnitFor(1096)],
     ["day", "week", "week", "month"],

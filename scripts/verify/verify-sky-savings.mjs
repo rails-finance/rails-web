@@ -16,7 +16,7 @@
 //      sUSDS; the panel draws no Full breakdown; the Explanation's figures
 //      each name USDS, carry the api's in, out, worth and interest, and add
 //      up (worth + out − in = interest; the bar's length = worth + out); every
-//      figure on the bar's line is in dollars; the scrubber's
+//      figure in the bar's tip sum is in dollars; the scrubber's
 //      balancing item reads "Interest earned" at every stop, its last stop
 //      states the header's block, and at 390px consecutive Savings Rate
 //      changes draw as one row that counts them.
@@ -279,7 +279,15 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     `${name} page: the panel draws no Full breakdown`,
     (await page.getByRole("button", { name: /Full breakdown/ }).count()) === 0,
   );
-  const lineAt = () => page.locator('[data-flow-sources="collateral"]').innerText();
+  // The bar's sum closes each segment's tip: hover the first segment and read it.
+  const lineAt = async () => {
+    await page.locator('[data-flow-side="collateral"] div[aria-hidden] > span').first().hover();
+    const sum = page.locator('[data-flow-tip-sum="collateral"]');
+    await sum.waitFor({ timeout: 5000 });
+    const text = await sum.innerText();
+    await page.mouse.move(0, 0);
+    return text;
+  };
   // The Explanation's bullets (lib/sky-savings/flows-explanation.tsx), read
   // from the panel whether or not its pane is open.
   const prose = await page.evaluate(() =>
@@ -345,12 +353,12 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
       near(length[1], units(pos.data.value.raw) + units(pos.data.usdsOut.raw)),
       length[1],
     );
-  // The bar's line: every figure in dollars.
+  // The bar's sum: every figure in dollars.
   const line = (await lineAt()).replace(/\s+/g, " ");
   const bare = [...line.matchAll(/(?:^|[^$\d.,])([\d][\d.,]*[KMBT]?)(?![\d.,KMBT%])/g)].map((m) => m[1]);
-  check(`${name} page: every figure on the bar's line is in dollars`, /\$/.test(line) && bare.length === 0, line);
+  check(`${name} page: every figure in the bar's sum is in dollars`, /\$/.test(line) && bare.length === 0, line);
   const stops = [await lineAt()];
-  await page.getByRole("button", { name: "Previous event", exact: true }).click();
+  await page.getByRole("button", { name: "Previous date", exact: true }).click();
   await page.waitForTimeout(300);
   stops.push(await lineAt());
   check(

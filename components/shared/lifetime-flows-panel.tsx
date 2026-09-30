@@ -4,8 +4,8 @@
 // date scrubber (rails-ops reference/lifetime-flows-scrubber.md): the header
 // that collapses the panel, the scrubber, and the Explanation with the
 // scrubber's Key after its prose. The scrubber reports the Key's hatches where
-// it draws them, and a line each for the Key and the Explanation on which of
-// its two views (Flows, Over time) is which. Until the scrubber's timeline
+// it draws them, and a line each for the Key and the Explanation on what the
+// bars and the line under them cover. Until the scrubber's timeline
 // lands the panel says it is reading; where that read fails, that it was not
 // read.
 //

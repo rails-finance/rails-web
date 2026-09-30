@@ -736,9 +736,7 @@ export default function AaveV3PositionDetail({
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
                 scrubber={
-                  flowTimeline ? (
-                    <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} combined />
-                  ) : null
+                  flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
                 }
               />
             )}
