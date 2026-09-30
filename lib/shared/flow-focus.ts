@@ -133,6 +133,7 @@ export const AAVE_FAMILY_KINDS: FolderKinds = (() => {
     swappedIn: ["swap"],
     withdrawn: ["withdraw"],
     soldToRepay: ["repay", "swap"],
+    usedToRepay: ["repay"],
     withdrawnSwapped: ["swap"],
     swappedOut: ["swap"],
     sent: ["transfer_out"],

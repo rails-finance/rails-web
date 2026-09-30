@@ -88,7 +88,7 @@ const PAGES = [
     wallet: "0x763c12108c37e19d3c23d7348daff7af802893fd",
     market: "core",
     url: "/ethereum/aave-v3/0x763c12108c37e19d3c23d7348daff7af802893fd?market=core",
-    pill: 23,
+    pill: 20,
   },
   {
     key: "spark:0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6",
@@ -176,7 +176,8 @@ const txOf = (id) => (id.match(/0x[0-9a-fA-F]{64}/)?.[0] ?? "").toLowerCase();
 const TOUCH = new Set(["supply", "withdraw", "borrow", "repay", "liquidation"]);
 
 /** The position's own touches, each with what it held once the row landed —
- *  a running map over ALL rows in chain order, transfers included. */
+ *  a running map over ALL rows in chain order, transfers included; a repay
+ *  made with aTokens lowers the supply by the amount repaid. */
 function holdings(events) {
   const rows = [...events].sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a.id) - logIndexOf(b.id));
   const held = new Map();
@@ -198,6 +199,12 @@ function holdings(events) {
       if (own) {
         if (d.supplyAfter != null) at(own).supply = Number(d.supplyAfter);
         if (d.debtAfter != null) at(own).debt = Number(d.debtAfter);
+        // A repay made with aTokens burns the supply it repaid; the row
+        // states only the debt.
+        if (d.eventType === "repay" && d.useATokens === true) {
+          const burned = Number(e.flows?.[0]?.amountFormatted);
+          if (Number.isFinite(burned)) at(own).supply = Math.max(0, at(own).supply - burned);
+        }
       }
       // A swap row (a CoW collateral or debt swap, grouped into one row) also
       // lands its received reserve, the event's second flow — the other leg is
@@ -606,8 +613,7 @@ for (const p of PAGES) {
   );
   // SparkLend draws no live note whose move rounds to 0.00 points (newcomer
   // round 2, R7), so those sides are expected off the page there.
-  const drawn =
-    p.proto === "spark" ? above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005) : above;
+  const drawn = p.proto === "spark" ? above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005) : above;
   data.expected = { historical: got, since, above: drawn, below, through };
 }
 

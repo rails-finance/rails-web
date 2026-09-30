@@ -110,8 +110,14 @@ async function scan(proto) {
     for (const e of evs) {
       const actionLabel = actionLabelOf(e, env);
       const d = e.context?.data ?? {};
-      const cd = Number(d.collDelta) || 0;
-      const dd = Number(d.debtDelta) || 0;
+      // What the act moved, from the TroveOperation log (web a2a16f7): the debt
+      // without the interest accrued since the last touch, the collateral
+      // without a liquidated neighbour's redistribution. The net deltas carry
+      // both, so an add-collateral adjust would read as a borrow off them.
+      const op = d.operation;
+      const cd = (Number(d.collDelta) || 0) - (op ? Number(op.collFromRedist) || 0 : 0);
+      const dd =
+        op && Number.isFinite(Number(op.debtFromOperation)) ? Number(op.debtFromOperation) : Number(d.debtDelta) || 0;
       // Validate adjustTrove verb ↔ deltas (skip no-change bucket).
       if (d.eventType === "adjustTrove" && e.actionType !== "adjustTrove_noChange") {
         const exp = expectAdjustLabel(cd, dd);
