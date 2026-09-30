@@ -42,7 +42,8 @@ import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
-import { movedDeltaProv, type DolomiteCoords } from "@/lib/dolomite/event-provenance";
+import { balanceAfterProv, movedDeltaProv, type DolomiteCoords } from "@/lib/dolomite/event-provenance";
+import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -138,6 +139,29 @@ function Addr({ address }: { address: string }) {
 }
 
 const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
+
+/** A transfer's other side, named as the header names it: the account number,
+ *  with the wallet only when it is not the page's own. `counterparty` on a
+ *  transfer leg is the other account's owner, which is usually this wallet. */
+function OtherAccount({ ctx, owner }: { ctx: DolomiteContext; owner?: string }) {
+  if (ctx.counterpartyAccountNumber == null)
+    return ctx.counterparty ? (
+      <>
+        another Dolomite account (<Addr address={ctx.counterparty} />)
+      </>
+    ) : (
+      <>another Dolomite account</>
+    );
+  const name = otherAccountName(ctx.counterpartyAccountNumber);
+  const same = ctx.counterparty == null || (owner != null && ctx.counterparty === owner.toLowerCase());
+  return same ? (
+    <>{name} of this wallet</>
+  ) : (
+    <>
+      {name} of <Addr address={ctx.counterparty!} />
+    </>
+  );
+}
 
 // ── the variant table ────────────────────────────────────────────────────────
 
@@ -275,6 +299,18 @@ function dolomiteEventSlotsBase(
     </Fig>
   );
 
+  // The debt after a transfer that moved it without crossing zero, as the
+  // detail grid states it (the token balance at the block's index).
+  const debtAfter = (verb: "rose" | "fell") =>
+    ctx.balanceAfter != null ? (
+      <>
+        : the account&rsquo;s {sym} debt {verb} to{" "}
+        <Fig echo info={balanceAfterProv(sym, coords)} value={fmtAbs(ctx.balanceAfter)} symbol={sym}>
+          {fmtAbs(ctx.balanceAfter)} {sym}
+        </Fig>
+      </>
+    ) : null;
+
   switch (ctx.eventType) {
     case "deposit": {
       if (rs.wasDebt) {
@@ -390,19 +426,19 @@ function dolomiteEventSlotsBase(
         ? clause(
             <>Here it lifted the account&rsquo;s {sym} balance out of the negative, repaying that much of the debt.</>,
           )
-        : null;
+        : rs.wasDebt && rs.nowDebt
+          ? clause(
+              <>
+                This repaid {fmtAbs(ctx.weiDelta)} {sym} of the debt
+                {debtAfter("fell")}.
+              </>,
+            )
+          : null;
       return {
         happened: [
           clause(
             <>
-              Received {moved()} from another Dolomite account
-              {ctx.counterparty ? (
-                <>
-                  {" "}
-                  (<Addr address={ctx.counterparty} />)
-                </>
-              ) : null}
-              .
+              Received {moved()} from <OtherAccount ctx={ctx} owner={coords.owner} />.
             </>,
           ),
         ],
@@ -416,19 +452,19 @@ function dolomiteEventSlotsBase(
     case "transfer_out": {
       const intoDebt: ClauseInput = rs.crossedIntoDebt
         ? clause(<>This transfer took the {sym} balance below zero — a negative balance IS borrowing here.</>)
-        : null;
+        : rs.deepenedDebt
+          ? clause(
+              <>
+                This borrowed {fmtAbs(ctx.weiDelta)} {sym}
+                {debtAfter("rose")}.
+              </>,
+            )
+          : null;
       return {
         happened: [
           clause(
             <>
-              Sent {moved()} to another Dolomite account
-              {ctx.counterparty ? (
-                <>
-                  {" "}
-                  (<Addr address={ctx.counterparty} />)
-                </>
-              ) : null}
-              .
+              Sent {moved()} to <OtherAccount ctx={ctx} owner={coords.owner} />.
             </>,
           ),
         ],
@@ -488,6 +524,40 @@ function dolomiteEventSlotsBase(
       // collateral is named in words (its figure lives on the seize_out card).
       const seize = seizeSibling(siblings, self);
       const seizeSym = seize?.context.data.marketSymbol;
+      // What remains follows the share repaid: Dolomite clears half the debt
+      // at a health factor of 0.95 or above on a market that allows it, and
+      // all of it otherwise (the detail's note states the rule).
+      const share =
+        ctx.balanceBefore != null && Number(ctx.balanceBefore) < 0 && ctx.weiDelta != null
+          ? Math.abs(Number(ctx.weiDelta)) / Math.abs(Number(ctx.balanceBefore))
+          : null;
+      const cleared = rs.after != null && rs.after >= 0;
+      const left = seize?.context.data.balanceAfter;
+      const remains: ClauseInput = cleared
+        ? clause(
+            <>
+              The {sym} debt is cleared; the remaining collateral stays in the account
+              {seize && seizeSym && left != null && Number(left) > 0 ? (
+                <>
+                  {" "}
+                  (
+                  <Fig
+                    echo
+                    info={balanceAfterProv(seizeSym, { ...coords, marketId: seize.context.data.marketId })}
+                    value={formatNumber(Number(left))}
+                    symbol={seizeSym}
+                  >
+                    {formatNumber(Number(left))} {seizeSym}
+                  </Fig>
+                  )
+                </>
+              ) : null}
+              .
+            </>,
+          )
+        : share != null && Math.abs(share - 0.5) < 0.005
+          ? clause(<>Half the debt remains; the account can be liquidated again if it falls below its line.</>)
+          : clause(<>Part of the debt remains; the account can be liquidated again if it falls below its line.</>);
       return {
         happened: [
           clause(
@@ -521,11 +591,7 @@ function dolomiteEventSlotsBase(
               liquidator&rsquo;s payout and receipt.
             </>,
           ),
-          clause(
-            <>
-              It is partial and repeatable — the account continues with whatever remains, rather than being closed out.
-            </>,
-          ),
+          remains,
         ],
       };
     }

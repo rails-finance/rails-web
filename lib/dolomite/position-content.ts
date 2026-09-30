@@ -24,7 +24,7 @@ export function dolomitePositionContent(opts: {
       }
     : {
         bold: "Highest recorded, in par",
-        text: "each peak is the maximum of the running par balance, a scaled figure: multiply it by the market's interest index for tokens.",
+        text: "each peak is the maximum of the running par balance, the figure the protocol stores and interest does not move: multiply it by the market's interest index for tokens.",
       };
 
   if (opts.status === "liquidated") {
@@ -75,7 +75,7 @@ export function dolomitePositionContent(opts: {
   const details: LearnMoreContent["details"] = [
     {
       bold: "Par × index",
-      text: "the core stores each balance as par — a scaled figure. Par × the market's interest index = the token amount, and the index grows per second, so interest lives entirely in it.",
+      text: "par is the balance the protocol stores; the token amount is par × the market's index, which grows with interest, so par stays still between the account's events.",
     },
     {
       bold: "No separate Borrow action",

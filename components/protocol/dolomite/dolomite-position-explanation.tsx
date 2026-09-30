@@ -34,6 +34,7 @@ export function DolomitePositionExplanation({
   chain,
   liquidationCount,
   txCount,
+  eventTotal,
   externalActivity,
 }: {
   /** The live chain read. Null until it lands (or for a closed account):
@@ -44,6 +45,8 @@ export function DolomitePositionExplanation({
   liquidationCount?: number;
   /** The card's transaction count (the count badge). Omit to skip. */
   txCount?: number;
+  /** The account's timeline rows, when the whole history is known. */
+  eventTotal?: number;
   /** Who executed the account's events, reduced over its whole history. The
    *  page derives it from the events already on the page; omit to skip the
    *  operator bullet. */
@@ -201,12 +204,12 @@ export function DolomitePositionExplanation({
     }
     bullets.push(
       <span key="mechanics">
-        A liquidation here repays part of the debt and takes collateral worth that repayment plus{" "}
+        A liquidation here repays half or all of the debt and takes collateral worth that repayment plus{" "}
         {chain.override.active && chain.override.liquidationSpread != null
           ? `${(chain.override.liquidationSpread * 100).toFixed(0)}%`
           : `${(chain.liquidationSpread * 100).toFixed(0)}%`}
-        . It is partial and repeatable, moving four balances in one event across the borrower&rsquo;s and the
-        liquidator&rsquo;s accounts.
+        : half when the health factor is 0.95 or above and the collateral market allows it, all of it otherwise. It
+        moves four balances in one event across the borrower&rsquo;s and the liquidator&rsquo;s accounts.
       </span>,
     );
   }
@@ -224,7 +227,7 @@ export function DolomitePositionExplanation({
     bullets.push(
       <span key="survivor">
         The account has been liquidated <H>{liquidationCount}</H> time{liquidationCount === 1 ? "" : "s"} and remains
-        open. Liquidation here is partial and repeatable — an event in the account&rsquo;s life rather than its end.
+        open: a liquidation repays half or all of the debt, and the collateral left over stays in the account.
       </span>,
     );
   }
@@ -232,7 +235,17 @@ export function DolomitePositionExplanation({
   if (txCount != null && txCount > 0) {
     bullets.push(
       <span key="tx-count">
-        The account has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date.
+        The account has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date
+        {liquidationCount != null && liquidationCount > 0 ? ", liquidations left out" : ""}
+        {eventTotal != null && eventTotal !== txCount ? (
+          <>
+            ; its timeline holds {eventTotal} events
+            {liquidationCount != null && liquidationCount > 0
+              ? ", because each liquidation writes two rows"
+              : ", because one transaction can write a row per market it moves"}
+          </>
+        ) : null}
+        .
       </span>,
     );
   }
@@ -320,14 +333,30 @@ export function DolomiteClosedPositionExplanation({ v }: { v: DolomitePositionVi
         The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
         {v.liquidations && v.liquidations.length > 0
           ? liquidationSentences(v.liquidations).join(" ")
-          : "Each time a liquidator repaid part of the debt and took collateral worth that repayment plus the liquidation spread."}
+          : "Each time a liquidator repaid half or all of the debt and took collateral worth that repayment plus the liquidation spread."}
       </>,
     );
   }
   list.push(
     <>
       Its last activity landed on <H>{formatDate(v.lastActivityAt)}</H>, after <H>{v.txCount}</H> transaction
-      {v.txCount === 1 ? "" : "s"}.
+      {v.txCount === 1 ? "" : "s"}
+      {v.liquidationCount > 0 ? " (liquidations left out)" : ""}
+      {v.eventTotal != null && v.eventTotal !== v.txCount ? (
+        <>
+          {" "}
+          and {v.eventTotal} events
+          {v.liquidationCount > 0 ? (
+            <>
+              : each liquidation is the liquidator&rsquo;s transaction and writes two rows, the debt repaid and the
+              collateral seized
+            </>
+          ) : (
+            <>: one transaction can write a row per market it moves</>
+          )}
+        </>
+      ) : null}
+      .
     </>,
   );
   list.push(

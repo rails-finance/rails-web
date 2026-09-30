@@ -85,13 +85,22 @@ export function accountLabel(accountNumber: string): string {
   return `Borrow Position #${shortAccountNumber(norm)}`;
 }
 
-/** The other side of a transfer between two accounts of one wallet, named by
- *  its account number ("account 0", "account 0xd010…e722"). */
+/** The other side of a transfer, named as the listing and the card header name
+ *  that account ("account 0 (Dolomite Balance)", "Borrow Position #0xd010…e722"). */
 export function otherAccountName(accountNumber: string): string {
   const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
   if (norm === "0") return "account 0 (Dolomite Balance)";
   if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER) return "the WLFI frontend account";
-  return `account ${shortAccountNumber(norm)}`;
+  return accountLabel(norm);
+}
+
+/** A price in dollars without the sign: two decimals from $1, four
+ *  significant digits below it, so a token worth a few cents keeps the digits
+ *  that tell two prices apart ($0.05303, not $0.05). */
+export function formatDolomitePrice(n: number): string {
+  if (Number.isFinite(n) && n > 0 && n < 1)
+    return n.toLocaleString("en-US", { minimumSignificantDigits: 4, maximumSignificantDigits: 4 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** What an account label means, for the tip on its first appearance. */

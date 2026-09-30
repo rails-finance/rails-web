@@ -220,17 +220,6 @@ export default function DolomitePositionView({
 
   const dolomiteEvents = useMemo(() => events.filter(isDolomiteEvent), [events]);
 
-  // A closed card's peaks as each row's token balance before and after it,
-  // and what each liquidation did, where the page holds every row.
-  const cardView = useMemo<DolomitePositionView | null>(() => {
-    if (!liveView || liveView.status === "open" || cutoffBlock != null || dolomiteEvents.length === 0) return liveView;
-    return {
-      ...liveView,
-      liquidations: dolomiteLiquidationStories(dolomiteEvents),
-      peakSupplies: withTokenPeaks(liveView.peakSupplies, dolomiteEvents, "supply"),
-      peakBorrows: withTokenPeaks(liveView.peakBorrows, dolomiteEvents, "debt"),
-    };
-  }, [liveView, cutoffBlock, dolomiteEvents]);
   // The tx-sibling seam: each card reaches its same-tx legs so the liquidation
   // narrator (the debt leg) can name the collateral seized on a sibling leg.
   const siblingsByTx = useMemo(() => groupEventsByTx(dolomiteEvents), [dolomiteEvents]);
@@ -265,6 +254,23 @@ export default function DolomitePositionView({
     protocolKey: "dolomite",
     window: historyWindow,
   });
+
+  // A closed card's peaks as each row's token balance before and after it,
+  // and what each liquidation did, where the page holds every row. The card's
+  // count gives the timeline's rows beside the owner's transactions once the
+  // whole history is known.
+  const eventTotal = lifetimeFiguresKnown(historyWindow) ? tl.totalCount : undefined;
+  const cardView = useMemo<DolomitePositionView | null>(() => {
+    if (!liveView) return liveView;
+    const counted = { ...liveView, eventTotal };
+    if (liveView.status === "open" || cutoffBlock != null || dolomiteEvents.length === 0) return counted;
+    return {
+      ...counted,
+      liquidations: dolomiteLiquidationStories(dolomiteEvents),
+      peakSupplies: withTokenPeaks(liveView.peakSupplies, dolomiteEvents, "supply"),
+      peakBorrows: withTokenPeaks(liveView.peakBorrows, dolomiteEvents, "debt"),
+    };
+  }, [liveView, eventTotal, cutoffBlock, dolomiteEvents]);
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
   // not the window's. `lifetimeEvents` is undefined until the opening balance
@@ -381,6 +387,7 @@ export default function DolomitePositionView({
                     chain={chain}
                     liquidationCount={liveView.liquidationCount}
                     txCount={liveView.txCount}
+                    eventTotal={eventTotal}
                     externalActivity={externalActivityWithOpening}
                   />
                 ) : (
