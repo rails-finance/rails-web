@@ -587,7 +587,11 @@ for (const p of PAGES) {
           .filter(Boolean)
           .join(" · "),
   );
-  data.expected = { historical: got, since, above, below, through };
+  // SparkLend draws no live note whose move rounds to 0.00 points (newcomer
+  // round 2, R7), so those sides are expected off the page there.
+  const drawn =
+    p.proto === "spark" ? above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005) : above;
+  data.expected = { historical: got, since, above: drawn, below, through };
 }
 
 // 1c. BREAK the rule: read B's OWN transaction for the later end, and show the
@@ -671,7 +675,7 @@ for (const p of PAGES) {
   const noteCount = await marketNoteCount(page);
   check(
     `2c0. ${p.wallet.slice(0, 10)}… — the timeline states a note count (the notes computation ran at all)`,
-    noteCount > 0,
+    noteCount > 0 || pillWanted === 0,
     noteCount > 0
       ? ""
       : "no count after 180s — the reserve-rates fetch never landed, so every count above is a silent zero",
@@ -802,18 +806,17 @@ for (const p of PAGES) {
   }
 }
 
-// 4b. the flat live note — 0xbdfa…'s USDS borrow, Δ 0.00, which MUST render.
-// Since 2026-09-10 a flat move is invisible in the HEADER (which states the
-// later rate, and on a flat note that is the same rate the earlier end had),
-// so the row is opened and the move read where it now lives: under the rate
-// card, as "+0.00 points".
+// 4b. the flat live note — 0xbdfa…'s USDS borrow, Δ 0.00. SparkLend leaves a
+// live note whose move rounds to 0.00 points off the page (newcomer round 2,
+// R7: the note modal promises a move), so no head row may read "0.00 points".
 {
   const p = PAGES[4];
   const page = pages[p.key];
   const ids = await noteIdsOn(page);
   const head = ids.filter((i) => i.endsWith("-head"));
-  const row = page.locator(`[data-market-note="${head[0]}"]`);
-  if (head.length === 1) {
+  let flat = false;
+  for (const id of head) {
+    const row = page.locator(`[data-market-note="${id}"]`);
     await row.scrollIntoViewIfNeeded();
     await row
       .getByRole("button", { expanded: false })
@@ -821,12 +824,12 @@ for (const p of PAGES) {
       .click()
       .catch(() => {});
     await page.waitForTimeout(300);
+    if (/[+−-]0\.00 points/.test((await row.textContent()).replace(/\s+/g, " "))) flat = true;
   }
-  const text = head.length ? (await row.textContent()).replace(/\s+/g, " ") : "";
   check(
-    "4b. 0xbdfa… renders its live note even at Δ 0.00 points (nothing having moved is the fact)",
-    head.length === 1 && /0\.00 points/.test(text),
-    head.length ? text.slice(0, 160) : "no head row",
+    "4b. 0xbdfa… draws no live note whose move rounds to 0.00 points (SparkLend hides them)",
+    !flat,
+    `${head.length} head row(s)`,
   );
 }
 
