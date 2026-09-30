@@ -81,6 +81,7 @@ import {
   type BinInput,
 } from "@/lib/shared/flows-series";
 import { combinedAt, combinedStops, nearestStop } from "@/lib/shared/flows-combined";
+import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -372,6 +373,84 @@ test("the window's opening segment: what was held when it opens, and every lengt
     (last.txs ?? last.events) - (open.txs ?? open.events),
   );
   assert.equal(throughput(w).txs, (full.totalTxs ?? full.totalEvents) - (open.txs ?? open.events));
+});
+
+// ── the segment panel's sum ─────────────────────────────────────────────────
+
+/** Reads the panel's printed sum back: each line's sign and figure, and the
+ *  total, as the reader would add them. */
+const printedAdds = (st: FlowSideState): { lines: number; total: number; text: string } => {
+  const rows = sideSumRows(st);
+  const dollars = (amount: string) => Number(amount.replace(/[$,]/g, ""));
+  const lines = rows.lines.reduce((a, l) => a + (l.sign === "−" ? -1 : 1) * dollars(l.amount), 0);
+  const text = rows.lines.map((l) => `${l.sign}${l.label} ${l.amount}`).join(" · ") + ` = ${rows.total.amount}`;
+  return { lines, total: dollars(rows.total.amount), text };
+};
+
+test("the panel's sum: the printed lines add to the printed held figure, on plain, windowed and busy bars", () => {
+  const check = (m: FlowModel, stops: number[], what: string) => {
+    for (const stop of stops)
+      for (const side of ["collateral", "debt"] as const) {
+        const st = stateAt(m, stop)[side];
+        if (!(st.total > 0)) continue;
+        const p = printedAdds(st);
+        assert.equal(p.lines, p.total, `${what} at stop ${stop}, ${side}: ${p.text}`);
+        assert.equal(p.total, Math.round(st.now), `${what} at stop ${stop}, ${side}: the total is what is held`);
+        const rows = sideSumRows(st);
+        // The first line reads unsigned; each later one carries its sign.
+        assert.ok(
+          rows.lines.slice(1).every((l) => l.sign !== ""),
+          `${what} at stop ${stop}, ${side}: signs`,
+        );
+        // Only the balancing item is a remainder, and it comes last.
+        assert.ok(rows.lines.filter((l) => l.kind === "rest").length <= 1);
+        if (rows.lines.some((l) => l.kind === "rest")) assert.equal(rows.lines[rows.lines.length - 1].kind, "rest");
+        // The outflows come in the bar's order.
+        const outs = rows.lines.filter((l) => l.kind === "out").map((l) => l.key);
+        const bar = st.bar.filter((x) => outs.includes(x.key)).map((x) => x.key);
+        assert.deepEqual(outs, bar, `${what} at stop ${stop}, ${side}: the bar's order`);
+      }
+  };
+  // Plain bars, whole life: 9 Nov 2025 (Miles's screenshot), a liquidation-free
+  // stop early on, and the live stop.
+  check(model, [dayOf("2025-11-09T00:00:00Z"), model.eventDays[3], model.liveStop], "0xfb93, whole");
+  // The bars' window: the sum opens with what was held when it opens.
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const w = windowModel(full, full.eventDays[12]);
+  check(w, [0, Math.floor(w.liveStop / 2), w.liveStop], "0xfb93, windowed");
+  assert.equal(sideSumRows(stateAt(w, 0).collateral).lines[0].kind, "opening");
+  // A busy window: the same $1k cycled forty times, held at $20 with a price
+  // off the dollar, so every line rounds.
+  const busy = buildFlowModel({
+    buckets: [
+      { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
+      { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
+    ],
+    days: Array.from({ length: 80 }, (_, i) => ({
+      day: 20_000 + i,
+      events: i + 1,
+      tick: "collateral" as const,
+      cum: {
+        deposited: Math.ceil((i + 1) / 2) * 1000.37,
+        withdrawn: Math.floor((i + 1) / 2) * (i === 79 ? 980.61 : 1000.29),
+      },
+      balances: [{ asset: "a", symbol: "A", side: "collateral" as const, amount: i % 2 === 0 ? 1000 : 20 }],
+      prices: [{ asset: "a", usd: 1 + i / 997, ts: (20_000 + i) * 86_400 }],
+    })),
+    live: { collateralUsd: 20.49, debtUsd: 0 },
+  }) as FlowModel;
+  assert.equal(isBusy(busy), true);
+  check(busy, [0, 1, 17, 40, 78, busy.liveStop], "busy");
+  // Every figure is whole dollars, and the held assets add to the total.
+  assert.equal(wholeUsd(79_411.6), "$79,412");
+  assert.equal(wholeUsd(-90_118.2), "$90,118");
+  assert.deepEqual(apportionDollars([150_920.6, 12_714.7], 163_635), [150_920, 12_715]);
+  const parts = apportionDollars([0.4, 0.4, 0.4], 1);
+  assert.equal(
+    parts.reduce((a, v) => a + v, 0),
+    1,
+  );
 });
 
 test("the Lifetime series: calendar bins from the open to today, each at the replay's balances and its last recorded price", () => {
