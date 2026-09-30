@@ -3,12 +3,13 @@
 // status-lead sentence plus bullets built straight from the tower's own data
 // (computeMakerEconomics), never boilerplate.
 
+import { usdPrice } from "@/lib/makerdao/price-format";
 import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
 import type { MakerTowerData } from "@/lib/makerdao/economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
-import { formatNumber, formatPrice } from "@/lib/utils/format";
+import { formatNumber } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import type { MakerCollateralLeg } from "@/lib/makerdao/economics";
 
@@ -58,13 +59,20 @@ const exitedTotal = (side: TowerSideData): number => side.exited.reduce((sum, l)
 /** Explanation body for the MakerDAO tower — a lead sentence plus bullets
  *  derived from `data`. Every USD figure names the price it is valued at.
  *  Returns null when there's nothing to narrate. */
-export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
+export function makerdaoEconomicsExplanation(data: MakerTowerData, opts: { capped?: boolean } = {}): ReactNode {
   const { collateral, debt } = data;
   const collSym = data.collateralSymbol ?? sideSymbol(collateral, "collateral");
   const debtSym = sideSymbol(debt, "DAI");
   const atEvents = data.flowsPricedAtEvents === true;
   const now = data.priceNow;
-  const nowText = now != null ? `today's OSM price of $${formatPrice(now)}` : "today's OSM price";
+  // A capped feed (LockStake) values the collateral at the cap, under the OSM.
+  const nowText = opts.capped
+    ? now != null
+      ? `today's capped price of ${usdPrice(now)}`
+      : "today's capped price"
+    : now != null
+      ? `today's OSM price of ${usdPrice(now)}`
+      : "today's OSM price";
   const bullets: ReactNode[] = [];
 
   const collWithdrawn = exitedTotal(collateral);
@@ -84,7 +92,11 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
             {fig(collWithdrawn)} withdrawn
           </>
         )}
-        {atEvents ? ", each valued at the OSM price at its own block." : `, valued at ${nowText}.`}
+        {atEvents
+          ? opts.capped
+            ? ", each valued at the capped price at its own block."
+            : ", each valued at the OSM price at its own block."
+          : `, valued at ${nowText}.`}
       </span>,
     );
   }
@@ -180,17 +192,35 @@ export function makerdaoEconomicsExplanation(data: MakerTowerData): ReactNode {
   }
 
   if (data.lifetimeInterest != null && data.lifetimeInterest > DUST) {
-    const owed = data.feeOwed ?? 0;
     const liq = data.feeLiquidated ?? 0;
-    const repaid = Math.max(0, data.lifetimeInterest - owed - liq);
+    // With no repayment and no liquidation, every fee the vault ran up is
+    // still in the debt; otherwise the split needs the page's fee owed.
+    const noRepay = debtRepaid <= DUST;
+    const owed = data.feeOwed ?? (noRepay && liq <= DUST ? data.lifetimeInterest : null);
+    const repaid = owed != null && !noRepay ? Math.max(0, data.lifetimeInterest - owed - liq) : 0;
     const parts: ReactNode[] = [];
-    if (owed > DUST) parts.push(<>{fig(owed)} is in today&apos;s debt</>);
+    if (owed != null && owed > DUST)
+      parts.push(
+        Math.abs(owed - data.lifetimeInterest) < 0.5 ? (
+          <>all of it is in today&apos;s debt</>
+        ) : (
+          <>{fig(owed)} is in today&apos;s debt</>
+        ),
+      );
     if (repaid > DUST) parts.push(<>{fig(repaid)} was paid inside repayments</>);
     if (liq > DUST) parts.push(<>{fig(liq)} was part of the debt the liquidation cleared</>);
+    const netOf =
+      !noRepay && (debtLiq || collLiq)
+        ? " net of repayments and liquidations"
+        : !noRepay
+          ? " net of repayments"
+          : debtLiq || collLiq
+            ? " net of liquidations"
+            : "";
     bullets.push(
       <span key="interest-accrued">
         {fig(data.lifetimeInterest)} of stability fee over the vault&apos;s life: the {debtSym} owed now less every{" "}
-        {debtSym} drawn net of repayments and liquidations
+        {debtSym} drawn{netOf}
         {parts.length > 0 ? (
           <>
             {"; "}
@@ -251,24 +281,31 @@ const MAKER_DOCS = {
 } as const;
 
 /** The tower's "?" FAQ for MakerDAO. */
-export function makerdaoEconomicsContent(): LearnMoreContent {
+export function makerdaoEconomicsContent(
+  opts: { debtSym?: string; ilk?: string; priceChangeRow?: boolean; capped?: boolean } = {},
+): LearnMoreContent {
+  const dsym = opts.debtSym ?? "DAI";
+  const priceWord = opts.capped ? "the price Maker values it at (the capped oracle price)" : "today's OSM price";
   return {
     title: "About the Economics",
-    intro:
-      "This panel adds up everything the vault's events moved: collateral in and out on the left, DAI drawn and repaid on the right, with what the vault holds and owes today at the bottom of each side.",
+    intro: `This panel adds up everything the vault's events moved: collateral in and out on the left, ${dsym} drawn and repaid on the right, with what the vault holds and owes today at the bottom of each side.`,
     stepsHeading: "How the figures are valued:",
     steps: [
       "Collateral flows are valued at Maker's oracle (OSM) price at each event's block when the page has read every one of them; otherwise at today's OSM price, and the explanation says which.",
-      "What the vault holds is valued at today's OSM price. The difference between the two is the Price change row.",
-      "DAI is counted at $1. Each draw and repayment is the DAI minted or burned at the time.",
-      "Maker keeps one debt figure. The page splits it into principal (DAI drawn less DAI repaid) and the stability fee owed (the rest). A repayment counts against principal first and against fee only once principal reaches zero, so the repaid rows split the same way.",
+      opts.priceChangeRow
+        ? `What the vault holds is valued at ${priceWord}. The difference between the two is the Price change row.`
+        : `What the vault holds is valued at ${priceWord}.`,
+      `${dsym} is counted at $1. Each draw and repayment is the ${dsym} minted or burned at the time.`,
+      `Maker keeps one debt figure. The page splits it into principal (${dsym} drawn less ${dsym} repaid) and the stability fee owed (the rest). A repayment counts against principal first and against fee only once principal reaches zero, so the repaid rows split the same way.`,
       "The all-time fee row adds the fee already paid inside repayments or cleared by a liquidation to the fee owed now.",
     ],
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The collateral type",
-        text: "each vault belongs to one collateral type (ETH-A, ETH-C, …), which sets its own minimum ratio and stability fee.",
+        text: opts.ilk
+          ? `each vault belongs to one collateral type (this one is ${opts.ilk}), which sets its own minimum ratio and stability fee.`
+          : "each vault belongs to one collateral type (ETH-A, ETH-C, …), which sets its own minimum ratio and stability fee.",
       },
       {
         bold: "Stability fee",

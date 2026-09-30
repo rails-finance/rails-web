@@ -21,7 +21,8 @@
 
 import { parseAbi, getAddress, stringToHex } from "viem";
 import { alchemyClient } from "./rpc";
-import { MAKER_ADDRESSES, ilkToCollateralSymbol } from "@/lib/makerdao/asset-catalog";
+import { MAKER_ADDRESSES, ilkToCollateralSymbol, isLseIlk } from "@/lib/makerdao/asset-catalog";
+import { readAuctionStop, readLockstakeUrn, readPriceCap } from "./makerdao-lse-oracle";
 
 const RAY = BigInt(10) ** BigInt(27);
 const wad = (x: bigint): number => Number(x) / 1e18;
@@ -106,6 +107,14 @@ export interface MakerVaultState {
   lineDai: number | null;
   /** The ilk's total normalized debt share of the ceiling — Art × rate (DAI). */
   ilkDebtDai: number | null;
+  /** A capped price feed (LockStake): the governance cap and the OSM price
+   *  behind it. `priceUsd` is the lower of the two. Null for a plain OSM. */
+  priceCap?: { capUsd: number; oracleUsd: number | null } | null;
+  /** The ilk's auction terms: the Clipper breaker (0 auctions run, 1–3 new
+   *  auctions refused, 3 also purchases) and the Dog's penalty. Null when not read. */
+  auction?: { stopped: number; chop: number } | null;
+  /** A LockStake urn's engine settings (exit fee, farm, vote delegate). */
+  lockstake?: { exitFee: number; farm: string | null; voteDelegate: string | null } | null;
 }
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -227,6 +236,11 @@ export async function loadMakerVaultStateFromChain(
   const perSecond = Number(jugBase + duty) / 1e27;
   const stabilityFeeApr = perSecond >= 1 ? Math.pow(perSecond, SECONDS_PER_YEAR) - 1 : null;
   const ilk = bytes32ToStr(ilkB);
+  const [priceCap, auction, lockstake] = await Promise.all([
+    isLseIlk(ilk) ? readPriceCap(client, spotIlk[0], head.number) : Promise.resolve(null),
+    readAuctionStop(client, ilkB, head.number),
+    lse ? readLockstakeUrn(client, urn, head.number) : Promise.resolve(null),
+  ]);
 
   return {
     cdpId,
@@ -256,5 +270,8 @@ export async function loadMakerVaultStateFromChain(
     dustDai: Number(dust) / 1e45,
     lineDai: Number(line) / 1e45,
     ilkDebtDai: Number((ilkArt * rate) / RAY) / 1e18,
+    priceCap,
+    auction,
+    lockstake,
   };
 }

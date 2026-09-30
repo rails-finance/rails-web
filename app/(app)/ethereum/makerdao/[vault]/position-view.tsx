@@ -62,6 +62,7 @@ import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-ma
 import { liveMakerRateStepNote, makerRateStepNotesFor } from "@/lib/makerdao/market-notes";
 import type { MarketNote } from "@/lib/shared/market-note";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
+import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import {
   useMakerAuctions,
   useMakerIlkAt,
@@ -132,6 +133,9 @@ function mergeView(chain: MakerVaultState | null, summary: MakerVaultSummary | n
       dustDai: chain.dustDai,
       lineDai: chain.lineDai,
       ilkDebtDai: chain.ilkDebtDai,
+      priceCap: chain.priceCap ?? null,
+      auction: chain.auction ?? null,
+      lockstake: chain.lockstake ?? null,
     };
   }
   return summary ? viewFromSummary(summary) : null;
@@ -652,8 +656,13 @@ export default function MakerVaultDetailView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={makerdaoEconomicsExplanation(towerData)}
-                  learnMore={makerdaoEconomicsContent()}
+                  explanation={makerdaoEconomicsExplanation(towerData, { capped: (cardView ?? view).priceCap != null })}
+                  learnMore={makerdaoEconomicsContent({
+                    debtSym: ilkDebtSymbol((cardView ?? view).ilk),
+                    ilk: (cardView ?? view).ilk,
+                    priceChangeRow: towerData.collateral.priceChange?.usd != null,
+                    capped: (cardView ?? view).priceCap != null,
+                  })}
                 />
               );
             })()}
@@ -673,7 +682,8 @@ export default function MakerVaultDetailView({
             folderRegister={MAKERDAO_FOLDER_REGISTER}
             readFolderMembers={readFolderMembers}
             segments={segments}
-            notice={<MakerSpineKey />}
+            phoneNoteLine={MAKER_PHONE_NOTE_LINE}
+            notice={<MakerSpineKey debtSym={ilkDebtSymbol(view?.ilk ?? "")} />}
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
@@ -682,6 +692,8 @@ export default function MakerVaultDetailView({
                 // When the vault actually opened, not when the window does.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                labelLastActivity
+                labelTenure
               />
             }
             renderCard={(event, meta) =>
@@ -702,13 +714,15 @@ export default function MakerVaultDetailView({
   );
 }
 
+const MAKER_PHONE_NOTE_LINE = { rate: "stability fee" };
+
 /** What the desktop spine's marks mean, once, above the first row. The phone
  *  list states each row in words. */
-function MakerSpineKey() {
+function MakerSpineKey({ debtSym }: { debtSym: string }) {
   return (
     <p className="hidden px-1 text-xs text-rb-500 sm:block" data-spine-key="">
-      Key: <span aria-hidden>&rarr;</span> after a coin: into the vault (collateral deposited, DAI repaid) ·{" "}
-      <span aria-hidden>&larr;</span> before a coin: out to the owner (DAI drawn, collateral withdrawn) ·{" "}
+      Key: <span aria-hidden>&rarr;</span> after a coin: into the vault (collateral deposited, {debtSym} repaid) ·{" "}
+      <span aria-hidden>&larr;</span> before a coin: out to the owner ({debtSym} drawn, collateral withdrawn) ·{" "}
       <span aria-hidden>&#9671;</span> governance changed the stability fee (click for the note) ·{" "}
       <span className="inline-block size-2 rounded-full bg-green-500 align-middle" aria-hidden /> now
     </p>

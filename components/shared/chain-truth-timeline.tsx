@@ -89,7 +89,12 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { MarketNoteRow } from "@/components/shared/market-note-row";
-import { PhoneNoteRun, type PhoneNoteRunWords } from "@/components/shared/phone-note-run";
+import {
+  PhoneNoteLine,
+  PhoneNoteRun,
+  type PhoneNoteLineWords,
+  type PhoneNoteRunWords,
+} from "@/components/shared/phone-note-run";
 import { ListNoteGap, SpineNoteGap } from "@/components/shared/spine-note-markers";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -362,6 +367,10 @@ export interface ChainTruthTimelineProps {
    *  that names how many and the dates they span, and opens to each note
    *  (components/shared/phone-note-run.tsx). Unset: every note is its own row. */
   phoneNoteRun?: PhoneNoteRunWords;
+  /** In the phone list view, each rate-step note draws as one short line that
+   *  opens to its row (components/shared/phone-note-run.tsx PhoneNoteLine).
+   *  Unset: every note is its own row. */
+  phoneNoteLine?: PhoneNoteLineWords;
   /** True while this OPEN position's live reads are still in flight —
    *  reserves the live-note slot's height (`LIVE_NOTE_SKELETON_HEIGHT`) so
    *  the list does not shift under a reader once they land. Never pass this
@@ -640,6 +649,7 @@ function ChainTruthTimelineBody({
   liveNotes,
   liveNotesPending,
   phoneNoteRun,
+  phoneNoteLine,
   liveWindow,
   footer,
   notice,
@@ -679,6 +689,15 @@ function ChainTruthTimelineBody({
   const phoneNoteRows = (list: MarketNote[], key: string, one: (note: MarketNote, i: number) => ReactNode) =>
     phoneNoteRun && list.length > 1 ? (
       <PhoneNoteRun key={`noterun_${key}`} notes={list} words={phoneNoteRun} renderNote={one} />
+    ) : phoneNoteLine ? (
+      list.map((note, i) => (
+        <PhoneNoteLine
+          key={`noteline_${key}_${note.id}`}
+          note={note}
+          words={phoneNoteLine}
+          renderNote={(n) => one(n, i)}
+        />
+      ))
     ) : (
       list.map(one)
     );

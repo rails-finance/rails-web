@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatDate } from "@/lib/date";
 
@@ -35,6 +36,8 @@ export interface ClosedPositionStatsProps {
   debtLabel?: string;
   /** What each heading means, shown on hover or tap (MakerDAO). */
   labelTips?: { collateral?: string; debt?: string; outcome?: string };
+  /** A hover/tap tip on the CLOSED badge (opt-in). */
+  badgeTip?: string;
   /** Token icon shown after the collateral column label */
   collateralIcon?: ReactNode;
   /** Token icon shown after the debt column label */
@@ -90,6 +93,7 @@ export function ClosedPositionStats({
   icons,
   identity,
   leadingIdentity,
+  badgeTip,
 }: ClosedPositionStatsProps) {
   const { label, color, badge } = OUTCOME[outcome];
   const closure = closedAt ? formatClosureDate(closedAt) : null;
@@ -109,7 +113,13 @@ export function ClosedPositionStats({
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+          {badgeTip ? (
+            <RevealTip tip={badgeTip} label={`Closed: ${badgeTip}`} focusable className="focus-ring rounded-xs">
+              <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+            </RevealTip>
+          ) : (
+            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+          )}
           {leadingIdentity}
         </span>
         {identity}

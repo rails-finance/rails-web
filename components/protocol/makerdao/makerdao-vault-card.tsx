@@ -16,6 +16,7 @@
 // leaf — a DefiLlama price, a projection — would push it out; cf. Compound's
 // parked USD.)
 
+import { collAmount, usdPrice } from "@/lib/makerdao/price-format";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -90,6 +91,14 @@ export interface MakerVaultView {
   lineDai?: number | null;
   /** The ilk's total drawn debt (Art × rate, DAI). */
   ilkDebtDai?: number | null;
+  /** A capped price feed (LockStake): the governance cap and the OSM price
+   *  behind it; priceUsd is the lower. */
+  priceCap?: { capUsd: number; oracleUsd: number | null } | null;
+  /** The ilk's auction terms: Clipper breaker (0 run; 1–3 new auctions
+   *  refused) and the penalty multiplier. */
+  auction?: { stopped: number; chop: number } | null;
+  /** A LockStake urn's engine settings. */
+  lockstake?: { exitFee: number; farm: string | null; voteDelegate: string | null } | null;
   /** LockStake Engine urn (decision 0013): cdp-less — the urn address is the
    *  identity — with SKY collateral and USDS debt. */
   lse?: boolean;
@@ -101,6 +110,8 @@ export interface MakerVaultView {
   drawnSince?: number | null;
 }
 
+const BORROWING_TIP = "Open, with debt drawn against the collateral. The vault list marks it OPEN.";
+const COLLATERAL_ONLY_TIP = "Open, holding collateral with no debt. The vault list marks it OPEN.";
 const URN_TIP =
   "The vault's address in the Vat, Maker's core accounting contract. This vault has no vault number, so it is named by that address.";
 const LOCKSTAKE_TIP =
@@ -179,6 +190,11 @@ export function MakerVaultCard({
       >
         <ClosedPositionStats
           outcome={v.status}
+          badgeTip={
+            v.status === "liquidated"
+              ? "A liquidation emptied this vault. It still belongs to its owner and can take a new deposit."
+              : "This vault owes nothing and its collateral has been taken out. It still belongs to its owner and can take a new deposit."
+          }
           leadingIdentity={identity}
           closedAt={v.lastActivityAt ?? undefined}
           identity={
@@ -198,7 +214,7 @@ export function MakerVaultCard({
             v.peakInk > 0 ? (
               <StatValue>
                 <Prov info={peakInkProv(v.collateralSymbol, { ilk: v.ilk })}>
-                  <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} />
+                  <AssetAmount value={v.peakInk} symbol={v.collateralSymbol} display={collAmount(v.peakInk)} />
                 </Prov>
               </StatValue>
             ) : (
@@ -241,9 +257,16 @@ export function MakerVaultCard({
         // pill (facehash + copy + bookmark) renders on both surfaces.
         statusPill={
           receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {(v.debtDai ?? 0) > 0 ? "Borrowing" : "Collateral only"}
-            </span>
+            <RevealTip
+              tip={(v.debtDai ?? 0) > 0 ? BORROWING_TIP : COLLATERAL_ONLY_TIP}
+              label={`${(v.debtDai ?? 0) > 0 ? "Borrowing" : "Collateral only"}: ${(v.debtDai ?? 0) > 0 ? BORROWING_TIP : COLLATERAL_ONLY_TIP}`}
+              focusable
+              className="focus-ring rounded-sm"
+            >
+              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
+                {(v.debtDai ?? 0) > 0 ? "Borrowing" : "Collateral only"}
+              </span>
+            </RevealTip>
           ) : (
             <LifecyclePill status={v.status} />
           )
@@ -304,7 +327,9 @@ export function MakerVaultCard({
         columns={[
           {
             label: CARD_VOCAB.collateral,
-            labelTip: `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
+            labelTip: v.priceCap
+              ? `The ${v.collateralSymbol} locked in the vault, valued at Maker's price: the oracle's, capped by governance.`
+              : `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
             value: (
               <StatValue>
                 <Prov info={vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source)}>
@@ -400,7 +425,7 @@ export function MakerVaultCard({
                       `${formatNumber(v.ink)} ${v.collateralSymbol}`,
                     )}
                   >
-                    {formatUsd(v.liquidationPriceUsd)}
+                    {usdPrice(v.liquidationPriceUsd, formatUsd)}
                   </Prov>
                 </StatFootnote>
               ) : undefined,

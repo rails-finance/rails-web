@@ -42,8 +42,27 @@ const intro = (
       .
     </p>
     <p>
-      MakerDAO renamed itself Sky in 2024: the same vault system, now minting USDS beside DAI, so vaults opened through
-      Sky&apos;s LockStake engine are listed here too. Its savings are a separate explorer:{" "}
+      MakerDAO renamed itself Sky in 2024: the same vault system, now minting USDS beside DAI. USDS and DAI are
+      exchangeable one for one, both ways, through Sky&apos;s DAI–USDS converter.
+    </p>
+    <p>
+      Vaults opened through Sky&apos;s LockStake Engine are listed here too, as urns (for example{" "}
+      <Link
+        href="/ethereum/makerdao/0xdfdb5d44f1c0b935c00e4fff6cbfd76c0db7e97c"
+        className="text-blue-500 hover:underline"
+      >
+        this one
+      </Link>
+      ). The owner locks SKY and draws USDS through the engine, which makes a separate address, the urn, for the Vat to
+      record the SKY and the debt under; an urn has no vault number. The engine stakes the locked SKY in a rewards farm
+      the owner picks and passes its voting power to a delegate the owner picks, and the owner claims the farm&apos;s
+      rewards; governance can set an exit fee on SKY taken out. Picking a farm or a delegate and claiming rewards are
+      not shown here. Below the collateral type&apos;s minimum ratio (120% for LSEV2-SKY-A) an auction can sell the SKY,
+      which the engine first takes out of the farm and back from the delegate. Each urn page says whether governance has
+      these auctions switched on and what price cap it has set on SKY.
+    </p>
+    <p>
+      Sky&apos;s savings are a separate explorer:{" "}
       <Link href="/ethereum/sky-savings" className="text-blue-500 hover:underline">
         Sky Savings
       </Link>{" "}

@@ -1793,9 +1793,9 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   ];
   if (f.steps && note.steps != null) {
     stats.push({
-      label: "Merges",
+      label: "Covers",
       figure: {
-        text: `${f.steps} stretches between the vault's events`,
+        text: `${f.steps} gaps between the vault's events, as one note`,
         prov: makerRateStepProv(note, "steps"),
         exact: String(note.steps),
       },
@@ -1803,7 +1803,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Fee changes in between",
+      label: "Times governance changed the fee",
       figure: { text: f.sets, prov: makerRateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }

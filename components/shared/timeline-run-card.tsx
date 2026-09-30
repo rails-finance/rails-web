@@ -378,7 +378,10 @@ export function TimelineRunCard({
                 </Prov>
                 <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
                 {agg.count != null && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10">
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
+                    title={`${agg.count.toLocaleString("en-US")} ${agg.verb.toLowerCase()} rows, grouped in this row; open it to see each`}
+                  >
                     {agg.count.toLocaleString("en-US")}
                   </span>
                 )}

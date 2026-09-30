@@ -2,7 +2,7 @@
 
 import { PriceRunway } from "@/components/shared/price-runway";
 import { Prov } from "@/components/shared/provenance";
-import { fmtPrice } from "@/components/shared/price-pill";
+import { usdPrice } from "@/lib/makerdao/price-format";
 import { osmPriceProv } from "@/lib/makerdao/event-provenance";
 import type { MakerVaultView } from "./makerdao-vault-card";
 
@@ -42,15 +42,32 @@ export function MakerdaoRunway({
   )
     return null;
 
+  const ratio =
+    v.collateralUsd != null && v.debtDai != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
+  // A capped feed: the fall is in Maker's price for the collateral, which sits
+  // at the cap under the oracle.
+  const capped = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
+  const label = capped
+    ? `Maker's ${v.collateralSymbol} price can fall ${Math.round((1 - v.liquidationPriceUsd / v.priceUsd) * 100)}% before liquidation`
+    : undefined;
   if (slot) {
     return (
       <div className="w-full">
-        <PriceRunway compact currentPrice={v.priceUsd} liqPrice={v.liquidationPriceUsd} asset={v.collateralSymbol} />
-        <div className="mt-1.5 flex items-baseline justify-end gap-1 text-[11px] tabular-nums text-rb-500">
-          {/* The liquidation price is the ratio column's "Liquidates at" line;
-              the caption names the price the bar starts from. */}
+        <PriceRunway
+          compact
+          currentPrice={v.priceUsd}
+          liqPrice={v.liquidationPriceUsd}
+          asset={v.collateralSymbol}
+          label={label}
+        />
+        <div className="mt-1.5 flex items-baseline justify-between gap-2 text-[11px] tabular-nums text-rb-500">
+          {/* The bar's two ends in words: the minimum ratio at its left, the
+              ratio and price now at its right. */}
+          <span>{v.matRatio != null ? <>minimum {Number((v.matRatio * 100).toFixed(2))}%</> : null}</span>
           <span>
-            {v.collateralSymbol} now <Prov info={osmPriceProv(v.collateralSymbol, v.ilk)}>{fmtPrice(v.priceUsd)}</Prov>
+            {ratio != null ? <>now {ratio.toFixed(0)}% · </> : null}
+            {v.collateralSymbol} <Prov info={osmPriceProv(v.collateralSymbol, v.ilk)}>{usdPrice(v.priceUsd)}</Prov>
+            {capped ? " (capped)" : null}
           </span>
         </div>
       </div>
@@ -63,6 +80,7 @@ export function MakerdaoRunway({
       currentPrice={v.priceUsd}
       liqPrice={v.liquidationPriceUsd}
       asset={v.collateralSymbol}
+      label={label}
     />
   );
 }

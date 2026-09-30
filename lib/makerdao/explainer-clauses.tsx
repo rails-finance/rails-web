@@ -27,6 +27,7 @@
 // clause that needs one of them is left out until it lands (the never-empty
 // floor keeps the action sentence).
 
+import { collAmount, debtDigits, usdPrice } from "@/lib/makerdao/price-format";
 import type { ReactNode } from "react";
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -109,8 +110,6 @@ export interface MakerRowExtras {
 
 const dai2 = (n: number): string => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
-const usd2 = (n: number): string =>
-  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct2 = (r: number): string =>
   `${(r * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 const matPct = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
@@ -169,8 +168,6 @@ function Fig({
     </Prov>
   );
 }
-
-const fmtAbs = (h?: string): string => formatNumber(Math.abs(Number(h)));
 
 // ── the third-party actor clause ─────────────────────────────────────────────
 
@@ -264,14 +261,14 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords, extra
   const labeled = ctx.eventType === "frob";
   const colDeltaFig = () => (
     <Fig echo info={dinkProv(sym, coords)} value={chainTruthDeltaValue(dink, labeled)} symbol={sym}>
-      {fmtAbs(ctx.dink)} {sym}
+      {collAmount(Math.abs(dink))} {sym}
     </Fig>
   );
   // The collateral the vault holds after this event echoes the detail grid's
   // Collateral stat (formatNumber, same symbol → same entry key).
   const colAfterFig = () => (
     <Fig echo info={inkAfterProv(sym, coords)} value={formatNumber(rs.inkAfter)} symbol={sym}>
-      <AmountText value={rs.inkAfter} /> {sym}
+      {rs.inkAfter >= 1e-6 && rs.inkAfter < 1 ? collAmount(rs.inkAfter) : <AmountText value={rs.inkAfter} />} {sym}
     </Fig>
   );
 
@@ -282,7 +279,8 @@ function makerdaoEventSlotsBase(ctx: MakerDAOContext, coords: MakerCoords, extra
   const daiAmount: ReactNode | null =
     ctx.debtChange != null && dart !== 0 ? (
       <Fig echo info={debt.prov} value={chainTruthDeltaValue(debt.value, labeled)} symbol={dsym}>
-        <AmountText value={Math.abs(debt.value)} /> {dsym}
+        {rs.collateralOnly && dart < 0 ? debtDigits(Math.abs(debt.value)) : <AmountText value={Math.abs(debt.value)} />}{" "}
+        {dsym}
       </Fig>
     ) : null;
 
@@ -560,7 +558,12 @@ function frobSlots(
   }
 
   const valueOf = (amount: number) =>
-    price != null ? <> (worth {usd0(amount * price)} at Maker&rsquo;s oracle price then)</> : null;
+    price != null ? (
+      <>
+        {" "}
+        (worth {usd0(amount * price)} at Maker&rsquo;s {extras.ilkAt?.priceCap ? "capped price" : "oracle price"} then)
+      </>
+    ) : null;
   const collFrag: ReactNode | null =
     dink > 0 ? (
       <>
@@ -595,12 +598,20 @@ function frobSlots(
 
   // The row's risk at its own price: how far the collateral price could fall
   // and how much more the vault could draw.
+  const capAt =
+    extras.ilkAt?.priceCap != null &&
+    extras.ilkAt.priceCap.oracleUsd != null &&
+    extras.ilkAt.priceCap.oracleUsd > extras.ilkAt.priceCap.capUsd
+      ? extras.ilkAt.priceCap
+      : null;
   const riskClause: ClauseInput = risk
     ? clause(
         <>
-          At <H>{usd2(risk.price)}</H> {indefiniteArticle(sym).toLowerCase()} {sym}, the vault could draw{" "}
-          <H>{dai2(risk.room)}</H> {dsym} more before the <H>{matPct(risk.mat)}</H> minimum, and {sym} could fall{" "}
-          {dropText(risk.drop)} (to {usd2(risk.liqPrice)}) before it could be liquidated.
+          At <H>{usdPrice(risk.price)}</H> {indefiniteArticle(sym).toLowerCase()} {sym}
+          {capAt ? <> (Maker&rsquo;s capped price; the oracle read {usdPrice(capAt.oracleUsd as number)})</> : null},
+          the vault could draw <H>{dai2(risk.room)}</H> {dsym} more before the <H>{matPct(risk.mat)}</H> minimum, and{" "}
+          {capAt ? <>Maker&rsquo;s price</> : sym} could fall {dropText(risk.drop)} (to {usdPrice(risk.liqPrice)})
+          before it could be liquidated.
         </>,
       )
     : null;
@@ -745,7 +756,7 @@ function grabSlots(
     ratio != null && mat != null && price != null ? (
       <>
         The vault&rsquo;s collateral ratio fell under {ctx.ilk}&rsquo;s <H>{matPct(mat)}</H> minimum (
-        <H>{pct2(ratio)}</H> at the OSM price of <H>{usd2(price)}</H>), so a keeper liquidated it:
+        <H>{pct2(ratio)}</H> at the OSM price of <H>{usdPrice(price)}</H>), so a keeper liquidated it:
       </>
     ) : (
       <>This vault fell below its liquidation ratio and was liquidated:</>

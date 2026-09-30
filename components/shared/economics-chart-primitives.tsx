@@ -159,7 +159,11 @@ export function computeTowerLayout(
   chartHeight = CHART_HEIGHT,
 ): PositionedSegment[] {
   if (!maxValue || !isFinite(maxValue)) return [];
-  const visible = segments.filter((s) => s.value > 0 && isFinite(s.value));
+  // Dust draws no bar: a segment under a hundredth of a pixel's worth of the
+  // tallest would show at MIN_SEGMENT_PX beside a legend reading $0.
+  const visible = segments.filter(
+    (s) => s.value > 0 && isFinite(s.value) && (s.value / maxValue) * chartHeight >= 0.01,
+  );
   if (visible.length === 0) return [];
   const totalGapPx = Math.max(0, visible.length - 1) * SEGMENT_GAP_PX;
   const availableHeight = chartHeight - totalGapPx;

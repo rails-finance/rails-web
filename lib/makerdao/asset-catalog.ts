@@ -22,6 +22,9 @@ export const MAKER_ADDRESSES = {
   LOCKSTAKE_ENGINE: "0xce01c90de7fd1bcfa39e237fe6d8d9f569e8a6a3",
   LOCKSTAKE_CLIPPER: "0x836f56750517b1528b5078cba4ac4b94fbe4a399",
   USDS: "0xdc035d45d973e3ec169d2276ddab16f1e407384f",
+  // Chainlog DAI_USDS: daiToUsds / usdsToDai burn one and mint the other, one
+  // for one (a UsdsToDai at block 26,084,531 burned and minted 20,062.087…).
+  DAI_USDS: "0x3225737a9bbb6473cb4a45b7244aca2befdb276a",
   SKY: "0x56072c95faa701256059aa122697b133aded9279",
   // The system lane (/makerdao/system) — the Vat's balance sheet decomposed by
   // ilk. Chain-verified at block 25,539,122 (2026-07-15).
