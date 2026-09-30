@@ -53,6 +53,8 @@ import { formatNumber } from "@/lib/utils/format";
 import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
 import { SparkAccountState } from "./spark-account-state";
+import { createPortal } from "react-dom";
+import { MoveChartLink } from "@/components/protocol/aave-v3/aave-family-event-receipt";
 import { StatSubline } from "@/components/shared/state-transition";
 import { AmountText } from "@/components/shared/amount-text";
 import {
@@ -73,6 +75,11 @@ export interface SparkEventDetailProps {
   market?: "spark";
   reserveAddress?: string;
   previous?: { blockNumber: number; txHash: string };
+  /** The timeline event: the card's lifetime sum and its link to the chart. */
+  eventId?: string;
+  eventTs?: number;
+  /** Where the card's (i) takes the interest line and the prices. */
+  notesSlot?: HTMLElement | null;
 }
 
 /** Interest below this reads as "<0.000001" and says nothing; the line is left
@@ -152,6 +159,9 @@ export function SparkEventDetail({
   market,
   reserveAddress,
   previous,
+  eventId,
+  eventTs,
+  notesSlot,
 }: SparkEventDetailProps) {
   const coords: SparkCoords = { txHash, blockNumber };
   const read = useSparkEventState({ ctx, wallet, market, blockNumber, txHash, reserveAddress, previous });
@@ -343,35 +353,19 @@ export function SparkEventDetail({
   const readPills = ready?.sources.market ? statePricePills(ready, v3Coords, touched) : [];
   const pricePills = readPills.length > 0 ? readPills : ctxPills;
 
-  return (
-    <div>
-      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {read.status === "ready" && read.state && read.raw ? (
-        <SparkAccountState
-          state={read.state}
-          raw={read.raw}
-          coords={v3Coords}
-          isLiquidation={ctx.eventType === "liquidation"}
-          touched={touched}
-        />
-      ) : read.status === "loading" ? (
-        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
-          Reading the account before and after this transaction…
-        </div>
-      ) : read.status === "unavailable" && !read.lasting ? (
-        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
-          The account before and after this transaction was not read. Reload to try again.
-        </div>
-      ) : null}
+  // Behind the card's (i): the interest since the previous event and every
+  // price the card's USD figures use.
+  const readNotes = (
+    <div data-card-read-notes="">
       {ready && read.prevRaw && (
-        <div className="px-5 pb-1">
+        <div className="pb-1">
           <StateInterestLine here={ready} prev={read.prevRaw} coords={v3Coords} />
         </div>
       )}
       {ready &&
         !read.prevRaw &&
         laneLines.map((l) => (
-          <div key={`${l.side}:${l.symbol}`} className="px-5 pb-1">
+          <div key={`${l.side}:${l.symbol}`} className="pb-1">
             <StatSubline>
               {l.side === "debt" ? "Interest on the debt" : "Supply interest"} since this balance last moved:{" "}
               <Prov info={l.prov} value={l.value} symbol={l.symbol}>
@@ -384,12 +378,42 @@ export function SparkEventDetail({
           </div>
         ))}
       {ready && previous && read.prevUnread && (
-        <div className="px-5 pb-1">
+        <div className="pb-1">
           <StatSubline>
             Supply interest on the collateral is left out: the position after the previous event was not read.
           </StatSubline>
         </div>
       )}
+      {pricePills.length > 0 && (
+        <div className="pb-2">
+          <AtBlockPriceFootnote pills={pricePills} />
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
+      {read.status === "ready" && read.state && read.raw ? (
+        <SparkAccountState
+          state={read.state}
+          raw={read.raw}
+          coords={v3Coords}
+          isLiquidation={ctx.eventType === "liquidation"}
+          touched={touched}
+          eventId={eventId}
+          eventTs={eventTs}
+        />
+      ) : read.status === "loading" ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
+          Reading the account before and after this transaction…
+        </div>
+      ) : read.status === "unavailable" && !read.lasting ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
+          The account before and after this transaction was not read. Reload to try again.
+        </div>
+      ) : null}
       {forensics && (
         <LiquidationForensics
           {...forensics}
@@ -398,17 +422,16 @@ export function SparkEventDetail({
           premiumLabel="Liquidator's premium over the debt"
         />
       )}
-      {pricePills.length > 0 && (
-        <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={pricePills} />
-        </div>
-      )}
       {showBasket && (
         <div className="mt-3 grid grid-cols-2 gap-4 border-t border-rb-200/60 pt-3 dark:border-rb-500/20">
           <BasketList label="All supplied · after" items={supplies} coords={coords} side="supply" />
           <BasketList label="All borrowed · after" items={debts} coords={coords} side="debt" />
         </div>
       )}
+      {notesSlot
+        ? createPortal(readNotes, notesSlot)
+        : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
+      {eventTs != null && <MoveChartLink ts={eventTs} />}
     </div>
   );
 }

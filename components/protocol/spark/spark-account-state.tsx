@@ -19,19 +19,14 @@
 // limits are each asset's figures; an account with no debt says it has no
 // health factor.
 
-import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
 import { emodeCategoryProv, healthFactorProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { bpsPct, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { emodeLabel, type SparkEventState } from "@/lib/spark/event-state";
-import {
-  CollateralCellBody,
-  DebtCellBody,
-  LtvCellBody,
-  type TouchedLeg,
-} from "@/components/protocol/aave-v3/aave-v3-position-state";
+import { LtvCellBody, type TouchedLeg } from "@/components/protocol/aave-v3/aave-v3-position-state";
+import { AaveFamilyEventReceipt, type RiskItem } from "@/components/protocol/aave-v3/aave-family-event-receipt";
 
 interface Fig {
   text: string;
@@ -94,7 +89,12 @@ export function SparkAccountState({
   isLiquidation,
   touched = [],
   hfFormat = hfLabelV4,
+  eventId,
+  eventTs,
 }: {
+  /** The timeline event, for the card's lifetime sum. */
+  eventId?: string;
+  eventTs?: number;
   state: SparkEventState;
   raw: AaveV3PositionState;
   coords: V3Coords;
@@ -107,8 +107,6 @@ export function SparkAccountState({
   const acc = raw.account;
   if (!acc) return null;
   const { before, after } = state;
-  const touchedOn = (side: "supply" | "debt"): Set<string> =>
-    new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
 
   const hfBeforeValue = isLiquidation && state.liqHfAtCall != null ? state.liqHfAtCall : before.hf;
   const hfFig = (hf: number | null, when: "before" | "after"): Fig => {
@@ -154,25 +152,18 @@ export function SparkAccountState({
   const hfChanged = hfBeforeValue !== after.hf;
   const emodeChanged = state.emodeBefore.id !== state.emodeAfter.id;
 
-  // Collateral and Debt: the totals with each reserve beneath (rails-ops
-  // TO-DO-ui-jobs §213); the event's own reserve is stated there once, the
-  // grid above giving way to it (§47).
-  const cards: { key: string; label: string; body: ReactNode }[] = [
-    {
-      key: "collateral",
-      label: "Collateral",
-      body: <CollateralCellBody state={raw} coords={coords} touched={touchedOn("supply")} />,
-    },
-    { key: "debt", label: "Debt", body: <DebtCellBody state={raw} coords={coords} touched={touchedOn("debt")} /> },
-  ];
+  // The row under the two side cells (aave-family-event-receipt.tsx):
+  // health factor, LTV, what can still be borrowed, and E-mode, which always
+  // draws ("None" says the limits are each asset's own).
+  const risk: RiskItem[] = [];
   if (before.hf != null || after.hf != null)
-    cards.push({
+    risk.push({
       key: "health-factor",
       label: "Health factor",
       body: <Pair before={hfFig(hfBeforeValue, "before")} after={hfFig(after.hf, "after")} changed={hfChanged} />,
     });
   else
-    cards.push({
+    risk.push({
       key: "health-factor",
       label: "Health factor",
       body: (
@@ -192,36 +183,41 @@ export function SparkAccountState({
       r.liquidationThresholdBps != null &&
       r.symbol != null,
   );
-  cards.push({ key: "ltv", label: "LTV", body: <LtvCellBody state={raw} coords={coords} before={ltvBefore} /> });
-  // E-mode always draws: "None" says the limits above are each asset's own.
-  {
-    cards.push({
-      key: "emode",
-      label: "E-mode",
-      body: (
-        <>
-          <Pair before={emodeFig("before")} after={emodeFig("after")} changed={emodeChanged} />
-          {state.emodeAfter.id !== 0 &&
-            state.emodeAfter.ltvBps != null &&
-            state.emodeAfter.liquidationThresholdBps != null && (
-              <StatSubline>
-                LTV {bpsPct(state.emodeAfter.ltvBps)} · liquidation at{" "}
-                {bpsPct(state.emodeAfter.liquidationThresholdBps)}
-                {outside.length > 0
-                  ? ` (outside e-mode: ${outside
-                      .map(
-                        (r) =>
-                          `${r.symbol} ${bpsPct(r.ltvBps as number)} · ${bpsPct(r.liquidationThresholdBps as number)}`,
-                      )
-                      .join(", ")})`
-                  : ""}
-              </StatSubline>
-            )}
-          {state.emodeAfter.id === 0 && <StatSubline>limits are each asset&rsquo;s own</StatSubline>}
-        </>
-      ),
-    });
-  }
+  risk.push({
+    key: "ltv",
+    label: "LTV",
+    body: <LtvCellBody state={raw} coords={coords} before={ltvBefore} part="ratio" />,
+  });
+  risk.push({
+    key: "borrowable",
+    label: "Still borrowable",
+    body: <LtvCellBody state={raw} coords={coords} part="borrowable" />,
+  });
+  risk.push({
+    key: "emode",
+    label: "E-mode",
+    body: (
+      <>
+        <Pair before={emodeFig("before")} after={emodeFig("after")} changed={emodeChanged} />
+        {state.emodeAfter.id !== 0 &&
+          state.emodeAfter.ltvBps != null &&
+          state.emodeAfter.liquidationThresholdBps != null && (
+            <StatSubline>
+              LTV {bpsPct(state.emodeAfter.ltvBps)} · liquidation at {bpsPct(state.emodeAfter.liquidationThresholdBps)}
+              {outside.length > 0
+                ? ` (outside e-mode: ${outside
+                    .map(
+                      (r) =>
+                        `${r.symbol} ${bpsPct(r.ltvBps as number)} · ${bpsPct(r.liquidationThresholdBps as number)}`,
+                    )
+                    .join(", ")})`
+                : ""}
+            </StatSubline>
+          )}
+        {state.emodeAfter.id === 0 && <StatSubline>limits are each asset&rsquo;s own</StatSubline>}
+      </>
+    ),
+  });
 
   // A liquidation's before figures are read at the prices the call ran at; the
   // end of the block before is the second basis, named here once.
@@ -238,15 +234,16 @@ export function SparkAccountState({
     ) : null;
 
   return (
-    <div className="px-5 pb-2" data-spark-account-state="ready">
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {cards.map((c) => (
-          <div key={c.key} className="h-full min-w-0" data-position-card={c.key}>
-            <StatCard label={c.label}>{c.body}</StatCard>
-          </div>
-        ))}
-      </div>
-      {basis}
+    <div data-spark-account-state="ready">
+      <AaveFamilyEventReceipt
+        state={raw}
+        coords={coords}
+        touched={touched}
+        eventId={eventId}
+        eventTs={eventTs}
+        risk={risk}
+        notes={basis}
+      />
     </div>
   );
 }

@@ -40,6 +40,7 @@ import {
   aaveV3FlowEvents,
   aaveV3FlowSeriesTimeline,
   aaveV3FlowTimeline,
+  aaveV3FocusEvents,
   lifetimeFromSeries,
 } from "@/lib/aave-v3/flows-timeline";
 import type { AaveV3FlowSeries, FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -82,6 +83,17 @@ import {
 } from "@/lib/shared/flows-series";
 import { combinedAt, combinedStops, nearestStop } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
+import {
+  AAVE_FAMILY_KINDS,
+  bucketsById,
+  chipText,
+  eventCum,
+  eventSideSum,
+  filterPasses,
+  flowLines,
+  folderUnderFilter,
+  heldKey,
+} from "@/lib/shared/flow-focus";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -1191,4 +1203,116 @@ test("the counter counts the card's transactions", () => {
   assert.equal(s.count, 33);
   assert.equal(s.txs, 28);
   assert.equal(m.totalTxs, 28);
+});
+
+// ── The flows panel and the timeline tied together (lib/shared/flow-focus.ts) ──
+
+test("the event card's sum: the running totals around each event meet the route's day rows, and the printed lines add", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  assert.equal(focus.length, 63);
+  let exact = 0;
+  for (const ev of focus) {
+    const cum = eventCum(route, focus, ev.id);
+    assert.ok(cum, `a sum for ${ev.id}`);
+    if (cum.exact) exact++;
+    // The event's own legs are the move from before to after.
+    for (const l of ev.legs) if (l.usd != null) assert.ok(cum.after[l.bucket] - cum.before[l.bucket] >= l.usd - 1e-6);
+    // The last event of a day lands on the day row.
+    const sameDay = focus.filter((e) => Math.floor(e.ts / 86_400) === Math.floor(ev.ts / 86_400));
+    if (sameDay[sameDay.length - 1].id === ev.id) {
+      const row = route.rows.find((r) => r.day === cum.stop)!;
+      for (const b of route.buckets) assert.ok(near(cum.after[b.key], row.cum[b.key] ?? 0, 1), `${b.key} at ${ev.id}`);
+    }
+    // Held at the event: any figure; the printed lines add to the printed total.
+    for (const side of ["collateral", "debt"] as const) {
+      const held: number = stateAt(route, cum.stop)[side].now;
+      const sum = eventSideSum(route, side, cum, held);
+      assert.equal(
+        sum.lines.reduce((a, l) => a + l.dollars, 0),
+        sum.total.dollars,
+        `${side} at ${ev.id}`,
+      );
+      assert.equal(sum.total.amount, wholeUsd(held));
+      for (const l of sum.lines) assert.equal(l.hl, cum.buckets.has(l.key));
+    }
+  }
+  assert.equal(exact, 63, "the page holds the whole history, so every event's totals are its own");
+  // The 29 Sep 2026 Borrow of 200 USDC: Borrowed moves by $200 and is the highlighted line.
+  const borrow = fixture.events.find(
+    (e) =>
+      e.timestamp >= Date.UTC(2026, 8, 29) / 1000 && (e.context?.data as { eventType?: string } | undefined)?.eventType === "borrow",
+  );
+  if (borrow) {
+    const cum = eventCum(route, focus, borrow.id)!;
+    assert.ok(near(cum.after.borrowed - cum.before.borrowed, 200, 1));
+  }
+});
+
+test("the event card's sum where the page lacks some of a day's events: the day's close, said so", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const all = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  // A day with two or more events, one of them left off the page.
+  const byDay = new Map<number, typeof all>();
+  for (const e of all) byDay.set(Math.floor(e.ts / 86_400), [...(byDay.get(Math.floor(e.ts / 86_400)) ?? []), e]);
+  const busyDay = [...byDay.values()].find((xs) => xs.length >= 2 && xs.some((x) => x.legs.length > 0));
+  assert.ok(busyDay, "the fixture has a day with two events");
+  const dropped = busyDay[busyDay.length - 1];
+  const page = all.filter((e) => e.id !== dropped.id);
+  const cum = eventCum(route, page, busyDay[0].id)!;
+  if (dropped.legs.some((l) => (l.usd ?? 0) > 1)) {
+    assert.equal(cum.exact, false);
+    const row = route.rows.find((r) => r.day === cum.stop)!;
+    for (const b of route.buckets) assert.ok(near(cum.after[b.key], row.cum[b.key] ?? 0, 1e-6));
+  }
+});
+
+test("a segment's filter: its events up to the cursor's date; the held segment every event", () => {
+  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  const buckets = bucketsById(focus);
+  const lines = flowLines(model);
+  assert.deepEqual(
+    lines.filter((l) => l.side === "collateral").map((l) => l.kind),
+    ["held", "in", "in", "out", "out", "out", "out", "rest"],
+  );
+  assert.equal(lines.find((l) => l.kind === "rest")?.label, "Market move and interest");
+  const jun19 = Date.UTC(2026, 5, 19, 23, 59, 59) / 1000;
+  const cursor = { endTs: jun19, word: "19 Jun '26", live: false };
+  const withdrawn = { key: "withdrawn", side: "collateral" as const, label: "Withdrawn" };
+  assert.equal(chipText(withdrawn, cursor), "Showing Withdrawn to 19 Jun '26");
+  assert.equal(chipText({ ...withdrawn, key: heldKey("collateral") }, cursor), "Showing every event to 19 Jun '26");
+  const listed = fixture.events.filter((e) => filterPasses(withdrawn, cursor, buckets, e.id, e.timestamp));
+  assert.ok(listed.length > 0);
+  for (const e of listed) {
+    assert.ok(e.timestamp <= jun19);
+    assert.ok(buckets.get(e.id)?.has("withdrawn"));
+  }
+  const every = fixture.events.filter((e) =>
+    filterPasses({ ...withdrawn, key: heldKey("debt") }, cursor, buckets, e.id, e.timestamp),
+  );
+  assert.equal(every.length, fixture.events.filter((e) => e.timestamp <= jun19).length);
+  // A served folder: dropped after the date, counted where its kind fills the line alone.
+  const folder = {
+    firstAt: jun19 - 100,
+    lastAt: jun19 - 10,
+    count: 4,
+    counts: [
+      { key: "withdraw", count: 3 },
+      { key: "supply", count: 1 },
+    ],
+  };
+  assert.deepEqual(folderUnderFilter(folder, withdrawn, cursor, AAVE_FAMILY_KINDS), { admits: true, matched: 3 });
+  assert.deepEqual(
+    folderUnderFilter({ ...folder, firstAt: jun19 + 1, lastAt: jun19 + 9 }, withdrawn, cursor, AAVE_FAMILY_KINDS),
+    {
+      admits: false,
+      matched: 0,
+    },
+  );
+  assert.deepEqual(folderUnderFilter({ ...folder, lastAt: jun19 + 99 }, withdrawn, cursor, AAVE_FAMILY_KINDS), {
+    admits: true,
+    matched: null,
+  });
 });

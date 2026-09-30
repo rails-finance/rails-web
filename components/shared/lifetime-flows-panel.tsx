@@ -19,6 +19,7 @@ import { ChartBarBig, ChevronDown } from "lucide-react";
 import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
+import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -79,6 +80,14 @@ export function LifetimeFlowsPanel({
   const reactId = useId();
   const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
+  // A card's "Move the chart to this event" opens a collapsed panel.
+  const move = useFlowFocusState((s) => s.move?.n ?? 0);
+  useEffect(() => {
+    if (move === 0 || !collapseKey || !isFlowsCollapsed(collapseKey)) return;
+    setFlowsCollapsed(collapseKey, false);
+    setCollapsed(false);
+    setSettled(true);
+  }, [move, collapseKey]);
   if (scrubber == null && read === "done") return null;
 
   return (
@@ -86,6 +95,7 @@ export function LifetimeFlowsPanel({
     <ProvReceiptsScope registry={registry}>
       <section
         data-skel-section="detail-economics"
+        data-lifetime-flows-panel=""
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
         suppressHydrationWarning

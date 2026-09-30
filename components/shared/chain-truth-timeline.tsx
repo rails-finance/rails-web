@@ -69,6 +69,7 @@
 // On a client-grouped page the flag still bypasses the run specs, as before.
 
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
+import { FlowFilterChip, FlowFilterMenu } from "@/components/shared/flow-filter-controls";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -1106,6 +1107,9 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
+  // The latest event a flow-line filter lists opens.
+  const openAndShow = useCallback((id: string) => clickToOpenIfClosed(id), []);
+
   const hasMore = windowSize < rows.length;
   const growWindow = () => setWindowSize((s) => Math.min(s + WINDOW_CHUNK, rows.length));
 
@@ -1469,6 +1473,7 @@ function ChainTruthTimelineBody({
             countTooltip={countTooltip}
             countDetail={countDetail}
             viewSwitch={spineOptIn}
+            extraControls={<FlowFilterMenu />}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.
             monthReach={
@@ -1483,6 +1488,8 @@ function ChainTruthTimelineBody({
             }
           />
         </div>
+        {/* The Lifetime flows filter's chip, where the page ties the two. */}
+        <FlowFilterChip latestId={events[0]?.id ?? null} open={openAndShow} />
         {notice}
         {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
           list otherwise renders exactly as it would have without `at`. */}

@@ -27,7 +27,7 @@ import {
 } from "@/lib/shared/timeline-folder";
 import { lifeDayCounts, lifeExtent, planSegmentAsk, segmentSpan, trimToNewest } from "@/lib/shared/timeline-segments";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
-import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { useTimelineEvents, type TimelineExtraFilter } from "@/hooks/useTimelineEvents";
 import type { TimelineSegments } from "@/components/shared/chain-truth-timeline";
 
 /** A grouped answer as the hook reads it: the family's fetch result, which
@@ -76,6 +76,8 @@ export interface TimelineSegmentOptions {
   folderParams: Record<string, string>;
   storageKey: string;
   protocolKey: string;
+  /** The Lifetime flows panel's filter over the timeline, where the page has one. */
+  extraFilter?: TimelineExtraFilter | null;
 }
 
 export function useTimelineSegment(o: TimelineSegmentOptions) {
@@ -187,6 +189,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   const tl = useTimelineEvents(segmentEvents ?? events, {
     storageKey: o.storageKey,
     protocolKey: o.protocolKey,
+    extraFilter: o.extraFilter,
     window: timelineWindow,
     servedRows: segment ? segmentRows : servedRows,
     eventsServed: segment ? (segment.grouped?.eventsServed ?? segment.events.length) : groupedTail?.eventsServed,

@@ -36,10 +36,10 @@
 // `withFlagNote` below), since `collateralFlagProv` names one reserve and a
 // group can list several.
 
-import type { ReactNode } from "react";
+import { AaveFamilyEventReceipt, type RiskItem } from "./aave-family-event-receipt";
 import { DustToggle, isDustUsd, useDustOpen } from "@/components/shared/dust-reserves";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
 import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -154,7 +154,7 @@ export interface Figure {
 
 /** Before → after; one figure where the two agree, unless `always` (the
  *  health factor, which every event states as a pair). */
-function BeforeAfter({ before, after, always = false }: { before: Figure; after: Figure; always?: boolean }) {
+export function BeforeAfter({ before, after, always = false }: { before: Figure; after: Figure; always?: boolean }) {
   return (
     <StateTransition>
       {(always || before.value !== after.value) && (
@@ -315,7 +315,7 @@ function CollateralGroupBlock({
   );
 }
 
-function ReserveList({
+export function ReserveList({
   state,
   side,
   coords,
@@ -378,7 +378,7 @@ function ReserveList({
 
 /** A cell's headline: the account's total collateral or total debt in USD,
  *  before → after where it moved. */
-function TotalHeadline({
+export function TotalHeadline({
   state,
   what,
   coords,
@@ -402,46 +402,6 @@ function TotalHeadline({
     <div data-account-total={what}>
       <BeforeAfter before={fig(account.before, "before")} after={fig(account.after, "after")} />
     </div>
-  );
-}
-
-/** The Collateral cell: the total, each collateral reserve beneath it, and
- *  the supplied reserves whose switch is off under their own line. */
-export function CollateralCellBody({
-  state,
-  coords,
-  touched,
-}: {
-  state: AaveV3PositionState;
-  coords: V3Coords;
-  touched: Set<string>;
-}) {
-  return (
-    <>
-      <TotalHeadline state={state} what="collateral" coords={coords} />
-      <ReserveList state={state} side="supply" coords={coords} touched={touched} />
-      {state.sources.settings == null && (
-        <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
-      )}
-    </>
-  );
-}
-
-/** The Debt cell: the total, each borrowed reserve beneath it. */
-export function DebtCellBody({
-  state,
-  coords,
-  touched,
-}: {
-  state: AaveV3PositionState;
-  coords: V3Coords;
-  touched: Set<string>;
-}) {
-  return (
-    <>
-      <TotalHeadline state={state} what="debt" coords={coords} />
-      <ReserveList state={state} side="debt" coords={coords} touched={touched} />
-    </>
   );
 }
 
@@ -477,10 +437,14 @@ export function LtvCellBody({
   state,
   coords,
   before: beforeOverride,
+  part = "all",
 }: {
   state: AaveV3PositionState;
   coords: V3Coords;
   before?: Figure;
+  /** The event card's risk row draws the ratio with its limits, and what can
+   *  still be borrowed, as two figures. */
+  part?: "all" | "ratio" | "borrowable";
 }) {
   const { account, emode } = state;
   if (!account) return <NotAvailable />;
@@ -502,6 +466,27 @@ export function LtvCellBody({
   const hasCollateral = big(account.before.totalCollateralBase) > ZERO || big(account.after.totalCollateralBase) > ZERO;
   const room = borrowableBase(account.after);
   const roomUsd = baseToUsd(room.toString());
+  const roomFig = (
+    <Prov
+      info={borrowableProv(coords, {
+        ltvBps: account.after.ltvBps,
+        collateralUsd: baseToUsd(account.after.totalCollateralBase),
+        debtUsd: baseToUsd(account.after.totalDebtBase),
+        resultUsd: roomUsd,
+      })}
+      value={formatUsdValue(roomUsd)}
+    >
+      {room === ZERO ? "$0" : fmtPositionUsd(roomUsd)}
+    </Prov>
+  );
+  if (part === "borrowable")
+    return hasCollateral ? (
+      <span className="text-sm font-semibold tabular-nums" data-ltv-borrowable="">
+        {roomFig}
+      </span>
+    ) : (
+      <span className="text-sm text-rb-500">None</span>
+    );
   return (
     <>
       <BeforeAfter
@@ -524,22 +509,11 @@ export function LtvCellBody({
               <InlinePair before={ratio("lt", account.before, "before")} after={ratio("lt", account.after, "after")} />
             </span>
           </StatSubline>
-          <StatSubline>
-            <span data-ltv-borrowable="">
-              Still borrowable:{" "}
-              <Prov
-                info={borrowableProv(coords, {
-                  ltvBps: account.after.ltvBps,
-                  collateralUsd: baseToUsd(account.after.totalCollateralBase),
-                  debtUsd: baseToUsd(account.after.totalDebtBase),
-                  resultUsd: roomUsd,
-                })}
-                value={formatUsdValue(roomUsd)}
-              >
-                {room === ZERO ? "$0" : fmtPositionUsd(roomUsd)}
-              </Prov>
-            </span>
-          </StatSubline>
+          {part === "all" && (
+            <StatSubline>
+              <span data-ltv-borrowable="">Still borrowable: {roomFig}</span>
+            </StatSubline>
+          )}
         </>
       )}
     </>
@@ -677,9 +651,14 @@ export function AaveV3PositionStateBlock({
   coords,
   touched = [],
   liquidation = false,
+  eventId,
+  eventTs,
 }: {
   state: AaveV3PositionState;
   coords: V3Coords;
+  /** The timeline event, for the card's lifetime sum. */
+  eventId?: string;
+  eventTs?: number;
   /** Reserves the event touched: the grid above gives way to their row for
    *  the same balance (§47), so the dust rule here never hides it (§52). */
   touched?: TouchedLeg[];
@@ -688,7 +667,6 @@ export function AaveV3PositionStateBlock({
   liquidation?: boolean;
 }) {
   const { account, emode, sources } = state;
-  const touchedOn = (side: Side): Set<string> => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
   const atCall = liquidation ? beforeAtBlockPrices(state) : null;
 
   const inEmode = !!emode && (emode.before !== 0 || emode.after !== 0);
@@ -703,17 +681,9 @@ export function AaveV3PositionStateBlock({
     return { text, value: text, prov: ltvAtCallProv(coords, atCall.ltv, coll > 0 ? debt / coll : null) };
   };
 
-  const cards: { key: string; label: string; body: ReactNode }[] = [
-    {
-      key: "collateral",
-      label: "Collateral",
-      body: <CollateralCellBody state={state} coords={coords} touched={touchedOn("supply")} />,
-    },
-    {
-      key: "debt",
-      label: "Debt",
-      body: <DebtCellBody state={state} coords={coords} touched={touchedOn("debt")} />,
-    },
+  // The row under the two side cells: health factor, LTV and what can still
+  // be borrowed, and eMode where the account used a category on either side.
+  const risk: RiskItem[] = [
     {
       key: "health-factor",
       label: "Health factor",
@@ -722,7 +692,7 @@ export function AaveV3PositionStateBlock({
           always={account.before.healthFactor != null && account.after.healthFactor != null}
           before={
             // A liquidation's before is the health factor at the prices the
-            // call ran at (block N); the note under the grid gives the end of
+            // call ran at (block N); the note under the row gives the end of
             // N−1.
             atCall?.hf != null
               ? {
@@ -742,8 +712,20 @@ export function AaveV3PositionStateBlock({
         <NotAvailable />
       ),
     },
-    { key: "ltv", label: "LTV", body: <LtvCellBody state={state} coords={coords} before={ltvBefore()} /> },
-    // eMode draws only where the account used a category on either side.
+    {
+      key: "ltv",
+      label: "LTV",
+      body: <LtvCellBody state={state} coords={coords} before={ltvBefore()} part="ratio" />,
+    },
+    ...(account
+      ? [
+          {
+            key: "borrowable",
+            label: "Still borrowable",
+            body: <LtvCellBody state={state} coords={coords} part="borrowable" />,
+          },
+        ]
+      : []),
     ...(emode && !inEmode
       ? []
       : [
@@ -771,17 +753,9 @@ export function AaveV3PositionStateBlock({
           ? "Prices and reserve settings at this block aren’t available, so USD and the account figures are not shown."
           : null;
   const clamped = state.notes.some((n) => n.startsWith("negative_scaled_sum:"));
-
-  return (
-    <div className="px-5 py-2" data-position-state="ready" data-position-complete={state.complete ? "true" : "false"}>
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {cards.map((c) => (
-          <div key={c.key} className="h-full min-w-0" data-position-card={c.key}>
-            <StatCard label={c.label}>{c.body}</StatCard>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 space-y-0.5 text-xs text-rb-500">
+  const notes =
+    (account && liquidation && atCall?.hf != null) || missing || clamped ? (
+      <>
         {account && liquidation && atCall?.hf != null && (
           <p data-liq-basis>
             Before: the health factor and loan-to-value at the oracle prices the liquidation ran at (block{" "}
@@ -800,12 +774,23 @@ export function AaveV3PositionStateBlock({
         )}
         {missing && <p>{missing}</p>}
         {clamped && <p>A balance whose recorded changes sum below zero is shown as 0.</p>}
-      </div>
-    </div>
+      </>
+    ) : null;
+
+  return (
+    <AaveFamilyEventReceipt
+      state={state}
+      coords={coords}
+      touched={touched}
+      eventId={eventId}
+      eventTs={eventTs}
+      risk={risk}
+      notes={notes}
+    />
   );
 }
 
-function hfFigure(a: AaveV3AccountSide, when: When, coords: V3Coords): Figure {
+export function hfFigure(a: AaveV3AccountSide, when: When, coords: V3Coords): Figure {
   return {
     text: hfLabelV3(a.healthFactor == null ? null : wadToNumber(a.healthFactor)),
     value: a.healthFactor == null ? "∞" : groupExact(humanOf(a.healthFactor, 18)),
@@ -818,7 +803,7 @@ function hfFigure(a: AaveV3AccountSide, when: When, coords: V3Coords): Figure {
   };
 }
 
-function emodeFigure(state: AaveV3PositionState, id: number, when: When, coords: V3Coords): Figure {
+export function emodeFigure(state: AaveV3PositionState, id: number, when: When, coords: V3Coords): Figure {
   const name = emodeName(state, id);
   return {
     text: name,

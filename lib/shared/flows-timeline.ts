@@ -755,6 +755,13 @@ function sideState(
   return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
 }
 
+/** One side's bar and sources for a set of running totals and what is held
+ *  or owed, as `stateAt` builds each stop's: the event card's lifetime sum
+ *  (lib/shared/flow-focus.ts) reads a side at one event with it. */
+export function sideStateFor(m: FlowModel, side: FlowSide, cum: Record<string, number>, now: number): FlowSideState {
+  return sideState(m, side, cum, now, null);
+}
+
 /** The position as of the end of day `stop` (0 = the first event's day), or
  *  at live prices at `m.liveStop`. */
 export function stateAt(m: FlowModel, stop: number): FlowState {

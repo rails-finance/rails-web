@@ -30,6 +30,7 @@ import {
   type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
+import type { FocusEvent } from "@/lib/shared/flow-focus";
 import {
   aaveV3EventLegs,
   aaveV3LiquidationTxs,
@@ -282,6 +283,42 @@ export function aaveV3FlowEvents(
     },
     todayPrices,
   );
+}
+
+/** The page's events as the flow lines read them (lib/shared/flow-focus.ts):
+ *  each leg's bucket, in USD at the price its event carries, else today's,
+ *  else unpriced. Ascending, as `ordered` is. */
+export function focusEventsFromLegs<E extends BaseActivityEvent>(
+  ordered: E[],
+  legsOf: (ev: E) => AaveV3EventLeg[],
+  todayPrices: Record<string, number> | undefined,
+): FocusEvent[] {
+  const priceToday = (address: string | undefined) => {
+    const p = address ? (todayPrices?.[address] ?? todayPrices?.[address.toLowerCase()]) : undefined;
+    return typeof p === "number" && p > 0 ? p : undefined;
+  };
+  return ordered.map((ev) => ({
+    id: ev.id,
+    ts: ev.timestamp,
+    legs: legsOf(ev).flatMap((l) => {
+      const bucket = bucketOf(l);
+      if (!bucket || !(l.amount > 0) || !Number.isFinite(l.amount)) return [];
+      const price = l.price != null && l.price > 0 ? l.price : priceToday(l.address);
+      return [{ bucket, usd: price == null ? null : l.amount * price }];
+    }),
+  }));
+}
+
+/** An Aave V3 page's events for the flow lines. */
+export function aaveV3FocusEvents(
+  events: BaseActivityEvent[],
+  todayPrices: Record<string, number> | undefined,
+): FocusEvent[] {
+  const ordered = events
+    .filter(isAaveV3Event)
+    .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id));
+  const liqTxs = aaveV3LiquidationTxs(ordered);
+  return focusEventsFromLegs(ordered, (ev) => aaveV3EventLegs(ev, liqTxs), todayPrices);
 }
 
 /** Actions each family's position card leaves out of its transaction count

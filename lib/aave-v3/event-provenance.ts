@@ -1521,3 +1521,35 @@ export const laneNetProv = (sym: string, side: "supply" | "debt"): Provenance =>
     { label: "net moved", kind: "chain", pclass: "indexed", note: "the position's own logs on this reserve, summed" },
   ],
 });
+
+/** What the position held once the transaction had run, every supplied
+ *  reserve counted: the lifetime sum's total on the event card, where some
+ *  supply has its collateral switch off (the Pool's total leaves it out). */
+export const heldAtEventProv = (
+  coords: V3Coords,
+  vals: { parts: { symbol: string; usd: number }[]; total: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `Held at this event — every supplied balance once this transaction had run, its collateral switch on or off, at the oracle's price at this block, added up in US dollars. The lifetime flows count every supply, so the sum lands here.`,
+  contract: poolOf(coords),
+  via: `${vals.parts.map((p) => `${p.symbol} $${p.usd.toFixed(2)}`).join(" + ")} = $${vals.total.toFixed(2)}`,
+  formula: "Σ supplied × price",
+  inputs: eventInputs(coords),
+});
+
+/** The move in a side's total at this event: after less before, both the
+ *  Pool's totals at the oracle's prices at this block. */
+export const sideChangeProv = (
+  what: "collateral" | "debt",
+  coords: V3Coords,
+  vals: { before: number; after: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  summary: `Change in total ${what} at this event — the total once this transaction had run less the total before it, each at the oracle's prices at this block; the asset in brackets is the balance the event moved.`,
+  contract: poolOf(coords),
+  via: `$${vals.after.toFixed(2)} − $${vals.before.toFixed(2)} = $${(vals.after - vals.before).toFixed(2)}`,
+  formula: "after − before",
+  inputs: eventInputs(coords),
+});

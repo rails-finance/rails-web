@@ -54,7 +54,8 @@ import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
+import { aaveV3FlowSeriesTimeline, aaveV3FocusEvents, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
@@ -423,7 +424,15 @@ export default function AaveV3PositionDetail({
   // Decision 0019, amendments 2026-09-24 and 2026-09-25: the month read the
   // served pages share (hooks/useTimelineSegment.ts). The preload stays the
   // page's whole-history record; the timeline alone swaps to a segment.
+  // The Lifetime flows panel filters this timeline, and each card states the
+  // lifetime sum as of its event (components/shared/flow-focus-context.tsx).
+  const focusEvents = useMemo(
+    () => aaveV3FocusEvents(aaveEvents, view?.priceByAddress),
+    [aaveEvents, view?.priceByAddress],
+  );
+  const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
+    extraFilter: focusRoot.extraFilter,
     events: aaveEvents,
     groupedTail,
     servedRows,
@@ -620,6 +629,7 @@ export default function AaveV3PositionDetail({
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
   );
+  const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
     () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
@@ -655,156 +665,158 @@ export default function AaveV3PositionDetail({
 
   return (
     <V3PoolProvider pool={poolIdentity}>
-      <div className="py-8 space-y-6">
-        <DetailTopRow
-          session="aave-v3"
-          wallet={wallet}
-          assets={stripAssets}
-          closed={view != null && view.status !== "open"}
-        >
-          {view && (
-            <AaveV3ExportMenu
-              wallet={wallet}
-              marketName={MARKET_NAME[market] ?? "Core"}
-              view={view}
-              chain={chain}
-              captions={captions}
-              events={aaveEvents}
-              notes={notes}
-              liveNotes={liveNotes}
-              csvFilename={`aave-v3-${market}-${wallet.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              queued={{
-                protocol: "aave-v3",
-                params: { wallet, market },
-                totalEvents: preloadTotal,
-              }}
-              history={markdownHistoryScope(historyWindow, aaveEvents, servedFolders)}
-              scopeNote={exportScopeNote(historyWindow, aaveEvents, "this wallet's whole history", servedFolders)}
-            />
-          )}
-        </DetailTopRow>
+      <FlowFocusContext.Provider value={flowFocus}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="aave-v3"
+            wallet={wallet}
+            assets={stripAssets}
+            closed={view != null && view.status !== "open"}
+          >
+            {view && (
+              <AaveV3ExportMenu
+                wallet={wallet}
+                marketName={MARKET_NAME[market] ?? "Core"}
+                view={view}
+                chain={chain}
+                captions={captions}
+                events={aaveEvents}
+                notes={notes}
+                liveNotes={liveNotes}
+                csvFilename={`aave-v3-${market}-${wallet.slice(0, 10)}-activity.csv`}
+                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+                queued={{
+                  protocol: "aave-v3",
+                  params: { wallet, market },
+                  totalEvents: preloadTotal,
+                }}
+                history={markdownHistoryScope(historyWindow, aaveEvents, servedFolders)}
+                scopeNote={exportScopeNote(historyWindow, aaveEvents, "this wallet's whole history", servedFolders)}
+              />
+            )}
+          </DetailTopRow>
 
-        {loading ? (
-          <DetailBodySkeleton />
-        ) : (
-          <>
-            {cardView && (
-              <AaveV3PositionCard
-                v={cardView}
-                receipts
-                viewHref={tl.viewHref}
-                captions={captions ?? undefined}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). The room left to borrow and the distance bar from the
-                // Pool read sit in the opened layer under Debt and Health
-                // factor, inside the card's receipts scope.
-                disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
-                debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
-                riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
-                // The Explanation is now pure layman prose about those same face
-                // figures — no secondary figure-strips. The LTV strip is absorbed
-                // into the risk slot above; the reserve rates live on the market
-                // view (where pool-wide rate context belongs).
-                explanation={
-                  cardView.status !== "open" ? (
-                    <AaveV3ClosedPositionExplanation
-                      v={cardView}
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : (
+            <>
+              {cardView && (
+                <AaveV3PositionCard
+                  v={cardView}
+                  receipts
+                  viewHref={tl.viewHref}
+                  captions={captions ?? undefined}
+                  // Closed by default, remembered per viewer and position (ui-jobs
+                  // 209). The room left to borrow and the distance bar from the
+                  // Pool read sit in the opened layer under Debt and Health
+                  // factor, inside the card's receipts scope.
+                  disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
+                  debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
+                  riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
+                  // The Explanation is now pure layman prose about those same face
+                  // figures — no secondary figure-strips. The LTV strip is absorbed
+                  // into the risk slot above; the reserve rates live on the market
+                  // view (where pool-wide rate context belongs).
+                  explanation={
+                    cardView.status !== "open" ? (
+                      <AaveV3ClosedPositionExplanation
+                        v={cardView}
+                        events={aaveEvents}
+                        folders={servedFolders}
+                        countNote={countNote}
+                      />
+                    ) : (
+                      // Passed before the Pool read lands (the Fluid treatment):
+                      // the pane, and the copy-view link at its foot, mount with
+                      // the card rather than with the read.
+                      <AaveV3PositionExplanation
+                        chain={chain}
+                        captions={captions}
+                        view={liveView}
+                        externalActivity={externalActivity}
+                        marketName={MARKET_NAME[market] ?? "Core"}
+                        countNote={countNote}
+                      />
+                    )
+                  }
+                />
+              )}
+              {towerData && (
+                <LifetimeFlowsPanel
+                  read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
+                  explanation={aaveV3EconomicsExplanation(towerData)}
+                  learnMore={aaveV3EconomicsContent({}, towerData)}
+                  scrubber={
+                    flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
+                  }
+                />
+              )}
+              <ChainTruthTimeline
+                // The queued export (rails-ops decision 0029) has no row cap: the
+                // card offers the CSV whenever the total is known.
+                csvExportCeiling={null}
+                // Matches `AaveV3CtEventCard`'s own `persistKey={`aave-v3:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="aave-v3"
+                closed={view ? view.status !== "open" : undefined}
+                notes={notes}
+                liveNotes={liveNotes}
+                liveNotesPending={liveNotesPending}
+                tl={tl}
+                // Both grouping paths, side by side: the specs group the flat
+                // answer client-side, the register draws the folders the index
+                // served. Only one is ever in force on a given load — see the
+                // `?folders=1` block above.
+                runs={AAVE_V3_TIMELINE_RUNS}
+                folderRegister={AAVE_V3_FOLDER_REGISTER}
+                readFolderMembers={readFolderMembers}
+                // The month picker above the rows, on a served page.
+                segments={segments}
+                // The USD-values toggle joins the chain-state items: the detail
+                // grid renders after-balance USD chips off the captured
+                // oracle-at-block prices (mig 092).
+                displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+                // Tenure-first header (the V4 spoke treatment): when the account
+                // started, how long it has run, how fresh the latest activity is.
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
                       events={aaveEvents}
                       folders={servedFolders}
-                      countNote={countNote}
+                      closed={view.status !== "open"}
+                      // When the position actually opened, not when the window
+                      // does — otherwise a wallet with 104,000 events reads as
+                      // days old because its oldest loaded card is. Same reason
+                      // the folders answer when there is no cut: their members
+                      // are events this page holds without listing.
+                      firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
                     />
-                  ) : (
-                    // Passed before the Pool read lands (the Fluid treatment):
-                    // the pane, and the copy-view link at its foot, mount with
-                    // the card rather than with the read.
-                    <AaveV3PositionExplanation
-                      chain={chain}
-                      captions={captions}
-                      view={liveView}
-                      externalActivity={externalActivity}
-                      marketName={MARKET_NAME[market] ?? "Core"}
-                      countNote={countNote}
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isAaveV3Event(event) ? (
+                    <AaveV3CtEventCard
+                      event={event as AaveV3Event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      market={market}
+                      siblings={neighbours.get(event.id)?.siblings}
+                      previous={neighbours.get(event.id)?.previous}
                     />
-                  )
+                  ) : null
                 }
               />
-            )}
-            {towerData && (
-              <LifetimeFlowsPanel
-                read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
-                explanation={aaveV3EconomicsExplanation(towerData)}
-                learnMore={aaveV3EconomicsContent({}, towerData)}
-                scrubber={
-                  flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
-                }
-              />
-            )}
-            <ChainTruthTimeline
-              // The queued export (rails-ops decision 0029) has no row cap: the
-              // card offers the CSV whenever the total is known.
-              csvExportCeiling={null}
-              // Matches `AaveV3CtEventCard`'s own `persistKey={`aave-v3:${event.id}`}` —
-              // lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="aave-v3"
-              closed={view ? view.status !== "open" : undefined}
-              notes={notes}
-              liveNotes={liveNotes}
-              liveNotesPending={liveNotesPending}
-              tl={tl}
-              // Both grouping paths, side by side: the specs group the flat
-              // answer client-side, the register draws the folders the index
-              // served. Only one is ever in force on a given load — see the
-              // `?folders=1` block above.
-              runs={AAVE_V3_TIMELINE_RUNS}
-              folderRegister={AAVE_V3_FOLDER_REGISTER}
-              readFolderMembers={readFolderMembers}
-              // The month picker above the rows, on a served page.
-              segments={segments}
-              // The USD-values toggle joins the chain-state items: the detail
-              // grid renders after-balance USD chips off the captured
-              // oracle-at-block prices (mig 092).
-              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
-              // Tenure-first header (the V4 spoke treatment): when the account
-              // started, how long it has run, how fresh the latest activity is.
-              toolbarLeading={
-                view ? (
-                  <TimelineActivityHeader
-                    events={aaveEvents}
-                    folders={servedFolders}
-                    closed={view.status !== "open"}
-                    // When the position actually opened, not when the window
-                    // does — otherwise a wallet with 104,000 events reads as
-                    // days old because its oldest loaded card is. Same reason
-                    // the folders answer when there is no cut: their members
-                    // are events this page holds without listing.
-                    firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  />
-                ) : undefined
-              }
-              renderCard={(event, meta) =>
-                isAaveV3Event(event) ? (
-                  <AaveV3CtEventCard
-                    event={event as AaveV3Event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                    market={market}
-                    siblings={neighbours.get(event.id)?.siblings}
-                    previous={neighbours.get(event.id)?.previous}
-                  />
-                ) : null
-              }
-            />
-            {/* The inspector's layer: armed from Tools in the top row, every
+              {/* The inspector's layer: armed from Tools in the top row, every
               traced value on the page becomes a click target and its receipt
               pins into a popover at the value (prototype: this page). */}
-            <ProvInspectorLayer />
-          </>
-        )}
-      </div>
+              <ProvInspectorLayer />
+            </>
+          )}
+        </div>
+      </FlowFocusContext.Provider>
     </V3PoolProvider>
   );
 }

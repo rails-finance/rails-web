@@ -29,7 +29,9 @@
 // captured price's footnote pill sits under the grid. A block with no price
 // keeps the card token-only.
 
+import { createPortal } from "react-dom";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
+import { MoveChartLink } from "./aave-family-event-receipt";
 import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
@@ -120,6 +122,12 @@ export interface AaveV3CtEventDetailProps {
   /** The previous transaction: its after-state is where this event's
    *  interest line starts. */
   previous?: { blockNumber: number; txHash: string };
+  /** The timeline event: the card's lifetime sum and its link to the chart. */
+  eventId?: string;
+  eventTs?: number;
+  /** Where the card's (i) takes the interest line and the prices, which sit
+   *  behind it (components/protocol/aave-v3/aave-family-event-receipt.tsx). */
+  notesSlot?: HTMLElement | null;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -177,6 +185,9 @@ export function AaveV3CtEventDetail({
   feeOf,
   fee,
   previous,
+  eventId,
+  eventTs,
+  notesSlot,
 }: AaveV3CtEventDetailProps) {
   const coords: V3Coords = {
     txHash,
@@ -662,6 +673,50 @@ export function AaveV3CtEventDetail({
   // previous read that failed leaves the supply interest on the collateral out.
   const prevUnread = !!ready && !!previous && prevState?.status === "unavailable";
 
+  // Behind the card's (i): the interest since the previous event, the rates
+  // behind it, and every price the card's USD figures use. Without a slot (a
+  // card outside a timeline) they stay under the grid.
+  const readNotes = (
+    <div data-card-read-notes="">
+      {/* The interest line: from the two position reads where both landed,
+          else the given-way balance's since its last move. */}
+      {ready && prevReady ? (
+        <div className="pb-1">
+          <StateInterestLine here={ready} prev={prevReady} coords={stateCoords} />
+        </div>
+      ) : (
+        interestLines.map((l) => (
+          <div key={`${l.label ?? ""}:${l.symbol}`} className="pb-1">
+            <StatSubline>
+              {l.label ?? "Interest since previous event"}:{" "}
+              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
+                <span title={l.value}>
+                  <AmountText value={Number(l.value)} />
+                </span>
+              </Prov>{" "}
+              {l.symbol}
+            </StatSubline>
+          </div>
+        ))
+      )}
+      {prevUnread && (
+        <div className="pb-1">
+          <StatSubline>
+            Supply interest on the collateral is left out: the position after the previous event was not read.
+          </StatSubline>
+        </div>
+      )}
+      {ready && prevReady && rated.length > 0 && (
+        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
+      )}
+      {pricePills.length > 0 && (
+        <div className="pb-2">
+          <AtBlockPriceFootnote pills={pricePills} />
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       {stats.length > 0 && <ChainTruthDetail stats={stats} />}
@@ -687,38 +742,9 @@ export function AaveV3CtEventDetail({
           coords={stateCoords}
           touched={touched}
           liquidation={ctx.eventType === "liquidation"}
+          eventId={eventId}
+          eventTs={eventTs}
         />
-      )}
-      {/* The interest line sits under the grid: from the two position reads
-          where both landed, else the given-way balance's since its last move. */}
-      {ready && prevReady ? (
-        <div className="px-5 pb-1">
-          <StateInterestLine here={ready} prev={prevReady} coords={stateCoords} />
-        </div>
-      ) : (
-        interestLines.map((l) => (
-          <div key={`${l.label ?? ""}:${l.symbol}`} className="px-5 pb-1">
-            <StatSubline>
-              {l.label ?? "Interest since previous event"}:{" "}
-              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
-                <span title={l.value}>
-                  <AmountText value={Number(l.value)} />
-                </span>
-              </Prov>{" "}
-              {l.symbol}
-            </StatSubline>
-          </div>
-        ))
-      )}
-      {prevUnread && (
-        <div className="px-5 pb-1">
-          <StatSubline>
-            Supply interest on the collateral is left out: the position after the previous event was not read.
-          </StatSubline>
-        </div>
-      )}
-      {ready && prevReady && rated.length > 0 && (
-        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
       )}
       {forensics && <LiquidationForensics {...forensics} />}
       {fee && ctx.collateralSymbol && (
@@ -742,11 +768,10 @@ export function AaveV3CtEventDetail({
           the liquidation&rsquo;s card.
         </div>
       )}
-      {pricePills.length > 0 && (
-        <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={pricePills} />
-        </div>
-      )}
+      {notesSlot
+        ? createPortal(readNotes, notesSlot)
+        : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
+      {eventTs != null && <MoveChartLink ts={eventTs} />}
     </>
   );
 }

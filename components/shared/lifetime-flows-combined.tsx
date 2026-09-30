@@ -25,6 +25,7 @@ import {
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { DateRow, Headline, Rescaled, Throughput, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL } from "@/components/shared/lifetime-flows-tip";
+import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { assetsAt, axisFor, DAY_MS, dayStart, type FlowModel } from "@/lib/shared/flows-timeline";
@@ -109,6 +110,35 @@ export function CombinedFlows({
     const ms = Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, PLAY_WALK_MS / Math.max(1, last)));
     timer.current = setInterval(() => setAt((i) => Math.min(last, i + 1)), ms);
   };
+
+  // On a page that ties the panel to its timeline: the committed cursor's
+  // date (not a hover preview) bounds the filter, and a card can ask for its
+  // event's day.
+  const focus = useFlowFocus();
+  const committed = stops[Math.min(at, last)];
+  const committedEnd = committed
+    ? committed.live
+      ? Number.MAX_SAFE_INTEGER
+      : dayStart(model, committed.stop) + 86_399
+    : Number.MAX_SAFE_INTEGER;
+  const committedWord =
+    committed && !committed.live ? dayStamp(dayStart(model, committed.stop)) : dayStamp(Date.now() / 1000);
+  useEffect(() => {
+    focus?.store.set({ cursor: { endTs: committedEnd, word: committedWord, live: !!committed?.live } });
+  }, [focus?.store, committedEnd, committedWord, committed?.live]);
+  useEffect(() => () => focus?.store.set({ cursor: null }), [focus?.store]);
+  const move = useFlowFocusState((s) => s.move);
+  const moved = useRef<number | null>(null);
+  useEffect(() => {
+    if (!move || moved.current === move.n) return;
+    moved.current = move.n;
+    const day = Math.floor(move.ts / 86_400) - model.start / DAY_MS;
+    const i = stops.findIndex((x) => !x.live && x.stop === day);
+    if (i >= 0) {
+      halt();
+      setAt(i);
+    }
+  }, [move, stops, model.start, halt]);
 
   const shown = preview ?? at;
   const cur: CombinedStop = stops[Math.min(shown, last)];
