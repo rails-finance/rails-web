@@ -83,6 +83,21 @@ export function sideSumRows(st: FlowSideState): SideSumRows {
   return { lines, total: { dollars: totalDollars, amount: wholeUsd(totalDollars), seg: held } };
 }
 
+/** The line under a side's sum that says how it is valued and what its
+ *  balancing item holds: a family's own words where the balancing item
+ *  carries them (Liquity), else the lending families' ("so it holds price
+ *  changes and interest together"). `held` is "held" or "owed"; `at` the
+ *  date in words ("at 5 Jul '25"). */
+export function sumBasis(st: FlowSideState, rest: string, held: string, at: string): string {
+  const seg = st.sources.find((x) => x.fill === "estimate");
+  const tail = seg?.note
+    ? `, so it is ${seg.note}.`
+    : rest.toLowerCase() === "interest earned"
+      ? "."
+      : ", so it holds price changes and interest together.";
+  return `${seg?.basis ?? "Each flow is valued at the price on its own day."} ${rest} is the remainder, ${held} ${at} less the lines above it${tail}`;
+}
+
 /** Signed whole-dollar parts that add to `total`: each part rounded, then the
  *  difference moved a dollar at a time onto the parts whose rounding moved
  *  them furthest the other way. Parts that do not add to within a dollar of

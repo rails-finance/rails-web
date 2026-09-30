@@ -31,7 +31,7 @@ import {
 } from "@/lib/shared/liquity-flows";
 import { troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
-import { sideSumRows } from "@/lib/shared/flows-sum";
+import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries } from "@/lib/shared/flows-series";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
 
@@ -197,4 +197,17 @@ test("between events the debt grows by the interest its rate builds, and the lin
   })!;
   const series = binSeries(binInputFromTimeline(t)!, "week")!;
   assert.equal(series.gaps.length, 0, "the line carries the last recorded price: no gaps");
+});
+
+test("the basis line names what each remainder holds", () => {
+  const m = model(REDEEMED, ["WETH", "BOLD"], true);
+  const st = stateAt(m, m.liveStop);
+  assert.equal(
+    sumBasis(st.collateral, "Market move", "held", "today"),
+    "Each flow is valued at the branch's price when it happened. Market move is the remainder, held today less the lines above it, so it is the change in WETH's price since each flow.",
+  );
+  assert.match(
+    sumBasis(st.debt, "Interest since the last event", "owed", "today"),
+    /^Debt is counted at BOLD's \$1 face\. .* so it is the interest built up on the recorded debt since the Trove's last event\.$/,
+  );
 });
