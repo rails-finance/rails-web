@@ -51,7 +51,9 @@ import {
   type MoonwellCoords,
 } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 
 export interface MoonwellEventDetailProps {
   ctx: MoonwellContext;
@@ -263,10 +265,36 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: Moonwe
         ]
       : [];
 
+  const collMSym =
+    ctx.eventType === "liquidation" && ctx.collateralMarket
+      ? dep.market(ctx.collateralMarket, ctx.collateralSymbol).mSymbol
+      : `m${ctx.collateralSymbol ?? ""}`;
+
   return (
     <>
       <ChainTruthDetail stats={stats} />
       {forensics && <LiquidationForensics {...forensics} />}
+      {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
+        <CTokenLiquidationBreakdown
+          protocol={coords.chainId === BASE_CHAIN_ID ? "moonwell-base" : "moonwell"}
+          brand="Moonwell"
+          wallet={wallet}
+          block={blockNumber}
+          comptroller={{ name: dep.comptroller.name, address: dep.comptroller.address }}
+          collateralKey={ctx.collateralMarket}
+          debtKey={ctx.market}
+          repaidRaw={ctx.raw?.amount}
+          debtSymbol={ctx.marketSymbol}
+          repaid={Math.abs(Number(ctx.assetsDelta ?? "0"))}
+          debtBefore={null}
+          seizeTokens={Number(ctx.seizeTokens ?? "0")}
+          seizeSymbol={collMSym}
+          seizedValue={forensics?.seized.usd ?? null}
+          clearedValue={forensics?.cleared.usd ?? null}
+          incentive={ctx.incentiveAtBlock != null ? ctx.incentiveAtBlock - 1 : null}
+          protocolShareRow="Protocol share"
+        />
+      )}
       {footnote.length > 0 && (
         <div className="px-5 pb-2">
           <AtBlockPriceFootnote pills={footnote} />

@@ -165,9 +165,15 @@ function transferSpec(direction: "transfer_in" | "transfer_out"): KindSpec {
     eventType: direction,
     memberNoun: "transfer",
     aggregatesOf: (events) => {
+      // A liquidation's seizure leaves as two mToken transfers in its own
+      // transaction: they are counted under Seized, not as transfers sent.
+      const liquidationTxs = new Set(
+        events.filter((e) => isMoonwellEvent(e) && e.context.data.eventType === "liquidation").map((e) => e.txHash),
+      );
       const sums = sumBySymbol(
         events
           .filter(isMoonwellEvent)
+          .filter((e) => direction === "transfer_in" || !liquidationTxs.has(e.txHash))
           .map((e) => ({ symbol: `m${e.context.data.marketSymbol}`, amount: e.context.data.mTokensDelta })),
       );
       return [...sums].map(([symbol, value]) => ({
@@ -256,7 +262,12 @@ function activityAggregates(buckets: Map<MoonwellEventType, BaseActivityEvent[]>
         )
       : []),
     ...KIND_SPECS.filter((spec) => spec.eventType !== "liquidation" && spec.eventType !== "repay").flatMap((spec) => {
-      const members = buckets.get(spec.eventType) ?? [];
+      // A liquidation's two seizure transfers are its Seized figure, not
+      // transfers the owner sent.
+      const liqTxs = new Set(liquidationMembers.map((e) => e.txHash));
+      const members = (buckets.get(spec.eventType) ?? []).filter(
+        (e) => spec.eventType !== "transfer_out" || !liqTxs.has(e.txHash),
+      );
       return members.length ? withCount(spec.aggregatesOf(members), members.length) : [];
     }),
   ];
@@ -275,16 +286,19 @@ function folderCard(events: BaseActivityEvent[], folder: RunFolderMeta): ReactNo
   const { buckets, other } = bucketByKind(events);
   const present = KIND_SPECS.filter((spec) => (buckets.get(spec.eventType)?.length ?? 0) > 0);
   const solo = other === 0 && present.length === 1 ? present[0] : undefined;
+  const hasLiquidation = (buckets.get("liquidation")?.length ?? 0) > 0;
   return (
     <TimelineRunCard
       key={folder.key}
       count={events.length}
       memberNoun={solo ? solo.memberNoun : "event"}
       aggregates={solo ? solo.aggregatesOf(events) : activityAggregates(buckets)}
-      tone={solo ? solo.tone : "neutral"}
-      spineIcon={solo ? solo.spineIcon : "custody"}
-      warningLabel={solo?.warningLabel}
-      muted={solo ? solo.muted : true}
+      tone={solo ? solo.tone : hasLiquidation ? "danger" : "neutral"}
+      spineIcon={solo ? solo.spineIcon : hasLiquidation ? "warning" : "custody"}
+      warningLabel={solo?.warningLabel ?? (hasLiquidation ? "Liquidation" : undefined)}
+      // A folder holding a liquidation is drawn at full weight: it is the
+      // row the account's story turns on.
+      muted={solo ? solo.muted : !hasLiquidation}
       folder
       folderBadge={solo ? solo.folderBadge : MIXED_FOLDER_BADGE}
       extraHeader={
@@ -326,7 +340,10 @@ export const MOONWELL_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFol
     folder.other === 0 && folder.counts.length === 1
       ? KIND_SPECS.find((spec) => spec.eventType === folder.counts[0].key)
       : undefined;
-  if (!solo) return MIXED_FOLDER;
+  if (!solo)
+    return folder.counts.some((c) => c.key === "liquidation")
+      ? { ...MIXED_FOLDER, tone: "danger", spineIcon: "warning", warningLabel: "Liquidation", muted: false }
+      : MIXED_FOLDER;
   return {
     memberNoun: solo.memberNoun,
     tone: solo.tone,

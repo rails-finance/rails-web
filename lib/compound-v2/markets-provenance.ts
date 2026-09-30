@@ -234,6 +234,17 @@ export const cvKinkProv = (coords: CompoundV2MarketCoords): Provenance => ({
   via: `${LANE} · InterestRateModel.kink() @ head`,
 });
 
+/** Every market's reserve factor, read at the head block: all twenty at 1e18
+ *  (100%). The dates are the markets' own NewReserveFactor logs. */
+export const cvReserveFactorProv = (coords: CompoundV2MarketCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("CToken.reserveFactorMantissa", coords),
+  summary: `Reserve factor — each cToken's \`reserveFactorMantissa()\`${atBlock(coords)}, 1e18-scaled: 1e18 (100%) on all twenty markets, so the supply rate (borrow rate × utilisation × (1 − reserve factor)) is zero. Sixteen markets were set to 100% by the NewReserveFactor logs of one governance transaction at block 23,969,453 (8 Dec 2025, tx 0xf79dd9f6…a88a2); SAI (block 10,096,844), REP (10,522,436), the older WBTC market (12,370,865) and FEI (15,761,599) earlier.`,
+  via: `${LANE} · CToken.reserveFactorMantissa() @ head`,
+});
+
 /** A live annualised rate — {supply,borrow}RatePerBlock × the model's own
  *  blocksPerYear, both the protocol's own arithmetic. */
 export const cvRateProv = (side: "supply" | "borrow", coords: CompoundV2MarketCoords): Provenance => {

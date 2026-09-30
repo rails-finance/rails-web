@@ -48,6 +48,14 @@ import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
+import { ctokenLedgerTower, type LedgerMarket } from "@/lib/shared/ctoken-ledger";
+
+/** Pre-August-2020 rows: how an ETH-denominated oracle price became dollars. */
+const FIXED_NOTE =
+  "One or more markets here have a fixed price set by governance: the oracle stores a number with no live feed behind it, and Compound values those legs at it.";
+
+const COMPOUND_V2_PRICE_NOTE =
+  "(before August 2020 Compound's oracle priced in ETH; those rows are turned into dollars with the same oracle's USDC price in that block)";
 
 const DUST = 1e-9;
 
@@ -338,6 +346,61 @@ export function computeCompoundV2Economics(
   events?: BaseActivityEvent[],
   /** See computeCompoundV2CardCaptions — the same seam, the same rules. */
   precomputedLifetime?: MarketFlows[],
+  /** The whole-history ledger (lib/compound-v2/ledger.ts), when the page holds
+   *  every row: each flow at its own block's price, with the sent, received
+   *  and seized collateral and the interest on both sides, so each column
+   *  closes. Absent, the lifetime layer below stands. */
+  ledger?: LedgerMarket[] | null,
+): ChainTruthTowerData {
+  const base = computeCompoundV2EconomicsBase(view, events, precomputedLifetime);
+  if (!ledger || ledger.length === 0) return base;
+  const priceOf = (market: string): number | null => {
+    const p = view.priceByMarket?.[market];
+    return typeof p === "number" && p > 0 ? p : null;
+  };
+  const heldSupply = view.supplies
+    .filter((r) => r.cTokens > 0)
+    .map((r) => ({ market: r.market, amount: r.current ?? r.principal, price: priceOf(r.market) }));
+  const heldDebt = view.borrows
+    .filter((r) => r.amount > 0)
+    .map((r) => ({ market: r.market, amount: r.amount, price: priceOf(r.market) }));
+  const flows = ctokenLedgerTower(ledger, { supply: heldSupply, debt: heldDebt }, priceOf, {
+    brand: "Compound",
+    receipt: "cToken",
+    priceNote: COMPOUND_V2_PRICE_NOTE,
+  });
+  if (!flows.valued) return base;
+  // The held lines stay whole: the interest rows above carry the interest,
+  // so no principal/interest split is drawn beside them.
+  const current = (lines: TowerLine[], rows: { market: string; amount: number }[]) =>
+    lines.map((l) => {
+      const r = rows.find((x) => x.market === l.key);
+      return r ? { ...l, amount: r.amount, usd: priceOf(r.market) != null ? r.amount * priceOf(r.market)! : l.usd } : l;
+    });
+  return {
+    ...base,
+    valued: true,
+    priceKind: "chain-derived",
+    collateral: {
+      ...flows.collateral,
+      current: current(base.collateral.current, heldSupply),
+      interest: null,
+    },
+    debt: {
+      ...flows.debt,
+      current: current(base.debt.current, heldDebt),
+      interest: null,
+    },
+    flowsPricedAtEvents: flows.flowsPricedAtEvents,
+    wrapFlowLabels: true,
+    interestNote: base.interestNote?.startsWith(FIXED_NOTE) ? FIXED_NOTE : undefined,
+  };
+}
+
+function computeCompoundV2EconomicsBase(
+  view: CompoundV2PositionView,
+  events?: BaseActivityEvent[],
+  precomputedLifetime?: MarketFlows[],
 ): ChainTruthTowerData {
   const prices = view.priceByMarket;
   const usdOf = (market: string, amount: number): number | null => {
@@ -512,9 +575,7 @@ export function computeCompoundV2Economics(
       lifetimeInflow: inflow((r) => r.borrowed),
     },
     interestNote:
-      (anyFixed
-        ? "One or more markets here are priced by a fixed number stored in the oracle, with no live feed behind it — the value is the one Compound itself uses, but nothing updates those legs. "
-        : "") +
+      (anyFixed ? `${FIXED_NOTE} ` : "") +
         (interest != null
           ? ""
           : "Collateral is shown at its current value — the deposit plus the interest it has earned; the spread over the amount deposited is that interest. Debt is shown as of the position's last borrow, repayment or liquidation, so interest that has built up since then isn't counted there yet. Seized collateral moves as receipt tokens with no underlying amount, so it shows up in the balances rather than the flow totals. The principal-versus-interest split is shown only when a single borrowed market's history lines up cleanly. USD is valued at Compound's own oracle price.") ||

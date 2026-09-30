@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
+import { ctokenLedgerBullets } from "@/lib/shared/ctoken-ledger-explanation";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { MoonwellDeploymentName } from "@/lib/shared/learn-more-content";
 import { formatCompact } from "@/lib/utils/format";
@@ -52,6 +53,21 @@ export interface MoonwellEconomicsOpts {
 
 export function moonwellEconomicsExplanation(data: ChainTruthTowerData, opts: MoonwellEconomicsOpts = {}): ReactNode {
   const name = opts.deployment === "base" ? "Moonwell on Base" : "Moonwell";
+  const ledger = ctokenLedgerBullets(data, { brand: "Moonwell" });
+  if (ledger)
+    return (
+      <div className="space-y-2 text-sm text-rb-500">
+        <p className="leading-relaxed">
+          These figures total this account&apos;s flows on {name} over its whole history.
+        </p>
+        {ledger.map((item, i) => (
+          <div key={i} className="flex items-start gap-2 leading-relaxed">
+            <span className="select-none text-rb-500">•</span>
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    );
   const { valued, collateral, debt } = data;
   const collSymbol = sideSymbol(collateral);
   const debtSymbol = sideSymbol(debt);

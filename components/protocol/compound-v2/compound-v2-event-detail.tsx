@@ -47,7 +47,8 @@ import {
   liqIncentiveRefProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
 
@@ -271,11 +272,33 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
   // The valued two-leg breakdown, beneath the chain-state grid — only once the
   // oracle-at-block walk has priced BOTH legs (token-only until then).
   const forensics = ctx.eventType === "liquidation" ? buildCompoundV2LiqForensics(ctx, coords) : undefined;
+  const values = ctx.eventType === "liquidation" ? compoundV2LiquidationValues(ctx) : undefined;
+  const collM = ctx.collateralMarket ? COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket] : undefined;
 
   return (
     <>
       <ChainTruthDetail stats={stats} />
       {forensics && <LiquidationForensics {...forensics} />}
+      {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
+        <CTokenLiquidationBreakdown
+          protocol="compound-v2"
+          brand="Compound"
+          wallet={wallet}
+          block={blockNumber}
+          comptroller={{ name: "Comptroller", address: COMPOUND_V2_ADDRESSES.COMPTROLLER }}
+          collateralKey={ctx.collateralMarket}
+          debtSymbol={ctx.marketSymbol}
+          repaid={Math.abs(Number(ctx.assetsDelta ?? "0"))}
+          debtBefore={ctx.debtBefore != null ? Number(ctx.debtBefore) : null}
+          seizeTokens={Number(ctx.seizeTokens ?? "0")}
+          seizeSymbol={collM?.cSymbol ?? `c${ctx.collateralSymbol ?? ""}`}
+          seizedValue={values?.seizedValue ?? null}
+          clearedValue={values?.clearedValue ?? null}
+          incentive={values?.incPct ?? null}
+          protocolShareRow="Protocol seize share"
+          format={values?.numeraire === "ETH" ? (n: number) => `${formatNumber(n)} ETH` : undefined}
+        />
+      )}
     </>
   );
 }

@@ -84,6 +84,8 @@ export function CompoundV2EventHeader({
         symbol: collCSym,
         address: soleFlowAddress(flows, collCSym),
         prov: seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens),
+        // A cToken count, named so it does not read as the underlying.
+        suffix: collCSym,
       });
     }
   } else if (ctx.eventType === "seize_out" || ctx.eventType === "seize_burn") {
@@ -96,6 +98,7 @@ export function CompoundV2EventHeader({
         symbol: cSym,
         address: soleFlowAddress(flows, cSym),
         prov: seizeLegProv(cSym, ctx.eventType, coords, ctx.raw?.cTokens),
+        suffix: cSym,
       });
   } else {
     // mint/redeem/borrow/repay (underlying) · transfer_in/transfer_out ·
@@ -107,7 +110,14 @@ export function CompoundV2EventHeader({
     const d = Number((isCTokenLane ? ctx.cTokensDelta : ctx.assetsDelta) ?? "0") || 0;
     const prov = movedDeltaProv(ctx.eventType, ctx.marketSymbol, cSym, coords, raw);
     const shown = isCTokenLane ? cSym : ctx.marketSymbol;
-    if (d !== 0 && prov) deltas.push({ value: d, symbol: shown, address: soleFlowAddress(flows, shown), prov });
+    if (d !== 0 && prov)
+      deltas.push({
+        value: d,
+        symbol: shown,
+        address: soleFlowAddress(flows, shown),
+        prov,
+        ...(isCTokenLane ? { suffix: cSym } : {}),
+      });
   }
 
   // Party chips. Transfers name their counterparty neutrally; the seizure

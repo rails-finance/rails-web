@@ -56,6 +56,7 @@ import {
 import { moonwellLiveDebtProv } from "@/lib/moonwell/position-provenance";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
+import { ctokenLedgerTower, type LedgerMarket } from "@/lib/shared/ctoken-ledger";
 
 const DUST = 1e-9;
 
@@ -407,6 +408,61 @@ export function computeMoonwellEconomics(
   /** Lifetime sums reduced over the WHOLE history elsewhere (the Base sweep
    *  route). When given, `events` are not reduced here at all. */
   precomputedLifetime?: MarketFlows[],
+  /** The whole-history ledger (lib/moonwell/ledger.ts, or the Base replay's
+   *  own): each flow at its own block's price, the sent, received and seized
+   *  collateral and the interest on both sides, so each column closes.
+   *  Absent, the lifetime layer below stands. */
+  ledger?: LedgerMarket[] | null,
+): ChainTruthTowerData {
+  const base = computeMoonwellEconomicsBase(view, events, vocab, precomputedLifetime);
+  if (!ledger || ledger.length === 0) return base;
+  const priceOf = (market: string): number | null => {
+    const address =
+      view.supplies.find((r) => r.market === market)?.address ??
+      view.borrows.find((r) => r.market === market)?.address ??
+      ledger.find((m) => m.market === market)?.address;
+    const p = address ? view.priceByAddress?.[address.toLowerCase()] : undefined;
+    return typeof p === "number" && p > 0 ? p : null;
+  };
+  const heldSupply = view.supplies
+    .filter((r) => r.mTokens > 0)
+    .map((r) => ({ market: r.market, amount: r.current ?? r.principal, price: priceOf(r.market) }));
+  const heldDebt = view.borrows
+    .filter((r) => r.amount > 0)
+    .map((r) => ({ market: r.market, amount: r.amount, price: priceOf(r.market) }));
+  const flows = ctokenLedgerTower(ledger, { supply: heldSupply, debt: heldDebt }, priceOf, {
+    brand: "Moonwell",
+    receipt: "mToken",
+  });
+  if (!flows.valued) return base;
+  const byAddress = (rows: { market: string; amount: number }[], supplyRows: { market: string; address: string }[]) =>
+    new Map(rows.map((r) => [supplyRows.find((x) => x.market === r.market)?.address, r]));
+  const supplyBy = byAddress(heldSupply, view.supplies);
+  const debtBy = byAddress(heldDebt, view.borrows);
+  // The held lines stay whole: the interest rows carry the interest.
+  const current = (lines: TowerLine[], by: Map<string | undefined, { market: string; amount: number }>) =>
+    lines.map((l) => {
+      const r = by.get(l.key);
+      const p = r ? priceOf(r.market) : null;
+      return r ? { ...l, amount: r.amount, usd: p != null ? r.amount * p : l.usd } : l;
+    });
+  return {
+    ...base,
+    valued: true,
+    priceKind: "chain-derived",
+    collateral: { ...flows.collateral, current: current(base.collateral.current, supplyBy), interest: null },
+    debt: { ...flows.debt, current: current(base.debt.current, debtBy), interest: null },
+    flowsPricedAtEvents: flows.flowsPricedAtEvents,
+    wrapFlowLabels: true,
+    interestNote: undefined,
+  };
+}
+
+function computeMoonwellEconomicsBase(
+  view: MoonwellPositionView,
+  events: BaseActivityEvent[] | undefined,
+  vocab: MoonwellTowerVocabulary,
+  precomputedLifetime: MarketFlows[] | undefined,
 ): ChainTruthTowerData {
   const prices = view.priceByAddress;
   const usdOf = (address: string | undefined, amount: number): number | null => {

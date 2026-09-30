@@ -369,10 +369,13 @@ export function buildMoonwellTimeline(
       }
     }
 
+    // An mToken transfer to the market's own contract is the protocol's share
+    // of a liquidation's seizure, kept as reserves: named so, not "Sent".
+    const toMarket = kind === "transfer_out" && caller != null && caller === m.mtoken.toLowerCase();
     return {
       ...base,
       actionType: kind,
-      actionLabel: LABELS[kind] ?? kind,
+      actionLabel: toMarket ? "Protocol share" : (LABELS[kind] ?? kind),
       flows,
       context: { protocol: "moonwell", data: ctx },
     };
