@@ -122,6 +122,8 @@ export function CompoundAbsorbBreakdown({
     return () => ac.abort();
   }, [coords.blockNumber, coords.chainId, marketKey, addrKey, previous?.blockNumber]);
 
+  // A swept row's balance is short of its interest, so the split would be too.
+  if (ctx.baseUnsettled) return null;
   if (!split || legs.length === 0 || !Number.isFinite(creditedUsd) || creditedUsd <= 0) return null;
   const sym = ctx.assetSymbol;
   const paidOut = Number(split.paidOut);

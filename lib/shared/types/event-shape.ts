@@ -1584,8 +1584,9 @@ export interface CompoundContext {
   quoteValue?: string;
   quoteUsd?: string;
   /** The row came from a live sweep of the Comet's logs, which carry the
-   *  amounts moved but not the interest between them: no `baseAfter` is
-   *  stated, and the row says the balance is unread (Base lane only). */
+   *  amounts moved but not the interest between them: `baseAfter` is their
+   *  running sum, which the lifetime walk reads and the row does not show
+   *  (Base lane only). */
   baseUnsettled?: boolean;
   /** absorb_debt only — the same-transaction AbsorbCollateral legs (Comet
    *  absorbs the whole account: one debt clear + every collateral seized).

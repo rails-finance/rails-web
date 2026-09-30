@@ -1167,16 +1167,13 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       // The account's running signed base rides on collateral rows too, as it
       // does in the MV, so a collateral card can state the debt its stack
       // stands behind.
-      // Without the chain's block state (the sweep) the running sum is the
-      // logged amounts alone, short of every interest accrual, so the row
-      // states no base balance and says it is unread instead.
-      ...(p.blockState == null
-        ? { baseUnsettled: true }
-        : {
-            baseAfter: fmtUnits(baseAfter, m.baseDecimals),
-            ...(baseInterest !== ZERO ? { baseInterest: fmtUnits(baseInterest, m.baseDecimals) } : {}),
-            ...(baseUnlogged !== ZERO ? { baseUnlogged: fmtUnits(baseUnlogged, m.baseDecimals) } : {}),
-          }),
+      baseAfter: fmtUnits(baseAfter, m.baseDecimals),
+      ...(baseInterest !== ZERO ? { baseInterest: fmtUnits(baseInterest, m.baseDecimals) } : {}),
+      ...(baseUnlogged !== ZERO ? { baseUnlogged: fmtUnits(baseUnlogged, m.baseDecimals) } : {}),
+      // Without the chain's block state (the sweep) that balance is the logged
+      // amounts alone, short of every interest accrual: the lifetime walk
+      // still reads it, and the row says the balance is unread instead.
+      ...(p.blockState == null ? { baseUnsettled: true } : {}),
       ...(collAfter != null ? { collateralAfter: fmtUnits(collAfter, meta.decimals) } : {}),
       // The wallet's opening row. With a seed the opening row sits before
       // the cut, and no row of the tail is it.

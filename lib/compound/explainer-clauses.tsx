@@ -219,7 +219,7 @@ function compoundEventSlotsBase(
   // (base) panel, sharing its receipt.
   const collAfterClause = (): ClauseInput => {
     if (ctx.collateralAfter == null) return null;
-    const base = ctx.baseAfter != null ? Number(ctx.baseAfter) : null;
+    const base = ctx.baseAfter != null && !ctx.baseUnsettled ? Number(ctx.baseAfter) : null;
     if (base != null && base < -COMPOUND_EPS) {
       const baseSym = cometMarket.baseSymbol;
       return clause(

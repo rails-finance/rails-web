@@ -196,7 +196,7 @@ export function CompoundEventDetail({
     // the reference cards' Collateral | Debt shape. Static: this event moved
     // no base, so there is no transition arrow; the value cites the same
     // replayed base_after receipt the base cards cite.
-    if (ctx.baseAfter != null) {
+    if (ctx.baseAfter != null && !ctx.baseUnsettled) {
       const b = Number(ctx.baseAfter);
       stats.push({
         label: b < 0 ? "Borrowed (base)" : b > 0 ? "Lent (base)" : "Base balance",
