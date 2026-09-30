@@ -171,7 +171,7 @@ export interface ChainTruthRowSpec {
    *  tracing both facts (tx sender + Pool caller vs owner). Like `critical`,
    *  it keeps the moved amounts in the header — the glyph spine carries no
    *  flanking numbers. */
-  externalActor?: { address: string; prov: Provenance; tip?: ReactNode };
+  externalActor?: { address: string; prov: Provenance; tip?: ReactNode; prefix?: string };
   /** Neutral party chip — "<prefix> 0x12…34" beside the deltas (e.g. Maker's
    *  give: "to <new owner>"). Unlike `externalActor` it carries no
    *  external-party signal: neutral tint, no spine hand-off — a named
@@ -646,6 +646,7 @@ export function ChainTruthRow({
             address={spec.externalActor.address}
             prov={spec.externalActor.prov}
             tip={spec.externalActor.tip}
+            prefix={spec.externalActor.prefix}
           />
         </span>
       )}

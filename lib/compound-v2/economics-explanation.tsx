@@ -57,13 +57,24 @@ function fmtScalar(value: number, valued: boolean, symbol: string | null): strin
   return null;
 }
 
-export function compoundV2EconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+export function compoundV2EconomicsExplanation(
+  data: ChainTruthTowerData,
+  opts: {
+    /** The history has more rows to price than one at-block read takes: the
+     *  panel stays at today's prices, and says why. */
+    overLimit?: number;
+  } = {},
+): ReactNode {
   const ledger = ctokenLedgerBullets(data, {
     brand: "Compound",
     priceNote:
       "(before August 2020 Compound's oracle priced in ETH; those rows are turned into dollars with its USDC price in that block)",
   });
   if (ledger) return <LedgerBullets bullets={ledger} />;
+  const overLimitNote =
+    opts.overLimit != null
+      ? `This history has more than ${opts.overLimit} rows to price at their blocks, which is more than one read takes, so the flows are valued at Compound's oracle price today and the transfer, seizure and interest lines are left out.`
+      : null;
   const valued = data.valued;
   const collSymbol = sideSymbol(data.collateral);
   const debtSymbol = sideSymbol(data.debt);
@@ -128,6 +139,7 @@ export function compoundV2EconomicsExplanation(data: ChainTruthTowerData): React
       "Bars are shown in token units, not dollars, because no on-chain price is captured for one or more of the markets held here.",
     );
   }
+  if (overLimitNote) bullets.push(overLimitNote);
 
   return (
     <div className="space-y-2 text-sm text-rb-500">
@@ -167,8 +179,8 @@ export function compoundV2EconomicsContent(): LearnMoreContent {
     stepsHeading: "How this is built:",
     steps: [
       "Flows are replayed from the wallet's own cToken events, per market.",
-      "Collateral is shown at balanceOfUnderlying — the cToken balance converted at the market's exchangeRateStored — so it already includes accrued interest; debt is shown as of the last borrow, repayment or liquidation.",
-      "USD values use Compound's own on-chain oracle price for each market (getUnderlyingPrice) — the same price the Comptroller reads — and only appear when every contributing market is priced.",
+      "Collateral is the cToken balance converted at the market's exchange rate, so it already includes accrued interest; debt is shown as of the last borrow, repayment or liquidation.",
+      "USD values use Compound's oracle price for each market, the same price the Comptroller reads, and only appear when every contributing market is priced.",
     ],
     detailsHeading: "Key concepts:",
     details: [

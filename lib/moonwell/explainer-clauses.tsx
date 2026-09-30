@@ -200,8 +200,8 @@ export function moonwellEventSlots(
       const meansNow: ClauseInput[] = [
         clause(
           <>
-            Supplying and entering the market are separate steps: the deposit backs borrowing, and becomes seizable in a
-            liquidation, only once it is entered.
+            Supplying and entering the market are separate steps: the deposit counts toward the borrow limit only once
+            its market is entered. A liquidation can seize it either way.
           </>,
         ),
       ];
@@ -214,9 +214,11 @@ export function moonwellEventSlots(
     }
 
     case "redeem": {
+      const continues = rs.marketEmptied || rs.mTokensAfter != null;
       const happened = (
         <>
-          Withdrew {assetsDeltaFig()} from the {sym} market, burning {mintDeltaFig()} of the receipt token.
+          Withdrew {assetsDeltaFig()} from the {sym} market, burning {mintDeltaFig()}
+          {continues ? null : "."}
         </>
       );
       const changed: ClauseInput = rs.marketEmptied
@@ -337,21 +339,31 @@ export function moonwellEventSlots(
         // carries it verbatim.
       ];
       if (ctx.liquidator) {
+        const link = (a: string) => (
+          <a
+            href={explorerUrl(coords.chainId ?? MAINNET_CHAIN_ID, "address", a)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {a.slice(0, 6)}…{a.slice(-4)}
+          </a>
+        );
+        // Two addresses on a bot's liquidation: the wallet that sent the
+        // transaction, and the contract it called, which is the liquidator
+        // the market records (it repaid the debt and received the mTokens).
+        const sender = ctx.txFrom && ctx.txFrom.toLowerCase() !== ctx.liquidator.toLowerCase() ? ctx.txFrom : null;
         meansNow.push(
           clause(
-            <>
-              Cleared by a third-party liquidator, typically an automated bot:{" "}
-              <a
-                href={explorerUrl(coords.chainId ?? MAINNET_CHAIN_ID, "address", ctx.liquidator)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {ctx.liquidator.slice(0, 6)}…{ctx.liquidator.slice(-4)}
-              </a>
-              .
-            </>,
+            sender ? (
+              <>
+                Sent by the wallet {link(sender)} through the contract {link(ctx.liquidator)}. The contract is the
+                liquidator: it repaid the debt and received the seized mTokens.
+              </>
+            ) : (
+              <>Carried out by a third-party liquidator, typically an automated bot: {link(ctx.liquidator)}.</>
+            ),
           ),
         );
       }

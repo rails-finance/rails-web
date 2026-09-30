@@ -44,6 +44,7 @@ import type {
   MoonwellPeakAmount,
 } from "@/lib/sources/api/moonwell-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { TipLabel } from "@/components/shared/tip-label";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
@@ -72,6 +73,10 @@ export interface MoonwellPositionView {
   liquidations?: LiquidationStory[];
   /** Every row of the history, beside the transaction count (the detail page). */
   eventTotal?: number;
+  /** The markets the account has entered as collateral (Comptroller
+   *  getAssetsIn at head), each with its live collateral factor. Absent where
+   *  no chain read stands behind the card (the listing). */
+  entered?: { underlying: string; symbol: string; collateralFactor: number }[];
 }
 
 /** The figure a supply line asserts: the current value (interest included)
@@ -268,6 +273,46 @@ function PeakStack({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
   );
 }
 
+const NOT_COLLATERAL_TIP =
+  "Supplied and earning the supply rate, but not entered as collateral (the Comptroller's market membership, read now), so it backs no borrowing. A liquidation can still seize it.";
+
+/** Whether a line's market is entered as collateral; true where membership
+ *  is unknown, so nothing is split without a read behind it. */
+const isEntered = (v: MoonwellPositionView, address: string) =>
+  !v.entered || v.entered.some((e) => e.underlying === address.toLowerCase());
+
+/** "Collateral factor WETH 84% · USDC 88%": the entered markets the card
+ *  lists, each at the factor the Comptroller applies to it now. */
+function FactorCaption({ v, addresses }: { v: MoonwellPositionView; addresses: string[] }) {
+  const rows = (v.entered ?? []).filter((e) => addresses.some((a) => a.toLowerCase() === e.underlying));
+  if (rows.length === 0) return null;
+  return (
+    <div className="text-xs mt-0.5 text-rb-500" data-moonwell-collateral-factors="">
+      <TipLabel
+        text={rows.length > 1 ? "collateral factors" : "collateral factor"}
+        tip="The share of each entered market's value that counts toward the borrow limit, as the Comptroller sets it now."
+      />{" "}
+      {rows.map((e, i) => (
+        <span key={e.underlying}>
+          {i > 0 ? " · " : ""}
+          {e.symbol} {Math.round(e.collateralFactor * 100)}%
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function NotCollateralBlock({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-2" data-moonwell-not-collateral="">
+      <div className="text-rb-500 text-xs font-semibold">
+        <TipLabel text="Supplied, not collateral" tip={NOT_COLLATERAL_TIP} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function MoonwellPositionCard({
   v,
   receipts = false,
@@ -305,9 +350,17 @@ export function MoonwellPositionCard({
   // Moonwell on Ethereum and on Base; only the deployment named by the
   // card's own session changes the prose (roster size, separate-deployment note).
   const positionDeployment: MoonwellPositionDeployment = session === "moonwell-base" ? "base" : "ethereum";
+  // The collateral column holds the entered markets; a supply the account
+  // never entered is shown apart ("Supplied, not collateral").
+  const vc: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => isEntered(v, r.address)) };
+  const vo: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => !isEntered(v, r.address)) };
   const collUsd = totalUsd(
-    v,
-    v.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
+    vc,
+    vc.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
+  );
+  const otherUsd = totalUsd(
+    vo,
+    vo.supplies.map((r) => ({ address: r.address, amount: supplyAmount(r) })),
   );
   const debtUsd = totalUsd(v, v.borrows);
   // `receipts` is the render-site switch (listing defaults false; only the
@@ -319,7 +372,7 @@ export function MoonwellPositionCard({
   const isDetail = receipts;
   // Dust lines (under a cent) leave the icon stack, its "+N" and the list
   // count; the lines put them behind the "N dust reserves hidden" control.
-  const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
+  const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
   const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
   const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
   const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
@@ -361,9 +414,24 @@ export function MoonwellPositionCard({
           }
           closedAt={v.lastActivityAt}
           outcomeDates={outcomeDates(v)}
-          collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
+          collateral={<PeakStack lines={v.peakSupplies.filter((r) => isEntered(v, r.address))} side="supply" />}
           debt={<PeakStack lines={v.peakBorrows} side="debt" />}
-          collateralFootnote={noPeaksNote}
+          collateralFootnote={
+            noPeaksNote ??
+            (receipts ? (
+              <>
+                <FactorCaption
+                  v={v}
+                  addresses={v.peakSupplies.filter((r) => isEntered(v, r.address)).map((r) => r.address)}
+                />
+                {v.peakSupplies.some((r) => !isEntered(v, r.address)) && (
+                  <NotCollateralBlock>
+                    <PeakStack lines={v.peakSupplies.filter((r) => !isEntered(v, r.address))} side="supply" />
+                  </NotCollateralBlock>
+                )}
+              </>
+            ) : undefined)
+          }
           debtFootnote={noPeaksNote}
         />
       </PositionCardShell>
@@ -420,7 +488,7 @@ export function MoonwellPositionCard({
           {
             label: CARD_VOCAB.collateral,
             assetIcons:
-              v.supplies.length > 0 ? (
+              vc.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
                   <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
@@ -430,21 +498,36 @@ export function MoonwellPositionCard({
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={dep.card.usd("Collateral")} />
               ) : supplyDisclosure.collapsible ? null : (
-                <SupplyStack v={v} />
+                <SupplyStack v={vc} />
               ),
             footnote: (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyStack v={v} />
+                    <SupplyStack v={vc} />
                   </ReserveDisclosureList>
                 )}
                 {isDetail && collUsd != null && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyFootnoteLines v={v} />
+                    <SupplyFootnoteLines v={vc} />
                   </ReserveDisclosureList>
                 )}
                 <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
+                {isDetail && <FactorCaption v={v} addresses={vc.supplies.map((r) => r.address)} />}
+                {vo.supplies.length > 0 && (
+                  <NotCollateralBlock>
+                    {otherUsd != null ? (
+                      <>
+                        <div className="text-sm font-semibold tabular-nums">
+                          <Prov info={dep.card.usd("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
+                        </div>
+                        {isDetail && <SupplyFootnoteLines v={vo} />}
+                      </>
+                    ) : (
+                      <SupplyStack v={vo} />
+                    )}
+                  </NotCollateralBlock>
+                )}
               </>
             ),
           },

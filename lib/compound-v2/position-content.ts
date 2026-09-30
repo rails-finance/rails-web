@@ -31,11 +31,11 @@ export function compoundV2PositionContent(opts: {
       details: [
         {
           bold: "Account liquidity",
-          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account.",
+          text: "the Comptroller (Compound's risk contract) adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account. A borrow in a deprecated market can be liquidated without one.",
         },
         {
           bold: "Partial by design",
-          text: "each liquidation repays at most half the debt in one borrowed market (the close factor), so a liquidated account often survives it.",
+          text: "each liquidation repays at most half the debt in one borrowed market (the close factor, 50%), or the whole borrow in a deprecated market, so a liquidated account often survives it.",
         },
         {
           bold: "cTokens & the exchange rate",
@@ -82,11 +82,11 @@ export function compoundV2PositionContent(opts: {
     opts.hasDebt
       ? {
           bold: "Account liquidity",
-          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt) per call.",
+          text: "the Comptroller (Compound's risk contract) adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt, or the whole borrow in a deprecated market) per call.",
         }
       : {
           bold: "Supply only",
-          text: "a supply is not collateral until the wallet enters its market (enterMarkets); only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
+          text: "a supply is not collateral until the wallet enters its market; only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
         },
     {
       bold: "Reserve factor 100%",
@@ -97,7 +97,7 @@ export function compoundV2PositionContent(opts: {
   return {
     title: "About This Position",
     intro:
-      "This panel explains the account's live state in plain language — what's supplied across each Compound V2 market, what's borrowed against it, and how the Comptroller's account liquidity covers it.",
+      "This panel explains the account's live state in plain language: what's supplied across each Compound V2 market, what's borrowed against it, and how much borrowing room the Comptroller (Compound's risk contract) leaves it.",
     detailsHeading: "Key concepts:",
     details,
     links: LINKS,

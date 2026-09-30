@@ -116,7 +116,16 @@ export function MoonwellEventHeader({
             prefix:
               coords.mtoken != null && ctx.counterparty === coords.mtoken.toLowerCase()
                 ? `to the ${mSym} market`
-                : "to",
+                : // A seizure's transfer to the liquidator: the contract that
+                  // called the market is the one receiving, in a transaction
+                  // someone other than the owner sent.
+                  wallet &&
+                    ctx.caller &&
+                    ctx.caller.toLowerCase() === ctx.counterparty.toLowerCase() &&
+                    ctx.txFrom &&
+                    ctx.txFrom.toLowerCase() !== wallet.toLowerCase()
+                  ? "to the liquidator"
+                  : "to",
             address: ctx.counterparty,
             prov: transferAmountProv(mSym, "out", coords),
             ens: true,
@@ -146,6 +155,19 @@ export function MoonwellEventHeader({
                   { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
                   coords,
                 ),
+                // A contract made the repayment for the wallet that sent the
+                // transaction (a liquidation bot's contract, say): both named.
+                ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
+                  ? {
+                      prefix: "sent by",
+                      tip: (
+                        <>
+                          {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
+                          {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
+                        </>
+                      ),
+                    }
+                  : {}),
               }
             : undefined,
         party,

@@ -393,6 +393,8 @@ function buildSide(
     unitAll?: boolean;
     /** USD rows in whole dollars (ChainTruthTowerData.fullUsdAmounts). */
     fullUsd?: boolean;
+    /** USD rows in dollars and cents (ChainTruthTowerData.centsUsdAmounts). */
+    centsUsd?: boolean;
   },
 ): TowerSide {
   const {
@@ -412,7 +414,12 @@ function buildSide(
   const sc = (l: TowerLine) => Math.max(0, lineScalar(l, valued));
   // Compact dollars ("$6.4M"), or whole dollars where the feeder asks for a
   // column that adds up on its face.
-  const usdRow = (n: number) => (opts.fullUsd ? `$${Math.round(n).toLocaleString("en-US")}` : formatCompactUsd(n));
+  const usdRow = (n: number) =>
+    opts.centsUsd
+      ? `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : opts.fullUsd
+        ? `$${Math.round(n).toLocaleString("en-US")}`
+        : formatCompactUsd(n);
   const cmp = (n: number) => (opts.fullAmounts ? formatNumber(n) : formatCompact(n));
   // Full token amounts (a Morpho-only opt-in) name their token on every row,
   // as does a tower that opts into `unitOnEveryRow`.
@@ -618,7 +625,8 @@ function buildSide(
   // same faded reference bar, so it wears the flow swatch like `received`.
   // A whole-dollar column prints interest under half a dollar as "<$1" beside
   // its token amount, where "$0" would read as none earned.
-  const underDollar = (l: TowerLine) => valued && opts.fullUsd && l.usd != null && l.usd > 0 && l.usd < 0.5;
+  const underDollar = (l: TowerLine) =>
+    valued && opts.fullUsd && !opts.centsUsd && l.usd != null && l.usd > 0 && l.usd < 0.5;
   if (hasFlows)
     earnedLines.forEach((l) =>
       rows.push({
@@ -926,6 +934,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     wrapLabels: data.wrapFlowLabels,
     unitAll: data.unitOnEveryRow,
     fullUsd: data.fullUsdAmounts,
+    centsUsd: data.centsUsdAmounts,
   });
   const right = build(debtParts, d, {
     solid: DEBT_SOLID,
@@ -943,6 +952,7 @@ function ChainTruthTowerChart({ data, hideHistorical }: { data: ChainTruthTowerD
     wrapLabels: data.wrapFlowLabels,
     unitAll: data.unitOnEveryRow,
     fullUsd: data.fullUsdAmounts,
+    centsUsd: data.centsUsdAmounts,
   });
   // A position with no debt axis (a lender, a saver) draws its one tower.
   const noDebt = data.debtAxisAbsent && data.debt.current.length === 0 && data.debt.exited.length === 0;

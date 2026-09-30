@@ -136,7 +136,14 @@ const PARTY_ROLES = [
       /\banother (\w+ )?(account|wallet)\b/i,
     ],
   },
-  { role: "liquidator", prefixes: ["by", "liquidated by", "seized by"], phrases: [/\bliquidator\b/i] },
+  {
+    role: "liquidator",
+    prefixes: ["by", "liquidated by", "seized by", "to the liquidator"],
+    phrases: [/\bliquidator\b/i],
+  },
+  // The wallet that sent a transaction whose contract acted for it (a
+  // liquidation bot's wallet and its contract).
+  { role: "sender", prefixes: ["sent by"], phrases: [/\bsent the transaction\b/i, /\bsent by the wallet\b/i] },
   {
     role: "liquidated account",
     prefixes: ["borrower", "seized from", "repaid for"],

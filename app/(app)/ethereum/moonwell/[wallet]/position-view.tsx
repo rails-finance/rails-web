@@ -410,7 +410,11 @@ export default function MoonwellPositionView({
   // before and after it (interest included), where the page holds every row.
   const cardView = useMemo<MoonwellPositionView | null>(() => {
     if (!liveView) return liveView;
-    const counted = { ...liveView, eventTotal: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : undefined };
+    const counted = {
+      ...liveView,
+      eventTotal: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : undefined,
+      ...(chain?.entered ? { entered: chain.entered } : {}),
+    };
     if (historyWindow.state !== "whole" || moonwellEvents.length === 0) return counted;
     const liquidations = liquidationStories(
       moonwellEvents.map((e) => {
@@ -449,7 +453,7 @@ export default function MoonwellPositionView({
       peakSupplies: withBalancePeaks(liveView.peakSupplies, peaks, "supply"),
       peakBorrows: withBalancePeaks(liveView.peakBorrows, peaks, "debt"),
     };
-  }, [liveView, historyWindow, moonwellEvents, tl.totalCount]);
+  }, [liveView, historyWindow, moonwellEvents, tl.totalCount, chain]);
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest splits; the rates ride the listing row's per-market chain read.
