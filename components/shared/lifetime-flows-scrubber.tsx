@@ -3,10 +3,16 @@
 // <LifetimeFlowsScrubber> — Lifetime flows as two horizontal bars on one USD
 // axis, with a date scrubber under them (rails-ops
 // reference/lifetime-flows-scrubber.md). Solid is what is still there, each
-// kind of exit its own hatch, named in the key under the bars. Every figure is
-// `stateAt(model, stop)` and `assetsAt(model, stop)` (lib/shared/flows-timeline.ts);
-// this file only draws them. Under each bar one line says where its length
-// came from; hovering or tapping a segment lists its assets.
+// kind of exit its own hatch, named in the Key inside the panel's Explanation
+// (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
+// `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
+// them. Under each bar one line says where its length came from; hovering or
+// tapping a segment lists its assets.
+//
+// Accuracy: each segment is its own rounded block, 1px apart, laid out in
+// pixels from the measured track; a non-zero segment is at least 2px, the
+// width that takes comes off the largest segments, and the bar's total length
+// stays exact on the axis (`layoutStrip`).
 
 import {
   createContext,
@@ -18,6 +24,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type RefObject,
 } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -116,6 +123,90 @@ const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
  *  null at the last stop, where the two agree. */
 export const FlowsLedgerNoteContext = createContext<((note: string | null) => void) | null>(null);
 
+/** The Key: each kind of exit the position has had over its life, and the
+ *  dashed outline where it has other stops. The scrubber reports it; the panel
+ *  draws it inside its Explanation, so the bars stand alone. */
+export type FlowsKeyItems = { items: { side: FlowSide; s: FlowSegment }[]; outline: string | null };
+export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
+
+/** Gap between neighbouring segments, the least width a non-zero segment
+ *  draws at, and the largest corner radius, all in px. */
+const SEG_GAP = 1;
+const SEG_MIN = 2;
+const SEG_RADIUS = 3;
+
+type SegBox = { left: number; width: number };
+
+/** Lays a strip's segments out in pixels on a track `trackPx` wide whose axis
+ *  runs to `max`. The bar ends where its total sits on the axis; the gaps come
+ *  out of that length; a segment the split leaves under SEG_MIN is raised to
+ *  it, and what that adds is shaved off the largest segments (down to a common
+ *  ceiling). A bar too short to hold every segment at SEG_MIN runs that much
+ *  longer. Edges snap to device pixels. */
+export function layoutStrip(widths: number[], max: number, trackPx: number, dpr = 1): SegBox[] {
+  const n = widths.length;
+  const total = widths.reduce((a, w) => a + w, 0);
+  if (n === 0 || !(total > 0) || !(max > 0) || !(trackPx > 0)) return widths.map(() => ({ left: 0, width: 0 }));
+  const length = Math.min(trackPx, (total / max) * trackPx);
+  const room = length - SEG_GAP * (n - 1);
+  let w: number[];
+  if (room <= SEG_MIN * n) {
+    w = widths.map(() => SEG_MIN);
+  } else {
+    w = widths.map((v) => (v / total) * room);
+    const small = w.map((x) => x < SEG_MIN);
+    const owed = w.reduce((a, x, i) => a + (small[i] ? SEG_MIN - x : 0), 0);
+    if (owed > 0) {
+      // The ceiling c over the rest where what lies above it equals `owed`.
+      const big = w.filter((_, i) => !small[i]).sort((a, b) => b - a);
+      let c = 0;
+      let sum = 0;
+      for (let k = 0; k < big.length; k++) {
+        sum += big[k];
+        c = (sum - owed) / (k + 1);
+        if (k === big.length - 1 || c >= big[k + 1]) break;
+      }
+      w = w.map((x, i) => (small[i] ? SEG_MIN : Math.min(x, c)));
+    }
+  }
+  const snap = (x: number) => Math.round(x * dpr) / dpr;
+  const out: SegBox[] = [];
+  let edge = 0;
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    edge += w[i];
+    const end = Math.max(start + SEG_MIN, snap(edge));
+    out.push({ left: start, width: end - start });
+    edge += SEG_GAP;
+    start = end + SEG_GAP;
+  }
+  return out;
+}
+
+/** The track's width once measured, and whether it has been measured long
+ *  enough for moves to animate (the first measured frame lands without one). */
+function useTrackWidth(): [RefObject<HTMLDivElement | null>, number | null, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  const [settled, setSettled] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setWidth(r.width);
+    });
+    ro.observe(el);
+    const raf = requestAnimationFrame(() => setSettled(true));
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+  return [ref, width, settled];
+}
+
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -166,8 +257,36 @@ function Strip({
   split: AssetSplit;
 }) {
   const shown = segments.filter((s) => s.width > 0);
+  const [trackRef, trackPx, settled] = useTrackWidth();
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  // Until the track is measured (the server's render, the first paint) the
+  // segments sit on percentages with no gaps; after it, on `layoutStrip`.
+  const boxes = useMemo(() => {
+    if (trackPx == null) {
+      let at = 0;
+      return shown.map((s) => {
+        const box = { left: pct(at, max), width: pct(s.width, max), radius: SEG_RADIUS };
+        at += s.width;
+        return box;
+      });
+    }
+    return layoutStrip(
+      shown.map((s) => s.width),
+      max,
+      trackPx,
+      dpr,
+    ).map((b) => ({ left: `${b.left}px`, width: `${b.width}px`, radius: Math.min(SEG_RADIUS, b.width / 2) }));
+    // `shown` is new each render; its widths are what the layout reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown.map((s) => `${s.key}:${s.width}`).join("|"), max, trackPx, dpr]);
+  const anim = trackPx != null && settled ? motion : "";
+  const place = (i: number): CSSProperties => ({
+    left: boxes[i].left,
+    width: boxes[i].width,
+    borderRadius: boxes[i].radius,
+  });
   return (
-    <div className={`relative ${height}`}>
+    <div ref={trackRef} className={`relative ${height}`}>
       <div role="img" aria-label={label} className="absolute inset-0 overflow-hidden rounded-md bg-sunken">
         {ticks.slice(1).map((t) => (
           <i
@@ -177,22 +296,20 @@ function Strip({
             style={{ left: pct(t, max) }}
           />
         ))}
-        <div className="absolute inset-0 flex">
-          {shown.map((s) => (
-            <span
-              key={s.key}
-              className={`block h-full shrink-0 ${motion}`}
-              style={{ width: pct(s.width, max), ...fillStyle(side, s) }}
-            />
-          ))}
-        </div>
+        {shown.map((s, i) => (
+          <span
+            key={s.key}
+            className={`absolute inset-y-0 block ${anim}`}
+            style={{ ...place(i), ...fillStyle(side, s) }}
+          />
+        ))}
       </div>
-      <div className="absolute inset-0 flex" aria-hidden>
-        {shown.map((s) => {
+      <div className="absolute inset-0" aria-hidden>
+        {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
           const parts = split.get(s.key) ?? [];
           return (
-            <span key={s.key} className={`block h-full shrink-0 ${motion}`} style={{ width: pct(s.width, max) }}>
+            <span key={s.key} className={`absolute inset-y-0 block ${anim}`} style={place(i)}>
               <RevealTip
                 className="h-full w-full"
                 tip={
@@ -215,7 +332,8 @@ function Strip({
                 }
               >
                 <span
-                  className={`block h-full w-full rounded-[3px] ${on ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                  className={`block h-full w-full ${on ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                  style={{ borderRadius: boxes[i].radius }}
                   onMouseEnter={() => onHover(hlKey(s))}
                   onMouseLeave={() => onHover(null)}
                   onClick={() => s.link && onPin(hlKey(s))}
@@ -228,7 +346,7 @@ function Strip({
       {today != null && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 left-0 rounded-md border border-dashed border-rb-500 ${motion}`}
+          className={`pointer-events-none absolute inset-y-0 left-0 rounded-md border border-dashed border-rb-500 ${anim}`}
           style={{ width: pct(today, max) }}
         />
       )}
@@ -275,6 +393,10 @@ function SideBlock({
     ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
+  // The strip's label names every segment it draws, so the bar reads without
+  // the Key.
+  const named = st.bar.filter((s) => s.width > 0).map((s) => `${s.label} ${spokenUsd(s.value)}`);
+  const label = named.length > 0 ? `${spoken} Segments: ${named.join(", ")}.` : spoken;
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
   const sideHeld = assets.held.filter((h) => h.side === side);
@@ -306,7 +428,7 @@ function SideBlock({
         active={active}
         onHover={onHover}
         onPin={onPin}
-        label={spoken}
+        label={label}
         motion={motion}
         split={split}
       />
@@ -355,26 +477,30 @@ function SourceLine({
   );
 }
 
-/** The hatches the bars draw, by name: each kind of exit the position has
- *  had over its life. The segments' tips carry the figures. Off the last
- *  stop, the dashed outline too: where each bar ends at that stop. */
-function HatchKey({ items, outline }: { items: { side: FlowSide; s: FlowSegment }[]; outline: string | null }) {
+/** The Key, drawn inside the panel's Explanation: the hatches the bars
+ *  draw, by name, for each kind of exit the position has had over its life.
+ *  The segments' tips carry the figures. Where the position has other stops,
+ *  the dashed outline too: where each bar ends at the last stop. */
+export function FlowsKey({ items, outline }: FlowsKeyItems) {
   if (items.length === 0 && !outline) return null;
   return (
-    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key" data-flow-key="">
-      {items.map(({ side, s }) => (
-        <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
-          <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
-          {s.label}
-        </li>
-      ))}
-      {outline && (
-        <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
-          <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
-          {outline}
-        </li>
-      )}
-    </ul>
+    <div className="mt-3 first:mt-0" data-flow-key="">
+      <p className="text-xs font-semibold text-foreground">Key</p>
+      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key">
+        {items.map(({ side, s }) => (
+          <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
+            {s.label}
+          </li>
+        ))}
+        {outline && (
+          <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
+            {outline}
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -538,8 +664,14 @@ function ScrubberBody({ model }: { model: FlowModel }) {
       ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
       : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
-  // Off the last stop, the dashed outline marks where each bar ends there.
-  const outline = s.isLive ? null : closed ? "Length at close" : "Today's length";
+  // The Key goes to the panel's Explanation. Its dashed outline, which marks
+  // where each bar ends at the last stop, is named wherever there is another stop.
+  const keyOutline = model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null;
+  const reportKey = useContext(FlowsKeyContext);
+  useEffect(() => {
+    reportKey?.({ items: keyItems, outline: keyOutline });
+  }, [reportKey, keyItems, keyOutline]);
+  useEffect(() => () => reportKey?.(null), [reportKey]);
   // The ledger under the panel shows the last stop; say so while the slider is elsewhere.
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
@@ -617,8 +749,6 @@ function ScrubberBody({ model }: { model: FlowModel }) {
           first={false}
         />
       )}
-
-      <HatchKey items={keyItems} outline={outline} />
 
       <div className="relative mt-3">
         {/* Event pips over the line, coloured by the side each event moved.

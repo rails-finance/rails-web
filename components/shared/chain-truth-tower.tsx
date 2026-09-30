@@ -39,7 +39,12 @@
 // opt-in; a feeder that sets none renders as before.
 
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
-import { FlowsLedgerNoteContext } from "@/components/shared/lifetime-flows-scrubber";
+import {
+  FlowsKey,
+  FlowsKeyContext,
+  FlowsLedgerNoteContext,
+  type FlowsKeyItems,
+} from "@/components/shared/lifetime-flows-scrubber";
 import { usePathname } from "next/navigation";
 import { ChartBarBig, ChevronDown } from "lucide-react";
 import {
@@ -1148,6 +1153,8 @@ export function ChainTruthTower({
   const [ledgerOpen, setLedgerOpen] = useState(false);
   // What the ledger shows while the scrubber's slider is off its last stop.
   const [ledgerNote, setLedgerNote] = useState<string | null>(null);
+  // The scrubber's Key, drawn inside the Explanation rather than under the bars.
+  const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
   const ledgerShown = timeline == null || ledgerOpen;
   // Collapsed, per protocol (ui-jobs 61). `settled` is false until the effect
   // below has read the store, and while it is false React writes NO collapsed
@@ -1284,7 +1291,9 @@ export function ChainTruthTower({
           {timeline != null && (
             <>
               <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                <div className="mt-2">{timeline}</div>
+                <FlowsKeyContext.Provider value={setFlowsKey}>
+                  <div className="mt-2">{timeline}</div>
+                </FlowsKeyContext.Provider>
               </FlowsLedgerNoteContext.Provider>
               <div className="mt-3 flex flex-wrap items-center gap-x-2">
                 <button
@@ -1340,7 +1349,21 @@ export function ChainTruthTower({
               </p>
             )}
           </div>
-          <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
+          <ProvenanceInfoTabs
+            className="mt-3"
+            explanation={
+              timeline != null && flowsKey ? (
+                <>
+                  {explanation}
+                  <FlowsKey {...flowsKey} />
+                </>
+              ) : (
+                explanation
+              )
+            }
+            learnMore={learnMore}
+            rowExtra={rowExtra}
+          />
         </div>
       </section>
     </ProvReceiptsScope>
