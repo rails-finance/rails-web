@@ -19,6 +19,7 @@ import {
   polarisValueFormat,
 } from "@/components/protocol/polaris/polaris-liquidation-forensics";
 import { crPct2, polarisCrAtEvent } from "@/lib/polaris/cr-at-event";
+import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisPsmOutcomeSentence } from "@/lib/polaris/economics-explanation";
 import { polarisSinceLastTouch, polarisSinceLastTouchSentence } from "@/lib/polaris/since-last-touch";
@@ -105,9 +106,15 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(
       `- **Collateral:** ${amt(view.coll)} pETH${view.collUsd != null ? ` (≈ ${usd(view.collUsd)} by the protocol's own feed)` : ""}`,
     );
-    lines.push(`- **Debt:** ${amt(view.debt)} ${stable}`);
+    lines.push(
+      view.debt > 0
+        ? `- **Debt:** ${amt(view.debt)} ${stable}`
+        : `- **Debt:** none${view.recordedDebt != null && view.recordedDebt > 0 ? ` (the pending legs exceed the ${amt(view.recordedDebt)} ${stable} recorded at the last touch; the next touch settles it to zero)` : ""}`,
+    );
     if (view.icr != null)
-      lines.push(`- **Collateral ratio:** ${pct(view.icr)}${view.mcr != null ? ` (minimum ${pct(view.mcr)})` : ""}`);
+      lines.push(
+        `- **Collateral ratio:** ${formatPolarisRatio(view.icr, 1, view.mcr ?? undefined)}${view.mcr != null ? ` (minimum ${pct(view.mcr)})` : ""}`,
+      );
     lines.push("");
   }
 
@@ -137,14 +144,14 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     if (live.bcTokenGain > 0) lines.push(`- **Reward pETH pending:** ${amt(live.bcTokenGain)} pETH`);
     if (live.mintRedeemCollChange !== 0 || live.mintRedeemDebtChange !== 0)
       lines.push(
-        `- **PSM share pending:** ${amt(live.mintRedeemCollChange)} pETH / ${amt(live.mintRedeemDebtChange)} ${stable}`,
+        `- **Net PSM share pending:** ${amt(live.mintRedeemCollChange)} pETH / ${amt(live.mintRedeemDebtChange)} ${stable}`,
       );
     if (live.price) {
       lines.push(
         `- **pETH price (protocol feed):** ${amt(live.price.pethInDebt)} ${stable} — bonding curve ${num(live.price.curve, 4)} ETH per pETH × ETH/USD ${usd(live.price.ethUsd)}${live.price.xauUsd != null ? ` ÷ XAU/USD ${usd(live.price.xauUsd)}` : ""}`,
       );
       if (live.entireColl > 0) {
-        const equity = live.entireColl * live.price.pethInDebt - live.entireDebt;
+        const equity = live.entireColl * live.price.pethInDebt - Math.max(0, live.entireDebt);
         lines.push(
           `- **Equity at the feed:** ${amt(equity)} ${stable} (collateral × feed − debt; a valuation at block ${live.blockNumber}, not a profit)`,
         );
@@ -173,8 +180,12 @@ export function polarisPositionToMarkdown(args: PolarisPositionMarkdownArgs): st
     lines.push(`- **Stability gains credited:** ${amt(lifetime.stableGains)} ${stable}`);
     lines.push(`- **Reward pETH added:** ${amt(lifetime.rewardPeth)} pETH`);
     lines.push(
-      `- **PSM shares:** +${amt(lifetime.collFromPsm)} / −${amt(lifetime.collToPsm)} pETH; +${amt(lifetime.debtFromPsm)} / −${amt(lifetime.debtToPsm)} ${stable}`,
+      `- **Net PSM shares:** +${amt(lifetime.collFromPsm)} / −${amt(lifetime.collToPsm)} pETH; +${amt(lifetime.debtFromPsm)} / −${amt(lifetime.debtToPsm)} ${stable}`,
     );
+    if (lifetime.mintedToSettle > 0)
+      lines.push(
+        `- **Settled to zero:** ${amt(lifetime.mintedToSettle)} ${stable} added to the debt where a net PSM share cleared more than was owed`,
+      );
     if (lifetime.collLiquidated > 0 || lifetime.debtLiquidated > 0)
       lines.push(
         `- **Liquidated:** ${amt(lifetime.collLiquidated)} pETH taken, ${amt(lifetime.debtLiquidated)} ${stable} cleared`,

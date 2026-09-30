@@ -1049,6 +1049,9 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
   let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
   let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
   let mcrFig: NoteFigure | undefined;
+  // A Polaris stretch ending in a liquidation: the liquidation's own seized
+  // collateral and cleared debt, which the later end states.
+  let fireFigs: { coll: NoteFigure; debt: NoteFigure } | undefined;
   if (p) {
     const vd = separatingDecimals(p.coll * note.from.value, p.coll * note.to.value, 0, 2);
     const money = (n: number) => (stable ? `${grouped(n, vd)} ${stable}` : `$${grouped(n, vd)}`);
@@ -1085,17 +1088,69 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
         ),
       },
     };
-    stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
-    stats.push({
-      label: "Debt",
-      figure: {
-        text: amountText(p.debt),
-        exact: String(p.debt),
-        ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
-        muted: true,
-        prov: heldAmountProv(note, "debt", String(p.debt), held),
-      },
-    });
+    const debtFig: NoteFigure = {
+      text: amountText(p.debt),
+      exact: String(p.debt),
+      ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+      muted: true,
+      prov: heldAmountProv(note, "debt", String(p.debt), held),
+    };
+    if (isPolaris && p.atFire) {
+      // A Polaris stretch that ends in a liquidation: the later end is the
+      // liquidation's own seized collateral and cleared debt, the figures its
+      // row and its ratio state, once the pending legs were written in.
+      const fire = p.atFire;
+      const liqProv = (what: string, field: string): Provenance => ({
+        kind: "chain",
+        pclass: "emitted",
+        summary: `The ${what} at the liquidation that ends the stretch — the Liquidation log's \`${field}\` at block ${note.to.block}, after the interest, stability gain and PSM share pending since the earlier touch were written in.`,
+        via: `Liquidation.${field}`,
+      });
+      const seizedValue = fire.coll * note.to.value;
+      fireFigs = {
+        coll: {
+          text: grouped(fire.coll, 4),
+          exact: String(fire.coll),
+          symbol: note.marketSymbol,
+          muted: true,
+          prov: liqProv("collateral seized", "_collLiquidated"),
+        },
+        debt: {
+          text: amountText(fire.debt),
+          exact: String(fire.debt),
+          ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+          muted: true,
+          prov: liqProv("debt cleared", "_debtLiquidated"),
+        },
+      };
+      valueFigs = {
+        before: valueFigs.before,
+        after: {
+          text: money(seizedValue),
+          exact: String(seizedValue),
+          prov: {
+            kind: "chain-derived",
+            pclass: "oracle",
+            summary: `The collateral seized at the liquidation, valued — at that block's pETH price, the figure the ratio at the liquidation divides by the debt cleared.`,
+            formula: "collateral seized × price",
+            inputs: [
+              {
+                label: "collateral seized",
+                value: `${fire.coll} ${note.marketSymbol}`,
+                kind: "chain",
+                pclass: "emitted",
+              },
+              { label: "price", value: `${priceText(note.to.value)} ${priceUnit}`, kind: "chain", pclass: "oracle" },
+            ],
+          },
+        },
+      };
+      stats.push({ label: "Collateral", transition: { before: collFig, after: fireFigs.coll }, values: valueFigs });
+      stats.push({ label: "Debt", transition: { before: debtFig, after: fireFigs.debt } });
+    } else {
+      stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
+      stats.push({ label: "Debt", figure: debtFig });
+    }
   }
   if (p && f.crBefore && f.crAfter && f.mcr) {
     crFigs = {
@@ -1180,13 +1235,23 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
         between the two events, so nothing between them is drawn.
       </>
     ),
-    collFig && valueFigs && (
-      <>
-        The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
-        <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
-        <Echo figure={valueFigs.after} /> {nowWord}.
-      </>
-    ),
+    collFig &&
+      valueFigs &&
+      (fireFigs ? (
+        <>
+          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+          <Echo figure={valueFigs.before} /> {thenWord}. At the liquidation, once the interest, stability gain and PSM
+          share pending since then were written in, the CDP held{" "}
+          <Echo figure={fireFigs.coll} suffix={` ${note.marketSymbol}`} />, worth <Echo figure={valueFigs.after} />,
+          against <Echo figure={fireFigs.debt} suffix={p?.debtSymbol ? ` ${p.debtSymbol}` : ""} /> of debt.
+        </>
+      ) : (
+        <>
+          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+          <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
+          <Echo figure={valueFigs.after} /> {nowWord}.
+        </>
+      )),
     crFigs && mcrFig && p && (
       <>
         The collateral ratio was {ratioPairNote(p.crBefore, crFigs.before, mode)} {thenWord} and{" "}
@@ -1194,7 +1259,15 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
         {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
       </>
     ),
-    atBlock && <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>,
+    atBlock &&
+      (fireFigs ? (
+        <>
+          The earlier ratio uses the debt and collateral recorded at block {atBlock}; the later one uses the
+          liquidation&rsquo;s seized collateral and cleared debt, as its row does.
+        </>
+      ) : (
+        <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>
+      )),
     p &&
       (note.live ? (
         <>
@@ -1782,7 +1855,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Rate resets in between",
+      label: "Times the rate was set in between",
       figure: { text: f.sets, prov: rateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }

@@ -12,7 +12,7 @@
 //   2. usdp/27: exactly 1, +46.96%, CR 251.3% → 369.3%, minimum 115% named
 //      as normal-mode.
 //   3. usdp/166: exactly 1, ends in a liquidation, −3.03%, CR 117.8% →
-//      114.3%.
+//      114.5% (the liquidation's ratio at fire).
 //   4. The receipt names the market's PriceFeed and the oracle-at-block
 //      lane.
 //   5. A Liquity V2 trove note header shows "oracle price" and a Moonwell
@@ -204,7 +204,7 @@ check(
 );
 await page27.close();
 
-// ── 3. usdp/166: exactly 1, ends in a liquidation, −3.03%, CR 117.8%→114.3% ──
+// ── 3. usdp/166: exactly 1, ends in a liquidation, −3.03%, CR 117.8%→114.5% ──
 
 const page166 = await open(context, polarisUrl("usdp", "166"));
 const ids166 = await page166
@@ -228,9 +228,13 @@ check("3c2. the direction glyph is down (a fall)", downCount166 > 0);
 await row166.first().getByRole("button", { expanded: false }).first().click();
 await page166.waitForTimeout(300);
 const open166 = await row166.first().innerText();
+// The later end is the liquidation's ratio at fire (collateral seized ×
+// price ÷ debt cleared, 114.5% — the figure the liquidation row states), not
+// the earlier touch's recorded figures at the later price (114.3%), and a
+// ratio near the 115% minimum keeps the decimal that shows which side it is.
 check(
-  "3d. the opened note states the pinned CR before/after — 118% → 114%",
-  open166.includes(formatPercentLevel(117.8)) && open166.includes(formatPercentLevel(114.3)),
+  "3d. the opened note states CR 117.8% → 114.5% (the liquidation's ratio)",
+  open166.includes("117.8%") && open166.includes("114.5%"),
   open166.slice(0, 400),
 );
 // Open the derivation disclosure to reach "the stretch is stated because…".

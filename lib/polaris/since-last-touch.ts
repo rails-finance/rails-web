@@ -101,6 +101,12 @@ export interface PolarisSinceLastTouch {
     stabilityGain: number;
     reward: number;
     psm: number;
+    /** Where the pending legs clear more than the debt (an entire debt below
+     *  zero), the part the next touch adds back so the debt lands on zero —
+     *  zero or negative, and zero on every other CDP. The card's equity counts
+     *  that debt as zero, so this leg keeps the window's sum on the card's
+     *  figure. */
+    settle: number;
   };
   raw: {
     psmColl: number;
@@ -155,15 +161,17 @@ export function polarisSinceLastTouch(
   const priceNow = chain.price.pethInDebt;
 
   const equityAtTouch = collAtTouch * priceAtTouch - debtAtTouch;
-  const equityNow = chain.entireColl * priceNow - chain.entireDebt;
+  // The card's equity: an entire debt at or below zero owes nothing.
+  const equityNow = chain.entireColl * priceNow - Math.max(0, chain.entireDebt);
   const feed = collAtTouch * (priceNow - priceAtTouch);
   const legs = {
     interest: -chain.accruedInterest,
     stabilityGain: chain.accruedStables,
     reward: chain.bcTokenGain * priceNow,
     psm: chain.mintRedeemCollChange * priceNow - chain.mintRedeemDebtChange,
+    settle: Math.min(0, chain.entireDebt),
   };
-  const protocol = legs.interest + legs.stabilityGain + legs.reward + legs.psm;
+  const protocol = legs.interest + legs.stabilityGain + legs.reward + legs.psm + legs.settle;
   const total = feed + protocol;
 
   // The gate is the identity itself: if the two terms do not add up to the
@@ -224,12 +232,10 @@ export const signedFigure = (n: number, unit: string): string =>
  *  than stated as zero. */
 export function polarisProtocolLegNames(w: PolarisSinceLastTouch): string[] {
   const named: Array<[number, string]> = [
-    [
-      w.legs.psm,
-      // Named by the debt leg, as the rows name it; by the collateral leg
-      // only where the debt did not move.
-      w.raw.psmDebt < 0 || (w.raw.psmDebt === 0 && w.raw.psmColl < 0) ? "a PSM redemption share" : "a PSM mint share",
-    ],
+    // The share is the net of every mint and redemption since the touch, so
+    // it is named as a net, never after one of the two trades.
+    [w.legs.psm, "the net PSM share"],
+    [w.legs.settle, "the debt below zero the next touch settles"],
     [w.legs.reward, "the pETH reward"],
     [w.legs.interest, "interest charged"],
     [w.legs.stabilityGain, "the stability gain"],

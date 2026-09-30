@@ -4606,7 +4606,11 @@ export function polarisCdpContent(): LearnMoreContent {
       },
       {
         bold: "The PSM",
-        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint share raises a CDP's debt and collateral; a redemption share lowers both. The trade's fees go to the CDPs, so the net share can move the two sides by different amounts. It is not a Liquity redemption, and no one chose this CDP.",
+        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint adds debt and collateral to each CDP; a redemption takes both away. A row states the net share of every mint and redemption since the CDP's previous touch, so its two sides can move in opposite directions, and the trades' fees, which go to the CDPs, make their sizes differ. It is not a Liquity redemption, and no one chose this CDP.",
+      },
+      {
+        bold: "Settled to zero",
+        text: "when a net PSM share clears more debt than a CDP owes, the protocol adds the difference back to the debt at that touch, so the debt lands on zero rather than below.",
       },
       {
         bold: "Stability gain",
@@ -4614,7 +4618,7 @@ export function polarisCdpContent(): LearnMoreContent {
       },
       {
         bold: "Reward pETH",
-        text: "a share of the pETH yield Polaris pays to minters, added to the collateral in proportion to the debt the CDP holds.",
+        text: "pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the docs), shared between CDPs in proportion to the debt each holds and added to the collateral.",
       },
       {
         bold: "Minimum collateral ratio",

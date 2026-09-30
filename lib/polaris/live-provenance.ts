@@ -50,7 +50,7 @@ export function liveEntireProv(what: "coll" | "debt", market: PolarisMarket): Pr
     summary:
       what === "coll"
         ? "pETH the CDP holds NOW — the cdpManager's own getCDPEntireColl(id) at the latest block: the recorded collateral plus every pending leg (the PSM share and reward pETH accrued since the last touch). The identity the contract keeps, and the verifier asserts: entireColl = coll + mintRedeemCollChange + bcTokenGain."
-        : `${stable} the CDP owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables.`,
+        : `${stable} the CDP owes NOW — the cdpManager's own getCDPEntireDebt(id) at the latest block: the recorded debt with interest accrued since the last touch, the pending PSM share, and the pending stability gain netted off. The identity the contract keeps: entireDebt = debt + accruedInterest + mintRedeemDebtChange − accruedStables. The getter is signed: when the pending legs clear more than the recorded debt it answers zero or below, the CDP owes nothing, and its next touch mints the difference so the debt lands on zero.`,
     contract: manager(market),
     via: `${LANE_VIA} · ${what === "coll" ? "getCDPEntireColl" : "getCDPEntireDebt"}(id) @ head`,
   };
@@ -77,7 +77,7 @@ const PENDING: Record<PolarisPendingLeg, { method: string; summary: (stable: str
   bcTokenGain: {
     method: "getCDPBcTokenGain(id)",
     summary: () =>
-      "Reward pETH pending into the collateral — the cdpManager's own getCDPBcTokenGain(id) at the latest block: the CDP's share of bonding-curve token rewards not yet settled. Added to the collateral at the next touch (the CDPUpdated's _bcTokenGain).",
+      "Reward pETH pending into the collateral — the cdpManager's own getCDPBcTokenGain(id) at the latest block: the CDP's share, in proportion to its debt, of the pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the Polaris docs), not yet settled. Added to the collateral at the next touch (the CDPUpdated's _bcTokenGain).",
   },
   mintRedeemColl: {
     method: "getCDPMintRedeemCollChange(id)",
@@ -145,14 +145,19 @@ export function liveEquityProv(market: PolarisMarket): Provenance {
     kind: "chain",
     pclass: "oracle",
     verify: recompute("getCDPEntireColl(id) × priceFeed.previewPrice() − getCDPEntireDebt(id)"),
-    summary: `The CDP's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
+    summary: `The CDP's equity at the feed — entire collateral (getCDPEntireColl(id)) times the market's own price for pETH in ${stable} (the PriceFeed's previewPrice()), minus entire debt (getCDPEntireDebt(id)), all three read at the latest block. An entire debt at or below zero counts as zero: the CDP owes nothing, and its next touch settles the debt to zero rather than paying the difference out. A valuation at this block, not a profit: it moves with the feed's price and with the interest and PSM share still pending, and it can be negative when the debt is worth more than the collateral. Turning it into a realised profit or loss needs a price for each of the holder's own deposits — a decision about basis, not a fact of the chain.`,
     contract: manager(market),
     via: `${LANE_VIA} · getCDPEntireColl(id) × previewPrice() − getCDPEntireDebt(id) @ head`,
-    formula: "entireColl × pethInDebt − entireDebt",
+    formula: "entireColl × pethInDebt − max(0, entireDebt)",
     inputs: [
       { label: "entire collateral", kind: "chain", pclass: "state", note: "getCDPEntireColl(id)" },
       { label: "pETH price", kind: "chain", pclass: "oracle", note: "the market's PriceFeed — pETH in the debt unit" },
-      { label: "entire debt", kind: "chain", pclass: "state", note: "getCDPEntireDebt(id)" },
+      {
+        label: "entire debt",
+        kind: "chain",
+        pclass: "state",
+        note: "getCDPEntireDebt(id), counted as zero at or below zero",
+      },
     ],
   };
 }

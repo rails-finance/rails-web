@@ -61,17 +61,17 @@ function formatSpP(raw: string): string {
   } catch {
     return raw;
   }
-  if (p === P_AT_DEPLOY) return "unchanged since deploy";
-  if (p <= BigInt(0)) return "0 × deploy";
+  if (p === P_AT_DEPLOY) return "1";
+  if (p <= BigInt(0)) return "0";
   const scaled = (p * P_SCALE) / P_AT_DEPLOY;
   if (scaled === BigInt(0)) {
     // Liquidations have taken P below 1e-10 of deploy — state the order of
     // magnitude rather than ten zeros after the point.
-    return `~1e${p.toString().length - 37} × deploy`;
+    return `~1e${p.toString().length - 37}`;
   }
   const s = scaled.toString().padStart(11, "0");
   const frac = `${s.slice(0, s.length - 10)}.${s.slice(-10)}`.replace(/0+$/, "").replace(/\.$/, "");
-  return `${frac} × deploy`;
+  return frac;
 }
 
 function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; book: PolarisMarketBook | null }) {
@@ -157,12 +157,11 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               label="Stability pool"
               note={
                 <>
-                  P{" "}
+                  each {stable} deposited when the pool opened is now worth{" "}
                   <Prov info={liveSpPProv(market)} value={chain.spP}>
                     {formatSpP(chain.spP)}
-                  </Prov>
-                  : a {stable} deposit made at launch is now worth this fraction of itself, the rest spent on liquidated
-                  debt and paid back in pETH
+                  </Prov>{" "}
+                  {stable}; the rest paid off liquidated debt and came back to the depositor as pETH
                 </>
               }
             >
@@ -321,7 +320,8 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
           PSM&rsquo;s mints and redemptions, plus a secondary rate that rises with the market&rsquo;s debt-to-reserve
           ratio. A market whose reserve-to-debt ratio falls below 1.10 enters defensive mode and its minimum rises to
           150%. The stability pool is what absorbs a liquidation&rsquo;s debt. Reserve loans, which lend ETH against
-          fpETH (the floor part of pETH), are captured by the index but not shown here.
+          fpETH, are captured by the index but not shown here. fpETH is the floor part of pETH: the component whose
+          price in ETH the protocol guarantees can only rise, which is why a loan against it cannot be liquidated.
         </p>
       </section>
       <ProvenanceInfoTabs className="mt-6" />

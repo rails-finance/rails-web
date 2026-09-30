@@ -55,6 +55,12 @@ export const POLARIS_LIQ_CONSTANTS = {
    *  in force at a past block is not indexed, so the explainer names this one
    *  and says which it is. */
   mcr: { fn: "MCR()", fraction: 1.15, raw: "1150000000000000000", label: "115%" },
+  /** The fixed gas compensation each CDP escrows at open, beside its
+   *  collateral: returned on close, paid to the liquidator on a liquidation
+   *  (the Liquidation's flat compensation). rails-ops TO-DO-polaris-scoping
+   *  §4.6 records it; the open tx of usdp/2266 sends 0.05 pETH for a
+   *  0.0125 pETH collateral. */
+  gasComp: { fn: "fixedGasComp", amount: 0.0375, label: "0.0375 pETH" },
   readAtBlock: 11674201,
 } as const;
 
