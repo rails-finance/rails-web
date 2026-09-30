@@ -1,12 +1,12 @@
-// The Combined view's cursor (a trial on Aave V3; rails-ops TO-DO-ui-jobs §141):
-// the Over time line as a strip under the Flows bars, one cursor for both.
+// The Lifetime flows panel's cursor (rails-ops reference/lifetime-flows-scrubber.md):
+// the collateral and debt line as a strip under the bars, one cursor for both.
 // ----------------------------------------------------------------------------
 // The cursor stands on the line's points (a week's or a month's last day, and
 // today) and on every day with events. At a stop the headlines and the bars
 // are the scrubber's state at that day, `stateAt`: the balances the day's last
 // event left (or the last event before it), each asset at the daily price
 // recorded by that day's end. So the headlines and the bars state one figure,
-// on an event day and between events alike. Before the Flows window opens the
+// on an event day and between events alike. Before the bars' window opens the
 // bars have no stop: the headlines still take the whole life's state, and the
 // bars stand aside.
 //

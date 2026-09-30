@@ -1,14 +1,15 @@
 "use client";
 
-// The Combined view (a trial on Aave V3; rails-ops TO-DO-ui-jobs §141): the
-// Flows bars with the Over time line under them as a short strip, one cursor
-// for both. The strip's horizontal axis is the slider: pointing previews a
-// point, a tap, a drag or the arrow keys move the cursor there, and play walks
-// it along. The cursor stands on the line's points and on every day with
-// events (tapping an event tick jumps to it); what the headlines and the bars
-// state there is `combinedAt` (lib/shared/flows-combined.ts). The dashed
-// outline marks where each bar ends today, as in Flows. Before the Flows window
-// opens the bars grey out at the window's first day and say so.
+// The Lifetime flows panel on a position with a series (rails-ops
+// reference/lifetime-flows-scrubber.md): the bars with the collateral and debt
+// line under them as a short strip, one cursor for both. The strip's
+// horizontal axis is the slider: pointing previews a point, a tap, a drag or
+// the arrow keys move the cursor there, and play walks it along. The cursor
+// stands on the line's points and on every day with events (tapping an event
+// tick jumps to it); what the headlines and the bars state there is
+// `combinedAt` (lib/shared/flows-combined.ts). The dashed outline marks where
+// each bar ends today. Before the bars' window opens the bars grey out at the
+// window's first day and say so.
 
 import {
   useCallback,
@@ -23,7 +24,6 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { DateRow, Headline, Rescaled, Throughput, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
-import { OVER_TIME_HUE } from "@/components/shared/lifetime-flows-over-time";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { assetsAt, axisFor, DAY_MS, dayStart, type FlowModel } from "@/lib/shared/flows-timeline";
@@ -39,6 +39,9 @@ export const FLOW_TICK: Record<FlowModel["ticks"][number]["tick"], string> = {
   liquidation: "var(--color-red-500)",
 };
 
+/** The line's hues; the panel's Key draws the same. */
+export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+
 const STRIP_H = 80;
 /** The strip's inset each side. */
 const PAD = 8;
@@ -52,21 +55,31 @@ const PLAY_MAX_MS = 220;
 export interface CombinedFlowsProps {
   /** The whole life's model: the headlines and the line. */
   model: FlowModel;
-  /** The model cut to the Flows window. */
+  /** The model cut to the bars' window. */
   bars: FlowModel;
-  /** The stop the Flows window opens on (0 where it covers the whole life). */
+  /** The stop the bars' window opens on (0 where it covers the whole life). */
   from: number;
   busy: boolean;
-  /** The Over time series, or null while it loads. */
+  /** The line's series, or null while it loads. */
   series: FlowBinSeries | null;
   failed: boolean;
-  switcher?: ReactNode;
+  /** A ledger's note while the cursor is off its last stop (Aave V4). */
+  onLedgerNote?: (note: string | null) => void;
   /** The plain bars at a stop of `bars` (the scrubber's); `atLive` is the
    *  last stop, where no outline of today's length is drawn. */
   renderBars: (barStop: number, when: string, isLive: boolean, atLive: boolean) => ReactNode;
 }
 
-export function CombinedFlows({ model, bars, from, busy, series, failed, switcher, renderBars }: CombinedFlowsProps) {
+export function CombinedFlows({
+  model,
+  bars,
+  from,
+  busy,
+  series,
+  failed,
+  onLedgerNote,
+  renderBars,
+}: CombinedFlowsProps) {
   const stops = useMemo(() => combinedStops(model, series, from), [model, series, from]);
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
@@ -116,6 +129,11 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
       ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
       : `Position on ${dateText}`;
   const liveReceipts = head.isLive && !closed;
+  const ledgerText = head.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
+  useEffect(() => {
+    onLedgerNote?.(ledgerText);
+  }, [onLedgerNote, ledgerText]);
+  useEffect(() => () => onLedgerNote?.(null), [onLedgerNote]);
   const outside = barState == null;
   const windowDay = dayStamp(dayStart(model, from));
   const through = useMemo(() => (busy ? throughput(bars) : null), [busy, bars]);
@@ -128,7 +146,7 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
   return (
     <div className="text-sm" data-flows-combined="">
       <Steady>
-        <DateRow switcher={switcher}>{dateLine}</DateRow>
+        <DateRow>{dateLine}</DateRow>
         {through && <Throughput t={through} hasDebt={hasDebt} />}
         <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
           <Headline
@@ -169,7 +187,7 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
               className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
               data-flow-outside-window=""
             >
-              Before the Flows window, {windowDay}
+              Before the bars&rsquo; window, {windowDay}
             </p>
           )}
         </div>
@@ -260,8 +278,8 @@ type Point = { to: number; collateral: number | null; debt: number | null };
 /** How near, in px, a pointer must be to an event tick to open it. */
 const TICK_REACH = { mouse: 6, touch: 14 };
 
-/** The Over time line, short and unlabelled (the headlines carry the
- *  figures), with the event ticks over it and the Flows window shaded. Its
+/** The collateral and debt line, short and unlabelled (the headlines carry the
+ *  figures), with the event ticks over it and the bars' window shaded. Its
  *  horizontal axis is the slider; the cursor snaps to the nearest stop, and
  *  tapping a tick jumps to that day's events. */
 function LineStrip({
@@ -509,14 +527,8 @@ function LineStrip({
             {(hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const)).map((k) =>
               runs(k).map((run) => (
                 <g key={`${k}${run[0]}`}>
-                  <path d={area(k, run)} fill={OVER_TIME_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
-                  <path
-                    d={line(k, run)}
-                    fill="none"
-                    stroke={OVER_TIME_HUE[k]}
-                    strokeWidth={1.5}
-                    strokeLinejoin="round"
-                  />
+                  <path d={area(k, run)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
+                  <path d={line(k, run)} fill="none" stroke={LINE_HUE[k]} strokeWidth={1.5} strokeLinejoin="round" />
                 </g>
               )),
             )}
@@ -525,7 +537,7 @@ function LineStrip({
               cx={cx}
               cy={y(head.collateral)}
               r={3.5}
-              fill={OVER_TIME_HUE.collateral}
+              fill={LINE_HUE.collateral}
               className="stroke-background"
               strokeWidth={1.5}
             />
@@ -534,7 +546,7 @@ function LineStrip({
                 cx={cx}
                 cy={y(head.debt)}
                 r={3.5}
-                fill={OVER_TIME_HUE.debt}
+                fill={LINE_HUE.debt}
                 className="stroke-background"
                 strokeWidth={1.5}
               />
@@ -542,7 +554,7 @@ function LineStrip({
           </svg>
         ) : (
           <p className="flex h-full items-center justify-center text-xs text-rb-500">
-            {failed ? "The series could not be read." : "Reading the series…"}
+            {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
           </p>
         )}
       </div>

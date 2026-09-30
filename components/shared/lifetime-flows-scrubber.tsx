@@ -8,8 +8,13 @@
 // its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
-// them. Under each bar one line says where its length came from; hovering or
-// tapping a segment lists its assets.
+// them. Hovering or tapping a segment lists its assets and ends with its
+// side's sum: where the bar's length came from, what has left and what is held.
+//
+// Where the position has a series (a family's route, or day rows the page
+// holds), the panel is the bars with the collateral and debt line under them
+// on one cursor (components/shared/lifetime-flows-combined.tsx); without one,
+// the bars and their date slider.
 //
 // Accuracy: each segment is its own rounded block, 1px apart, laid out in
 // pixels from the measured track; a non-zero segment is at least 2px, the
@@ -29,21 +34,9 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  ChartBarStacked,
-  ChartLine,
-  ChartNoAxesCombined,
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -67,9 +60,8 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
-import { LifetimeOverTime, OVER_TIME_HUE } from "@/components/shared/lifetime-flows-over-time";
-import { CombinedFlows, FLOW_TICK } from "@/components/shared/lifetime-flows-combined";
+import { AxisLabels, BusyFlows, DateRow, Headline, SideSum, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
   binSeries,
@@ -153,12 +145,12 @@ export const FlowsLedgerNoteContext = createContext<((note: string | null) => vo
 export type FlowsKeyItems = {
   items: { side: FlowSide; s: FlowSegment }[];
   outline: string | null;
-  /** The Over time view's lines, and the Flows window where it is shaded. */
+  /** The line's two sides, and the bars' window where it is shaded. */
   lines?: { label: string; color: string }[];
   shade?: string | null;
-  /** The Key's line on which view is which. */
+  /** The Key's line on what the bars and the line cover. */
   views?: string;
-  /** The Explanation's line on the same. */
+  /** The Explanation's line on the same, and how to read the panel. */
   explain?: string;
 };
 export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
@@ -276,6 +268,7 @@ function Strip({
   label,
   motion,
   split,
+  sum,
 }: {
   side: FlowSide;
   segments: FlowSegment[];
@@ -289,6 +282,8 @@ function Strip({
   label: string;
   motion: string;
   split: AssetSplit;
+  /** The side's sum, at the foot of every segment's tip. */
+  sum: ReactNode;
 }) {
   const shown = segments.filter((s) => s.width > 0);
   const [trackRef, trackPx, settled] = useTrackWidth();
@@ -347,7 +342,7 @@ function Strip({
               <RevealTip
                 className="h-full w-full"
                 tip={
-                  <span className="flex min-w-40 flex-col gap-0.5">
+                  <span className="flex min-w-40 flex-col gap-0.5" data-flow-tip={side}>
                     <span className="flex items-center gap-2">
                       <span>{s.label}</span>
                       <span className="ml-auto">{formatFlowUsd(s.value)}</span>
@@ -362,6 +357,7 @@ function Strip({
                     {parts.length > TIP_ROWS && (
                       <span className="text-xs font-normal opacity-80">{parts.length - TIP_ROWS} more</span>
                     )}
+                    {sum}
                   </span>
                 }
               >
@@ -402,7 +398,6 @@ function SideBlock({
   assets,
   last,
   atLive,
-  tally = false,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -419,9 +414,6 @@ function SideBlock({
   /** The last stop, where no "today" outline is drawn (`isLive` there is
    *  false on a closed position: its receipts read as the close's). */
   atLive: boolean;
-  /** Name the bar's length, what has left and what is held on its line,
-   *  where something has left (Combined, whose headlines sit over the bars). */
-  tally?: boolean;
 }) {
   const coll = side === "collateral";
   const word = coll ? model.labels.collateral : model.labels.debt;
@@ -461,109 +453,10 @@ function SideBlock({
         label={label}
         motion={motion}
         split={split}
+        sum={<SideSum side={side} st={st} />}
       />
       {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
-      <SourceLine
-        side={side}
-        segments={st.sources}
-        when={when}
-        isLive={isLive}
-        daily={model.daily}
-        tally={tally ? st : undefined}
-      />
     </div>
-  );
-}
-
-/** Where a bar's length came from, as one line under it: each source and
- *  its figure, which add up to the bar. */
-function SourceLine({
-  side,
-  segments,
-  when,
-  isLive,
-  daily,
-  tally,
-}: {
-  side: FlowSide;
-  segments: FlowSegment[];
-  when: string;
-  isLive: boolean;
-  daily: boolean;
-  /** The side's state, to name the bar's length, what has left and what is
-   *  held (the headline's figure) around the sources, where something has left. */
-  tally?: FlowSideState;
-}) {
-  const shown = segments.filter((s) => Math.abs(s.value) >= 0.5);
-  if (shown.length === 0) return null;
-  const t = tally && tally.out >= 0.5 ? tally : null;
-  const coll = side === "collateral";
-  const fig = (v: number, info: Provenance) => (
-    <Prov info={info}>
-      <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v)}</span>
-    </Prov>
-  );
-  const heldSeg = t?.bar.find((x) => x.fill === "held");
-  const liquidated = t ? t.bar.some((x) => x.fill === "out" && x.tone === "liquidation" && x.value >= 0.5) : false;
-  const leftWord = coll ? "Left" : liquidated ? "Repaid or liquidated" : "Repaid";
-  return (
-    <p
-      className="mt-1.5 text-xs leading-relaxed text-rb-500"
-      data-flow-sources={side}
-      data-flow-tally={t ? "" : undefined}
-    >
-      {t && (
-        <span className="whitespace-nowrap">
-          {coll ? "Came in" : "Owed in all"}{" "}
-          {fig(t.total, {
-            kind: "chain-derived",
-            summary: `Came in by ${when}. The bar's whole length: everything that came in on this side, the sources after it added up.`,
-            formula: "Σ sources",
-          })}
-          :{" "}
-        </span>
-      )}
-      {shown.map((s, i) => {
-        const word = (x: string) => (i === 0 && !t ? x : x.charAt(0).toLowerCase() + x.slice(1));
-        return (
-          <span key={s.key}>
-            <span className="whitespace-nowrap">
-              {word(s.label)}{" "}
-              <Prov info={flowSegmentProv(s, side, when, isLive, daily)}>
-                <span className="font-medium tabular-nums text-foreground">
-                  {s.signed && s.value >= 0.5 ? "+" : ""}
-                  {formatFlowUsd(s.value)}
-                </span>
-              </Prov>
-              {i < shown.length - 1 ? " ·" : t ? "." : ""}
-            </span>{" "}
-          </span>
-        );
-      })}
-      {t && (
-        <span className="whitespace-nowrap">
-          {leftWord}{" "}
-          {fig(t.out, {
-            kind: "chain-derived",
-            summary: `Everything that has left this side by ${when}: the hatched segments added up. Their tips name each kind.`,
-            formula: "Σ outflows",
-          })}
-          , {coll ? "held" : "owed"}{" "}
-          {heldSeg ? (
-            <Prov info={flowSegmentProv(heldSeg, side, when, isLive, daily)}>
-              <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(t.now)}</span>
-            </Prov>
-          ) : (
-            fig(t.now, {
-              kind: "chain-derived",
-              summary: `${coll ? "Held" : "Owed"} at ${when}. The solid part of the bar: what this side ${coll ? "holds" : "owes"} at that date.`,
-              formula: "Σ balance × price",
-            })
-          )}
-          .
-        </span>
-      )}
-    </p>
   );
 }
 
@@ -648,49 +541,46 @@ function PipTip({ at }: { at: PipOpen }) {
   );
 }
 
-/** Where the Over time view reads its series: the family's route
+/** Where the panel reads the line's series: the family's route
  *  (`/api/spark/flows/series`) and the position's parameters. */
 export type FlowSeriesSource = { path: string; params: Record<string, string> };
 
-/** The two views (rails-ops reference/lifetime-flows-scrubber.md): the bars,
- *  cut to the last WINDOW_ACTIVE_DAYS active days, and Over time, collateral
- *  and debt per week or month from the open. The bars take the busy
- *  treatment (lib/shared/flows-busy.ts) where their window is busy. Where
- *  `combined` is set, a third view between them draws both under one cursor
- *  (a trial on Aave V3, components/shared/lifetime-flows-combined.tsx). */
+/** The panel's chart (rails-ops reference/lifetime-flows-scrubber.md): the
+ *  bars, cut to the last WINDOW_ACTIVE_DAYS active days, with the collateral
+ *  and debt line per week or month from the open under them on one cursor.
+ *  The bars take the busy treatment (lib/shared/flows-busy.ts) where their
+ *  window is busy. Without a series the bars keep their date slider. */
 export function LifetimeFlowsScrubber({
   timeline,
   series,
-  combined = false,
 }: {
   timeline: FlowTimeline;
-  /** The family's series route; absent, Over time bins the timeline's own day
-   *  rows (a page that holds them all, Sky Savings). */
+  /** The family's series route; absent, the line bins the timeline's day rows
+   *  (a page that holds them all, Sky Savings), and without a daily price
+   *  series there is no line. */
   series?: FlowSeriesSource;
-  /** Offer the Combined view. */
-  combined?: boolean;
 }) {
   const model = useMemo(() => buildFlowModel(timeline), [timeline]);
   const from = model ? windowFromDay(model.eventDays) : 0;
   const bars = useMemo(() => (model ? windowModel(model, from) : null), [model, from]);
   const busy = bars ? isBusy(bars) : false;
-  const [view, setView] = useState<FlowsView>("bars");
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const reportKey = useContext(FlowsKeyContext);
   const [hatches, setHatches] = useState<Pick<FlowsKeyItems, "items" | "outline"> | null>(null);
 
-  // Over time's series: read on first opening, from the family's route, or
-  // binned here from the page's rows.
+  // The line's series: from the family's route, or binned here from the
+  // page's rows.
   const startDay = model ? model.start / DAY_MS : 0;
   const bin: SeriesBin = model ? lifetimeBinFor((timeline.today ?? startDay + model.liveStop) - startDay) : "week";
+  const binInput = useMemo(() => (series ? null : binInputFromTimeline(timeline)), [series, timeline]);
+  const lined = series != null || binInput != null;
   const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);
   const seriesKey = series ? `${series.path}?${new URLSearchParams(series.params).toString()}&bin=${bin}` : null;
   useEffect(() => setLifetime(null), [seriesKey, timeline]);
   useEffect(() => {
-    if (view === "bars" || lifetime) return;
+    if (lifetime) return;
     if (!series) {
-      const input = binInputFromTimeline(timeline);
-      setLifetime({ series: input ? binSeries(input, bin) : null, failed: !input });
+      if (binInput) setLifetime({ series: binSeries(binInput, bin), failed: false });
       return;
     }
     const ctl = new AbortController();
@@ -704,144 +594,62 @@ export function LifetimeFlowsScrubber({
     return () => ctl.abort();
     // `seriesKey` stands for `series`, which a caller may build afresh each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, lifetime, seriesKey, timeline, bin]);
+  }, [lifetime, seriesKey, binInput, bin]);
 
   const words = useMemo(
-    () => (bars && model ? viewWords(model, bars, from, bin, combined) : null),
-    [model, bars, from, bin, combined],
+    () => (bars && model ? panelWords(model, bars, from, bin, lined, busy) : null),
+    [model, bars, from, bin, lined, busy],
   );
   useEffect(() => {
     if (!words) return;
-    const drawn = view !== "lifetime" && !busy ? hatches : null;
-    const over = view !== "bars";
+    const drawn = busy ? null : hatches;
     reportKey?.({
       items: drawn?.items ?? [],
-      // Combined draws the outline on the plain and the busy bars alike.
-      outline: view === "bars" ? (drawn?.outline ?? null) : view === "combined" ? words.outline : null,
-      lines: over ? words.lines : undefined,
-      shade: over && from > 0 ? `The ${VIEWS.bars.label} window` : null,
+      // With the line, the outline is drawn on the plain and the busy bars alike.
+      outline: lined ? words.outline : (drawn?.outline ?? null),
+      lines: lined ? words.lines : undefined,
+      shade: lined && from > 0 ? "The bars' window" : null,
       views: words.key,
       explain: words.explain,
     });
-  }, [reportKey, view, busy, hatches, words, from]);
+  }, [reportKey, busy, hatches, words, from, lined]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
-  useEffect(() => {
-    if (view !== "bars") ledgerNote?.(null);
-  }, [view, ledgerNote]);
 
   if (!model || !bars || !words) return null;
-  const switcher = (
-    <ViewSwitch
-      view={view}
-      onChange={setView}
-      what={words.what}
-      views={combined ? ["bars", "combined", "lifetime"] : ["bars", "lifetime"]}
+  if (!lined)
+    return busy ? (
+      <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
+    ) : (
+      <ScrubberBody model={bars} onKey={setHatches} />
+    );
+  return (
+    <CombinedFlows
+      model={model}
+      bars={bars}
+      from={from}
+      busy={busy}
+      series={lifetime?.series ?? null}
+      failed={lifetime?.failed ?? false}
+      onLedgerNote={ledgerNote ?? undefined}
+      renderBars={(stop, when, isLive, atLive) => (
+        <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
+      )}
     />
   );
-  return (
-    <div>
-      {view === "combined" ? (
-        <CombinedFlows
-          model={model}
-          bars={bars}
-          from={from}
-          busy={busy}
-          series={lifetime?.series ?? null}
-          failed={lifetime?.failed ?? false}
-          switcher={switcher}
-          renderBars={(stop, when, isLive, atLive) => (
-            <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
-          )}
-        />
-      ) : view === "lifetime" ? (
-        <LifetimeOverTime
-          model={model}
-          series={lifetime?.series ?? null}
-          failed={lifetime?.failed ?? false}
-          windowFrom={from > 0 ? startDay + from : null}
-          switcher={switcher}
-        />
-      ) : busy ? (
-        <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} switcher={switcher} />
-      ) : (
-        <ScrubberBody model={bars} onKey={setHatches} switcher={switcher} />
-      )}
-    </div>
-  );
 }
 
-type FlowsView = "bars" | "combined" | "lifetime";
-
-/** The switch's options: an icon and a label at desktop width, the icon
- *  alone on a phone, where `title` and `aria-label` carry the words. */
-const VIEWS: Record<FlowsView, { label: string; says: (what: string) => string; Icon: typeof ChartLine }> = {
-  bars: { label: "Flows", says: (what) => `Flows: where the ${what} came from and went`, Icon: ChartBarStacked },
-  combined: {
-    label: "Combined",
-    says: (what) => `Combined: the flows and the ${what} since the open, on one date`,
-    Icon: ChartNoAxesCombined,
-  },
-  lifetime: { label: "Over time", says: (what) => `Over time: the ${what} since the open`, Icon: ChartLine },
-};
-
-/** The segmented control between the views, on the date line's row. */
-function ViewSwitch({
-  view,
-  onChange,
-  what,
-  views,
-}: {
-  view: FlowsView;
-  onChange: (v: FlowsView) => void;
-  /** "collateral and debt", in the card's words. */
-  what: string;
-  views: FlowsView[];
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="Chart view"
-      className="inline-flex shrink-0 rounded-lg border border-rb-200 bg-sunken p-0.5 dark:border-rb-700"
-      data-flow-view-switch=""
-    >
-      {views.map((v) => {
-        const { label, Icon } = VIEWS[v];
-        const says = VIEWS[v].says(what);
-        const on = view === v;
-        return (
-          <button
-            key={v}
-            type="button"
-            aria-pressed={on}
-            aria-label={says}
-            title={says}
-            onClick={() => onChange(v)}
-            className={`${CTRL_GHOST} ${
-              on ? "bg-foreground text-background shadow-sm" : CTRL_OFF
-            } h-9 min-w-11 gap-1.5 rounded-md px-2.5 text-xs font-semibold sm:h-8 sm:min-w-0`}
-            data-flow-view={v}
-          >
-            <Icon size={15} aria-hidden />
-            <span className="max-sm:hidden">{label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** The Key's and the Explanation's line on which view is which, and the Over
- *  time view's lines for the Key. */
-function viewWords(
+/** The Key's and the Explanation's lines on what the bars and the line cover
+ *  and how to read them, and the line's two sides for the Key. */
+function panelWords(
   model: FlowModel,
   bars: FlowModel,
   from: number,
   bin: SeriesBin,
-  combined: boolean,
+  lined: boolean,
+  busy: boolean,
 ): {
-  key: string;
+  key: string | undefined;
   explain: string;
-  what: string;
   lines: { label: string; color: string }[];
   /** The Key's name for the dashed outline, where there is more than one stop. */
   outline: string | null;
@@ -856,30 +664,34 @@ function viewWords(
     : model.labels.collateral.toLowerCase();
   const barsCover =
     from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} active days, from ${opens}` : `every active day since ${opens}`;
-  const f = VIEWS.bars.label;
-  const o = VIEWS.lifetime.label;
-  const c = VIEWS.combined.label;
+  // One bar on a one-sided position (savings, a lender).
+  const [bs, cov, them, heads, each] = hasDebt
+    ? ["bars", "cover", "them", "the headlines and the bars are", "each bar ends"]
+    : ["bar", "covers", "it", "the headline and the bar are", "the bar ends"];
+  const cover =
+    from > 0
+      ? `The ${bs} ${cov} the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and start${hasDebt ? "" : "s"} with what was held as that window opens. `
+      : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
+  const read = busy
+    ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and its tip ends with how that side's flows net to it.`
+    : "A bar's length is everything that came in: the headline is the solid part of the bar, and each part's tip ends with that side's sum.";
+  const today = closed ? "at the close" : "today";
   return {
-    key:
-      `${f}: ${barsCover} · ${o}: ${what} by ${bin} since the open` +
-      (combined ? ` · ${c}: both, on the ${o} line's dates and each day with events` : ""),
-    explain:
-      (from > 0
-        ? `${f} covers the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and starts with what was held as that window opens. `
-        : `${f} covers all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `) +
-      `${o} draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
-      `${from > 0 ? `, with the ${f} window shaded` : ""}, and leaves a gap where a held asset has no price that ${bin}.` +
-      (combined
-        ? ` ${c} draws the ${f} bars over the ${o} line, and one cursor moves both. It stops at the end of each ${bin}, on each day with events (tap a tick to go to it) and today; at each stop the headlines and the bars are the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. A bar's length is everything that came in, so where some has left, the line under it names the length, what has left and what is held: the headline is the solid part. The dashed outline is where each bar ends ${closed ? "at the close" : "today"}.` +
-          (from > 0
-            ? ` Before the ${f} window opens the bars grey out at its first day; the headlines still follow the line.`
-            : "")
-        : ""),
-    what,
+    key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
+    explain: lined
+      ? cover +
+        `The line under ${them} draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
+        `${from > 0 ? `, with the ${bs}' window shaded` : ""}, and leaves a gap where a held asset has no price that ${bin}. ` +
+        `One cursor moves both. It stops at the end of each ${bin}, on each day with events (tap a tick to go to it) and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
+        `${read} The dashed outline is where ${each} ${today}.` +
+        (from > 0
+          ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`
+          : "")
+      : cover + read,
     outline: model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null,
     lines: [
-      { label: model.labels.collateral, color: OVER_TIME_HUE.collateral },
-      ...(hasDebt ? [{ label: model.labels.debt, color: OVER_TIME_HUE.debt }] : []),
+      { label: model.labels.collateral, color: LINE_HUE.collateral },
+      ...(hasDebt ? [{ label: model.labels.debt, color: LINE_HUE.debt }] : []),
     ],
   };
 }
@@ -899,9 +711,9 @@ function keyHatches(model: FlowModel): { side: FlowSide; s: FlowSegment }[] {
   return out;
 }
 
-/** The two bars at a stop, with their lines, for the Combined view: the
- *  scrubber's bars with the cursor held elsewhere, and the outline of today's
- *  length off the last stop. */
+/** The two bars at a stop, under the line's cursor: the scrubber's bars with
+ *  the cursor held elsewhere, and the outline of today's length off the last
+ *  stop. */
 function PlainBars({
   model,
   stop,
@@ -939,7 +751,6 @@ function PlainBars({
       model={model}
       isLive={isLive}
       atLive={atLive}
-      tally
       active={active}
       onHover={setHover}
       onPin={pin}
@@ -960,13 +771,10 @@ function PlainBars({
 function ScrubberBody({
   model,
   onKey,
-  switcher,
 }: {
   model: FlowModel;
   /** The Key's hatches and outline, for the panel's Explanation. */
   onKey: (key: Pick<FlowsKeyItems, "items" | "outline"> | null) => void;
-  /** The view switch, on the date line's row. */
-  switcher?: ReactNode;
 }) {
   const [stop, setStop] = useState(model.liveStop);
   const [playing, setPlaying] = useState(false);
@@ -1089,7 +897,7 @@ function ScrubberBody({
   };
   return (
     <div className="text-sm">
-      <DateRow switcher={switcher}>{dateLine}</DateRow>
+      <DateRow>{dateLine}</DateRow>
       <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
         <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={liveReceipts} assets={assets} />
         {hasDebt && (

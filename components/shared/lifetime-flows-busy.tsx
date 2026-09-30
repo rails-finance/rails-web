@@ -6,12 +6,14 @@
 // with the window's throughput in one line, a density strip counting the
 // transactions in each bin (a day, a week or a month, by the window's span),
 // and the slider stepping by bin. Every figure is `stateAt(model, stop)` at a
-// bin's last day, or the live stop.
+// bin's last day, or the live stop. Each bar's tip ends with how its side's
+// flows net to what is held (`SideSum`).
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -54,14 +56,13 @@ export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
   return [ref, w];
 }
 
-/** The date line with the view switch at its right, in every view. */
-export function DateRow({ children, switcher }: { children: ReactNode; switcher?: ReactNode }) {
+/** The date line over the headlines. */
+export function DateRow({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
+    <div className="mb-2 flex min-h-9 items-center">
       <p className="min-w-0 font-semibold tabular-nums text-foreground" aria-live="polite">
         {children}
       </p>
-      {switcher}
     </div>
   );
 }
@@ -86,11 +87,9 @@ export interface BusyFlowsProps {
   model: FlowModel;
   /** A ledger's note while the slider is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
-  /** The view switch, on the date line's row. */
-  switcher?: ReactNode;
 }
 
-export function BusyFlows({ model, onLedgerNote, switcher }: BusyFlowsProps) {
+export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   const { unit, bins } = useMemo(() => flowBins(model), [model]);
   const through = useMemo(() => throughput(model), [model]);
   const last = bins.length; // the live stop's index
@@ -150,7 +149,7 @@ export function BusyFlows({ model, onLedgerNote, switcher }: BusyFlowsProps) {
 
   return (
     <div className="text-sm" data-flows-busy="">
-      <DateRow switcher={switcher}>{dateLine}</DateRow>
+      <DateRow>{dateLine}</DateRow>
       <Throughput t={through} hasDebt={hasDebt} />
 
       <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
@@ -271,7 +270,6 @@ export function Headline({
   when,
   isLive,
   assets,
-  figure,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -279,70 +277,65 @@ export function Headline({
   when: string;
   isLive: boolean;
   assets: ReturnType<typeof assetsAt>;
-  /** A figure read elsewhere (a bin of the Over time view), in place of
-   *  `st`'s; null where the bin has no price. */
-  figure?: { v: number | null; info: Provenance };
 }) {
   const word = side === "collateral" ? model.labels.collateral : model.labels.debt;
   const tokens = assets.held.filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => h.symbol);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      {figure && figure.v == null ? (
-        <span className="text-xl font-semibold text-rb-500">No price</span>
-      ) : (
-        <Prov info={figure ? figure.info : flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
-          <span className="text-xl font-semibold tabular-nums text-foreground">
-            {formatFlowUsd(figure ? (figure.v as number) : st.now)}
-          </span>
-        </Prov>
-      )}
+      <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
+        <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
+      </Prov>
       {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
       <span className="text-xs text-rb-500">{word}</span>
     </div>
   );
 }
 
-/** Held or owed, as the flows net to it: each inflow, each outflow taken
- *  off, and the balancing item. */
-function NetLine({
-  side,
-  st,
-  when,
-  isLive,
-  daily,
-}: {
-  side: FlowSide;
-  st: FlowSideState;
-  when: string;
-  isLive: boolean;
-  daily: boolean;
-}) {
-  const ins = st.sources.filter((x) => x.fill === "in");
-  const rest = st.sources.find((x) => x.fill === "estimate");
-  const outs = st.bar.filter((x) => x.fill === "out");
-  const terms: { seg: FlowSegment; v: number; signed: boolean }[] = [
-    ...ins.map((seg) => ({ seg, v: seg.value, signed: false })),
-    ...outs.map((seg) => ({ seg, v: -seg.value, signed: true })),
-    ...(rest ? [{ seg: rest, v: rest.value, signed: true }] : []),
-  ].filter((x) => Math.abs(x.v) >= 0.5);
-  if (terms.length === 0) return null;
+/** A side's sum, at the foot of each segment's tip on that bar, in short
+ *  lines. The plain bars: the bar's length and where it came from, what has
+ *  left, and what is held or owed (the headline, the solid part). The busy
+ *  bars (`net`), whose length is what is held: each inflow, each outflow
+ *  taken off, the balancing item, and what they net to. */
+export function SideSum({ side, st, net = false }: { side: FlowSide; st: FlowSideState; net?: boolean }) {
+  const coll = side === "collateral";
+  const row = (key: string, label: string, v: number, opts: { sub?: boolean; sign?: boolean } = {}) => (
+    <span key={key} className={`flex items-center gap-3${opts.sub ? " pl-2 font-normal opacity-80" : ""}`}>
+      <span>{label}</span>
+      <span className="ml-auto tabular-nums">
+        {opts.sign && v >= 0.5 ? "+" : ""}
+        {formatFlowUsd(v)}
+      </span>
+    </span>
+  );
+  const rows: ReactNode[] = [];
+  if (net) {
+    const ins = st.sources.filter((x) => x.fill === "in");
+    const rest = st.sources.find((x) => x.fill === "estimate");
+    const outs = st.bar.filter((x) => x.fill === "out");
+    const terms: { seg: FlowSegment; v: number; signed: boolean }[] = [
+      ...ins.map((seg) => ({ seg, v: seg.value, signed: false })),
+      ...outs.map((seg) => ({ seg, v: -seg.value, signed: true })),
+      ...(rest ? [{ seg: rest, v: rest.value, signed: true }] : []),
+    ].filter((x) => Math.abs(x.v) >= 0.5);
+    for (const { seg, v, signed } of terms) rows.push(row(seg.key, seg.label, v, { sign: signed }));
+  } else {
+    const shown = st.sources.filter((x) => Math.abs(x.value) >= 0.5);
+    rows.push(row("total", coll ? "Came in" : "Owed in all", st.total));
+    for (const x of shown) rows.push(row(x.key, x.label, x.value, { sub: true, sign: x.signed }));
+    if (st.out >= 0.5) {
+      const liquidated = st.bar.some((x) => x.fill === "out" && x.tone === "liquidation" && x.value >= 0.5);
+      rows.push(row("out", coll ? "Left" : liquidated ? "Repaid or liquidated" : "Repaid", st.out));
+    }
+  }
+  rows.push(row("now", coll ? "Held" : "Owed", st.now));
   return (
-    <p className="mt-1.5 text-xs leading-relaxed text-rb-500" data-flow-net={side}>
-      {terms.map(({ seg, v, signed }, i) => (
-        <span key={seg.key}>
-          <span className="whitespace-nowrap">
-            {i === 0 ? seg.label : seg.label.charAt(0).toLowerCase() + seg.label.slice(1)}{" "}
-            <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>
-              <span className="font-medium tabular-nums text-foreground">
-                {i > 0 && (signed || v >= 0) && v >= 0.5 ? "+" : ""}
-                {formatFlowUsd(v)}
-              </span>
-            </Prov>
-            {i < terms.length - 1 && " ·"}
-          </span>{" "}
-        </span>
-      ))}
-    </p>
+    <span
+      className="mt-1.5 flex flex-col gap-0.5 border-t pt-1.5"
+      style={{ borderColor: "var(--rb-tooltip-border)" }}
+      data-flow-tip-sum={side}
+    >
+      {rows}
+    </span>
   );
 }
 
@@ -389,23 +382,43 @@ export function Rescaled({
         const st = s[side];
         return (
           <div key={side} className={i === 0 ? "" : "mt-3"} data-flow-side={side}>
-            <div
-              role="img"
-              aria-label={`${side === "collateral" ? model.labels.collateral : model.labels.debt}: ${spokenUsd(st.now)}.`}
-              className="relative h-10 overflow-hidden rounded-md bg-sunken sm:h-11"
-            >
-              {axis.ticks.slice(1).map((t) => (
-                <i
-                  key={t}
-                  aria-hidden
-                  className="absolute inset-y-0 border-l border-rb-300/60 dark:border-rb-600"
-                  style={{ left: `${(t / axis.max) * 100}%` }}
+            <div className="relative h-10 sm:h-11">
+              <div
+                role="img"
+                aria-label={`${side === "collateral" ? model.labels.collateral : model.labels.debt}: ${spokenUsd(st.now)}.`}
+                className="absolute inset-0 overflow-hidden rounded-md bg-sunken"
+              >
+                {axis.ticks.slice(1).map((t) => (
+                  <i
+                    key={t}
+                    aria-hidden
+                    className="absolute inset-y-0 border-l border-rb-300/60 dark:border-rb-600"
+                    style={{ left: `${(t / axis.max) * 100}%` }}
+                  />
+                ))}
+                <span
+                  className="absolute inset-y-0 left-0 block rounded-[3px] transition-all duration-200 ease-out motion-reduce:transition-none"
+                  style={{ width: `${Math.max(0, (st.now / axis.max) * 100)}%`, background: HUE[side] }}
                 />
-              ))}
-              <span
-                className="absolute inset-y-0 left-0 block rounded-[3px] transition-all duration-200 ease-out motion-reduce:transition-none"
-                style={{ width: `${Math.max(0, (st.now / axis.max) * 100)}%`, background: HUE[side] }}
-              />
+              </div>
+              {/* The whole track opens the tip, so a bar held near zero still
+                  names its flows. */}
+              <span className="absolute inset-0 block" aria-hidden>
+                <RevealTip
+                  className="h-full w-full"
+                  tip={
+                    <span className="flex min-w-40 flex-col gap-0.5" data-flow-tip={side}>
+                      <span className="flex items-center gap-2">
+                        <span>{side === "collateral" ? model.labels.collateral : model.labels.debt}</span>
+                        <span className="ml-auto">{formatFlowUsd(st.now)}</span>
+                      </span>
+                      <SideSum side={side} st={st} net />
+                    </span>
+                  }
+                >
+                  <span className="block h-full w-full cursor-default" />
+                </RevealTip>
+              </span>
               {outline && (
                 <span
                   aria-hidden
@@ -416,7 +429,6 @@ export function Rescaled({
               )}
             </div>
             {i === sides.length - 1 && <AxisLabels ticks={axis.ticks} max={axis.max} />}
-            <NetLine side={side} st={st} when={when} isLive={isLive} daily={model.daily} />
           </div>
         );
       })}
