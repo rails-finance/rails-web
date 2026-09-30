@@ -49,7 +49,9 @@ import {
   mapleFlowSummaries,
   mapleLifetimeWithOpening,
 } from "@/lib/maple/economics";
-import { mapleRateWindows, mapleRowTimes } from "@/lib/maple/row-times";
+import { mapleBoundaryFolders, mapleRateWindows, mapleRowTimes, mapleSinceLastEvent } from "@/lib/maple/row-times";
+import { MapleSinceLastEventRow } from "@/components/protocol/maple/maple-since-last-event";
+import type { FolderMembersReader } from "@/lib/shared/folder-members";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -316,14 +318,76 @@ export default function MaplePositionView({
     return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
   }, [mapleEvents, opening, servedFolders]);
 
+  // Folder members the page has read, by folder: the reader opens a folder, or
+  // the page reads the one holding a pool's first or last row. Their rows date
+  // the interest of the rows around them and bound the yield window.
+  const [memberEvents, setMemberEvents] = useState<Record<string, BaseActivityEvent[]>>({});
+  const readMembers = useCallback<FolderMembersReader>(
+    async (ask) => {
+      const res = await readFolderMembers(ask);
+      setMemberEvents((m) => ({ ...m, [res.folder.responseId]: res.events }));
+      return res;
+    },
+    [readFolderMembers],
+  );
+  const readFolders = useMemo(() => new Set(Object.keys(memberEvents)), [memberEvents]);
+  const rowEvents = useMemo(() => {
+    const seen = new Set(mapleEvents.map((e) => e.id));
+    const extra = Object.values(memberEvents)
+      .flat()
+      .filter((e) => isMapleEvent(e) && !seen.has(e.id) && (seen.add(e.id), true));
+    return extra.length > 0 ? [...mapleEvents, ...extra] : mapleEvents;
+  }, [mapleEvents, memberEvents]);
+  const boundaryFolders = useMemo(
+    () => mapleBoundaryFolders(rowEvents, servedFolders, readFolders),
+    [rowEvents, servedFolders, readFolders],
+  );
+  useEffect(() => {
+    for (const f of boundaryFolders) void readMembers({ folder: f.responseId }).catch(() => {});
+    // One read per folder: a failed one is not retried, and its figures stay unstated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundaryFolders.map((f) => f.responseId).join(",")]);
+
   // Each row's previous row in its pool and, for a queue fill, its request:
   // the period a row's interest covers and how long a fill waited.
-  const rowTimes = useMemo(() => mapleRowTimes(mapleEvents), [mapleEvents]);
-  const rateWindows = useMemo(() => mapleRateWindows(mapleEvents), [mapleEvents]);
+  const rowTimes = useMemo(
+    () => mapleRowTimes(rowEvents, servedFolders, readFolders),
+    [rowEvents, servedFolders, readFolders],
+  );
+  // The yield window runs from the wallet's first row in a pool to its last,
+  // so it is stated only on a page that holds the whole history.
+  const rateWindows = useMemo(
+    () => (cutoffBlock == null ? mapleRateWindows(rowEvents, servedFolders, readFolders) : undefined),
+    [rowEvents, servedFolders, readFolders, cutoffBlock],
+  );
+  // The stretch from the newest row to now, per live pool: the interest no row
+  // states, drawn at the head of the timeline.
+  const sinceLast = useMemo(
+    () =>
+      view && view.status === "open"
+        ? mapleSinceLastEvent(rowEvents, servedFolders, readFolders, view.pools, (pool) => poolState[pool]?.blockNumber)
+        : [],
+    [view, rowEvents, servedFolders, readFolders, poolState],
+  );
+  // Requests the wallet cancelled, counted over the rows and the folders'
+  // own counts; unstated on a windowed page, whose older rows are not here.
+  const cancelledRequests = useMemo(() => {
+    if (cutoffBlock != null) return undefined;
+    let n = mapleEvents.filter((e) => e.context.data.eventType === "request_cancel").length;
+    for (const f of servedFolders ?? []) n += f.counts.find((c) => c.key === "request_cancel")?.count ?? 0;
+    return n;
+  }, [mapleEvents, servedFolders, cutoffBlock]);
 
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
   const captions = view ? computeMapleCardCaptions(view, lifetimeEvents, precomputedLifetime) : null;
+  // The pools the wallet received shares in by transfer: their interest counts
+  // from each batch's worth when it arrived, which the card's Explanation says.
+  const receivedPools = view
+    ? mapleFlowSummaries(view, lifetimeEvents, precomputedLifetime)
+        .filter((p) => p.received > 0)
+        .map((p) => p.assetSymbol)
+    : [];
 
   // The access band on the pools this wallet touches — the liquid/deployed
   // split IS the position's risk surface, so it belongs on the page.
@@ -442,6 +506,7 @@ export default function MaplePositionView({
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
+              cancelledRequests={cancelledRequests}
               // The Explanation pane: layman narration of the card's own face
               // figures (claim, exit rate, escrow, the pool's queue and split).
               explanation={
@@ -450,6 +515,8 @@ export default function MaplePositionView({
                   captions={captions}
                   externalActivity={externalActivity}
                   rateWindows={rateWindows}
+                  cancelledRequests={cancelledRequests}
+                  receivedPools={receivedPools}
                 />
               }
             />
@@ -492,13 +559,24 @@ export default function MaplePositionView({
                   // old because its oldest loaded card is.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  // "in the pool 315 days" runs to today; the Explanation's
+                  // yield window runs first event to last, and says so.
+                  labelTenure={view.status === "open" ? "in the pool" : true}
+                  labelLastActivity
                 />
               ) : undefined
             }
             runs={MAPLE_QUEUE_FILL_RUNS}
             folderRegister={MAPLE_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
+            readFolderMembers={readMembers}
             segments={segments}
+            liveWindow={
+              sinceLast.length > 0
+                ? ({ isFirst }) => (
+                    <MapleSinceLastEventRow lines={sinceLast} isFirst={isFirst} now={Math.floor(Date.now() / 1000)} />
+                  )
+                : undefined
+            }
             renderCard={(event, meta) =>
               isMapleEvent(event) ? (
                 <MapleEventCard

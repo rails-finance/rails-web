@@ -100,8 +100,9 @@ export function TimelineActivityHeader({
    *  age of the date before it. Unset changes nothing. */
   labelLastActivity?: boolean;
   /** Say what the tenure pill measures ("open 1,508 days", "active 281
-   *  days"). Unset changes nothing. */
-  labelTenure?: boolean;
+   *  days"). A string is the word itself ("in the pool 315 days"). Unset
+   *  changes nothing. */
+  labelTenure?: boolean | string;
 }) {
   if (events.length === 0 && !folders?.length) return null;
   let first = events.length ? events[0].timestamp : folders![0].firstAt;
@@ -196,7 +197,7 @@ export function TimelineActivityHeader({
             data-prov-exempt=""
             title={`${closed ? "Open from" : "Active from"} ${formatDate(first)} to ${closed ? formatDate(last) : "today"}`}
           >
-            {labelTenure ? (closed ? "open " : "active ") : ""}
+            {labelTenure ? (typeof labelTenure === "string" ? `${labelTenure} ` : closed ? "open " : "active ") : ""}
             {formatDuration(first, closed ? last : now)}
           </span>
         </>

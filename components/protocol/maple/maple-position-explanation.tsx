@@ -40,6 +40,8 @@ export function MaplePositionExplanation({
   captions,
   externalActivity,
   rateWindows,
+  cancelledRequests,
+  receivedPools,
 }: {
   v: MaplePositionView;
   /** The card's stat captions (earned interest) — the same computed value the
@@ -52,6 +54,10 @@ export function MaplePositionExplanation({
   /** Per pool, the rate at the wallet's first and last loaded rows: the
    *  window a yield figure covers. Omit to state none. */
   rateWindows?: Map<string, MapleRateWindow>;
+  /** Requests the wallet cancelled, where the page holds its whole history. */
+  cancelledRequests?: number;
+  /** The assets of the pools the wallet received shares in by transfer. */
+  receivedPools?: string[];
 }) {
   // Hooks first — the pane declines below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
@@ -243,8 +249,8 @@ export function MaplePositionExplanation({
       const yearly = Math.pow(w.toRate / w.fromRate, 365 / days) - 1;
       bullets.push(
         <span key={`yield-${p.pool}`}>
-          Between {formatDate(w.fromAt)} and {formatDate(w.toAt)} ({Math.round(days)} days, this wallet&rsquo;s first
-          and last events in the pool) the pool&rsquo;s rate rose from {w.fromRate.toFixed(4)} to {w.toRate.toFixed(4)}{" "}
+          From this wallet&rsquo;s first event in the pool to its last, {formatDate(w.fromAt)} to {formatDate(w.toAt)} (
+          {Math.round(days)} days), the pool&rsquo;s rate rose from {w.fromRate.toFixed(4)} to {w.toRate.toFixed(4)}{" "}
           {p.assetSymbol} per share: {(rise * 100).toFixed(2)}%, or about {(yearly * 100).toFixed(1)}% a year at that
           pace. Past rates do not set future ones.
         </span>,
@@ -286,6 +292,13 @@ export function MaplePositionExplanation({
             <AmountText value={it.amount} format="compact" /> {it.symbol}
           </H>{" "}
           of that claim is interest earned to date, already included in the figure above.
+          {receivedPools && receivedPools.includes(it.symbol) && (
+            <>
+              {" "}
+              For shares the wallet received from another wallet, the interest counts from what each batch was worth
+              when it arrived.
+            </>
+          )}
         </span>,
       );
     }
@@ -367,7 +380,15 @@ export function MaplePositionExplanation({
     bullets.push(
       <span key="requests">
         The wallet has made <H>{v.requestCount}</H> withdrawal request{v.requestCount === 1 ? "" : "s"} over its
-        lifetime.
+        lifetime
+        {cancelledRequests != null && cancelledRequests > 0 && cancelledRequests <= v.requestCount
+          ? cancelledRequests === v.requestCount
+            ? v.requestCount === 1
+              ? " and cancelled it, so the shares came back to the wallet"
+              : " and cancelled all of them, so the shares came back to the wallet"
+            : `; it cancelled ${cancelledRequests}, and those shares came back to the wallet`
+          : ""}
+        .
       </span>,
     );
   }

@@ -74,7 +74,7 @@ import {
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
 import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
@@ -407,18 +407,21 @@ export default function SparkPositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? sparkEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet]);
@@ -684,6 +687,7 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -810,8 +814,8 @@ export default function SparkPositionDetail({
             />
           )}
           {towerData && (
-            <ChainTruthTower
-              data={towerData}
+            <LifetimeFlowsPanel
+              read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
               explanation={sparkEconomicsExplanation(
                 towerData,
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
@@ -819,7 +823,9 @@ export default function SparkPositionDetail({
                 (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
               )}
               learnMore={sparkEconomicsContent(towerData)}
-              timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+              scrubber={
+                flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
+              }
             />
           )}
           <ChainTruthTimeline

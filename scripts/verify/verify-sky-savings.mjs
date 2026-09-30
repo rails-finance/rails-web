@@ -13,7 +13,10 @@
 //      figures, the rate is the api's, the scrubber draws one bar, every
 //      referral code is on its row, the listing opens on the largest holder,
 //      and the rate history lists every change. The words: the balance names
-//      sUSDS, every Full breakdown row names its unit, the scrubber's
+//      sUSDS; the panel draws no Full breakdown; the Explanation's figures
+//      each name USDS, carry the api's in, out, worth and interest, and add
+//      up (worth + out − in = interest; the bar's length = worth + out); every
+//      figure on the bar's line is in dollars; the scrubber's
 //      balancing item reads "Interest earned" at every stop, its last stop
 //      states the header's block, and at 390px consecutive Savings Rate
 //      changes draw as one row that counts them.
@@ -272,30 +275,80 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
       words.live === `Position at block ${Number(pos.asOf.block).toLocaleString("en-US")}`,
       words.live,
     );
-  await page
-    .getByRole("button", { name: /Full breakdown/ })
-    .first()
-    .click();
-  await page.waitForTimeout(300);
+  check(
+    `${name} page: the panel draws no Full breakdown`,
+    (await page.getByRole("button", { name: /Full breakdown/ }).count()) === 0,
+  );
   const lineAt = () => page.locator('[data-flow-sources="collateral"]').innerText();
-  // The Full breakdown's rows: from its heading to its first bullet or the
-  // timeline's eyebrow.
-  const breakdown = await page.evaluate(() => {
-    const t = document.body.innerText;
-    const at = t.indexOf("Full breakdown");
-    const ends = ["•", "\nHolding since", "\nHeld "].map((w) => t.indexOf(w, at)).filter((i) => i > at);
-    return t.slice(at, Math.min(...ends, t.length));
-  });
-  const rowCount = [...breakdown.matchAll(/^(Deposited \(all.time\)|Worth now)$/gm)].length;
-  check(`${name} page: the Full breakdown opened`, rowCount > 0, breakdown.slice(0, 120));
+  // The Explanation's bullets (lib/sky-savings/flows-explanation.tsx), read
+  // from the panel whether or not its pane is open.
+  const prose = await page.evaluate(() =>
+    (document.querySelector('section[data-skel-section="detail-economics"]')?.textContent ?? "").replace(/\s+/g, " "),
+  );
+  const FIG = "([\\d.,]+[KMBT]?)";
+  const num = (t) => {
+    const m = /^([\d.,]+)([KMBT]?)$/.exec(t ?? "");
+    if (!m) return NaN;
+    return Number(m[1].replace(/,/g, "")) * { "": 1, K: 1e3, M: 1e6, B: 1e9, T: 1e12 }[m[2]];
+  };
+  const inOut = prose.match(new RegExp(`${FIG} USDS came in.*? and ${FIG} USDS left\\.`));
+  const held = prose.match(new RegExp(`${FIG} USDS is still held\\.`));
+  const earnedM = prose.match(new RegExp(`The difference, ${FIG} USDS, is the interest earned`));
+  const length = prose.match(new RegExp(`what is still held plus what left, ${FIG} USDS`));
+  // Units: each sentence that states a figure states it in USDS.
   const unitless = [
-    ...breakdown.matchAll(
-      /^(Deposited \(all.time\)|Received|Interest earned|Withdrawn|Sent|Worth now)\n\s*([^\n]+)$/gm,
-    ),
-  ]
-    .filter((m) => /^[0-9.,KMB]+$/.test(m[2].trim()))
-    .map((m) => `${m[1]} ${m[2].trim()}`);
-  check(`${name} page: every Full breakdown row names its unit`, unitless.length === 0, unitless.join("; "));
+    [/came in/, inOut],
+    [/is still held\./, held],
+    [/is the interest earned/, earnedM],
+    [/what is still held plus what left/, length],
+  ].filter(([said, m]) => said.test(prose) && !m);
+  check(
+    `${name} page: every Explanation figure names USDS`,
+    unitless.length === 0 && inOut != null,
+    unitless.map(([r]) => String(r)).join("; ") || prose.slice(0, 160),
+  );
+  // The api's figures, at the two decimals of the compact form: a figure
+  // shown as 1.23M is within half a unit of its last place.
+  const units = (raw) => Number(BigInt(raw)) / 1e18;
+  const near = (shown, v) => {
+    const x = num(shown);
+    const place = /[KMBT]$/.test(shown) ? { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }[shown.slice(-1)] : 1;
+    return Math.abs(x - v) <= 0.005 * place + 1e-9;
+  };
+  if (inOut) {
+    check(`${name} page: the Explanation's in is the api's`, near(inOut[1], units(pos.data.usdsIn.raw)), inOut[1]);
+    check(`${name} page: the Explanation's out is the api's`, near(inOut[2], units(pos.data.usdsOut.raw)), inOut[2]);
+  }
+  if (held && pos.data.value)
+    check(`${name} page: the Explanation's worth is the api's`, near(held[1], units(pos.data.value.raw)), held[1]);
+  if (earnedM && pos.data.earned)
+    check(
+      `${name} page: the Explanation's interest is the api's`,
+      near(earnedM[1], units(pos.data.earned.raw)),
+      earnedM[1],
+    );
+  if (inOut && held && earnedM) {
+    // The shown figures add up within their rounding: worth + out − in = interest.
+    const slack = [inOut[1], inOut[2], held[1], earnedM[1]]
+      .map((t) => (/[KMBT]$/.test(t) ? { K: 1e3, M: 1e6, B: 1e9, T: 1e12 }[t.slice(-1)] : 1) * 0.005)
+      .reduce((a, b) => a + b, 0);
+    const gap = num(held[1]) + num(inOut[2]) - num(inOut[1]) - num(earnedM[1]);
+    check(
+      `${name} page: the Explanation adds up: worth + out − in = interest`,
+      Math.abs(gap) <= slack + 1e-9,
+      `${gap}`,
+    );
+  }
+  if (length && held && inOut)
+    check(
+      `${name} page: the bar's length is worth + out`,
+      near(length[1], units(pos.data.value.raw) + units(pos.data.usdsOut.raw)),
+      length[1],
+    );
+  // The bar's line: every figure in dollars.
+  const line = (await lineAt()).replace(/\s+/g, " ");
+  const bare = [...line.matchAll(/(?:^|[^$\d.,])([\d][\d.,]*[KMBT]?)(?![\d.,KMBT%])/g)].map((m) => m[1]);
+  check(`${name} page: every figure on the bar's line is in dollars`, /\$/.test(line) && bare.length === 0, line);
   const stops = [await lineAt()];
   await page.getByRole("button", { name: "Previous event", exact: true }).click();
   await page.waitForTimeout(300);

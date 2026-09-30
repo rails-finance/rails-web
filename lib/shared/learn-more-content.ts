@@ -3379,7 +3379,7 @@ export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): 
       },
       {
         bold: "Where the money actually is",
-        text: "only a small liquid buffer sits in the pool contract (a few percent of the pool; the pool band shows it live). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians (BitGo, Copper, Anchorage, Hex Trust) under off-chain tri-party agreements. The chain records the bookkeeping; the collateral itself is not on-chain.",
+        text: "only a small liquid buffer sits in the pool contract (a few percent of the pool; the pool band shows it live). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians, firms that keep the borrowers' collateral in safekeeping and release it only on the agreed terms (BitGo, Copper, Anchorage, Hex Trust). The chain records the bookkeeping; the collateral itself is not on-chain.",
       },
       {
         bold: "What the chain proves",
@@ -3396,12 +3396,12 @@ export function mapleQueueContent(
   return {
     title: "How the Withdrawal Queue Works",
     intro:
-      "Syrup-pool withdrawals are queued: a request moves the shares into the queue's escrow and takes a place in a first-in, first-out (FIFO) line, paid from the pool's liquid cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
+      "Syrup-pool withdrawals are queued: a request moves the shares into the queue and takes a place in a first-in, first-out (FIFO) line, paid from the pool's liquid cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Escrow, not exit",
-        text: "requested shares leave the wallet's balance but remain the position's — they sit at the WithdrawalManager until processed or cancelled. Cancelling (fully or partly) returns them.",
+        bold: "Held in the queue, not paid out",
+        text: "requested shares leave the wallet's balance but remain the position's: the queue's contract holds them for the wallet until they are paid out or the request is cancelled. Cancelling (fully or partly) returns them.",
       },
       {
         bold: "Priced at fill time",
@@ -3429,17 +3429,17 @@ export function mapleTransferContent(eventType: "transfer_in" | "transfer_out"):
     title: "Transferable Pool Shares",
     intro:
       eventType === "transfer_in"
-        ? "Syrup-pool shares are ordinary ERC-20 tokens: receiving them moves the pool claim into this wallet with no pool event."
-        : "Syrup-pool shares are ordinary ERC-20 tokens: sending them moves the pool claim to another wallet with no pool event.",
+        ? "Syrup-pool shares move between wallets like any token: receiving them moves the pool claim into this wallet with no pool event."
+        : "Syrup-pool shares move between wallets like any token: sending them moves the pool claim to another wallet with no pool event.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The claim moves with the token",
-        text: "whoever holds the shares holds the deposit and its accrued interest — positions routinely arrive via DEX buys, Pendle, or exchange distributions.",
+        text: "whoever holds the shares holds the claim on the pool, interest included. A wallet can receive them from another lender, or buy them from one.",
       },
       {
-        bold: "Deposit principal stays behind",
-        text: "a transferred-in position has no deposit history in this wallet, so its replayed principal reads zero — the share lane (exact, equal to balanceOf) is the truthful basis, and the current value comes from shares × the exit rate.",
+        bold: "Interest counts from arrival",
+        text: "the wallet paid nothing into the pool for shares it received, so the page starts from what they were worth when they arrived. Their claim now is the shares times the exit rate, and the interest is the rise since arrival.",
       },
     ],
     links: [{ label: "Maple docs", url: MAPLE_DOC_URL }],

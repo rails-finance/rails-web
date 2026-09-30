@@ -1,6 +1,6 @@
 // Receipts for the date scrubber's figures (components/shared/
 // lifetime-flows-scrubber.tsx). Each states what the figure sums and to which
-// date; the Full breakdown under the scrubber carries the per-asset receipts.
+// date; a segment's tip lists its assets.
 
 import type { Provenance } from "@/components/shared/provenance";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -19,7 +19,7 @@ export function flowSegmentProv(
     return isLive
       ? {
           kind: "chain-derived",
-          summary: `${s.label} — each asset the position has ${held} now, at the oracle price now, added up. The Full breakdown lists them.`,
+          summary: `${s.label} — each asset the position has ${held} now, at the oracle price now, added up. The segment's tip lists them.`,
           formula: "Σ balance × price",
         }
       : daily
@@ -37,7 +37,7 @@ export function flowSegmentProv(
     return {
       kind: "chain-derived",
       summary: s.key.endsWith("-interest")
-        ? `${s.label} — as the Full breakdown states it for the position's whole life.`
+        ? `${s.label} — over the position's whole life, as the Explanation states it.`
         : `${s.label} at ${when} — the bar's length less the sources beside it: what prices and interest added to what came in. No funds moved.`,
       formula: s.key.endsWith("-interest") ? undefined : "in − Σ sources",
     };
