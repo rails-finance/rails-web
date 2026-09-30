@@ -26,6 +26,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAsymmetryEvent } from "@/lib/shared/types/event-shape";
 import { positionCollateralProv, positionDebtProv, lifetimeFlowProv } from "@/lib/asymmetry/event-provenance";
 import type { LiquityForkLifetimeFlow } from "@/lib/shared/liquity-fork-provenance";
+import { liquityForkFlowNotes } from "@/lib/shared/liquity-fork-economics-explanation";
 import type { LiquityForkTowerData } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
 import { flowsReconcile, type TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -255,6 +256,10 @@ export function computeAsymmetryEconomics(
 
   return {
     ...(redemptionOutcome ? { redemptionOutcome } : {}),
+    // The dollar bars' price, named on the panel, and the parts of the
+    // lifetime flows the owner did not move (see liquityForkFlowNotes).
+    ...(valued && priced ? { todayPrice: view.priceUsd as number } : {}),
+    ...liquityForkFlowNotes(events),
     valued,
     // The branch's own PriceFeed → chain-derived, so the USD bars survive
     // On-chain-values; the debt leg is the $1 redemption face.
@@ -278,7 +283,7 @@ export function computeAsymmetryEconomics(
     flowsNote:
       "The tower shows the position as it stands; every inflow and outflow that produced it is in the timeline below, event by event.",
     interestNote: valued
-      ? "Asymmetry is a Liquity V2 fork: each Trove carries an annual interest rate. The USDaf figure is the Trove's debt at its last change — interest built up since isn't counted here, and the position card shows the live total. Collateral is valued at the branch's price and the debt at USDaf's $1 redemption face, the protocol's reckoning on both sides. Lifetime bars sum the Trove's recorded deltas; the borrowed total counts every debt increase its events recorded — new draws, upfront fees, and interest applied when an operation touched the Trove."
+      ? "Asymmetry is a Liquity V2 fork: each Trove carries an annual interest rate. The USDaf figure is the Trove's debt at its last change — interest built up since isn't counted here, and the position card shows the live total. Collateral is valued at today's branch price and the debt at USDaf's $1 redemption face, the protocol's reckoning on both sides. Lifetime bars sum the Trove's recorded deltas; the borrowed total counts every debt increase its events recorded — new draws, upfront fees, and interest applied when an operation touched the Trove."
       : "Asymmetry is a Liquity V2 fork: each Trove carries an annual interest rate. The USDaf figure is the Trove's debt at its last change; interest built up since isn't counted here. The branch's price wasn't available on this load, so the tower shows amounts only — it never asserts a partial dollar total. Lifetime bars sum the Trove's recorded deltas; the borrowed total counts every debt increase its events recorded — new draws, upfront fees, and interest applied when an operation touched the Trove.",
   };
 }

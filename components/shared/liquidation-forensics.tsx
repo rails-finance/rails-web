@@ -83,6 +83,10 @@ export interface LiquidationForensicsProps {
    *  single governing constant (Maker's penalty settles at a later auction)
    *  passes nothing. */
   premiumReference?: { label: string; value: string; prov: Provenance };
+  /** State the third cell as the collateral ratio at liquidation
+   *  ((1 + premium) × 100%, "122.09%") rather than a signed premium — for a
+   *  protocol whose seized-over-cleared figure is that ratio, not a bonus. */
+  premiumAsRatio?: boolean;
   /** The at-block prices the legs derive from, one pill per asset. */
   pricePills: AtBlockPricePill[];
   /** Denomination formatters — default USD. A protocol whose own unit is not
@@ -204,6 +208,7 @@ export function LiquidationForensics({
   format,
   seizedLabel,
   clearedLabel,
+  premiumAsRatio,
 }: LiquidationForensicsProps) {
   const fmtValue = format?.value ?? formatUsdValue;
   const fmtPrice = format?.price ?? formatPrice;
@@ -217,7 +222,9 @@ export function LiquidationForensics({
       </div>
     );
   const sign = premium >= 0 ? "+" : "−";
-  const premiumPct = `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
+  const premiumPct = premiumAsRatio
+    ? `${((1 + premium) * 100).toFixed(2)}%`
+    : `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
   return (
     <div className="px-5 pb-2">
       <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">

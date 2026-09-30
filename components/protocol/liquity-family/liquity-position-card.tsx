@@ -48,6 +48,7 @@ import { liquityPositionContent } from "@/lib/shared/learn-more-content";
 import { liquityForkPositionContent } from "@/lib/shared/liquity-fork-position-content";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
 import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkCollAmount } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import {
@@ -94,7 +95,7 @@ import {
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
 import {
-  CLAIMABLE_WHERE,
+  CLAIMABLE_BY_OWNER,
   collSurplusClaimableProv,
   collSurplusUsdProv,
 } from "@/lib/shared/liquity-coll-surplus-provenance";
@@ -567,24 +568,23 @@ export function LiquityPositionCard({
       ) : (
         <StatDash />
       );
-    const claimableStat = claimable ? (
-      <StatValue>
-        <Prov info={collSurplusClaimableProv(claimable, ct)}>
-          <span className="text-foreground/80">{formatPrice(claimable.claimable)}</span>
-        </Prov>
-      </StatValue>
-    ) : null;
+    // One state for the card: the life's peaks stay the headline figures, and
+    // a surplus the owner can still claim is its own line under them, so the
+    // card does not change meaning when the head read lands.
     const claimableFootnote = claimable ? (
-      <>
+      <div className="text-xs mt-0.5 text-rb-500">
+        <Prov info={collSurplusClaimableProv(claimable, ct)}>
+          <span className="font-semibold text-foreground/80 tabular-nums">{forkCollAmount(claimable.claimable)}</span>
+        </Prov>{" "}
+        {ct}
         {claimableUsd != null && (
-          <div className="text-xs mt-0.5 min-h-[1rem]">
-            <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
-              <Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>
-            </span>
-          </div>
-        )}
-        <div className="text-xs text-rb-500 mt-0.5">{CLAIMABLE_WHERE}</div>
-      </>
+          <>
+            {" "}
+            (<Prov info={collSurplusUsdProv(claimable, ct, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
+          </>
+        )}{" "}
+        {CLAIMABLE_BY_OWNER}
+      </div>
     ) : undefined;
     return (
       <PositionCardShell
@@ -619,13 +619,9 @@ export function LiquityPositionCard({
           identity={meta}
           collateralIcon={<TokenChipIcon symbol={ct} size={28} filterable={false} />}
           debtIcon={<TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />}
-          collateralLabel={claimable ? "Claimable collateral" : undefined}
-          collateral={claimable ? claimableStat : peakCollateralStat}
-          collateralFootnote={claimable ? claimableFootnote : undefined}
-          // The debt the liquidation cleared is not the owner's to act on, so
-          // it stands down while the surplus is claimable.
-          debt={claimable ? undefined : peakDebtStat}
-          outcomeFollows={!!claimable}
+          collateral={peakCollateralStat}
+          collateralFootnote={claimableFootnote}
+          debt={peakDebtStat}
         />
         {footer}
       </PositionCardShell>
@@ -754,6 +750,9 @@ export function LiquityPositionCard({
                   </HighlightableValue>
                 </Prov>{" "}
                 interest rate
+                {/* The live read's debt includes interest to the head block,
+                    so the figure grows while the page is open. */}
+                {lv && debt > 0 && <div>Live, accrues every second</div>}
               </div>
             ),
           },

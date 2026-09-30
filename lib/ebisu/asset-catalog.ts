@@ -55,6 +55,14 @@ export interface EbisuBranch {
    *  values read with MCR() at the block before. sUSDe, LBTC and stcUSD have no
    *  such log, so their minimum has not moved. */
   mcrBefore?: readonly ForkMcrStep[];
+  /** The branch's liquidation penalties, as fractions: on debt the Stability
+   *  Pool absorbs, and on debt redistributed to the other Troves. Read from
+   *  the EbisuBranchManager's liquidationPenaltySp() and
+   *  liquidationPenaltyRedistribution() on 2026-09-30 at head block
+   *  26,087,728, and the same at block 23,796,940 (before the first
+   *  liquidation). No log has moved them. */
+  liquidationPenaltySp: number;
+  liquidationPenaltyRedist: number;
 }
 
 export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
@@ -73,6 +81,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     mcrBefore: [{ mcr: 1.28, untilBlock: 24_160_712, untilTimestamp: 1_767_522_647 }],
     ccr: 1.5,
     scr: 1.2,
+    liquidationPenaltySp: 0.05,
+    liquidationPenaltyRedist: 0.2,
   },
   susde: {
     key: "susde",
@@ -87,6 +97,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     mcr: 1.15,
     ccr: 1.2,
     scr: 1.1,
+    liquidationPenaltySp: 0.05,
+    liquidationPenaltyRedist: 0.1,
   },
   wbtc: {
     key: "wbtc",
@@ -103,6 +115,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     mcrBefore: [{ mcr: 1.32, untilBlock: 24_160_701, untilTimestamp: 1_767_522_515 }],
     ccr: 1.5,
     scr: 1.2,
+    liquidationPenaltySp: 0.05,
+    liquidationPenaltyRedist: 0.2,
   },
   lbtc: {
     key: "lbtc",
@@ -117,6 +131,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     mcr: 1.35,
     ccr: 1.5,
     scr: 1.2,
+    liquidationPenaltySp: 0.05,
+    liquidationPenaltyRedist: 0.2,
   },
   stcusd: {
     key: "stcusd",
@@ -131,6 +147,8 @@ export const EBISU_BRANCHES: Record<string, EbisuBranch> = {
     mcr: 1.15,
     ccr: 1.3,
     scr: 1.1,
+    liquidationPenaltySp: 0.05,
+    liquidationPenaltyRedist: 0.1,
   },
 };
 

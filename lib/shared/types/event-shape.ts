@@ -1213,6 +1213,22 @@ export interface LiquityForkRedemptionFacts {
  *  where the transaction liquidated this one Trove on the branch, so the totals
  *  are this Trove's. Human decimal strings: debt legs in the stablecoin (18),
  *  collateral legs in the branch's own units. */
+/** A liquidation whose redistribution reached a Trove — the liquidated Trove
+ *  and the whole redistributed legs of its Liquidation log. A receiving
+ *  Trove's share is its `debtFromRedist` over the sum of these legs. */
+export interface LiquityForkRedistSource {
+  /** The liquidated Trove, on the same branch. */
+  troveId: string;
+  blockNumber: number;
+  /** Unix seconds. */
+  timestamp: number;
+  txHash: string;
+  /** Liquidation `_debtRedistributed`, human decimal (the stablecoin). */
+  debtRedistributed: string;
+  /** Liquidation `_collRedistributed`, human decimal (the branch's units). */
+  collRedistributed: string;
+}
+
 export interface LiquityForkLiquidationFacts {
   /** Debt the Stability Pool absorbed — `_debtOffsetBySP`. */
   debtOffsetBySP: string;
@@ -1227,6 +1243,11 @@ export interface LiquityForkLiquidationFacts {
   collSurplus: string;
   /** Collateral paid to the liquidator as gas compensation — `_collGasCompensation`. */
   collGasCompensation: string;
+  /** The branch's liquidation penalties in force (fractions: 0.05 = 5%), on
+   *  debt the Stability Pool absorbs and on redistributed debt — where the
+   *  fork's catalogue carries a chain read of them. */
+  penaltySp?: number;
+  penaltyRedist?: number;
 }
 
 // ───────────────────────── Ebisu (Liquity V2 fork) detail types ─────────────────────────
@@ -1324,6 +1345,14 @@ export interface EbisuContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Asymmetry (Liquity V2 fork) detail types ─────────────────────────
@@ -1421,6 +1450,14 @@ export interface AsymmetryContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Basedollar (Liquity V2 fork on Base) detail types ─────────────────────────
@@ -1519,6 +1556,14 @@ export interface BasedollarContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Compound V3 (Comet) detail types ─────────────────────────

@@ -61,6 +61,100 @@ export function forkDebtMove(ctx: { debtDelta: string; operation?: { debtFromOpe
  *  float twin of FORK_DEBT_DUST. */
 export const FORK_DEBT_DUST_FLOAT = 0.01;
 
+/** The collateral THIS event's act moved: the net change less the collateral
+ *  a liquidated neighbour's redistribution added on the same touch
+ *  (TroveOperation `_collIncreaseFromRedist`). Collateral earns no interest,
+ *  so what is left is `_collChangeFromOperation`. The redistribution is not a
+ *  deposit: no token left the owner's wallet for it. */
+export function forkCollMoveRaw(collDelta: bigint, collIncreaseFromRedist: string | null | undefined): bigint {
+  if (collIncreaseFromRedist == null || collIncreaseFromRedist === "") return collDelta;
+  try {
+    return collDelta - BigInt(collIncreaseFromRedist.split(".")[0]);
+  } catch {
+    return collDelta;
+  }
+}
+
+/** The client twin of forkCollMoveRaw over a fork event context. */
+export function forkCollMove(ctx: { collDelta: string; operation?: { collFromRedist: string } }): number {
+  const delta = Number(ctx.collDelta) || 0;
+  const redist = Number(ctx.operation?.collFromRedist ?? 0);
+  return Number.isFinite(redist) ? delta - redist : delta;
+}
+
+/** The receipt operands for the act's collateral figure — the shape
+ *  collDeltaProv takes, built once for the header, the spine and the prose so
+ *  the three echo one receipt. Where a redistribution shares the touch, the
+ *  receipt names the act's own field. */
+export function forkCollMoveOps(ctx: {
+  collDelta: string;
+  collAfter?: string;
+  operation?: { collFromOperation: string; collFromRedist: string };
+}): DeltaOps {
+  const net = Number(ctx.collDelta) || 0;
+  const redist = Number(ctx.operation?.collFromRedist ?? 0);
+  return {
+    after: ctx.collAfter,
+    before: ctx.collAfter != null ? Number(ctx.collAfter) - net : null,
+    ...(redist > 0 ? { collFromOperation: ctx.operation!.collFromOperation } : {}),
+  };
+}
+
+/** What a liquidated neighbour's redistribution added to this Trove on this
+ *  touch, or null when nothing did. */
+export function forkRedistArrival(ctx: {
+  operation?: { debtFromRedist: string; collFromRedist: string };
+}): { debt: number; coll: number; debtText: string; collText: string } | null {
+  const op = ctx.operation;
+  if (!op) return null;
+  const debt = Number(op.debtFromRedist);
+  const coll = Number(op.collFromRedist);
+  if (!(debt > 0) && !(coll > 0)) return null;
+  return {
+    debt: debt > 0 ? debt : 0,
+    coll: coll > 0 ? coll : 0,
+    debtText: op.debtFromRedist,
+    collText: op.collFromRedist,
+  };
+}
+
+/** One precision rule for a fork amount on the timeline, shared by the row
+ *  header, the opened grid and the prose: a figure of 1 or more at up to
+ *  three decimals, a smaller one at up to four decimals (the header's own
+ *  rule, so 0.0115 reads 0.0115 on every layer), and a figure too small for
+ *  four decimals at three significant digits. */
+export function forkAmount(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a === 0 || a >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  const sign = n < 0 ? "-" : "";
+  const four = parseFloat(a.toFixed(4));
+  if (four !== 0 && a >= 0.001) return `${sign}${four.toString()}`;
+  if (a < 1e-6) return `${sign}<0.000001`;
+  return `${sign}${a.toLocaleString("en-US", { maximumSignificantDigits: 3 })}`;
+}
+
+/** The same rule for a collateral amount, which is worth far more per unit
+ *  than the stablecoin: up to four decimals below 1,000 (8.4996 wstETH, so a
+ *  redemption's 0.0004 shows in the balance), three above. */
+export function forkCollAmount(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a === 0 || a >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  if (a >= 0.001)
+    return `${n < 0 ? "-" : ""}${parseFloat(a.toFixed(4)).toLocaleString("en-US", { maximumFractionDigits: 4 })}`;
+  return forkAmount(n);
+}
+
+/** A small fee in collateral, to three significant digits (0.000677 rETH),
+ *  so the fee a redeemer left reads as the amount the sums need. */
+export function forkFeeAmount(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  if (Math.abs(n) < 1e-9) return "0";
+  return n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+}
+
 /** The direction each axis of a trove adjustment moved, or null when it didn't.
  *  "add"/"withdraw" is collateral in/out; "borrow"/"repay" is debt drawn/repaid. */
 export interface TroveAdjustDirection {
