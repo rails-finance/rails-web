@@ -576,7 +576,11 @@ function LineStrip({
   // the widest of them (about 6px a character at 10px, and some air).
   // Labels at least 24px apart: every k-th of the axis's ticks.
   const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
-  const yTicks = axis.ticks.filter((_, i) => i % every === 0);
+  // A label that reads as the one under it ("$0" thrice on a position worth
+  // cents) is left out.
+  const yTicks = axis.ticks
+    .filter((_, i) => i % every === 0)
+    .filter((t, i, a) => i === 0 || formatFlowUsd(t) !== formatFlowUsd(a[i - 1]));
   const labelW = Math.max(0, ...yTicks.map((t) => formatFlowUsd(t).length)) * 6 + 8;
   const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
   const x0 = PAD + Math.min(lead, inner);

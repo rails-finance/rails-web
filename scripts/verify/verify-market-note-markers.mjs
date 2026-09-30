@@ -103,13 +103,18 @@ console.log(`Market notes — against ${BASE}\n`);
     tip.text,
   );
 
-  const yClosed = await first.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
+  // Measured from the row above the gap, so content landing higher on the
+  // page does not read as the diamond moving.
+  const yOf = (el) => {
+    const gap = el.closest("[data-note-gap]");
+    const above = gap?.previousElementSibling;
+    return Math.round(el.getBoundingClientRect().top - (above ? above.getBoundingClientRect().top : 0));
+  };
+  const yClosed = await first.evaluate(yOf);
   await first.focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
-  const yOpen = await page
-    .locator(`[data-note-marker="${id}"][aria-expanded="true"]`)
-    .evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
+  const yOpen = await page.locator(`[data-note-marker="${id}"][aria-expanded="true"]`).evaluate(yOf);
   check("3d. the diamond stays where it stood as the note opens", yOpen === yClosed, `${yClosed} → ${yOpen}`);
   const row = page.locator(`[data-market-note="${id}"]`);
   check("3. Enter on a marker opens its row", (await row.count()) === 1);
