@@ -61,8 +61,16 @@ export function sideSumRows(st: FlowSideState): SideSumRows {
     if (seg.fill !== "out") continue;
     raw.push({ key: seg.key, label: seg.label, kind: "out", seg, dollars: -Math.round(seg.value) });
   }
-  const shown = raw.filter((l) => l.dollars !== 0);
   const rest = st.sources.find((s) => s.fill === "estimate");
+  // A balancing item under half a dollar holds nothing but the other lines'
+  // rounding: the lines are rounded together instead (largest remainder), so
+  // no line states a dollar the position never had.
+  if (rest && Math.abs(rest.value) < 0.5 && raw.length > 0) {
+    const signed = raw.map((l) => (l.kind === "out" ? -l.seg.value : l.seg.value));
+    const parts = apportionSigned(signed, totalDollars);
+    raw.forEach((l, i) => (l.dollars = parts[i]));
+  }
+  const shown = raw.filter((l) => l.dollars !== 0);
   if (rest) {
     const dollars = totalDollars - shown.reduce((a, l) => a + l.dollars, 0);
     if (dollars !== 0) shown.push({ key: rest.key, label: rest.label, kind: "rest", seg: rest, dollars });
@@ -73,6 +81,42 @@ export function sideSumRows(st: FlowSideState): SideSumRows {
     amount: wholeUsd(l.dollars),
   }));
   return { lines, total: { dollars: totalDollars, amount: wholeUsd(totalDollars), seg: held } };
+}
+
+/** The line under a side's sum that says how it is valued and what its
+ *  balancing item holds: a family's own words where the balancing item
+ *  carries them (Liquity), else the lending families' ("so it holds price
+ *  changes and interest together"). `held` is "held" or "owed"; `at` the
+ *  date in words ("at 5 Jul '25"). */
+export function sumBasis(st: FlowSideState, rest: string, held: string, at: string): string {
+  const seg = st.sources.find((x) => x.fill === "estimate");
+  const tail = seg?.note
+    ? `, so it is ${seg.note}.`
+    : rest.toLowerCase() === "interest earned"
+      ? "."
+      : ", so it holds price changes and interest together.";
+  return `${seg?.basis ?? "Each flow is valued at the price on its own day."} ${rest} is the remainder, ${held} ${at} less the lines above it${tail}`;
+}
+
+/** Signed whole-dollar parts that add to `total`: each part rounded, then the
+ *  difference moved a dollar at a time onto the parts whose rounding moved
+ *  them furthest the other way. Parts that do not add to within a dollar of
+ *  the total are left rounded on their own. */
+function apportionSigned(parts: number[], total: number): number[] {
+  const out = parts.map((v) => Math.round(v));
+  const sum = parts.reduce((a, v) => a + v, 0);
+  if (Math.abs(sum - total) >= 1) return out;
+  let diff = total - out.reduce((a, v) => a + v, 0);
+  const order = parts.map((v, i) => [v - out[i], i] as const);
+  while (diff !== 0) {
+    const up = diff > 0;
+    order.sort((a, b) => (up ? b[0] - a[0] : a[0] - b[0]));
+    const [, i] = order[0];
+    out[i] += up ? 1 : -1;
+    order[0] = [parts[i] - out[i], i];
+    diff += up ? -1 : 1;
+  }
+  return out;
 }
 
 /** Whole-dollar parts that add to `total` (largest remainder), where the raw

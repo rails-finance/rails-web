@@ -43,6 +43,9 @@ export interface BinInput {
   prices: Record<string, [number, number][]>;
   symbols: Record<string, string>;
   today: number;
+  /** Prices are recorded only on some days (a family's events): a bin keeps
+   *  the last one recorded by its end, however old. */
+  carry?: boolean;
 }
 
 /** [first day, last day, held, owed]; null where a held asset has no price in the bin. */
@@ -111,7 +114,7 @@ export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null
     let i = cursor.get(asset) ?? -1;
     while (i + 1 < list.length && list[i + 1][0] <= to) i++;
     cursor.set(asset, i);
-    return i >= 0 && list[i][0] >= from ? list[i][1] : null;
+    return i >= 0 && (input.carry || list[i][0] >= from) ? list[i][1] : null;
   };
 
   const held = new Map<string, { side: FlowSide; asset: string; amount: number }>();
@@ -175,5 +178,6 @@ export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
     prices: t.dailyPrices,
     symbols,
     today: t.today,
+    ...(t.seriesCarry ? { carry: true } : {}),
   };
 }

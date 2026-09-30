@@ -22,23 +22,27 @@ export function flowSegmentProv(
           summary: `${s.label} — each asset the position has ${held} now, at the oracle price now, added up. The segment's tip lists them.`,
           formula: "Σ balance × price",
         }
-      : daily
-        ? {
-            kind: "chain-derived",
-            summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the last oracle price recorded by the end of that day, added up.`,
-            formula: "Σ balance × price at the day's end",
-          }
-        : {
-            kind: "chain-derived",
-            summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
-            formula: "Σ balance × price at its last event",
-          };
+      : s.basis
+        ? { kind: "chain-derived", summary: `${s.label} at ${when} — ${s.basis}` }
+        : daily
+          ? {
+              kind: "chain-derived",
+              summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the last oracle price recorded by the end of that day, added up.`,
+              formula: "Σ balance × price at the day's end",
+            }
+          : {
+              kind: "chain-derived",
+              summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
+              formula: "Σ balance × price at its last event",
+            };
   if (s.fill === "estimate")
     return {
       kind: "chain-derived",
       summary: s.key.endsWith("-interest")
         ? `${s.label} — over the position's whole life, as the Explanation states it.`
-        : `${s.label} at ${when} — the bar's length less the sources beside it: what prices and interest added to what came in. No funds moved.`,
+        : s.note
+          ? `${s.label} at ${when} — the bar's length less the sources beside it: ${s.note}. No funds moved.`
+          : `${s.label} at ${when} — the bar's length less the sources beside it: what prices and interest added to what came in. No funds moved.`,
       formula: s.key.endsWith("-interest") ? undefined : "in − Σ sources",
     };
   return {
@@ -50,11 +54,12 @@ export function flowSegmentProv(
 
 /** The balancing item in a side's sum: what is held or owed at the date less
  *  every flow above it, printed from the printed figures so the lines add. */
-export function flowRemainderProv(label: string, side: FlowSide, when: string): Provenance {
+export function flowRemainderProv(label: string, side: FlowSide, when: string, note?: string): Provenance {
   const held = side === "collateral" ? "held" : "owed";
+  const holds = note ? `It is ${note}` : "It holds price changes and interest together";
   return {
     kind: "chain-derived",
-    summary: `${label} ${when === "now" ? "now" : `at ${when}`} — the remainder: what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. It holds price changes and interest together; no funds moved.`,
+    summary: `${label} ${when === "now" ? "now" : `at ${when}`} — the remainder: what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. ${holds}; no funds moved.`,
     formula: `${held} − Σ flows`,
   };
 }

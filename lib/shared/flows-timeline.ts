@@ -82,6 +82,10 @@ export interface FlowLive {
   /** Each asset held and owed now, as the ledger values it, for the zoom
    *  view; absent, the last day's balances at today's prices. */
   assets?: FlowAssetHeld[];
+  /** Flows a live read states that no event has recorded yet, added to their
+   *  buckets at the live stop only (a Liquity Trove's pending redistribution
+   *  and batch fee, from getLatestTroveData). */
+  pending?: { bucket: string; symbol: string; usd: number }[];
 }
 
 /** One asset held or owed at a stop. */
@@ -134,6 +138,11 @@ export interface FlowTimeline {
   labels?: { collateral: string; debt: string };
   /** A family's own words for the one-sided bar; each unset one keeps the default. */
   words?: FlowWords;
+  /** The daily series holds prices only on the days a price was recorded (a
+   *  family with no daily price lane builds it from its events): a day or a
+   *  line's bin between keeps the last one, and a price older than
+   *  STALE_DAYS is stated as such. */
+  seriesCarry?: boolean;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -149,6 +158,22 @@ export interface FlowWords {
    *  interest and price change are told apart only at the live stop, so no
    *  stop splits them (rails-ops reference/lifetime-flows-scrubber.md). */
   rest?: string;
+  /** Each side's balancing item by name, where a family can say what it
+   *  holds (Liquity: "Market move" on the collateral, "Interest since the
+   *  last event" on the debt). Signed, the remainder of the printed lines. */
+  restBySide?: Partial<Record<FlowSide, string>>;
+  /** What each side's balancing item holds, the clause the segment panel
+   *  and the receipt close its basis line with. */
+  restNote?: Partial<Record<FlowSide, string>>;
+  /** The panel's basis line for a side, where it is not "Each flow is
+   *  valued at the price on its own day." */
+  basis?: Partial<Record<FlowSide, string>>;
+  /** How a side's held or owed figure is valued between events, for its
+   *  receipt ("each Trove's …"). */
+  heldBasis?: Partial<Record<FlowSide, string>>;
+  /** The Explanation's clause on the prices the line is drawn at, where it is
+   *  not the index's daily prices. */
+  linePrices?: string;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -246,6 +271,11 @@ export interface FlowSegment {
   value: number;
   /** A balancing item that can go either way: its figure carries a sign. */
   signed?: boolean;
+  /** A balancing item: what it holds, for the basis line and its receipt. */
+  note?: string;
+  /** The basis line's opening sentence for the side, and (on the held
+   *  segment) how the held figure is valued between events. */
+  basis?: string;
 }
 
 export interface FlowSideState {
@@ -408,7 +438,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const startDay = days[0].day;
   const start = startDay * DAY_MS;
   const daily = !!t.dailyPrices && Object.keys(t.dailyPrices).length > 0;
-  const gapDays = daily ? SERIES_GAP_DAYS : STALE_DAYS;
+  const gapDays = daily && !t.seriesCarry ? SERIES_GAP_DAYS : STALE_DAYS;
   const outOf = (side: FlowSide, c: Record<string, number>) =>
     t.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
 
@@ -550,6 +580,9 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       const kinds: string[] = [];
       for (const b of t.buckets) {
         const word = b.event ?? b.label;
+        // An empty event name: a bucket that moves on most events (interest)
+        // names none.
+        if (!word) continue;
         const now = d.cum[b.key];
         if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
       }
@@ -600,6 +633,12 @@ export function assetsAt(
   const upto = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const cells = new Map<string, { bucket: string; symbol: string; usd: number }>();
   for (let i = 0; i <= upto; i++) for (const c of m.rows[i].cells) cells.set(`${c.bucket}|${c.symbol}`, c);
+  if (isLive)
+    for (const p of m.live.pending ?? []) {
+      const k = `${p.bucket}|${p.symbol}`;
+      const had = cells.get(k);
+      cells.set(k, { bucket: p.bucket, symbol: p.symbol, usd: (had?.usd ?? 0) + p.usd });
+    }
   const flows = new Map<string, { symbol: string; usd: number }[]>();
   for (const c of cells.values()) {
     if (!(Math.abs(c.usd) >= 0.005)) continue;
@@ -634,7 +673,7 @@ function rowAt(m: FlowModel, stop: number): number {
 function sourcesFor(
   exact: FlowSegment[],
   total: number,
-  balancing: { key: string; label: string; value: number; signed?: boolean },
+  balancing: { key: string; label: string; value: number; signed?: boolean; note?: string; basis?: string },
 ): FlowSegment[] {
   let left = Math.max(0, total);
   const out: FlowSegment[] = [];
@@ -668,6 +707,7 @@ function sideState(
       fill: "held",
       width: heldNow,
       value: heldNow,
+      ...(m.words.heldBasis?.[side] ? { basis: m.words.heldBasis[side] } : {}),
     },
     ...outs.map((b) => {
       const v = Math.max(0, cum[b.key] ?? 0);
@@ -699,9 +739,19 @@ function sideState(
   }
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
   const oneRest = side === "collateral" ? m.words.rest : undefined;
+  const named = m.words.restBySide?.[side];
+  const words = {
+    ...(m.words.restNote?.[side] ? { note: m.words.restNote[side] } : {}),
+    ...(m.words.basis?.[side] ? { basis: m.words.basis[side] } : {}),
+  };
   const balancing = oneRest
-    ? { key: interest != null ? `${side}-interest` : `${side}-market`, label: oneRest, value: interest ?? rest }
-    : { key: `${side}-market`, label: "Market move and interest", value: rest, signed: true };
+    ? {
+        key: interest != null ? `${side}-interest` : `${side}-market`,
+        label: oneRest,
+        value: interest ?? rest,
+        ...words,
+      }
+    : { key: `${side}-market`, label: named ?? "Market move and interest", value: rest, signed: true, ...words };
   return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
 }
 
@@ -711,7 +761,11 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const isLive = stop >= m.liveStop;
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
-  const cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
+  let cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
+  if (isLive && m.live.pending?.length) {
+    cum = { ...cum };
+    for (const p of m.live.pending) cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
+  }
   const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
