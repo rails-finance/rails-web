@@ -25,6 +25,10 @@ export function useSparkEventState(a: SparkStateArgs): {
   /** Unavailable only: true where a reload cannot change it (400, 404). */
   lasting?: boolean;
   raw?: AaveV3PositionState;
+  /** The read around the previous transaction, where it landed. */
+  prevRaw?: AaveV3PositionState;
+  /** The previous transaction's read failed. */
+  prevUnread?: boolean;
   state?: SparkEventState;
 } {
   const here = useAaveV3PositionState({ wallet: a.wallet, market: a.market, block: a.blockNumber, txHash: a.txHash });
@@ -37,6 +41,13 @@ export function useSparkEventState(a: SparkStateArgs): {
   if (!here) return { status: "off" };
   if (here.status === "unavailable") return { status: "unavailable", lasting: here.lasting };
   if (here.status !== "ready") return { status: here.status };
-  const state = sparkEventState(a.ctx, a.reserveAddress, here.data, prev?.status === "ready" ? prev.data : undefined);
-  return { status: state ? "ready" : "unavailable", raw: here.data, state };
+  const prevRaw = prev?.status === "ready" ? prev.data : undefined;
+  const state = sparkEventState(a.ctx, a.reserveAddress, here.data, prevRaw);
+  return {
+    status: state ? "ready" : "unavailable",
+    raw: here.data,
+    prevRaw,
+    prevUnread: prev?.status === "unavailable",
+    state,
+  };
 }

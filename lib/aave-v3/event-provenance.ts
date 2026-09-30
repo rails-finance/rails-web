@@ -1095,6 +1095,45 @@ export const currentLtvProv = (
   inputs: eventInputs(coords),
 });
 
+/** What the account could still borrow once the transaction had run: the
+ *  weighted max LTV × the total collateral − the total debt, floored at zero. */
+export const borrowableProv = (
+  coords: V3Coords,
+  vals: { ltvBps: number; collateralUsd: number; debtUsd: number; resultUsd: number },
+): Provenance => {
+  const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Still borrowable after this transaction — the weighted max LTV times the total collateral, less the total debt, and zero where the debt is already past that line. It is the Pool's availableBorrowsBase arithmetic over the account figures on this card, at the block's oracle prices.`,
+    contract: poolOf(coords),
+    via: `${(vals.ltvBps / 100).toFixed(2)}% × ${usd(vals.collateralUsd)} − ${usd(vals.debtUsd)} = ${usd(vals.resultUsd)}`,
+    formula: "max LTV × collateral − debt",
+    inputs: eventInputs(coords, [
+      { label: "max LTV", value: `${vals.ltvBps} bps`, kind: "chain-derived", pclass: "state" },
+      { label: "collateral", value: usd(vals.collateralUsd), kind: "chain-derived", pclass: "oracle" },
+      { label: "debt", value: usd(vals.debtUsd), kind: "chain-derived", pclass: "oracle" },
+    ]),
+  };
+};
+
+/** A reserve's oracle price as the position read took it at the block: the
+ *  price every US-dollar figure on the card uses for that reserve. */
+export const stateReadPriceProv = (
+  sym: string,
+  coords: V3Coords,
+  vals: { priceUsd: string; readBlock: number | null },
+): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  summary: `${sym} price at this block — the price the Pool's oracle answered with at block ${vals.readBlock ?? coords.blockNumber ?? "N"}, which every US-dollar figure on this card uses for ${sym}. The oracle gives it in US dollars with 8 decimal places; the chip prints it to the decimals that reproduce those figures.`,
+  contract: {
+    name: coords.pool ? `${coords.pool.name}'s oracle (IAaveOracle)` : "Aave V3 market oracle (IAaveOracle)",
+  },
+  via: `IAaveOracle getAssetPrice read at block ${vals.readBlock ?? coords.blockNumber ?? "of the event"} = $${vals.priceUsd}`,
+  inputs: eventInputs(coords),
+});
+
 /** The account's weighted LTV or liquidation threshold. */
 export const accountRatioProv = (
   which: "ltv" | "lt",
