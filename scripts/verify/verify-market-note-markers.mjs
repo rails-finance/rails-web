@@ -2,7 +2,9 @@
 // Liquity V2 trove with notes.
 // ----------------------------------------------------------------------------
 // On desktop a closed note is a marker on the spine (`[data-note-marker]`, a
-// button) and takes no row height; a click or Enter/Space opens the note's row
+// button) that sits where its open row's node will stand, so it neither moves
+// nor misses a second click as the note opens and closes; between two rows it
+// takes the open row's header height above its node. A click or Enter/Space opens the note's row
 // and panel in place and moves focus to its header, and the open row's filled
 // diamond closes it and returns focus to the marker. Display carries
 // "Market notes" and "Open all market notes"; the toolbar's "Market
@@ -69,14 +71,19 @@ console.log(`Market notes — against ${BASE}\n`);
     '1c. the toolbar carries no "Market notes · N" pill',
     (await page.getByRole("button", { name: /^Market notes ·/i }).count()) === 0,
   );
-  // No row height: the rows either side of a marker keep the list's spacing.
+  // A single marker takes the height the open row's header takes above its
+  // node: the list's 8px and 32px (Miles, 30 Sep 2026).
   const gap = await page.evaluate(() => {
     const g = document.querySelector('[data-note-gap=""]');
     const prev = g?.previousElementSibling?.getBoundingClientRect();
     const next = g?.nextElementSibling?.getBoundingClientRect();
     return g && prev && next ? Math.round(next.top - prev.bottom) : null;
   });
-  check("1d. a single marker takes no row height (the rows either side stay 8px apart)", gap === 8, `${gap}px`);
+  check(
+    "1d. a single marker takes the open row's header height (the rows either side 40px apart)",
+    gap === 40,
+    `${gap}px`,
+  );
 
   const first = closedMarkers(page).first();
   const id = await first.getAttribute("data-note-marker");
@@ -96,9 +103,14 @@ console.log(`Market notes — against ${BASE}\n`);
     tip.text,
   );
 
+  const yClosed = await first.evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
   await first.focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
+  const yOpen = await page
+    .locator(`[data-note-marker="${id}"][aria-expanded="true"]`)
+    .evaluate((el) => Math.round(el.getBoundingClientRect().top + window.scrollY));
+  check("3d. the diamond stays where it stood as the note opens", yOpen === yClosed, `${yClosed} → ${yOpen}`);
   const row = page.locator(`[data-market-note="${id}"]`);
   check("3. Enter on a marker opens its row", (await row.count()) === 1);
   check("3b. …with its panel open", (await row.getAttribute("data-market-note-open")) !== null);

@@ -679,6 +679,11 @@ body {
   .evt-has-chev .evt-meta {
     padding-right: 1.75rem;
   }
+  /* An open card's header action (the Aave family's calculator) sits left of
+     the chevron: the meta keeps clear of both. */
+  .evt-has-chev.evt-has-action .evt-meta {
+    padding-right: 4.5rem;
+  }
 }
 
 /* Focus ring */

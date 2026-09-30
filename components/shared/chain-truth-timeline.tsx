@@ -70,7 +70,9 @@
 
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
-import { FlowDayHeader, utcDay } from "@/components/shared/flow-day-header";
+import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
+import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
+import { History, X } from "lucide-react";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -114,7 +116,7 @@ import {
   type ServedFolderRegister,
 } from "@/lib/shared/timeline-folder";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
-import { EventDateContext } from "@/components/shared/event-time";
+import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
 import {
   EventCaptionContext,
   SpineKeyRow,
@@ -557,7 +559,7 @@ function ServedFolderRow({
   isLast: boolean;
   /** One member's card, numbered from the folder's own ordinals — the same
    *  literal numbering the rest of the list runs on, one level down. */
-  renderMember: (event: BaseActivityEvent, eventNumber: number, isLastMember: boolean) => ReactNode;
+  renderMember: (event: BaseActivityEvent, eventNumber: number, isLastMember: boolean, isNewest: boolean) => ReactNode;
 }) {
   const folders = useFolderMembers();
   const entry = register(folder);
@@ -571,6 +573,9 @@ function ServedFolderRow({
           .map((event, i) => ({ event, eventNumber: folder.ordinalFirst + i }))
           .filter(({ event }) => !memberPasses || memberPasses(event))
       : undefined;
+  // The newest shown member (the first on a tie), which carries the day's
+  // mark on a page with day marks.
+  const newest = shown?.reduce((best, m, j) => (m.event.timestamp > shown[best].event.timestamp ? j : best), 0) ?? -1;
   // A folder is admitted on its header — its SPAN for the date range — so a
   // narrow selection can reach none of its members (a day inside a wide span,
   // a counterparty the header cannot name). The card then says so in one line
@@ -584,7 +589,7 @@ function ServedFolderRow({
               : "No event in this folder passes the filters."}
           </p>,
         ]
-      : shown?.map((m, i) => renderMember(m.event, m.eventNumber, i === shown.length - 1));
+      : shown?.map((m, i) => renderMember(m.event, m.eventNumber, i === shown.length - 1, i === newest));
   // Rule 6 (decision 0019, amended 2026-09-25): "a folder header is complete
   // about its members" — one sum per kind of event the folder holds, with its
   // count, and nothing else. `other` is what keeps that promise: with it the
@@ -708,14 +713,28 @@ function ChainTruthTimelineBody({
   // one transaction as one card and hide nothing, so there is nothing for the
   // choice to give back.
   const activeRuns = useMemo(() => (collapseRuns ? runs : runs?.filter((r) => r.asOneEvent)), [collapseRuns, runs]);
-  const events = tl.displayedEvents;
+  // The rewind (lib/shared/flow-focus.ts): while the Lifetime flows chart's
+  // cursor is frozen on a day, the list holds every event up to that day's
+  // close. What goes is the list's top, so the rows keep their order and move
+  // up by what was cut.
+  const rewind = useFlowFocusState((st) => st.rewind);
+  const cut = rewind?.endTs ?? null;
+  const allEvents = tl.displayedEvents;
+  const events = useMemo(() => rewindEvents(allEvents, cut), [allEvents, cut]);
+  const cutOff = allEvents.length - events.length;
   const [windowSize, setWindowSize] = useState(WINDOW_CHUNK);
   const folders = useFolderMembers();
   // A SERVED list arrives already grouped, so there is nothing to detect and
   // the run memo below is skipped. Both halves have to be present: a register
   // without served rows would have nothing to draw, and served rows without a
   // register would have no words for it.
-  const servedRows = folderRegister && tl.displayedRows ? tl.displayedRows : null;
+  const servedRows = useMemo(
+    () =>
+      folderRegister && tl.displayedRows
+        ? rewindRows(tl.displayedRows, cut, (r) => (r.kind === "event" ? r.event.timestamp : r.folder.firstAt), cutOff)
+        : null,
+    [folderRegister, tl.displayedRows, cut, cutOff],
+  );
   // A FILTER OPENS WHAT IT SPLITS. A folder stands while any of its members
   // can pass, so a standing folder can hold members the filter admits beside
   // members it hides — four supplies among ninety-six transfers, or a day
@@ -936,12 +955,12 @@ function ChainTruthTimelineBody({
     if (!activeRuns || activeRuns.length === 0) {
       return events.map((event, flatIdx) => ({ kind: "event", event, flatIdx }) as const);
     }
-    const all = dateRange ? [...tl.visibleEvents].reverse() : events;
+    const all = dateRange ? rewindEvents([...tl.visibleEvents].reverse(), cut) : events;
     const inRange = dateRange
       ? (e: BaseActivityEvent) => e.timestamp >= dateRange[0] && e.timestamp <= dateRange[1]
       : () => true;
     return settleRunRows(all, activeRuns, inRange);
-  }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents]);
+  }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents, cut]);
 
   // Market notes, attached by anchor event id — OUTSIDE the rows.
   //
@@ -960,13 +979,15 @@ function ChainTruthTimelineBody({
   //
   // A date range keeps the notes that end inside it: a note from outside the
   // range would otherwise anchor to the nearest row in it.
+  // The rewind keeps the notes that end by its cut, a live note none.
   const notesInView = useMemo(() => {
     if (!notes?.length) return NO_NOTES;
     const range = tl.dateRange;
-    return range
+    const byRange = range
       ? notes.filter((n) => !(n.to.timestamp > 0) || (n.to.timestamp >= range[0] && n.to.timestamp <= range[1]))
       : notes;
-  }, [notes, tl.dateRange]);
+    return cut == null ? byRange : byRange.filter((n) => !n.live && n.to.timestamp > 0 && n.to.timestamp <= cut);
+  }, [notes, tl.dateRange, cut]);
   const anchored = useMemo(
     () => (notesInView.length ? anchorMarketNotes(notesInView, events, "desc") : NO_ANCHORS),
     [notesInView, events],
@@ -1002,7 +1023,8 @@ function ChainTruthTimelineBody({
   // in flight) so the two never show at once. Whatever stands highest there
   // takes the spine's lead-in dot and the `isFirst` flag, and every other
   // claim on them is suppressed below, so no two rows draw either.
-  const liveRowsShown = showMarketNotes ? (liveNotes ?? NO_NOTES) : NO_NOTES;
+  // A rewound list ends at its cut, so it holds no live notes.
+  const liveRowsShown = showMarketNotes && cut == null ? (liveNotes ?? NO_NOTES) : NO_NOTES;
   /** Two or more live notes stand as one card (`liveNoteGroup`); one keeps
    *  its own row. */
   const liveGroup = useMemo(() => liveNoteGroup(liveRowsShown), [liveRowsShown]);
@@ -1021,7 +1043,7 @@ function ChainTruthTimelineBody({
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
    *  leaves it standing (see the prop). It draws above the live notes, so when
    *  both are there this is the row the spine's lead-in dot belongs to. */
-  const liveWindowAtTop = !!liveWindow;
+  const liveWindowAtTop = !!liveWindow && cut == null;
 
   // The boundary card. A page that trims its own list passes one; the window
   // arm's is derived from the opening balance here, with the position at the
@@ -1108,76 +1130,203 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
-  // The chart's "View on timeline" (flow-focus-context.tsx): the day's header
-  // comes into view and flashes, and the day's last event (the one whose close
-  // the chart shows) opens. Where a filter or the Dates choice hides the day,
-  // the filters clear or the day's month is read, and a line says so.
-  const reveal = useFlowFocusState((st) => st.reveal);
-  const [revealing, setRevealing] = useState<{ day: number; n: number; cleared: boolean } | null>(null);
-  const [revealNote, setRevealNote] = useState<string | null>(null);
-  const [flash, setFlash] = useState<{ day: number; n: number } | null>(null);
-  const flashDay = flash?.day ?? null;
+  // The rewind's other half. Whenever it moves, the list's top event (the
+  // frozen day's last, or the last before it) opens; the frozen tag's
+  // "Timeline to …" also brings it into view and flashes its header. Where
+  // the page holds another month (a served, month-navigated page) it reads
+  // the cut's month; where a filter would leave the rewound list empty the
+  // filters clear; a line says either. A month picked in Dates releases the
+  // rewind.
+  const focusStore = useFlowFocus()?.store ?? null;
+  const go = useFlowFocusState((st) => st.go);
+  const [rewindNote, setRewindNote] = useState<string | null>(null);
+  /** The month this code asked the page to read, and whether it cleared the
+   *  Dates range: changes it made release nothing. */
+  const askedMonth = useRef<number | null>(null);
+  const clearedRange = useRef(false);
+  /** A month picked in Dates is releasing the rewind: nothing more is read
+   *  for it meanwhile. */
+  const releasing = useRef(false);
+  const releaseRewind = useCallback(() => {
+    if (focusStore) focusStore.set({ release: focusStore.get().release + 1 });
+  }, [focusStore]);
+  /** The top row, looked for in the page: its day's mark, a folder holding it
+   *  opened first, a run opened by its header. */
+  const [seek, setSeek] = useState<{
+    day: number;
+    n: number;
+    folderId: string | null;
+    runId: string | null;
+    scroll: boolean;
+  } | null>(null);
+  const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
+  const flashId = flash?.id ?? null;
+  /** The folder the rewind's top lies in; it stays open. */
+  const [revealFolderId, setRevealFolderId] = useState<string | null>(null);
+  const seekTop = useCallback(
+    (scroll: boolean, n: number) => {
+      const row = rows[0];
+      if (!row) return;
+      const top =
+        row.kind === "event"
+          ? row.event.timestamp
+          : row.kind === "folder"
+            ? Math.min(row.folder.lastAt, cut ?? Infinity)
+            : Math.max(...row.events.map((e) => e.timestamp));
+      if (row.kind === "folder") setRevealFolderId(row.folder.responseId);
+      setSeek({
+        day: utcDay(top),
+        n,
+        folderId: row.kind === "folder" ? row.folder.responseId : null,
+        runId: row.kind === "run" && !row.spec.asOneEvent ? row.events[0].id : null,
+        scroll,
+      });
+    },
+    [rows, cut],
+  );
+  // The rewind moved: its month read, its filters cleared, its top opened.
+  const rewindKey = rewind ? `${rewind.endTs}` : null;
+  const topKey = rows[0]
+    ? rows[0].kind === "event"
+      ? rows[0].event.id
+      : rows[0].kind === "folder"
+        ? rows[0].folder.responseId
+        : rows[0].events[0].id
+    : null;
+  // A month picked in Dates releases the rewind. Declared before the effect
+  // below, which reads `releasing` in the same commit.
+  const rangeKey = tl.dateRange ? `${tl.dateRange[0]}:${tl.dateRange[1]}` : null;
+  const monthNow = segments?.month ?? null;
+  const lastDates = useRef({ range: rangeKey, month: monthNow });
   useEffect(() => {
-    if (!reveal) return;
-    setRevealNote(null);
-    setRevealing({ day: utcDay(reveal.ts), n: reveal.n, cleared: false });
-  }, [reveal]);
+    const prev = lastDates.current;
+    lastDates.current = { range: rangeKey, month: monthNow };
+    const rangeMoved = prev.range !== rangeKey;
+    const monthMoved = prev.month !== monthNow;
+    if (!rangeMoved && !monthMoved) return;
+    const own =
+      (!rangeMoved || (clearedRange.current && rangeKey == null)) && (!monthMoved || monthNow === askedMonth.current);
+    if (rangeMoved) clearedRange.current = false;
+    if (own || !rewind) return;
+    releasing.current = true;
+    releaseRewind();
+    // `rewind` is read at the moment Dates changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeKey, monthNow, releaseRewind]);
   useEffect(() => {
-    if (!revealing) return;
-    const { day } = revealing;
-    const at = rows.findIndex((r) => {
-      const sp =
-        r.kind === "event"
-          ? { top: r.event.timestamp, bottom: r.event.timestamp }
-          : r.kind === "folder"
-            ? { top: r.folder.lastAt, bottom: r.folder.firstAt }
-            : { top: r.events[0].timestamp, bottom: r.events[r.events.length - 1].timestamp };
-      return utcDay(sp.bottom) <= day && day <= utcDay(Math.max(sp.top, sp.bottom));
-    });
-    if (at < 0) {
-      if (revealing.cleared || segments?.loading != null) return;
-      const words = `${shortDate(day * 86_400)} ${shortDateYear(day * 86_400)}`;
-      const held = tl.sortedEvents.some((e) => utcDay(e.timestamp) === day);
-      if (held && tl.isFiltered) {
+    if (rewindKey == null) {
+      // Released: a month the rewind read goes back to the rows the page
+      // opened with, unless a month picked in Dates released it.
+      if (!releasing.current && askedMonth.current != null && segments?.month === askedMonth.current)
+        segments.onReset?.();
+      setRewindNote(null);
+      releasing.current = false;
+      askedMonth.current = null;
+      return;
+    }
+    if (releasing.current || segments?.loading != null) return;
+    if (cut != null) {
+      const words = rewind?.word ?? "";
+      const d = new Date(cut * 1000);
+      const cutMonth = d.getUTCFullYear() * 12 + d.getUTCMonth();
+      const oldestHeld = tl.sortedEvents[0]?.timestamp ?? Infinity;
+      const lifeBefore = segments ? [...segments.lifeDays.keys()].some((dayStartTs) => dayStartTs <= cut) : false;
+      if (
+        segments &&
+        ((segments.month != null && segments.month !== cutMonth) ||
+          (segments.month == null && oldestHeld > cut && lifeBefore))
+      ) {
+        askedMonth.current = cutMonth;
+        segments.onPick(cutMonth);
+        setRewindNote(`The timeline now shows the month of ${words}.`);
+        return;
+      }
+      if (rows.length === 0 && tl.isFiltered && tl.sortedEvents.some((e) => e.timestamp <= cut)) {
+        clearedRange.current = tl.dateRange != null;
         tl.resetHiddenActions();
         tl.resetHiddenAssets();
         tl.resetHiddenCounterparties();
         tl.resetHiddenVersions();
         tl.setDateRange(null);
-        setRevealNote(`The filters are cleared so ${words} shows.`);
-      } else if (!held && segments) {
-        const d = new Date(day * 86_400_000);
-        segments.onPick(d.getUTCFullYear() * 12 + d.getUTCMonth());
-        setRevealNote(`The timeline now shows the month of ${words}.`);
+        setRewindNote(`The filters are cleared so the timeline to ${words} shows.`);
+        return;
       }
-      setRevealing({ ...revealing, cleared: true });
-      return;
     }
-    // The row lies past the drawn part of a long list: draw down to it first.
-    if (at >= windowSize) {
-      setWindowSize(Math.min(rows.length, at + WINDOW_CHUNK));
-      return;
-    }
-    setRevealing(null);
-    // `events` is newest first: the day's first match is its last event.
-    const last = events.find((e) => utcDay(e.timestamp) === day);
-    if (last) clickToOpenIfClosed(last.id);
-    setFlash({ day, n: revealing.n });
-    // `tl` and `segments` are read at the moment the rows change.
+    // Draw from the top, where the rewound list starts.
+    setWindowSize(WINDOW_CHUNK);
+    seekTop(false, 0);
+    // `tl`, `segments` and `seekTop` are read at the moment the rewind or the
+    // top row changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revealing, rows, events, segments?.loading, windowSize]);
+  }, [rewindKey, topKey, segments?.loading]);
+  // The frozen tag's "Timeline to …".
+  const wentTo = useRef(go);
+  useEffect(() => {
+    if (wentTo.current === go) return;
+    wentTo.current = go;
+    seekTop(true, go);
+  }, [go, seekTop]);
+  // The mark is in the page once its row is drawn, a folder's once its
+  // members are read, a run's once it is open: look for it until it is.
+  useEffect(() => {
+    if (!seek) return;
+    const { day, n, runId, scroll } = seek;
+    let tries = 0;
+    let runOpened = false;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const bring = (el: HTMLElement) =>
+      // 16px of air above the card, so its ring shows whole.
+      window.setTimeout(
+        () =>
+          window.scrollTo({
+            top: el.getBoundingClientRect().top + window.scrollY - 16,
+            behavior: reduced ? "auto" : "smooth",
+          }),
+        60,
+      );
+    const find = () => {
+      tries++;
+      const mark = document.querySelector<HTMLElement>(`[data-flow-day-mark="${day}"]`);
+      const card = mark?.closest<HTMLElement>("[data-event-id]");
+      if (card?.dataset.eventId) {
+        window.clearInterval(timer);
+        clickToOpenIfClosed(card.dataset.eventId);
+        setSeek(null);
+        if (scroll) {
+          setFlash({ id: card.dataset.eventId, n });
+          bring(card);
+        }
+        return;
+      }
+      if (runId && !runOpened) {
+        runOpened = true;
+        document.querySelector<HTMLElement>(`[data-flow-run="${runId}"] [role="button"]`)?.click();
+      }
+      if (tries >= 50) {
+        // No mark (its last event filtered out): the day's newest drawn
+        // event, or its folder, comes into view.
+        window.clearInterval(timer);
+        setSeek(null);
+        const last = events.find((e) => utcDay(e.timestamp) === day);
+        if (last) clickToOpenIfClosed(last.id);
+        const el = last
+          ? document.getElementById(`event-${last.id}`)
+          : seek.folderId
+            ? document.querySelector<HTMLElement>(`[data-flow-folder="${seek.folderId}"]`)
+            : null;
+        if (el && scroll) bring(el);
+      }
+    };
+    const timer = window.setInterval(find, 100);
+    find();
+    return () => window.clearInterval(timer);
+    // `events` is read when the mark is not found.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seek]);
   useEffect(() => {
     if (!flash) return;
-    const t = window.setTimeout(() => {
-      const el = document.querySelector<HTMLElement>(`[data-flow-day="${flash.day}"]`);
-      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-    }, 60);
     const off = window.setTimeout(() => setFlash(null), 2000);
-    return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(off);
-    };
+    return () => window.clearTimeout(off);
   }, [flash]);
 
   const hasMore = windowSize < rows.length;
@@ -1289,7 +1438,7 @@ function ChainTruthTimelineBody({
   // withheld-dot glyph; the bottom's are the cut's and the view's.
   const topTerminusTaken = liveWindowAtTop || liveSlotAtTop || tipBoundaryAtTop;
   const bottomTerminusTaken = boundaryAtBottom || viewBoundaryAtBottom;
-  const liveSkeletonAtTop = showMarketNotes && !!liveNotesPending;
+  const liveSkeletonAtTop = showMarketNotes && !!liveNotesPending && cut == null;
 
   // Auto-grow as the bottom sentinel nears the viewport. The observer re-arms on
   // each window change (the sentinel stays mounted while `hasMore`); a 600px
@@ -1319,23 +1468,34 @@ function ChainTruthTimelineBody({
   // the newest and oldest card of each day) left the middle cards of a busy
   // day as a bare time a reader dated from the card below it (MakerDAO 19103,
   // 2026-09-29). `lastIdx` stays in the signature for a one-transaction run.
-  // On a page that ties the timeline to the Lifetime flows panel, a header
-  // row dates each day (FlowDayHeader) and the cards under it state their
-  // time only.
-  const dayHeaders = useFlowFocus() != null;
+  // On a page that ties the timeline to the Lifetime flows panel, the last
+  // event of each day carries the day's mark (FlowDayMark: its date and "View
+  // on chart") and every other card states its time only.
+  const dayMarks = useFlowFocus() != null;
   const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) => {
-    if (dayHeaders) return null;
+    if (dayMarks) return null;
     const event = events[flatIdx];
     return `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`;
   };
-  /** A row's newest and oldest moment: the day its header names, and the day
-   *  the next row's header is measured from. */
+  /** A row's newest and oldest moment: the day its mark names, and the day
+   *  the next row's mark is measured from. */
   const rowSpan = (row: TimelineRow): { top: number; bottom: number } => {
     if (row.kind === "event") return { top: row.event.timestamp, bottom: row.event.timestamp };
-    if (row.kind === "folder") return { top: row.folder.lastAt, bottom: row.folder.firstAt };
+    if (row.kind === "folder")
+      return { top: cut != null ? Math.min(row.folder.lastAt, cut) : row.folder.lastAt, bottom: row.folder.firstAt };
     const ts = row.events.map((e) => e.timestamp);
     return { top: Math.max(...ts), bottom: Math.min(...ts) };
   };
+  /** Whether a drawn row opens a new day, so its newest event carries the
+   *  day's mark. A folder spanning days marks its newest day; a row on the
+   *  day a folder above it ends does not open that day again. */
+  const opensDay = (rowIdx: number): boolean =>
+    dayMarks &&
+    (rowIdx === 0 || utcDay(rowSpan(windowed[rowIdx - 1]).bottom) !== utcDay(rowSpan(windowed[rowIdx]).top));
+  const markFor = (ts: number, id: string): ReactNode => <FlowDayMark ts={ts} flash={flashId === id} />;
+  /** The newest of a run's members (the first on a tie). */
+  const newestOf = (list: BaseActivityEvent[]): number =>
+    list.reduce((best, e, i) => (e.timestamp > list[best].timestamp ? i : best), 0);
 
   /** A market note's day stamp, on the same rule: dated by its stretch's
    *  later end. */
@@ -1366,23 +1526,29 @@ function ChainTruthTimelineBody({
    *  list, its own share link, and the `?at=` landing target. All three read
    *  the run's FIRST member, which is the row a link to any leg of that
    *  transaction resolves to. Every other run row is returned untouched. */
-  const wrapRunRow = (row: TimelineRow & { kind: "run" }, node: ReactNode): ReactNode => {
-    if (!row.spec.asOneEvent) return node;
+  const wrapRunRow = (row: TimelineRow & { kind: "run" }, node: ReactNode, marked = false): ReactNode => {
+    // Under day marks a run holding a day's last event is found by this, to
+    // open it (the rewind's top).
+    if (!row.spec.asOneEvent) return dayMarks ? <div data-flow-run={row.events[0].id}>{node}</div> : node;
     const lead = row.events[0];
     return (
       <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
-        <EventShareProvider href={shareHrefFor(lead.id)}>
-          <div
-            id={`event-${lead.id}`}
-            data-event-id={lead.id}
-            data-row-at={lead.timestamp}
-            className={`rounded-xl transition-shadow duration-[2000ms] ${
-              highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-            }`}
-          >
-            {node}
-          </div>
-        </EventShareProvider>
+        <EventDayMarkContext.Provider
+          value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
+        >
+          <EventShareProvider href={shareHrefFor(lead.id)}>
+            <div
+              id={`event-${lead.id}`}
+              data-event-id={lead.id}
+              data-row-at={lead.timestamp}
+              className={`rounded-xl transition-shadow duration-[2000ms] ${
+                highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+              }`}
+            >
+              {node}
+            </div>
+          </EventShareProvider>
+        </EventDayMarkContext.Provider>
       </EventDateContext.Provider>
     );
   };
@@ -1401,53 +1567,57 @@ function ChainTruthTimelineBody({
        *  flat displayed list and a member is not in it. */
       datePrefix?: string | null;
       isLastMember?: boolean;
+      /** The last event of its day: the card carries the day's mark. */
+      mark?: boolean;
     },
   ) => (
     <EventDateContext.Provider
       key={event.id}
       value={opts?.datePrefix !== undefined ? opts.datePrefix : datePrefixAt(flatIdx)}
     >
-      <EventShareProvider href={shareHrefFor(event.id)}>
-        <EventCaptionContext.Provider value={{ kind: event.actionLabel, ts: event.timestamp }}>
-          {/* The scroll/highlight target for a `?at=` landing (and, in pinned
+      <EventDayMarkContext.Provider value={opts?.mark ? markFor(event.timestamp, event.id) : null}>
+        <EventShareProvider href={shareHrefFor(event.id)}>
+          <EventCaptionContext.Provider value={{ kind: event.actionLabel, ts: event.timestamp }}>
+            {/* The scroll/highlight target for a `?at=` landing (and, in pinned
             mode below, for the lone card) — `id` for `getElementById`,
             `data-event-id` as the brief's documented alternative for anything
             that prefers a data-attribute query. The ring fades over the
             `duration-[2000ms]` already on the wrapper; `highlightId` is only
             ever set when `prefers-reduced-motion` did NOT ask for none. */}
-          {/* The tip reaches the card's own <SpineColumn> through context: a
+            {/* The tip reaches the card's own <SpineColumn> through context: a
             member of an expanded run re-provides null, so the run's folder
             node above it keeps the one dot. */}
-          <SpineTipContext.Provider
-            value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
-          >
-            <div
-              id={`event-${event.id}`}
-              data-event-id={event.id}
-              data-row-at={event.timestamp}
-              className={`rounded-xl transition-shadow duration-[2000ms] ${
-                highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-              }`}
+            <SpineTipContext.Provider
+              value={!closed && !opts?.inRun && !liveHoldsTip && event.id === tipEventId ? tipSide : null}
             >
-              <UnreadTokensProvider tokens={event.decimalsUnread}>
-                {renderCard(event, {
-                  eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
-                  // Line ends only — the dot is the tip's (see `tipEventId`).
-                  // Inside an expanded run the LAST member still owns the spine
-                  // terminus so the dotted segment ends where the timeline does.
-                  // Suppressed at the top when a live note now sits there
-                  // instead — see `liveSlotAtTop`.
-                  isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
-                  isLast:
-                    opts?.isLastMember !== undefined
-                      ? opts.isLastMember
-                      : flatIdx === events.length - 1 && !bottomTerminusTaken,
-                })}
-              </UnreadTokensProvider>
-            </div>
-          </SpineTipContext.Provider>
-        </EventCaptionContext.Provider>
-      </EventShareProvider>
+              <div
+                id={`event-${event.id}`}
+                data-event-id={event.id}
+                data-row-at={event.timestamp}
+                className={`rounded-xl transition-shadow duration-[2000ms] ${
+                  highlightId === event.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+                }`}
+              >
+                <UnreadTokensProvider tokens={event.decimalsUnread}>
+                  {renderCard(event, {
+                    eventNumber: opts?.eventNumber ?? tl.eventNumberOf(event),
+                    // Line ends only — the dot is the tip's (see `tipEventId`).
+                    // Inside an expanded run the LAST member still owns the spine
+                    // terminus so the dotted segment ends where the timeline does.
+                    // Suppressed at the top when a live note now sits there
+                    // instead — see `liveSlotAtTop`.
+                    isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
+                    isLast:
+                      opts?.isLastMember !== undefined
+                        ? opts.isLastMember
+                        : flatIdx === events.length - 1 && !bottomTerminusTaken,
+                  })}
+                </UnreadTokensProvider>
+              </div>
+            </SpineTipContext.Provider>
+          </EventCaptionContext.Provider>
+        </EventShareProvider>
+      </EventDayMarkContext.Provider>
     </EventDateContext.Provider>
   );
 
@@ -1570,10 +1740,32 @@ function ChainTruthTimelineBody({
             }
           />
         </div>
-        {revealNote && (
-          <p className="text-xs text-rb-500" data-flow-reveal-note="">
-            {revealNote}
-          </p>
+        {rewind && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span
+              className="inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800"
+              data-flow-rewind-chip=""
+            >
+              <span className="inline-flex items-center gap-1.5 py-1 pl-2.5 pr-1.5">
+                <History size={13} aria-hidden className="text-rb-500" />
+                Timeline to {rewind.word}
+              </span>
+              <button
+                type="button"
+                onClick={releaseRewind}
+                aria-label={`Release the timeline to ${rewind.word}`}
+                className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 text-rb-500 transition-colors hover:bg-rb-200/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1 dark:hover:bg-rb-700/60"
+                data-flow-rewind-release=""
+              >
+                <X className="size-3.5" aria-hidden />
+              </button>
+            </span>
+            {rewindNote && (
+              <p className="text-xs text-rb-500" data-flow-reveal-note="">
+                {rewindNote}
+              </p>
+            )}
+          </div>
         )}
         {notice}
         {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
@@ -1600,7 +1792,7 @@ function ChainTruthTimelineBody({
               {/* The live window is the head row: it ends at now, so it stands
                 above the live notes and takes the lead-in dot. The notes
                 toggle does not reach it — it is not a note (see `liveWindow`). */}
-              {liveWindow && (
+              {liveWindowAtTop && liveWindow && (
                 <SpineTipContext.Provider value={tipSide}>
                   {liveWindow({ isFirst: !tipBoundaryAtTop })}
                 </SpineTipContext.Provider>
@@ -1656,9 +1848,10 @@ function ChainTruthTimelineBody({
                   </SpineTipContext.Provider>
                 ))}
               {windowed.map((row, rowIdx) => {
+                const marked = opensDay(rowIdx);
                 const rowNode =
                   row.kind === "event" ? (
-                    renderEventRow(row.event, row.flatIdx)
+                    renderEventRow(row.event, row.flatIdx, { mark: marked })
                   ) : row.kind === "folder" ? (
                     <SpineTipContext.Provider
                       key={`folder_${row.folder.responseId}`}
@@ -1667,12 +1860,26 @@ function ChainTruthTimelineBody({
                       value={!liveHoldsTip && rowIdx === tipRowIdx ? tipSide : null}
                     >
                       {/* The folder's newest moment (see `data-row-at`). */}
-                      <div data-row-at={row.folder.lastAt}>
+                      <div
+                        data-row-at={row.folder.lastAt}
+                        data-flow-folder={dayMarks ? row.folder.responseId : undefined}
+                      >
                         <ServedFolderRow
                           folder={row.folder}
                           register={folderRegister as ServedFolderRegister}
-                          forceOpen={splitByFilter(row) || row.folder.responseId === landedFolderId}
-                          memberPasses={tl.isFiltered ? tl.memberPasses : null}
+                          forceOpen={
+                            splitByFilter(row) ||
+                            row.folder.responseId === landedFolderId ||
+                            row.folder.responseId === revealFolderId ||
+                            (cut != null && row.folder.lastAt > cut)
+                          }
+                          memberPasses={
+                            cut != null
+                              ? (e) => e.timestamp <= cut && (!tl.isFiltered || tl.memberPasses(e))
+                              : tl.isFiltered
+                                ? tl.memberPasses
+                                : null
+                          }
                           onlyDates={
                             tl.dateRange !== null &&
                             tl.visibleActionKeys.size === tl.eventOptions.length &&
@@ -1686,19 +1893,21 @@ function ChainTruthTimelineBody({
                           // a live note or the boundary card now sits there.
                           isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
                           isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
-                          renderMember={(event, eventNumber, isLastMember) =>
+                          renderMember={(event, eventNumber, isLastMember, isNewest) =>
                             renderEventRow(event, row.flatIdx, {
                               inRun: true,
                               eventNumber,
                               // A member's own day, read off the member itself:
                               // `datePrefixAt` indexes the flat displayed list,
                               // and a folder's members are not in it.
-                              // Under a day header, a member of that day
-                              // states its time only.
+                              // Under day marks, a member of the folder's
+                              // newest day states its time only, and the
+                              // newest member carries the day's mark.
                               datePrefix:
-                                dayHeaders && utcDay(event.timestamp) === utcDay(row.folder.lastAt)
+                                dayMarks && utcDay(event.timestamp) === utcDay(rowSpan(row).top)
                                   ? null
                                   : `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
+                              mark: marked && isNewest && utcDay(event.timestamp) === utcDay(rowSpan(row).top),
                               isLastMember:
                                 isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
                             })
@@ -1719,38 +1928,26 @@ function ChainTruthTimelineBody({
                           row.spec.render(row.events, {
                             isFirst: row.flatIdx === 0 && !topTerminusTaken,
                             isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                            children: row.events.map((e, k) => renderEventRow(e, row.flatIdx + k, { inRun: true })),
+                            children: row.events.map((e, k) =>
+                              renderEventRow(e, row.flatIdx + k, {
+                                inRun: true,
+                                mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
+                              }),
+                            ),
                           }),
+                          marked,
                         )}
                       </UnreadTokensProvider>
                     </SpineTipContext.Provider>
                   );
                 const rowNotes = notesFor(row);
-                // A new day opens under its header.
-                const span = rowSpan(row);
-                const dayHeader =
-                  dayHeaders && (rowIdx === 0 || utcDay(rowSpan(windowed[rowIdx - 1]).bottom) !== utcDay(span.top)) ? (
-                    <FlowDayHeader
-                      ts={span.top}
-                      line={rowIdx > 0 || topTerminusTaken}
-                      flash={flashDay === utcDay(span.top)}
-                    />
-                  ) : null;
                 const rowKey =
                   row.kind === "event"
                     ? `evt_${row.event.id}`
                     : row.kind === "folder"
                       ? `folderrow_${row.folder.responseId}`
                       : `runrow_${row.events[0].id}`;
-                if (rowNotes.length === 0)
-                  return dayHeader ? (
-                    <Fragment key={rowKey}>
-                      {dayHeader}
-                      {rowNode}
-                    </Fragment>
-                  ) : (
-                    rowNode
-                  );
+                if (rowNotes.length === 0) return rowNode;
                 // Below is older, so a note FOLLOWS the event it is known to
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
@@ -1779,7 +1976,6 @@ function ChainTruthTimelineBody({
                 );
                 return (
                   <Fragment key={rowKey}>
-                    {dayHeader}
                     {rowNode}
                     {noteRows}
                   </Fragment>

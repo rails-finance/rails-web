@@ -80,7 +80,7 @@ export function LifetimeFlowsPanel({
   const reactId = useId();
   const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
-  // A day header's "View on chart" opens a collapsed panel.
+  // A day mark's rewind button opens a collapsed panel.
   const move = useFlowFocusState((s) => s.move?.n ?? 0);
   useEffect(() => {
     if (move === 0 || !collapseKey || !isFlowsCollapsed(collapseKey)) return;

@@ -231,8 +231,10 @@ export function EventCard({
   const contentTiers = (
     <div className="min-w-0 grow">
       {/* ── Header panel ─────────────────────────────────────────── */}
+      {/* The ring: the header of a day's last event flashes after the Lifetime
+          flows chart's "Timeline to …" (flow-day-mark.tsx). */}
       <div
-        className={`overflow-visible rounded-xl transition-colors ${
+        className={`overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
           showDetail ? "rounded-b-none bg-raised" : hasDetail ? "hover:bg-raised" : ""
         }`}
       >
@@ -257,7 +259,9 @@ export function EventCard({
               header's `.evt-meta` row lines up beside it, reserving width
               for the chevron when present — see the `.evt-meta` rules in
               app/globals.css. */}
-          <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
+          <div
+            className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}${showDetail && headerAction ? " evt-has-action" : ""}`}
+          >
             <div className="flex-1 min-w-0">{header}</div>
             {showDetail && headerAction && (
               <div

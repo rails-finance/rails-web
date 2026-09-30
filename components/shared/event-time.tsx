@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import { formatTimestamp } from "@/lib/shared/format-event";
 import { useTimelineDisplay } from "./timeline-display-context";
@@ -11,6 +11,14 @@ import { useTimelineDisplay } from "./timeline-display-context";
  * (e.g. "Mar 15 '24"); null/empty for subsequent events.
  */
 export const EventDateContext = createContext<string | null>(null);
+
+/**
+ * A mark that stands in the date prefix's place: on a page that ties the
+ * timeline to the Lifetime flows panel, the last event of each day carries
+ * the day's date and a "Timeline to …" button (flow-day-mark.tsx). It shows
+ * with timestamps off too, since nothing else dates the day there.
+ */
+export const EventDayMarkContext = createContext<ReactNode>(null);
 
 /**
  * Renders an event timestamp. When inside an EventDateContext that
@@ -27,12 +35,13 @@ export const EventDateContext = createContext<string | null>(null);
  */
 export function EventTime({ ts }: { ts: number }) {
   const datePrefix = useContext(EventDateContext);
+  const mark = useContext(EventDayMarkContext);
   const { showTimestamps } = useTimelineDisplay();
-  if (!showTimestamps) return null;
+  if (!showTimestamps) return mark ? <>{mark}</> : null;
   const time = formatTimestamp(ts);
   return (
     <>
-      {datePrefix && <span className="text-xs">{datePrefix} </span>}
+      {mark ? <>{mark} </> : datePrefix && <span className="text-xs">{datePrefix} </span>}
       <span className="text-xs text-rb-500" title={`${formatDate(ts)} ${time} UTC`}>
         {time}
       </span>

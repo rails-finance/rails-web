@@ -1,8 +1,8 @@
 // The Lifetime flows panel and the timeline under it, tied together by the day
 // (rails-ops TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "The day
-// links the chart and the timeline"): the chart's "View on timeline" shows the
-// cursor's day on the timeline, a day header's "View on chart" moves the
-// cursor to that day's close. An event card states the side's lifetime sum as
+// links the chart and the timeline"): freezing the chart's cursor on a day
+// rewinds the timeline to that day's close, and a day mark's button on the
+// timeline freezes the cursor there. An event card states the side's lifetime sum as
 // of that event, from the same day rows the bars read and the legs of the
 // events on the page.
 //
@@ -163,12 +163,19 @@ function rowIndexAt(m: FlowModel, stop: number): number {
 
 export interface FlowFocusState {
   cursor: FlowCursorAt | null;
-  /** A day header's "View on chart": the chart's cursor goes to that day's
-   *  close and freezes there. */
+  /** A day mark's button on the timeline: the chart's cursor goes to that
+   *  day's close and freezes there, which rewinds the timeline to it. */
   move: { ts: number; n: number } | null;
-  /** The chart's "View on timeline": the timeline shows that day's header
-   *  and opens the day's last event. */
-  reveal: { ts: number; n: number } | null;
+  /** The frozen cursor, which is the timeline's rewind: the list holds every
+   *  event up to `endTs` (the frozen day's close; null at the live stop, where
+   *  nothing is cut), named `word` ("2 Sep '26"). Null when nothing is frozen. */
+  rewind: { endTs: number | null; word: string } | null;
+  /** The frozen tag's "Timeline to …": the timeline comes into view, its top
+   *  event open, its header flashing. */
+  go: number;
+  /** The timeline's chip × or a month picked in Dates: the chart releases
+   *  its freeze, which ends the rewind. */
+  release: number;
 }
 
 export interface FlowFocusStore {
@@ -178,7 +185,7 @@ export interface FlowFocusStore {
 }
 
 export function createFlowFocusStore(): FlowFocusStore {
-  let state: FlowFocusState = { cursor: null, move: null, reveal: null };
+  let state: FlowFocusState = { cursor: null, move: null, rewind: null, go: 0, release: 0 };
   const subs = new Set<() => void>();
   return {
     get: () => state,
@@ -191,4 +198,29 @@ export function createFlowFocusStore(): FlowFocusStore {
       return () => subs.delete(fn);
     },
   };
+}
+
+// ── The timeline's rewind ───────────────────────────────────────────────────
+
+/** A newest-first list cut to what happened by `cut` (unix seconds); the
+ *  list whole where `cut` is null. What goes is always the list's top. */
+export function rewindEvents<E extends { timestamp: number }>(events: E[], cut: number | null): E[] {
+  return cut == null ? events : events.filter((e) => e.timestamp <= cut);
+}
+
+/** Rows over a newest-first flat list, cut to what began by `cut`: a row
+ *  stays where its oldest moment (`oldest`) is on or before the cut, and each
+ *  kept row's `flatIdx` moves up by the flat events cut before it: the
+ *  `removed` newest, less any a straddling row sits above. A row straddling
+ *  the cut stays; its members answer the cut. */
+export function rewindRows<R extends { flatIdx: number }>(
+  rows: R[],
+  cut: number | null,
+  oldest: (row: R) => number,
+  removed: number,
+): R[] {
+  if (cut == null) return rows;
+  return rows
+    .filter((r) => oldest(r) <= cut)
+    .map((r) => (removed ? { ...r, flatIdx: r.flatIdx - Math.min(r.flatIdx, removed) } : r));
 }

@@ -75,11 +75,25 @@ export function DateRow({ children }: { children: ReactNode }) {
 }
 
 /** The first and last day, under the two ends of a slider or a chart. */
-export function TrackEnds({ start, end, startInset = 0 }: { start: string; end: string; startInset?: number }) {
+export function TrackEnds({
+  start,
+  end,
+  startInset = 0,
+  endInset = 0,
+}: {
+  start: string;
+  end: string;
+  startInset?: number;
+  /** How far before the strip's right end the end label's point sits. */
+  endInset?: number;
+}) {
   return (
     <div
-      className="mt-0.5 flex justify-between px-2 text-[11px] tabular-nums text-rb-500"
-      style={startInset > 0 ? { paddingLeft: 8 + startInset } : undefined}
+      className="mt-0.5 flex justify-between gap-x-2 whitespace-nowrap px-2 text-[11px] tabular-nums text-rb-500"
+      style={{
+        ...(startInset > 0 ? { paddingLeft: 8 + startInset } : {}),
+        ...(endInset > 0 ? { paddingRight: 8 + endInset } : {}),
+      }}
       aria-hidden
       data-prov-exempt=""
       data-flow-track-ends=""

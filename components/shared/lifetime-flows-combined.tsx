@@ -22,7 +22,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, History, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
@@ -44,6 +44,7 @@ import {
   combinedAt,
   combinedStops,
   eventStep,
+  axisSpanDays,
   nearestStop,
   stopForDay,
   type CombinedStop,
@@ -133,11 +134,14 @@ export function CombinedFlows({
   };
 
   // On a page that ties the panel to its timeline, the day is the unit the
-  // two share: a click on the strip freezes the cursor on a day, with a tag
-  // that offers "View on timeline"; a day header's "View on chart" moves the
-  // cursor to that day's close and freezes it; the back and forward steps go
-  // by days with events. A second click on the same day, or Escape, releases
-  // the freeze. A segment states its name and value under the bars and opens no panel.
+  // two share. A click on the strip freezes the cursor on a day, and the
+  // freeze is the timeline's rewind: the list holds every event up to that
+  // day's close, its last event on top and open. The tag's "Timeline to …"
+  // brings the list into view; a day mark's button on the timeline freezes
+  // the cursor on its day from the other side. The back and forward steps go
+  // by days with events and move both. A second click on the same day,
+  // Escape, the tag's × or the timeline chip's × releases both. A segment
+  // states its name and value under the bars and opens no panel.
   const focus = useFlowFocus();
   const byDays = focus != null;
   const [frozen, setFrozen] = useState(false);
@@ -178,7 +182,30 @@ export function CombinedFlows({
   useEffect(() => {
     focus?.store.set({ cursor: { endTs: committedEnd, word: committedWord, live: !!committed?.live } });
   }, [focus?.store, committedEnd, committedWord, committed?.live]);
-  useEffect(() => () => focus?.store.set({ cursor: null }), [focus?.store]);
+  useEffect(() => () => focus?.store.set({ cursor: null, rewind: null }), [focus?.store]);
+  // The freeze, published as the timeline's rewind.
+  const rewindWord =
+    committed && !committed.live
+      ? dayStamp(dayStart(model, committed.stop))
+      : !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0)
+        ? dayStamp(dayStart(model, model.lastDay))
+        : "today";
+  const rewindEnd = committed && !committed.live ? committedEnd : null;
+  useEffect(() => {
+    if (!focus) return;
+    const cur = focus.store.get().rewind;
+    const next = frozen ? { endTs: rewindEnd, word: rewindWord } : null;
+    if (cur?.endTs === next?.endTs && cur?.word === next?.word) return;
+    focus.store.set({ rewind: next });
+  }, [focus, frozen, rewindEnd, rewindWord]);
+  // The timeline's chip × (or a month picked in Dates) releases the freeze.
+  const release = useFlowFocusState((s) => s.release);
+  const released = useRef(release);
+  useEffect(() => {
+    if (released.current === release) return;
+    released.current = release;
+    setFrozen(false);
+  }, [release]);
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
   useEffect(() => {
@@ -225,26 +252,13 @@ export function CombinedFlows({
   const barStop = cur.barStop ?? 0;
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
-  // "View on timeline": the day whose close the frozen cursor shows, the last
-  // day with events on or before it.
-  const revealStop = (() => {
-    for (let i = Math.min(at, last); i >= 0; i--) if (stops[i].event) return stops[i].stop;
-    return null;
-  })();
-  const tagDate = head.isLive ? (closed ? closeDay : "Today") : dayStamp(dayStart(model, cur.stop));
-  const viewOnTimeline = () => {
-    if (!focus || revealStop == null) return;
-    const s = focus.store.get();
-    focus.store.set({ reveal: { ts: dayStart(model, revealStop), n: (s.reveal?.n ?? 0) + 1 } });
+  // "Timeline to …": the rewound list comes into view.
+  const toTimeline = () => {
+    if (!focus) return;
+    focus.store.set({ go: focus.store.get().go + 1 });
   };
   const tag =
-    byDays && frozen ? (
-      <FreezeTag
-        date={tagDate}
-        onView={revealStop != null ? viewOnTimeline : null}
-        onRelease={() => setFrozen(false)}
-      />
-    ) : null;
+    byDays && frozen ? <FreezeTag word={rewindWord} onView={toTimeline} onRelease={() => setFrozen(false)} /> : null;
   const tickHere = cur.event && !cur.live ? model.ticks.find((t) => t.day === cur.stop) : undefined;
   // What an open segment panel reads: the date in words and the cursor's
   // steps, so the panel restates its figures as the cursor moves.
@@ -418,29 +432,28 @@ function SegmentLabelLine({
   );
 }
 
-/** The frozen cursor's tag: its date, "View on timeline" and a release. */
-function FreezeTag({ date, onView, onRelease }: { date: string; onView: (() => void) | null; onRelease: () => void }) {
+/** The frozen cursor's tag: "Timeline to …", the rewind it holds, and a
+ *  release. */
+function FreezeTag({ word, onView, onRelease }: { word: string; onView: () => void; onRelease: () => void }) {
   return (
     <span
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border py-0.5 pl-2.5 pr-0.5 text-xs font-medium tabular-nums text-foreground shadow-sm"
+      className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-lg border py-0.5 pl-0.5 pr-0.5 text-xs font-medium tabular-nums text-foreground shadow-sm"
       style={{ background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
       data-flow-freeze-tag=""
     >
-      <span data-flow-freeze-date="">{date}</span>
-      {onView && (
-        <button
-          type="button"
-          className="min-h-11 rounded-md px-2 text-blue-600 hover:underline sm:min-h-7 dark:text-blue-300"
-          onClick={onView}
-          data-flow-view-timeline=""
-        >
-          View on timeline
-        </button>
-      )}
+      <button
+        type="button"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-blue-600 hover:underline sm:min-h-7 dark:text-blue-300"
+        onClick={onView}
+        data-flow-view-timeline=""
+      >
+        <History size={14} aria-hidden />
+        <span data-flow-freeze-date="">Timeline to {word}</span>
+      </button>
       <button
         type="button"
         className={`${CTRL_GHOST} ${CTRL_OFF} size-11 rounded-md sm:size-7`}
-        aria-label="Release the cursor"
+        aria-label="Release the cursor and the timeline"
         onClick={onRelease}
         data-flow-freeze-release=""
       >
@@ -553,11 +566,19 @@ function LineStrip({
   // The time axis: the lead-in, then the start of the first event's day at
   // `x0`, and the end of today at the right. A day's figures are its close,
   // drawn at the end of that day, so a life of one day, today's included,
-  // still runs from the lead-in through the day to Today.
+  // still runs from the lead-in through the day to Today. The axis spans at
+  // least a week (axisSpanDays), so the stretch after a short life's last event keeps
+  // its length in days.
   const today = series?.today ?? startDay + model.liveStop;
-  const span = Math.max(1, today + 1 - startDay);
+  const span = axisSpanDays(startDay, today);
   const inner = Math.max(0, w - PAD * 2);
-  const lead = Math.max(LEAD_MIN_PX, Math.round(inner * LEAD_SHARE));
+  // The lead-in also holds the value labels, so it is never narrower than
+  // the widest of them (about 6px a character at 10px, and some air).
+  // Labels at least 24px apart: every k-th of the axis's ticks.
+  const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
+  const yTicks = axis.ticks.filter((_, i) => i % every === 0);
+  const labelW = Math.max(0, ...yTicks.map((t) => formatFlowUsd(t).length)) * 6 + 8;
+  const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
   const x0 = PAD + Math.min(lead, inner);
   const run = Math.max(0, PAD + inner - x0);
   /** Where a day starts on the strip (absolute UTC day). */
@@ -698,68 +719,23 @@ function LineStrip({
   const area = (k: "collateral" | "debt", seq: number[]) =>
     `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;
   const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
-  const per = series?.bin === "month" ? "month" : "week";
+  const per = series?.bin ?? "week";
   const cx = n > 0 && stops[at] ? xStop(stops[at]) : PAD + inner;
   const sides = hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const);
 
   return (
     <div className="mt-4">
-      {/* The event ticks, on the line's time axis. The keyboard hears each
-          day's events through the slider's value. */}
-      <div
-        ref={pipRef}
-        className="relative h-5 cursor-pointer sm:h-3.5"
-        data-flow-pips=""
-        onPointerMove={(e) => {
-          if (e.pointerType !== "mouse") return;
-          const t = tickAt(e.clientX, TICK_REACH.mouse);
-          setPip(t ? openTick(t) : null);
-        }}
-        onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
-        onClick={(e) => {
-          const t = tickAt(e.clientX, TICK_REACH.touch);
-          if (!t) return setPip(null);
-          setPip(openTick(t));
-          const i = stops.findIndex((s) => !s.live && s.stop === t.day);
-          if (i >= 0) {
-            onPreview(null);
-            onPick(i);
-          }
-        }}
-      >
-        <div aria-hidden>
-          {w > 0 &&
-            model.ticks.map((t, i) => (
-              <i
-                key={i}
-                className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] -translate-x-1/2 rounded-[1px]"
-                style={{ left: xClose(startDay + t.day), background: FLOW_TICK[t.tick] }}
-              />
-            ))}
-        </div>
-        {pip && (
-          <span
-            role="tooltip"
-            data-prov-hidden=""
-            data-flow-pip-tip=""
-            className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-            style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
-          >
-            {pip.text}
-          </span>
-        )}
-      </div>
       <div className="relative">
         <div
           ref={ref}
           role="slider"
           tabIndex={0}
-          aria-label={`Date, by ${per} and by day with events: moves the headlines and the bars`}
+          aria-label={`Date, by ${per === "day" ? "day" : `${per} and by day with events`}: moves the headlines and the bars`}
           aria-valuemin={0}
           aria-valuemax={Math.max(0, stops.length - 1)}
           aria-valuenow={at}
           aria-valuetext={valueText}
-          className="relative mt-0.5 cursor-crosshair touch-none select-none rounded-md bg-sunken outline-none focus-visible:ring-2 focus-visible:ring-rb-400"
+          className="relative mt-0.5 cursor-crosshair touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400"
           style={{ height: STRIP_H }}
           data-flow-strip=""
           onPointerDown={onDown}
@@ -781,6 +757,22 @@ function LineStrip({
                   data-flow-window=""
                 />
               )}
+              {/* Faint gridlines at the value labels' ticks, the zero line
+                  being the plot's floor. */}
+              {yTicks
+                .filter((t) => t > 0)
+                .map((t) => (
+                  <line
+                    key={t}
+                    x1={PAD}
+                    x2={w - PAD}
+                    y1={y(t)}
+                    y2={y(t)}
+                    className="stroke-rb-400/20 dark:stroke-rb-500/25"
+                    strokeWidth={1}
+                    data-flow-gridline=""
+                  />
+                ))}
               {sides.map((k) =>
                 runs(k).map((seq) => (
                   <g key={`${k}${seq[0]}`}>
@@ -815,7 +807,26 @@ function LineStrip({
                 />
               )}
             </svg>
-          ) : (
+          ) : null}
+          {/* The value labels, in the lead-in at the plot's left, each just
+              above its gridline (under it at the top). */}
+          {w > 0 && n > 0 && (
+            <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
+              {yTicks.map((t) => {
+                const ty = y(t);
+                return (
+                  <span
+                    key={t}
+                    className="pointer-events-none absolute text-[10px] leading-none tabular-nums text-rb-500"
+                    style={{ left: PAD + 1, ...(ty < 14 ? { top: ty + 2 } : { top: ty - 11 }) }}
+                  >
+                    {formatFlowUsd(t)}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {w > 0 && n > 0 ? null : (
             <p className="flex h-full items-center justify-center text-xs text-rb-500">
               {failed ? "The line could not be read. Reload to try again." : "Reading the line…"}
             </p>
@@ -832,9 +843,64 @@ function LineStrip({
           </div>
         )}
       </div>
+      {/* The event ticks, under the plot on the line's time axis, the cursor
+          running through them. The keyboard hears each day's events through
+          the slider's value. */}
+      <div
+        ref={pipRef}
+        className="relative h-5 cursor-pointer sm:h-3.5"
+        data-flow-pips=""
+        onPointerMove={(e) => {
+          if (e.pointerType !== "mouse") return;
+          const t = tickAt(e.clientX, TICK_REACH.mouse);
+          setPip(t ? openTick(t) : null);
+        }}
+        onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
+        onClick={(e) => {
+          const t = tickAt(e.clientX, TICK_REACH.touch);
+          if (!t) return setPip(null);
+          setPip(openTick(t));
+          const i = stops.findIndex((s) => !s.live && s.stop === t.day);
+          if (i >= 0) {
+            onPreview(null);
+            onPick(i);
+          }
+        }}
+      >
+        <div aria-hidden>
+          {w > 0 && n > 0 && (
+            <i className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: cx - 0.5 }} />
+          )}
+          {w > 0 &&
+            model.ticks.map((t, i) => (
+              <i
+                key={i}
+                className="pointer-events-none absolute top-0.5 h-2.5 w-[2px] -translate-x-1/2 rounded-[1px]"
+                style={{ left: xClose(startDay + t.day), background: FLOW_TICK[t.tick] }}
+              />
+            ))}
+        </div>
+        {pip && (
+          <span
+            role="tooltip"
+            data-prov-hidden=""
+            data-flow-pip-tip=""
+            className="pointer-events-none absolute bottom-full z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+            style={{ left: pip.x, background: "var(--rb-tooltip-bg)", borderColor: "var(--rb-tooltip-border)" }}
+          >
+            {pip.text}
+          </span>
+        )}
+      </div>
+      {/* The first day sits under the end of the lead-in, and the end under
+        today's close. */}
+      <TrackEnds
+        start={ends.start}
+        end={ends.end}
+        startInset={w > 0 ? Math.max(0, x0 - PAD) : 0}
+        endInset={w > 0 ? Math.max(0, PAD + inner - xClose(today)) : 0}
+      />
       {freeze?.tag && phone && <div className="mt-1.5 flex justify-center">{freeze.tag}</div>}
-      {/* The first day sits under the end of the lead-in. */}
-      <TrackEnds start={ends.start} end={ends.end} startInset={w > 0 ? Math.max(0, x0 - PAD) : 0} />
       {/* The line's key: its two sides and what each point is. */}
       <ul
         className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-[11px] text-rb-500"

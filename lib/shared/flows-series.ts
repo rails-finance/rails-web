@@ -2,10 +2,10 @@
 // (components/shared/lifetime-flows-over-time.tsx; rails-ops
 // reference/lifetime-flows-scrubber.md, "The two views").
 // ----------------------------------------------------------------------------
-// The Next routes GET /api/{aave-v3,spark,aave-v4}/flows/series?bin=week|month
+// The Next routes GET /api/{aave-v3,spark,aave-v4}/flows/series?bin=day|week|month
 // read the index's day rows (the daily route's replay and price reads) and
-// answer with this, about 52 points a year per side, so the browser never
-// needs the whole history for this view. Sky Savings holds its day rows on
+// answer with this, at most 366 points by day and about 52 a year by week per
+// side, so the browser never needs the whole history for this view. Sky Savings holds its day rows on
 // the page and bins them here.
 //
 // Each bin states what was held and owed at its last day: the balances the
@@ -18,14 +18,25 @@
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import type { FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
 
-export type SeriesBin = "week" | "month";
+export type SeriesBin = "day" | "week" | "month";
 
 /** The bars cover this many active days (days with events) back from today. */
 export const WINDOW_ACTIVE_DAYS = 300;
 
-/** A life of more than three years is drawn by month, else by week. */
+/** A life of more than three years is drawn by month, else by week.
+ *  `spanDays` is today less the first event's day. */
 export function lifetimeBinFor(spanDays: number): SeriesBin {
   return spanDays > 3 * 365 ? "month" : "week";
+}
+
+/** The longest life the Aave family's line draws by day: today at most this
+ *  many days after the first event's day, 366 points at most. */
+export const DAILY_LINE_MAX_DAYS = 365;
+
+/** The Aave family's line (the families with a series route): by day up to
+ *  DAILY_LINE_MAX_DAYS, then as lifetimeBinFor. */
+export function seriesRouteBinFor(spanDays: number): SeriesBin {
+  return spanDays <= DAILY_LINE_MAX_DAYS ? "day" : lifetimeBinFor(spanDays);
 }
 
 /** The first active day the bars show: the WINDOW_ACTIVE_DAYS-th from the
@@ -78,13 +89,13 @@ function nextMonth(day: number): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) / DAY_MS;
 }
 
-/** The calendar bins from the week (or month) of `first` to today's. The
+/** The calendar bins from the day (week, month) of `first` to today's. The
  *  first bin starts at `first`, the last ends today. */
 export function binRanges(first: number, today: number, bin: SeriesBin): [number, number][] {
   const out: [number, number][] = [];
-  let from = bin === "week" ? weekStart(first) : monthStart(first);
+  let from = bin === "day" ? first : bin === "week" ? weekStart(first) : monthStart(first);
   while (from <= today) {
-    const next = bin === "week" ? from + 7 : nextMonth(from);
+    const next = bin === "day" ? from + 1 : bin === "week" ? from + 7 : nextMonth(from);
     out.push([Math.max(from, first), Math.min(next - 1, today)]);
     from = next;
   }

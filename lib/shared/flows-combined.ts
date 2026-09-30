@@ -64,8 +64,21 @@ export function combinedStops(model: FlowModel, series: FlowBinSeries | null, fr
   return out;
 }
 
+/** The line strip's time axis spans at least this many days (a week, the
+ *  line's shortest bin). */
+export const AXIS_MIN_DAYS = 7;
+
+/** The days the line strip's time axis spans, from the first event's day
+ *  (`startDay`) to the end of `today` (absolute UTC days): the life, or
+ *  AXIS_MIN_DAYS where the life is shorter, so a life shorter than a week
+ *  takes its days' share of a week and the strip past today's close stays
+ *  empty. */
+export function axisSpanDays(startDay: number, today: number): number {
+  return Math.max(AXIS_MIN_DAYS, today + 1 - startDay);
+}
+
 /** The stop a step back (-1) or forward (+1) from `at` lands on, where the
- *  steps go by days with events (the timeline's day headers): the nearest day
+ *  steps go by days with events (the timeline's day marks): the nearest day
  *  with events that way, or the live stop going forward; `at` where there is
  *  none. */
 export function eventStep(stops: CombinedStop[], at: number, dir: -1 | 1): number {

@@ -1,9 +1,10 @@
 // The Lifetime view's series routes (app/api/{aave-v3,spark,aave-v4}/flows/
 // series/route.ts): read the index's day rows for one position (rails-server
 // GET /api/<family>/flows/daily, the replay and daily price reads the
-// scrubber's route serves) and answer with them binned per week or month
-// (lib/shared/flows-series.ts), about 52 points a year per side. Cacheability
-// is the daily route's, forwarded as that route's hop forwards it.
+// scrubber's route serves) and answer with them binned per day, week or month
+// (lib/shared/flows-series.ts), at most 366 points by day and about 52 a year
+// by week per side. Cacheability is the daily route's, forwarded as that
+// route's hop forwards it.
 
 import { NextRequest, NextResponse } from "next/server";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
@@ -23,8 +24,8 @@ export async function serveFlowBinSeries(
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
   const binParam = request.nextUrl.searchParams.get("bin") ?? "week";
-  if (binParam !== "week" && binParam !== "month") {
-    return NextResponse.json({ error: "bin is week or month" }, { status: 400 });
+  if (binParam !== "day" && binParam !== "week" && binParam !== "month") {
+    return NextResponse.json({ error: "bin is day, week or month" }, { status: 400 });
   }
   const bin: SeriesBin = binParam;
   const t0 = Date.now();

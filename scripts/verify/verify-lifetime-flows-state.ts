@@ -26,6 +26,7 @@
 // and a bin with no price recorded for a held asset a gap.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
+import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -76,12 +77,20 @@ import {
   binRanges,
   binSeries,
   lifetimeBinFor,
+  seriesRouteBinFor,
   weekStart,
   WINDOW_ACTIVE_DAYS,
   windowFromDay,
   type BinInput,
 } from "@/lib/shared/flows-series";
-import { combinedAt, combinedStops, eventStep, nearestStop, stopForDay } from "@/lib/shared/flows-combined";
+import {
+  axisSpanDays,
+  combinedAt,
+  combinedStops,
+  eventStep,
+  nearestStop,
+  stopForDay,
+} from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
 import { eventCum, eventSideSum } from "@/lib/shared/flow-focus";
 
@@ -327,6 +336,9 @@ test("the window is the last 300 active days, or the whole life", () => {
   assert.equal(windowFromDay([]), 0);
   assert.equal(longDay(Date.UTC(2025, 2, 3) / 1000), "3 Mar 2025");
   assert.deepEqual([lifetimeBinFor(1095), lifetimeBinFor(1096)], ["week", "month"]);
+  // The Aave family's line (a series route) goes by day up to a year.
+  assert.deepEqual([0, 365, 366, 1095, 1096].map(seriesRouteBinFor), ["day", "day", "week", "week", "month"]);
+  assert.equal(lifetimeBinFor(30), "week", "the rows binned on the page keep weeks");
 });
 
 test("the window's opening segment: what was held when it opens, and every length still adds up", () => {
@@ -460,14 +472,15 @@ test("the Lifetime series: calendar bins from the open to today, each at the rep
   const input = binInputFromWire(series);
   const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const first = series.days[0][0];
-  for (const bin of ["week", "month"] as const) {
+  for (const bin of ["day", "week", "month"] as const) {
     const out = binSeries(input, bin)!;
     assert.equal(out.first, first);
     assert.equal(out.points[0][0], first, `${bin}: the first bin starts at the open`);
     assert.equal(out.points[out.points.length - 1][1], series.today, `${bin}: the last ends today`);
     for (let i = 1; i < out.points.length; i++) {
       assert.equal(out.points[i][0], out.points[i - 1][1] + 1, `${bin}: bins are contiguous`);
-      if (bin === "week") assert.equal(weekStart(out.points[i][0]), out.points[i][0], "weeks start on Monday");
+      if (bin === "day") assert.equal(out.points[i][0], out.points[i][1], "a day is one day");
+      else if (bin === "week") assert.equal(weekStart(out.points[i][0]), out.points[i][0], "weeks start on Monday");
       else assert.equal(new Date(out.points[i][0] * 86_400_000).getUTCDate(), 1, "months start on the 1st");
     }
     // Where every held asset recorded its price on the bin's last day, the bin
@@ -493,7 +506,9 @@ test("the Lifetime series: calendar bins from the open to today, each at the rep
       checked++;
     }
     assert.ok(checked > 0, `${bin}: some bins checked against the scrubber`);
-    assert.ok(out.points.length <= Math.ceil((series.today - first) / (bin === "week" ? 7 : 28)) + 1);
+    assert.ok(
+      out.points.length <= Math.ceil((series.today - first) / (bin === "day" ? 1 : bin === "week" ? 7 : 28)) + 1,
+    );
   }
 });
 
@@ -551,7 +566,7 @@ test("Combined: the cursor stops on the line's points and every day with events"
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const startDay = full.start / DAY_MS;
-  for (const bin of ["week", "month"] as const) {
+  for (const bin of ["day", "week", "month"] as const) {
     const line = binSeries(binInputFromWire(series), bin)!;
     const from = full.eventDays[12];
     const stops = combinedStops(full, line, from);
@@ -600,7 +615,7 @@ test("Combined: the cursor stops on the line's points and every day with events"
   );
 });
 
-test("Combined: the back and forward steps go by days with events; a day header lands on its day's close", () => {
+test("Combined: the back and forward steps go by days with events; a day's mark lands on its day's close", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const line = binSeries(binInputFromWire(series), "week")!;
@@ -624,9 +639,72 @@ test("Combined: the back and forward steps go by days with events; a day header 
   const between = stops.findIndex((s) => !s.event && !s.live);
   assert.ok(between > 0, "the weekly line has a point between events");
   assert.ok(stops[eventStep(stops, between, 1)].event || stops[eventStep(stops, between, 1)].live);
-  // Every event day's header finds that day's stop; today or later finds the live stop.
+  // Every event day's mark finds that day's stop; today or later finds the live stop.
   for (const d of days) assert.equal(stops[stopForDay(stops, d)!].stop, d);
   assert.equal(stopForDay(stops, full.liveStop + 3), last);
+});
+
+test("Combined: on a daily line a day's mark lands on that day's point", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "day")!;
+  const stops = combinedStops(full, line, 0);
+  const startDay = full.start / DAY_MS;
+  // Every day of the life before today is a stop on its day's point (today's
+  // point is the live stop's).
+  for (let d = 0; startDay + d < line.today; d++) {
+    const at = stops[stopForDay(stops, d)!];
+    assert.equal(at.stop, d);
+    assert.ok(at.point != null && line.points[at.point][1] === startDay + d, `day ${d} is its point`);
+  }
+});
+
+test("the rewind: the list up to a day's close, its rows moved up by what was cut", () => {
+  const ev = (id: string, timestamp: number) => ({ id, timestamp });
+  // Newest first, as the timeline draws them.
+  const events = [ev("e", 500), ev("d", 400), ev("c", 300), ev("b", 200), ev("a", 100)];
+  assert.deepEqual(
+    rewindEvents(events, 350).map((e) => e.id),
+    ["c", "b", "a"],
+  );
+  assert.equal(rewindEvents(events, null), events, "no cut, the list whole");
+  assert.deepEqual(rewindEvents(events, 50), [], "before the first event, nothing");
+  // Rows over it: a folder (oldest 250, newest 450) straddles a cut at 350
+  // and stays, first; the event rows newer than the cut go, and each row
+  // left moves up by the cut events above it.
+  type Row = { id: string; flatIdx: number; oldest: number };
+  const rows: Row[] = [
+    { id: "e", flatIdx: 0, oldest: 500 },
+    { id: "folder", flatIdx: 1, oldest: 250 },
+    { id: "d", flatIdx: 1, oldest: 400 },
+    { id: "c", flatIdx: 2, oldest: 300 },
+    { id: "a", flatIdx: 3, oldest: 100 },
+  ];
+  const cutOff = events.length - rewindEvents(events, 350).length;
+  assert.deepEqual(
+    rewindRows(rows, 350, (r) => r.oldest, cutOff).map((r) => [r.id, r.flatIdx]),
+    [
+      ["folder", 0],
+      ["c", 0],
+      ["a", 1],
+    ],
+  );
+  assert.equal(
+    rewindRows(rows, null, (r) => r.oldest, 0),
+    rows,
+  );
+});
+
+test("Combined: the strip's time axis spans a week at least, and a longer life whole", () => {
+  const d = 20_361; // 30 Sep 2025, any day serves
+  // A life of one day, today: the day takes a seventh of the axis after the
+  // lead-in, and the rest stays empty past today's close.
+  assert.equal(axisSpanDays(d, d), 7);
+  // Three days: three sevenths.
+  assert.equal(axisSpanDays(d, d + 2), 7);
+  // Two event days a week apart, and a long life: the life, as before.
+  assert.equal(axisSpanDays(d, d + 7), 8);
+  assert.equal(axisSpanDays(d, d + 400), 401);
 });
 
 test("Combined: the headlines and the bars state one figure at every stop, between events, on event days and outside the window", () => {

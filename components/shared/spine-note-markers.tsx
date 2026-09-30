@@ -307,13 +307,23 @@ export function SpineNoteGap({
 /** The desktop marker's target: 28px tall, so it clears the glyphs above and
  *  below it, and 64px wide. */
 const LIST_TARGET = 28;
-/** Where the first marker's centre sits below the slot's top. A slot follows
- *  the row above it with the list's 8px gap cancelled, so its top is that
- *  row's bottom edge, which is about where the glyph above ends; the next
- *  node's halo starts 24px further down (the gap, the next row's 4px padding
- *  and its column's 16px top padding, less the 4px halo). The marker is
- *  centred on that bare line. */
+/** How far the last closed marker's centre sits above the slot's bottom, so
+ *  above the next row's node: a slot follows its gap's rows with the list's
+ *  8px gap cancelled, and the next node's halo starts 24px below the slot's
+ *  end (the gap, the next row's padding and its column's 16px top padding,
+ *  less the 4px halo). */
 const LIST_FIRST_CENTRE = 12;
+/** The open row's node: 32px below its column's top (ListNodeControl). */
+const LIST_NODE_Y = 32;
+/** A closed marker sits where the node of its open row will stand, so a
+ *  marker opens and closes under the pointer (Miles, 30 Sep 2026): a closed
+ *  slot takes the height the open row's header takes above its node. Where
+ *  the first marker's centre sits below its slot's top: between two rows the
+ *  open row starts 8px down (its `pt-2`), then the row's padding; in the
+ *  head slot, at the slot's top. Markers after the first step by the same
+ *  distance, less the 12px a closed run leaves below its last marker. */
+const listFirstCentre = (cardPad: number, head: boolean) => (head ? 0 : 8) + cardPad + LIST_NODE_Y;
+const listStep = (cardPad: number) => 8 + cardPad + LIST_NODE_Y - LIST_FIRST_CENTRE;
 /** The spine's x in a row: the centre of the `w-2/5` column inside the row's
  *  `--card-pad`. */
 const LIST_SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
@@ -358,7 +368,7 @@ function ListNodeControl({ note, openAll, onClose }: { note: GapItem; openAll: b
       data-tip={markerText(note).tip}
       className={`${LIST_MARKER_CLASS} ${LIST_TIP_CLASS} ${openAll ? "cursor-default" : ""}`}
       // The column's node is centred 16px + half a glyph below its top.
-      style={{ left: "calc(50% - 22px)", top: 32 - LIST_TARGET / 2, height: LIST_TARGET }}
+      style={{ left: "calc(50% - 22px)", top: LIST_NODE_Y - LIST_TARGET / 2, height: LIST_TARGET }}
     >
       <span aria-hidden className="block h-4 w-4 shrink-0" />
     </button>
@@ -441,7 +451,7 @@ export function ListNoteGap({
           className="absolute w-px -translate-x-1/2"
           style={{
             left: LIST_SPINE_X,
-            top: tip ? 16 : head.above ? 0 : padTop + LIST_TARGET / 2,
+            top: tip ? 16 : head.above ? 0 : padTop + listFirstCentre(scale.cardPad, true),
             bottom: head.below ? "calc(-1 * var(--card-pad) - 28px)" : lastGroupClosed ? -LIST_FIRST_CENTRE : 0,
             ...spineLineStyle(NOTE_LINE),
           }}
@@ -503,14 +513,16 @@ function ListMarkerSlot({
   onOpen: (note: GapItem) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { cardPad } = useTimelineScale();
   const n = notes.length;
-  const height = !head
-    ? LIST_TARGET * (n - 1)
-    : last
-      ? LIST_TARGET / 2 + LIST_TARGET * (n - 1) - LIST_FIRST_CENTRE
-      : LIST_TARGET * n;
+  const first = listFirstCentre(cardPad, head);
+  const step = listStep(cardPad);
+  // A run stops LIST_FIRST_CENTRE below its last marker, which between rows
+  // is `step` a marker; in the head slot a run with more after it takes a
+  // whole step for each.
+  const height = head && !last ? step * n : first + step * (n - 1) - LIST_FIRST_CENTRE;
   useExtendLineAbove(ref, height, !head && height > 0, "[data-list-line]");
-  const centre = (i: number) => (head ? LIST_TARGET / 2 : LIST_FIRST_CENTRE) + i * LIST_TARGET;
+  const centre = (i: number) => first + i * step;
   return (
     <div ref={ref} className="relative" style={{ height }}>
       {notes.map((note, i) => (

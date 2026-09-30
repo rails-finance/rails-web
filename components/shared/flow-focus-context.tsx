@@ -4,8 +4,9 @@
 // event cards (lib/shared/flow-focus.ts; rails-ops TO-DO-ui-jobs 141). A page
 // that has it (the Aave family) wraps both in <FlowFocusContext.Provider>: the
 // chart's segments name their line and value without opening a panel, the
-// chart's frozen cursor offers "View on timeline", the timeline draws a header
-// for each day (its close, and "View on chart"), and each event card can state
+// chart's frozen cursor rewinds the timeline to its day, each day's last card
+// carries the day's date and a button that freezes the chart there, and each
+// event card can state
 // the lifetime sum as of its event. A page without it keeps the segment panels
 // (the Liquity family).
 

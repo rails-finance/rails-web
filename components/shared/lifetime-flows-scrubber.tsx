@@ -79,6 +79,7 @@ import {
   binInputFromTimeline,
   binSeries,
   lifetimeBinFor,
+  seriesRouteBinFor,
   windowFromDay,
   WINDOW_ACTIVE_DAYS,
   type FlowBinSeries,
@@ -550,7 +551,7 @@ export type FlowSeriesSource = { path: string; params: Record<string, string> };
 
 /** The panel's chart (rails-ops reference/lifetime-flows-scrubber.md): the
  *  bars, cut to the last WINDOW_ACTIVE_DAYS active days, with the collateral
- *  and debt line per week or month from the open under them on one cursor.
+ *  and debt line per day, week or month from the open under them on one cursor.
  *  The bars take the busy treatment (lib/shared/flows-busy.ts) where their
  *  window is busy. Without a series the bars keep their date slider. */
 export function LifetimeFlowsScrubber({
@@ -576,7 +577,10 @@ export function LifetimeFlowsScrubber({
   // The line's series: from the family's route, or binned here from the
   // page's rows.
   const startDay = model ? model.start / DAY_MS : 0;
-  const bin: SeriesBin = model ? lifetimeBinFor((timeline.today ?? startDay + model.liveStop) - startDay) : "week";
+  // A family with a series route (the Aave family) draws a life of up to a
+  // year by day; the rows binned here keep weeks and months.
+  const spanDays = model ? (timeline.today ?? startDay + model.liveStop) - startDay : 0;
+  const bin: SeriesBin = model ? (series ? seriesRouteBinFor(spanDays) : lifetimeBinFor(spanDays)) : "week";
   const binInput = useMemo(() => (series ? null : binInputFromTimeline(timeline)), [series, timeline]);
   const lined = series != null || binInput != null;
   const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);
@@ -680,8 +684,8 @@ function panelWords(
       : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
   const read = focused
     ? busy
-      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar. A click on the line freezes the cursor on a day, and "View on timeline" shows that day's events below; each day's "View on chart" comes back. Each event's card adds up its side as of that event, line by line.`
-      : "A bar's length is everything that came in: the headline is the solid part of the bar, and pointing at a part names it. A click on the line freezes the cursor on a day, and \"View on timeline\" shows that day's events below; each day's \"View on chart\" comes back. Each event's card adds up its side as of that event, line by line."
+      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar. A click on the line freezes the cursor on a day and rewinds the timeline below to it, every event up to that day's close; each day's last event has a button that does the same from the timeline. Each event's card adds up its side as of that event, line by line.`
+      : "A bar's length is everything that came in: the headline is the solid part of the bar, and pointing at a part names it. A click on the line freezes the cursor on a day and rewinds the timeline below to it, every event up to that day's close; each day's last event has a button that does the same from the timeline. Each event's card adds up its side as of that event, line by line."
     : busy
       ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
       : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";
@@ -692,7 +696,7 @@ function panelWords(
       ? cover +
         `The line under ${them} draws ${what} at the end of each ${bin} since the open, ${model.words.linePrices ?? "at the daily prices the index records"}` +
         `${from > 0 ? `, with the ${bs}' window shaded` : ""}${model.words.linePrices ? "" : `, and leaves a gap where a held asset has no price that ${bin}`}. ` +
-        `One cursor moves both. It stops at the end of each ${bin}, on each day with events (tap a tick to go to it) and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
+        `One cursor moves both. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
         `${read} The dashed outline is where ${each} ${today}.` +
         (from > 0
           ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`

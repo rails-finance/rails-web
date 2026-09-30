@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { serveFlowBinSeries } from "@/lib/api/flow-bin-series-route";
 
 // The Lifetime view's series for one SparkLend position: the daily route's
-// day rows binned per week or month (lib/api/flow-bin-series-route.ts;
+// day rows binned per day, week or month (lib/api/flow-bin-series-route.ts;
 // rails-ops reference/lifetime-flows-scrubber.md). Node runtime.
 
 export const runtime = "nodejs";
