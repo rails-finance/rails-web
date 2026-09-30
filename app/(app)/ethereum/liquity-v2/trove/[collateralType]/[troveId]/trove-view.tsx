@@ -388,7 +388,12 @@ export default function TroveView({
     [totalEvents, liquityEvents, flowHistory.events],
   );
   const flowsRead: FlowsRead = totalEvents == null ? "done" : flowHistory.read;
-  const [flowsNow] = useState(() => Date.now() / 1000);
+  // Until the clock is set the panel says it is reading.
+  // The clock the replay reads (the interest since the last event): set on
+  // mount, so the server's render and the first client render agree (the
+  // panel reads as loading until then).
+  const [flowsNow, setFlowsNow] = useState<number | null>(null);
+  useEffect(() => setFlowsNow(Date.now() / 1000), []);
   const flowCollSymbol = troveData?.collateralType ?? collateralType;
   const flowDebtSymbol = liquityEvents[0]?.context.data.assetType || "BOLD";
   const flowPrice = prices?.[flowCollSymbol.toLowerCase() as keyof OraclePricesData];
@@ -396,26 +401,28 @@ export default function TroveView({
   const flowSurplusClaimed = surplus?.claimed != null;
   const flowTimeline = useMemo(
     () =>
-      liquityFlowTimeline(flowEvents, {
-        collSymbol: flowCollSymbol,
-        debtSymbol: flowDebtSymbol,
-        surplusClaimed: flowSurplusClaimed,
-        now: flowsNow,
-        live: flowOpen
-          ? {
-              price: flowPrice ?? null,
-              ...(liveState
-                ? {
-                    coll: liveState.collateral.entire,
-                    debt: liveState.debt.entire,
-                    redistColl: liveState.collateral.redistGain,
-                    redistDebt: liveState.debt.redistGain,
-                    batchFee: liveState.rates.accruedBatchManagementFee,
-                  }
-                : {}),
-            }
-          : null,
-      }),
+      flowsNow == null
+        ? null
+        : liquityFlowTimeline(flowEvents, {
+            collSymbol: flowCollSymbol,
+            debtSymbol: flowDebtSymbol,
+            surplusClaimed: flowSurplusClaimed,
+            now: flowsNow,
+            live: flowOpen
+              ? {
+                  price: flowPrice ?? null,
+                  ...(liveState
+                    ? {
+                        coll: liveState.collateral.entire,
+                        debt: liveState.debt.entire,
+                        redistColl: liveState.collateral.redistGain,
+                        redistDebt: liveState.debt.redistGain,
+                        batchFee: liveState.rates.accruedBatchManagementFee,
+                      }
+                    : {}),
+                }
+              : null,
+          }),
     [flowEvents, flowCollSymbol, flowDebtSymbol, flowSurplusClaimed, flowsNow, flowOpen, flowPrice, liveState],
   );
 
@@ -611,7 +618,7 @@ export default function TroveView({
             <>
               <LifetimeFlowsPanel
                 scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-                read={flowsRead}
+                read={flowsNow == null ? "reading" : flowsRead}
                 explanation={
                   <div className="space-y-2 text-sm text-rb-500">
                     {liquityEconomicsExplanation(

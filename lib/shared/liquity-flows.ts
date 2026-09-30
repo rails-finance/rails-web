@@ -417,7 +417,7 @@ export function liquityFlowWords(collSymbol: string, debtSymbol: string): NonNul
       debt: "the interest built up on the recorded debt since the Trove's last event",
     },
     basis: {
-      collateral: "Each flow is valued at the branch's price at its block.",
+      collateral: "Each flow is valued at the branch's price when it happened.",
       debt: `Debt is counted at ${debtSymbol}'s $1 face.`,
     },
     heldBasis: {

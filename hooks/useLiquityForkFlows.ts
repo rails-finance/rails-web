@@ -60,11 +60,13 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
   const source = p.wholeEvents ?? fetched.events;
   const { is } = p;
   const events = useMemo(() => (source ? liquityForkFlowEvents(source, is) : []), [source, is]);
-  const [now] = useState(() => Date.now() / 1000);
+  // Set on mount, so the server's render and the first client render agree.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => setNow(Date.now() / 1000), []);
   const chain = p.chain;
   const livePrice = chain?.priceUsd ?? p.price ?? null;
   const timeline = useMemo(() => {
-    if (!p.collSymbol || events.length === 0) return null;
+    if (now == null || !p.collSymbol || events.length === 0) return null;
     return liquityFlowTimeline(events, {
       collSymbol: p.collSymbol,
       debtSymbol: p.debtSymbol,
@@ -87,5 +89,5 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
         : null,
     });
   }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain]);
-  return { timeline, read: p.wholeEvents != null ? "done" : fetched.read, events };
+  return { timeline, read: now == null ? "reading" : p.wholeEvents != null ? "done" : fetched.read, events };
 }
