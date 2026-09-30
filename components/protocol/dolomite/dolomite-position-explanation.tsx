@@ -18,6 +18,9 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatDate } from "@/lib/date";
+import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
+import type { DolomitePositionView } from "@/components/protocol/dolomite/dolomite-position-card";
 
 /** Oxford-join asset symbols ("wstETH and WETH"). */
 function joinSymbols(syms: string[]): string {
@@ -270,4 +273,66 @@ export function DolomitePositionExplanation({
   if (lead == null && bullets.length === 0) return null;
 
   return <ProseExplainer paragraph={lead} items={bullets} />;
+}
+
+/** Closed/liquidated mood: narration from the index and the rows alone (a
+ *  terminal account has no live state to read): the peaks, the liquidation
+ *  record, the closure. Figures bold only where the card shows the same
+ *  figure (the peaks, the closure date, the counts). */
+export function DolomiteClosedPositionExplanation({ v }: { v: DolomitePositionView }) {
+  const liquidated = v.status === "liquidated";
+  const peakText = (rs: { amount: number; symbol: string }[]) =>
+    rs.map((r, i) => (
+      <span key={r.symbol + i}>
+        {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
+        <H>
+          <AmountText value={r.amount} /> {r.symbol}
+        </H>
+      </span>
+    ));
+  const inTokens = [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens);
+
+  const lead = liquidated ? (
+    <>This account closed with liquidation in its record, and nothing remains supplied or borrowed:</>
+  ) : (
+    <>This account ran its course and closed, and nothing remains supplied or borrowed:</>
+  );
+
+  const list: React.ReactNode[] = [];
+  if (v.peakSupplies.length > 0 || v.peakBorrows.length > 0) {
+    list.push(
+      <>
+        At its height the account
+        {v.peakSupplies.length > 0 && <> held as much as {peakText(v.peakSupplies)}</>}
+        {v.peakSupplies.length > 0 && v.peakBorrows.length > 0 && <> and</>}
+        {v.peakBorrows.length > 0 && <> owed as much as {peakText(v.peakBorrows)}</>}
+        {inTokens ? (
+          <>: each market&rsquo;s largest balance just before or after any event, interest included.</>
+        ) : (
+          <>, in par: multiply by each market&rsquo;s interest index for tokens.</>
+        )}
+      </>,
+    );
+  }
+  if (v.liquidationCount > 0) {
+    list.push(
+      <>
+        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
+        {v.liquidations && v.liquidations.length > 0
+          ? liquidationSentences(v.liquidations).join(" ")
+          : "Each time a liquidator repaid part of the debt and took collateral worth that repayment plus the liquidation spread."}
+      </>,
+    );
+  }
+  list.push(
+    <>
+      Its last activity landed on <H>{formatDate(v.lastActivityAt)}</H>, after <H>{v.txCount}</H> transaction
+      {v.txCount === 1 ? "" : "s"}.
+    </>,
+  );
+  list.push(
+    <>The wallet can come back at any time: a new deposit into this account number reopens this same timeline.</>,
+  );
+
+  return <ProseExplainer paragraph={lead} items={list} />;
 }

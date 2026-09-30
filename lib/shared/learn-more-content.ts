@@ -2050,8 +2050,8 @@ export function dolomiteLiquidationContent(): LearnMoreContent {
     intro:
       "An account becomes liquidatable when its adjusted collateral value falls below the margin requirement times its adjusted debt — the requirement being the global 117.65% minimum scaled up by each market's margin premium (multiplicatively), or the account's own risk override (111.11% on the LST/ETH category) where one applies.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt from their own Dolomite balances and takes collateral worth that repayment plus the liquidation spread (5% globally, scaled by per-market spread premiums; 4% under the risk override). One liquidation event moves FOUR balances: the borrower's debt and collateral, and the liquidator's payout and receipt — each account's timeline shows its own two legs.",
-      "Liquidation is partial and repeatable: it clears what the liquidator chooses to repay, and the account continues with whatever remains. The timeline shows each liquidation as an event in the account's life.",
+      "A liquidator repays part of the account's debt from their own Dolomite balances and takes collateral worth that repayment plus the liquidation spread. The spread is a 5% base multiplied by (1 + the spread premium) of the collateral market and of the debt market: collateral with a 200% premium against a debt with none is seized at 5% × 3 = 15%. An account with a risk override is seized at the override's own spread instead. The opened liquidation row states the spread that applied and its parts. One liquidation event moves FOUR balances: the borrower's debt and collateral, and the liquidator's payout and receipt — each account's timeline shows its own two legs.",
+      "How much is repaid is set by the protocol: when the account's health factor (adjusted collateral ÷ (margin requirement × adjusted debt)) is 0.95 or above and the collateral market allows partial liquidation, a liquidation clears half the debt; below 0.95 it can clear all of it. The account continues with whatever remains and can be liquidated again.",
     ],
     detailsHeading: "Key concepts:",
     details: [

@@ -96,16 +96,17 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
   lines.push("");
 
   if (view.status !== "open") {
-    // Unwound: the headline is what each market lane held at its height —
-    // PAR amounts (the oracle prices the PRESENT, not history).
+    // Unwound: the headline is what each market lane held at its height, in
+    // tokens where the page read them from the rows, else in PAR (the oracle
+    // prices the PRESENT, not history).
     for (const p of view.peakSupplies) {
       lines.push(
-        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
+        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     for (const p of view.peakBorrows) {
       lines.push(
-        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
+        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     if (view.peakSupplies.length > 0 || view.peakBorrows.length > 0) lines.push("");

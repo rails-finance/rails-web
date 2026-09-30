@@ -543,6 +543,17 @@ export const dolomitePeakParProv = (sym: string, side: "supply" | "debt"): Prove
   via: `${DOLOMITE_VIA} · max(|newPar|) over this lane's own legs`,
 });
 
+/** A closed account's peak in TOKENS — the highest balance before or after
+ *  any of its rows on this market, each row's par × the market's index at
+ *  that row's block. */
+export const dolomitePeakTokenProv = (sym: string, side: "supply" | "debt"): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The most ${sym} this account ever ${side === "supply" ? "held" : "owed"} on this market, in tokens: the highest balance just before or just after any of its events, each the row's par × the market's ${side === "supply" ? "supply" : "borrow"} index at that row's block (what getAccountWei reads there), interest included. No USD is stated: the oracle prices the present, not history.`,
+  contract: MARGIN,
+  via: `${DOLOMITE_VIA} · max(|par × index|) before and after each of this lane's legs`,
+});
+
 /** A lifetime gross flow (Σ deposited / withdrawn / repaid / borrowed /
  *  liquidation-cleared on one market) — sums of the legs' own emitted
  *  deltaWei amounts, bucketed by which side of zero the balance sat on. */

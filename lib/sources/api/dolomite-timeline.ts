@@ -32,6 +32,7 @@
 import type { BaseActivityEvent, AssetFlow, DolomiteContext, DolomiteEventType } from "@/lib/shared/types/event-shape";
 import type { DolomiteMarketStateMap } from "@/lib/sources/chain/dolomite-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
 
 export interface DolomiteTimelineResult {
   owner: string;
@@ -333,7 +334,12 @@ export function buildDolomiteTimeline(
       wallet: owner,
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       actionType: kind,
-      actionLabel: LABELS[kind] ?? kind,
+      // A deposit or withdrawal is named by what it did to the balance
+      // (Borrow / Repay / Deposit / Withdraw): the core has no Borrow action.
+      actionLabel: (() => {
+        const act = dolomiteBalanceAction(ctx);
+        return act ? DOLOMITE_BALANCE_ACTION_LABELS[act] : (LABELS[kind] ?? kind);
+      })(),
       flows,
       context: { protocol: "dolomite" as const, data: ctx },
     };
