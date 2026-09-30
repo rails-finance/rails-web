@@ -169,7 +169,7 @@ export function folderUnderFilter(
 // ── The lifetime sum at one event ───────────────────────────────────────────
 
 /** The running totals per bucket once the event's transaction had run
- *  (`after`), and that less this event's own legs (`before`). */
+ *  (`after`), and that less this event's legs (`before`). */
 export interface EventCum {
   before: Record<string, number>;
   after: Record<string, number>;
@@ -178,7 +178,7 @@ export interface EventCum {
   exact: boolean;
   /** The event's day, as a stop of the model. */
   stop: number;
-  /** The buckets this event filled, and its own legs. */
+  /** The buckets this event filled, and its legs. */
   buckets: Set<string>;
   legs: FocusEvent["legs"];
   /** Events after this one in the position's history. */
@@ -233,7 +233,7 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
   };
 }
 
-/** A line of the event card's sum: the panel's line, and on this event's own
+/** A line of the event card's sum: the panel's line, and on this event's
  *  line what it stood at just before the event. */
 export type EventSumLine = SumLine & { hl: boolean; before: string | null };
 

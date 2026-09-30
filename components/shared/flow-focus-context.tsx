@@ -60,7 +60,7 @@ const NONE = null;
 
 /** A page's side of it, in two steps because the timeline's hook comes
  *  before the flow model on a page: `useFlowFocusRoot` (the store, the
- *  events' buckets, and the filter the timeline adds to its own axes while a
+ *  events' buckets, and the filter the timeline adds to its axes while a
  *  flow line is picked; the page re-renders when the filter or, while one is
  *  in force, the cursor moves), then `useFlowFocusValue` (the context value,
  *  once the day rows are in hand). */

@@ -8,7 +8,9 @@
 // its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
-// them. A click, a tap or Enter on a segment opens its panel
+// them. A click, a tap or Enter on a segment filters the timeline to that
+// line's events up to the cursor's date on a page that ties the two
+// (flow-focus-context.tsx, the Aave family); elsewhere it opens its panel
 // (lifetime-flows-tip.tsx): its assets, then its side's sum, one signed line
 // per component in whole dollars, landing on what is held or owed.
 //

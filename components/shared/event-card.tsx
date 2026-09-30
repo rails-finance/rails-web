@@ -87,7 +87,7 @@ export interface EventCardProps {
    *  the event's `actionLabel` (which the timeline provides by default). */
   caption?: string;
   /** A control beside the chevron while the card is open (the Aave family's
-   *  calculator). It handles its own clicks; the header's toggle ignores them. */
+   *  calculator). It takes its clicks; the header's toggle ignores them. */
   headerAction?: React.ReactNode;
 }
 

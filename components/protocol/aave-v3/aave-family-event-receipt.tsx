@@ -312,7 +312,7 @@ function SideSum({
         });
   const heldBefore = facts.heldBefore;
   const changed = heldBefore != null && Math.round(heldBefore) !== Math.round(facts.held);
-  // The label keeps its room; a wide before → after wraps under itself.
+  // The label keeps its room; a wide before → after takes two lines.
   const grid = "grid grid-cols-[12px_12px_minmax(7.5rem,1fr)_auto] items-center gap-x-2 rounded-lg px-1.5 -mx-1.5 py-1";
   const pair = (before: string | null, after: ReactNode) => (
     <span className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">

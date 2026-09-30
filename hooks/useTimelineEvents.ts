@@ -120,7 +120,7 @@ export type DisplayedTimelineRow =
       matched: number | null;
     };
 
-/** A filter a page adds on top of the timeline's own axes: the Lifetime flows
+/** A filter a page adds on top of the timeline's axes: the Lifetime flows
  *  panel's flow line up to its cursor's date (lib/shared/flow-focus.ts). A
  *  served folder answers on its header where it can; `matched` null opens it
  *  and its members answer `passes` one by one. */
@@ -370,7 +370,7 @@ export function useTimelineEvents(
     extraFilter = null,
   }: {
     storageKey?: string;
-    /** The page's own filter over the axes (TimelineExtraFilter). */
+    /** The page's filter over the axes (TimelineExtraFilter). */
     extraFilter?: TimelineExtraFilter | null;
     protocolKey: string;
     /** The index's own answer as ROWS, in ASCENDING chain order: folders and
