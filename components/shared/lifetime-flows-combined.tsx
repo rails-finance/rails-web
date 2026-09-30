@@ -11,6 +11,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -123,50 +124,52 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
 
   return (
     <div className="text-sm" data-flows-combined="">
-      <DateRow switcher={switcher}>{dateLine}</DateRow>
-      {through && <Throughput t={through} hasDebt={hasDebt} />}
-      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
-        <Headline
-          side="collateral"
-          st={head.collateral}
-          model={model}
-          when={when}
-          isLive={liveReceipts}
-          assets={assets}
-        />
-        {hasDebt && (
-          <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
-        )}
-      </div>
-      <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"}>
-        <div
-          className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
-          aria-hidden={outside || undefined}
-          {...(outside ? { inert: true } : {})}
-        >
-          {busy ? (
-            <Rescaled
-              model={bars}
-              s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0, live: false }).bars!}
-              hasDebt={hasDebt}
-              when={when}
-              isLive={liveReceipts}
-              assets={barAssets}
-              headlines={false}
-            />
-          ) : (
-            renderBars(barStop, when, liveReceipts)
+      <Steady>
+        <DateRow switcher={switcher}>{dateLine}</DateRow>
+        {through && <Throughput t={through} hasDebt={hasDebt} />}
+        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+          <Headline
+            side="collateral"
+            st={head.collateral}
+            model={model}
+            when={when}
+            isLive={liveReceipts}
+            assets={assets}
+          />
+          {hasDebt && (
+            <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
           )}
         </div>
-        {outside && (
-          <p
-            className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
-            data-flow-outside-window=""
+        <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"}>
+          <div
+            className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
+            aria-hidden={outside || undefined}
+            {...(outside ? { inert: true } : {})}
           >
-            Before the Flows window, {windowDay}
-          </p>
-        )}
-      </div>
+            {busy ? (
+              <Rescaled
+                model={bars}
+                s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0, live: false }).bars!}
+                hasDebt={hasDebt}
+                when={when}
+                isLive={liveReceipts}
+                assets={barAssets}
+                headlines={false}
+              />
+            ) : (
+              renderBars(barStop, when, liveReceipts)
+            )}
+          </div>
+          {outside && (
+            <p
+              className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
+              data-flow-outside-window=""
+            >
+              Before the Flows window, {windowDay}
+            </p>
+          )}
+        </div>
+      </Steady>
 
       <LineStrip
         model={model}
@@ -213,6 +216,37 @@ export function CombinedFlows({ model, bars, from, busy, series, failed, switche
             .join(", ")}.`}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Holds its height at the tallest it has been at this width, so the strip
+ *  under it stays put while the cursor moves (the lines under the bars wrap
+ *  to more or fewer rows on a phone); otherwise the strip would slide out
+ *  from under the pointer that is moving the cursor. */
+function Steady({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [min, setMin] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let width = el.getBoundingClientRect().width;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      if (Math.abs(r.width - width) > 0.5) {
+        width = r.width;
+        setMin(0);
+        return;
+      }
+      setMin((m) => Math.max(m, r.height));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div style={{ minHeight: min || undefined }}>
+      <div ref={ref}>{children}</div>
     </div>
   );
 }
