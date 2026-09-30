@@ -103,11 +103,11 @@ assert(
 );
 assert(new RegExp(`${PEAK_DEBT}\\s*0\\.1\\b`).test(bRaw), "genuine borrow still reads 0.1");
 assert(bText.includes("Highest recorded collateral"), "a borrower's supply column stays 'collateral'");
-// The caveat the old label carried in-line lives on as the column's footnote —
-// dropping the word "principal" from the heading must not drop the claim.
+// On Ethereum each row is the chain's balance, interest included, so the
+// principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(
-  bText.includes("principal only — accrued interest not included"),
-  "the principal-only caveat still rides the debt column as a footnote",
+  !bText.includes("principal only — accrued interest not included"),
+  "an Ethereum debt column carries no principal-only footnote",
 );
 
 const bCols = await bGrid.evaluate((el) => getComputedStyle(el).gridTemplateColumns);
