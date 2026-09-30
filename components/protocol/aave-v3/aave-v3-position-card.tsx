@@ -80,6 +80,12 @@ export interface AaveV3PositionView {
   txCount: number;
   /** The position's events, where the page knows them: the count's tip gives both. */
   eventTotal?: number | null;
+  /** Why the events and the transactions differ, after both in the count's tip. */
+  countNote?: string;
+  /** What the transaction count counts, added to its tip. */
+  countRule?: string;
+  /** What the liquidation count counts, added to its tip. */
+  liquidationRule?: string;
   /** Unix seconds of the most recent event (activity-meta). */
   lastActivityAt: number;
   /** On-chain oracle USD (IAaveOracle, chain-derived) per reserve, keyed by
@@ -201,7 +207,8 @@ function InterestCaption({
   if (usd == null || usd < 0.01 || !receipt) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest{since != null ? ` since ${formatDate(since)}` : ""}
+      incl. <Prov info={receipt(side)}>{formatUsd(usd)}</Prov> interest
+      {since != null ? ` since ${formatDate(since)}` : ""}
     </div>
   );
 }
@@ -502,6 +509,9 @@ function AaveV3PositionCardBody({
               eventCount={v.txCount}
               eventTotal={v.eventTotal}
               liquidationCount={v.liquidationCount}
+              countNote={v.countNote}
+              countRule={v.countRule}
+              liquidationRule={v.liquidationRule}
             />
           }
           closedAt={v.lastActivityAt}
@@ -581,6 +591,9 @@ function AaveV3PositionCardBody({
             eventCount={v.txCount}
             eventTotal={v.eventTotal}
             liquidationCount={v.liquidationCount}
+            countNote={v.countNote}
+            countRule={v.countRule}
+            liquidationRule={v.liquidationRule}
           />
         }
         columns={[
@@ -622,7 +635,11 @@ function AaveV3PositionCardBody({
                     <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} since={captions?.supplyInterestSince} />
+                <InterestCaption
+                  side="supply"
+                  usd={captions?.supplyInterestUsd}
+                  since={captions?.supplyInterestSince}
+                />
               </>
             ),
           },

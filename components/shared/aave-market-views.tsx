@@ -42,6 +42,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, Ban, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { formatCompact } from "@/lib/utils/format";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { type AssetClass, ASSET_CLASS_TITLE, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
@@ -410,15 +412,22 @@ function sizes({ r, vocab, assetHref }: RowProps) {
   const hasBorrow = r.borrowedUsd >= 0.01 || r.borrowed > 0;
   const supplyLink = assetHref && r.suppliedUsd > 0 ? assetHref(r.symbol, "supply") : null;
   const borrowLink = assetHref && hasBorrow ? assetHref(r.symbol, "borrow") : null;
-  const supplied = supplyLink ? (
-    <Link href={supplyLink} className={LINK}>
-      <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
-    </Link>
-  ) : (
-    <span className={r.suppliedUsd > 0 ? "text-foreground/80" : "text-rb-500"}>
-      <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
-    </span>
-  );
+  // A reserve with no market price states its size in tokens.
+  const fixed = r.fixedOraclePrice;
+  const supplied =
+    fixed && r.supplied > 0 ? (
+      <span className="text-foreground/80">
+        {formatCompact(r.supplied)} {r.symbol}
+      </span>
+    ) : supplyLink ? (
+      <Link href={supplyLink} className={LINK}>
+        <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
+      </Link>
+    ) : (
+      <span className={r.suppliedUsd > 0 ? "text-foreground/80" : "text-rb-500"}>
+        <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
+      </span>
+    );
   const borrowed = hasBorrow ? (
     borrowLink ? (
       <Link href={borrowLink} className={LINK}>
@@ -448,6 +457,15 @@ function sizes({ r, vocab, assetHref }: RowProps) {
   const price =
     r.priceUsd != null ? (
       <Prov info={vocab.reservePriceProv(r.symbol)}>{fmtPrice(r.priceUsd)}</Prov>
+    ) : fixed ? (
+      <RevealTip
+        tip={`No market price. The oracle returns a fixed ${fmtPrice(fixed.usd)} for ${r.symbol} (source ${fixed.source.slice(0, 6)}…${fixed.source.slice(-4)}), so ${r.symbol} is left out of the dollar totals. It is not collateral, so the figure moves no health factor.`}
+        label={`No market price for ${r.symbol}`}
+        focusable
+        className="focus-ring rounded-sm text-rb-500 underline decoration-dotted"
+      >
+        no price
+      </RevealTip>
     ) : (
       <span className="text-rb-500">—</span>
     );

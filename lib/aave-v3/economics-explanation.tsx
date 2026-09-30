@@ -15,7 +15,6 @@ import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/sha
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { WRITTEN_OFF_KEY } from "@/lib/aave-v3/chain-truth-tower";
 
-
 /** "67.36 AAVE and 1.2 WETH" — each line's own token amount. */
 const tokenList = (lines: TowerLine[]): string =>
   lines.map((l) => `${fmt2(String(l.amount))} ${l.symbol}`).join(" and ");
@@ -307,7 +306,13 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
           <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
           {data.flowsPricedAtEvents ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
-          liquidation bonus, part of which went to the {treasury} treasury.
+          liquidation bonus
+          {data.liquidationFeeZero
+            ? `, all of it to the liquidator (the ${treasury} protocol fee on the bonus was 0)`
+            : split.length > 0
+              ? `, part of which went to the ${treasury} treasury`
+              : ""}
+          .
         </span>,
       );
   } else if (collLiquidated > 0) {
@@ -425,7 +430,9 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
         ? [
             {
               bold: "Liquidated",
-              text: "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
+              text: data?.liquidationFeeZero
+                ? "the collateral a liquidation took, all of it to the liquidator (no protocol fee on the bonus), and the debt it cleared, valued at the prices when it happened."
+                : "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
             },
           ]
         : []),

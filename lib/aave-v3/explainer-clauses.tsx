@@ -64,6 +64,7 @@ import { hfLabelV4, fmtUnitPrice } from "@/lib/aave-v4/format";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import {
   baseToUsd,
+  beforeAtBlockPrices,
   findReserve,
   humanOf,
   sincePrevious,
@@ -173,6 +174,12 @@ export interface V3StateRead {
   sincePrev?: { prevAfter: number; interest: number };
   /** The event's reserve's loan-to-value at the block, in bps. */
   reserveLtvBps?: number | null;
+  /** The event's reserve's liquidation threshold at the block, in bps (the
+   *  collateral's, on a liquidation). */
+  reserveLtBps?: number | null;
+  /** A liquidation: the health factor before the call at block N's oracle
+   *  prices, the prices the call ran at (hfBefore is the end of N−1). */
+  hfAtCall?: number | null;
   /** The account held nothing and owed nothing once the transaction had run. */
   emptyAfter?: boolean;
   /** The assets on as collateral once the transaction had run. */
@@ -207,6 +214,8 @@ export function v3StateRead(
     collateral: own?.collateral ?? undefined,
     sincePrev: since ? { prevAfter: Number(since.prevAfter), interest: Number(since.interest) } : undefined,
     reserveLtvBps: own?.ltvBps ?? null,
+    reserveLtBps: own?.liquidationThresholdBps ?? null,
+    ...(ctx.eventType === "liquidation" ? { hfAtCall: beforeAtBlockPrices(here)?.hf ?? null } : {}),
     emptyAfter: stateEmptyAfter(here),
     collateralSymbols: here.reserves
       .filter((r) => r.collateral?.after && r.decimals != null && Number(humanOf(r.supply.after, r.decimals)) > 0)
@@ -1014,21 +1023,24 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
       );
       const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
       const recipient = named?.name ?? "another account";
-      const happened = (
-        <>
-          Sent {transferFig} of supplied {sym} to {recipient} as an aToken transfer.
-        </>
-      );
       // The gateway pulls aWETH only to withdraw it as ETH (WrappedTokenGatewayV3
       // withdrawETH): the transfer is the first step of a withdrawal.
-      if (named?.kind === "gateway")
+      if (named?.kind === "gateway") {
+        const seamless = v3Protocol(coords.pool) === "Seamless";
         return {
-          happened: [clause(happened)],
+          happened: [
+            clause(
+              <>
+                Withdrew {transferFig} as ETH through the {seamless ? "Seamless " : ""}WETH gateway.
+              </>,
+            ),
+          ],
           meansNow: [
             clause(
               <>
-                This is how the Aave app withdraws ETH: the gateway took the supplied {sym}, withdrew it from the Pool,
-                unwrapped it and sent it on as ETH to the address the owner named, all in this transaction. The {sym}{" "}
+                On chain the supplied {sym} moved to the gateway as an aToken transfer, and the gateway withdrew it from
+                the Pool, unwrapped it and sent it on as ETH to the address the owner named, all in this transaction.
+                This is how {seamless ? "an app withdraws ETH from Seamless" : "the Aave app withdraws ETH"}. The {sym}{" "}
                 left the position and the Pool.
               </>,
             ),
@@ -1038,6 +1050,7 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
             closedLine(ctx, state, sym, "withdrawn"),
           ],
         };
+      }
       const sentUsd = ctx.price ? Math.abs(Number(ctx.amount)) * ctx.price.usd : null;
       return {
         happened: [
@@ -1151,9 +1164,15 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
     </Fig>
   );
 
+  // The health factor before the call on the basis the call ran at: block N's
+  // prices where the read has them, else the end of N−1.
+  const hfBeforeCall = state?.hfAtCall ?? state?.hfBefore ?? null;
   const fell =
-    state?.hfBefore != null ? (
-      <>The account&rsquo;s health factor had fallen to {hfText(state.hfBefore)}, below 1.0</>
+    hfBeforeCall != null ? (
+      <>
+        The account&rsquo;s health factor had fallen to {hfBeforeCall.toFixed(4)} at the prices the liquidation ran at,
+        below 1.0
+      </>
     ) : (
       <>The account&rsquo;s health factor fell below 1.0</>
     );
@@ -1212,32 +1231,59 @@ function liquidationSlots(ctx: AaveV3Context, coords: V3Coords, debtSym: string,
   const clearedUsd = ctx.debtPrice ? Number(ctx.debtToCover) * ctx.debtPrice.usd : null;
   const half =
     clearedUsd != null && state?.debtUsdBefore ? Math.abs(clearedUsd / state.debtUsdBefore - 0.5) < 0.002 : false;
+  // Seamless runs the Aave V3.0 rule (Pool revision 2, LiquidationLogic):
+  // half of the one debt asset's balance while the health factor is above
+  // 0.95, all of it at 0.95 or below.
+  const debtBeforeAmt = numOf(ctx.debtBefore);
+  const halfOfAsset =
+    debtBeforeAmt != null && debtBeforeAmt > 0 && Math.abs(Number(ctx.debtToCover) / debtBeforeAmt - 0.5) < 0.001;
   const closeFactor: ClauseInput =
-    v3Protocol(coords.pool) === "Aave V3"
-      ? clause(
-          half && state?.debtUsdBefore ? (
-            <>
-              One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
-              the health factor is at or below 0.95 or the position in either asset is under $2,000: the{" "}
-              {formatUsdValue(clearedUsd as number)} cleared here is half of the {formatUsdValue(state.debtUsdBefore)}{" "}
-              owed.
-            </>
-          ) : (
-            <>
-              One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
-              the health factor is at or below 0.95 or the position in either asset is under $2,000.
-            </>
-          ),
-        )
-      : null;
-
-  const hfMove: ClauseInput =
-    state?.hfBefore != null && state.hfAfter != null
+    v3Protocol(coords.pool) === "Seamless"
       ? clause(
           <>
-            The health factor went from {hfText(state.hfBefore)} to {hfText(state.hfAfter)}: collateral counts toward it
-            only up to its liquidation threshold, so taking collateral lowers it less than clearing the same value of
-            debt raises it.
+            One liquidation may repay at most half of the account&rsquo;s debt in one asset while the health factor is
+            above 0.95, and all of it at 0.95 or below
+            {halfOfAsset && debtBeforeAmt != null ? (
+              <>
+                : the {fmt2(ctx.debtToCover)} {debtSym} repaid here is half of the {fmt2(String(debtBeforeAmt))}{" "}
+                {debtSym} owed
+              </>
+            ) : null}
+            .
+          </>,
+        )
+      : v3Protocol(coords.pool) === "Aave V3"
+        ? clause(
+            half && state?.debtUsdBefore ? (
+              <>
+                One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
+                the health factor is at or below 0.95 or the position in either asset is under $2,000: the{" "}
+                {formatUsdValue(clearedUsd as number)} cleared here is half of the {formatUsdValue(state.debtUsdBefore)}{" "}
+                owed.
+              </>
+            ) : (
+              <>
+                One liquidation may repay at most half of the account&rsquo;s total debt, or all of the debt asset when
+                the health factor is at or below 0.95 or the position in either asset is under $2,000.
+              </>
+            ),
+          )
+        : null;
+
+  const hfMove: ClauseInput =
+    hfBeforeCall != null && state?.hfAfter != null
+      ? clause(
+          <>
+            The health factor went from {hfText(hfBeforeCall)} to {hfText(state.hfAfter)}: collateral counts toward it
+            only up to its liquidation threshold
+            {state.reserveLtBps != null ? (
+              <>
+                {" "}
+                ({collSym}&rsquo;s was {(state.reserveLtBps / 100).toFixed(0)}% at this block; governance can change it
+                later, and the market page shows today&rsquo;s)
+              </>
+            ) : null}
+            , so taking collateral lowers it less than clearing the same value of debt raises it.
           </>,
         )
       : null;
@@ -1414,7 +1460,13 @@ function valuedSentences(
                 ({fmt2(fee?.amount)} {collSym})
               </>
             ) : null}{" "}
-            goes to the Aave treasury, which leaves the liquidator {pctPlain(b.bonus * (1 - b.feeShare))}
+            goes to the {v3Brand(v3Protocol(coords.pool))} treasury, which leaves the liquidator{" "}
+            {pctPlain(b.bonus * (1 - b.feeShare))}
+          </>
+        ) : atBlock && atBlock.protocolFeeBps === 0 ? (
+          <>
+            . {v3Brand(v3Protocol(coords.pool))}&rsquo;s protocol fee on the bonus was 0 at this block, so the whole
+            bonus went to the liquidator and none to the treasury
           </>
         ) : null}
         .{" "}

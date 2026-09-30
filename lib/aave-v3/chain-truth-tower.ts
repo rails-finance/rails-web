@@ -827,6 +827,9 @@ export type AaveV3TowerData = ChainTruthTowerData & {
   /** Each liquidated collateral asset: what left in all, and of it the fee
    *  the Aave treasury took (the liquidator had the rest). */
   liquidationSplit?: { symbol: string; total: number; fee: number }[];
+  /** Every liquidation in the rows read a protocol fee of 0 at its block, so
+   *  the liquidator kept the whole bonus (Seamless). */
+  liquidationFeeZero?: true;
 };
 
 export function computeAaveV3Economics(
@@ -1220,6 +1223,14 @@ export function computeAaveV3Economics(
         .map((r) => ({ symbol: r.symbol, total: r.liquidatedCollateral, fee: r.treasuryFee ?? 0 }))
     : [];
 
+  // Every liquidation in the rows paid no protocol fee (the fee bps its
+  // block's configuration read), and none sent a fee row to a treasury.
+  const liqRows = (events ?? []).filter((e) => isAaveV3Event(e) && e.context.data.eventType === "liquidation");
+  const liquidationFeeZero =
+    liqRows.length > 0 &&
+    liquidationSplit.length === 0 &&
+    liqRows.every((e) => isAaveV3Event(e) && e.context.data.liquidationBonusAtBlock?.protocolFeeBps === 0);
+
   return {
     valued,
     // On-chain oracle price → chain-derived, so the USD bars survive On-chain-values.
@@ -1251,6 +1262,7 @@ export function computeAaveV3Economics(
     ...(notLoaded.length > 0 ? { notLoaded } : {}),
     flowsPricedAtEvents: valued && flowsAtEventPrices,
     ...(liquidationSplit.length > 0 ? { liquidationSplit } : {}),
+    ...(liquidationFeeZero ? { liquidationFeeZero: true as const } : {}),
   };
 }
 

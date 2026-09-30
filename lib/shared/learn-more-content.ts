@@ -1153,10 +1153,12 @@ export function aaveV3LiquidationContent(protocol: V3Protocol = "Aave V3"): Lear
     title: "How Liquidations Work",
     intro: `${account} can be liquidated when its health factor falls below 1.0: its collateral, each asset counted up to its liquidation threshold, no longer covers its debt. Anyone can then liquidate it; in practice automated bots do.`,
     extraParagraphs: [
-      "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. A share of it, the liquidation protocol fee, goes to the treasury as aTokens in the same transaction.",
+      protocol === "Seamless"
+        ? "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. Seamless can keep a share of the bonus, the liquidation protocol fee, also set per asset: it is 0 on most reserves, WETH and USDC among them, so the liquidator keeps the whole bonus. Each liquidation's card states the bonus and the fee at its block."
+        : "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. A share of it, the liquidation protocol fee, goes to the treasury as aTokens in the same transaction.",
       aave
         ? "One liquidation may repay up to half of the account's total debt. It may repay all of the debt asset when the health factor is at or below 0.95, or when the account's position in the debt or the collateral asset is worth under $2,000. The account stays open, and it can be liquidated again while its health factor is below 1.0."
-        : `One liquidation may repay up to half of the debt asset it repays, or all of it when the health factor is below 0.95. The account stays open, and it can be liquidated again while its health factor is below 1.0.`,
+        : `One liquidation may repay up to half of the debt asset it repays, or all of it when the health factor is at or below 0.95. The account stays open, and it can be liquidated again while its health factor is below 1.0.`,
       "Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt. More collateral or less debt keeps it above 1.0.",
     ],
     links: v3ModalLinks(protocol, [

@@ -26,6 +26,10 @@ export interface AaveMarketReserve {
   borrowed: number;
   /** USD per whole token from the market's own IAaveOracle; null if unpriced. */
   priceUsd: number | null;
+  /** The oracle returns a fixed figure here, not a market price (Seamless:
+   *  SEAM, DEGEN, BRETT at $1.00). `priceUsd` is then null, so the reserve
+   *  stays out of the dollar totals. */
+  fixedOraclePrice?: { usd: number; source: string };
   /** Liquidation threshold (0..1) from the live reserve config; null when 0.
    *  Zero does NOT mean "can never be collateral" — see `emodeCategories`: a
    *  reserve the Pool weights at zero on its own can still be collateral at a
