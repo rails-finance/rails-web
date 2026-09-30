@@ -295,7 +295,7 @@ function FactorCaption({ v, addresses }: { v: MoonwellPositionView; addresses: s
       {rows.map((e, i) => (
         <span key={e.underlying}>
           {i > 0 ? " · " : ""}
-          {e.symbol} {Math.round(e.collateralFactor * 100)}%
+          {e.symbol} {+(e.collateralFactor * 100).toFixed(1)}%
         </span>
       ))}
     </div>

@@ -51,6 +51,11 @@ export interface CTokenLiquidationBreakdownProps {
 }
 
 const pct = (f: number, digits = 1) => `${(f * 100).toFixed(digits)}%`;
+/** A collateral factor as set: 75%, or 82.5% where it has a half. */
+const factorPct = (f: number) => {
+  const p = Math.round(f * 1000) / 10;
+  return `${Number.isInteger(p) ? p.toFixed(0) : p.toFixed(1)}%`;
+};
 
 /** Small amounts keep four significant figures: a 0.0058 ETH repayment is
  *  the figure the story turns on. */
@@ -157,7 +162,7 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
             <>
               : at that block&rsquo;s prices the account was <strong>{money(metShortfall)}</strong> short when it was
               liquidated (its {money(at.after!.liquidityUsd)} of room after the liquidation, less the{" "}
-              {money(p.clearedValue!)} repaid, plus the {money(p.seizedValue!)} seized × {pct(collCf!, 0)})
+              {money(p.clearedValue!)} repaid, plus the {money(p.seizedValue!)} seized × {factorPct(collCf!)})
             </>
           ) : null}
           .
@@ -180,7 +185,7 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
         {counted.map((c, i) => (
           <span key={c.market}>
             {i > 0 ? (i === counted.length - 1 ? " and " : ", ") : ""}
-            {c.label} {c.value != null ? money(c.value) : ""} × {pct(c.collateralFactor, 0)}
+            {c.label} {c.value != null ? money(c.value) : ""} × {factorPct(c.collateralFactor)}
           </span>
         ))}
         {limit != null && counted.length > 0 ? <> = {money(limit)}</> : null}.

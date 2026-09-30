@@ -49,7 +49,10 @@ export function CTokenMembershipLine(p: {
             <strong>entered as collateral</strong>
           </Prov>{" "}
           at this block
-          {m.collateralFactor != null ? <>, counting at {Math.round(m.collateralFactor * 100)}% of its value</> : null}.
+          {m.collateralFactor != null ? (
+            <>, counting at {+(m.collateralFactor * 100).toFixed(1)}% of its value</>
+          ) : null}
+          .
         </>
       ) : (
         <>
