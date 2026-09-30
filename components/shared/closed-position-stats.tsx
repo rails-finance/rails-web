@@ -53,9 +53,9 @@ export interface ClosedPositionStatsProps {
   outcomeLabel?: string;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
-  /** Unix timestamp of the outcome itself (the last liquidation), where it
+  /** Unix timestamp of the outcome (the last liquidation), where it
    *  differs from the closure: its date leads beneath Outcome and the
-   *  closing date follows on its own line. */
+   *  closing date follows on the next line. */
   outcomeAt?: number;
   /** Optional 4th column (rate slot) — keeps closed cards the same width as open */
   extra?: { label: string; value: ReactNode };

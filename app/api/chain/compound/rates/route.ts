@@ -5,14 +5,14 @@ import { COMPOUND_DEPLOYMENT } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 
 // A Comet market's interest rates at past blocks — what a row's interest line
-// sets its own average against. Comet charges and pays at the rate its
+// sets its average against. Comet charges and pays at the rate its
 // utilisation gives at each moment, so the rate at the previous event and the
 // rate just before this one bracket what a balance earned or paid between them.
 //
 // `?deployment=ethereum|base&market=<key>&blocks=a,b,…` (at most four)
 // answers `{ rates: { [block]: { utilization, supply, borrow } } }`, yearly
 // fractions: getUtilization, then getSupplyRate and getBorrowRate at it, each
-// per second × 31,536,000 (Comet's own SECONDS_PER_YEAR). A block whose read
+// per second × 31,536,000 (Comet's SECONDS_PER_YEAR). A block whose read
 // fails is absent.
 
 export const runtime = "nodejs";
