@@ -278,21 +278,19 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     .click();
   await page.waitForTimeout(300);
   const lineAt = () => page.locator('[data-flow-sources="collateral"]').innerText();
-  // The Full breakdown's rows: from its heading to its first bullet or the
-  // timeline's eyebrow.
+  // The Full breakdown's rows: the ledger the Lifetime flows panel opens
+  // (`<id>-ledger` under the Full breakdown control). A row's text starts with
+  // its sign and the table's tabs ("+\t\tInterest earned").
   const breakdown = await page.evaluate(() => {
-    const t = document.body.innerText;
-    const at = t.indexOf("Full breakdown");
-    const ends = ["•", "\nHolding since", "\nHeld "].map((w) => t.indexOf(w, at)).filter((i) => i > at);
-    return t.slice(at, Math.min(...ends, t.length));
+    const control = [...document.querySelectorAll("button")].find((b) => /Full breakdown/.test(b.innerText));
+    const id = control?.getAttribute("aria-controls");
+    const ledger = id ? document.getElementById(id) : null;
+    return ledger && !ledger.hidden ? ledger.innerText : "";
   });
-  const rowCount = [...breakdown.matchAll(/^(Deposited \(all.time\)|Worth now)$/gm)].length;
+  const ROW = /^[+−-]?\s*(Deposited \(all.time\)|Received|Interest earned|Withdrawn|Sent|Worth now)\n\s*([^\n]+)$/gm;
+  const rowCount = [...breakdown.matchAll(/^[+−-]?\s*(Deposited \(all.time\)|Worth now)$/gm)].length;
   check(`${name} page: the Full breakdown opened`, rowCount > 0, breakdown.slice(0, 120));
-  const unitless = [
-    ...breakdown.matchAll(
-      /^(Deposited \(all.time\)|Received|Interest earned|Withdrawn|Sent|Worth now)\n\s*([^\n]+)$/gm,
-    ),
-  ]
+  const unitless = [...breakdown.matchAll(ROW)]
     .filter((m) => /^[0-9.,KMB]+$/.test(m[2].trim()))
     .map((m) => `${m[1]} ${m[2].trim()}`);
   check(`${name} page: every Full breakdown row names its unit`, unitless.length === 0, unitless.join("; "));

@@ -7,7 +7,7 @@
 
 import { useMemo } from "react";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -200,11 +200,11 @@ export default function SkySavingsPositionView({
         }
       />
 
-      <ChainTruthTower
-        data={tower}
+      <LifetimeFlowsPanel
+        ledger={tower}
         explanation={skyFlowsExplanation(position, totals)}
         learnMore={skyFlowsContent()}
-        timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+        scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
       />
 
       <ChainTruthTimeline

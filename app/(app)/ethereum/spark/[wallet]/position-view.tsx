@@ -74,7 +74,7 @@ import {
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
 import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { operationsFromEvents } from "@/lib/shared/flows-busy";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
@@ -825,8 +825,8 @@ export default function SparkPositionDetail({
             />
           )}
           {towerData && (
-            <ChainTruthTower
-              data={towerData}
+            <LifetimeFlowsPanel
+              ledger={towerData}
               explanation={sparkEconomicsExplanation(
                 towerData,
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
@@ -834,7 +834,7 @@ export default function SparkPositionDetail({
                 (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
               )}
               learnMore={sparkEconomicsContent(towerData)}
-              timeline={
+              scrubber={
                 flowTimeline ? (
                   <LifetimeFlowsScrubber
                     timeline={flowTimeline}
@@ -842,7 +842,7 @@ export default function SparkPositionDetail({
                     loadOperations={flowOperations ? undefined : loadFlowOperations}
                     healthThreshold={healthThreshold}
                   />
-                ) : undefined
+                ) : null
               }
             />
           )}

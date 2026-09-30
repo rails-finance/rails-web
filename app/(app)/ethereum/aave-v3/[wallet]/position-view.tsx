@@ -52,7 +52,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { operationsFromEvents } from "@/lib/shared/flows-busy";
 import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
@@ -742,11 +742,11 @@ export default function AaveV3PositionDetail({
               />
             )}
             {towerData && (
-              <ChainTruthTower
-                data={towerData}
+              <LifetimeFlowsPanel
+                ledger={towerData}
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
-                timeline={
+                scrubber={
                   flowTimeline ? (
                     <LifetimeFlowsScrubber
                       timeline={flowTimeline}
@@ -754,7 +754,7 @@ export default function AaveV3PositionDetail({
                       loadOperations={flowOperations ? undefined : loadFlowOperations}
                       healthThreshold={healthThreshold}
                     />
-                  ) : undefined
+                  ) : null
                 }
               />
             )}
