@@ -173,7 +173,9 @@ export function PriceRunway({
   const liqPos = posFromPct(0); // liquidation line — constant across every row
   const markerPos = posFromPct(mPct); // live marker — left of liqPos when safe, right when underwater
 
-  const pctFromLiq = Math.round(mPct);
+  // A fall that rounds to 100% while the liquidation price is above zero reads
+  // "over 99%": a 100% fall would take the price to nothing.
+  const pctFromLiq = Math.round(mPct) >= 100 && mPct < 100 ? "over 99" : String(Math.round(mPct));
   const safeLabel =
     label ?? (asset ? `${asset} can fall ${pctFromLiq}% before liquidation` : `${pctFromLiq}% from liquidation`);
   // Once underwater the runway is spent — the only figure that matters is how far

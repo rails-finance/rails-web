@@ -19,7 +19,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { makerdaoVaultContent, makerdaoLiquidationContent } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { makerdaoEventSlots, type MakerRowExtras } from "@/lib/makerdao/explainer-clauses";
-import { openedForSigner, useMakerVaultHistory, type MakerEvent } from "@/lib/makerdao/vault-history";
+import { makerOwnerAt, openedForSigner, useMakerVaultHistory, type MakerEvent } from "@/lib/makerdao/vault-history";
 import { useIlkAtRow } from "./makerdao-event-detail";
 
 export interface MakerDAOEventExplainerProps {
@@ -85,6 +85,7 @@ export function useMakerRowExtras(
     ownershipAll: history.ownership,
     matStep: eventId ? history.matSteps.get(eventId) : undefined,
     createdForSigner: self ? openedForSigner(self as MakerEvent, history.txRows) : false,
+    ownerAt: self ? makerOwnerAt(history, self.timestamp) : history.owner,
     eventId,
     split: eventId ? history.debtSplit.get(eventId) : undefined,
     previousAt: eventId ? history.previousAt.get(eventId) : undefined,

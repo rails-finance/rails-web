@@ -78,6 +78,8 @@ export interface MakerVaultHistory {
   matSteps: Map<string, MakerMatStep>;
   /** The owners over the vault's loaded history, oldest first. */
   owners: MakerOwnerSpan[];
+  /** The vault's owner today (the account behind its proxy), lowercased. */
+  owner: string | null;
 }
 
 /** An owner of the vault: the address the CDP manager records (`holder`,
@@ -128,6 +130,7 @@ const EMPTY: MakerVaultHistory = {
   txContext: new Map(),
   matSteps: new Map(),
   owners: [],
+  owner: null,
 };
 
 const Ctx = createContext<MakerVaultHistory>(EMPTY);
@@ -294,6 +297,14 @@ export function makerOwnership(
     if (owners[i].until === owners[i].since) owners[i].withinTx = true;
   }
   return { steps, owners };
+}
+
+/** The account that owned the vault at `at` (the owner behind its proxy):
+ *  the loaded owner span that covers it, else the owner today. */
+export function makerOwnerAt(history: MakerVaultHistory, at: number): string | null {
+  let found: MakerOwnerRef | null = null;
+  for (const o of history.owners) if (o.since <= at) found = o.ref;
+  return found?.owner ?? found?.holder ?? history.owner;
 }
 
 /** Where the ilk's minimum ratio differs from the previous row's. */

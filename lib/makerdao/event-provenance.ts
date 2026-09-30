@@ -620,11 +620,31 @@ export const feeInDebtProv = (vals: { debt: string; drawn: string; since?: strin
 export const drawnDaiProv = (vals: { drawn: string; since?: string }): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `DAI drawn and still owed — every draw less every repayment since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}, each valued at the rate accumulator at its block, which is the DAI minted or burned then.`,
+  summary: `Principal: DAI drawn less DAI repaid since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}, each valued at the rate accumulator at its block, which is the DAI minted or burned then. A repayment counts against principal first and against fee only once principal reaches zero.`,
   contract: VAT,
   via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) since the debt was last zero`,
   formula: "Σ draws − Σ repayments since zero debt",
   inputs: [{ label: "DAI drawn", value: vals.drawn, kind: "chain-derived", pclass: "indexed" }],
+});
+
+/** One part of the lifetime repayments: the principal it cleared, or the fee
+ *  paid inside it. A repayment counts against principal first and against fee
+ *  only once principal reaches zero, so the fee part is the lifetime fee less
+ *  the fee owed now and the fee a liquidation cleared. */
+export const repaidPartProv = (part: "principal" | "fee", vals: { repaid: string; fee: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  summary:
+    part === "fee"
+      ? "Stability fee paid inside repayments — the fee over the vault's life less the fee in today's debt and the fee a liquidation cleared. A repayment counts against principal first and against fee only once principal reaches zero."
+      : "Principal cleared by repayments — every repayment, each at its block's rate, less the stability fee paid inside them.",
+  contract: VAT,
+  via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) (repaid), split principal-first`,
+  formula: part === "fee" ? "lifetime fee − fee owed − fee liquidated" : "Σ repaid − fee paid in repayments",
+  inputs: [
+    { label: "repaid", value: vals.repaid, kind: "chain-derived", pclass: "indexed", note: "each at its block's rate" },
+    { label: "fee paid in repayments", value: vals.fee, kind: "chain-derived", pclass: "indexed" },
+  ],
 });
 
 /** The stability fee accrued over the vault's whole life. */

@@ -3,9 +3,7 @@
 import { PriceRunway } from "@/components/shared/price-runway";
 import { Prov } from "@/components/shared/provenance";
 import { fmtPrice } from "@/components/shared/price-pill";
-import { liquidationPriceProv, osmPriceProv } from "@/lib/makerdao/event-provenance";
-import { formatNumber } from "@/lib/utils/format";
-import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
+import { osmPriceProv } from "@/lib/makerdao/event-provenance";
 import type { MakerVaultView } from "./makerdao-vault-card";
 
 /**
@@ -45,23 +43,14 @@ export function MakerdaoRunway({
     return null;
 
   if (slot) {
-    const dsym = ilkDebtSymbol(v.ilk);
-    const liqProv =
-      v.debtDai != null && v.matRatio != null
-        ? liquidationPriceProv(
-            `${formatNumber(v.debtDai)} ${dsym}`,
-            `${(v.matRatio * 100).toFixed(0)}%`,
-            `${formatNumber(v.ink)} ${v.collateralSymbol}`,
-          )
-        : null;
     return (
       <div className="w-full">
         <PriceRunway compact currentPrice={v.priceUsd} liqPrice={v.liquidationPriceUsd} asset={v.collateralSymbol} />
         <div className="mt-1.5 flex items-baseline justify-end gap-1 text-[11px] tabular-nums text-rb-500">
+          {/* The liquidation price is the ratio column's "Liquidates at" line;
+              the caption names the price the bar starts from. */}
           <span>
-            liquidation{" "}
-            {liqProv ? <Prov info={liqProv}>{fmtPrice(v.liquidationPriceUsd)}</Prov> : fmtPrice(v.liquidationPriceUsd)}{" "}
-            · {v.collateralSymbol} <Prov info={osmPriceProv(v.collateralSymbol, v.ilk)}>{fmtPrice(v.priceUsd)}</Prov>
+            {v.collateralSymbol} now <Prov info={osmPriceProv(v.collateralSymbol, v.ilk)}>{fmtPrice(v.priceUsd)}</Prov>
           </span>
         </div>
       </div>

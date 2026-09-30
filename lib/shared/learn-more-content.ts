@@ -3127,6 +3127,7 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
         stepsHeading: "What it changes:",
         steps: [
           "The DAI owed includes the stability fee added since the draws, so clearing a debt takes more DAI than was drawn.",
+          "Maker keeps one debt figure. This page splits it into principal (DAI drawn less DAI repaid) and fee (the rest), so a repayment counts against principal first and against fee only once principal reaches zero.",
           "A repayment must leave either no debt or at least the type's minimum debt; a smaller remainder is refused.",
           "Anyone can repay a vault's debt directly at the Vat; the collateral stays the owner's.",
         ],
@@ -3141,7 +3142,8 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
         stepsHeading: "Who the owner is:",
         steps: [
           "The recorded owner is usually a DSProxy, a small contract wallet each user deploys once and controls from their own address. The page names the address behind the proxy as the owner.",
-          "Some tools hold a vault in a contract of their own for part of a transaction (a migration contract, an automation account) and hand it on or back before the transaction ends.",
+          "The CDP manager makes whoever opens a vault its owner, so a contract that opens a vault for someone gives it to them in the same transaction.",
+          "Some tools hold a vault in a contract for part of a transaction (a migration contract, an automation account) and hand it on or back before the transaction ends.",
           "Only the owner, or an address the owner allowed on this vault, can give it away.",
         ],
         detailsHeading: "What the owner can do:",
