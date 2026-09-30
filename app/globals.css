@@ -1645,7 +1645,9 @@ label[for] {
    muted text) on the teal paper — the inverted receipt row's technique. */
 .prov-inspect-pop {
   position: fixed;
-  z-index: 60;
+  /* Over the bottom sheets (mobile-sheet.tsx, z 9999), so a receipt opened
+     from inside a sheet lands on top of it. */
+  z-index: 10000;
   width: 400px;
   max-width: calc(100vw - 16px);
   max-height: min(440px, calc(100vh - 16px));

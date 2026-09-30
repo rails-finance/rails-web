@@ -16,7 +16,7 @@
 //      sUSDS; the panel draws no Full breakdown; the Explanation's figures
 //      each name USDS, carry the api's in, out, worth and interest, and add
 //      up (worth + out − in = interest; the bar's length = worth + out); every
-//      figure in the bar's tip sum is in dollars; the scrubber's
+//      figure in the bar's panel sum is in dollars; the scrubber's
 //      balancing item reads "Interest earned" at every stop, its last stop
 //      states the header's block, and at 390px consecutive Savings Rate
 //      changes draw as one row that counts them.
@@ -279,13 +279,15 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
     `${name} page: the panel draws no Full breakdown`,
     (await page.getByRole("button", { name: /Full breakdown/ }).count()) === 0,
   );
-  // The bar's sum closes each segment's tip: hover the first segment and read it.
+  // The bar's sum closes each segment's panel: click the first segment, read
+  // it, and close the panel with Escape.
   const lineAt = async () => {
-    await page.locator('[data-flow-side="collateral"] div[aria-hidden] > span').first().hover();
+    await page.locator('[data-flow-side="collateral"] [data-flow-seg]').first().click();
     const sum = page.locator('[data-flow-tip-sum="collateral"]');
     await sum.waitFor({ timeout: 5000 });
     const text = await sum.innerText();
-    await page.mouse.move(0, 0);
+    await page.keyboard.press("Escape");
+    await sum.waitFor({ state: "detached", timeout: 5000 });
     return text;
   };
   // The Explanation's bullets (lib/sky-savings/flows-explanation.tsx), read
@@ -354,7 +356,8 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
       length[1],
     );
   // The bar's sum: every figure in dollars.
-  const line = (await lineAt()).replace(/\s+/g, " ");
+  // The total's label names its date ("Held today (30 Sep '26)"), which is no figure.
+  const line = (await lineAt()).replace(/\s+/g, " ").replace(/\d{1,2} [A-Z][a-z]{2} '\d{2}/g, "");
   const bare = [...line.matchAll(/(?:^|[^$\d.,])([\d][\d.,]*[KMBT]?)(?![\d.,KMBT%])/g)].map((m) => m[1]);
   check(`${name} page: every figure in the bar's sum is in dollars`, /\$/.test(line) && bare.length === 0, line);
   const stops = [await lineAt()];

@@ -24,6 +24,7 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { DateRow, Headline, Rescaled, Throughput, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
+import { FlowCursorContext, KEEP_PANEL } from "@/components/shared/lifetime-flows-tip";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { assetsAt, axisFor, DAY_MS, dayStart, type FlowModel } from "@/lib/shared/flows-timeline";
@@ -142,103 +143,122 @@ export function CombinedFlows({
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
   const btn = `${CTRL_GHOST} ${CTRL_OFF} size-11 shrink-0 rounded-md sm:size-9`;
   const tickHere = cur.event && !cur.live ? model.ticks.find((t) => t.day === cur.stop) : undefined;
+  // What an open segment panel reads: the date in words and the cursor's
+  // steps, so the panel restates its figures as the cursor moves.
+  const cursor = useMemo(
+    () => ({
+      at: atClose ? `at close, ${closeDay}` : head.isLive ? `today (${dayStamp(Date.now() / 1000)})` : `at ${dateText}`,
+      prev: () => go(at - 1),
+      next: () => go(at + 1),
+      canPrev: at > 0,
+      canNext: at < last,
+      live: !outside,
+    }),
+    // `go` closes over `last`, listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [atClose, closeDay, head.isLive, dateText, at, last, outside],
+  );
 
   return (
-    <div className="text-sm" data-flows-combined="">
-      <Steady>
-        <DateRow>{dateLine}</DateRow>
-        {through && <Throughput t={through} hasDebt={hasDebt} />}
-        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
-          <Headline
-            side="collateral"
-            st={head.collateral}
-            model={model}
-            when={when}
-            isLive={liveReceipts}
-            assets={assets}
-          />
-          {hasDebt && (
-            <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
-          )}
-        </div>
-        <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"}>
-          <div
-            className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
-            aria-hidden={outside || undefined}
-            {...(outside ? { inert: true } : {})}
-          >
-            {busy ? (
-              <Rescaled
-                model={bars}
-                s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
-                hasDebt={hasDebt}
-                when={when}
-                isLive={liveReceipts}
-                assets={barAssets}
-                headlines={false}
-                outline={!cur.live}
-              />
-            ) : (
-              renderBars(barStop, when, liveReceipts, cur.live)
+    <FlowCursorContext.Provider value={cursor}>
+      <div className="text-sm" data-flows-combined="">
+        <Steady>
+          <DateRow>{dateLine}</DateRow>
+          {through && <Throughput t={through} hasDebt={hasDebt} />}
+          <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+            <Headline
+              side="collateral"
+              st={head.collateral}
+              model={model}
+              when={when}
+              isLive={liveReceipts}
+              assets={assets}
+            />
+            {hasDebt && (
+              <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
             )}
           </div>
-          {outside && (
-            <p
-              className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
-              data-flow-outside-window=""
+          <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"}>
+            <div
+              className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
+              aria-hidden={outside || undefined}
+              {...(outside ? { inert: true } : {})}
             >
-              Before the bars&rsquo; window, {windowDay}
-            </p>
-          )}
+              {busy ? (
+                <Rescaled
+                  model={bars}
+                  s={barState ?? combinedAt(model, bars, { stop: from, barStop: 0 }).bars!}
+                  hasDebt={hasDebt}
+                  when={when}
+                  isLive={liveReceipts}
+                  assets={barAssets}
+                  headlines={false}
+                  outline={!cur.live}
+                />
+              ) : (
+                renderBars(barStop, when, liveReceipts, cur.live)
+              )}
+            </div>
+            {outside && (
+              <p
+                className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap rounded-md border border-rb-200 bg-raised px-2 py-1 text-xs font-medium text-rb-500 shadow-sm dark:border-rb-700"
+                data-flow-outside-window=""
+              >
+                Before the bars&rsquo; window, {windowDay}
+              </p>
+            )}
+          </div>
+        </Steady>
+
+        <div {...KEEP_PANEL}>
+          <LineStrip
+            model={model}
+            series={series}
+            failed={failed}
+            stops={stops}
+            at={Math.min(shown, last)}
+            head={{ collateral: head.collateral.now, debt: head.debt.now }}
+            hasDebt={hasDebt}
+            windowFrom={from > 0 ? model.start / DAY_MS + from : null}
+            valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
+            onPreview={setPreview}
+            onPick={go}
+          />
+          <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
         </div>
-      </Steady>
 
-      <LineStrip
-        model={model}
-        series={series}
-        failed={failed}
-        stops={stops}
-        at={Math.min(shown, last)}
-        head={{ collateral: head.collateral.now, debt: head.debt.now }}
-        hasDebt={hasDebt}
-        windowFrom={from > 0 ? model.start / DAY_MS + from : null}
-        valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-        onPreview={setPreview}
-        onPick={go}
-      />
-      <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
+        <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="" {...KEEP_PANEL}>
+          <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
+            <SkipBack size={16} aria-hidden />
+          </button>
+          <button type="button" className={btn} aria-label="Previous date" onClick={() => go(at - 1)}>
+            <ChevronLeft size={18} aria-hidden />
+          </button>
+          <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
+            {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+          </button>
+          <button type="button" className={btn} aria-label="Next date" onClick={() => go(at + 1)}>
+            <ChevronRight size={18} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={btn}
+            aria-label={closed ? "Jump to close" : "Jump to today"}
+            onClick={() => go(last)}
+          >
+            <SkipForward size={16} aria-hidden />
+          </button>
+        </div>
 
-      <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="">
-        <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
-          <SkipBack size={16} aria-hidden />
-        </button>
-        <button type="button" className={btn} aria-label="Previous date" onClick={() => go(at - 1)}>
-          <ChevronLeft size={18} aria-hidden />
-        </button>
-        <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
-          {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-        </button>
-        <button type="button" className={btn} aria-label="Next date" onClick={() => go(at + 1)}>
-          <ChevronRight size={18} aria-hidden />
-        </button>
-        <button
-          type="button"
-          className={btn}
-          aria-label={closed ? "Jump to close" : "Jump to today"}
-          onClick={() => go(last)}
-        >
-          <SkipForward size={16} aria-hidden />
-        </button>
+        {head.stale.length > 0 && (
+          <p className="mt-2 text-[11px] leading-snug text-rb-500">
+            {`${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${head.stale
+              .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
+              .join(", ")}.`}
+          </p>
+        )}
       </div>
-
-      {head.stale.length > 0 && (
-        <p className="mt-2 text-[11px] leading-snug text-rb-500">
-          {`${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${head.stale
-            .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
-            .join(", ")}.`}
-        </p>
-      )}
-    </div>
+    </FlowCursorContext.Provider>
   );
 }
 

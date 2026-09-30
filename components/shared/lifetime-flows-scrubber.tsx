@@ -8,8 +8,9 @@
 // its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
-// them. Hovering or tapping a segment lists its assets and ends with its
-// side's sum: where the bar's length came from, what has left and what is held.
+// them. A click, a tap or Enter on a segment opens its panel
+// (lifetime-flows-tip.tsx): its assets, then its side's sum, one signed line
+// per component in whole dollars, landing on what is held or owed.
 //
 // Where the position has a series (a family's route, or day rows the page
 // holds), the panel is the bars with the collateral and debt line under them
@@ -36,7 +37,15 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import {
+  fillStyle,
+  FlowCursorContext,
+  FlowPanelShell,
+  sumSwatch,
+  KEEP_PANEL,
+  SegmentPanelBody,
+  type PanelPart,
+} from "@/components/shared/lifetime-flows-tip";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -51,7 +60,6 @@ import {
   spokenUsd,
   stateAt,
   type FlowAssetHeld,
-  type FlowHatch,
   type FlowModel,
   type FlowSegment,
   type FlowSide,
@@ -60,7 +68,7 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { AxisLabels, BusyFlows, DateRow, Headline, SideSum, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
 import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
@@ -76,49 +84,6 @@ import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
 const PLAY_MS = 60;
-
-// The position axes' hues (color-grammar §6): blue the supplied side, green
-// the debt. Each outflow kind takes its own hatch (standards/lexicon.md).
-const HUE: Record<FlowSide, { solid: string; line: string; hatch: string }> = {
-  collateral: {
-    solid: "var(--color-blue-500)",
-    line: "rgba(96, 165, 250, 0.9)",
-    hatch: "rgba(96, 165, 250, 0.75)",
-  },
-  debt: {
-    solid: "var(--color-green-400)",
-    line: "rgba(74, 222, 128, 0.9)",
-    hatch: "rgba(74, 222, 128, 0.7)",
-  },
-};
-const TONE_HATCH = { liquidation: "rgba(248, 113, 113, 0.75)", redemption: "rgba(244, 114, 182, 0.75)" };
-const TONE_LINE = { liquidation: "rgba(239, 68, 68, 0.9)", redemption: "rgba(236, 72, 153, 0.9)" };
-
-/** A 6px tile of the hatch, in `color`. */
-function hatchImage(hatch: FlowHatch, color: string): CSSProperties {
-  const c = encodeURIComponent(color);
-  const paths: Record<FlowHatch, string> = {
-    reverse: `<path d='M-1,5 l2,2 M0,0 l6,6 M5,-1 l2,2' stroke='${c}' stroke-width='1.6'/>`,
-    forward: `<path d='M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2' stroke='${c}' stroke-width='1.6'/>`,
-    cross: `<path d='M0,0 l6,6 M6,0 l-6,6' stroke='${c}' stroke-width='1.1'/>`,
-    vertical: `<path d='M1.5,0 v6 M4.5,0 v6' stroke='${c}' stroke-width='1.2'/>`,
-    horizontal: `<path d='M0,1.5 h6 M0,4.5 h6' stroke='${c}' stroke-width='1.2'/>`,
-    // One dot a tile, a square grid: a diagonal pair of dots reads as the
-    // reverse diagonal at bar size.
-    dots: `<circle cx='3' cy='3' r='1.3' fill='${c}'/>`,
-  };
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='6' height='6'>${paths[hatch]}</svg>`;
-  return { backgroundImage: `url("data:image/svg+xml,${svg}")`, backgroundSize: "6px 6px", backgroundRepeat: "repeat" };
-}
-
-function fillStyle(side: FlowSide, s: FlowSegment): CSSProperties {
-  const h = HUE[side];
-  if (s.fill !== "out") return { background: h.solid };
-  const hatch = s.hatch ?? (s.tone && s.tone !== "exit" ? "forward" : "reverse");
-  if (s.tone === "liquidation" || s.tone === "redemption")
-    return { ...hatchImage(hatch, TONE_HATCH[s.tone]), boxShadow: `inset 0 0 0 1px ${TONE_LINE[s.tone]}` };
-  return { ...hatchImage(hatch, h.hatch), boxShadow: `inset 0 0 0 1px ${h.line}` };
-}
 
 /** Tick colours: the side an event moved; a liquidation in the critical red. */
 const TICK = FLOW_TICK;
@@ -246,15 +211,16 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-/** A segment's assets, largest first, for its tip. */
-type AssetSplit = Map<string, { symbol: string; usd: number; token?: boolean }[]>;
+/** A segment's assets, largest first, for its panel. */
+type AssetSplit = Map<string, PanelPart[]>;
 
-/** Rows a segment's tip lists before it counts the rest. */
-const TIP_ROWS = 6;
+/** The open segment panel: the segment's key, and whether the keyboard
+ *  opened it (focus then moves into the panel). */
+export type OpenPanel = { key: string; keyboard: boolean } | null;
 
 /** One strip: a bar or its drill-down. Fills are clipped to the rounded
- *  track; the hover and tap targets ride a layer above, unclipped, so the
- *  tip can rise out of it. */
+ *  track; the segments' buttons ride a layer above, unclipped. A click, a tap
+ *  or Enter on one opens its panel (lifetime-flows-tip.tsx). */
 function Strip({
   side,
   segments,
@@ -264,11 +230,11 @@ function Strip({
   today,
   active,
   onHover,
-  onPin,
+  open,
+  onOpen,
   label,
   motion,
-  split,
-  sum,
+  panel,
 }: {
   side: FlowSide;
   segments: FlowSegment[];
@@ -278,12 +244,12 @@ function Strip({
   today?: number | null;
   active: string | null;
   onHover: (k: string | null) => void;
-  onPin: (k: string) => void;
+  open: OpenPanel;
+  onOpen: (p: OpenPanel) => void;
   label: string;
   motion: string;
-  split: AssetSplit;
-  /** The side's sum, at the foot of every segment's tip. */
-  sum: ReactNode;
+  /** The open segment's panel body. */
+  panel: (s: FlowSegment) => ReactNode;
 }) {
   const shown = segments.filter((s) => s.width > 0);
   const [trackRef, trackPx, settled] = useTrackWidth();
@@ -314,6 +280,7 @@ function Strip({
     width: boxes[i].width,
     borderRadius: boxes[i].radius,
   });
+  const openSeg = open ? shown.find((s) => s.key === open.key) : undefined;
   return (
     <div ref={trackRef} className={`relative ${height}`}>
       <div role="img" aria-label={label} className="absolute inset-0 overflow-hidden rounded-md bg-sunken">
@@ -333,42 +300,24 @@ function Strip({
           />
         ))}
       </div>
-      <div className="absolute inset-0" aria-hidden>
+      <div className="absolute inset-0" data-flow-segments={side}>
         {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
-          const parts = split.get(s.key) ?? [];
+          const isOpen = open?.key === s.key;
           return (
             <span key={s.key} className={`absolute inset-y-0 block ${anim}`} style={place(i)}>
-              <RevealTip
-                className="h-full w-full"
-                tip={
-                  <span className="flex min-w-40 flex-col gap-0.5" data-flow-tip={side}>
-                    <span className="flex items-center gap-2">
-                      <span>{s.label}</span>
-                      <span className="ml-auto">{formatFlowUsd(s.value)}</span>
-                    </span>
-                    {parts.slice(0, TIP_ROWS).map((p) => (
-                      <span key={p.symbol} className="flex items-center gap-1.5 text-xs font-normal">
-                        {p.token !== false && <TokenChipIcon symbol={p.symbol} size={14} filterable={false} />}
-                        <span className="opacity-80">{p.symbol}</span>
-                        <span className="ml-auto pl-2 opacity-80">{formatFlowUsd(p.usd)}</span>
-                      </span>
-                    ))}
-                    {parts.length > TIP_ROWS && (
-                      <span className="text-xs font-normal opacity-80">{parts.length - TIP_ROWS} more</span>
-                    )}
-                    {sum}
-                  </span>
-                }
-              >
-                <span
-                  className={`block h-full w-full ${on ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
-                  style={{ borderRadius: boxes[i].radius }}
-                  onMouseEnter={() => onHover(hlKey(s))}
-                  onMouseLeave={() => onHover(null)}
-                  onClick={() => s.link && onPin(hlKey(s))}
-                />
-              </RevealTip>
+              <button
+                type="button"
+                className={`block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${on || isOpen ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                style={{ borderRadius: boxes[i].radius }}
+                aria-label={`${s.label}: ${spokenUsd(s.value)}`}
+                aria-expanded={isOpen}
+                aria-haspopup="dialog"
+                data-flow-seg={s.key}
+                onMouseEnter={() => onHover(hlKey(s))}
+                onMouseLeave={() => onHover(null)}
+                onClick={(e) => onOpen(isOpen ? null : { key: s.key, keyboard: e.detail === 0 })}
+              />
             </span>
           );
         })}
@@ -381,6 +330,16 @@ function Strip({
           data-flow-outline=""
         />
       )}
+      {openSeg && open && (
+        <FlowPanelShell
+          label={`${openSeg.label}: ${spokenUsd(openSeg.value)}`}
+          anchor={() => trackRef.current?.querySelector<HTMLElement>(`[data-flow-seg="${openSeg.key}"]`) ?? null}
+          onClose={() => onOpen(null)}
+          focusOnOpen={open.keyboard}
+        >
+          {panel(openSeg)}
+        </FlowPanelShell>
+      )}
     </div>
   );
 }
@@ -392,7 +351,8 @@ function SideBlock({
   isLive,
   active,
   onHover,
-  onPin,
+  open,
+  onOpen,
   motion,
   when,
   assets,
@@ -406,7 +366,8 @@ function SideBlock({
   when: string;
   active: string | null;
   onHover: (k: string | null) => void;
-  onPin: (k: string) => void;
+  open: OpenPanel;
+  onOpen: (p: OpenPanel) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
   /** The last bar drawn, which carries the axis labels under it. */
@@ -437,6 +398,7 @@ function SideBlock({
     sideHeld.map((h) => ({ symbol: h.symbol, usd: h.usd, token: isToken(h) })),
   );
   for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
+  const rest = st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest";
 
   return (
     <div className="mt-3 first:mt-0" data-flow-side={side}>
@@ -449,11 +411,26 @@ function SideBlock({
         today={atLive ? null : coll ? model.today.collateral : model.today.debt}
         active={active}
         onHover={onHover}
-        onPin={onPin}
+        open={open}
+        onOpen={onOpen}
         label={label}
         motion={motion}
-        split={split}
-        sum={<SideSum side={side} st={st} />}
+        panel={(s) => (
+          <SegmentPanelBody
+            side={side}
+            seg={s}
+            title={s.label}
+            // The held segment's assets are the sum's total, listed under it.
+            parts={s.fill === "held" ? [] : (split.get(s.key) ?? [])}
+            st={st}
+            held={sideHeld}
+            when={when}
+            isLive={isLive}
+            daily={model.daily}
+            swatch={sumSwatch(side)}
+            words={{ rest }}
+          />
+        )}
       />
       {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
     </div>
@@ -673,8 +650,8 @@ function panelWords(
       ? `The ${bs} ${cov} the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and start${hasDebt ? "" : "s"} with what was held as that window opens. `
       : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
   const read = busy
-    ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and its tip ends with how that side's flows net to it.`
-    : "A bar's length is everything that came in: the headline is the solid part of the bar, and each part's tip ends with that side's sum.";
+    ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
+    : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";
   const today = closed ? "at the close" : "today";
   return {
     key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
@@ -731,7 +708,7 @@ function PlainBars({
   onKey: (key: Pick<FlowsKeyItems, "items" | "outline"> | null) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<string | null>(null);
+  const [open, setOpen] = useState<OpenPanel>(null);
   const reduced = useReducedMotion();
   const motion = reduced ? "" : "transition-all duration-200 ease-out";
   const s = stateAt(model, stop);
@@ -742,8 +719,16 @@ function PlainBars({
     onKey({ items: keyItems, outline: null });
   }, [onKey, keyItems]);
   useEffect(() => () => onKey(null), [onKey]);
-  const active = pinned ?? hover;
-  const pin = (k: string) => setPinned((p) => (p === k ? null : k));
+  const cursor = useContext(FlowCursorContext);
+  // The open panel follows the cursor: it restates its figures at the new
+  // date, and closes where its segment has no width there, or while the bars
+  // are greyed before their window.
+  const openHere = open && [...s.collateral.bar, ...s.debt.bar].some((x) => x.key === open.key && x.width > 0);
+  useEffect(() => {
+    if (open && (!openHere || cursor?.live === false)) setOpen(null);
+  }, [open, openHere, cursor?.live]);
+  const openSeg = open ? [...s.collateral.bar, ...s.debt.bar].find((x) => x.key === open.key) : undefined;
+  const active = openSeg ? hlKey(openSeg) : hover;
   const side = (sd: FlowSide, last: boolean) => (
     <SideBlock
       side={sd}
@@ -753,7 +738,8 @@ function PlainBars({
       atLive={atLive}
       active={active}
       onHover={setHover}
-      onPin={pin}
+      open={open}
+      onOpen={setOpen}
       motion={motion}
       when={when}
       assets={assets}
@@ -779,7 +765,7 @@ function ScrubberBody({
   const [stop, setStop] = useState(model.liveStop);
   const [playing, setPlaying] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
-  const [pinned, setPinned] = useState<string | null>(null);
+  const [open, setOpen] = useState<OpenPanel>(null);
   const [dragging, setDragging] = useState(false);
   const [pip, setPip] = useState<PipOpen | null>(null);
   const pipRef = useRef<HTMLDivElement>(null);
@@ -827,8 +813,11 @@ function ScrubberBody({
   const keyItems = useMemo(() => keyHatches(model), [model]);
   // Every stop: the headline icons and each segment's tip list the assets.
   const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
-  const active = pinned ?? hover;
-  const pin = (k: string) => setPinned((p) => (p === k ? null : k));
+  const openSeg = open ? [...s.collateral.bar, ...s.debt.bar].find((x) => x.key === open.key) : undefined;
+  const active = openSeg ? hlKey(openSeg) : hover;
+  useEffect(() => {
+    if (open && !(openSeg && openSeg.width > 0)) setOpen(null);
+  }, [open, openSeg]);
   // Closed: nothing held after the last event, so the last stop is its close.
   const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   // A closed position's last stop is stated as the close: its day, its prices.
@@ -895,152 +884,175 @@ function ScrubberBody({
     halt();
     setStop(to);
   };
+  const cursor = {
+    at: atClose ? `at close, ${closeDay}` : s.isLive ? `today (${dayStamp(Date.now() / 1000)})` : `at ${dateText}`,
+    prev: () => go(prevEventDay(model, stop)),
+    next: () => go(nextEventDay(model, stop)),
+    canPrev: stop > 0,
+    canNext: stop < model.liveStop,
+  };
   return (
-    <div className="text-sm">
-      <DateRow>{dateLine}</DateRow>
-      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
-        <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={liveReceipts} assets={assets} />
-        {hasDebt && (
-          <Headline side="debt" st={s.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
-        )}
-      </div>
-      <SideBlock
-        side="collateral"
-        st={s.collateral}
-        model={model}
-        isLive={liveReceipts}
-        atLive={s.isLive}
-        active={active}
-        onHover={setHover}
-        onPin={pin}
-        motion={motion}
-        when={when}
-        assets={assets}
-        last={!hasDebt}
-      />
-      {/* A one-sided position (savings, a lender) names no debt bucket and
-          draws a single bar. */}
-      {hasDebt && (
+    <FlowCursorContext.Provider value={cursor}>
+      <div className="text-sm">
+        <DateRow>{dateLine}</DateRow>
+        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+          <Headline
+            side="collateral"
+            st={s.collateral}
+            model={model}
+            when={when}
+            isLive={liveReceipts}
+            assets={assets}
+          />
+          {hasDebt && (
+            <Headline side="debt" st={s.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
+          )}
+        </div>
         <SideBlock
-          side="debt"
-          st={s.debt}
+          side="collateral"
+          st={s.collateral}
           model={model}
           isLive={liveReceipts}
           atLive={s.isLive}
           active={active}
           onHover={setHover}
-          onPin={pin}
+          open={open}
+          onOpen={setOpen}
           motion={motion}
           when={when}
           assets={assets}
-          last
+          last={!hasDebt}
         />
-      )}
+        {/* A one-sided position (savings, a lender) names no debt bucket and
+          draws a single bar. */}
+        {hasDebt && (
+          <SideBlock
+            side="debt"
+            st={s.debt}
+            model={model}
+            isLive={liveReceipts}
+            atLive={s.isLive}
+            active={active}
+            onHover={setHover}
+            open={open}
+            onOpen={setOpen}
+            motion={motion}
+            when={when}
+            assets={assets}
+            last
+          />
+        )}
 
-      <div className="relative mt-3">
-        {/* Event pips over the line, coloured by the side each event moved.
+        <div className="relative mt-3" {...KEEP_PANEL}>
+          {/* Event pips over the line, coloured by the side each event moved.
             Hovering or tapping one names its day's events; the keyboard hears
             the same through the slider's value. */}
-        <div
-          ref={pipRef}
-          className="relative mx-2 h-4 sm:h-3"
-          data-flow-pips=""
-          onPointerMove={(e) => e.pointerType === "mouse" && setPip(pipAt(e.clientX))}
-          onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
-          onClick={(e) => setPip(pipAt(e.clientX))}
-        >
-          <div aria-hidden>
-            {model.ticks.map((t, i) => (
-              <i
-                key={i}
-                className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
-                style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
-              />
-            ))}
+          <div
+            ref={pipRef}
+            className="relative mx-2 h-4 sm:h-3"
+            data-flow-pips=""
+            onPointerMove={(e) => e.pointerType === "mouse" && setPip(pipAt(e.clientX))}
+            onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
+            onClick={(e) => setPip(pipAt(e.clientX))}
+          >
+            <div aria-hidden>
+              {model.ticks.map((t, i) => (
+                <i
+                  key={i}
+                  className="pointer-events-none absolute bottom-0 h-2.5 w-[2px] rounded-[1px]"
+                  style={{ left: pct(t.day, model.liveStop), background: TICK[t.tick] }}
+                />
+              ))}
+            </div>
+            {pip && <PipTip at={pip} />}
           </div>
-          {pip && <PipTip at={pip} />}
-        </div>
-        <div className="relative">
-          <input
-            type="range"
-            min={0}
-            max={model.liveStop}
-            step={1}
-            value={stop}
-            aria-label="Date"
-            aria-valuetext={tickHere?.kinds.length ? `${dateText}: ${tickHere.kinds.join(", ")}` : dateText}
-            onChange={(e) => {
-              halt();
-              setStop(Number(e.target.value));
-            }}
-            onPointerDown={() => setDragging(true)}
-            className="block h-11 w-full cursor-pointer accent-[var(--color-rb-500)] sm:h-7"
-          />
-          {dragging && (
-            <span
-              aria-hidden
-              data-prov-hidden=""
-              className="pointer-events-none absolute bottom-full z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
-              style={{
-                left: `calc(${stop / model.liveStop} * (100% - 16px) + 8px)`,
-                background: "var(--rb-tooltip-bg)",
-                borderColor: "var(--rb-tooltip-border)",
+          <div className="relative">
+            <input
+              type="range"
+              min={0}
+              max={model.liveStop}
+              step={1}
+              value={stop}
+              aria-label="Date"
+              aria-valuetext={tickHere?.kinds.length ? `${dateText}: ${tickHere.kinds.join(", ")}` : dateText}
+              onChange={(e) => {
+                halt();
+                setStop(Number(e.target.value));
               }}
-            >
-              {atClose ? "Close" : s.isLive ? "Today" : dateText}
-            </span>
-          )}
-        </div>
-        {/* A marker where an event repriced an asset whose price had gone stale. */}
-        {model.repricings.length > 0 && (
-          <div className="relative mx-2 h-3">
-            {model.repricings.map((r, i) => (
-              <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: pct(r.day, model.liveStop) }}>
-                <RevealTip
-                  tip={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
-                  label={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
-                >
-                  <span className="block size-2 rotate-45 border border-rb-500" />
-                </RevealTip>
+              onPointerDown={() => setDragging(true)}
+              className="block h-11 w-full cursor-pointer accent-[var(--color-rb-500)] sm:h-7"
+            />
+            {dragging && (
+              <span
+                aria-hidden
+                data-prov-hidden=""
+                className="pointer-events-none absolute bottom-full z-50 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+                style={{
+                  left: `calc(${stop / model.liveStop} * (100% - 16px) + 8px)`,
+                  background: "var(--rb-tooltip-bg)",
+                  borderColor: "var(--rb-tooltip-border)",
+                }}
+              >
+                {atClose ? "Close" : s.isLive ? "Today" : dateText}
               </span>
-            ))}
+            )}
           </div>
+          {/* A marker where an event repriced an asset whose price had gone stale. */}
+          {model.repricings.length > 0 && (
+            <div className="relative mx-2 h-3">
+              {model.repricings.map((r, i) => (
+                <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: pct(r.day, model.liveStop) }}>
+                  <RevealTip
+                    tip={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
+                    label={`Repriced ${dayStamp(dayStart(model, r.day))}: ${r.symbol} last priced ${dayStamp(r.from)}`}
+                  >
+                    <span className="block size-2 rotate-45 border border-rb-500" />
+                  </RevealTip>
+                </span>
+              ))}
+            </div>
+          )}
+          <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
+        </div>
+
+        <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="" {...KEEP_PANEL}>
+          <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
+            <SkipBack size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={btn}
+            aria-label="Previous event"
+            onClick={() => go(prevEventDay(model, stop))}
+          >
+            <ChevronLeft size={18} aria-hidden />
+          </button>
+          <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
+            {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
+          </button>
+          <button type="button" className={btn} aria-label="Next event" onClick={() => go(nextEventDay(model, stop))}>
+            <ChevronRight size={18} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className={btn}
+            aria-label={closed ? "Jump to close" : "Jump to today"}
+            onClick={() => go(model.liveStop)}
+          >
+            <SkipForward size={16} aria-hidden />
+          </button>
+        </div>
+
+        {(s.stale.length > 0 || repricedHere.length > 0) && (
+          <p className="mt-2 text-[11px] leading-snug text-rb-500">
+            {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${dayStamp(r.from)}. `).join("")}
+            {s.stale.length > 0 &&
+              `${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
+                .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
+                .join(", ")}.`}
+          </p>
         )}
-        <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
       </div>
-
-      <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="">
-        <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
-          <SkipBack size={16} aria-hidden />
-        </button>
-        <button type="button" className={btn} aria-label="Previous event" onClick={() => go(prevEventDay(model, stop))}>
-          <ChevronLeft size={18} aria-hidden />
-        </button>
-        <button type="button" className={btn} aria-label={playing ? "Pause" : "Play"} onClick={play}>
-          {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
-        </button>
-        <button type="button" className={btn} aria-label="Next event" onClick={() => go(nextEventDay(model, stop))}>
-          <ChevronRight size={18} aria-hidden />
-        </button>
-        <button
-          type="button"
-          className={btn}
-          aria-label={closed ? "Jump to close" : "Jump to today"}
-          onClick={() => go(model.liveStop)}
-        >
-          <SkipForward size={16} aria-hidden />
-        </button>
-      </div>
-
-      {(s.stale.length > 0 || repricedHere.length > 0) && (
-        <p className="mt-2 text-[11px] leading-snug text-rb-500">
-          {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${dayStamp(r.from)}. `).join("")}
-          {s.stale.length > 0 &&
-            `${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
-              .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
-              .join(", ")}.`}
-        </p>
-      )}
-    </div>
+    </FlowCursorContext.Provider>
   );
 }

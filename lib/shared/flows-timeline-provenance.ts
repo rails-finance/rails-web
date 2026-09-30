@@ -47,3 +47,52 @@ export function flowSegmentProv(
     formula: "Σ amount × price at block",
   };
 }
+
+/** The balancing item in a side's sum: what is held or owed at the date less
+ *  every flow above it, printed from the printed figures so the lines add. */
+export function flowRemainderProv(label: string, side: FlowSide, when: string): Provenance {
+  const held = side === "collateral" ? "held" : "owed";
+  return {
+    kind: "chain-derived",
+    summary: `${label} at ${when} — the remainder: what the position has ${held} at that date less every flow above it, each flow valued at the oracle price at its block. It holds price changes and interest together; no funds moved.`,
+    formula: `${held} − Σ flows`,
+  };
+}
+
+/** What was held or owed when the bars' window opens: the first line of a
+ *  windowed side's sum. */
+export function flowOpeningProv(label: string, side: FlowSide): Provenance {
+  const held = side === "collateral" ? "held" : "owed";
+  return {
+    kind: "chain-derived",
+    summary: `${label} — what the position had ${held} at the close of the day before the bars' window opens: each asset's balance after its last event by then, at the last oracle price recorded that day, added up.`,
+    formula: "Σ balance × price at the day's end",
+  };
+}
+
+/** One asset's part of a segment in the panel: a flow's running total in that
+ *  asset, or what is held or owed of it at the date. */
+export function flowAssetProv(
+  symbol: string,
+  s: FlowSegment,
+  side: FlowSide,
+  when: string,
+  isLive: boolean,
+  daily = false,
+): Provenance {
+  if (s.fill === "held") {
+    const held = side === "collateral" ? "held" : "owed";
+    return {
+      kind: "chain-derived",
+      summary: isLive
+        ? `${symbol} ${held} now — the position's ${symbol} balance at the oracle price now.`
+        : `${symbol} ${held} at ${when} — the ${symbol} balance after its last event by then, at ${daily ? "the last oracle price recorded by the end of that day" : "the oracle price that event carried"}.`,
+      formula: daily && !isLive ? "balance × price at the day's end" : "balance × price",
+    };
+  }
+  return {
+    kind: "chain-derived",
+    summary: `${s.label} in ${symbol} up to ${when} — every ${symbol} flow of this kind the position's events record by then, each at the oracle price at its block, added up.`,
+    formula: "Σ amount × price at block",
+  };
+}
