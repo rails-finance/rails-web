@@ -90,7 +90,14 @@ import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChartBarBig, ChevronDown } from "lucide-react";
-import { FlowsLedgerNoteContext, LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import {
+  FlowsBasis,
+  FlowsKey,
+  FlowsKeyContext,
+  FlowsLedgerNoteContext,
+  LifetimeFlowsScrubber,
+  type FlowsKeyItems,
+} from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import { aaveV4FlowLive, aaveV4FlowSeriesTimeline, aaveV4FocusEvents } from "@/lib/aave-v4/flows-timeline";
@@ -1086,6 +1093,9 @@ function AaveV4SpokeTowerBlock({
   }, [onFlowTimeline, flowTimeline]);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [ledgerNote, setLedgerNote] = useState<string | null>(null);
+  // The line's key and basis, reported by the scrubber: the key in the
+  // Explanation, the basis beside the (i).
+  const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
   const title = (
     <span className={`${OVERLAY_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>
@@ -1110,10 +1120,12 @@ function AaveV4SpokeTowerBlock({
               <div className="flex min-h-[28px] items-center">{title}</div>
               <div className="mt-2">
                 <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                  <LifetimeFlowsScrubber
-                    timeline={flowTimeline}
-                    series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
-                  />
+                  <FlowsKeyContext.Provider value={setFlowsKey}>
+                    <LifetimeFlowsScrubber
+                      timeline={flowTimeline}
+                      series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
+                    />
+                  </FlowsKeyContext.Provider>
                 </FlowsLedgerNoteContext.Provider>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-2">
@@ -1152,6 +1164,7 @@ function AaveV4SpokeTowerBlock({
               with its figures — beside route-icon Provenance, the receipts list
               for the breakdown figures. */}
           <ProvenanceInfoTabs
+            rowExtra={flowTimeline != null && flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
             explanation={
               <div className="space-y-2 text-sm text-rb-500">
                 {/* Value-bearing narration of the tower legend — a one-line lead
@@ -1230,6 +1243,9 @@ function AaveV4SpokeTowerBlock({
                     </span>
                   </div>
                 )}
+                {flowTimeline != null && flowsKey?.lines?.length ? (
+                  <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
+                ) : null}
                 <LearnMore
                   content={aaveV4EconomicsContent({
                     supplyInterest: totals.supplyInterestUsd > 0.01,

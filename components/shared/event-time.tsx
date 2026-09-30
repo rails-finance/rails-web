@@ -15,7 +15,7 @@ export const EventDateContext = createContext<string | null>(null);
 /**
  * A mark that stands in the date prefix's place: on a page that ties the
  * timeline to the Lifetime flows panel, the last event of each day carries
- * the day's date and a "Timeline to …" button (flow-day-mark.tsx). It shows
+ * the day's date and a "View on chart" button (flow-day-mark.tsx). It shows
  * with timestamps off too, since nothing else dates the day there.
  */
 export const EventDayMarkContext = createContext<ReactNode>(null);

@@ -17,9 +17,9 @@ import {
   FlowCursorContext,
   FlowPanelShell,
   KEEP_PANEL,
-  SegmentLabelContext,
+  SegmentTipContext,
+  SegmentTipBody,
   SegmentPanelBody,
-  segmentLabelHandlers,
   sumSwatch,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
@@ -360,9 +360,9 @@ export function Rescaled({
   useEffect(() => {
     if (open && cursor?.live === false) setOpen(null);
   }, [open, cursor?.live]);
-  // On a page that ties the panel to its timeline, the track names what is
-  // held instead of opening a panel.
-  const segLabel = useContext(SegmentLabelContext);
+  // On a page that ties the panel to its timeline, the track opens a short
+  // tip naming what is held instead of the side's panel.
+  const tip = useContext(SegmentTipContext) != null;
   return (
     <div>
       {headlines && (
@@ -398,45 +398,54 @@ export function Rescaled({
               </div>
               {/* The whole track opens the side's panel, so a bar held near
                   zero still names its flows. */}
-              {segLabel ? (
-                <button
-                  type="button"
-                  className="absolute inset-0 block cursor-default rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
-                  aria-label={`${st.bar[0].label}: ${spokenUsd(st.now)}`}
-                  data-flow-seg={`${side}-busy`}
-                  {...segmentLabelHandlers(segLabel, side, st.bar[0])}
-                />
-              ) : (
-                <button
-                  type="button"
-                  className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${open?.side === side ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
-                  aria-label={`${word}: ${spokenUsd(st.now)}. Open how its flows add up.`}
-                  aria-expanded={open?.side === side}
-                  aria-haspopup="dialog"
-                  data-flow-seg={`${side}-busy`}
-                  onClick={(e) => setOpen(open?.side === side ? null : { side, keyboard: e.detail === 0 })}
-                />
-              )}
+              <button
+                type="button"
+                className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!tip && open?.side === side ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                aria-label={
+                  tip
+                    ? `${st.bar[0].label}: ${spokenUsd(st.now)}`
+                    : `${word}: ${spokenUsd(st.now)}. Open how its flows add up.`
+                }
+                aria-expanded={open?.side === side}
+                aria-haspopup="dialog"
+                data-flow-seg={`${side}-busy`}
+                onClick={(e) => setOpen(open?.side === side ? null : { side, keyboard: e.detail === 0 })}
+              />
               {open?.side === side && (
                 <FlowPanelShell
                   label={`${word}: ${spokenUsd(st.now)}`}
                   anchor={() => document.querySelector<HTMLElement>(`[data-flow-seg="${side}-busy"]`)}
                   onClose={() => setOpen(null)}
                   focusOnOpen={open.keyboard}
+                  width={tip ? 260 : undefined}
                 >
-                  <SegmentPanelBody
-                    side={side}
-                    seg={st.bar[0]}
-                    title={word}
-                    parts={[]}
-                    st={st}
-                    held={assets.held.filter((h) => h.side === side)}
-                    when={when}
-                    isLive={isLive}
-                    daily={model.daily}
-                    swatch={sumSwatch(side)}
-                    words={{ rest: st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest" }}
-                  />
+                  {tip ? (
+                    <SegmentTipBody
+                      side={side}
+                      seg={st.bar[0]}
+                      st={st}
+                      when={when}
+                      isLive={isLive}
+                      daily={model.daily}
+                      share={false}
+                    />
+                  ) : (
+                    <SegmentPanelBody
+                      side={side}
+                      seg={st.bar[0]}
+                      title={word}
+                      parts={[]}
+                      st={st}
+                      held={assets.held.filter((h) => h.side === side)}
+                      when={when}
+                      isLive={isLive}
+                      daily={model.daily}
+                      swatch={sumSwatch(side)}
+                      words={{
+                        rest: st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest",
+                      }}
+                    />
+                  )}
                 </FlowPanelShell>
               )}
               {outline && (

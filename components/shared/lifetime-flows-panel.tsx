@@ -5,7 +5,8 @@
 // that collapses the panel, the scrubber, and the Explanation with the
 // scrubber's Key after its prose. The scrubber reports the Key's hatches where
 // it draws them, and a line each for the Key and the Explanation on what the
-// bars and the line under them cover. Until the scrubber's timeline
+// bars and the line under them cover; the line's basis ("USD at each day's
+// close") sits beside the (i). Until the scrubber's timeline
 // lands the panel says it is reading; where that read fails, that it was not
 // read.
 //
@@ -16,7 +17,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ChartBarBig, ChevronDown } from "lucide-react";
-import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -80,7 +81,7 @@ export function LifetimeFlowsPanel({
   const reactId = useId();
   const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
-  // A day mark's rewind button opens a collapsed panel.
+  // A card's "View on chart" opens a collapsed panel.
   const move = useFlowFocusState((s) => s.move?.n ?? 0);
   useEffect(() => {
     if (move === 0 || !collapseKey || !isFlowsCollapsed(collapseKey)) return;
@@ -160,7 +161,14 @@ export function LifetimeFlowsPanel({
               )
             }
             learnMore={learnMore}
-            rowExtra={rowExtra}
+            rowExtra={
+              flowsKey?.basis || rowExtra ? (
+                <>
+                  {flowsKey?.basis && <FlowsBasis text={flowsKey.basis} />}
+                  {rowExtra}
+                </>
+              ) : undefined
+            }
           />
         </div>
       </section>

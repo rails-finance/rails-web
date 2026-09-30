@@ -183,7 +183,7 @@ export function SparkEventCard({
     <ReceiptCalcContext.Provider value={calc}>
       <EventCard
         avatar={null}
-        headerAction={hasSum && stateMarket ? <ReceiptCalcButton /> : undefined}
+        infoAction={hasSum && stateMarket ? <ReceiptCalcButton /> : undefined}
         iconColumn={iconSlot}
         header={
           // The pointer on the header starts the account reads the open card

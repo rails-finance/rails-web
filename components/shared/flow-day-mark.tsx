@@ -5,13 +5,13 @@
 // reference/lifetime-flows-scrubber.md, "The day links the chart and the
 // timeline"). The chart moves in days, so the day is the unit the two share.
 // The last event of each day (the newest, whose close the chart shows) states
-// the day's date before its time, with a History icon button ("Timeline to
-// 2 Sep '26") that freezes the chart's cursor on that day's close, which
-// rewinds the list to it: the chart's frozen tag and the timeline's chip are
-// the same state. The day's other events state their time only.
+// the day's date before its time, with a chart button ("View on chart") that
+// moves the chart's cursor to that day's close, freezes it there and brings
+// the chart into view. The timeline is untouched. The button hides while the
+// chart is frozen on that day. The day's other events state their time only.
 
-import { History } from "lucide-react";
-import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { ChartBarBig } from "lucide-react";
+import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
@@ -19,8 +19,8 @@ const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}
 /** The UTC day (days since the epoch) of a unix-seconds moment. */
 export const utcDay = (tsSec: number): number => Math.floor(tsSec / 86_400);
 
-/** Asks the chart for a day's close (frozen there, so the list rewinds to
- *  it) and brings the panel into view. */
+/** Asks the chart for a day's close, frozen there, and brings the panel
+ *  into view. */
 export function moveChartToDay(store: NonNullable<ReturnType<typeof useFlowFocus>>["store"], tsSec: number): void {
   const s = store.get();
   store.set({ move: { ts: tsSec, n: (s.move?.n ?? 0) + 1 } });
@@ -29,12 +29,13 @@ export function moveChartToDay(store: NonNullable<ReturnType<typeof useFlowFocus
   el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 }
 
-/** The mark in the card header's time slot: the rewind button, then the
- *  date. `ts` is the event's moment; `flash` is set briefly after the frozen
- *  tag's "Timeline to …", and the card header rings while it is
- *  (event-card.tsx). */
+/** The mark in the card header's time slot: the chart button, then the
+ *  date. `ts` is the event's moment; `flash` is set briefly after "Apply to
+ *  timeline" or the timeline chip brings the card into view, and the card
+ *  header rings while it is (event-card.tsx). */
 export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean }) {
   const focus = useFlowFocus();
+  const frozenHere = useFlowFocusState((s) => s.frozenDay === utcDay(ts));
   const date = dayStamp(ts);
   return (
     <span
@@ -42,12 +43,12 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
       data-flow-day-mark={utcDay(ts)}
       {...(flash ? { "data-flow-day-flash": "" } : {})}
     >
-      {focus?.model && (
+      {focus?.model && !frozenHere && (
         <button
           type="button"
           className="header-badge-tip -my-2 inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring sm:-my-1 sm:size-6 dark:hover:bg-rb-800"
-          aria-label={`Timeline and chart to ${date}`}
-          data-tooltip={`Timeline to ${date}`}
+          aria-label={`View ${date} on the chart`}
+          data-tooltip="View on chart"
           data-flow-day-move=""
           onClick={(e) => {
             // The header around it opens and closes the card.
@@ -56,7 +57,7 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
           }}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <History size={14} aria-hidden />
+          <ChartBarBig size={14} aria-hidden />
         </button>
       )}
       <span className="text-xs" data-flow-day-date="">

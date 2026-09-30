@@ -46,9 +46,9 @@ import {
   FlowPanelShell,
   sumSwatch,
   KEEP_PANEL,
-  SegmentLabelContext,
+  SegmentTipContext,
+  SegmentTipBody,
   SegmentPanelBody,
-  segmentLabelHandlers,
   type PanelPart,
 } from "@/components/shared/lifetime-flows-tip";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
@@ -123,6 +123,9 @@ export type FlowsKeyItems = {
   views?: string;
   /** The Explanation's line on the same, and how to read the panel. */
   explain?: string;
+  /** How the line values a point ("USD at each day's close"), beside the
+   *  panel's (i). */
+  basis?: string;
 };
 export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
 
@@ -131,6 +134,8 @@ export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => voi
 const SEG_GAP = 1;
 const SEG_MIN = 2;
 const SEG_RADIUS = 3;
+/** A segment's tip's width, in px. */
+const TIP_W = 260;
 
 type SegBox = { left: number; width: number };
 
@@ -258,7 +263,8 @@ function Strip({
   /** The open segment's panel body. */
   panel: (s: FlowSegment) => ReactNode;
   /** On a page that ties the panel to its timeline (flow-focus-context.tsx):
-   *  pointing at a segment names it under the bars, and no panel opens. */
+   *  hovering shows nothing, and a click opens the segment's short tip
+   *  (`panel` draws it) with no outline on the segment. */
   focus?: boolean;
 }) {
   const shown = segments.filter((s) => s.width > 0);
@@ -291,7 +297,6 @@ function Strip({
     borderRadius: boxes[i].radius,
   });
   const openSeg = open ? shown.find((s) => s.key === open.key) : undefined;
-  const segLabel = useContext(SegmentLabelContext);
   return (
     <div ref={trackRef} className={`relative ${height}`}>
       <div role="img" aria-label={label} className="absolute inset-0 overflow-hidden rounded-md bg-sunken">
@@ -315,31 +320,23 @@ function Strip({
         {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
           const isOpen = open?.key === s.key;
-          const named = focus && segLabel?.shown?.side === side && segLabel.shown.seg.key === s.key;
-          const labelled = focus && segLabel ? segmentLabelHandlers(segLabel, side, s) : null;
           return (
             <span key={s.key} className={`absolute inset-y-0 block ${anim}`} style={place(i)}>
               <button
                 type="button"
-                className={`block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${focus ? "cursor-default" : "cursor-pointer"} ${on || isOpen || named ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                className={`block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!focus && (on || isOpen) ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 style={{ borderRadius: boxes[i].radius }}
                 aria-label={`${s.label}: ${spokenUsd(s.value)}`}
-                {...(focus ? {} : { "aria-expanded": isOpen, "aria-haspopup": "dialog" as const })}
+                aria-expanded={isOpen}
+                aria-haspopup="dialog"
                 data-flow-seg={s.key}
-                onMouseEnter={() => {
-                  onHover(hlKey(s));
-                  labelled?.onMouseEnter();
-                }}
-                onMouseLeave={() => {
-                  onHover(null);
-                  labelled?.onMouseLeave();
-                }}
-                onFocus={labelled?.onFocus}
-                onBlur={labelled?.onBlur}
-                onPointerUp={labelled?.onPointerUp}
-                onClick={(e) => {
-                  if (!focus) onOpen(isOpen ? null : { key: s.key, keyboard: e.detail === 0 });
-                }}
+                {...(focus
+                  ? {}
+                  : {
+                      onMouseEnter: () => onHover(hlKey(s)),
+                      onMouseLeave: () => onHover(null),
+                    })}
+                onClick={(e) => onOpen(isOpen ? null : { key: s.key, keyboard: e.detail === 0 })}
               />
             </span>
           );
@@ -359,6 +356,7 @@ function Strip({
           anchor={() => trackRef.current?.querySelector<HTMLElement>(`[data-flow-seg="${openSeg.key}"]`) ?? null}
           onClose={() => onOpen(null)}
           focusOnOpen={open.keyboard}
+          width={focus ? TIP_W : undefined}
         >
           {panel(openSeg)}
         </FlowPanelShell>
@@ -422,9 +420,9 @@ function SideBlock({
   );
   for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
   const rest = st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest";
-  // On a page that ties the panel to its timeline, a segment states its
-  // name and value under the bars instead of opening a panel.
-  const focus = useContext(SegmentLabelContext) != null;
+  // On a page that ties the panel to its timeline, a segment opens a short
+  // tip with its line, value and share instead of its panel.
+  const focus = useContext(SegmentTipContext) != null;
 
   return (
     <div className="mt-3 first:mt-0" data-flow-side={side}>
@@ -442,22 +440,26 @@ function SideBlock({
         label={label}
         motion={motion}
         focus={focus}
-        panel={(s) => (
-          <SegmentPanelBody
-            side={side}
-            seg={s}
-            title={s.label}
-            // The held segment's assets are the sum's total, listed under it.
-            parts={s.fill === "held" ? [] : (split.get(s.key) ?? [])}
-            st={st}
-            held={sideHeld}
-            when={when}
-            isLive={isLive}
-            daily={model.daily}
-            swatch={sumSwatch(side)}
-            words={{ rest }}
-          />
-        )}
+        panel={(s) =>
+          focus ? (
+            <SegmentTipBody side={side} seg={s} st={st} when={when} isLive={isLive} daily={model.daily} />
+          ) : (
+            <SegmentPanelBody
+              side={side}
+              seg={s}
+              title={s.label}
+              // The held segment's assets are the sum's total, listed under it.
+              parts={s.fill === "held" ? [] : (split.get(s.key) ?? [])}
+              st={st}
+              held={sideHeld}
+              when={when}
+              isLive={isLive}
+              daily={model.daily}
+              swatch={sumSwatch(side)}
+              words={{ rest }}
+            />
+          )
+        }
       />
       {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
     </div>
@@ -505,6 +507,15 @@ export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems)
         </p>
       )}
     </div>
+  );
+}
+
+/** The line's basis beside the panel's (i): how a point is valued. */
+export function FlowsBasis({ text }: { text: string }) {
+  return (
+    <span className="self-center text-[11px] text-rb-500" data-flow-basis="">
+      {text}
+    </span>
   );
 }
 
@@ -620,8 +631,9 @@ export function LifetimeFlowsScrubber({
       shade: lined && from > 0 ? "The bars' window" : null,
       views: words.key,
       explain: words.explain,
+      basis: lined ? `USD at each ${bin}’s close` : undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined]);
+  }, [reportKey, busy, hatches, words, from, lined, bin]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;
@@ -646,6 +658,10 @@ export function LifetimeFlowsScrubber({
     />
   );
 }
+
+/** How the chart and the timeline meet, on a page that ties them. */
+const FOCUS_READ =
+  "A click on the line freezes the cursor on a day, and the line after it is dimmed; “Apply to timeline” then cuts the timeline below at that day's close and brings its last event into view. Each day's last event has a chart button that brings the chart to its day, and a month or range picked in the timeline's Dates is bracketed on the line. Each event's card adds up its side as of that event, line by line.";
 
 /** The Key's and the Explanation's lines on what the bars and the line cover
  *  and how to read them, and the line's two sides for the Key. */
@@ -684,8 +700,8 @@ function panelWords(
       : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
   const read = focused
     ? busy
-      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar. A click on the line freezes the cursor on a day and rewinds the timeline below to it, every event up to that day's close; each day's last event has a button that does the same from the timeline. Each event's card adds up its side as of that event, line by line.`
-      : "A bar's length is everything that came in: the headline is the solid part of the bar, and pointing at a part names it. A click on the line freezes the cursor on a day and rewinds the timeline below to it, every event up to that day's close; each day's last event has a button that does the same from the timeline. Each event's card adds up its side as of that event, line by line."
+      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a click on ${hasDebt ? "one" : "it"} names what it holds. ${FOCUS_READ}`
+      : `A bar's length is everything that came in: the headline is the solid part of the bar, and a click on a part names it with its share of the bar. ${FOCUS_READ}`
     : busy
       ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
       : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";

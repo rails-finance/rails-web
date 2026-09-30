@@ -299,7 +299,7 @@ export function AaveV3CtEventCard({
     <ReceiptCalcContext.Provider value={calc}>
       <EventCard
         avatar={null}
-        headerAction={hasSum && market && !feeOf ? <ReceiptCalcButton /> : undefined}
+        infoAction={hasSum && market && !feeOf ? <ReceiptCalcButton /> : undefined}
         iconColumn={iconSlot}
         header={
           // The pointer on the header starts the position reads the open card

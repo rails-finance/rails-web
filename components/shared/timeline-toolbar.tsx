@@ -248,15 +248,17 @@ export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
-/** The chain-state items + the USD-values toggle — for the explorers whose
- *  index carries per-event oracle-at-block prices (Aave V3 + Spark, server
- *  mig 092): their detail grids render the after-balance USD chip, so the
- *  flag has a render path there. Order mirrors the V4 spoke menu (USD values
- *  before Event numbers). */
+/** The chain-state items + the two USD switches (stablecoins, other tokens;
+ *  lib/shared/usd-display.ts) — for the explorers whose index carries
+ *  per-event oracle-at-block prices (Aave V3 + Spark, server mig 092): their
+ *  detail grids render the after-balance USD chip, so the flags have a
+ *  render path there. Order mirrors the V4 spoke menu (USD before Event
+ *  numbers). */
 export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showUsdValues", label: "USD values" },
+  { key: "showUsdStable", label: "USD for stablecoins" },
+  { key: "showUsdOther", label: "USD for other tokens" },
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 

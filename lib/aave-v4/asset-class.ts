@@ -57,6 +57,15 @@ const STABLE_DENOMINATED = new Set<string>([
   "syrupUSDT",
 ]);
 
+const STABLE_LOWER = new Set([...STABLE_DENOMINATED].map((s) => s.toLowerCase()));
+
+/** Whether a symbol names a stable-denominated asset (the list above, any
+ *  case). The timeline's Display rule for stablecoins' USD reads it
+ *  (lib/shared/usd-display.ts). */
+export function isStableDenominated(symbol: string): boolean {
+  return STABLE_DENOMINATED.has(symbol) || STABLE_LOWER.has(symbol.toLowerCase());
+}
+
 /** Bucket a token symbol. */
 export function assetClass(symbol: string): AssetClass {
   if (ETH_CORRELATED.has(symbol)) return "eth";

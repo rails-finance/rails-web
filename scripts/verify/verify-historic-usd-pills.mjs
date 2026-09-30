@@ -291,7 +291,7 @@ async function openReceiptFor(page, card, valueText) {
 const browser = await chromium.launch();
 const pageErrors = [];
 
-/** Open a wallet's position page with event numbers and USD values on, every
+/** Open a wallet's position page with event numbers and both USD switches on, every
  *  event painted. */
 async function openTimeline(proto, wallet) {
   const page = await browser.newPage();
@@ -303,7 +303,8 @@ async function openTimeline(proto, wallet) {
     .waitFor({ state: "visible", timeout: 60000 });
 
   await setDisplayFlag(page, "Event Numbers", true);
-  await setDisplayFlag(page, "USD Values", true);
+  await setDisplayFlag(page, "USD for stablecoins", true);
+  await setDisplayFlag(page, "USD for other tokens", true);
   await showAll(page);
   return page;
 }
@@ -349,12 +350,14 @@ async function runProtocol(proto, wallet, cases) {
     check(`${proto}: card has no "Untraced input" caution`, !(await card.innerText()).includes("Untraced input"));
 
     // Toggle-off: chip disappears.
-    await setDisplayFlag(page, "USD Values", false);
+    await setDisplayFlag(page, "USD for stablecoins", false);
+    await setDisplayFlag(page, "USD for other tokens", false);
     const chipOff = card.locator(usdChipSel);
-    check(`${proto}: USD chip disappears when "USD values" toggled off`, (await chipOff.count()) === 0);
-    await setDisplayFlag(page, "USD Values", true);
+    check(`${proto}: USD chip disappears with both USD switches off`, (await chipOff.count()) === 0);
+    await setDisplayFlag(page, "USD for stablecoins", true);
+    await setDisplayFlag(page, "USD for other tokens", true);
     const chipBackOn = card.locator(usdChipSel);
-    check(`${proto}: USD chip returns when "USD values" toggled back on`, (await chipBackOn.count()) > 0);
+    check(`${proto}: USD chip returns with both USD switches back on`, (await chipBackOn.count()) > 0);
   }
 
   // ── Priced liquidation: both legs + forensics ───────────────────────

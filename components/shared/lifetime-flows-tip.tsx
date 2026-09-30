@@ -140,32 +140,11 @@ export interface FlowCursor {
 export const FlowCursorContext = createContext<FlowCursor | null>(null);
 
 /** On a page that ties the panel to its timeline (the Aave family), a segment
- *  opens no panel: pointing at it (a hover, a tap on a phone, keyboard focus)
- *  names its line and value in one key-style line under the bars. The view
- *  that draws the bars provides it (Combined). */
-export interface SegmentLabel {
-  shown: { side: FlowSide; seg: FlowSegment } | null;
-  show: (x: { side: FlowSide; seg: FlowSegment } | null) => void;
-}
-export const SegmentLabelContext = createContext<SegmentLabel | null>(null);
-
-/** A segment button's handlers under SegmentLabelContext: hover and focus
- *  name it, a tap names it or, tapped again, clears it. */
-export function segmentLabelHandlers(label: SegmentLabel, side: FlowSide, seg: FlowSegment) {
-  const on = () => label.show({ side, seg });
-  const off = () => label.show(null);
-  return {
-    onMouseEnter: on,
-    onMouseLeave: off,
-    onFocus: on,
-    onBlur: off,
-    onPointerUp: (e: { pointerType: string }) => {
-      if (e.pointerType === "mouse") return;
-      if (label.shown?.side === side && label.shown.seg.key === seg.key) off();
-      else on();
-    },
-  };
-}
+ *  opens a short tip instead of its panel: a click, a tap or Enter shows its
+ *  line, its value and its share of the bar (`SegmentTipBody`), in the same
+ *  popover or bottom sheet. Hovering shows nothing. The view that draws the
+ *  bars provides it (Combined). */
+export const SegmentTipContext = createContext<true | null>(null);
 
 /** Marks the parts of the panel that move the cursor: a pointer there does
  *  not close an open segment panel. */
@@ -186,6 +165,7 @@ export function FlowPanelShell({
   anchor,
   onClose,
   focusOnOpen,
+  width: popW = POP_W,
   children,
 }: {
   label: string;
@@ -193,6 +173,8 @@ export function FlowPanelShell({
   onClose: () => void;
   /** Opened from the keyboard: focus moves into the panel. */
   focusOnOpen: boolean;
+  /** The popover's width in px (a segment's tip is narrower than a panel). */
+  width?: number;
   children: ReactNode;
 }) {
   const phone = useMediaQuery(PHONE_QUERY);
@@ -215,7 +197,7 @@ export function FlowPanelShell({
       const r = a.getBoundingClientRect();
       const vw = document.documentElement.clientWidth;
       const vh = window.innerHeight;
-      const width = Math.min(POP_W, vw - GUTTER * 2);
+      const width = Math.min(popW, vw - GUTTER * 2);
       const h = el.offsetHeight;
       const mid = r.left + r.width / 2;
       const left = Math.min(Math.max(GUTTER, mid - width / 2), vw - GUTTER - width);
@@ -289,7 +271,7 @@ export function FlowPanelShell({
       style={{
         top: pos?.top ?? 0,
         left: pos?.left ?? 0,
-        width: pos?.width ?? POP_W,
+        width: pos?.width ?? popW,
         visibility: pos ? undefined : "hidden",
         background: "var(--rb-tooltip-bg)",
         borderColor: "var(--rb-tooltip-border)",
@@ -341,6 +323,54 @@ function PanelDate({ cursor }: { cursor: FlowCursor | null }) {
         <button type="button" className={btn} aria-label="Next date" disabled={!cursor.canNext} onClick={cursor.next}>
           <ChevronRight size={14} aria-hidden />
         </button>
+      )}
+    </div>
+  );
+}
+
+/** A segment's tip on the Aave family: the date its figures are at, its
+ *  swatch and line, its value and its share of its bar's length (everything
+ *  that came in on that side); on a busy bar, what is held. */
+export function SegmentTipBody({
+  side,
+  seg,
+  st,
+  when,
+  isLive,
+  daily,
+  share: withShare = true,
+}: {
+  side: FlowSide;
+  seg: FlowSegment;
+  st: FlowSideState;
+  when: string;
+  isLive: boolean;
+  daily: boolean;
+  /** False on a busy bar, drawn at the scale of what is held. */
+  share?: boolean;
+}) {
+  const cursor = useContext(FlowCursorContext);
+  const share = withShare && st.total > 0 ? (seg.value / st.total) * 100 : null;
+  const pct =
+    share == null ? null : share > 0 && share < 1 ? "under 1%" : `${Math.round(share).toLocaleString("en-US")}%`;
+  return (
+    <div className="flex flex-col gap-1" data-flow-seg-tip={side}>
+      {cursor && (
+        <p className="pr-7 text-rb-500 tabular-nums" data-flow-panel-date="">
+          {cursor.at.charAt(0).toUpperCase() + cursor.at.slice(1)}
+        </p>
+      )}
+      <div className="flex items-center gap-2 pr-6 text-sm font-semibold">
+        <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg)} />
+        <span>{seg.label}</span>
+        <span className="ml-auto tabular-nums">
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value)}</Prov>
+        </span>
+      </div>
+      {pct && (
+        <p className="text-rb-500" data-flow-seg-share="" data-prov-exempt="">
+          {pct} of the {side === "collateral" ? "collateral" : "debt"} bar
+        </p>
       )}
     </div>
   );

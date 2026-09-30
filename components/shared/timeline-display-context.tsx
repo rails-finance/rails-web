@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { usdShown } from "@/lib/shared/usd-display";
 
 export type TimelineDisplayKey =
   | "showTimestamps"
@@ -8,7 +9,8 @@ export type TimelineDisplayKey =
   | "showBalanceBars"
   | "showTimelineValues"
   | "showTickerLabels"
-  | "showUsdValues"
+  | "showUsdStable"
+  | "showUsdOther"
   | "showEventNumbers"
   | "showInterestRates"
   | "showCollateralRatio"
@@ -29,9 +31,16 @@ export interface TimelineDisplayState {
   /** When true, position-snapshot rows show the asset ticker text alongside
    * the icon. Off by default — the icon alone identifies the asset. */
   showTickerLabels: boolean;
-  /** When true, position-snapshot / simulator rows show the USD-equivalent
-   * value next to the asset amount. */
-  showUsdValues: boolean;
+  /** "USD for stablecoins" in Display: a stablecoin's amount shows its USD
+   * value. Off by default; a stablecoin more than 1% off $1 at the event
+   * shows it anyway (lib/shared/usd-display.ts). */
+  showUsdStable: boolean;
+  /** "USD for other tokens" in Display: every other amount shows its USD
+   * value. On by default. A page without the stablecoin switch follows this
+   * one for every amount. */
+  showUsdOther: boolean;
+  /** The page's Display menu offers the two USD switches. */
+  usdSplit: boolean;
   /** When true, each timeline row displays its 1-based chronological number —
    * the position in the WHOLE history, not in the drawn list. */
   showEventNumbers: boolean;
@@ -72,7 +81,8 @@ const DEFAULTS = {
   showBalanceBars: false,
   showTimelineValues: true,
   showTickerLabels: false,
-  showUsdValues: true,
+  showUsdStable: false,
+  showUsdOther: true,
   showEventNumbers: false,
   showInterestRates: false,
   showCollateralRatio: false,
@@ -86,8 +96,12 @@ const DEFAULTS = {
 // predate this key simply keeps the default for it.
 const STORAGE_KEY = "timeline-display-v3";
 
+// Without a provider (a position card, a listing) every USD value shows, as
+// no Display menu governs it.
 const Ctx = createContext<TimelineDisplayState>({
   ...DEFAULTS,
+  showUsdStable: true,
+  usdSplit: false,
   spineView: false,
   toggle: () => {},
   setSpineView: () => {},
@@ -109,7 +123,24 @@ function markSpineView(on: boolean) {
   else delete d.timelineView;
 }
 
-export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
+/** A stored preference from before the two USD switches: a reader who hid
+ *  every USD value ("USD values" off) keeps both off. */
+function migrate(parsed: Partial<typeof DEFAULTS> & { showUsdValues?: boolean }): Partial<typeof DEFAULTS> {
+  const { showUsdValues, ...rest } = parsed;
+  if (showUsdValues === false && rest.showUsdOther === undefined)
+    return { ...rest, showUsdOther: false, showUsdStable: false };
+  return rest;
+}
+
+export function TimelineDisplayProvider({
+  children,
+  usdSplit = false,
+}: {
+  children: ReactNode;
+  /** The page's Display menu offers "USD for stablecoins" and "USD for other
+   *  tokens" (lib/shared/usd-display.ts). */
+  usdSplit?: boolean;
+}) {
   const [state, setState] = useState(DEFAULTS);
   const [override, setOverride] = useState<boolean | null>(null);
   const saved = useRef(DEFAULTS.mobileSpine);
@@ -120,7 +151,7 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Partial<typeof DEFAULTS>;
+        const parsed = migrate(JSON.parse(raw) as Partial<typeof DEFAULTS> & { showUsdValues?: boolean });
         saved.current = parsed.mobileSpine === true;
         setState((s) => ({ ...s, ...parsed }));
       }
@@ -155,9 +186,20 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const spineView = override ?? state.mobileSpine;
-  return <Ctx.Provider value={{ ...state, spineView, toggle, setSpineView }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...state, usdSplit, spineView, toggle, setSpineView }}>{children}</Ctx.Provider>;
 }
 
 export function useTimelineDisplay(): TimelineDisplayState {
   return useContext(Ctx);
+}
+
+/** Whether a USD value shows beside an amount, by the page's Display
+ *  switches (lib/shared/usd-display.ts). */
+export function useUsdShown(): (
+  symbol: string | null | undefined,
+  usd: number | null | undefined,
+  amount: number | string | null | undefined,
+) => boolean {
+  const d = useContext(Ctx);
+  return (symbol, usd, amount) => usdShown(d, symbol, usd, amount);
 }

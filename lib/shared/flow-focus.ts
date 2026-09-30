@@ -1,10 +1,10 @@
 // The Lifetime flows panel and the timeline under it, tied together by the day
 // (rails-ops TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "The day
-// links the chart and the timeline"): freezing the chart's cursor on a day
-// rewinds the timeline to that day's close, and a day mark's button on the
-// timeline freezes the cursor there. An event card states the side's lifetime sum as
-// of that event, from the same day rows the bars read and the legs of the
-// events on the page.
+// links the chart and the timeline"): the chart's "Apply to timeline" cuts the
+// timeline at its cursor's day close, and a day mark's button on the timeline
+// freezes the chart's cursor there. Freezing the chart cuts nothing. An event
+// card states the side's lifetime sum as of that event, from the same day rows
+// the bars read and the legs of the events on the page.
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts); the
 // store at the foot is the one piece of state the panel, the timeline and the
@@ -163,19 +163,24 @@ function rowIndexAt(m: FlowModel, stop: number): number {
 
 export interface FlowFocusState {
   cursor: FlowCursorAt | null;
-  /** A day mark's button on the timeline: the chart's cursor goes to that
-   *  day's close and freezes there, which rewinds the timeline to it. */
+  /** The chart's frozen day (absolute UTC day; today's at the live stop), or
+   *  null while the cursor is not frozen. A card's chart button hides on it. */
+  frozenDay: number | null;
+  /** A card's "View on chart": the chart's cursor goes to that day's close
+   *  and freezes there. The timeline is untouched. */
   move: { ts: number; n: number } | null;
-  /** The frozen cursor, which is the timeline's rewind: the list holds every
-   *  event up to `endTs` (the frozen day's close; null at the live stop, where
-   *  nothing is cut), named `word` ("2 Sep '26"). Null when nothing is frozen. */
-  rewind: { endTs: number | null; word: string } | null;
-  /** The frozen tag's "Timeline to …": the timeline comes into view, its top
-   *  event open, its header flashing. */
+  /** The cut applied to the timeline by the chart's "Apply to timeline": the
+   *  list holds every event up to `endTs` (that day's close), named `word`
+   *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
+   *  leaves it where it is; the chip's × or a month picked in Dates clears
+   *  it. */
+  rewind: { endTs: number; word: string } | null;
+  /** Bumped to bring the cut's last card into view and flash its header
+   *  (Apply, and the chip's text). */
   go: number;
-  /** The timeline's chip × or a month picked in Dates: the chart releases
-   *  its freeze, which ends the rewind. */
-  release: number;
+  /** The Dates filter's span on the timeline (unix seconds, inclusive), which
+   *  the chart brackets on its line; null with Dates at All. */
+  dates: [number, number] | null;
 }
 
 export interface FlowFocusStore {
@@ -185,7 +190,7 @@ export interface FlowFocusStore {
 }
 
 export function createFlowFocusStore(): FlowFocusStore {
-  let state: FlowFocusState = { cursor: null, move: null, rewind: null, go: 0, release: 0 };
+  let state: FlowFocusState = { cursor: null, frozenDay: null, move: null, rewind: null, go: 0, dates: null };
   const subs = new Set<() => void>();
   return {
     get: () => state,

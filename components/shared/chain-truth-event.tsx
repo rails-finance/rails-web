@@ -43,7 +43,7 @@ import {
   ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { useTimelineDisplay, useUsdShown } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -774,7 +774,7 @@ export function ChainTruthDetail({
   symbolText?: boolean;
 }) {
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
-  const { showUsdValues } = useTimelineDisplay();
+  const usdShown = useUsdShown();
   const unreadOf = useUnreadTokenOf();
   // The before→after toggle surfaces a reconstructed before (after − change).
   // Every leaf is on-chain (the replayed after, the logged delta), so the before
@@ -859,7 +859,7 @@ export function ChainTruthDetail({
                     {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>
-                {(showUsdValues || s.usdAlways) && s.usd && (
+                {s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.value)) && (
                   // The after-balance valued at the event-block oracle price —
                   // the bordered chip the Liquity V2 / Aave V4 details use
                   // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the

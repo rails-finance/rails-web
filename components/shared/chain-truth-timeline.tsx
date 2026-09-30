@@ -72,7 +72,7 @@ import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context"
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
-import { History, X } from "lucide-react";
+import { List, X } from "lucide-react";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -516,7 +516,7 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
   const tip = `${props.tl.totalCount}:${props.tl.servedRowCount ?? props.tl.sortedEvents.length}`;
   return (
     <SingleWalletProvider value={true}>
-      <TimelineDisplayProvider>
+      <TimelineDisplayProvider usdSplit={props.displayItems?.some((i) => i.key === "showUsdStable") ?? false}>
         <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
           <ChainTruthTimelineBody {...props} />
         </FolderMembersProvider>
@@ -713,10 +713,10 @@ function ChainTruthTimelineBody({
   // one transaction as one card and hide nothing, so there is nothing for the
   // choice to give back.
   const activeRuns = useMemo(() => (collapseRuns ? runs : runs?.filter((r) => r.asOneEvent)), [collapseRuns, runs]);
-  // The rewind (lib/shared/flow-focus.ts): while the Lifetime flows chart's
-  // cursor is frozen on a day, the list holds every event up to that day's
-  // close. What goes is the list's top, so the rows keep their order and move
-  // up by what was cut.
+  // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
+  // "Apply to timeline" is pressed, the list holds every event up to that
+  // day's close. What goes is the list's top, so the rows keep their order
+  // and move up by what was cut.
   const rewind = useFlowFocusState((st) => st.rewind);
   const cut = rewind?.endTs ?? null;
   const allEvents = tl.displayedEvents;
@@ -1130,13 +1130,13 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
-  // The rewind's other half. Whenever it moves, the list's top event (the
-  // frozen day's last, or the last before it) opens; the frozen tag's
-  // "Timeline to …" also brings it into view and flashes its header. Where
-  // the page holds another month (a served, month-navigated page) it reads
-  // the cut's month; where a filter would leave the rewound list empty the
-  // filters clear; a line says either. A month picked in Dates releases the
-  // rewind.
+  // The cut's other half. "Apply to timeline" (and the chip's text) brings
+  // the list's top event (the cut day's last, or the last before it) into
+  // view and flashes its header; the card stays open or closed as the
+  // visitor left it. Where the page holds another month (a served,
+  // month-navigated page) it reads the cut's month; where a filter would
+  // leave the cut list empty the filters clear; a line says either. A month
+  // picked in Dates clears the cut.
   const focusStore = useFlowFocus()?.store ?? null;
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
@@ -1144,12 +1144,15 @@ function ChainTruthTimelineBody({
    *  Dates range: changes it made release nothing. */
   const askedMonth = useRef<number | null>(null);
   const clearedRange = useRef(false);
-  /** A month picked in Dates is releasing the rewind: nothing more is read
-   *  for it meanwhile. */
+  /** A month picked in Dates is clearing the cut: nothing more is read for
+   *  it meanwhile. */
   const releasing = useRef(false);
   const releaseRewind = useCallback(() => {
-    if (focusStore) focusStore.set({ release: focusStore.get().release + 1 });
+    if (focusStore?.get().rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
+  /** The last "go" not yet answered by a card brought into view: a cut whose
+   *  month is still loading scrolls once its rows land. */
+  const pendingGo = useRef(0);
   /** The top row, looked for in the page: its day's mark, a folder holding it
    *  opened first, a run opened by its header. */
   const [seek, setSeek] = useState<{
@@ -1193,11 +1196,28 @@ function ChainTruthTimelineBody({
         ? rows[0].folder.responseId
         : rows[0].events[0].id
     : null;
-  // A month picked in Dates releases the rewind. Declared before the effect
+  // A month picked in Dates clears the cut. Declared before the effect
   // below, which reads `releasing` in the same commit.
   const rangeKey = tl.dateRange ? `${tl.dateRange[0]}:${tl.dateRange[1]}` : null;
   const monthNow = segments?.month ?? null;
   const lastDates = useRef({ range: rangeKey, month: monthNow });
+  // The Dates span, for the chart's bracket on its line: the range picked,
+  // or the month the page reads as its own segment.
+  useEffect(() => {
+    if (!focusStore) return;
+    const r = tl.dateRange;
+    const span: [number, number] | null = r
+      ? [r[0], r[1]]
+      : monthNow != null
+        ? [
+            Date.UTC(Math.floor(monthNow / 12), monthNow % 12, 1) / 1000,
+            Date.UTC(Math.floor(monthNow / 12), (monthNow % 12) + 1, 1) / 1000 - 1,
+          ]
+        : null;
+    focusStore.set({ dates: span });
+    // `rangeKey` stands for `tl.dateRange`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusStore, rangeKey, monthNow]);
   useEffect(() => {
     const prev = lastDates.current;
     lastDates.current = { range: rangeKey, month: monthNow };
@@ -1215,13 +1235,14 @@ function ChainTruthTimelineBody({
   }, [rangeKey, monthNow, releaseRewind]);
   useEffect(() => {
     if (rewindKey == null) {
-      // Released: a month the rewind read goes back to the rows the page
-      // opened with, unless a month picked in Dates released it.
+      // Cleared: a month the cut read goes back to the rows the page
+      // opened with, unless a month picked in Dates cleared it.
       if (!releasing.current && askedMonth.current != null && segments?.month === askedMonth.current)
         segments.onReset?.();
       setRewindNote(null);
       releasing.current = false;
       askedMonth.current = null;
+      pendingGo.current = 0;
       return;
     }
     if (releasing.current || segments?.loading != null) return;
@@ -1252,19 +1273,25 @@ function ChainTruthTimelineBody({
         return;
       }
     }
-    // Draw from the top, where the rewound list starts.
+    // Draw from the top, where the cut list starts.
     setWindowSize(WINDOW_CHUNK);
-    seekTop(false, 0);
+    seekTop(pendingGo.current > 0, pendingGo.current);
     // `tl`, `segments` and `seekTop` are read at the moment the rewind or the
     // top row changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewindKey, topKey, segments?.loading]);
-  // The frozen tag's "Timeline to …".
+  // "Apply to timeline", or the chip's text.
   const wentTo = useRef(go);
   useEffect(() => {
     if (wentTo.current === go) return;
     wentTo.current = go;
+    pendingGo.current = go;
+    // A cut whose month is still being read scrolls once it lands (the
+    // effect above).
+    if (segments?.loading != null || (askedMonth.current != null && segments?.month !== askedMonth.current)) return;
     seekTop(true, go);
+    // `segments` is read at the moment of the press.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [go, seekTop]);
   // The mark is in the page once its row is drawn, a folder's once its
   // members are read, a run's once it is open: look for it until it is.
@@ -1290,9 +1317,9 @@ function ChainTruthTimelineBody({
       const card = mark?.closest<HTMLElement>("[data-event-id]");
       if (card?.dataset.eventId) {
         window.clearInterval(timer);
-        clickToOpenIfClosed(card.dataset.eventId);
         setSeek(null);
         if (scroll) {
+          pendingGo.current = 0;
           setFlash({ id: card.dataset.eventId, n });
           bring(card);
         }
@@ -1308,7 +1335,7 @@ function ChainTruthTimelineBody({
         window.clearInterval(timer);
         setSeek(null);
         const last = events.find((e) => utcDay(e.timestamp) === day);
-        if (last) clickToOpenIfClosed(last.id);
+        if (scroll) pendingGo.current = 0;
         const el = last
           ? document.getElementById(`event-${last.id}`)
           : seek.folderId
@@ -1746,14 +1773,20 @@ function ChainTruthTimelineBody({
               className="inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800"
               data-flow-rewind-chip=""
             >
-              <span className="inline-flex items-center gap-1.5 py-1 pl-2.5 pr-1.5">
-                <History size={13} aria-hidden className="text-rb-500" />
+              <button
+                type="button"
+                onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
+                title={`Bring the last event of ${rewind.word} into view`}
+                className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-l-full py-1 pl-2.5 pr-1.5 text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 dark:text-blue-300"
+                data-flow-rewind-go=""
+              >
+                <List size={13} aria-hidden />
                 Timeline to {rewind.word}
-              </span>
+              </button>
               <button
                 type="button"
                 onClick={releaseRewind}
-                aria-label={`Release the timeline to ${rewind.word}`}
+                aria-label={`Clear the cut at ${rewind.word}`}
                 className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 text-rb-500 transition-colors hover:bg-rb-200/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1 dark:hover:bg-rb-700/60"
                 data-flow-rewind-release=""
               >

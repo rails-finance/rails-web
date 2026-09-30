@@ -7,8 +7,9 @@
 // row: health factor, LTV, still borrowable (and eMode where the account
 // used one).
 //
-// The card's calculator (ReceiptCalcButton, in the card's header) grows each
-// cell into its side's lifetime sum as of the event: the first line unsigned,
+// The card's calculator (ReceiptCalcButton, at the right of the open card's
+// (i) row) grows each cell into its side's lifetime sum as of the event: the
+// first line unsigned,
 // then each inflow, each outflow, the balancing item last, a rule, "=" and
 // what is held or owed, its assets under it. The line the event filled is
 // highlighted with its running total before → after. The printed lines add to
@@ -58,7 +59,7 @@ export function useEventCum(eventId: string | undefined): EventCum | null {
   );
 }
 
-/** The calculator in the card's header: shown once the card is open and the
+/** The calculator at the right of the open card's (i) row: shown where the
  *  event has a lifetime sum to state. */
 export function ReceiptCalcButton() {
   const calc = useContext(ReceiptCalcContext);
@@ -66,7 +67,7 @@ export function ReceiptCalcButton() {
   return (
     <button
       type="button"
-      className={`${CTRL_GHOST} ${calc.on ? "bg-sunken text-foreground ring-1 ring-foreground" : CTRL_OFF} size-11 shrink-0 rounded-lg sm:size-9`}
+      className={`${CTRL_GHOST} ${calc.on ? "bg-sunken text-foreground ring-1 ring-foreground" : CTRL_OFF} size-11 shrink-0 rounded-lg sm:size-8`}
       aria-pressed={calc.on}
       aria-label="Show how the position adds up"
       title="Show how the position adds up"
@@ -77,7 +78,7 @@ export function ReceiptCalcButton() {
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <Calculator size={18} aria-hidden />
+      <Calculator size={16} aria-hidden />
     </button>
   );
 }

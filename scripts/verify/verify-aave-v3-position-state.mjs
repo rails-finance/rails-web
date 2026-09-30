@@ -708,10 +708,13 @@ for (const fx of FIXTURES) {
     if (fx.deep) {
       const chipSel = '[data-position-state="ready"] span.border-l-2.border-r-2.border-rb-500';
       check(`${fx.label}: USD chips render in the position block`, (await card.locator(chipSel).count()) > 0);
-      await setDisplayFlag(page, "USD Values", false);
-      check(`${fx.label}: USD chips leave when USD values are off`, (await card.locator(chipSel).count()) === 0);
-      await setDisplayFlag(page, "USD Values", true);
-      check(`${fx.label}: USD chips return when USD values are on`, (await card.locator(chipSel).count()) > 0);
+      // Display's two USD switches (stablecoins off by default, other tokens on).
+      await setDisplayFlag(page, "USD for stablecoins", false);
+      await setDisplayFlag(page, "USD for other tokens", false);
+      check(`${fx.label}: USD chips leave when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
+      await setDisplayFlag(page, "USD for stablecoins", true);
+      await setDisplayFlag(page, "USD for other tokens", true);
+      check(`${fx.label}: USD chips return when both USD switches are on`, (await card.locator(chipSel).count()) > 0);
       if (a) {
         const hfReceipt = await receiptText(
           page,

@@ -2,13 +2,12 @@
 
 // The page-level tie between the Lifetime flows panel, the timeline and the
 // event cards (lib/shared/flow-focus.ts; rails-ops TO-DO-ui-jobs 141). A page
-// that has it (the Aave family) wraps both in <FlowFocusContext.Provider>: the
-// chart's segments name their line and value without opening a panel, the
-// chart's frozen cursor rewinds the timeline to its day, each day's last card
-// carries the day's date and a button that freezes the chart there, and each
-// event card can state
-// the lifetime sum as of its event. A page without it keeps the segment panels
-// (the Liquity family).
+// that has it (the Aave family) wraps both in <FlowFocusContext.Provider>: a
+// click on a chart segment opens a short tip with its line, value and share,
+// the chart's "Apply to timeline" cuts the timeline at its cursor's day, each
+// day's last card carries the day's date and a button that freezes the chart
+// there, and each event card can state the lifetime sum as of its event. A
+// page without it keeps the segment panels (the Liquity family).
 
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
 import { buildFlowModel, type FlowModel, type FlowTimeline } from "@/lib/shared/flows-timeline";
