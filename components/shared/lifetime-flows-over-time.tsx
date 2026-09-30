@@ -5,21 +5,17 @@
 // more than three years) from the open to today, from the family's series
 // route (lib/shared/flows-series.ts). The figures above are today's, the
 // same as the bars'; the last point is today's. The bars' window is shaded.
-// A bin where a held asset recorded no price draws a gap. Under it, where
-// `SHOW_HEALTH_OVER_TIME` is set and the page states a liquidation threshold,
-// the health factor at today's threshold.
+// A bin where a held asset recorded no price draws a gap.
 
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { Prov } from "@/components/shared/provenance";
 import { Headline, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { assetsAt, axisFor, dayStart, formatFlowUsd, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
-import { healthAt } from "@/lib/shared/flows-busy";
-import { SHOW_HEALTH_OVER_TIME, type FlowBinSeries } from "@/lib/shared/flows-series";
+import type { FlowBinSeries } from "@/lib/shared/flows-series";
 
 const HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
 const CHART_H = 150;
-const HEALTH_H = 44;
 /** The chart's inset each side. */
 const PAD = 8;
 const DAY_S = 86_400;
@@ -32,7 +28,6 @@ export function LifetimeOverTime({
   series,
   failed,
   windowFrom,
-  healthThreshold,
 }: {
   /** The whole life's model: today's figures, the labels, the close. */
   model: FlowModel;
@@ -41,7 +36,6 @@ export function LifetimeOverTime({
   failed: boolean;
   /** UTC day the bars' window opens, where it opens after the first event. */
   windowFrom: number | null;
-  healthThreshold: number | null;
 }) {
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   const s = stateAt(model, model.liveStop);
@@ -63,13 +57,7 @@ export function LifetimeOverTime({
         {hasDebt && <Headline side="debt" st={s.debt} model={model} when={when} isLive={!closed} assets={assets} />}
       </div>
       {series && series.points.length > 0 ? (
-        <Chart
-          model={model}
-          series={series}
-          hasDebt={hasDebt}
-          windowFrom={windowFrom}
-          healthThreshold={healthThreshold}
-        />
+        <Chart model={model} series={series} hasDebt={hasDebt} windowFrom={windowFrom} />
       ) : (
         <p className="mt-3 flex h-[150px] items-center justify-center rounded-md bg-sunken text-xs text-rb-500">
           {failed ? "The series could not be read." : "Reading the series…"}
@@ -84,13 +72,11 @@ function Chart({
   series,
   hasDebt,
   windowFrom,
-  healthThreshold,
 }: {
   model: FlowModel;
   series: FlowBinSeries;
   hasDebt: boolean;
   windowFrom: number | null;
-  healthThreshold: number | null;
 }) {
   const [ref, w] = useWidth();
   // The last point is today's, at the figures above.
@@ -138,23 +124,6 @@ function Chart({
       <circle key={`${k}${run[0]}`} cx={x(run[0])} cy={y(points[run[0]][k] as number)} r={2} fill={HUE[k]} />
     ) : null;
 
-  const showHealth = SHOW_HEALTH_OVER_TIME && hasDebt && healthThreshold != null && healthThreshold > 0;
-  const health = showHealth
-    ? points.map((p) =>
-        p.collateral == null || p.debt == null ? null : healthAt(p.collateral, p.debt, healthThreshold),
-      )
-    : null;
-  const hVals = health ? health.filter((h): h is number => h != null) : [];
-  const hMax = Math.min(3, Math.max(1.1, ...hVals) * 1.01);
-  const hMin = Math.max(0, Math.min(1, ...hVals) - (hMax - Math.min(1, ...hVals)) * 0.08);
-  const hy = (h: number) => HEALTH_H - 3 - ((Math.min(h, hMax) - hMin) / (hMax - hMin)) * (HEALTH_H - 6);
-  const hPath = health
-    ? health.reduce<string>(
-        (d, h, i) => (h == null ? d : `${d}${d === "" || health[i - 1] == null ? "M" : "L"}${x(i)},${hy(h)}`),
-        "",
-      )
-    : "";
-
   const pick = (clientX: number, el: Element) => {
     const r = el.getBoundingClientRect();
     const px = clientX - r.left;
@@ -187,7 +156,6 @@ function Chart({
   const shade = windowFrom != null && windowFrom > series.first ? xDay(windowFrom) : null;
   const firstLabel = dayStamp(series.first * DAY_S);
   const per = series.bin === "month" ? "month" : "week";
-  const hNow = health?.[at] ?? null;
 
   return (
     <div className="mt-3">
@@ -329,42 +297,6 @@ function Chart({
           </span>
         )}
       </p>
-      {health && w > 0 && hPath && (
-        <div className="mt-3" data-flow-health="">
-          <p className="mb-1 flex flex-wrap items-baseline gap-x-2 text-xs text-rb-500">
-            <span>
-              Health factor at today&apos;s liquidation threshold, {Math.round((healthThreshold ?? 0) * 1000) / 10}%,
-              applied to every past {per}
-            </span>
-            {hNow != null && (
-              <Prov
-                info={{
-                  kind: "chain-derived",
-                  summary: `Health factor for ${binLabel(p, at).toLowerCase()}: ${model.labels.collateral.toLowerCase()} held then × today's liquidation threshold, over the debt owed then. The threshold then may have differed.`,
-                  formula: "collateral × threshold ÷ debt",
-                }}
-              >
-                <span className="font-medium tabular-nums text-foreground">{hNow.toFixed(2)}</span>
-              </Prov>
-            )}
-          </p>
-          <svg width={w} height={HEALTH_H} aria-hidden className="block">
-            {hMin < 1 && (
-              <line
-                x1={0}
-                x2={w}
-                y1={hy(1)}
-                y2={hy(1)}
-                stroke="var(--color-red-500)"
-                strokeDasharray="2 3"
-                strokeWidth={1}
-              />
-            )}
-            <path d={hPath} fill="none" className="stroke-rb-500" strokeWidth={1.5} strokeLinejoin="round" />
-            {hNow != null && <circle cx={x(at)} cy={hy(hNow)} r={3} className="fill-foreground" />}
-          </svg>
-        </div>
-      )}
     </div>
   );
 }

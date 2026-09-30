@@ -357,18 +357,21 @@ export default function AaveV3PositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? aaveEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<AaveV3FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchAaveV3FlowSeries({ wallet, market, signal: ctl.signal })
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet, market]);
@@ -608,9 +611,6 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // Lifetime's health line (lib/shared/flows-series.ts): today's threshold.
-  const healthThreshold =
-    chain && !chain.chainStale && chain.avgLiquidationThreshold > 0 ? chain.avgLiquidationThreshold : null;
   const flowSeriesSource = useMemo(
     () => ({ path: "/api/aave-v3/flows/series", params: { wallet, market } }),
     [wallet, market],
@@ -735,17 +735,11 @@ export default function AaveV3PositionDetail({
             )}
             {towerData && (
               <LifetimeFlowsPanel
-                ledger={towerData}
+                read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
                 scrubber={
-                  flowTimeline ? (
-                    <LifetimeFlowsScrubber
-                      timeline={flowTimeline}
-                      series={flowSeriesSource}
-                      healthThreshold={healthThreshold}
-                    />
-                  ) : null
+                  flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
                 }
               />
             )}

@@ -18,6 +18,7 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
   axisFor,
+  axisLabelOnPhone,
   dayStart,
   formatFlowUsd,
   spokenUsd,
@@ -56,7 +57,7 @@ export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
 export interface BusyFlowsProps {
   /** The model, cut to the bars' window where it has one. */
   model: FlowModel;
-  /** The Full breakdown's note while the slider is off its last stop. */
+  /** A ledger's note while the slider is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
 }
 
@@ -217,6 +218,35 @@ function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt:
 
 // ── a: the bars at the scale of what is held ────────────────────────────────
 
+/** The shared axis's labels, once, under the last bar, in both bar views;
+ *  a phone thins them (`axisLabelOnPhone`). */
+export function AxisLabels({ ticks, max }: { ticks: number[]; max: number }) {
+  return (
+    <div
+      className="relative mt-1 h-4 text-[11px] tabular-nums text-rb-500"
+      aria-hidden
+      data-flow-axis=""
+      data-prov-exempt=""
+    >
+      {ticks.map((t, i) => {
+        const at = t / max;
+        return (
+          <span
+            key={t}
+            className={`absolute top-0${axisLabelOnPhone(i, ticks.length) ? "" : " max-sm:hidden"}`}
+            style={{
+              left: `${at * 100}%`,
+              transform: at === 0 ? "none" : at > 0.9 ? "translateX(-100%)" : "translateX(-50%)",
+            }}
+          >
+            {formatFlowUsd(t)}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 export function Headline({
   side,
   st,
@@ -313,33 +343,15 @@ function Rescaled({
   const sides: FlowSide[] = hasDebt ? ["collateral", "debt"] : ["collateral"];
   return (
     <div>
+      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        {sides.map((side) => (
+          <Headline key={side} side={side} st={s[side]} model={model} when={when} isLive={isLive} assets={assets} />
+        ))}
+      </div>
       {sides.map((side, i) => {
         const st = s[side];
         return (
-          <div key={side} className={i === 0 ? "mt-1" : "mt-4"}>
-            <Headline side={side} st={st} model={model} when={when} isLive={isLive} assets={assets} />
-            <div
-              className="relative mb-1 mt-1.5 h-4 text-[11px] tabular-nums text-rb-500"
-              aria-hidden
-              data-prov-exempt=""
-            >
-              {axis.ticks.map((t, k) => {
-                const x = t / axis.max;
-                const lastTick = k === axis.ticks.length - 1;
-                return (
-                  <span
-                    key={t}
-                    className={`absolute top-0${axis.ticks.length > 5 && k % 2 === 1 && !lastTick ? " max-sm:hidden" : ""}`}
-                    style={{
-                      left: `${x * 100}%`,
-                      transform: x === 0 ? "none" : x > 0.9 ? "translateX(-100%)" : "translateX(-50%)",
-                    }}
-                  >
-                    {formatFlowUsd(t)}
-                  </span>
-                );
-              })}
-            </div>
+          <div key={side} className={i === 0 ? "" : "mt-3"} data-flow-side={side}>
             <div
               role="img"
               aria-label={`${side === "collateral" ? model.labels.collateral : model.labels.debt}: ${spokenUsd(st.now)}.`}
@@ -358,6 +370,7 @@ function Rescaled({
                 style={{ width: `${Math.max(0, (st.now / axis.max) * 100)}%`, background: HUE[side] }}
               />
             </div>
+            {i === sides.length - 1 && <AxisLabels ticks={axis.ticks} max={axis.max} />}
             <NetLine side={side} st={st} when={when} isLive={isLive} daily={model.daily} />
           </div>
         );

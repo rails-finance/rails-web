@@ -1,14 +1,12 @@
 "use client";
 
-// <FlowsLedger> — the Lifetime flows ledger: the towers and their flank tables
-// drawn from a ChainTruthTowerData, with the Display menu over them. The
-// Lifetime flows panel (lifetime-flows-panel.tsx) shows it behind "Full
-// breakdown"; <ChainTruthTower> draws the same pieces as its whole panel.
-// Moved here from chain-truth-tower.tsx so the panel holds no tower import
-// (rails-ops TO-DO-ui-jobs §206). The design notes for the bars are in that
-// file's header.
+// The ledger pieces <ChainTruthTower> draws: the towers and their flank
+// tables from a ChainTruthTowerData, and the Display menu over them. Moved
+// here from chain-truth-tower.tsx while the Lifetime flows panel also drew
+// them (rails-ops TO-DO-ui-jobs §206); the panel no longer does. The design
+// notes for the bars are in chain-truth-tower.tsx's header.
 
-import { useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import {
   DualTowerChart,
   formatCompactUsd,
@@ -25,8 +23,6 @@ import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/compon
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { formatCompact, formatNumber } from "@/lib/utils/format";
-import { NotLoaded } from "@/components/shared/not-loaded";
-import { leftOutTitle } from "@/lib/shared/decimals-unread";
 import {
   type ChainTruthTowerData,
   type TowerLine,
@@ -1038,81 +1034,6 @@ export function sideMonoSymbol(s: TowerSideData): boolean {
       .map((l) => l.symbol),
   );
   return syms.size <= 1;
-}
-
-/** Whether the ledger has anything to draw: a held balance on either side,
- *  drawable lifetime flows, or a token left out because its decimals did not
- *  load. <ChainTruthTower> renders nothing when it has none. */
-export function ledgerDrawable(data: ChainTruthTowerData): { drawable: boolean; any: boolean } {
-  const holds = (s: TowerSideData) =>
-    s.current.some((l) => l.amount > 0) || (s.eventlessGains ?? []).some((l) => l.amount > 0);
-  const hasDebt = sideParts(data.debt).some(holds) || (data.debt.interest?.amount ?? 0) > 0;
-  const hasColl = sideParts(data.collateral).some(holds);
-  const showBars =
-    data.valued ||
-    (data.debt.interest?.amount ?? 0) > 0 ||
-    (hasLifetime(data) && sideMonoSymbol(data.collateral) && sideMonoSymbol(data.debt));
-  const drawable = hasDebt || hasColl || (showBars && hasLifetime(data));
-  return { drawable, any: drawable || (data.notLoaded ?? []).length > 0 };
-}
-
-/** The ledger as the Lifetime flows panel shows it: the Display menu on its
- *  own row, the towers pulled up under it (or the gated reserve list), and the
- *  note naming any token left out. The same markup <ChainTruthTower> draws
- *  under a collapsible header. */
-export function FlowsLedger({ data }: { data: ChainTruthTowerData }) {
-  // Lifetime-first: "Hide inactive / repaid" collapses to the current-state
-  // principal/interest split.
-  const [hideHistorical, setHideHistorical] = useState(false);
-  // null = follow the auto-default (group whenever anything can merge).
-  const [groupOverride, setGroupOverride] = useState<boolean | null>(null);
-  const showBars =
-    data.valued ||
-    (data.debt.interest?.amount ?? 0) > 0 ||
-    (hasLifetime(data) && sideMonoSymbol(data.collateral) && sideMonoSymbol(data.debt));
-  const lifetimeAvailable = showBars && hasLifetime(data);
-  const { drawable } = ledgerDrawable(data);
-  const leftOut = data.notLoaded ?? [];
-  const canGroup = showBars && (sideCanGroup(data.collateral, data.valued) || sideCanGroup(data.debt, data.valued));
-  const grouped = canGroup && (groupOverride ?? true);
-  const chartData: ChainTruthTowerData = grouped
-    ? { ...data, collateral: groupSide(data.collateral, data.valued), debt: groupSide(data.debt, data.valued) }
-    : data;
-  return (
-    <>
-      <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-end gap-3">
-        <div className="pointer-events-auto flex items-center gap-3">
-          <TowerDisplayControls
-            lifetimeAvailable={lifetimeAvailable}
-            canGroup={canGroup}
-            grouped={grouped}
-            hideHistorical={hideHistorical}
-            showBars={showBars}
-            flowsNote={data.flowsNote}
-            onGroup={() => setGroupOverride((v) => !(v ?? true))}
-            onHideHistorical={() => setHideHistorical((v) => !v)}
-          />
-        </div>
-      </div>
-      {/* Bars pull up under the Display row; the gated reserve LIST keeps its
-          own row (text would collide with the menu). */}
-      {drawable && (
-        <div className={showBars ? "-mt-7" : "mt-3"}>
-          {showBars ? (
-            <ChainTruthTowerChart data={chartData} hideHistorical={hideHistorical} />
-          ) : (
-            <GatedEconomics data={data} />
-          )}
-        </div>
-      )}
-      {leftOut.length > 0 && (
-        <p className="mt-3 text-[11px] leading-snug text-rb-400" data-not-loaded="">
-          Leaves out {leftOut.map((t) => t.label).join(", ")}:{" "}
-          <NotLoaded inline className="text-rb-500" title={leftOutTitle(leftOut)} />
-        </p>
-      )}
-    </>
-  );
 }
 
 /** The tower's Display menu — "Group assets" / "Hide inactive / repaid" — and
