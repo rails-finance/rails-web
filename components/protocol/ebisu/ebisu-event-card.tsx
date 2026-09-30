@@ -6,7 +6,13 @@
 // (branch collateral + ebUSD debt); a liquidation shows the critical warning
 // spine, a redemption the external-party (pink) one.
 
-import { forkDebtMove, forkDebtMoveOps, FORK_DEBT_DUST_FLOAT } from "@/lib/shared/liquity-fork-ops";
+import {
+  forkDebtMove,
+  forkDebtMoveOps,
+  FORK_DEBT_DUST_FLOAT,
+  forkCollMove,
+  forkCollMoveOps,
+} from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, EbisuContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -41,9 +47,11 @@ import {
   collRatioProv,
   costPerYearProv,
   batchFeeShareProv,
+  redistProv,
+  liqPenaltyProv,
   type EbisuCoords,
 } from "@/lib/ebisu/event-provenance";
-import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
+import { DEBT_SYMBOL, EBISU_DOCS, MIN_DEBT } from "@/lib/ebisu/asset-catalog";
 
 // The general Ebisu link (docs.ebisu.money doesn't answer) plus the
 // question-level docs links per card topic (EBISU_DOCS — read and verified
@@ -51,6 +59,7 @@ import { DEBT_SYMBOL, EBISU_DOCS } from "@/lib/ebisu/asset-catalog";
 export const EBISU_FORK = {
   protocolName: "Ebisu",
   stablecoin: DEBT_SYMBOL,
+  minDebt: MIN_DEBT,
   docsLink: { label: "Ebisu", url: "https://ebisu.money" },
   docsByTopic: EBISU_DOCS,
 };
@@ -76,6 +85,8 @@ const EBISU_EXPLAINER_PROVS = {
   collRatioProv,
   costPerYearProv,
   batchFeeShareProv,
+  redistProv,
+  liqPenaltyProv,
 };
 
 export interface EbisuEventCardProps {
@@ -98,7 +109,9 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
   // header suppresses its sub-epsilon dust chip.
   const isNoChange = event.actionType === "adjustTrove_noChange";
 
-  const collDelta = Number(ctx.collDelta) || 0;
+  // The collateral the act moved; a redistribution landing on the same touch
+  // is the header's own figure and moves no token, so the spine leaves it out.
+  const collDelta = forkCollMove(ctx);
   // The debt the act moved (TroveOperation), the figure the header states.
   const debtDelta = forkDebtMove(ctx).value;
 
@@ -118,11 +131,7 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
   const collProv: SpineValProv | undefined =
     collDelta !== 0
       ? {
-          info: collDeltaProv(
-            coords,
-            { after: ctx.collAfter, before: ctx.collAfter != null ? Number(ctx.collAfter) - collDelta : null },
-            ctx.origin?.coll,
-          ),
+          info: collDeltaProv(coords, forkCollMoveOps(ctx), ctx.origin?.coll),
           value: chainTruthDeltaValue(collDelta, labeled),
           symbol: ctx.collateralSymbol,
         }
@@ -205,6 +214,8 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
             rateAtEventProv,
             batchManagerProv,
             batchFeeShareProv,
+            redistProv,
+            minDebt: MIN_DEBT,
           }}
           flows={event.flows}
         />

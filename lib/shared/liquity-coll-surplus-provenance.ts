@@ -12,6 +12,8 @@ import type { CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 /** The line under a terminal card's "Claimable collateral": where it is and
  *  whose. The Explanation says how to claim it. */
 export const CLAIMABLE_WHERE = "In the surplus pool, for the owner to claim";
+/** The same fact as a trailing phrase after the amount. */
+export const CLAIMABLE_BY_OWNER = "claimable by the owner (surplus pool)";
 
 export function collSurplusClaimableProv(s: LiquityTroveSurplus, symbol: string): Provenance {
   return {

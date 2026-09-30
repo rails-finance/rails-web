@@ -49,7 +49,13 @@ import {
   poolUnrealizedLossesProv,
 } from "@/lib/maple/event-provenance";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { MapleResidualNote, mapleNavTip, mapleExitTip, MAPLE_NO_IMPAIRMENT_TIP } from "./maple-pools-copy";
+import {
+  MapleLoansNote,
+  MapleResidualNote,
+  mapleNavTip,
+  mapleExitTip,
+  MAPLE_NO_IMPAIRMENT_TIP,
+} from "./maple-pools-copy";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const amount = (v: number, symbol: string): React.ReactNode => {
@@ -188,6 +194,8 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           />
         )}
       </div>
+
+      <MapleLoansNote />
 
       {Math.abs(residual) > 1 && (
         <MapleResidualNote

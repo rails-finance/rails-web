@@ -19,6 +19,7 @@ import {
 } from "@/lib/maple/event-provenance";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
 import { formatWait } from "@/lib/maple/row-times";
+import { formatNumber } from "@/lib/utils/format";
 
 export interface MapleEventHeaderProps {
   actionLabel: string;
@@ -65,18 +66,33 @@ export function MapleEventHeader({
   // spine echo calls, so the two can never disagree on the sign.
   const flanked = flankedLegProv(ctx, coords);
   // Each amount names its token in words (the phone row has no spine to
-  // carry it): a request moves shares, a fill pays the asset.
-  if (flanked) deltas.push({ ...flanked, address: soleFlowAddress(flows, flanked.symbol), suffix: flanked.symbol });
+  // carry it): a request moves shares, a fill pays the asset. One rounding
+  // rule, Polaris's: the row, the spine, the opened grid and the card state
+  // an amount in full to three decimals.
+  if (flanked)
+    deltas.push({
+      ...flanked,
+      address: soleFlowAddress(flows, flanked.symbol),
+      suffix: flanked.symbol,
+      display: formatNumber(Math.abs(flanked.value)),
+    });
 
   // The share leg rides beside the asset leg on deposits/withdraws (mint/burn).
   // The card draws it as the spine's second row from this same builder, so the
   // hand-off at ≥sm has somewhere to land.
   const shares = sharesLegProv(ctx, coords);
-  if (shares) deltas.push({ ...shares, address: soleFlowAddress(flows, shares.symbol), suffix: shares.symbol });
+  if (shares)
+    deltas.push({
+      ...shares,
+      address: soleFlowAddress(flows, shares.symbol),
+      suffix: shares.symbol,
+      display: formatNumber(Math.abs(shares.value)),
+    });
 
   const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
-  // What the amount is and where it went, said on the row.
-  const note =
+  // Which pool the row is in (a wallet's two pools interleave), then what
+  // the amount is and where it went.
+  const what =
     ctx.eventType === "request"
       ? "shares moved into the queue"
       : ctx.eventType === "request_fill"
@@ -84,6 +100,7 @@ export function MapleEventHeader({
           ? `paid to the wallet, ${formatWait(timestamp - requestAt)} after the request`
           : "paid to the wallet"
         : undefined;
+  const note = what ? `${ctx.assetSymbol} pool · ${what}` : `${ctx.assetSymbol} pool`;
 
   // Party chips: a transfer counterparty is a NEUTRAL party of the event
   // itself; only a true external action is a verdict. A known infrastructure

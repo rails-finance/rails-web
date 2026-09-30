@@ -36,6 +36,8 @@ import {
   FORK_DEBT_DUST_FLOAT,
   forkDebtMove,
   forkDebtMoveOps,
+  forkCollMove,
+  forkRedistArrival,
 } from "@/lib/shared/liquity-fork-ops";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 
@@ -50,6 +52,12 @@ export interface LiquityForkHeaderBuilders {
   debtDeltaProv: (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null) => Provenance;
   rateAtEventProv: (coords?: LiquityForkCoords) => Provenance;
   batchManagerProv: (coords: LiquityForkCoords | undefined, address: string) => Provenance;
+  /** The branch minimum debt (MIN_DEBT); a redemption that takes the debt
+   *  under it marks the row as the one that made the Trove a zombie. */
+  minDebt?: number;
+  /** A liquidated neighbour's redistribution applied on this touch — the
+   *  TroveOperation `_debtIncreaseFromRedist` / `_collIncreaseFromRedist` leg. */
+  redistProv?: (coords: LiquityForkCoords, vals: { leg: "debt" | "coll"; amount: string }) => Provenance;
   /** The Trove's share of a batch's premature-adjustment fee (server mig 342). */
   batchFeeShareProv?: (
     coords: LiquityForkCoords,
@@ -129,7 +137,10 @@ export function LiquityForkEventHeader({
   const isAdjust = ctx.eventType === "adjustTrove";
   const perAxis = isOpen || isAdjust;
 
-  const coll = Number(ctx.collDelta) || 0;
+  // The collateral the act moved. A liquidated neighbour's redistribution
+  // landing on the same touch is its own figure below: no token left the
+  // wallet for it, so it is not an "Add".
+  const coll = forkCollMove(ctx);
   if (coll !== 0 && !noChange)
     deltas.push({
       value: coll,
@@ -169,6 +180,34 @@ export function LiquityForkEventHeader({
           : {}),
     });
 
+  // A redistribution from a liquidated Trove on this branch, applied on this
+  // touch: its own part of the row, in the caution tone, so a repayment that
+  // arrived with inherited debt never reads as a larger repayment or a borrow.
+  // No token moved for it, so the spine draws no row and the figure stays here.
+  const redist = forkRedistArrival(ctx);
+  if (redist && builders.redistProv) {
+    if (redist.debt >= FORK_DEBT_DUST_FLOAT)
+      deltas.push({
+        value: redist.debt,
+        symbol: builders.debtSymbol,
+        address: soleFlowAddress(flows, builders.debtSymbol),
+        prov: builders.redistProv(coords, { leg: "debt", amount: redist.debtText }),
+        label: "From a liquidation",
+        tone: "caution",
+        noSpineCounterpart: true,
+      });
+    if (redist.coll > 0)
+      deltas.push({
+        value: redist.coll,
+        symbol: ctx.collateralSymbol,
+        address: soleFlowAddress(flows, ctx.collateralSymbol),
+        prov: builders.redistProv(coords, { leg: "coll", amount: redist.collText }),
+        label: redist.debt >= FORK_DEBT_DUST_FLOAT ? "and" : "From a liquidation",
+        tone: "caution",
+        noSpineCounterpart: true,
+      });
+  }
+
   // Rate pill — only where the rate IS the event's point (open, rate change,
   // batch join/leave). A batched trove's rate is the delegate's, so it takes the
   // pink `delegate` treatment; the pill echoes the detail grid's rate receipt.
@@ -204,9 +243,20 @@ export function LiquityForkEventHeader({
         }
       : undefined;
 
+  // The redemption that took the debt under the branch minimum: from this
+  // row on the Trove is a zombie, out of the rate queue.
+  const debtAfterN = Number(ctx.debtAfter);
+  const becameZombie =
+    isRedemption &&
+    builders.minDebt != null &&
+    Number.isFinite(debtAfterN) &&
+    debtAfterN - debt >= builders.minDebt &&
+    debtAfterN < builders.minDebt;
+
   return (
     <ChainTruthRow
       spec={{
+        ...(becameZombie ? { note: "Now a zombie: out of the rate queue" } : {}),
         // Open → the short pill word + green status; a combined/single owner
         // adjust drops the row verb (the per-axis delta labels carry it) but
         // keeps its label when nothing moved (a "No change" row has no deltas).

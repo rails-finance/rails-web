@@ -3485,6 +3485,9 @@ export interface LiquityForkLearnMoreParams {
   protocolName: string;
   /** The fork's stablecoin ("ebUSD" | "USDaf"). */
   stablecoin: string;
+  /** The branch minimum debt, in the stablecoin (MIN_DEBT) — below it a
+   *  redeemed Trove is a zombie. */
+  minDebt?: number;
   /** One live-verified link (site or docs root) — the fallback below. */
   docsLink?: { label: string; url: string };
   /** Question-level docs links, keyed by the card topic that wants them. */

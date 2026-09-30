@@ -53,7 +53,7 @@
 // spine, same mark, same panel. A third kind is a third arm of that switch
 // plus its own provenance module, never a branch in the layout.
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { usePathname } from "next/navigation";
@@ -62,6 +62,10 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { useTimelineScale } from "@/components/shared/activity-timeline";
+import { ExpandChevron } from "@/components/shared/expand-chevron";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { SpineColumn } from "@/components/shared/spine-column";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -129,6 +133,7 @@ import {
   priceGapReason,
   rateStepFigures,
   formatRatePercent,
+  type LiveNoteGroup,
   type MarketNote,
   type MarketNotePoint,
   type PriceGapNote,
@@ -285,6 +290,31 @@ export function MarketNoteRow({
   isFirst?: boolean;
   isLast?: boolean;
 }) {
+  const body = useNoteBody(note);
+  return (
+    <NoteRowShell
+      icon={nodeControl ? "market-open" : "market"}
+      nodeControl={nodeControl}
+      isFirst={isFirst}
+      isLast={isLast}
+      label={body.label}
+      marker={{ attr: "data-market-note", value: note.id }}
+      defaultOpen={defaultOpen}
+      header={
+        <>
+          <NoteHeadline note={note} body={body} />
+          <NoteTime note={note} datePrefix={datePrefix} />
+        </>
+      }
+    >
+      <NoteBodyPanel body={body} />
+    </NoteRowShell>
+  );
+}
+
+/** What one note hands the row: its label, headline, cells and (i). The one
+ *  switch on `kind` is here, shared by the lone row and a live group's line. */
+function useNoteBody(note: MarketNote): NoteBody {
   const chainId = useChainId();
   const pathname = usePathname() ?? "";
   // The position's own path, on the position page and on a pinned event page
@@ -318,40 +348,38 @@ export function MarketNoteRow({
   const { prefs } = usePreferences();
 
   // The one switch. Everything below it is the same row whatever was observed.
-  const body =
-    note.kind === "price-gap"
-      ? priceGapBody(note, links, prefs.ratioMode)
-      : note.kind === "rate-step"
-        ? rateStepBody(note, links)
-        : note.kind === "vault-terms"
-          ? vaultTermsBody(note, links)
-          : shareRateBody(note, links);
+  return note.kind === "price-gap"
+    ? priceGapBody(note, links, prefs.ratioMode)
+    : note.kind === "rate-step"
+      ? rateStepBody(note, links)
+      : note.kind === "vault-terms"
+        ? vaultTermsBody(note, links)
+        : shareRateBody(note, links);
+}
 
+/** The header's figures: the marks, the direction, the headline and its
+ *  quantity word, and the step mark where the kind draws one. */
+function NoteHeadline({ note, body }: { note: MarketNote; body: NoteBody }) {
   return (
-    <NoteRowShell
-      icon={nodeControl ? "market-open" : "market"}
-      nodeControl={nodeControl}
-      isFirst={isFirst}
-      isLast={isLast}
-      label={body.label}
-      marker={{ attr: "data-market-note", value: note.id }}
-      defaultOpen={defaultOpen}
-      header={
-        <>
-          <MarkPair asset={note.marketSymbol} measure={body.measure} />
-          {/* `>=`, not `>`: a live note is never gated on any move
-              happening at all (see market-note.ts's `live` doc) — a
-              truly flat read must not read as a fall. A historical
-              note's selector always guards against an exact tie, so
-              this only ever matters for a live one. */}
-          {body.direction !== false && <DirectionGlyph rising={note.to.value >= note.from.value} />}
-          <Figure figure={body.headline} className="text-sm font-semibold" />
-          <span className="text-xs text-rb-500">{body.quantity}</span>
-          {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
-          <NoteTime note={note} datePrefix={datePrefix} />
-        </>
-      }
-    >
+    <>
+      <MarkPair asset={note.marketSymbol} measure={body.measure} />
+      {/* `>=`, not `>`: a live note is never gated on any move
+          happening at all (see market-note.ts's `live` doc) — a
+          truly flat read must not read as a fall. A historical
+          note's selector always guards against an exact tie, so
+          this only ever matters for a live one. */}
+      {body.direction !== false && <DirectionGlyph rising={note.to.value >= note.from.value} />}
+      <Figure figure={body.headline} className="text-sm font-semibold" />
+      <span className="text-xs text-rb-500">{body.quantity}</span>
+      {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
+    </>
+  );
+}
+
+/** The opened note: the lead line, the cells, the price chip and the (i). */
+function NoteBodyPanel({ body }: { body: NoteBody }) {
+  return (
+    <>
       {body.intro && (
         <p className="px-5 pt-3 text-xs text-rb-500">
           {body.intro.lead}
@@ -441,7 +469,7 @@ export function MarketNoteRow({
           )}
         </InfoDisclosure>
       </div>
-    </NoteRowShell>
+    </>
   );
 }
 
@@ -472,6 +500,103 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
   }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
+}
+
+/** The live group card's header. */
+const LIVE_GROUP_TITLE = "Market since the last event";
+
+/** The live group as its spine marker states it: the tooltip counts the
+ *  notes, and a screen reader hears each one. */
+export function liveGroupMarkerText(group: LiveNoteGroup): { tip: string; spoken: string } {
+  return {
+    tip: `${group.notes.length} market notes since the last event`,
+    spoken: `${LIVE_GROUP_TITLE}: ${group.notes.map((n) => noteMarkerText(n).spoken).join("; ")}`,
+  };
+}
+
+/** The head slot's live notes as ONE card (`liveNoteGroup` in
+ *  lib/shared/market-note.ts): one spine node, a header naming the card with
+ *  "Now", and one line per note in the group's order. A line states what the
+ *  note's lone row states at rest, and opens to that row's panel beneath it,
+ *  so each note's cells and (i) stay one click away. A single live note keeps
+ *  its lone row. */
+export function LiveNoteGroupRow({
+  group,
+  isFirst = false,
+  isLast = false,
+  nodeControl,
+}: {
+  group: LiveNoteGroup;
+  /** Spine terminus flags, as on a lone note row in the head slot. */
+  isFirst?: boolean;
+  isLast?: boolean;
+  /** The desktop marker's close control over the node (spine-note-markers.tsx). */
+  nodeControl?: ReactNode;
+}) {
+  const scale = useTimelineScale();
+  const { showTimestamps } = useTimelineDisplay();
+  return (
+    <div
+      data-live-note-group={group.notes.length}
+      className={`relative flex w-full items-start ${scale.cardRounded}`}
+      style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+    >
+      <div className="relative hidden w-2/5 shrink-0 self-stretch items-stretch justify-center sm:flex">
+        <SpineColumn icon={nodeControl ? "market-open" : "market"} spine="dotted" isFirst={isFirst} isLast={isLast} />
+        {nodeControl}
+      </div>
+      <div className="min-w-0 grow rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
+        <div className="flex items-center gap-2 px-5 pb-1 pt-4">
+          <span className="text-xs font-medium text-rb-500">{LIVE_GROUP_TITLE}</span>
+          {showTimestamps && <span className="ml-auto text-xs text-rb-500">Now</span>}
+        </div>
+        {group.notes.map((note) => (
+          <LiveNoteLine key={note.id} note={note} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One line of the live group: the note's headline, a chevron, and the note's
+ *  panel beneath while open. Its own receipt scope, as a lone row has. */
+function LiveNoteLine({ note }: { note: MarketNote }) {
+  const body = useNoteBody(note);
+  const registry = useReceiptRegistry();
+  const [open, setOpen] = useState(false);
+  const toggle = () => setOpen((o) => !o);
+  return (
+    <ProvReceiptsScope registry={registry}>
+      <div data-market-note={note.id} data-market-note-open={open ? "" : undefined}>
+        <div
+          className="group/evt cursor-pointer rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          aria-label={body.label}
+          onClick={toggle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggle();
+            }
+          }}
+        >
+          <div className="flex items-center gap-2 pr-5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-1.5 pl-5">
+              <NoteHeadline note={note} body={body} />
+            </div>
+            <ExpandChevron isOpen={open} group="evt" className="shrink-0" />
+          </div>
+        </div>
+        {open && (
+          <div className="mx-2 mb-1.5 rounded-lg border border-rb-200 dark:border-rb-700">
+            <NoteBodyPanel body={body} />
+          </div>
+        )}
+      </div>
+    </ProvReceiptsScope>
+  );
 }
 
 /** The asset's mark with the measure's overlapping it — WETH under the dollar,

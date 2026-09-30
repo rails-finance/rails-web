@@ -326,6 +326,73 @@ export interface VaultTermsNote extends MarketNoteBase {
 
 export type MarketNote = ShareRateStepNote | PriceGapNote | RateStepNote | VaultTermsNote;
 
+// ── The live notes as one card ──────────────────────────────────────────────
+// Where the head slot holds two or more LIVE notes (an Aave position borrowing
+// several reserves, a Moonwell account in several markets, a Polaris CDP's
+// price and rate), they are drawn as one card with one spine node and one
+// line per note (`LiveNoteGroupRow` in components/shared/market-note-row.tsx).
+// One live note keeps its own row, and a historical note never joins a group.
+
+/** The live notes of one head slot, drawn as one card. */
+export interface LiveNoteGroup {
+  group: "live";
+  /** One group per head slot, so one id: the open state and the spine
+   *  marker key on it. */
+  id: string;
+  /** In reading order (`orderLiveNotes`). */
+  notes: MarketNote[];
+}
+
+export const LIVE_NOTE_GROUP_ID = "live-notes:head";
+
+export const isLiveNoteGroup = (x: MarketNote | LiveNoteGroup): x is LiveNoteGroup =>
+  (x as LiveNoteGroup).group === "live";
+
+/** The size of the move a note states, in its kind's own unit: points of rate
+ *  for a rate step, the percentage move for a price gap, the ratio's distance
+ *  from one for a share rate. A vault's terms state no move. */
+function statedMove(note: MarketNote): number {
+  switch (note.kind) {
+    case "rate-step":
+      return Math.abs(note.deltaPp);
+    case "price-gap":
+      return Math.abs(note.changePct);
+    case "share-rate-step":
+      return Math.abs(note.ratio - 1);
+    default:
+      return 0;
+  }
+}
+
+/** The order a group's lines are read in. The builders emit notes in the
+ *  overlay's reserve or market order, which tells a reader nothing, so the
+ *  rule is the size of the move, largest first. The kinds do not share a
+ *  unit (points of rate against a percentage price move), so each kind keeps
+ *  the place the page built it in (a Polaris CDP's price gap before its rate)
+ *  and is ordered inside itself. Equal moves keep the builder's order. */
+export function orderLiveNotes(notes: readonly MarketNote[]): MarketNote[] {
+  const kindAt = new Map<string, number>();
+  notes.forEach((n) => {
+    if (!kindAt.has(n.kind)) kindAt.set(n.kind, kindAt.size);
+  });
+  return notes
+    .map((note, i) => ({ note, i }))
+    .sort(
+      (a, b) =>
+        (kindAt.get(a.note.kind) ?? 0) - (kindAt.get(b.note.kind) ?? 0) ||
+        statedMove(b.note) - statedMove(a.note) ||
+        a.i - b.i,
+    )
+    .map((x) => x.note);
+}
+
+/** The head slot's live notes as one group, or null where fewer than two are
+ *  live (a single note keeps its own row). */
+export function liveNoteGroup(notes: readonly MarketNote[]): LiveNoteGroup | null {
+  const live = notes.filter((n) => n.live);
+  return live.length > 1 ? { group: "live", id: LIVE_NOTE_GROUP_ID, notes: orderLiveNotes(live) } : null;
+}
+
 /** One vault-wide configuration event as a note the timeline shell can place.
  *
  *  The family supplies `say` — the figure, the noun, the sentence and the

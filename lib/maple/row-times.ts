@@ -89,47 +89,110 @@ export function formatWait(seconds: number): string {
   return `${Math.floor(h / 24)} d ${h % 24} h`;
 }
 
-/** A pool's rate at the wallet's first and last loaded rows in it. */
-export interface MapleRateWindow {
-  pool: string;
+/** One stretch the wallet held shares in a pool, queued shares included:
+ *  from the row that took the holding above zero to the row that left it
+ *  empty (`toAt` null while held), with the pool's rate at each end. */
+export interface MapleHeldStretch {
   fromAt: number;
   fromRate: number;
-  toAt: number;
-  toRate: number;
+  toAt: number | null;
+  toRate: number | null;
 }
 
-/** The pool rate each row carries (assets ÷ shares in the row's block), at the
- *  wallet's first and last rows per pool: the window a yield figure derived
- *  from them covers. A pool whose first or last row sits in a folder the page
- *  has not read gets no window: its ends are not on the page. */
-export function mapleRateWindows(
+/** A pool's holding over the wallet's history: every stretch it held shares. */
+export interface MaplePoolHolding {
+  pool: string;
+  firstAt: number;
+  stretches: MapleHeldStretch[];
+}
+
+/** Event kinds that can leave a pool holding empty. */
+const EMPTYING = new Set(["request_fill", "withdraw", "transfer_out"]);
+
+/** Per pool, the stretches the wallet held shares, from each row's shares and
+ *  queued shares after it and the pool rate in the row's block (assets ÷
+ *  shares). A pool with an unread folder that could hold an emptying row, or
+ *  a boundary row with no rate, gets nothing: its stretches are not on the
+ *  page. A folder of deposits, transfers in or requests cannot empty a
+ *  holding, so the holding runs through it. */
+export function mapleHoldings(
   events: readonly BaseActivityEvent[],
   folders?: readonly ServedFolder[] | null,
   read: ReadonlySet<string> = new Set(),
-): Map<string, MapleRateWindow> {
-  const out = new Map<string, MapleRateWindow>();
-  for (const e of events) {
+): Map<string, MaplePoolHolding> {
+  const rows = events
+    .filter(isMapleEvent)
+    .slice()
+    .sort((a, b) => (a.blockNumber ?? 0) - (b.blockNumber ?? 0) || logIndexOf(a.id) - logIndexOf(b.id));
+  const out = new Map<string, MaplePoolHolding>();
+  const bad = new Set<string>();
+  const shares = new Map<string, number>();
+  const escrow = new Map<string, number>();
+  for (const e of rows) {
     if (!isMapleEvent(e)) continue;
     const ctx = e.context.data;
+    const pool = ctx.pool;
+    const before = (shares.get(pool) ?? 0) + (escrow.get(pool) ?? 0);
+    if (ctx.sharesAfter != null) shares.set(pool, Number(ctx.sharesAfter));
+    if (ctx.escrowAfter != null) escrow.set(pool, Number(ctx.escrowAfter));
+    const after = (shares.get(pool) ?? 0) + (escrow.get(pool) ?? 0);
     const a = Number(ctx.raw?.rateAssets);
     const sh = Number(ctx.raw?.rateShares);
-    if (!(a > 0 && sh > 0)) continue;
-    const rate = a / sh;
-    const w = out.get(ctx.pool);
-    if (!w) {
-      out.set(ctx.pool, { pool: ctx.pool, fromAt: e.timestamp, fromRate: rate, toAt: e.timestamp, toRate: rate });
-      continue;
+    const rate = a > 0 && sh > 0 ? a / sh : null;
+    let h = out.get(pool);
+    if (!h) {
+      h = { pool, firstAt: e.timestamp, stretches: [] };
+      out.set(pool, h);
     }
-    if (e.timestamp < w.fromAt) Object.assign(w, { fromAt: e.timestamp, fromRate: rate });
-    if (e.timestamp > w.toAt) Object.assign(w, { toAt: e.timestamp, toRate: rate });
+    if (before <= 0 && after > 0) {
+      if (rate == null) bad.add(pool);
+      h.stretches.push({ fromAt: e.timestamp, fromRate: rate ?? 0, toAt: null, toRate: null });
+    } else if (before > 0 && after <= 0) {
+      const open = h.stretches[h.stretches.length - 1];
+      if (!open || rate == null) bad.add(pool);
+      else Object.assign(open, { toAt: e.timestamp, toRate: rate });
+    }
   }
-  for (const { f, pools } of unreadFolders(folders, read)) {
-    for (const pool of pools) {
-      const w = out.get(pool);
-      if (w && (f.firstAt < w.fromAt || f.lastAt > w.toAt)) out.delete(pool);
+  for (const f of folders ?? []) {
+    if (read.has(f.responseId)) continue;
+    const emptying = f.counts.some((c) => EMPTYING.has(c.key) && c.count > 0) || f.other > 0;
+    for (const pool of folderPools(f)) {
+      const h = out.get(pool);
+      if (!h || emptying || f.firstAt < h.firstAt) bad.add(pool);
     }
+  }
+  for (const pool of bad) out.delete(pool);
+  return out;
+}
+
+/** The wallet's stretches across its pools: a stretch runs while any pool
+ *  holds shares. For the activity header's lives. */
+export function mapleLives(holdings: ReadonlyMap<string, MaplePoolHolding>): { from: number; to: number | null }[] {
+  const all = [...holdings.values()]
+    .flatMap((h) => h.stretches.map((s) => ({ from: s.fromAt, to: s.toAt })))
+    .sort((a, b) => a.from - b.from);
+  const out: { from: number; to: number | null }[] = [];
+  for (const s of all) {
+    const last = out[out.length - 1];
+    if (last && (last.to == null || s.from <= last.to)) {
+      if (last.to != null) last.to = s.to == null ? null : Math.max(last.to, s.to);
+    } else out.push({ ...s });
   }
   return out;
+}
+
+/** Unread folders whose members the holding stretches need: a folder that
+ *  could hold an emptying row. At most `cap`; past it the stretches stay
+ *  unstated. */
+export function mapleStretchFolders(
+  folders: readonly ServedFolder[] | null | undefined,
+  read: ReadonlySet<string>,
+  cap = 6,
+): ServedFolder[] {
+  const need = (folders ?? []).filter(
+    (f) => !read.has(f.responseId) && (f.counts.some((c) => EMPTYING.has(c.key) && c.count > 0) || f.other > 0),
+  );
+  return need.length <= cap ? need : [];
 }
 
 /** The folders that hold a pool's first or last row, where the page has not

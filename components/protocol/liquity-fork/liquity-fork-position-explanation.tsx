@@ -22,7 +22,7 @@ import { formatUsd } from "@/lib/shared/format-event";
 // $1.18 in both places.
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
-import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
+import { forkAmount, forkCollAmount, forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
@@ -42,6 +42,7 @@ export function LiquityForkClosedExplanation({
   seizure,
   redemptionSource,
   surplus,
+  redist,
 }: {
   status: "closed" | "liquidated";
   collateralSymbol: string;
@@ -51,8 +52,13 @@ export function LiquityForkClosedExplanation({
   peakCollateral: number;
   peakDebt: number;
   /** The final liquidation's last recorded balances (the seizure legs) —
-   *  from the life's own liquidate event; null while the timeline streams. */
-  seizure?: { coll: number; debt: number } | null;
+   *  from the life's own liquidate event; null while the timeline streams.
+   *  `surplus` is the Liquidation log's collateral surplus, which came back
+   *  to the owner and is not part of what was taken. */
+  seizure?: { coll: number; debt: number; surplus?: number } | null;
+  /** Redistributions from liquidated Troves this life received, over its
+   *  whole history; absent when the history is not all loaded. */
+  redist?: ForkRedistTally | null;
   /** Named only where a branch's redemption balances are emitted by a
    *  DIFFERENT contract than the one that emits its opens/adjusts/closes/
    *  liquidations. Ebisu redeems through each branch's EbisuBranchManager,
@@ -80,8 +86,15 @@ export function LiquityForkClosedExplanation({
       <span key="seized">
         {seizure ? (
           <>
-            The liquidation seized its last <AmountText value={seizure.coll} /> {collateralSymbol} of collateral and
-            cleared the <AmountText value={seizure.debt} /> {debtSymbol} it still owed —{" "}
+            The liquidation cleared the <AmountText value={seizure.debt} /> {debtSymbol} it still owed and took{" "}
+            {forkCollAmount(seizure.coll - (seizure.surplus ?? 0))} {collateralSymbol} of its collateral
+            {seizure.surplus ? (
+              <>
+                {" "}
+                (the other {forkCollAmount(seizure.surplus)} {collateralSymbol} came back to the owner as surplus)
+              </>
+            ) : null}{" "}
+            —{" "}
           </>
         ) : (
           <>The liquidation seized the Trove&rsquo;s remaining collateral and cleared its remaining debt — </>
@@ -98,6 +111,8 @@ export function LiquityForkClosedExplanation({
       </span>,
     );
   }
+  const redistBullet = redistTallyBullet(redist, collateralSymbol, debtSymbol);
+  if (redistBullet) bullets.push(redistBullet);
   if (peakCollateral > 0 || peakDebt > 0) {
     bullets.push(
       <span key="peaks">
@@ -133,10 +148,35 @@ export function LiquityForkClosedExplanation({
   return <ProseExplainer paragraph={lead} items={bullets} />;
 }
 
+/** Redistributions a Trove received from liquidated Troves on its branch. */
+export interface ForkRedistTally {
+  count: number;
+  debt: number;
+  coll: number;
+}
+
+function redistTallyBullet(
+  t: ForkRedistTally | null | undefined,
+  collateralSymbol: string,
+  debtSymbol: string,
+): React.ReactNode {
+  if (!t || t.count === 0) return null;
+  return (
+    <span key="redist-received">
+      Received redistributions: <H>{t.count}</H>. Liquidations on the branch passed it {forkAmount(t.debt)} {debtSymbol}{" "}
+      of debt and {forkCollAmount(t.coll)} {collateralSymbol} of collateral in all, each added on the Trove&rsquo;s next
+      touch after the liquidation (marked &ldquo;From a liquidation&rdquo; on those rows below).
+    </span>
+  );
+}
+
 export function LiquityForkPositionExplanation({
   chain,
   isBatched = false,
+  redist,
 }: {
+  /** Redistributions received over the whole history, where it is loaded. */
+  redist?: ForkRedistTally | null;
   chain: LiquityForkTroveChainResponse;
   /** The Trove is delegated to an interest-batch manager (the indexed flag —
    *  membership only changes via the Trove's own operations, so it is exact).
@@ -226,6 +266,8 @@ export function LiquityForkPositionExplanation({
       ),
     );
   }
+  const redistBullet = redistTallyBullet(redist, chain.symbol, debtSymbol);
+  if (redistBullet) bullets.push(redistBullet);
   if (chain.redistCollGain > 0 || chain.redistDebtGain > 0.01) {
     bullets.push(
       <span key="redist">
@@ -275,8 +317,11 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       hasDebt ? (
         <span key="zombie">
-          A partial redemption left this Trove below the branch&rsquo;s minimum debt — a <H>zombie</H>: outside the
-          rate-ordered redemption queue, and redeemed first when the next redemption routes through this branch.
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it a <H>zombie</H>:
+          out of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent zombie, it is the first
+          Trove the next redemption on the branch reaches. The owner can close it to take back the collateral
+          {reserve ? <> and the {reserve} liquidation reserve</> : null}, or borrow back above the minimum to rejoin the
+          queue.
         </span>
       ) : (
         <span key="zombie">
@@ -288,6 +333,13 @@ export function LiquityForkPositionExplanation({
           {reserve ? <> and the {reserve} liquidation reserve</> : null} to the owner.
         </span>
       ),
+    );
+  } else if (hasDebt && chain.debtInFront != null && chain.debtInFront < 0.01 && !chain.trovesAhead) {
+    bullets.push(
+      <span key="queue">
+        No other debt on the branch sits at the same or a lower interest rate: this Trove has the lowest rate on the
+        branch now, so it is next in line when {debtSymbol} holders redeem at $1 face.
+      </span>,
     );
   } else if (hasDebt && chain.debtInFront != null) {
     bullets.push(

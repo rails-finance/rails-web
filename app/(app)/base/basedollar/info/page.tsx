@@ -11,15 +11,14 @@ export const metadata = infoMetadata("basedollar");
 const intro = (
   <>
     <p>
-      Basedollar issues BD, a dollar-tracking stablecoin borrowed against five collateral types — staked ether,
-      yield-bearing stablecoins and wrapped bitcoin. A borrower opens a Trove — a collateralised loan — and sets their
-      own interest rate; paying a higher rate pushes the Trove further from redemptions, the mechanism that holds BD at
-      a dollar by paying off the lowest-rate loans first.
+      Basedollar issues BD, a dollar-tracking stablecoin borrowed against five collateral types: ether (WETH), staked
+      ether (wstETH, rETH and cbETH) and wrapped bitcoin (wcbBTC). A borrower opens a Trove — a collateralised loan —
+      and sets their own interest rate; paying a higher rate pushes the Trove further from redemptions, the mechanism
+      that holds BD at a dollar by paying off the lowest-rate loans first.
     </p>
     <p>
-      Each row of the listing is one Trove: its collateral, its BD debt, the rate its owner chose, and its status.
-      Collateral ratios and dollar values are off by default — Basedollar states amounts in each Trove&apos;s own
-      tokens, and those extra figures are conversions layered on top. Or{" "}
+      Each row of the listing is one Trove: its collateral, its BD debt, its collateral ratio and dollar value at the
+      branch&apos;s price today, the rate its owner chose, and its status. Or{" "}
       <Link href="/base/basedollar/branches" className="text-blue-500 hover:underline">
         compare the branches and their redemption queues
       </Link>

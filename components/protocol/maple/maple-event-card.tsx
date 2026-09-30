@@ -9,6 +9,7 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
+import { formatNumber } from "@/lib/utils/format";
 import { flankedLegProv, sharesLegProv, type MapleCoords } from "@/lib/maple/event-provenance";
 import { mapleExplainerTeaser } from "@/lib/maple/explainer-clauses";
 import { MapleEventHeader } from "./maple-event-header";
@@ -94,6 +95,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
               address: soleFlowAddress(event.flows, symbol),
               direction: DIRECTION[kind],
               value: mag,
+              display: formatNumber(mag),
               // The token named beside every amount: a request moves shares,
               // a fill pays the asset, and the icons alone look alike.
               unit: symbol,
@@ -110,6 +112,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
                     address: soleFlowAddress(event.flows, shares.symbol),
                     direction: (shares.value < 0 ? "right" : "left") as "left" | "right",
                     value: Math.abs(shares.value),
+                    display: formatNumber(Math.abs(shares.value)),
                     unit: shares.symbol,
                     prov: {
                       info: shares.prov,

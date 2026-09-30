@@ -54,6 +54,7 @@ import {
   assetsAt,
   axisFor,
   axisLabelOnPhone,
+  DAY_MS,
   buildFlowModel,
   daysFromEvents,
   dayStart,
@@ -79,6 +80,7 @@ import {
   windowFromDay,
   type BinInput,
 } from "@/lib/shared/flows-series";
+import { combinedAt, combinedStops, nearestStop } from "@/lib/shared/flows-combined";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -458,6 +460,126 @@ test("the Lifetime series: a bin with no price recorded for a held asset is a ga
     [3, "collateral", "AAA"],
   ]);
   assert.deepEqual(binRanges(monday + 3, monday + 3, "week"), [[monday + 3, monday + 3]]);
+});
+
+test("Combined: the cursor stops on the line's points and every day with events", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const startDay = full.start / DAY_MS;
+  for (const bin of ["week", "month"] as const) {
+    const line = binSeries(binInputFromWire(series), bin)!;
+    const from = full.eventDays[12];
+    const stops = combinedStops(full, line, from);
+    const days = stops.map((s) => s.stop);
+    assert.deepEqual(
+      days,
+      [...new Set(days)].sort((x, y) => x - y),
+      `${bin}: ascending, one stop per day`,
+    );
+    const last = stops[stops.length - 1];
+    assert.ok(last.live && last.stop === full.liveStop && last.point === line.points.length - 1, `${bin}: today last`);
+    // Every point of the line but today's is a stop, at the point's last day.
+    line.points.slice(0, -1).forEach(([, to], i) => {
+      const at = stops.find((s) => s.point === i);
+      assert.ok(at, `${bin}: point ${i} is a stop`);
+      assert.equal(at.stop, to - startDay);
+    });
+    // Every day with events is a stop, marked as one.
+    for (const d of full.eventDays) {
+      if (d >= full.liveStop) continue;
+      const at = stops.find((s) => s.stop === d);
+      assert.ok(at?.event, `${bin}: event day ${d} is a stop`);
+    }
+    // Nothing else: a stop is a point's day, an event day or today.
+    for (const s of stops) assert.ok(s.live || s.point != null || s.event, `${bin}: stop ${s.stop} has a reason`);
+    assert.equal(
+      stops.length,
+      new Set([...line.points.slice(0, -1).map(([, to]) => to - startDay), ...full.eventDays]).size + 1,
+    );
+    // Snapping: each stop is its own nearest; a day between two stops goes to the nearer.
+    stops.forEach((s, i) => assert.equal(nearestStop(stops, s.stop), i));
+    for (let i = 1; i < stops.length; i++) {
+      const [a, b] = [stops[i - 1].stop, stops[i].stop];
+      if (b - a < 3) continue;
+      assert.equal(nearestStop(stops, a + 1), i - 1);
+      assert.equal(nearestStop(stops, b - 1), i);
+    }
+    assert.equal(nearestStop(stops, -5), 0);
+    assert.equal(nearestStop(stops, full.liveStop + 5), stops.length - 1);
+  }
+  // Without the series: the event days and today.
+  const bare = combinedStops(full, null, 0);
+  assert.deepEqual(
+    bare.map((s) => s.stop),
+    [...full.eventDays.filter((d) => d < full.liveStop), full.liveStop],
+  );
+});
+
+test("Combined: the headlines and the bars state one figure at every stop, between events, on event days and outside the window", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  // A life of more than three years: the line is monthly, so every event day
+  // but a month's last falls between the line's points.
+  const bin = lifetimeBinFor(series.today - full.start / DAY_MS);
+  assert.equal(bin, "month", "a long position");
+  const line = binSeries(binInputFromWire(series), bin)!;
+  // A window opening on the 13th active day, so the early months fall before it.
+  const from = full.eventDays[12];
+  const bars = windowModel(full, from);
+  const stops = combinedStops(full, line, from);
+  const events = new Set(full.eventDays);
+  const rowOf = new Map(full.rows.map((r) => [r.day, r]));
+  const amounts = (stop: number) =>
+    full.heldAt[stop]
+      .map((h) => `${h.side}:${h.symbol}:${h.amount}`)
+      .sort()
+      .join("|");
+  let between = 0;
+  let outside = 0;
+  let onEvent = 0;
+  let lineChecked = 0;
+  stops.forEach((at, i) => {
+    const { head, bars: b } = combinedAt(full, bars, at);
+    if (at.stop < from) {
+      assert.equal(at.barStop, null, `stop ${i}: before the window the bars have no stop`);
+      assert.equal(b, null);
+      outside++;
+      return;
+    }
+    assert.equal(at.barStop, at.stop - from);
+    assert.ok(b);
+    for (const side of ["collateral", "debt"] as const) {
+      assert.ok(near(head[side].now, b[side].now, 1e-6), `stop ${i}: ${side} headline and bar agree`);
+      // The solid part of the bar is the headline's figure.
+      const held = b[side].bar.find((x) => x.fill === "held")?.value ?? 0;
+      assert.ok(near(held, head[side].now, 1e-6), `stop ${i}: ${side} solid part is the headline`);
+    }
+    if (at.live) return;
+    if (at.event) {
+      // An event day inside a month: the day's own balances, at its prices.
+      assert.ok(events.has(at.stop));
+      const row = rowOf.get(at.stop)!;
+      assert.equal(head.count, row.events, `stop ${i}: the day's events are counted`);
+      if (at.point == null) onEvent++;
+    } else {
+      const prev = full.eventDays.filter((d) => d < at.stop).pop()!;
+      assert.equal(amounts(at.stop), amounts(prev), `stop ${i}: the makeup is the last event's`);
+      between++;
+    }
+    // The line's point, where priced, is the same figure.
+    if (at.point != null) {
+      const [, , coll, debt] = line.points[at.point];
+      if (coll != null && debt != null) {
+        assert.ok(near(coll, head.collateral.now, Math.max(0.01, coll * 1e-6)), `stop ${i}: the line's held`);
+        assert.ok(near(debt, head.debt.now, Math.max(0.01, debt * 1e-6)), `stop ${i}: the line's owed`);
+        lineChecked++;
+      }
+    }
+  });
+  assert.ok(between > 0, "some stops fall between events");
+  assert.ok(onEvent > 0, "some stops are event days inside a month");
+  assert.ok(outside > 0, "some stops fall before the window");
+  assert.ok(lineChecked > 0, "some points checked against the line");
 });
 
 // ── the route's day rows ────────────────────────────────────────────────────
