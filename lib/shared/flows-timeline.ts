@@ -711,13 +711,16 @@ export function nextEventDay(m: FlowModel, stop: number): number {
 /** Unix seconds of the start of day `stop`. */
 export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop * DAY_MS) / 1000;
 
-/** "$123k" · "$5.5k" · "$363" · "$1.2M" · "−$5k": whole dollars under $1k, one
- *  decimal under $10k, whole thousands above. */
+/** "$123k" · "$5.5k" · "$363" · "$1.2M" · "$1.89B" · "−$5k": whole dollars
+ *  under $1k, one decimal under $10k, whole thousands under $1M, one decimal
+ *  of millions under $1B, then billions to two decimals with a trailing zero
+ *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
 export function formatFlowUsd(v: number): string {
   const a = Math.abs(v);
   const sign = v < 0 && a >= 0.5 ? "−" : "";
   let body: string;
-  if (a >= 1_000_000) body = `$${(a / 1_000_000).toFixed(1)}M`;
+  if (a >= 999_950_000) body = `$${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")}B`;
+  else if (a >= 1_000_000) body = `$${(a / 1_000_000).toFixed(1)}M`;
   else if (a >= 9_999.5) body = `$${Math.round(a / 1_000)}k`;
   else if (a >= 999.5) body = `$${(a / 1_000).toFixed(1)}k`;
   else body = `$${Math.round(a)}`;
@@ -728,6 +731,7 @@ export function formatFlowUsd(v: number): string {
 export function spokenUsd(v: number): string {
   const a = Math.abs(v);
   const sign = v < 0 ? "minus " : "";
+  if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion dollars`;
   if (a >= 1_000_000) return `${sign}${(a / 1_000_000).toFixed(1)} million dollars`;
   if (a >= 1_000) return `${sign}${Math.round(a / 1_000)} thousand dollars`;
   return `${sign}${Math.round(a)} dollars`;

@@ -54,6 +54,7 @@ import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { operationsFromEvents } from "@/lib/shared/flows-busy";
 import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -597,7 +598,9 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents) : null;
+  const captions = view
+    ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
+    : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -606,6 +609,20 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  // The busy treatments' operations and health line (lib/shared/flows-busy.ts):
+  // the operations only where the page holds every row.
+  const flowOperations = useMemo(
+    () => operationsFromEvents(aaveEvents, historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0),
+    [aaveEvents, historyWindow.state, servedFolders],
+  );
+  // A folder-served or windowed page reads the whole history as rows once the
+  // grouping is asked for (the export's read).
+  const loadFlowOperations = useCallback(async () => {
+    const all = await fetchAllHistory();
+    return all.missing > 0 ? null : operationsFromEvents(all.events, true);
+  }, [fetchAllHistory]);
+  const healthThreshold =
+    chain && !chain.chainStale && chain.avgLiquidationThreshold > 0 ? chain.avgLiquidationThreshold : null;
   const flowTimeline = useMemo(
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -729,7 +746,16 @@ export default function AaveV3PositionDetail({
                 data={towerData}
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
-                timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+                timeline={
+                  flowTimeline ? (
+                    <LifetimeFlowsScrubber
+                      timeline={flowTimeline}
+                      operations={flowOperations}
+                      loadOperations={flowOperations ? undefined : loadFlowOperations}
+                      healthThreshold={healthThreshold}
+                    />
+                  ) : undefined
+                }
               />
             )}
             <ChainTruthTimeline

@@ -76,6 +76,7 @@ import {
 import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { operationsFromEvents } from "@/lib/shared/flows-busy";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -684,6 +685,20 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  // The busy treatments' operations and health line (lib/shared/flows-busy.ts):
+  // the operations only where the page holds every row.
+  const flowOperations = useMemo(
+    () => operationsFromEvents(sparkEvents, historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0),
+    [sparkEvents, historyWindow.state, servedFolders],
+  );
+  // A folder-served or windowed page reads the whole history as rows once the
+  // grouping is asked for (the export's read).
+  const loadFlowOperations = useCallback(async () => {
+    const all = await fetchAllHistory();
+    return all.missing > 0 ? null : operationsFromEvents(all.events, true);
+  }, [fetchAllHistory]);
+  const healthThreshold =
+    chain && !chain.chainStale && chain.avgLiquidationThreshold > 0 ? chain.avgLiquidationThreshold : null;
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -819,7 +834,16 @@ export default function SparkPositionDetail({
                 (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
               )}
               learnMore={sparkEconomicsContent(towerData)}
-              timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+              timeline={
+                flowTimeline ? (
+                  <LifetimeFlowsScrubber
+                    timeline={flowTimeline}
+                    operations={flowOperations}
+                    loadOperations={flowOperations ? undefined : loadFlowOperations}
+                    healthThreshold={healthThreshold}
+                  />
+                ) : undefined
+              }
             />
           )}
           <ChainTruthTimeline

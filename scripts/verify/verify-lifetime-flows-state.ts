@@ -60,6 +60,7 @@ import {
   type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
+import { binUnitFor, flowBins, flowVariant, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -197,6 +198,54 @@ test("the number format", () => {
   assert.equal(formatFlowUsd(-5_000), "−$5.0k");
   assert.equal(formatFlowUsd(1_234_567), "$1.2M");
   assert.equal(formatFlowUsd(9_999.7), "$10k");
+  assert.equal(formatFlowUsd(1_000_000_000), "$1.0B");
+  assert.equal(formatFlowUsd(1_887_545_149), "$1.89B");
+  assert.equal(formatFlowUsd(1_500_000_000), "$1.5B");
+  assert.equal(formatFlowUsd(999_960_000), "$1.0B");
+  assert.equal(formatFlowUsd(999_940_000), "$999.9M");
+});
+
+test("the busy treatments: variant, bins, throughput, operations", () => {
+  // No parameter keeps today's scrubber; the parameter forces a treatment.
+  assert.equal(flowVariant(null, true), null);
+  assert.equal(flowVariant("default", true), null);
+  assert.deepEqual(flowVariant("a", false), { chart: "rescaled", ops: false });
+  assert.deepEqual(flowVariant("bc", false), { chart: "over-time", ops: true });
+  assert.deepEqual(flowVariant("auto", true), { chart: "rescaled", ops: false });
+  assert.equal(flowVariant("auto", false), null);
+  assert.equal(isBusy(model), false);
+  assert.deepEqual(
+    [binUnitFor(90), binUnitFor(91), binUnitFor(1095), binUnitFor(1096)],
+    ["day", "week", "week", "month"],
+  );
+  // The bins cover every stop before the live one, once, and count every row.
+  const { bins } = flowBins(model);
+  assert.equal(bins[0].from, 0);
+  assert.equal(bins[bins.length - 1].to, model.liveStop - 1);
+  for (let i = 1; i < bins.length; i++) assert.equal(bins[i].from, bins[i - 1].to + 1);
+  const last = model.rows[model.rows.length - 1];
+  assert.equal(
+    bins.reduce((a, b) => a + b.count, 0),
+    last.txs ?? last.events,
+  );
+  assert.equal(throughput(model).txs, model.totalTxs ?? model.totalEvents);
+  const ops = groupOperations([
+    { txHash: "0x1", actionType: "supply", txFrom: "0xa" },
+    { txHash: "0x1", actionType: "borrow", txFrom: "0xa" },
+    { txHash: "0x2", actionType: "repay", txFrom: "0xa" },
+    { txHash: "0x2", actionType: "withdraw" },
+    { txHash: "0x3", actionType: "withdraw" },
+    { txHash: "0x4", actionType: "withdraw", txFrom: "0xa" },
+    { txHash: "0x4", actionType: "supply" },
+    { txHash: "0x4", actionType: "borrow" },
+  ]);
+  assert.deepEqual(ops?.kinds, [
+    { label: "Leverage up", count: 1 },
+    { label: "Unwind", count: 1 },
+    { label: "Withdraw", count: 1 },
+    { label: "Withdraw, supply and borrow", count: 1 },
+  ]);
+  assert.deepEqual(ops?.executor, { address: "0xa", count: 3, known: 3 });
 });
 
 // ── the route's day rows ────────────────────────────────────────────────────

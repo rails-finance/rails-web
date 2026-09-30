@@ -51,6 +51,8 @@ import {
   type FlowSideState,
   type FlowTimeline,
 } from "@/lib/shared/flows-timeline";
+import { flowVariant, isBusy, type FlowOperations } from "@/lib/shared/flows-busy";
+import { BusyFlows } from "@/components/shared/lifetime-flows-busy";
 
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
@@ -569,9 +571,53 @@ function AxisLabels({ model }: { model: FlowModel }) {
   );
 }
 
-export function LifetimeFlowsScrubber({ timeline }: { timeline: FlowTimeline }) {
+/** `?flows=` from the address bar, read after mount so the server's render
+ *  and the first client render agree. */
+function useFlowsParam(): string | null {
+  const [param, setParam] = useState<string | null>(null);
+  useEffect(() => setParam(new URLSearchParams(window.location.search).get("flows")), []);
+  return param;
+}
+
+export function LifetimeFlowsScrubber({
+  timeline,
+  operations,
+  loadOperations,
+  healthThreshold,
+}: {
+  timeline: FlowTimeline;
+  /** The whole history's transactions grouped by what they did, where the
+   *  page holds every row (lib/shared/flows-busy.ts). */
+  operations?: FlowOperations | null;
+  /** Reads the grouping where the page holds only part of the rows; called
+   *  only when the grouping is drawn. */
+  loadOperations?: () => Promise<FlowOperations | null>;
+  /** The account's liquidation threshold now, for the busy treatment's
+   *  health factor over time. */
+  healthThreshold?: number | null;
+}) {
   const model = useMemo(() => buildFlowModel(timeline), [timeline]);
+  const param = useFlowsParam();
+  const ledgerNote = useContext(FlowsLedgerNoteContext);
+  const reportKey = useContext(FlowsKeyContext);
+  const variant = model ? flowVariant(param, isBusy(model)) : null;
+  // The busy treatments draw no hatches, so the Explanation carries no Key.
+  const busyDrawn = variant != null;
+  useEffect(() => {
+    if (busyDrawn) reportKey?.(null);
+  }, [busyDrawn, reportKey]);
   if (!model) return null;
+  if (variant)
+    return (
+      <BusyFlows
+        model={model}
+        variant={variant}
+        operations={operations}
+        loadOperations={loadOperations}
+        healthThreshold={healthThreshold}
+        onLedgerNote={ledgerNote ?? undefined}
+      />
+    );
   return <ScrubberBody model={model} />;
 }
 
