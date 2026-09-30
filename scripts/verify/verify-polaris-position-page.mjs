@@ -256,9 +256,11 @@ for (const [market, id] of [
   await page.waitForTimeout(400);
   const explText = (await card(page).innerText()).replace(/\s+/g, " ");
   check(
-    `c5. ${market}/${id} — the explanation's rate bullet carries the same figure "on the debt as recorded"`,
-    /on the debt as recorded/.test(explText) && near(parseFig(/about ([\d,.]+)/.exec(explText)?.[1] ?? ""), onRecorded),
-    /about [\d,.]+ \w+ a year on the debt as recorded/.exec(explText)?.[0] ?? explText.slice(0, 160),
+    `c5. ${market}/${id} — the explanation's rate bullet carries the same figure "on the … recorded at the last touch"`,
+    /recorded at the last\s+touch/.test(explText) &&
+      near(parseFig(/about ([\d,.]+)/.exec(explText)?.[1] ?? ""), onRecorded),
+    /about [\d,.]+ \w+ a year on the [\d,.]+ \w+ recorded at the last\s+touch/.exec(explText)?.[0] ??
+      explText.slice(0, 160),
   );
 
   // The LLM export carries it too.

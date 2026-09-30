@@ -24,6 +24,8 @@ export const POLARIS_DOC_LINKS = {
   recoveryMode: polarisDocLink("/design/recovery-mode", "Recovery mode"),
   oracles: polarisDocLink("/design/oracles", "The price feeds"),
   polaris101: polarisDocLink("/polaris-101", "Polaris in one page"),
-  conversions: polarisDocLink("/design/conversions", "Conversions and the PSM"),
+  // The PSM is the docs' "Adaptive Peg Defense"; their "Conversions" page is
+  // the one-way pETH-to-POLAR auction, a different mechanism.
+  pegDefence: polarisDocLink("/design/adaptive-peg-defence", "The PSM (Adaptive Peg Defense)"),
   bondingCurve: polarisDocLink("/architecture/bonding-curve", "pETH and the bonding curve"),
 } as const;

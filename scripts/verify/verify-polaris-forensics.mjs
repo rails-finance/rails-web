@@ -241,7 +241,7 @@ for (const f of FIXTURES) {
 
   check(
     `1a. ${key} states the pool's collateral leg (${want.leg} pETH) beside the entire seized amount`,
-    rowText.includes(`Collateral to the pool ${want.leg}`) && rowText.includes("Collateral seized"),
+    rowText.includes(`Of which to the stability pool ${want.leg}`) && rowText.includes("Collateral seized"),
     rowText.slice(0, 500),
   );
   check(

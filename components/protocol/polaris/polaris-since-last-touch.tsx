@@ -236,6 +236,8 @@ export function PolarisSinceLastTouchRow({
       header={
         <>
           <span className="text-sm text-foreground">Since its last touch</span>
+          {/* The closed row names its figure: a bare number read as nothing. */}
+          <span className="text-xs text-rb-500">change in equity at the feed</span>
           {/* An ECHO of the "Change in equity at the feed" receipt below, not a
               second receipt for the same figure: one fact, stated where the row
               is closed and again where it opens. */}
@@ -244,15 +246,17 @@ export function PolarisSinceLastTouchRow({
               <Signed value={w.total} unit={stable} />
             </span>
           </Prov>
-          <span className="ml-auto text-xs text-rb-500">
-            <BlockRef block={w.from.block} /> · {elapsed} ago
+          {/* The block is a link to the touch's block on the chain's explorer,
+              chrome rather than a figure of this row. */}
+          <span className="ml-auto text-xs text-rb-500" data-prov-exempt="">
+            from block <BlockRef block={w.from.block} /> · {elapsed} ago
           </span>
         </>
       }
     >
       <div className="px-5 pb-3 pt-1 text-xs">
         <Row
-          label="The feed"
+          label="The feed:"
           detail={
             <>
               pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}, on the collateral
@@ -266,8 +270,14 @@ export function PolarisSinceLastTouchRow({
           }
         />
         <Row
-          label="The protocol"
-          detail={legNames.length > 0 ? legNames.join(", ") : "the legs pending since that touch"}
+          label="The protocol's pending legs:"
+          detail={
+            legNames.length > 1
+              ? `${legNames.slice(0, -1).join(", ")} and ${legNames[legNames.length - 1]}`
+              : legNames.length === 1
+                ? legNames[0]
+                : "the legs pending since that touch"
+          }
           value={
             <Prov info={protocolProv} value={formatExact(w.protocol)}>
               <Signed value={w.protocol} unit={stable} />

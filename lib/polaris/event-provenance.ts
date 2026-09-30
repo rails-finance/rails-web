@@ -508,7 +508,7 @@ export const rateInForceProv = (coords: PolarisCoords, raw?: string | null): Pro
     kind: "recompute",
     text: "Find the cdpManager's last PrimaryRateSet log at or before this block — its newPrimaryRate (1e18 = 100%/yr) is this figure.",
   },
-  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a CDP touch), so it is a fact of the market at that moment. The secondary, utilisation-driven rate is added on top and is not on this log.`,
+  summary: `The market's primary rate in force at this touch — the cdpManager's last PrimaryRateSet log at or before this row, newPrimaryRate ÷ 1e18 per year. Algorithmic: the market sets it (the event fires on the PSM's mints and redemptions, never inside a CDP touch), so it is a fact of the market at that moment. The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log.`,
   contract: managerContract(coords),
   via: `${POLARIS_VIA} · last PrimaryRateSet ≤ block · ${fieldSeg("newPrimaryRate", raw)} ÷ 1e18`,
   inputs: eventInputs(coords),
@@ -534,17 +534,24 @@ export const latestStateProv = (what: "coll" | "debt", market: PolarisMarket): P
 
 /** A terminal card's headline — the highest resulting figure the CDP ever
  *  emitted on one side. */
-export const peakProv = (what: "coll" | "debt", market: PolarisMarket): Provenance => ({
-  kind: "derived",
-  pclass: "indexed",
-  verify: { kind: "rollup", text: "Rolls up to the CDPUpdated rows the maximum was taken over" },
-  summary:
+export const peakProv = (what: "coll" | "debt", market: PolarisMarket, liquidationCounted = false): Provenance => {
+  const field = what === "coll" ? "_newColl" : "_newDebt";
+  const liqField = what === "coll" ? "_collLiquidated" : "_debtLiquidated";
+  const lead =
     what === "coll"
-      ? "The most pETH the CDP ever held at once — the maximum over its own CDPUpdated `_newColl` figures across its whole life. A closed or liquidated CDP's latest figures are zero, so the headline states the ledger's height instead."
-      : `The most ${stableOf(market)} the CDP ever owed at once — the maximum over its own CDPUpdated \`_newDebt\` figures across its whole life. A closed or liquidated CDP's latest figures are zero, so the headline states the ledger's height instead.`,
-  contract: { name: `Polaris ${stableOf(market)} CDPManager`, address: POLARIS_MARKET_CONFIG[market].cdpManager },
-  via: `${POLARIS_VIA} · max(${what === "coll" ? "_newColl" : "_newDebt"}) over all CDPUpdated`,
-});
+      ? "The most pETH the CDP ever held at once"
+      : `The most ${stableOf(market)} the CDP ever owed at once`;
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    verify: { kind: "rollup", text: "Rolls up to the CDPUpdated rows the maximum was taken over" },
+    summary: liquidationCounted
+      ? `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life and the Liquidation log's \`${liqField}\` (its state once the pending legs settled). A liquidated CDP's latest figures are zero, so the headline states the ledger's height instead.`
+      : `${lead} — the maximum over its own CDPUpdated \`${field}\` figures across its whole life. A closed or liquidated CDP's latest figures are zero, so the headline states the ledger's height instead. A liquidation's own state is not in it here; the CDP's page counts it.`,
+    contract: { name: `Polaris ${stableOf(market)} CDPManager`, address: POLARIS_MARKET_CONFIG[market].cdpManager },
+    via: `${POLARIS_VIA} · max(${field}) over all CDPUpdated${liquidationCounted ? ` and ${liqField}` : ""}`,
+  };
+};
 
 export type PolarisLifetimeLeg =
   | "deposited"

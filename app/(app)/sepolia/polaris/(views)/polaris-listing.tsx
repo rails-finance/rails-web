@@ -40,7 +40,8 @@ import { HolderStrip } from "@/components/shared/holder-strip";
 import { fetchPolarisListingPage } from "@/lib/polaris/listing-fetch";
 import { polarisHolderStrip } from "@/lib/polaris/holder-strip";
 import { namesHolder, parsePolarisSearch } from "@/lib/polaris/search";
-import { isAllStatuses } from "@/lib/polaris/listing-visibility";
+import { effectiveStatuses, isAllStatuses } from "@/lib/polaris/listing-visibility";
+import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import {
   polarisListDimensions,
   polarisSortOptions,
@@ -73,6 +74,27 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
         /* the board is an enhancement — the listing still lists */
       } finally {
         if (!cancelled) setMarketsSettled(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Every status's count per market, for the line that says the resting view
+  // is the open CDPs only. One read on mount; the envelope carries the counts
+  // whatever the page asks for.
+  const [books, setBooks] = useState<PolarisMarketBook[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/polaris/positions?status=open&limit=1");
+        if (!res.ok) return;
+        const json = (await res.json()) as { markets?: PolarisMarketBook[] };
+        if (!cancelled && json.markets?.length) setBooks(json.markets);
+      } catch {
+        /* the line is an aid — the listing still lists */
       }
     })();
     return () => {
@@ -146,7 +168,30 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
         fetchPage: (filters, page) => fetchPolarisListingPage(filters, page),
       })}
       onFilters={onFilters}
-      renderAbove={({ items, total, filters }) =>
+      renderAbove={({ items, total, filters }) => {
+        // The resting view shows open CDPs only (listing-visibility.ts). Say
+        // so, with the whole count beside it, wherever that default is what
+        // the page is showing.
+        // Only where status is the one thing narrowing the count (a market
+        // pick is carried into the whole count below).
+        const openOnly =
+          (filters.status ?? []).length === 0 &&
+          filters.debt.length === 0 &&
+          !filters.q &&
+          effectiveStatuses(filters).length === 1 &&
+          effectiveStatuses(filters)[0] === "open";
+        const allCount = books
+          ? books
+              .filter((b) => filters.market.length === 0 || filters.market.includes(b.market))
+              .reduce((n, b) => n + b.openCount + b.closedCount + b.liquidatedCount, 0)
+          : null;
+        const restingLine =
+          openOnly && allCount != null && allCount > 0 ? (
+            <p className="text-xs text-rb-500" data-prov-exempt="">
+              Open CDPs only, the default: {total.toLocaleString("en-US")} of {allCount.toLocaleString("en-US")}. Status
+              shows the closed and liquidated ones.
+            </p>
+          ) : null;
         // The strip is a statement about a WALLET, so it mounts only where the
         // page IS that wallet's own set: the search names a holder, the status
         // selection is the relaxed default the middle path gives a holder
@@ -156,14 +201,21 @@ export function PolarisListing({ initialItems, initialTotal, initialKey, initial
         // the band goes rather than misstate what it is about. It also needs
         // the board read: without a price nothing here can be summed across
         // the two markets, and a stale board is kept as no board at all.
-        namesHolder(filters.q) &&
-        isAllStatuses(filters) &&
-        filters.market.length === 0 &&
-        filters.debt.length === 0 &&
-        markets ? (
-          <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
-        ) : null
-      }
+        const strip =
+          namesHolder(filters.q) &&
+          isAllStatuses(filters) &&
+          filters.market.length === 0 &&
+          filters.debt.length === 0 &&
+          markets ? (
+            <HolderStrip {...polarisHolderStrip(items, total, markets, POLARIS_ITEMS_PER_PAGE)} />
+          ) : null;
+        return restingLine || strip ? (
+          <>
+            {restingLine}
+            {strip}
+          </>
+        ) : null;
+      }}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

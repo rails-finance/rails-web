@@ -26,14 +26,24 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type RefObject,
 } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import {
+  ChartBarStacked,
+  ChartLine,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_HOVER } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
@@ -56,8 +66,8 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { AxisLabels, BusyFlows, Headline } from "@/components/shared/lifetime-flows-busy";
-import { LifetimeOverTime } from "@/components/shared/lifetime-flows-over-time";
+import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import { LifetimeOverTime, OVER_TIME_HUE } from "@/components/shared/lifetime-flows-over-time";
 import {
   binInputFromTimeline,
   binSeries,
@@ -146,6 +156,9 @@ export const FlowsLedgerNoteContext = createContext<((note: string | null) => vo
 export type FlowsKeyItems = {
   items: { side: FlowSide; s: FlowSegment }[];
   outline: string | null;
+  /** The Over time view's lines, and the Flows window where it is shaded. */
+  lines?: { label: string; color: string }[];
+  shade?: string | null;
   /** The Key's line on which view is which. */
   views?: string;
   /** The Explanation's line on the same. */
@@ -497,8 +510,8 @@ function SourceLine({
  *  draw, by name, for each kind of exit the position has had over its life.
  *  The segments' tips carry the figures. Where the position has other stops,
  *  the dashed outline too: where each bar ends at the last stop. */
-export function FlowsKey({ items, outline, views }: FlowsKeyItems) {
-  if (items.length === 0 && !outline && !views) return null;
+export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems) {
+  if (items.length === 0 && !outline && !lines?.length && !shade && !views) return null;
   return (
     <div className="mt-3 first:mt-0" data-flow-key="">
       <p className="text-xs font-semibold text-foreground">Key</p>
@@ -513,6 +526,18 @@ export function FlowsKey({ items, outline, views }: FlowsKeyItems) {
           <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
             <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
             {outline}
+          </li>
+        )}
+        {lines?.map(({ label, color }) => (
+          <li key={label} className="inline-flex items-center gap-1.5" data-flow-key-line="">
+            <i aria-hidden className="inline-block h-0.5 w-4 shrink-0" style={{ background: color }} />
+            {label}
+          </li>
+        ))}
+        {shade && (
+          <li className="inline-flex items-center gap-1.5" data-flow-key-shade="">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] bg-rb-400/25 dark:bg-rb-500/25" />
+            {shade}
           </li>
         )}
       </ul>
@@ -562,12 +587,12 @@ function PipTip({ at }: { at: PipOpen }) {
   );
 }
 
-/** Where the Lifetime view reads its series: the family's route
+/** Where the Over time view reads its series: the family's route
  *  (`/api/spark/flows/series`) and the position's parameters. */
 export type FlowSeriesSource = { path: string; params: Record<string, string> };
 
 /** The two views (rails-ops reference/lifetime-flows-scrubber.md): the bars,
- *  cut to the last WINDOW_ACTIVE_DAYS active days, and Lifetime, collateral
+ *  cut to the last WINDOW_ACTIVE_DAYS active days, and Over time, collateral
  *  and debt per week or month from the open. The bars take the busy
  *  treatment (lib/shared/flows-busy.ts) where their window is busy. */
 export function LifetimeFlowsScrubber({
@@ -575,7 +600,7 @@ export function LifetimeFlowsScrubber({
   series,
 }: {
   timeline: FlowTimeline;
-  /** The family's series route; absent, Lifetime bins the timeline's own day
+  /** The family's series route; absent, Over time bins the timeline's own day
    *  rows (a page that holds them all, Sky Savings). */
   series?: FlowSeriesSource;
 }) {
@@ -586,9 +611,9 @@ export function LifetimeFlowsScrubber({
   const [view, setView] = useState<"bars" | "lifetime">("bars");
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const reportKey = useContext(FlowsKeyContext);
-  const [hatches, setHatches] = useState<Omit<FlowsKeyItems, "views" | "explain"> | null>(null);
+  const [hatches, setHatches] = useState<Pick<FlowsKeyItems, "items" | "outline"> | null>(null);
 
-  // Lifetime's series: read on first opening, from the family's route, or
+  // Over time's series: read on first opening, from the family's route, or
   // binned here from the page's rows.
   const startDay = model ? model.start / DAY_MS : 0;
   const bin: SeriesBin = model ? lifetimeBinFor((timeline.today ?? startDay + model.liveStop) - startDay) : "week";
@@ -619,87 +644,141 @@ export function LifetimeFlowsScrubber({
   useEffect(() => {
     if (!words) return;
     const drawn = view === "bars" && !busy ? hatches : null;
+    const over = view === "lifetime";
     reportKey?.({
       items: drawn?.items ?? [],
       outline: drawn?.outline ?? null,
+      lines: over ? words.lines : undefined,
+      shade: over && from > 0 ? `The ${VIEWS.bars.label} window` : null,
       views: words.key,
       explain: words.explain,
     });
-  }, [reportKey, view, busy, hatches, words]);
+  }, [reportKey, view, busy, hatches, words, from]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
   useEffect(() => {
     if (view === "lifetime") ledgerNote?.(null);
   }, [view, ledgerNote]);
 
   if (!model || !bars || !words) return null;
+  const switcher = <ViewSwitch view={view} onChange={setView} what={words.what} />;
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="min-w-0 text-xs tabular-nums text-rb-500" data-flow-window-range="">
-          {words.range}
-        </p>
-        <button
-          type="button"
-          aria-pressed={view === "lifetime"}
-          onClick={() => setView((v) => (v === "lifetime" ? "bars" : "lifetime"))}
-          className={`${CTRL_GHOST} ${view === "lifetime" ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF} h-8 shrink-0 rounded-md px-2.5 text-xs font-semibold`}
-          data-flow-lifetime-toggle=""
-        >
-          Lifetime
-        </button>
-      </div>
       {view === "lifetime" ? (
         <LifetimeOverTime
           model={model}
           series={lifetime?.series ?? null}
           failed={lifetime?.failed ?? false}
           windowFrom={from > 0 ? startDay + from : null}
+          switcher={switcher}
         />
       ) : busy ? (
-        <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
+        <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} switcher={switcher} />
       ) : (
-        <ScrubberBody model={bars} onKey={setHatches} />
+        <ScrubberBody model={bars} onKey={setHatches} switcher={switcher} />
       )}
     </div>
   );
 }
 
-/** The header's window, and the Key's and the Explanation's line on which
- *  view is which. */
+type FlowsView = "bars" | "lifetime";
+
+/** The switch's two options: an icon and a label at desktop width, the icon
+ *  alone on a phone, where `title` and `aria-label` carry the words. */
+const VIEWS: Record<FlowsView, { label: string; says: (what: string) => string; Icon: typeof ChartLine }> = {
+  bars: { label: "Flows", says: (what) => `Flows: where the ${what} came from and went`, Icon: ChartBarStacked },
+  lifetime: { label: "Over time", says: (what) => `Over time: the ${what} since the open`, Icon: ChartLine },
+};
+
+/** The segmented control between the two views, on the date line's row. */
+function ViewSwitch({
+  view,
+  onChange,
+  what,
+}: {
+  view: FlowsView;
+  onChange: (v: FlowsView) => void;
+  /** "collateral and debt", in the card's words. */
+  what: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Chart view"
+      className="inline-flex shrink-0 rounded-lg border border-rb-200 bg-sunken p-0.5 dark:border-rb-700"
+      data-flow-view-switch=""
+    >
+      {(["bars", "lifetime"] as const).map((v) => {
+        const { label, Icon } = VIEWS[v];
+        const says = VIEWS[v].says(what);
+        const on = view === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={on}
+            aria-label={says}
+            title={says}
+            onClick={() => onChange(v)}
+            className={`${CTRL_GHOST} ${
+              on ? "bg-foreground text-background shadow-sm" : CTRL_OFF
+            } h-9 min-w-11 gap-1.5 rounded-md px-2.5 text-xs font-semibold sm:h-8 sm:min-w-0`}
+            data-flow-view={v}
+          >
+            <Icon size={15} aria-hidden />
+            <span className="max-sm:hidden">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The Key's and the Explanation's line on which view is which, and the Over
+ *  time view's lines for the Key. */
 function viewWords(
   model: FlowModel,
   bars: FlowModel,
   from: number,
   bin: SeriesBin,
-): { range: string; key: string; explain: string } {
+): { key: string; explain: string; what: string; lines: { label: string; color: string }[] } {
   const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const opens = longDay(dayStart(bars, 0));
-  const ends = closed ? `close, ${longDay(dayStart(model, model.lastDay))}` : "today";
-  const days = bars.eventDays.length;
-  const range = `${opens} – ${ends} · ${days.toLocaleString("en-US")} active day${days === 1 ? "" : "s"}`;
+  const ends = closed ? `the close on ${longDay(dayStart(model, model.lastDay))}` : "today";
+  const days = (n: number) => `${n.toLocaleString("en-US")} day${n === 1 ? "" : "s"} with events`;
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   const what = hasDebt
     ? `${model.labels.collateral.toLowerCase()} and ${model.labels.debt.toLowerCase()}`
     : model.labels.collateral.toLowerCase();
   const barsCover =
     from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} active days, from ${opens}` : `every active day since ${opens}`;
+  const f = VIEWS.bars.label;
+  const o = VIEWS.lifetime.label;
   return {
-    range,
-    key: `Bars: ${barsCover} · Lifetime: ${what} by ${bin} since the open`,
+    key: `${f}: ${barsCover} · ${o}: ${what} by ${bin} since the open`,
     explain:
-      `The bars cover ${from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} days with events, from ${opens}, and start with what was held as it opens` : `every day with events since ${opens}`}; ` +
-      `Lifetime draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
-      `${from > 0 ? ", with the bars' window shaded" : ""}, and leaves a gap where a held asset has no price that ${bin}.`,
+      (from > 0
+        ? `${f} covers the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and starts with what was held as that window opens. `
+        : `${f} covers all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `) +
+      `${o} draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
+      `${from > 0 ? `, with the ${f} window shaded` : ""}, and leaves a gap where a held asset has no price that ${bin}.`,
+    what,
+    lines: [
+      { label: model.labels.collateral, color: OVER_TIME_HUE.collateral },
+      ...(hasDebt ? [{ label: model.labels.debt, color: OVER_TIME_HUE.debt }] : []),
+    ],
   };
 }
 
 function ScrubberBody({
   model,
   onKey,
+  switcher,
 }: {
   model: FlowModel;
   /** The Key's hatches and outline, for the panel's Explanation. */
-  onKey: (key: Omit<FlowsKeyItems, "views" | "explain"> | null) => void;
+  onKey: (key: Pick<FlowsKeyItems, "items" | "outline"> | null) => void;
+  /** The view switch, on the date line's row. */
+  switcher?: ReactNode;
 }) {
   const [stop, setStop] = useState(model.liveStop);
   const [playing, setPlaying] = useState(false);
@@ -784,10 +863,6 @@ function ScrubberBody({
       : `Position on ${dateText}`;
   // Receipts read the live stop as the close's where the position closed.
   const liveReceipts = s.isLive && !closed;
-  const counter =
-    model.totalTxs != null && s.txs != null
-      ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
-      : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
   // The Key goes to the panel's Explanation. Its dashed outline, which marks
   // where each bar ends at the last stop, is named wherever there is another stop.
@@ -838,9 +913,7 @@ function ScrubberBody({
   };
   return (
     <div className="text-sm">
-      <p className="mb-2 font-semibold tabular-nums text-foreground" aria-live="polite">
-        {dateLine}
-      </p>
+      <DateRow switcher={switcher}>{dateLine}</DateRow>
       <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
         <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={liveReceipts} assets={assets} />
         {hasDebt && (
@@ -949,9 +1022,10 @@ function ScrubberBody({
             ))}
           </div>
         )}
+        <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+      <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="">
         <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
           <SkipBack size={16} aria-hidden />
         </button>
@@ -972,9 +1046,6 @@ function ScrubberBody({
         >
           <SkipForward size={16} aria-hidden />
         </button>
-        <span className="ml-auto text-xs tabular-nums text-rb-500" data-prov-exempt="">
-          {counter}
-        </span>
       </div>
 
       {(s.stale.length > 0 || repricedHere.length > 0) && (

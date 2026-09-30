@@ -244,7 +244,7 @@ export function polarisEconomicsContent(): LearnMoreContent {
     ],
     links: [
       POLARIS_DOC_LINKS.interestRates,
-      POLARIS_DOC_LINKS.conversions,
+      POLARIS_DOC_LINKS.pegDefence,
       POLARIS_DOC_LINKS.bondingCurve,
       POLARIS_APP_LINK,
     ],

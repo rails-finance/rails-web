@@ -8,7 +8,7 @@
 // and the slider stepping by bin. Every figure is `stateAt(model, stop)` at a
 // bin's last day, or the live stop.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
@@ -54,14 +54,43 @@ export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
   return [ref, w];
 }
 
+/** The date line with the view switch at its right, in every view. */
+export function DateRow({ children, switcher }: { children: ReactNode; switcher?: ReactNode }) {
+  return (
+    <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
+      <p className="min-w-0 font-semibold tabular-nums text-foreground" aria-live="polite">
+        {children}
+      </p>
+      {switcher}
+    </div>
+  );
+}
+
+/** The first and last day, under the two ends of a slider or a chart. */
+export function TrackEnds({ start, end }: { start: string; end: string }) {
+  return (
+    <div
+      className="mt-0.5 flex justify-between px-2 text-[11px] tabular-nums text-rb-500"
+      aria-hidden
+      data-prov-exempt=""
+      data-flow-track-ends=""
+    >
+      <span>{start}</span>
+      <span>{end}</span>
+    </div>
+  );
+}
+
 export interface BusyFlowsProps {
   /** The model, cut to the bars' window where it has one. */
   model: FlowModel;
   /** A ledger's note while the slider is off its last stop (Aave V4). */
   onLedgerNote?: (note: string | null) => void;
+  /** The view switch, on the date line's row. */
+  switcher?: ReactNode;
 }
 
-export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
+export function BusyFlows({ model, onLedgerNote, switcher }: BusyFlowsProps) {
   const { unit, bins } = useMemo(() => flowBins(model), [model]);
   const through = useMemo(() => throughput(model), [model]);
   const last = bins.length; // the live stop's index
@@ -109,12 +138,6 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
       : `Position on ${dateText}`;
   const liveReceipts = s.isLive && !closed;
   const unitWord = through.unit;
-  // The card's count, over the whole life: a window's first stop reads where
-  // the window opens.
-  const through_ = s.txs ?? s.count;
-  const total = model.totalTxs ?? model.totalEvents;
-  const counter = `${count(through_)} of ${count(total)} ${unitWord}${total === 1 ? "" : "s"}`;
-  const binText = at >= last ? (closed ? "Close" : "Today") : bins[at].label;
 
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
   useEffect(() => {
@@ -127,9 +150,7 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
 
   return (
     <div className="text-sm" data-flows-busy="">
-      <p className="mb-1 font-semibold tabular-nums text-foreground" aria-live="polite">
-        {dateLine}
-      </p>
+      <DateRow switcher={switcher}>{dateLine}</DateRow>
       <Throughput t={through} hasDebt={hasDebt} />
 
       <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
@@ -147,9 +168,10 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
           onChange={(e) => go(Number(e.target.value))}
           className="block h-11 w-full cursor-pointer accent-[var(--color-rb-500)] sm:h-7"
         />
+        <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+      <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="">
         <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
           <SkipBack size={16} aria-hidden />
         </button>
@@ -170,11 +192,6 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
         >
           <SkipForward size={16} aria-hidden />
         </button>
-        <span className="ml-auto text-right text-xs tabular-nums text-rb-500" data-prov-exempt="">
-          <span className="max-sm:block">{binText}</span>
-          <span className="max-sm:hidden"> · </span>
-          <span>{counter}</span>
-        </span>
       </div>
 
       {s.stale.length > 0 && (
@@ -254,6 +271,7 @@ export function Headline({
   when,
   isLive,
   assets,
+  figure,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -261,14 +279,23 @@ export function Headline({
   when: string;
   isLive: boolean;
   assets: ReturnType<typeof assetsAt>;
+  /** A figure read elsewhere (a bin of the Over time view), in place of
+   *  `st`'s; null where the bin has no price. */
+  figure?: { v: number | null; info: Provenance };
 }) {
   const word = side === "collateral" ? model.labels.collateral : model.labels.debt;
   const tokens = assets.held.filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => h.symbol);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
-        <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
-      </Prov>
+      {figure && figure.v == null ? (
+        <span className="text-xl font-semibold text-rb-500">No price</span>
+      ) : (
+        <Prov info={figure ? figure.info : flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
+          <span className="text-xl font-semibold tabular-nums text-foreground">
+            {formatFlowUsd(figure ? (figure.v as number) : st.now)}
+          </span>
+        </Prov>
+      )}
       {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
       <span className="text-xs text-rb-500">{word}</span>
     </div>

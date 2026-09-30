@@ -59,21 +59,15 @@ async function api(path_, tries = 4) {
   throw last ?? new Error(`failed ${path_}`);
 }
 
-// ── Formatting, restated from the house helpers rather than imported
-// (lib/shared/header-values.ts fmtHeaderMagnitude → components/shared/
-// activity-timeline.tsx fmtSpine) — an expected value computed by IMPORTING
-// the code under test could never catch that code being wrong. ────────────
-function fmtSpineLike(n) {
-  const a = Math.abs(n);
+// Polaris states every row figure in full, three decimals (the house
+// formatNumber: en-US, at most 3 fraction digits; a non-zero amount that would
+// round to 0 reads to 3 significant digits) — restated, not imported.
+function fmtFullLike(n) {
+  const a = Math.abs(Number(n));
   if (!a || !isFinite(a)) return "";
-  if (a < 0.01) return "<0.01";
-  if (a >= 1_000_000) return `${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000) {
-    const k = a / 1_000;
-    return a >= 10_000 ? `${Math.round(k)}K` : `${parseFloat(k.toFixed(1))}K`;
-  }
-  if (a >= 1) return a.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  const s = parseFloat(a.toFixed(4)).toString();
+  const s = a.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  if (parseFloat(s.replace(/,/g, "")) === 0)
+    return a < 1e-6 ? "<0.000001" : a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
   return s;
 }
 
@@ -155,8 +149,8 @@ for (const f of FIXTURES) {
   if (e == null) continue;
   const collLabel = mrColl(e) > 0 ? "PSM added" : "PSM redeemed";
   const debtLabel = mrDebt(e) > 0 ? "PSM minted" : "PSM cleared";
-  const collMag = fmtSpineLike(mrColl(e));
-  const debtMag = fmtSpineLike(mrDebt(e));
+  const collMag = fmtFullLike(mrColl(e));
+  const debtMag = fmtFullLike(mrDebt(e));
   const text = await rowText(page8, e.id);
   check(`1. usdp/8 block ${f.block} row found on the page (event_key ${e.id})`, text != null);
   if (text == null) continue;
@@ -234,10 +228,10 @@ if (shareNonZero) {
   check("5. usdp/8's pending strip is present (interest or PSM share pending)", pendingCount > 0, pendingText);
   check(
     '5. the strip states "PSM share" when the live share is non-zero',
-    pendingText.includes("PSM share"),
+    /PSM (mint |redemption )?share/.test(pendingText),
     pendingText,
   );
-  const m = pendingText.match(/PSM share of ([+−][\d,.]+) pETH \/ ([+−][\d,.]+) (\S+)/);
+  const m = pendingText.match(/PSM (?:mint |redemption )?share of ([+−][\d,.]+) pETH \/ ([+−][\d,.]+) (\S+)/);
   check("5. the strip's PSM-share sentence parses (signed pETH / signed stable)", m != null, pendingText);
   if (m) {
     const gotColl = Number(m[1].replace(/,/g, "").replace("−", "-"));
@@ -256,7 +250,7 @@ if (shareNonZero) {
 } else {
   check(
     '5. the live PSM share is zero, so the strip (if any) states no "PSM share"',
-    !pendingText.includes("PSM share"),
+    !/PSM (mint |redemption )?share/.test(pendingText),
     pendingText || "(no strip)",
   );
 }

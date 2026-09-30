@@ -5,7 +5,7 @@
 // that collapses the panel, the scrubber, and the Explanation with the
 // scrubber's Key after its prose. The scrubber reports the Key's hatches where
 // it draws them, and a line each for the Key and the Explanation on which of
-// its two views (the bars, Lifetime) is which. Until the scrubber's timeline
+// its two views (Flows, Over time) is which. Until the scrubber's timeline
 // lands the panel says it is reading; where that read fails, that it was not
 // read.
 //
