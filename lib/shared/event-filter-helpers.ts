@@ -306,6 +306,7 @@ const SPARK_OP_LABELS: Record<string, string> = {
   liquidation_fee: "Liquidation fee",
   transfer_in: "Transfer in",
   transfer_out: "Transfer out",
+  emode: "E-mode",
 };
 
 /** SparkLend's WETH gateway and treasury (lib/spark/flows-timeline.ts names

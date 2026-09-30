@@ -35,7 +35,7 @@ import {
   PILL_META,
   ctrlWaking,
 } from "@/lib/shared/ui-grammar";
-import { formatDate, formatDayMonth, formatDuration } from "@/lib/date";
+import { formatDate, formatDateRange, formatDayMonth, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
@@ -62,6 +62,7 @@ export function TimelineActivityHeader({
   firstAt,
   tenurePending,
   reopenedAt,
+  lives,
   labelLastActivity,
   labelTenure,
 }: {
@@ -90,6 +91,11 @@ export function TimelineActivityHeader({
    *  loan began: the eyebrow then reads "Open again since {date} · {tenure} ·
    *  first opened {date}". Unset changes nothing. */
   reopenedAt?: number | null;
+  /** Where the account emptied and started again, each stretch it held
+   *  something (unix seconds; `to` null while open): the eyebrow then names
+   *  every stretch and its length ("7 Oct - 31 Oct 2025 · 24 days · again 29
+   *  Sep 2026 · 1 minute"). Drawn with two or more. Unset changes nothing. */
+  lives?: readonly { from: number; to: number | null }[] | null;
   /** Say "last activity" inside the freshness pill, so it cannot read as the
    *  age of the date before it. Unset changes nothing. */
   labelLastActivity?: boolean;
@@ -110,6 +116,54 @@ export function TimelineActivityHeader({
   }
   if (firstAt != null && firstAt > 0 && firstAt < first) first = firstAt;
   const now = Math.floor(Date.now() / 1000);
+  if (!tenurePending && lives && lives.length > 1) {
+    // Past three, the first and the last are named and the rest counted; the
+    // tip lists every one.
+    const shown = lives.length > 3 ? [lives[0], lives[lives.length - 1]] : lives;
+    const between = lives.length - shown.length;
+    const all = lives
+      .map((l) =>
+        l.to == null
+          ? `since ${formatDate(l.from)} (${formatDuration(l.from, now)})`
+          : `${formatDateRange(l.from, l.to)} (${formatDuration(l.from, l.to)})`,
+      )
+      .join("; ");
+    return (
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+        data-timeline-lives={lives.length}
+        title={`${lives.length} stretches, each starting from an empty account: ${all}`}
+      >
+        {shown.map((l, i) => {
+          const end = l.to ?? now;
+          const sameDay = l.to != null && formatDate(l.from) === formatDate(l.to);
+          const when =
+            l.to == null ? `since ${formatDate(l.from)}` : sameDay ? formatDate(l.from) : formatDateRange(l.from, l.to);
+          return (
+            <span key={l.from} className="inline-flex items-center gap-2">
+              <span className="text-foreground">
+                {i > 0 ? "again " : l.to == null ? "Active " : ""}
+                {i === 0 && l.to != null ? when.charAt(0).toUpperCase() + when.slice(1) : when}
+              </span>
+              <span className={PILL_META} data-prov-exempt="">
+                {formatDuration(l.from, end)}
+              </span>
+              {i === 0 && between > 0 && (
+                <span className="text-rb-500">
+                  {between} more {between === 1 ? "stretch" : "stretches"}
+                </span>
+              )}
+            </span>
+          );
+        })}
+        <span className={PILL_META}>
+          <Clock size={12} />
+          {labelLastActivity ? "last activity " : ""}
+          {formatDuration(last, now)} ago
+        </span>
+      </div>
+    );
+  }
   if (!tenurePending && !closed && reopenedAt != null && reopenedAt > first) {
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm">

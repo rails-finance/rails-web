@@ -40,7 +40,10 @@ export interface SparkEventCardProps {
 // spToken changed hands, nothing entered or left the Pool — so it has no entry
 // here: the row draws the reserve with the custody badge and no flank, and
 // the header carries the amount and the counterparty.
-const DIRECTION: Record<Exclude<SparkContext["eventType"], "transfer_in" | "transfer_out">, "right" | "left"> = {
+const DIRECTION: Record<
+  Exclude<SparkContext["eventType"], "transfer_in" | "transfer_out" | "emode">,
+  "right" | "left"
+> = {
   supply: "right",
   withdraw: "left",
   borrow: "left",

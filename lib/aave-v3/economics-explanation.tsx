@@ -9,7 +9,7 @@ import type { TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economic
 import type { AaveV3TowerData } from "@/lib/aave-v3/chain-truth-tower";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
-import { formatCompact } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
@@ -62,11 +62,14 @@ function sideSymbol(side: TowerSideData): string | null {
 /** Whole dollars: "$6,412,345". */
 export const wholeUsd = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
 
+/** Whole dollars, with a positive figure under half a dollar as "<$1". */
+const wholeOrUnder = (n: number): string => (n > 0 && n < 0.5 ? "<$1" : wholeUsd(n));
+
 function fmtWith(full: boolean) {
   return (scalar: number, valued: boolean, symbol: string | null): string =>
     valued
       ? full
-        ? wholeUsd(scalar)
+        ? wholeOrUnder(scalar)
         : formatCompactUsd(scalar)
       : symbol
         ? `${formatCompact(scalar)} ${symbol}`
@@ -166,7 +169,18 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             {" "}
             and earned <Fig>{fmt(collEarned, valued, collSym)}</Fig> of interest on it
             {valued && earnedLines.length > 1 ? (
-              <> ({earnedLines.map((l) => `${usdOnly(l.usd ?? 0)} on ${l.symbol}`).join(" and ")})</>
+              <>
+                {" "}
+                (
+                {earnedLines
+                  .map((l) =>
+                    opts.fullUsd && (l.usd ?? 0) < 0.5
+                      ? `${formatNumber(l.amount)} ${l.symbol}`
+                      : `${usdOnly(l.usd ?? 0)} on ${l.symbol}`,
+                  )
+                  .join(" and ")}
+                )
+              </>
             ) : null}
           </>
         )}

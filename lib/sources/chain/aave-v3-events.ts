@@ -107,6 +107,9 @@ const LABELS: Record<AaveV3EventType, string> = {
   // Never produced here: the sweep reads the Pool topics above and
   // DeficitCreated is not among them. Named so the roster stays total.
   bad_debt_written_off: "Debt written off",
+  // Never produced here either: the page reads it from the Pool's logs
+  // (lib/aave-v3/account-switches.ts).
+  emode: "E-mode",
 };
 
 /** V3 Pool event emitting each action's `amount` param — the origin envelope's

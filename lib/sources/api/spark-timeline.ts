@@ -130,6 +130,7 @@ const LABELS: Record<SparkEventType, string> = {
   liquidation: "Liquidated",
   transfer_in: "Transferred in",
   transfer_out: "Transferred out",
+  emode: "E-mode",
 };
 
 const ZERO = BigInt(0);

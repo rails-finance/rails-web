@@ -14,7 +14,9 @@
 // getUserAccountData read is the only HF this card ever shows.
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
+import { TipLabel } from "@/components/shared/tip-label";
+import type { SparkLife } from "@/lib/spark/lives";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
@@ -94,7 +96,40 @@ const MODE_TIPS: Record<string, string> = {
 };
 
 const COLLATERAL_TIP =
-  "What the account supplies, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
+  "What the account supplies that backs its borrowing, valued at SparkLend's oracle prices (the price feed SparkLend liquidates with). A supply is held as spTokens, SparkLend's receipt token, whose balance grows as interest accrues.";
+
+const NOT_COLLATERAL_TIP =
+  "Supplied and earning the supply rate, but backing no borrowing: its collateral switch is off, or SparkLend gives it a liquidation threshold of 0 (USDC, USDT, USDS and PYUSD).";
+
+const PEAK_NOT_COLLATERAL_TIP =
+  "Supplied and earning the supply rate, but never backing borrowing: the account never turned its collateral switch on (SparkLend gives USDC, USDT, USDS and PYUSD a liquidation threshold of 0).";
+
+/** "24 days · 7 Oct - 31 Oct 2025", one line per life. */
+function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
+  const now = Math.floor(Date.now() / 1000);
+  return (
+    <div className="flex flex-col gap-0.5 text-xs text-rb-500" data-spark-card-lives={lives.length}>
+      {(lives.length > 3 ? [lives[0], lives[lives.length - 1]] : lives).map((l, i) => {
+        const end = l.to ?? now;
+        const when =
+          l.to == null
+            ? `since ${formatDate(l.from)}`
+            : formatDate(l.from) === formatDate(l.to)
+              ? formatDate(l.from)
+              : formatDateRange(l.from, l.to);
+        return (
+          <div key={l.from}>
+            {i === 1 && lives.length > 3 && <div>{lives.length - 2} more between</div>}
+            <span className="text-sm font-semibold text-foreground" data-prov-exempt="">
+              {formatDuration(l.from, end)}
+            </span>{" "}
+            {when}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const HF_TIP =
   "The collateral, each asset counted up to its liquidation threshold, divided by the debt, at SparkLend's oracle prices. At or below 1, anyone can liquidate the account. The bar beside it shows how far the collateral can fall before that.";
@@ -201,10 +236,16 @@ function InterestCaption({
   since?: number | null;
 }) {
   if (usd == null || usd < 0.01) return null;
+  const words = `interest${since != null ? ` since ${formatDate(since)}` : ""}`;
+  const tip = `The ${side === "supply" ? "supply" : "borrow"} interest added since the balance last started from zero. Lifetime interest is in the Lifetime flows panel.`;
   return (
     <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov> interest
-      {since != null ? ` since ${formatDate(since)}` : ""}
+      incl. <Prov info={sparkInterestCaptionProv(side)}>{formatUsd(usd)}</Prov>{" "}
+      <RevealTip tip={tip} label={`${words}. ${tip}`} focusable className="focus-ring rounded-sm">
+        <span className="underline decoration-dotted decoration-rb-400 underline-offset-2" data-spark-interest-tip="">
+          {words}
+        </span>
+      </RevealTip>
     </div>
   );
 }
@@ -330,8 +371,17 @@ export function SparkPositionCard({
   viewHref,
   captions,
   outcomeAt,
+  notCollateral,
+  lives,
 }: {
   v: SparkPositionView;
+  /** Lowercased reserves the account supplies (or, closed, supplied) that back
+   *  no borrowing: the card lists them apart from the collateral. Unset until
+   *  the page has read the switches. */
+  notCollateral?: ReadonlySet<string> | null;
+  /** The account's lives, where it emptied and started again; a closed card
+   *  with two or more counts each. */
+  lives?: readonly SparkLife[] | null;
   /** A liquidated card's Outcome date: its last liquidation, where the page
    *  holds it. The last activity otherwise. */
   outcomeAt?: number;
@@ -350,7 +400,11 @@ export function SparkPositionCard({
    *  cards omit them; the liquidation caption needs neither and always rides. */
   captions?: SparkCardCaptions;
 }) {
-  const collUsd = totalUsd(v, v.supplies);
+  const isOther = (r: SparkReserveAmount) => notCollateral?.has(r.address.toLowerCase()) === true;
+  const collSupplies = v.supplies.filter((r) => !isOther(r));
+  const otherSupplies = v.supplies.filter(isOther);
+  const collUsd = totalUsd(v, collSupplies);
+  const otherUsd = totalUsd(v, otherSupplies);
   const debtUsd = totalUsd(v, v.borrows);
   // `receipts` is the render-site switch (listing defaults false; only the
   // detail page passes it) — computed here (not just below) because the
@@ -363,7 +417,7 @@ export function SparkPositionCard({
   // cent) leave the icon stack, its "+N" and the list count; the lines put
   // them behind the "N dust reserves hidden" control.
   const usdOf = dustUsdOf(v);
-  const suppliesRanked = rankByValue(v, v.supplies);
+  const suppliesRanked = rankByValue(v, collSupplies);
   const borrowsRanked = rankByValue(v, v.borrows);
   const suppliesShown = splitDust(suppliesRanked, usdOf).shown;
   const borrowsShown = splitDust(borrowsRanked, usdOf).shown;
@@ -398,7 +452,18 @@ export function SparkPositionCard({
             />
           }
           closedAt={v.status === "liquidated" && outcomeAt != null ? outcomeAt : v.lastActivityAt}
-          collateral={<PeakStack reserves={v.peakSupplies} side="supply" />}
+          collateral={<PeakStack reserves={v.peakSupplies.filter((r) => !isOther(r))} side="supply" />}
+          collateralFootnote={
+            v.peakSupplies.some(isOther) ? (
+              <div className="mt-2" data-spark-not-collateral="">
+                <div className="text-rb-500 text-xs font-semibold">
+                  <TipLabel text="Supplied, not collateral" tip={PEAK_NOT_COLLATERAL_TIP} />
+                </div>
+                <PeakStack reserves={v.peakSupplies.filter(isOther)} side="supply" />
+              </div>
+            ) : undefined
+          }
+          extra={lives && lives.length > 1 ? { label: "Time open", value: <LivesLines lives={lives} /> } : undefined}
           debt={<PeakStack reserves={v.peakBorrows} side="debt" />}
         />
       </PositionCardShell>
@@ -469,7 +534,7 @@ export function SparkPositionCard({
             label: CARD_VOCAB.collateral,
             labelTip: isDetail ? COLLATERAL_TIP : undefined,
             assetIcons:
-              v.supplies.length > 0 ? (
+              collSupplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} />
                   <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
@@ -479,13 +544,13 @@ export function SparkPositionCard({
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={sparkUsdProvOnchain("Collateral")} />
               ) : supplyDisclosure.collapsible ? null : (
-                <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
+                <ReserveStack reserves={collSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
               ),
             footnote: (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <ReserveStack reserves={v.supplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
+                    <ReserveStack reserves={collSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
                 {isDetail && collUsd != null && (
@@ -493,7 +558,35 @@ export function SparkPositionCard({
                     <ReserveFootnoteLines reserves={suppliesRanked} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} since={captions?.supplyInterestSince} />
+                <InterestCaption
+                  side="supply"
+                  usd={captions?.supplyInterestUsd}
+                  since={captions?.supplyInterestSince}
+                />
+                {otherSupplies.length > 0 && (
+                  <div className="mt-2" data-spark-not-collateral="">
+                    <div className="text-rb-500 text-xs font-semibold">
+                      <TipLabel text="Supplied, not collateral" tip={NOT_COLLATERAL_TIP} />
+                    </div>
+                    {otherUsd != null ? (
+                      <>
+                        <div className="text-sm font-semibold tabular-nums">
+                          <Prov info={sparkUsdProvOnchain("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
+                        </div>
+                        {isDetail && (
+                          <ReserveFootnoteLines
+                            reserves={rankByValue(v, otherSupplies)}
+                            side="supply"
+                            atBlock={v.atBlock}
+                            usdOf={usdOf}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <ReserveStack reserves={otherSupplies} side="supply" atBlock={v.atBlock} usdOf={usdOf} />
+                    )}
+                  </div>
+                )}
               </>
             ),
           },

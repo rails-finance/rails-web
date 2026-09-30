@@ -49,6 +49,18 @@ import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/li
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
+import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
+import {
+  emodeSwitchEvents,
+  fetchAccountSwitches,
+  switchesInWindow,
+  withEmodeRows,
+  withEmodeServedRows,
+  type AaveFamilyAccountSwitches,
+} from "@/lib/aave-v3/account-switches";
+import { sparkLives } from "@/lib/spark/lives";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import {
@@ -271,28 +283,61 @@ export default function SparkPositionDetail({
   // below) — a fresh array identity every render would cancel the in-flight
   // fetch whenever anything else (e.g. the chain read) re-rendered the page.
   const sparkEvents = useMemo(() => events.filter(isSparkEvent), [events]);
+  // The account's e-mode changes and the reserves it ever turned on as
+  // collateral, from the Pool's logs (the index serves neither). Each e-mode
+  // change is a timeline row; nothing else on the page counts it.
+  const [switches, setSwitches] = useState<AaveFamilyAccountSwitches | null>(null);
+  useEffect(() => {
+    const ac = new AbortController();
+    setSwitches(null);
+    fetchAccountSwitches("/api/chain/spark/account-switches", wallet, ac.signal)
+      .then(setSwitches)
+      .catch(() => {
+        // The rows and the card read as they did without it.
+      });
+    return () => ac.abort();
+  }, [wallet]);
+  // The e-mode rows the timeline draws among the served ones: those inside the
+  // loaded window (on a grouped answer, from its oldest row on).
+  const emodeRows = useMemo(() => {
+    if (!switches) return [];
+    let floor = cutoffBlock;
+    if (groupedTail && floor != null) {
+      const blocks = [
+        ...sparkEvents.map((e) => e.blockNumber),
+        ...groupedTail.rowPlan.flatMap((r) => (r.kind === "folder" ? [r.folder.firstBlock] : [])),
+      ];
+      if (blocks.length > 0) floor = Math.min(...blocks);
+    }
+    return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "spark", MAINNET_CHAIN_ID);
+  }, [switches, groupedTail, sparkEvents, wallet, cutoffBlock]);
+  const timelineEvents = useMemo(() => withEmodeRows(sparkEvents, emodeRows), [sparkEvents, emodeRows]);
   // Each row's same-transaction rows (a liquidation and its fee transfer) and
   // the previous transaction, for the account read at blocks N−1 and N; a
   // block holding two of the owner's transactions gets no read (it would mix
   // them), as on Aave V3 Base.
-  const neighbours = useMemo(() => aaveV3Neighbours(sparkEvents as SparkTimelineEvent[]), [sparkEvents]);
+  const neighbours = useMemo(
+    () => aaveV3Neighbours(timelineEvents.filter(isSparkEvent) as SparkTimelineEvent[]),
+    [timelineEvents],
+  );
   const sharedBlocks = useMemo(() => {
     const txs = new Map<number, Set<string>>();
-    for (const e of sparkEvents) {
+    for (const e of timelineEvents) {
       const set = txs.get(e.blockNumber) ?? new Set<string>();
       set.add((e.txHash ?? e.id).toLowerCase());
       txs.set(e.blockNumber, set);
     }
     return new Set([...txs].filter(([, set]) => set.size > 1).map(([b]) => b));
-  }, [sparkEvents]);
+  }, [timelineEvents]);
 
   // The served list as ROWS. `sparkEvents` holds the grouped answer's own
   // events when one is in hand — the read above put them there — so the plan
   // and the events it interleaves always come from the same answer, and two
   // partitions can never meet on one page.
   const servedRows = useMemo(
-    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, sparkEvents) : undefined),
-    [groupedTail, sparkEvents],
+    () =>
+      groupedTail ? withEmodeServedRows(interleaveRowPlan(groupedTail.rowPlan, sparkEvents), emodeRows) : undefined,
+    [groupedTail, sparkEvents, emodeRows],
   );
   /** The folders the index served, whole and UNFILTERED — the third contributor
    *  to the page's partition, and what every whole-history reduction below adds
@@ -423,7 +468,7 @@ export default function SparkPositionDetail({
   // (hooks/useTimelineSegment.ts, shared with the Aave V3 page). The preload
   // stays the page's whole-history record; the timeline alone swaps.
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: sparkEvents,
+    events: timelineEvents,
     groupedTail,
     servedRows,
     servedFolders,
@@ -575,6 +620,12 @@ export default function SparkPositionDetail({
     [sparkEvents, opening, servedFolders],
   );
 
+  // The account's lives, where the page holds every row of the history.
+  const lives = useMemo(
+    () => (historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0 ? sparkLives(sparkEvents) : null),
+    [historyWindow.state, servedFolders, sparkEvents],
+  );
+
   // What the wallet did, by act, where the page holds the whole history: the
   // card's explanation says it in one line on a long record.
   const activity = useMemo<SparkActivityCounts | null>(() => {
@@ -606,7 +657,9 @@ export default function SparkPositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime, sparkEvents) : null;
+  const captions = view
+    ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
+    : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -619,6 +672,27 @@ export default function SparkPositionDetail({
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
   );
+  // The supplies that back no borrowing, which the card lists apart: open, the
+  // live read's collateral switch and threshold (the e-mode category's where
+  // the reserve is in it); closed, the reserves the account never turned on
+  // as collateral (the Pool's logs).
+  const notCollateral = useMemo<Set<string> | null>(() => {
+    if (!view) return null;
+    if (view.status === "open") {
+      if (!chain) return null;
+      const out = new Set<string>();
+      for (const r of chain.reserves) {
+        if (r.supplyBalanceRaw === "0") continue;
+        const lt = r.inEmode && chain.emode?.lt ? chain.emode.lt : r.lt;
+        if (!r.isCollateral || !lt) out.add(r.address.toLowerCase());
+      }
+      return out;
+    }
+    if (!switches) return null;
+    const on = new Set(switches.collateralEnabled);
+    return new Set(view.peakSupplies.map((r) => r.address.toLowerCase()).filter((a) => !on.has(a)));
+  }, [view, chain, switches]);
+
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
     () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
@@ -681,6 +755,8 @@ export default function SparkPositionDetail({
               receipts
               viewHref={tl.viewHref}
               outcomeAt={lastLiquidationAt}
+              notCollateral={notCollateral}
+              lives={lives}
               captions={captions ?? undefined}
               // The risk slot rides the card's heading-button row (the V2 trove
               // treatment): the Display menu plus the chosen risk picture —
@@ -768,12 +844,24 @@ export default function SparkPositionDetail({
                   // does — otherwise a wallet with 28,000 events reads as days
                   // old because its oldest loaded card is.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                  lives={lives}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
                 />
               ) : undefined
             }
             renderCard={(event, meta) =>
-              isSparkEvent(event) ? (
+              isSparkEvent(event) && event.context.data.emodeSwitch ? (
+                <AaveFamilyEmodeSwitchCard
+                  event={event}
+                  sw={event.context.data.emodeSwitch}
+                  pool={SPARK_POOL_IDENTITY}
+                  persistPrefix="spark"
+                  eventNumber={meta.eventNumber}
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
+                />
+              ) : isSparkEvent(event) ? (
                 <SparkEventCard
                   event={event}
                   eventNumber={meta.eventNumber}

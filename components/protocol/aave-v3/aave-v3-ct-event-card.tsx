@@ -52,7 +52,7 @@ export interface AaveV3CtEventCardProps {
 // is the exception: its value left the position, so it draws the withdrawn
 // amount on the left flank, the reserve wearing the swap badge (D3).
 const DIRECTION: Record<
-  Exclude<AaveV3Context["eventType"], "transfer_in" | "transfer_out" | "swap">,
+  Exclude<AaveV3Context["eventType"], "transfer_in" | "transfer_out" | "swap" | "emode">,
   "right" | "left"
 > = {
   supply: "right",

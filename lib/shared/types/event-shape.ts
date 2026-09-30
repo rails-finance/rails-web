@@ -517,7 +517,10 @@ export type AaveV3EventType =
   // `amount` is the log's amountCreated on the written-off reserve. Emitted
   // inside executeLiquidationCall, so it always sits in a liquidation's
   // transaction, before that liquidation's own row (rails-ops TO-DO-ui-jobs §20).
-  | "bad_debt_written_off";
+  | "bad_debt_written_off"
+  // emode: the account's e-mode change, a row the page reads from the Pool's
+  // logs (lib/aave-v3/account-switches.ts; Seamless). It moves no balance.
+  | "emode";
 
 /** Provenance of an Aave V3 historic price (mirror of aave-v3.ts). */
 export type AaveV3PriceSource = "iaave-oracle";
@@ -653,6 +656,8 @@ export interface AaveV3ContextOrigin {
  *  strings to preserve precision across the wire. */
 export interface AaveV3Context {
   eventType: AaveV3EventType;
+  /** emode only — the switch. */
+  emodeSwitch?: EmodeSwitchFields;
   amount?: string;
   reserveSymbol?: string;
   /** The reserve `reserveSymbol` names, lowercase: the row's own reserve, a
@@ -918,7 +923,24 @@ export type SparkEventType =
   | "repay"
   | "liquidation"
   | "transfer_in"
-  | "transfer_out";
+  | "transfer_out"
+  // emode: the account's e-mode change (Pool UserEModeSet), read from the
+  // Pool's logs by the page (/api/chain/spark/account-switches); the index
+  // serves no such row. It moves no balance.
+  | "emode";
+
+/** An Aave V3-family account's e-mode change (Pool UserEModeSet), read from
+ *  the Pool's logs by the page (lib/aave-v3/account-switches.ts): the category
+ *  before and after, with the new category's limits read at the switch's
+ *  block (basis points). */
+export interface EmodeSwitchFields {
+  fromId: number;
+  fromLabel: string | null;
+  toId: number;
+  toLabel: string | null;
+  ltvBps: number | null;
+  liquidationThresholdBps: number | null;
+}
 
 /** Provenance of a SparkLend historic price — the protocol's own oracle
  *  (IAaveOracle fork) read at the event's block by the price filler. A named
@@ -998,6 +1020,8 @@ export interface SparkContext {
   interestRateMode?: number;
   /** Repay only — repaid with spTokens instead of the underlying. */
   useATokens?: boolean;
+  /** emode only — the switch (EmodeSwitchFields). */
+  emodeSwitch?: EmodeSwitchFields;
   /** transfer_in/transfer_out only — the OTHER account in the position move
    *  (the sender on an inflow, the recipient on an outflow), lowercased. A
    *  true counterparty of the event, not a verdict about who acted (renders

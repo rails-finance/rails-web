@@ -164,6 +164,8 @@ const LABELS: Record<AaveV3EventType, string> = {
   transfer_out: "Transferred out",
   swap: "Swap",
   bad_debt_written_off: "Debt written off",
+  // Never served by the index: the page reads it from the Pool's logs.
+  emode: "E-mode",
 };
 
 /** CoW Protocol's marker for native ETH as an order's buy token. */

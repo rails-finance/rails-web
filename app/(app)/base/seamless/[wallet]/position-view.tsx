@@ -41,6 +41,15 @@ import {
 import { AaveV3PoolNotes, type AaveV3FrozenMarket } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
 import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import {
+  emodeSwitchEvents,
+  fetchAccountSwitches,
+  switchesInWindow,
+  withEmodeRows,
+  withEmodeServedRows,
+  type AaveFamilyAccountSwitches,
+} from "@/lib/aave-v3/account-switches";
 import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
@@ -231,27 +240,59 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
 
   const events = useMemo<BaseActivityEvent[]>(() => timeline?.events ?? [], [timeline]);
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // The account's e-mode changes, from the Pool's logs: each is a timeline row
+  // of its own, placed among the swept rows and counted by nothing else.
+  const [switches, setSwitches] = useState<AaveFamilyAccountSwitches | null>(null);
+  useEffect(() => {
+    const ac = new AbortController();
+    setSwitches(null);
+    fetchAccountSwitches("/api/chain/seamless/account-switches", wallet, ac.signal)
+      .then(setSwitches)
+      .catch(() => {
+        // The timeline reads as it did without them.
+      });
+    return () => ac.abort();
+  }, [wallet]);
+  const emodeRows = useMemo(() => {
+    if (!switches) return [];
+    // A trimmed history takes the changes from its oldest loaded row on.
+    let floor: number | null = null;
+    if ((timeline?.coverage.omitted?.count ?? 0) > 0) {
+      const blocks = [
+        ...aaveEvents.map((e) => e.blockNumber),
+        ...(timeline?.rowPlan ?? []).flatMap((r) => (r.kind === "folder" ? [r.folder.firstBlock] : [])),
+      ];
+      if (blocks.length > 0) floor = Math.min(...blocks);
+    }
+    return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "aave-v3", SEAMLESS_CHAIN_ID).filter(
+      isAaveV3Event,
+    );
+  }, [switches, timeline, aaveEvents, wallet]);
+  const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
   // Each card's same-transaction rows and the transaction before it: the open
   // card reads the account at blocks N−1 and N (/api/chain/seamless/
   // position-state), as on Aave V3 Base.
-  const neighbours = useMemo(() => aaveV3Neighbours(aaveEvents as AaveV3TimelineEvent[]), [aaveEvents]);
+  const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3TimelineEvent[]), [timelineEvents]);
   // A block holding two of the owner's transactions has no N−1 read that is
   // "immediately before" the second: those cards keep the row's own figures.
   const sharedBlocks = useMemo(() => {
     const txs = new Map<number, Set<string>>();
-    for (const e of aaveEvents) {
+    for (const e of timelineEvents) {
       const set = txs.get(e.blockNumber) ?? new Set<string>();
       set.add((e.txHash ?? e.id).toLowerCase());
       txs.set(e.blockNumber, set);
     }
     return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
-  }, [aaveEvents]);
+  }, [timelineEvents]);
 
   // The served list as ROWS, when the route grouped it; the plan and the
   // events it interleaves come from one answer.
   const servedRows = useMemo(
-    () => (timeline?.grouped && timeline.rowPlan ? interleaveRowPlan(timeline.rowPlan, aaveEvents) : undefined),
-    [timeline, aaveEvents],
+    () =>
+      timeline?.grouped && timeline.rowPlan
+        ? withEmodeServedRows(interleaveRowPlan(timeline.rowPlan, aaveEvents), emodeRows)
+        : undefined,
+    [timeline, aaveEvents, emodeRows],
   );
   /** The folders, whole and unfiltered. Every whole-history claim below that
    *  is reduced over `aaveEvents` adds them, or states nothing it cannot. The
@@ -367,7 +408,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   // states them.
   const segmentReads = useMemo(() => replaySegmentReads(TIMELINE_ROUTE, wallet), [wallet]);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: aaveEvents,
+    events: timelineEvents,
     groupedTail,
     servedRows,
     servedFolders,
@@ -658,7 +699,18 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           )
                     }
                     renderCard={(event, meta) =>
-                      isAaveV3Event(event) ? (
+                      isAaveV3Event(event) && event.context.data.emodeSwitch ? (
+                        <AaveFamilyEmodeSwitchCard
+                          event={event}
+                          sw={event.context.data.emodeSwitch}
+                          pool={POOL_IDENTITY}
+                          persistPrefix="aave-v3"
+                          eventNumber={meta.eventNumber}
+                          isFirst={meta.isFirst}
+                          isLast={meta.isLast}
+                          market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
+                        />
+                      ) : isAaveV3Event(event) ? (
                         <AaveV3CtEventCard
                           event={event}
                           eventNumber={meta.eventNumber}
