@@ -1,20 +1,30 @@
-"use client";
-
-// The Lifetime view (rails-ops reference/lifetime-flows-scrubber.md, "The two
+// The Over time view (rails-ops reference/lifetime-flows-scrubber.md, "The two
 // views"): collateral and debt at the end of each week (a month on a life of
 // more than three years) from the open to today, from the family's series
-// route (lib/shared/flows-series.ts). The figures above are today's, the
-// same as the bars'; the last point is today's. The bars' window is shaded.
-// A bin where a held asset recorded no price draws a gap.
+// route (lib/shared/flows-series.ts). The headlines are today's, the same as
+// the Flows view's, until the pointer, a finger or the arrow keys pick a bin;
+// then they are that bin's, and leaving the chart returns them to today. The
+// last point is today's. The Flows window is shaded. A bin where a held asset
+// recorded no price draws a gap. The lines' legend is in the panel's Key.
 
-import { useMemo, useState, type KeyboardEvent } from "react";
-import { Prov } from "@/components/shared/provenance";
-import { Headline, useWidth } from "@/components/shared/lifetime-flows-busy";
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import type { Provenance } from "@/components/shared/provenance";
+import { DateRow, Headline, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { assetsAt, axisFor, dayStart, formatFlowUsd, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
+import {
+  assetsAt,
+  axisFor,
+  DAY_MS,
+  dayStart,
+  formatFlowUsd,
+  stateAt,
+  type FlowModel,
+} from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 
-const HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+/** The lines' hues; the panel's Key draws the same. */
+export const OVER_TIME_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
+const HUE = OVER_TIME_HUE;
 const CHART_H = 150;
 /** The chart's inset each side. */
 const PAD = 8;
@@ -23,44 +33,108 @@ const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}
 
 type Point = { from: number; to: number; collateral: number | null; debt: number | null };
 
+/** A bin's figure: its assets' balances at the period's last priced day. */
+const binProv = (what: string, day: string): Provenance => ({
+  kind: "chain-derived",
+  summary: `${what} on ${day} — each asset's balance after its last event by then, at the last daily oracle price recorded in that period, added up.`,
+  formula: "Σ balance × price on the period's last priced day",
+});
+
 export function LifetimeOverTime({
   model,
   series,
   failed,
   windowFrom,
+  switcher,
 }: {
   /** The whole life's model: today's figures, the labels, the close. */
   model: FlowModel;
   /** The family's series, or null while it loads. */
   series: FlowBinSeries | null;
   failed: boolean;
-  /** UTC day the bars' window opens, where it opens after the first event. */
+  /** UTC day the Flows window opens, where it opens after the first event. */
   windowFrom: number | null;
+  /** The view switch, on the date line's row. */
+  switcher?: ReactNode;
 }) {
   const hasDebt = model.buckets.some((b) => b.side === "debt");
+  // The last point is today's, at the live figures.
+  const points = useMemo<Point[]>(() => {
+    const out = (series?.points ?? []).map(([from, to, collateral, debt]) => ({ from, to, collateral, debt }));
+    const last = out[out.length - 1];
+    if (last) {
+      last.collateral = model.live.collateralUsd;
+      last.debt = model.live.debtUsd;
+    }
+    return out;
+  }, [series, model.live]);
+  const n = points.length;
+  // The bin under the pointer, a finger or the arrow keys; null is today.
+  const [picked, setPicked] = useState<number | null>(null);
+  useEffect(() => setPicked(null), [series]);
+  const at = picked != null && picked < n - 1 ? picked : null;
+  const p = at != null ? points[at] : null;
+  const stop = p ? Math.max(0, Math.min(model.liveStop, p.to - model.start / DAY_MS)) : model.liveStop;
   const s = stateAt(model, model.liveStop);
-  const assets = useMemo(() => assetsAt(model, model.liveStop), [model]);
+  const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
   const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const closeDay = dayStamp(dayStart(model, model.lastDay));
-  const dateLine = closed
-    ? `Position at close, ${closeDay}`
-    : `Position ${(model.words.live ?? "Today, live prices").replace(/^./, (c) => c.toLowerCase())}`;
+  const binDay = p ? dayStamp(p.to * DAY_S) : null;
+  const dateLine = binDay
+    ? `Position on ${binDay}`
+    : closed
+      ? `Position at close, ${closeDay}`
+      : `Position ${(model.words.live ?? "Today, live prices").replace(/^./, (c) => c.toLowerCase())}`;
   const when = closed ? `the close on ${closeDay}` : "now";
+  const figure = (side: "collateral" | "debt") =>
+    p && binDay
+      ? { v: p[side], info: binProv(side === "collateral" ? model.labels.collateral : model.labels.debt, binDay) }
+      : undefined;
+  const gapsHere = at != null && series ? series.gaps.filter(([i]) => i === at) : [];
 
   return (
     <div className="text-sm" data-flows-lifetime="">
-      <p className="mb-1 font-semibold tabular-nums text-foreground" aria-live="polite">
-        {dateLine}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
-        <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={!closed} assets={assets} />
-        {hasDebt && <Headline side="debt" st={s.debt} model={model} when={when} isLive={!closed} assets={assets} />}
+      <DateRow switcher={switcher}>{dateLine}</DateRow>
+      <div className="flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        <Headline
+          side="collateral"
+          st={s.collateral}
+          model={model}
+          when={when}
+          isLive={!closed}
+          assets={assets}
+          figure={figure("collateral")}
+        />
+        {hasDebt && (
+          <Headline
+            side="debt"
+            st={s.debt}
+            model={model}
+            when={when}
+            isLive={!closed}
+            assets={assets}
+            figure={figure("debt")}
+          />
+        )}
       </div>
-      {series && series.points.length > 0 ? (
-        <Chart model={model} series={series} hasDebt={hasDebt} windowFrom={windowFrom} />
+      {series && n > 0 ? (
+        <Chart
+          model={model}
+          series={series}
+          points={points}
+          at={at ?? n - 1}
+          onPick={setPicked}
+          hasDebt={hasDebt}
+          windowFrom={windowFrom}
+        />
       ) : (
         <p className="mt-3 flex h-[150px] items-center justify-center rounded-md bg-sunken text-xs text-rb-500">
           {failed ? "The series could not be read." : "Reading the series…"}
+        </p>
+      )}
+      {gapsHere.length > 0 && (
+        <p className="mt-2 text-xs text-rb-500" data-flow-gap-note="">
+          {`No price recorded that ${series?.bin === "month" ? "month" : "week"}: ${[...new Set(gapsHere.map(([, , sym]) => sym))].join(", ")}.`}
         </p>
       )}
     </div>
@@ -70,28 +144,24 @@ export function LifetimeOverTime({
 function Chart({
   model,
   series,
+  points,
+  at,
+  onPick,
   hasDebt,
   windowFrom,
 }: {
   model: FlowModel;
   series: FlowBinSeries;
+  points: Point[];
+  /** The bin drawn under the cursor line: the last, today's, unless picked. */
+  at: number;
+  /** A bin, or null for today. */
+  onPick: (i: number | null) => void;
   hasDebt: boolean;
   windowFrom: number | null;
 }) {
   const [ref, w] = useWidth();
-  // The last point is today's, at the figures above.
-  const points = useMemo<Point[]>(() => {
-    const out = series.points.map(([from, to, collateral, debt]) => ({ from, to, collateral, debt }));
-    const last = out[out.length - 1];
-    if (last) {
-      last.collateral = model.live.collateralUsd;
-      last.debt = model.live.debtUsd;
-    }
-    return out;
-  }, [series, model.live]);
   const n = points.length;
-  const [picked, setPicked] = useState<number | null>(null);
-  const at = picked ?? n - 1;
   const axis = useMemo(
     () => axisFor(Math.max(0, ...points.map((p) => Math.max(p.collateral ?? 0, hasDebt ? (p.debt ?? 0) : 0)))),
     [points, hasDebt],
@@ -124,35 +194,27 @@ function Chart({
       <circle key={`${k}${run[0]}`} cx={x(run[0])} cy={y(points[run[0]][k] as number)} r={2} fill={HUE[k]} />
     ) : null;
 
+  const set = (i: number) => onPick(i >= n - 1 ? null : i);
   const pick = (clientX: number, el: Element) => {
     const r = el.getBoundingClientRect();
     const px = clientX - r.left;
     let best = 0;
     for (let i = 1; i < n; i++) if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    setPicked(best === n - 1 ? null : best);
+    set(best);
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
     e.preventDefault();
-    const next =
+    set(
       e.key === "Home"
         ? 0
         : e.key === "End"
           ? n - 1
-          : Math.max(0, Math.min(n - 1, at + (e.key === "ArrowLeft" ? -1 : 1)));
-    setPicked(next === n - 1 ? null : next);
+          : Math.max(0, Math.min(n - 1, at + (e.key === "ArrowLeft" ? -1 : 1))),
+    );
   };
 
-  const binLabel = (p: Point, i: number) =>
-    i === n - 1
-      ? "Today"
-      : series.bin === "month"
-        ? new Date(p.from * DAY_S * 1000)
-            .toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" })
-            .replace(" ", " '")
-        : `Week to ${dayStamp(p.to * DAY_S)}`;
   const p = points[at];
-  const gapsHere = series.gaps.filter(([i]) => i === at && at !== n - 1);
   const shade = windowFrom != null && windowFrom > series.first ? xDay(windowFrom) : null;
   const firstLabel = dayStamp(series.first * DAY_S);
   const per = series.bin === "month" ? "month" : "week";
@@ -167,6 +229,7 @@ function Chart({
         role="group"
         aria-label={`${model.labels.collateral}${hasDebt ? ` and ${model.labels.debt.toLowerCase()}` : ""} at the end of each ${per}, from ${firstLabel} to today. Arrow keys step through the ${per}s.`}
         onKeyDown={onKey}
+        onBlur={() => onPick(null)}
       >
         {w > 0 && (
           <svg
@@ -176,7 +239,8 @@ function Chart({
             className="block cursor-crosshair touch-none"
             onPointerDown={(e) => pick(e.clientX, e.currentTarget)}
             onPointerMove={(e) => (e.buttons === 1 || e.pointerType === "mouse") && pick(e.clientX, e.currentTarget)}
-            onPointerLeave={(e) => e.pointerType === "mouse" && setPicked(null)}
+            onPointerLeave={() => onPick(null)}
+            onPointerCancel={() => onPick(null)}
           >
             {shade != null && (
               <rect
@@ -255,71 +319,7 @@ function Chart({
           ))}
         </div>
       </div>
-      <div
-        className="mt-1 flex justify-between px-2 text-[11px] tabular-nums text-rb-500"
-        aria-hidden
-        data-prov-exempt=""
-      >
-        <span>{firstLabel}</span>
-        <span>Today</span>
-      </div>
-      <p className="mt-2 min-h-[1.25rem] text-xs tabular-nums text-rb-500" aria-live="polite" data-flow-readout="">
-        <span className="font-medium text-foreground">{binLabel(p, at)}</span>
-        {": "}
-        {model.labels.collateral}{" "}
-        <Figure v={p.collateral} what={model.labels.collateral} when={binLabel(p, at)} live={at === n - 1} />
-        {hasDebt && (
-          <>
-            {" · "}
-            {model.labels.debt}{" "}
-            <Figure v={p.debt} what={model.labels.debt} when={binLabel(p, at)} live={at === n - 1} />
-          </>
-        )}
-        {gapsHere.length > 0 && (
-          <span className="block">{`No price recorded that ${per}: ${[...new Set(gapsHere.map(([, , sym]) => sym))].join(", ")}.`}</span>
-        )}
-      </p>
-      <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500">
-        <span className="inline-flex items-center gap-1.5">
-          <i aria-hidden className="inline-block h-0.5 w-4" style={{ background: HUE.collateral }} />
-          {model.labels.collateral}
-        </span>
-        {hasDebt && (
-          <span className="inline-flex items-center gap-1.5">
-            <i aria-hidden className="inline-block h-0.5 w-4" style={{ background: HUE.debt }} />
-            {model.labels.debt}
-          </span>
-        )}
-        {shade != null && (
-          <span className="inline-flex items-center gap-1.5">
-            <i aria-hidden className="inline-block h-3 w-4 rounded-[2px] bg-rb-400/25 dark:bg-rb-500/25" />
-            The bars&apos; window
-          </span>
-        )}
-      </p>
+      <TrackEnds start={firstLabel} end="Today" />
     </div>
-  );
-}
-
-function Figure({ v, what, when, live }: { v: number | null; what: string; when: string; live: boolean }) {
-  if (v == null) return <span className="text-rb-500">no price</span>;
-  return (
-    <Prov
-      info={
-        live
-          ? {
-              kind: "chain-derived",
-              summary: `${what} now — the figure above: each asset at the oracle price now, added up.`,
-              formula: "Σ balance × price",
-            }
-          : {
-              kind: "chain-derived",
-              summary: `${what} at the end of ${when.charAt(0).toLowerCase()}${when.slice(1)} — each asset's balance after its last event by then, at the last daily oracle price recorded in that period, added up.`,
-              formula: "Σ balance × price on the period's last priced day",
-            }
-      }
-    >
-      <span className="font-medium text-foreground">{formatFlowUsd(v)}</span>
-    </Prov>
   );
 }
