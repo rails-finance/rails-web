@@ -2,33 +2,44 @@
 // pooled-lending protocol, cross-collateralised through one Comptroller.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { liquidatedIntro, type LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 
 const COMPOUND_V2_DOC_URL = "https://docs.compound.finance/v2/";
+
+/** The exchange rate, and why it no longer rises. */
+const RATE_TEXT =
+  "each market's cToken is a receipt: balance × the market's exchange rate = the underlying claim. The rate rose as borrowers paid interest, and has stopped rising since governance set every reserve factor to 100% (the last sixteen markets on 8 Dec 2025): all interest now goes to reserves.";
 
 const LINKS: LearnMoreContent["links"] = [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }];
 
 export function compoundV2PositionContent(opts: {
   status: "open" | "closed" | "liquidated";
   hasDebt?: boolean;
+  /** Each liquidation as the rows tell it (the detail page). */
+  liquidations?: LiquidationStory[];
+  liquidationCount?: number;
 }): LearnMoreContent {
   if (opts.status === "liquidated") {
     return {
       title: "About This Position",
-      intro:
-        "This account was closed after one or more liquidations cleared its debt. The panel above reconstructs its final state — the highest recorded supply and debt for each market it held.",
+      intro: `${
+        opts.liquidations && opts.liquidations.length > 0
+          ? liquidatedIntro(opts.liquidations, opts.liquidationCount ?? opts.liquidations.length)
+          : "This account was liquidated at least once and has since closed: nothing remains supplied or borrowed."
+      } The panel above shows the highest supply and debt each market reached.`,
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Account liquidity",
-          text: "the Comptroller tracks one liquidity figure across the whole account; once it turns to shortfall, the account becomes liquidatable.",
+          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and anyone can liquidate the account.",
         },
         {
           bold: "Partial by design",
-          text: "each liquidation clears at most half the debt in one borrowed market (the close factor) — a liquidated account often survives; this one's history ended some other way.",
+          text: "each liquidation repays at most half the debt in one borrowed market (the close factor), so a liquidated account often survives it.",
         },
         {
           bold: "cTokens & the exchange rate",
-          text: "each market's cToken is a receipt: balance × the market's exchange rate = the underlying claim, which only grows as interest accrues.",
+          text: RATE_TEXT,
         },
       ],
       links: LINKS,
@@ -48,7 +59,7 @@ export function compoundV2PositionContent(opts: {
         },
         {
           bold: "cTokens & the exchange rate",
-          text: "each market's cToken is a receipt: balance × the market's exchange rate = the underlying claim, which only grows as interest accrues.",
+          text: RATE_TEXT,
         },
         {
           bold: "Cross-collateralisation",
@@ -62,7 +73,7 @@ export function compoundV2PositionContent(opts: {
   const details: LearnMoreContent["details"] = [
     {
       bold: "cTokens & the exchange rate",
-      text: "each market's cToken is a receipt: balance × the market's exchange rate = the underlying claim. The rate only rises as interest accrues, so a fixed cToken balance is worth ever more underlying.",
+      text: RATE_TEXT,
     },
     {
       bold: "Cross-collateralisation",
@@ -71,15 +82,15 @@ export function compoundV2PositionContent(opts: {
     opts.hasDebt
       ? {
           bold: "Account liquidity",
-          text: "the Comptroller tracks one liquidity figure across the whole account; when it turns to shortfall, the account can be liquidated at up to the close factor (50%) per call.",
+          text: "the Comptroller adds up each entered market's collateral × its collateral factor (the borrow limit) and subtracts the debt. When the debt is larger, the gap is a shortfall, and a liquidator can repay up to the close factor (50% of one debt) per call.",
         }
       : {
           bold: "Supply only",
-          text: "supplying alone does not enter a market or carry liquidation risk — that requires borrowing against the collateral factor.",
+          text: "a supply is not collateral until the wallet enters its market (enterMarkets); only entered markets count toward the borrow limit. With no debt there is nothing to liquidate.",
         },
     {
-      bold: "A wound-down roster",
-      text: "twenty markets listed across six years, no more coming — governance is winding the protocol down.",
+      bold: "Reserve factor 100%",
+      text: "governance has set every market to keep all the interest borrowers pay as reserves, so supplying earns nothing now.",
     },
   ];
 

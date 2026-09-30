@@ -236,6 +236,11 @@ function headerOf(members) {
   };
   const before = {};
   const after = {};
+  // A liquidation's two seizure transfers are its Seized figure, not "Sent"
+  // (lib/moonwell-base/timeline-folders.ts).
+  const liquidationTxs = new Set(
+    members.filter((e) => e.context.data.eventType === "liquidation").map((e) => e.txHash),
+  );
   for (const e of members) {
     const d = e.context.data;
     kinds.set(d.eventType, (kinds.get(d.eventType) ?? 0) + 1);
@@ -255,7 +260,7 @@ function headerOf(members) {
       bump(sums.liq, d.market, raw.amount);
       bump(sums.seized, d.collateralMarket, raw.seizeTokens);
     }
-    if (d.eventType === "transfer_out") bump(sums.sent, d.market, raw.mTokens);
+    if (d.eventType === "transfer_out" && !liquidationTxs.has(e.txHash)) bump(sums.sent, d.market, raw.mTokens);
     if (d.eventType === "transfer_in") bump(sums.received, d.market, raw.mTokens);
     for (const [lane, b, a] of [
       ["supply", raw.supplyBefore, raw.supplyAfter],

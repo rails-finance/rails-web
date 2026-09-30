@@ -4,6 +4,8 @@
 
 import type { ChainTimelineResponse } from "@/lib/api/fetch-chain-timeline";
 import type { MarketFlows } from "@/lib/moonwell/economics";
+import type { LedgerMarket } from "@/lib/shared/ctoken-ledger";
+import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 
 /** Per-market lifetime flows over every replayed row — the Moonwell tower's
  *  own shape, keyed by market because two Base markets share an mToken symbol. */
@@ -59,4 +61,16 @@ export interface MoonwellChainTimelineResponse extends ChainTimelineResponse<Moo
   positions: MoonwellReplayedPosition[];
   /** `lifetime`'s exact twin, one entry per market in the same order. */
   lifetimeRaw: MoonwellLifetimeFlowsRaw[];
+  /** Every flow of the life at its own block's price, with the sent,
+   *  received and seized collateral and the interest on both sides
+   *  (lib/shared/ctoken-ledger.ts). Absent on a seeded replay, whose rows
+   *  before the cut travelled as sums. */
+  ledger?: LedgerMarket[];
+  /** Per market, the highest balance before or after any row: the supply
+   *  (mTokens × the exchange rate at the row's block, interest included) and
+   *  the debt (the emitted accountBorrows, and the debt just before a
+   *  repayment). Absent on a seeded replay and on a router wallet. */
+  balancePeaks?: { market: string; supplyRaw: string; debtRaw: string }[];
+  /** What each liquidation did, from the rows (absent on a seeded replay). */
+  liquidations?: LiquidationStory[];
 }

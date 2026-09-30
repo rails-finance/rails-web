@@ -377,6 +377,11 @@ export function TimelineRunCard({
                   </span>
                 </Prov>
                 <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
+                {/* A receipt token wearing its underlying's mark names itself,
+                    so 0.0675 mWETH does not read as 0.0675 WETH. */}
+                {agg.iconSymbol && agg.iconSymbol !== agg.symbol && (
+                  <span className="text-xs text-rb-500">{agg.symbol}</span>
+                )}
                 {agg.count != null && (
                   <span
                     className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"

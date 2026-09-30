@@ -22,6 +22,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -125,8 +126,28 @@ export function CompoundV2PositionExplanation({
         <H>
           <AmountText value={m.supplyUnderlying} /> {m.symbol}
         </H>
-        {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}, earning the
-        market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}% APR).
+        {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}
+        {m.supplyApr === 0 ? (
+          <>
+            , earning nothing: the market&rsquo;s reserve factor is 100%, so all the interest borrowers pay goes to
+            reserves.
+          </>
+        ) : (
+          <>
+            , earning the market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}%
+            APR).
+          </>
+        )}
+      </>,
+    );
+  }
+
+  if (entered.length > 0) {
+    list.push(
+      <>
+        The {joinSymbols(entered.map((m) => m.symbol))} supply is <H>entered as collateral</H>: the wallet called
+        enterMarkets for it, which is what lets a supply count toward the borrow limit, and what lets a liquidator seize
+        it.
       </>,
     );
   }
@@ -378,9 +399,10 @@ export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2Positi
   if (v.liquidationCount > 0) {
     list.push(
       <>
-        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a liquidator
-        repaid part of what it owed and took collateral in exchange.
-        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
+        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
+        {v.liquidations && v.liquidations.length > 0
+          ? liquidationSentences(v.liquidations).join(" ")
+          : "Each time a liquidator repaid part of what it owed and took collateral in exchange."}
       </>,
     );
   }

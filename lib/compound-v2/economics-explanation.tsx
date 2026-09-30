@@ -8,6 +8,7 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { ChainTruthTowerData, TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economics";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
 import { formatCompact } from "@/lib/utils/format";
+import { ctokenLedgerBullets } from "@/lib/shared/ctoken-ledger-explanation";
 
 const COMPOUND_V2_DOC_URL = "https://docs.compound.finance/v2/";
 
@@ -57,6 +58,12 @@ function fmtScalar(value: number, valued: boolean, symbol: string | null): strin
 }
 
 export function compoundV2EconomicsExplanation(data: ChainTruthTowerData): ReactNode {
+  const ledger = ctokenLedgerBullets(data, {
+    brand: "Compound",
+    priceNote:
+      "(before August 2020 Compound's oracle priced in ETH; those rows are turned into dollars with its USDC price in that block)",
+  });
+  if (ledger) return <LedgerBullets bullets={ledger} />;
   const valued = data.valued;
   const collSymbol = sideSymbol(data.collateral);
   const debtSymbol = sideSymbol(data.debt);
@@ -128,6 +135,20 @@ export function compoundV2EconomicsExplanation(data: ChainTruthTowerData): React
         These figures total this position&apos;s lifetime flows on Compound V2 across every event in its captured
         history.
       </p>
+      {bullets.map((item, i) => (
+        <div key={i} className="flex items-start gap-2 leading-relaxed">
+          <span className="select-none text-rb-500">•</span>
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LedgerBullets({ bullets }: { bullets: string[] }) {
+  return (
+    <div className="space-y-2 text-sm text-rb-500">
+      <p className="leading-relaxed">These figures total this account&apos;s flows over its whole history.</p>
       {bullets.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
           <span className="select-none text-rb-500">•</span>

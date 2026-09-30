@@ -22,6 +22,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -345,8 +346,10 @@ export function MoonwellClosedPositionExplanation({ v }: { v: MoonwellPositionVi
   if (v.liquidationCount > 0) {
     list.push(
       <>
-        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a liquidator
-        repaid part of what it owed and took collateral in exchange.
+        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
+        {v.liquidations && v.liquidations.length > 0
+          ? liquidationSentences(v.liquidations).join(" ")
+          : "Each time a liquidator repaid part of what it owed and took collateral in exchange."}
       </>,
     );
   }

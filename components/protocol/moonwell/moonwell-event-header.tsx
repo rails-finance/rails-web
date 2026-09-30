@@ -73,8 +73,11 @@ export function MoonwellEventHeader({
       deltas.push({
         value: -seized,
         symbol: collMSym,
-        address: soleFlowAddress(flows, collMSym),
+        // No contract address for an mToken: the icon CDNs hold none, so the
+        // chip resolves the mark from the symbol.
         prov: seizeTokensProv(collMSym, coords),
+        // An mToken count, named so it does not read as the underlying.
+        suffix: collMSym,
       });
     }
   } else if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out") {
@@ -83,8 +86,8 @@ export function MoonwellEventHeader({
       deltas.push({
         value: d,
         symbol: mSym,
-        address: soleFlowAddress(flows, mSym),
         prov: transferAmountProv(mSym, ctx.eventType === "transfer_in" ? "in" : "out", coords),
+        suffix: mSym,
       });
   } else {
     const d = Number(ctx.assetsDelta ?? "0") || 0;
@@ -109,7 +112,11 @@ export function MoonwellEventHeader({
         }
       : ctx.eventType === "transfer_out" && ctx.counterparty
         ? {
-            prefix: "to",
+            // The protocol's share of a seizure goes to the market itself.
+            prefix:
+              coords.mtoken != null && ctx.counterparty === coords.mtoken.toLowerCase()
+                ? `to the ${mSym} market`
+                : "to",
             address: ctx.counterparty,
             prov: transferAmountProv(mSym, "out", coords),
             ens: true,

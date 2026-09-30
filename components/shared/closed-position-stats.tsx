@@ -56,6 +56,10 @@ export interface ClosedPositionStatsProps {
   outcomeLabel?: string;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
+  /** Dated lines beneath Outcome in place of the one closure date, where the
+   *  outcome and the closing happened on different days ("Liquidated
+   *  16 Sep 2025", "Closed 26 Sep 2026"). */
+  outcomeDates?: { label: string; at: number }[];
   /** Optional 4th column (rate slot) — keeps closed cards the same width as open */
   extra?: { label: string; value: ReactNode };
   /** Optional desktop-only left column (e.g. PositionPairIcons) */
@@ -89,6 +93,7 @@ export function ClosedPositionStats({
   collateralFootnote,
   debtFootnote,
   closedAt,
+  outcomeDates,
   extra,
   icons,
   identity,
@@ -165,7 +170,13 @@ export function ClosedPositionStats({
             <TipLabel text="Outcome" tip={labelTips?.outcome} />
           </div>
           <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
-          {closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
+          {outcomeDates && outcomeDates.length > 0
+            ? outcomeDates.map((d) => (
+                <div key={d.label} className="text-xs text-rb-500 mt-0.5">
+                  {d.label} {formatClosureDate(d.at)}
+                </div>
+              ))
+            : closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
         </div>
         {extra ? (
           <div>
