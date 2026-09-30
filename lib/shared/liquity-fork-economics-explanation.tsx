@@ -10,10 +10,7 @@ import type { ChainTruthTowerData, TowerSideData } from "@/lib/shared/chain-trut
 import { formatCompact, formatExact } from "@/lib/utils/format";
 import { formatCompactUsd, formatUsdValue } from "@/components/shared/economics-chart-primitives";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { forkLiquidationReserve, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import type { LiquityForkEventContext } from "@/lib/shared/liquity-fork-explainer-clauses";
-import { formatDate } from "@/lib/date";
+import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 
 const DUST = 1e-9;
 
@@ -42,43 +39,7 @@ export interface LiquityForkRedemptionOutcome {
   currentPrice: number | null;
 }
 
-export type LiquityForkTowerData = ChainTruthTowerData & {
-  redemptionOutcome?: LiquityForkRedemptionOutcome;
-  /** The branch price every dollar bar uses — today's, read on this load. */
-  todayPrice?: number;
-  /** Collateral a liquidation left for the owner to claim (its Liquidation
-   *  log's surplus), which the liquidated bar includes. */
-  liqSurplus?: number;
-  /** Debt and collateral received from liquidated Troves' redistribution,
-   *  which the borrowed and deposited bars include. */
-  redistIn?: { debt: number; coll: number };
-};
-
-/** The parts of a fork Trove's lifetime flows the owner did not move, from the
- *  loaded events: the surplus a liquidation left and what redistributions
- *  added. Empty where there are none. */
-export function liquityForkFlowNotes(
-  events: BaseActivityEvent[] | undefined,
-): Pick<LiquityForkTowerData, "liqSurplus" | "redistIn"> {
-  if (!events) return {};
-  let surplus = 0;
-  let debt = 0;
-  let coll = 0;
-  for (const e of events) {
-    const ctx = (e.context as { data?: LiquityForkEventContext } | undefined)?.data;
-    if (!ctx || typeof ctx !== "object" || !("eventType" in ctx)) continue;
-    if (ctx.eventType === "liquidate" && ctx.liquidation) surplus += Number(ctx.liquidation.collSurplus) || 0;
-    const r = forkRedistArrival(ctx);
-    if (r) {
-      debt += r.debt;
-      coll += r.coll;
-    }
-  }
-  return {
-    ...(surplus > DUST ? { liqSurplus: surplus } : {}),
-    ...(debt > DUST || coll > DUST ? { redistIn: { debt, coll } } : {}),
-  };
-}
+export type LiquityForkTowerData = ChainTruthTowerData & { redemptionOutcome?: LiquityForkRedemptionOutcome };
 
 const signedUsd = (n: number): string => `${n >= 0 ? "+" : "−"}${formatUsdValue(Math.abs(n))}`;
 
@@ -186,30 +147,10 @@ export function liquityForkEconomicsExplanation(
   const liquidatedDebt = liquidatedLine(debt);
   const liquidatedColl = liquidatedLine(collateral);
   if (liquidatedDebt) {
-    const surplus = data.liqSurplus;
     bullets.push(
       <span key="liquidated">
         {fig(liquidatedDebt.amount, liquidatedDebt.usd, valued, debtSym)} of debt was cleared in liquidation
-        {liquidatedColl && (
-          <>
-            , and {fig(liquidatedColl.amount, liquidatedColl.usd, valued, collSym)} of collateral left the Trove
-            {surplus != null ? (
-              <>
-                ; {formatCompact(surplus)} {collSym} of it came back as surplus, claimable by the owner (surplus pool)
-              </>
-            ) : null}
-          </>
-        )}
-        .
-      </span>,
-    );
-  }
-  if (data.redistIn) {
-    bullets.push(
-      <span key="redist-in">
-        The borrowed and deposited totals include {formatCompact(data.redistIn.debt)} {debtSym} of debt and{" "}
-        {formatCompact(data.redistIn.coll)} {collSym} of collateral received from liquidated Troves&apos;
-        redistribution.
+        {liquidatedColl && <>, seizing {fig(liquidatedColl.amount, liquidatedColl.usd, valued, collSym)} collateral</>}.
       </span>,
     );
   }
@@ -253,14 +194,6 @@ export function liquityForkEconomicsExplanation(
     <div className="space-y-2 text-sm text-rb-500">
       <p className="leading-relaxed">
         These figures total this trove&apos;s lifetime flows on {name} across every event in its captured history.
-        {valued && data.todayPrice != null ? (
-          <>
-            {" "}
-            The dollar figures value all of its {collSym} at today&apos;s price, {formatUsdValue(data.todayPrice)} on{" "}
-            {formatDate(new Date())}, and the debt at $1. The timeline shows each event&apos;s price where one was
-            recorded.
-          </>
-        ) : null}
       </p>
       {bullets.map((item, i) => (
         <div key={i} className="flex items-start gap-2 leading-relaxed">
@@ -362,7 +295,7 @@ export function liquityForkEconomicsContent({
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
       'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
       "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
-      `USD values use the branch's oracle price today for all collateral, whatever the date of the event, and ${debtSymbol}'s $1 redemption face for debt. They appear once that price has loaded.`,
+      `USD values use the branch's own oracle price for collateral and ${debtSymbol}'s $1 redemption face for debt, and appear only once that on-chain price has loaded.`,
       "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at today's price.",
     ],
     detailsHeading: "Key concepts:",
