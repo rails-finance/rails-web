@@ -120,15 +120,6 @@ export type DisplayedTimelineRow =
       matched: number | null;
     };
 
-/** A filter a page adds on top of the timeline's axes: the Lifetime flows
- *  panel's flow line up to its cursor's date (lib/shared/flow-focus.ts). A
- *  served folder answers on its header where it can; `matched` null opens it
- *  and its members answer `passes` one by one. */
-export interface TimelineExtraFilter {
-  passes: (e: BaseActivityEvent) => boolean;
-  folder: (f: ServedFolder) => { admits: boolean; matched: number | null };
-}
-
 export interface TimelineEventsState {
   /** Events oldest→newest, the canonical order for numbering + deltas. */
   sortedEvents: BaseActivityEvent[];
@@ -367,11 +358,8 @@ export function useTimelineEvents(
     olderCountIsFloor = false,
     servedRows,
     eventsServed,
-    extraFilter = null,
   }: {
     storageKey?: string;
-    /** The page's filter over the axes (TimelineExtraFilter). */
-    extraFilter?: TimelineExtraFilter | null;
     protocolKey: string;
     /** The index's own answer as ROWS, in ASCENDING chain order: folders and
      *  ungrouped events interleaved (decision 0019's evening amendment). Pass
@@ -599,7 +587,6 @@ export function useTimelineEvents(
   // a loose event must never answer the same filter differently.
   const passesAxes = useCallback(
     (e: BaseActivityEvent) => {
-      if (extraFilter && !extraFilter.passes(e)) return false;
       if (hiddenSet.has(getEventActionKey(e))) return false;
       if (hiddenAssetSet.size > 0) {
         const assets = getEventAssetKeys(e);
@@ -615,7 +602,7 @@ export function useTimelineEvents(
       }
       return true;
     },
-    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet, extraFilter],
+    [hiddenSet, hiddenAssetSet, hiddenCounterpartySet, hiddenVersionSet],
   );
   const visibleEvents = useMemo(() => sortedEvents.filter(passesAxes), [sortedEvents, passesAxes]);
 
@@ -657,17 +644,6 @@ export function useTimelineEvents(
    * admit where the header can say; a folder the filter SPLITS opens, and its
    * members answer the filter row by row (ChainTruthTimeline).
    */
-  // A folder's members the filters admit, off its header: the page's own
-  // filter joins the axes' count only where one of the two passes every
-  // member; otherwise the members answer once read.
-  const matchedOf = (folder: ServedFolder): number | null => {
-    const axes = folderMatchCount(folder, folderAxes);
-    if (!extraFilter) return axes;
-    const extra = extraFilter.folder(folder).matched;
-    if (axes === folder.count) return extra;
-    if (extra === folder.count) return axes;
-    return null;
-  };
   const displayedRows = useMemo<DisplayedTimelineRow[] | null>(() => {
     if (!servedRows) return null;
     const shown = new Set(dateFilteredEvents.map((e) => e.id));
@@ -677,17 +653,16 @@ export function useTimelineEvents(
         if (shown.has(row.event.id)) kept.push(row);
         continue;
       }
-      if (folderAdmits(row.folder, folderAxes) && (!extraFilter || extraFilter.folder(row.folder).admits))
-        kept.push(row);
+      if (folderAdmits(row.folder, folderAxes)) kept.push(row);
     }
     const ordered = kept.reverse();
     let flatIdx = 0;
     return ordered.map((row) =>
       row.kind === "event"
         ? ({ kind: "event", event: row.event, flatIdx: flatIdx++ } as const)
-        : ({ kind: "folder", folder: row.folder, flatIdx, matched: matchedOf(row.folder) } as const),
+        : ({ kind: "folder", folder: row.folder, flatIdx, matched: folderMatchCount(row.folder, folderAxes) } as const),
     );
-  }, [servedRows, dateFilteredEvents, folderAxes, extraFilter]);
+  }, [servedRows, dateFilteredEvents, folderAxes]);
 
   // The folders' own day histogram, over the folders the filters admit. The
   // activity map buckets `visibleEvents`, and a folder's members are not among
@@ -699,14 +674,10 @@ export function useTimelineEvents(
     if (!servedRows) return null;
     return foldersByDay(
       servedRows.flatMap((row) =>
-        row.kind === "folder" &&
-        folderAdmits(row.folder, { ...folderAxes, dateRange: null }) &&
-        (!extraFilter || extraFilter.folder(row.folder).admits)
-          ? [row.folder]
-          : [],
+        row.kind === "folder" && folderAdmits(row.folder, { ...folderAxes, dateRange: null }) ? [row.folder] : [],
       ),
     );
-  }, [servedRows, folderAxes, extraFilter]);
+  }, [servedRows, folderAxes]);
 
   const servedSpan = useMemo<{ firstAt: number; lastAt: number } | null>(() => {
     if (!servedRows || servedRows.length === 0) return null;
@@ -925,8 +896,7 @@ export function useTimelineEvents(
     hiddenAssetSet.size > 0 ||
     hiddenCounterpartySet.size > 0 ||
     hiddenVersionSet.size > 0 ||
-    dateRange !== null ||
-    extraFilter != null;
+    dateRange !== null;
 
   return {
     sortedEvents,

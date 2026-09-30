@@ -74,16 +74,30 @@ function hatchImage(hatch: FlowHatch, color: string): CSSProperties {
     cross: `<path d='M0,0 l6,6 M6,0 l-6,6' stroke='${c}' stroke-width='1.1'/>`,
     vertical: `<path d='M1.5,0 v6 M4.5,0 v6' stroke='${c}' stroke-width='1.2'/>`,
     horizontal: `<path d='M0,1.5 h6 M0,4.5 h6' stroke='${c}' stroke-width='1.2'/>`,
+    // Horizontal lines broken and offset row to row, like brick: kin to the
+    // repay-with-collateral lines, and apart from them at bar size.
+    dashes: `<path d='M0,1.5 h3 M3,4.5 h3' stroke='${c}' stroke-width='1.4'/>`,
     // One dot a tile, a square grid: a diagonal pair of dots reads as the
     // reverse diagonal at bar size.
     dots: `<circle cx='3' cy='3' r='1.3' fill='${c}'/>`,
+    // The inflow textures, drawn thin over the faded hue.
+    grid: `<path d='M0,0.5 h6 M0.5,0 v6' stroke='${c}' stroke-width='1'/>`,
+    checker: `<path d='M0,0 h3 v3 h-3 Z M3,3 h3 v3 h-3 Z' fill='${c}'/>`,
+    rings: `<circle cx='3' cy='3' r='1.6' fill='none' stroke='${c}' stroke-width='0.9'/>`,
   };
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='6' height='6'>${paths[hatch]}</svg>`;
   return { backgroundImage: `url("data:image/svg+xml,${svg}")`, backgroundSize: "6px 6px", backgroundRepeat: "repeat" };
 }
 
-export function fillStyle(side: FlowSide, s: FlowSegment): CSSProperties {
+/** Every line's fill (standards/lexicon.md, lifetime bars' fills): what is
+ *  held solid in the side's hue; each outflow a hatch no other outflow has, in the side's hue
+ *  (a liquidation or a redemption in its tone's); each inflow the side's
+ *  faded hue with a texture of its line, or none for the side's first inflow
+ *  (Deposited, Borrowed). No two lines of a side share a fill, and the bar,
+ *  the Key, the filter menu and the event card's sum draw a line alike. */
+export function fillStyle(side: FlowSide, s: Pick<FlowSegment, "fill" | "hatch" | "tone">): CSSProperties {
   const h = HUE[side];
+  if (s.fill === "in") return inflowStyle(side, s.hatch);
   if (s.fill !== "out") return { background: h.solid };
   const hatch = s.hatch ?? (s.tone && s.tone !== "exit" ? "forward" : "reverse");
   if (s.tone === "liquidation" || s.tone === "redemption")
@@ -91,19 +105,23 @@ export function fillStyle(side: FlowSide, s: FlowSegment): CSSProperties {
   return { ...hatchImage(hatch, h.hatch), boxShadow: `inset 0 0 0 1px ${h.line}` };
 }
 
-/** The inflow swatch in a side's sum: the side's hue, faded, as the towers'
- *  key drew what came in. */
+/** The inflow swatch: the side's hue, faded, as the towers' key drew what
+ *  came in, with the line's texture over it. */
 const INFLOW_SWATCH: Record<FlowSide, string> = {
   collateral: "rgba(96, 165, 250, 0.35)",
   debt: "rgba(74, 222, 128, 0.35)",
 };
+function inflowStyle(side: FlowSide, hatch?: FlowHatch): CSSProperties {
+  if (!hatch) return { background: INFLOW_SWATCH[side] };
+  return { ...hatchImage(hatch, HUE[side].line), backgroundColor: INFLOW_SWATCH[side] };
+}
 
 /** A line's swatch in a side's sum: its segment's fill on the bar; an inflow,
- *  which the bar does not draw, the side's faded hue. */
+ *  which the bar does not draw, its faded, textured fill. */
 export const sumSwatch =
   (side: FlowSide) =>
   (s: FlowSegment): CSSProperties | null =>
-    s.fill === "in" ? { background: INFLOW_SWATCH[side] } : s.fill === "estimate" ? null : fillStyle(side, s);
+    s.fill === "estimate" ? null : fillStyle(side, s);
 
 /** What the panels read of the cursor: the date in words, and the steps. The
  *  view that owns the cursor provides it (Combined, the busy bars, the
@@ -120,6 +138,34 @@ export interface FlowCursor {
   live?: boolean;
 }
 export const FlowCursorContext = createContext<FlowCursor | null>(null);
+
+/** On a page that ties the panel to its timeline (the Aave family), a segment
+ *  opens no panel: pointing at it (a hover, a tap on a phone, keyboard focus)
+ *  names its line and value in one key-style line under the bars. The view
+ *  that draws the bars provides it (Combined). */
+export interface SegmentLabel {
+  shown: { side: FlowSide; seg: FlowSegment } | null;
+  show: (x: { side: FlowSide; seg: FlowSegment } | null) => void;
+}
+export const SegmentLabelContext = createContext<SegmentLabel | null>(null);
+
+/** A segment button's handlers under SegmentLabelContext: hover and focus
+ *  name it, a tap names it or, tapped again, clears it. */
+export function segmentLabelHandlers(label: SegmentLabel, side: FlowSide, seg: FlowSegment) {
+  const on = () => label.show({ side, seg });
+  const off = () => label.show(null);
+  return {
+    onMouseEnter: on,
+    onMouseLeave: off,
+    onFocus: on,
+    onBlur: off,
+    onPointerUp: (e: { pointerType: string }) => {
+      if (e.pointerType === "mouse") return;
+      if (label.shown?.side === side && label.shown.seg.key === seg.key) off();
+      else on();
+    },
+  };
+}
 
 /** Marks the parts of the panel that move the cursor: a pointer there does
  *  not close an open segment panel. */

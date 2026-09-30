@@ -548,7 +548,6 @@ function AaveV4SpokePageInner({
   const [focusTimeline, setFocusTimeline] = useState<FlowTimeline | null>(null);
   const flowFocus = useFlowFocusValue(focusRoot, focusTimeline);
   const tl = useTimelineEvents(spokeScopedEvents, {
-    extraFilter: focusRoot.extraFilter,
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
     olderCount,

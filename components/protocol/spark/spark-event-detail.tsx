@@ -54,7 +54,6 @@ import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
 import { SparkAccountState } from "./spark-account-state";
 import { createPortal } from "react-dom";
-import { MoveChartLink } from "@/components/protocol/aave-v3/aave-family-event-receipt";
 import { StatSubline } from "@/components/shared/state-transition";
 import { AmountText } from "@/components/shared/amount-text";
 import {
@@ -431,7 +430,6 @@ export function SparkEventDetail({
       {notesSlot
         ? createPortal(readNotes, notesSlot)
         : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
-      {eventTs != null && <MoveChartLink ts={eventTs} />}
     </div>
   );
 }

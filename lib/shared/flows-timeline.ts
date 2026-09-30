@@ -41,16 +41,31 @@ export interface FlowBucket {
   /** Buckets sharing a link are one on-chain act seen from both sides (a
    *  repay with collateral, a liquidation): hovering one highlights all. */
   link?: string;
-  /** Outflows: the hatch that tells this kind of exit from the others
-   *  (standards/lexicon.md, chart grammar). Default "reverse". */
+  /** The pattern that tells this line from the side's others
+   *  (standards/lexicon.md, lifetime bars' fills). An outflow's is a hatch
+   *  (default "reverse"); an inflow's a texture over the side's faded hue
+   *  (none: the faded hue alone). No two lines of a side share a fill. */
   hatch?: FlowHatch;
 }
 
 /** The outflow hatches: reverse diagonal (a withdrawal or repayment), cross
  *  (withdrawn and swapped), vertical (swapped within the position), dots (sent
  *  to another account), horizontal (the two sides of a repay with collateral),
- *  forward diagonal (a liquidation or a redemption, in its tone's hue). */
-export type FlowHatch = "reverse" | "cross" | "vertical" | "dots" | "horizontal" | "forward";
+ *  dashes (a repay made with aTokens), forward diagonal (a liquidation or a
+ *  redemption, in its tone's hue). The inflow textures: grid (received by
+ *  transfer), checker (swapped in), rings (what was held when the window
+ *  opens). */
+export type FlowHatch =
+  | "reverse"
+  | "cross"
+  | "vertical"
+  | "dots"
+  | "horizontal"
+  | "dashes"
+  | "forward"
+  | "grid"
+  | "checker"
+  | "rings";
 
 export interface FlowEvent {
   id: string;
@@ -725,7 +740,7 @@ function sideState(
   ];
   const exact: FlowSegment[] = ins.map((b) => {
     const v = cum[b.key] ?? 0;
-    return { key: b.key, label: b.label, fill: "in", width: v, value: v };
+    return { key: b.key, label: b.label, fill: "in", ...(b.hatch ? { hatch: b.hatch } : {}), width: v, value: v };
   });
   if (m.opening) {
     const v = side === "collateral" ? m.opening.collateral : m.opening.debt;
@@ -733,6 +748,7 @@ function sideState(
       key: `${side}-opening`,
       label: `Held on ${longDay(m.opening.ts)}`,
       fill: "in",
+      hatch: "rings",
       width: v,
       value: v,
     });

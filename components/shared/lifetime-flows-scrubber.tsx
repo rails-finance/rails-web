@@ -8,9 +8,9 @@
 // its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
-// them. A click, a tap or Enter on a segment filters the timeline to that
-// line's events up to the cursor's date on a page that ties the two
-// (flow-focus-context.tsx, the Aave family); elsewhere it opens its panel
+// them. On a page that ties the panel to its timeline (flow-focus-context.tsx,
+// the Aave family) a hover, a tap or focus on a segment names its line and
+// value under the bars; elsewhere a click opens its panel
 // (lifetime-flows-tip.tsx): its assets, then its side's sum, one signed line
 // per component in whole dollars, landing on what is held or owed.
 //
@@ -37,20 +37,18 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { Prov } from "@/components/shared/provenance";
-import { useFlowFocus, useFlowFocusState, useFlowLineToggle } from "@/components/shared/flow-focus-context";
-import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
-import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { wholeUsd } from "@/lib/shared/flows-sum";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   fillStyle,
   FlowCursorContext,
   FlowPanelShell,
   sumSwatch,
   KEEP_PANEL,
+  SegmentLabelContext,
   SegmentPanelBody,
+  segmentLabelHandlers,
   type PanelPart,
 } from "@/components/shared/lifetime-flows-tip";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
@@ -259,13 +257,8 @@ function Strip({
   /** The open segment's panel body. */
   panel: (s: FlowSegment) => ReactNode;
   /** On a page that ties the panel to its timeline (flow-focus-context.tsx):
-   *  a segment's click filters the timeline, no panel opens, and on a phone
-   *  the whole track opens the side's list of lines under the bar. */
-  focus?: {
-    pressed: string | null;
-    onSegment: (s: FlowSegment) => void;
-    pick: { open: boolean; toggle: () => void } | null;
-  };
+   *  pointing at a segment names it under the bars, and no panel opens. */
+  focus?: boolean;
 }) {
   const shown = segments.filter((s) => s.width > 0);
   const [trackRef, trackPx, settled] = useTrackWidth();
@@ -297,6 +290,7 @@ function Strip({
     borderRadius: boxes[i].radius,
   });
   const openSeg = open ? shown.find((s) => s.key === open.key) : undefined;
+  const segLabel = useContext(SegmentLabelContext);
   return (
     <div ref={trackRef} className={`relative ${height}`}>
       <div role="img" aria-label={label} className="absolute inset-0 overflow-hidden rounded-md bg-sunken">
@@ -316,49 +310,40 @@ function Strip({
           />
         ))}
       </div>
-      <div className={`absolute inset-0${focus?.pick ? " max-sm:pointer-events-none" : ""}`} data-flow-segments={side}>
+      <div className="absolute inset-0" data-flow-segments={side}>
         {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
           const isOpen = open?.key === s.key;
-          const pressed = focus?.pressed === s.key;
+          const named = focus && segLabel?.shown?.side === side && segLabel.shown.seg.key === s.key;
+          const labelled = focus && segLabel ? segmentLabelHandlers(segLabel, side, s) : null;
           return (
             <span key={s.key} className={`absolute inset-y-0 block ${anim}`} style={place(i)}>
               <button
                 type="button"
-                className={`block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${on || isOpen || pressed ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                className={`block h-full w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${focus ? "cursor-default" : "cursor-pointer"} ${on || isOpen || named ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 style={{ borderRadius: boxes[i].radius }}
-                aria-label={
-                  focus
-                    ? `${s.label}: ${spokenUsd(s.value)}. ${s.fill === "held" ? "Lists every event to this date." : "Lists its events to this date."}`
-                    : `${s.label}: ${spokenUsd(s.value)}`
-                }
-                {...(focus
-                  ? { "aria-pressed": pressed }
-                  : { "aria-expanded": isOpen, "aria-haspopup": "dialog" as const })}
+                aria-label={`${s.label}: ${spokenUsd(s.value)}`}
+                {...(focus ? {} : { "aria-expanded": isOpen, "aria-haspopup": "dialog" as const })}
                 data-flow-seg={s.key}
-                onMouseEnter={() => onHover(hlKey(s))}
-                onMouseLeave={() => onHover(null)}
-                onClick={(e) =>
-                  focus ? focus.onSegment(s) : onOpen(isOpen ? null : { key: s.key, keyboard: e.detail === 0 })
-                }
+                onMouseEnter={() => {
+                  onHover(hlKey(s));
+                  labelled?.onMouseEnter();
+                }}
+                onMouseLeave={() => {
+                  onHover(null);
+                  labelled?.onMouseLeave();
+                }}
+                onFocus={labelled?.onFocus}
+                onBlur={labelled?.onBlur}
+                onPointerUp={labelled?.onPointerUp}
+                onClick={(e) => {
+                  if (!focus) onOpen(isOpen ? null : { key: s.key, keyboard: e.detail === 0 });
+                }}
               />
             </span>
           );
         })}
       </div>
-      {focus?.pick && (
-        // A phone: the segments are too thin to tap, so the track opens the
-        // side's lines under the bar.
-        <button
-          type="button"
-          className={`absolute inset-0 block w-full cursor-pointer rounded-md sm:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${focus.pick.open ? "outline outline-2 outline-offset-2 outline-foreground" : ""}`}
-          aria-expanded={focus.pick.open}
-          aria-controls={`flow-pick-${side}`}
-          aria-label={`${side === "collateral" ? "Collateral" : "Debt"} bar: choose a line to list its events`}
-          data-flow-pick={side}
-          onClick={focus.pick.toggle}
-        />
-      )}
       {today != null && (
         <span
           aria-hidden
@@ -436,27 +421,9 @@ function SideBlock({
   );
   for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
   const rest = st.sources.find((x) => x.fill === "estimate")?.label ?? "Market move and interest";
-  // On a page that ties the panel to its timeline, a segment filters it.
-  const lineToggle = useFlowLineToggle();
-  const phone = useMediaQuery(PHONE_QUERY);
-  const [pickOpen, setPickOpen] = useState(false);
-  const cursorWord = useFlowFocusState((s) => s.cursor?.word ?? null);
-  useEffect(() => {
-    if (!phone) setPickOpen(false);
-  }, [phone]);
-  const pickLine = (key: string, label: string) => {
-    lineToggle?.toggle(key, side, label);
-    setPickOpen(false);
-    if (phone) scrollToTimeline();
-  };
-  const focus = lineToggle
-    ? {
-        pressed: lineToggle.pressed,
-        onSegment: (s: FlowSegment) => lineToggle.toggle(s.key, side, s.label),
-        pick: phone ? { open: pickOpen, toggle: () => setPickOpen((o) => !o) } : null,
-      }
-    : undefined;
-  const pickRows = st.bar.filter((s) => s.width > 0 || s.fill === "held");
+  // On a page that ties the panel to its timeline, a segment states its
+  // name and value under the bars instead of opening a panel.
+  const focus = useContext(SegmentLabelContext) != null;
 
   return (
     <div className="mt-3 first:mt-0" data-flow-side={side}>
@@ -491,60 +458,9 @@ function SideBlock({
           />
         )}
       />
-      {focus?.pick?.open && (
-        <div
-          id={`flow-pick-${side}`}
-          role="group"
-          aria-label={`${side === "collateral" ? "Collateral" : "Debt"} lines`}
-          className="mt-2 flex flex-col rounded-xl bg-background px-1.5 pb-1.5 pt-1"
-          data-flow-pick-list={side}
-        >
-          <div className="flex items-center justify-between pl-2.5 text-xs font-semibold">
-            <span>List the events of</span>
-            <button
-              type="button"
-              className={`${CTRL_GHOST} ${CTRL_OFF} size-11 rounded-md`}
-              aria-label="Close the list"
-              onClick={() => setPickOpen(false)}
-            >
-              <X size={16} aria-hidden />
-            </button>
-          </div>
-          {pickRows.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              aria-pressed={lineToggle?.pressed === s.key}
-              className="grid min-h-11 w-full grid-cols-[12px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg px-2.5 py-1 text-left text-sm hover:bg-sunken aria-pressed:bg-sunken"
-              onClick={() => pickLine(s.key, s.label)}
-              data-flow-pick-line={s.key}
-            >
-              <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={fillStyle(side, s)} />
-              <span>
-                {s.label}
-                {s.fill === "held" && (
-                  <small className="block text-xs text-rb-500">Every event to {cursorWord ?? "this date"}</small>
-                )}
-              </span>
-              <span className="tabular-nums">
-                <Prov info={flowSegmentProv(s, side, when, isLive, model.daily)}>{wholeUsd(s.value)}</Prov>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
       {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
     </div>
   );
-}
-
-/** Brings the timeline's toolbar into view: a phone's pick, or the filter menu. */
-export function scrollToTimeline(): void {
-  if (typeof document === "undefined") return;
-  const el = document.querySelector<HTMLElement>("[data-flow-chip-slot]");
-  if (!el) return;
-  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 }
 
 /** The Key, drawn inside the panel's Explanation: the hatches the bars
@@ -764,8 +680,8 @@ function panelWords(
       : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
   const read = focused
     ? busy
-      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} lists every event up to the cursor's date in the timeline below. Each event's card adds up its side as of that event, line by line.`
-      : "A bar's length is everything that came in: the headline is the solid part of the bar. A tap on a part lists that line's events up to the cursor's date in the timeline below, and the solid part lists every event; each event's card adds up its side as of that event, line by line."
+      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar. A click on the line freezes the cursor on a day, and "View on timeline" shows that day's events below; each day's "View on chart" comes back. Each event's card adds up its side as of that event, line by line.`
+      : "A bar's length is everything that came in: the headline is the solid part of the bar, and pointing at a part names it. A click on the line freezes the cursor on a day, and \"View on timeline\" shows that day's events below; each day's \"View on chart\" comes back. Each event's card adds up its side as of that event, line by line."
     : busy
       ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
       : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";

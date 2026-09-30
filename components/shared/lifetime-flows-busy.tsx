@@ -17,11 +17,12 @@ import {
   FlowCursorContext,
   FlowPanelShell,
   KEEP_PANEL,
+  SegmentLabelContext,
   SegmentPanelBody,
+  segmentLabelHandlers,
   sumSwatch,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { useFlowLineToggle } from "@/components/shared/flow-focus-context";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
@@ -74,10 +75,11 @@ export function DateRow({ children }: { children: ReactNode }) {
 }
 
 /** The first and last day, under the two ends of a slider or a chart. */
-export function TrackEnds({ start, end }: { start: string; end: string }) {
+export function TrackEnds({ start, end, startInset = 0 }: { start: string; end: string; startInset?: number }) {
   return (
     <div
       className="mt-0.5 flex justify-between px-2 text-[11px] tabular-nums text-rb-500"
+      style={startInset > 0 ? { paddingLeft: 8 + startInset } : undefined}
       aria-hidden
       data-prov-exempt=""
       data-flow-track-ends=""
@@ -344,9 +346,9 @@ export function Rescaled({
   useEffect(() => {
     if (open && cursor?.live === false) setOpen(null);
   }, [open, cursor?.live]);
-  // On a page that ties the panel to its timeline, the track lists every
-  // event to the cursor's date instead of opening a panel.
-  const lineToggle = useFlowLineToggle();
+  // On a page that ties the panel to its timeline, the track names what is
+  // held instead of opening a panel.
+  const segLabel = useContext(SegmentLabelContext);
   return (
     <div>
       {headlines && (
@@ -382,14 +384,13 @@ export function Rescaled({
               </div>
               {/* The whole track opens the side's panel, so a bar held near
                   zero still names its flows. */}
-              {lineToggle ? (
+              {segLabel ? (
                 <button
                   type="button"
-                  className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${lineToggle.pressed === st.bar[0].key ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
-                  aria-label={`${word}: ${spokenUsd(st.now)}. Lists every event to this date.`}
-                  aria-pressed={lineToggle.pressed === st.bar[0].key}
+                  className="absolute inset-0 block cursor-default rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+                  aria-label={`${st.bar[0].label}: ${spokenUsd(st.now)}`}
                   data-flow-seg={`${side}-busy`}
-                  onClick={() => lineToggle.toggle(st.bar[0].key, side, st.bar[0].label)}
+                  {...segmentLabelHandlers(segLabel, side, st.bar[0])}
                 />
               ) : (
                 <button

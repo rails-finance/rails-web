@@ -19,7 +19,7 @@ import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 
 const BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
-  { key: "received", label: "Received by transfer", event: "Received", side: "collateral", dir: "in" },
+  { key: "received", label: "Received by transfer", event: "Received", side: "collateral", dir: "in", hatch: "grid" },
   { key: "withdrawn", label: "Withdrawn", event: "Withdrawal", side: "collateral", dir: "out", hatch: "reverse" },
   { key: "sent", label: "Sent to another account", event: "Sent", side: "collateral", dir: "out", hatch: "dots" },
 ];

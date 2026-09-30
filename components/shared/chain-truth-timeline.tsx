@@ -69,7 +69,8 @@
 // On a client-grouped page the flag still bypasses the run specs, as before.
 
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
-import { FlowFilterChip, FlowFilterMenu } from "@/components/shared/flow-filter-controls";
+import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { FlowDayHeader, utcDay } from "@/components/shared/flow-day-header";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -1107,8 +1108,77 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
-  // The latest event a flow-line filter lists opens.
-  const openAndShow = useCallback((id: string) => clickToOpenIfClosed(id), []);
+  // The chart's "View on timeline" (flow-focus-context.tsx): the day's header
+  // comes into view and flashes, and the day's last event (the one whose close
+  // the chart shows) opens. Where a filter or the Dates choice hides the day,
+  // the filters clear or the day's month is read, and a line says so.
+  const reveal = useFlowFocusState((st) => st.reveal);
+  const [revealing, setRevealing] = useState<{ day: number; n: number; cleared: boolean } | null>(null);
+  const [revealNote, setRevealNote] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ day: number; n: number } | null>(null);
+  const flashDay = flash?.day ?? null;
+  useEffect(() => {
+    if (!reveal) return;
+    setRevealNote(null);
+    setRevealing({ day: utcDay(reveal.ts), n: reveal.n, cleared: false });
+  }, [reveal]);
+  useEffect(() => {
+    if (!revealing) return;
+    const { day } = revealing;
+    const at = rows.findIndex((r) => {
+      const sp =
+        r.kind === "event"
+          ? { top: r.event.timestamp, bottom: r.event.timestamp }
+          : r.kind === "folder"
+            ? { top: r.folder.lastAt, bottom: r.folder.firstAt }
+            : { top: r.events[0].timestamp, bottom: r.events[r.events.length - 1].timestamp };
+      return utcDay(sp.bottom) <= day && day <= utcDay(Math.max(sp.top, sp.bottom));
+    });
+    if (at < 0) {
+      if (revealing.cleared || segments?.loading != null) return;
+      const words = `${shortDate(day * 86_400)} ${shortDateYear(day * 86_400)}`;
+      const held = tl.sortedEvents.some((e) => utcDay(e.timestamp) === day);
+      if (held && tl.isFiltered) {
+        tl.resetHiddenActions();
+        tl.resetHiddenAssets();
+        tl.resetHiddenCounterparties();
+        tl.resetHiddenVersions();
+        tl.setDateRange(null);
+        setRevealNote(`The filters are cleared so ${words} shows.`);
+      } else if (!held && segments) {
+        const d = new Date(day * 86_400_000);
+        segments.onPick(d.getUTCFullYear() * 12 + d.getUTCMonth());
+        setRevealNote(`The timeline now shows the month of ${words}.`);
+      }
+      setRevealing({ ...revealing, cleared: true });
+      return;
+    }
+    // The row lies past the drawn part of a long list: draw down to it first.
+    if (at >= windowSize) {
+      setWindowSize(Math.min(rows.length, at + WINDOW_CHUNK));
+      return;
+    }
+    setRevealing(null);
+    // `events` is newest first: the day's first match is its last event.
+    const last = events.find((e) => utcDay(e.timestamp) === day);
+    if (last) clickToOpenIfClosed(last.id);
+    setFlash({ day, n: revealing.n });
+    // `tl` and `segments` are read at the moment the rows change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealing, rows, events, segments?.loading, windowSize]);
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-flow-day="${flash.day}"]`);
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    }, 60);
+    const off = window.setTimeout(() => setFlash(null), 2000);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(off);
+    };
+  }, [flash]);
 
   const hasMore = windowSize < rows.length;
   const growWindow = () => setWindowSize((s) => Math.min(s + WINDOW_CHUNK, rows.length));
@@ -1249,9 +1319,22 @@ function ChainTruthTimelineBody({
   // the newest and oldest card of each day) left the middle cards of a busy
   // day as a bare time a reader dated from the card below it (MakerDAO 19103,
   // 2026-09-29). `lastIdx` stays in the signature for a one-transaction run.
+  // On a page that ties the timeline to the Lifetime flows panel, a header
+  // row dates each day (FlowDayHeader) and the cards under it state their
+  // time only.
+  const dayHeaders = useFlowFocus() != null;
   const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) => {
+    if (dayHeaders) return null;
     const event = events[flatIdx];
     return `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`;
+  };
+  /** A row's newest and oldest moment: the day its header names, and the day
+   *  the next row's header is measured from. */
+  const rowSpan = (row: TimelineRow): { top: number; bottom: number } => {
+    if (row.kind === "event") return { top: row.event.timestamp, bottom: row.event.timestamp };
+    if (row.kind === "folder") return { top: row.folder.lastAt, bottom: row.folder.firstAt };
+    const ts = row.events.map((e) => e.timestamp);
+    return { top: Math.max(...ts), bottom: Math.min(...ts) };
   };
 
   /** A market note's day stamp, on the same rule: dated by its stretch's
@@ -1473,7 +1556,6 @@ function ChainTruthTimelineBody({
             countTooltip={countTooltip}
             countDetail={countDetail}
             viewSwitch={spineOptIn}
-            extraControls={<FlowFilterMenu />}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.
             monthReach={
@@ -1488,8 +1570,11 @@ function ChainTruthTimelineBody({
             }
           />
         </div>
-        {/* The Lifetime flows filter's chip, where the page ties the two. */}
-        <FlowFilterChip latestId={events[0]?.id ?? null} open={openAndShow} />
+        {revealNote && (
+          <p className="text-xs text-rb-500" data-flow-reveal-note="">
+            {revealNote}
+          </p>
+        )}
         {notice}
         {/* A `?at=` landing whose id never turned up in `tl.sortedEvents` — the
           list otherwise renders exactly as it would have without `at`. */}
@@ -1608,7 +1693,12 @@ function ChainTruthTimelineBody({
                               // A member's own day, read off the member itself:
                               // `datePrefixAt` indexes the flat displayed list,
                               // and a folder's members are not in it.
-                              datePrefix: `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
+                              // Under a day header, a member of that day
+                              // states its time only.
+                              datePrefix:
+                                dayHeaders && utcDay(event.timestamp) === utcDay(row.folder.lastAt)
+                                  ? null
+                                  : `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
                               isLastMember:
                                 isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,
                             })
@@ -1636,7 +1726,31 @@ function ChainTruthTimelineBody({
                     </SpineTipContext.Provider>
                   );
                 const rowNotes = notesFor(row);
-                if (rowNotes.length === 0) return rowNode;
+                // A new day opens under its header.
+                const span = rowSpan(row);
+                const dayHeader =
+                  dayHeaders && (rowIdx === 0 || utcDay(rowSpan(windowed[rowIdx - 1]).bottom) !== utcDay(span.top)) ? (
+                    <FlowDayHeader
+                      ts={span.top}
+                      line={rowIdx > 0 || topTerminusTaken}
+                      flash={flashDay === utcDay(span.top)}
+                    />
+                  ) : null;
+                const rowKey =
+                  row.kind === "event"
+                    ? `evt_${row.event.id}`
+                    : row.kind === "folder"
+                      ? `folderrow_${row.folder.responseId}`
+                      : `runrow_${row.events[0].id}`;
+                if (rowNotes.length === 0)
+                  return dayHeader ? (
+                    <Fragment key={rowKey}>
+                      {dayHeader}
+                      {rowNode}
+                    </Fragment>
+                  ) : (
+                    rowNode
+                  );
                 // Below is older, so a note FOLLOWS the event it is known to
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
@@ -1664,15 +1778,8 @@ function ChainTruthTimelineBody({
                   ))
                 );
                 return (
-                  <Fragment
-                    key={
-                      row.kind === "event"
-                        ? `evt_${row.event.id}`
-                        : row.kind === "folder"
-                          ? `folderrow_${row.folder.responseId}`
-                          : `runrow_${row.events[0].id}`
-                    }
-                  >
+                  <Fragment key={rowKey}>
+                    {dayHeader}
                     {rowNode}
                     {noteRows}
                   </Fragment>

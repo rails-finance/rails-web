@@ -47,7 +47,6 @@ export interface ReceiptCalc {
 export const ReceiptCalcContext = createContext<ReceiptCalc | null>(null);
 
 const HUE: Record<FlowSide, string> = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
-const INFLOW: Record<FlowSide, string> = { collateral: "rgba(96, 165, 250, 0.35)", debt: "rgba(74, 222, 128, 0.35)" };
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 
 /** The event's running totals, where the page's flow model holds its day. */
@@ -290,13 +289,7 @@ function SideSum({
       <i
         aria-hidden
         className="inline-block size-2.5 rounded-[2px]"
-        style={
-          kind === "in" || kind === "opening"
-            ? { background: INFLOW[side] }
-            : seg
-              ? fillStyle(side, seg)
-              : { background: HUE[side] }
-        }
+        style={seg ? fillStyle(side, seg) : { background: HUE[side] }}
       />
     );
   const what = side === "collateral" ? "collateral" : "debt";
@@ -423,31 +416,5 @@ function SinceLine({ side, cum, held }: { side: FlowSide; cum: EventCum; held: n
       })}{" "}
       {isLive ? "today" : `at ${word}`}.
     </p>
-  );
-}
-
-/** The card's link back to the chart: the cursor goes to the event's day,
- *  and the panel comes into view. */
-export function MoveChartLink({ ts }: { ts: number }) {
-  const focus = useFlowFocus();
-  if (!focus?.model) return null;
-  const go = () => {
-    const s = focus.store.get();
-    focus.store.set({ move: { ts, n: (s.move?.n ?? 0) + 1 } });
-    const el = document.querySelector<HTMLElement>("[data-lifetime-flows-panel]");
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-  };
-  return (
-    <div className="flex justify-end px-5 pb-1">
-      <button
-        type="button"
-        className="min-h-11 px-1 text-sm text-blue-600 hover:underline sm:min-h-8 sm:text-[13px] dark:text-blue-300"
-        onClick={go}
-        data-receipt-move=""
-      >
-        Move the chart to this event
-      </button>
-    </div>
   );
 }

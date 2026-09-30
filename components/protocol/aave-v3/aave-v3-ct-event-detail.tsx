@@ -31,7 +31,6 @@
 
 import { createPortal } from "react-dom";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
-import { MoveChartLink } from "./aave-family-event-receipt";
 import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import {
@@ -771,7 +770,6 @@ export function AaveV3CtEventDetail({
       {notesSlot
         ? createPortal(readNotes, notesSlot)
         : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
-      {eventTs != null && <MoveChartLink ts={eventTs} />}
     </>
   );
 }

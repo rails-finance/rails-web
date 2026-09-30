@@ -1,9 +1,10 @@
-// The Lifetime flows panel and the timeline under it, tied together (rails-ops
-// TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "A segment filters
-// the timeline"). A segment's click filters the timeline to that flow line's
-// events up to the cursor's date; the held segment lists every event up to it.
-// An event card states the side's lifetime sum as of that event, from the same
-// day rows the bars read and the legs of the events on the page.
+// The Lifetime flows panel and the timeline under it, tied together by the day
+// (rails-ops TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "The day
+// links the chart and the timeline"): the chart's "View on timeline" shows the
+// cursor's day on the timeline, a day header's "View on chart" moves the
+// cursor to that day's close. An event card states the side's lifetime sum as
+// of that event, from the same day rows the bars read and the legs of the
+// events on the page.
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts); the
 // store at the foot is the one piece of state the panel, the timeline and the
@@ -32,139 +33,12 @@ export interface FocusEvent {
   legs: { bucket: string; usd: number | null; amount?: number; symbol?: string }[];
 }
 
-/** A line of the panel a filter can name: a side's held segment, or a bucket. */
-export interface FlowLine {
-  key: string;
-  side: FlowSide;
-  label: string;
-  kind: "held" | "in" | "out" | "rest";
-}
-
-/** The held segment's filter key. */
-export const heldKey = (side: FlowSide): string => `${side}-held`;
-export const isHeldKey = (key: string): boolean => key.endsWith("-held");
-
-/** The lines of each side a filter can name, in the order the sum prints
- *  them: held first (every event), then each inflow, each outflow, and the
- *  balancing item, which records no events. */
-export function flowLines(model: FlowModel): FlowLine[] {
-  const out: FlowLine[] = [];
-  for (const side of ["collateral", "debt"] as const) {
-    const bs = model.buckets.filter((b) => b.side === side);
-    if (bs.length === 0) continue;
-    out.push({
-      key: heldKey(side),
-      side,
-      label: side === "collateral" ? (model.words.held ?? "Still supplied") : "Still owed",
-      kind: "held",
-    });
-    for (const b of bs.filter((x) => x.dir === "in")) out.push({ key: b.key, side, label: b.label, kind: "in" });
-    for (const b of bs.filter((x) => x.dir === "out")) out.push({ key: b.key, side, label: b.label, kind: "out" });
-    out.push({
-      key: `${side}-market`,
-      side,
-      label:
-        model.words.restBySide?.[side] ??
-        (side === "collateral" ? model.words.rest : undefined) ??
-        "Market move and interest",
-      kind: "rest",
-    });
-  }
-  return out;
-}
-
-/** The filter in force: a line's key and its words. */
-export interface FlowFocusFilter {
-  key: string;
-  side: FlowSide;
-  label: string;
-}
-
 /** Where the panel's cursor stands: the last second its figures cover, the
  *  day in words, and whether it is the live stop. */
 export interface FlowCursorAt {
   endTs: number;
   word: string;
   live: boolean;
-}
-
-/** The chip over the filtered list: "Showing Withdrawn to 19 Jun '26". */
-export function chipText(filter: FlowFocusFilter, cursor: FlowCursorAt): string {
-  return `Showing ${isHeldKey(filter.key) ? "every event" : filter.label} to ${cursor.word}`;
-}
-
-/** Each event's buckets, by id. */
-export function bucketsById(events: FocusEvent[]): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  for (const e of events) out.set(e.id, new Set(e.legs.map((l) => l.bucket)));
-  return out;
-}
-
-/** Whether an event (its id and time) is one the filter lists: on or before
- *  the cursor's date, and for a bucket's line, an event that filled it. An
- *  event the flow lines do not read (an e-mode switch) is listed by the held
- *  segment alone. */
-export function filterPasses(
-  filter: FlowFocusFilter,
-  cursor: FlowCursorAt,
-  buckets: Map<string, Set<string>>,
-  id: string,
-  ts: number,
-): boolean {
-  if (ts > cursor.endTs) return false;
-  if (isHeldKey(filter.key)) return true;
-  return buckets.get(id)?.has(filter.key) ?? false;
-}
-
-/** The event kinds (the timeline's action keys) that can fill a bucket, for
- *  a folder the index served, whose members are not on the page. `exact`
- *  names the buckets whose kind fills nothing else, so a folder's count of
- *  that kind is how many of its members the filter lists. */
-export interface FolderKinds {
-  kinds: (bucket: string) => string[];
-  exact: (bucket: string) => boolean;
-}
-
-/** The Aave V3 family's (SparkLend and Aave V4 name their actions the same). */
-export const AAVE_FAMILY_KINDS: FolderKinds = (() => {
-  const map: Record<string, string[]> = {
-    deposited: ["supply"],
-    received: ["transfer_in"],
-    swappedIn: ["swap"],
-    withdrawn: ["withdraw"],
-    soldToRepay: ["repay", "swap"],
-    usedToRepay: ["repay"],
-    withdrawnSwapped: ["swap"],
-    swappedOut: ["swap"],
-    sent: ["transfer_out"],
-    liquidatedCollateral: ["liquidation"],
-    borrowed: ["borrow", "swap"],
-    repaid: ["repay", "swap"],
-    repaidWithCollateral: ["repay", "swap"],
-    repaidBySwap: ["swap"],
-    liquidatedDebt: ["liquidation"],
-    writtenOff: ["bad_debt_written_off"],
-  };
-  const exact = new Set(["deposited", "received", "withdrawn", "sent", "liquidatedCollateral", "liquidatedDebt"]);
-  return { kinds: (b) => map[b] ?? [], exact: (b) => exact.has(b) };
-})();
-
-/** A served folder under the filter: whether it stands, and how many of its
- *  members the filter lists, or null where its header cannot say (its
- *  members then answer one by one once read). */
-export function folderUnderFilter(
-  folder: { firstAt: number; lastAt: number; count: number; counts: { key: string; count: number }[] },
-  filter: FlowFocusFilter,
-  cursor: FlowCursorAt,
-  kinds: FolderKinds,
-): { admits: boolean; matched: number | null } {
-  if (folder.firstAt > cursor.endTs) return { admits: false, matched: 0 };
-  const whole = folder.lastAt <= cursor.endTs;
-  if (isHeldKey(filter.key)) return { admits: true, matched: whole ? folder.count : null };
-  const ks = kinds.kinds(filter.key);
-  const hits = folder.counts.filter((c) => ks.includes(c.key)).reduce((n, c) => n + c.count, 0);
-  if (hits === 0) return { admits: false, matched: 0 };
-  return { admits: true, matched: whole && kinds.exact(filter.key) ? hits : null };
 }
 
 // ── The lifetime sum at one event ───────────────────────────────────────────
@@ -288,13 +162,13 @@ function rowIndexAt(m: FlowModel, stop: number): number {
 // ── The shared state ────────────────────────────────────────────────────────
 
 export interface FlowFocusState {
-  filter: FlowFocusFilter | null;
   cursor: FlowCursorAt | null;
-  /** Bumped each time a filter is applied, so the timeline opens its latest
-   *  event once per application. */
-  applied: number;
-  /** A card's request that the chart's cursor go to its event's day. */
+  /** A day header's "View on chart": the chart's cursor goes to that day's
+   *  close and freezes there. */
   move: { ts: number; n: number } | null;
+  /** The chart's "View on timeline": the timeline shows that day's header
+   *  and opens the day's last event. */
+  reveal: { ts: number; n: number } | null;
 }
 
 export interface FlowFocusStore {
@@ -304,7 +178,7 @@ export interface FlowFocusStore {
 }
 
 export function createFlowFocusStore(): FlowFocusStore {
-  let state: FlowFocusState = { filter: null, cursor: null, applied: 0, move: null };
+  let state: FlowFocusState = { cursor: null, move: null, reveal: null };
   const subs = new Set<() => void>();
   return {
     get: () => state,

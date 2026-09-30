@@ -49,8 +49,15 @@ import {
 /** Every bucket an Aave-family position can fill, in drawing order. */
 export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", event: "Supply", side: "collateral", dir: "in" },
-  { key: "received", label: "Received by transfer", event: "Transferred in", side: "collateral", dir: "in" },
-  { key: "swappedIn", label: "Swapped in", event: "Collateral swap", side: "collateral", dir: "in" },
+  {
+    key: "received",
+    label: "Received by transfer",
+    event: "Transferred in",
+    side: "collateral",
+    dir: "in",
+    hatch: "grid",
+  },
+  { key: "swappedIn", label: "Swapped in", event: "Collateral swap", side: "collateral", dir: "in", hatch: "checker" },
   { key: "withdrawn", label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out", hatch: "reverse" },
   {
     key: "soldToRepay",
@@ -67,7 +74,7 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
     event: "Repay",
     side: "collateral",
     dir: "out",
-    hatch: "horizontal",
+    hatch: "dashes",
   },
   {
     key: "withdrawnSwapped",

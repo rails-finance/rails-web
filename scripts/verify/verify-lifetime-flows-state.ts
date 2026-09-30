@@ -81,19 +81,9 @@ import {
   windowFromDay,
   type BinInput,
 } from "@/lib/shared/flows-series";
-import { combinedAt, combinedStops, nearestStop } from "@/lib/shared/flows-combined";
+import { combinedAt, combinedStops, eventStep, nearestStop, stopForDay } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
-import {
-  AAVE_FAMILY_KINDS,
-  bucketsById,
-  chipText,
-  eventCum,
-  eventSideSum,
-  filterPasses,
-  flowLines,
-  folderUnderFilter,
-  heldKey,
-} from "@/lib/shared/flow-focus";
+import { eventCum, eventSideSum } from "@/lib/shared/flow-focus";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -608,6 +598,35 @@ test("Combined: the cursor stops on the line's points and every day with events"
     bare.map((s) => s.stop),
     [...full.eventDays.filter((d) => d < full.liveStop), full.liveStop],
   );
+});
+
+test("Combined: the back and forward steps go by days with events; a day header lands on its day's close", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "week")!;
+  const stops = combinedStops(full, line, 0);
+  const last = stops.length - 1;
+  // Forward from the first stop visits every event day once, in order, then today.
+  const visited: number[] = [];
+  for (let at = 0, next = eventStep(stops, 0, 1); next !== at; at = next, next = eventStep(stops, at, 1))
+    visited.push(stops[next].stop);
+  const days = full.eventDays.filter((d) => d < full.liveStop);
+  assert.deepEqual(visited, [...days.filter((d) => d > stops[0].stop), full.liveStop]);
+  // Back from today visits them the other way, and stops at the first.
+  const back: number[] = [];
+  for (let at = last, prev = eventStep(stops, last, -1); prev !== at; at = prev, prev = eventStep(stops, at, -1))
+    back.push(stops[prev].stop);
+  assert.deepEqual(
+    back,
+    [...days].reverse().filter((d) => d !== stops[last].stop),
+  );
+  // A point of the line between events is stepped over.
+  const between = stops.findIndex((s) => !s.event && !s.live);
+  assert.ok(between > 0, "the weekly line has a point between events");
+  assert.ok(stops[eventStep(stops, between, 1)].event || stops[eventStep(stops, between, 1)].live);
+  // Every event day's header finds that day's stop; today or later finds the live stop.
+  for (const d of days) assert.equal(stops[stopForDay(stops, d)!].stop, d);
+  assert.equal(stopForDay(stops, full.liveStop + 3), last);
 });
 
 test("Combined: the headlines and the bars state one figure at every stop, between events, on event days and outside the window", () => {
@@ -1242,7 +1261,8 @@ test("the event card's sum: the running totals around each event meet the route'
   // The 29 Sep 2026 Borrow of 200 USDC: Borrowed moves by $200 and is the highlighted line.
   const borrow = fixture.events.find(
     (e) =>
-      e.timestamp >= Date.UTC(2026, 8, 29) / 1000 && (e.context?.data as { eventType?: string } | undefined)?.eventType === "borrow",
+      e.timestamp >= Date.UTC(2026, 8, 29) / 1000 &&
+      (e.context?.data as { eventType?: string } | undefined)?.eventType === "borrow",
   );
   if (borrow) {
     const cum = eventCum(route, focus, borrow.id)!;
@@ -1269,50 +1289,20 @@ test("the event card's sum where the page lacks some of a day's events: the day'
   }
 });
 
-test("a segment's filter: its events up to the cursor's date; the held segment every event", () => {
-  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
-  const buckets = bucketsById(focus);
-  const lines = flowLines(model);
-  assert.deepEqual(
-    lines.filter((l) => l.side === "collateral").map((l) => l.kind),
-    ["held", "in", "in", "out", "out", "out", "out", "rest"],
-  );
-  assert.equal(lines.find((l) => l.kind === "rest")?.label, "Market move and interest");
-  const jun19 = Date.UTC(2026, 5, 19, 23, 59, 59) / 1000;
-  const cursor = { endTs: jun19, word: "19 Jun '26", live: false };
-  const withdrawn = { key: "withdrawn", side: "collateral" as const, label: "Withdrawn" };
-  assert.equal(chipText(withdrawn, cursor), "Showing Withdrawn to 19 Jun '26");
-  assert.equal(chipText({ ...withdrawn, key: heldKey("collateral") }, cursor), "Showing every event to 19 Jun '26");
-  const listed = fixture.events.filter((e) => filterPasses(withdrawn, cursor, buckets, e.id, e.timestamp));
-  assert.ok(listed.length > 0);
-  for (const e of listed) {
-    assert.ok(e.timestamp <= jun19);
-    assert.ok(buckets.get(e.id)?.has("withdrawn"));
+test("the fill rule: no two lines of a side share a fill", () => {
+  // A line's fill (lifetime-flows-tip.tsx fillStyle): held solid; an outflow
+  // its hatch in its tone; an inflow the faded hue with its texture, or none.
+  const fillOf = (b: (typeof AAVE_V3_FLOW_BUCKETS)[number]) =>
+    b.dir === "in"
+      ? `in:${b.hatch ?? "plain"}`
+      : `out:${b.tone ?? "exit"}:${b.hatch ?? (b.tone && b.tone !== "exit" ? "forward" : "reverse")}`;
+  for (const side of ["collateral", "debt"] as const) {
+    const fills = ["held", ...AAVE_V3_FLOW_BUCKETS.filter((b) => b.side === side).map(fillOf)];
+    // The window's opening line ("Held on …") takes the rings.
+    if (side === "collateral") fills.push("in:rings");
+    assert.equal(new Set(fills).size, fills.length, `${side}: ${fills.join(", ")}`);
   }
-  const every = fixture.events.filter((e) =>
-    filterPasses({ ...withdrawn, key: heldKey("debt") }, cursor, buckets, e.id, e.timestamp),
-  );
-  assert.equal(every.length, fixture.events.filter((e) => e.timestamp <= jun19).length);
-  // A served folder: dropped after the date, counted where its kind fills the line alone.
-  const folder = {
-    firstAt: jun19 - 100,
-    lastAt: jun19 - 10,
-    count: 4,
-    counts: [
-      { key: "withdraw", count: 3 },
-      { key: "supply", count: 1 },
-    ],
-  };
-  assert.deepEqual(folderUnderFilter(folder, withdrawn, cursor, AAVE_FAMILY_KINDS), { admits: true, matched: 3 });
-  assert.deepEqual(
-    folderUnderFilter({ ...folder, firstAt: jun19 + 1, lastAt: jun19 + 9 }, withdrawn, cursor, AAVE_FAMILY_KINDS),
-    {
-      admits: false,
-      matched: 0,
-    },
-  );
-  assert.deepEqual(folderUnderFilter({ ...folder, lastAt: jun19 + 99 }, withdrawn, cursor, AAVE_FAMILY_KINDS), {
-    admits: true,
-    matched: null,
-  });
+  const used = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "usedToRepay");
+  const sold = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "soldToRepay");
+  assert.notEqual(used?.hatch, sold?.hatch, "Used to repay has its own hatch");
 });

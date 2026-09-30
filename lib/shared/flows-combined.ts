@@ -64,6 +64,25 @@ export function combinedStops(model: FlowModel, series: FlowBinSeries | null, fr
   return out;
 }
 
+/** The stop a step back (-1) or forward (+1) from `at` lands on, where the
+ *  steps go by days with events (the timeline's day headers): the nearest day
+ *  with events that way, or the live stop going forward; `at` where there is
+ *  none. */
+export function eventStep(stops: CombinedStop[], at: number, dir: -1 | 1): number {
+  for (let i = at + dir; i >= 0 && i < stops.length; i += dir) if (stops[i].event || stops[i].live) return i;
+  return at;
+}
+
+/** The stop for a day's close (`stop`, the whole life's day index): that
+ *  day's stop, the live stop for today or later, or null where the day has
+ *  no stop. */
+export function stopForDay(stops: CombinedStop[], stop: number): number | null {
+  const last = stops.length - 1;
+  if (last >= 0 && stop >= stops[last].stop) return last;
+  const i = stops.findIndex((x) => !x.live && x.stop === stop);
+  return i >= 0 ? i : null;
+}
+
 /** The index of the stop nearest `stop` (the later one on a tie). */
 export function nearestStop(stops: CombinedStop[], stop: number): number {
   let lo = 0;

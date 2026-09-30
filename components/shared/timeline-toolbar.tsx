@@ -360,9 +360,6 @@ export interface TimelineToolbarProps {
   /** The page opted into the phone spine view: the count line ends in the
    *  "Timeline | List" switch below `sm`. */
   viewSwitch?: boolean;
-  /** Controls drawn before the filter menus (the Lifetime flows panel's
-   *  "Flow lines", flow-filter-controls.tsx). */
-  extraControls?: React.ReactNode;
 }
 
 /**
@@ -549,7 +546,6 @@ export function TimelineToolbar({
   countDetail,
   monthReach,
   viewSwitch,
-  extraControls,
 }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
@@ -682,7 +678,6 @@ export function TimelineToolbar({
             </span>
             {viewSwitch && <SpineViewSwitch />}
           </span>
-          {extraControls}
           {tl.eventOptions.length > 1 && (
             <FilterDropdown
               label="Types of event"

@@ -432,7 +432,6 @@ export default function AaveV3PositionDetail({
   );
   const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    extraFilter: focusRoot.extraFilter,
     events: aaveEvents,
     groupedTail,
     servedRows,
