@@ -31,6 +31,16 @@ import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
+/** The price chip sits behind the card's (i) (rails-ops TO-DO-ui-jobs 141):
+ *  open it before reading the chip. */
+async function openInfo(card) {
+  const b = card.locator('button[aria-label="Show explanation"]').first();
+  if (await b.count()) {
+    await b.click();
+    await card.page().waitForTimeout(300);
+  }
+}
+
 const ONLY = process.env.EXPLORER;
 const EXPLORERS = [
   {
@@ -389,6 +399,12 @@ async function runExplorer(x) {
     const own = ordinaryWallet === wallet ? { page, domN } : await openPage(x, ordinaryWallet, ordinaryEvents);
     await expandCard(own.page, own.domN(n));
     const card = cardFor(own.page, own.domN(n));
+    await card
+      .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
+      .first()
+      .waitFor({ timeout: 60000 })
+      .catch(() => {});
+    await openInfo(card);
     const pill = card.getByText(/oracle at block/).first();
     check(`${x.key} ordinary #${n}: AtBlockPriceFootnote pill renders`, (await pill.count()) > 0);
     if ((await pill.count()) > 0) {
@@ -484,6 +500,7 @@ async function runExplorer(x) {
       .catch(() => {});
     const readPriced = (await card.locator('[data-position-state="ready"] [data-account-total]').count()) > 0;
     if (readPriced) {
+      await openInfo(card);
       const receipt = await openReceiptFor(own.page, card, "oracle at block");
       check(
         `${x.key} unpriced #${n}: its price chip is the position read's (getAssetPrice read at the block)`,

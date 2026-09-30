@@ -300,11 +300,12 @@ export function focusEventsFromLegs<E extends BaseActivityEvent>(
   return ordered.map((ev) => ({
     id: ev.id,
     ts: ev.timestamp,
+    tx: ev.txHash?.toLowerCase(),
     legs: legsOf(ev).flatMap((l) => {
       const bucket = bucketOf(l);
       if (!bucket || !(l.amount > 0) || !Number.isFinite(l.amount)) return [];
       const price = l.price != null && l.price > 0 ? l.price : priceToday(l.address);
-      return [{ bucket, usd: price == null ? null : l.amount * price }];
+      return [{ bucket, usd: price == null ? null : l.amount * price, amount: l.amount, symbol: l.symbol }];
     }),
   }));
 }

@@ -240,6 +240,8 @@ export function FilterDropdown({
             }`}
           >
             {(minimal || multi) && (triggerIcon ?? <ListFilterIcon size={12} />)}
+            {/* A single pick at rest shows its own glyph where it has one. */}
+            {!minimal && !multi && isAll && triggerIcon}
             {minimal && showLabel && <span>{label}</span>}
             {!minimal &&
               !isAll &&

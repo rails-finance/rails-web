@@ -670,11 +670,7 @@ for (const fx of FIXTURES) {
           big(a.after.totalDebtBase);
         const room = roomBase > BigInt(0) ? fmtUsd(baseToUsd(roomBase.toString())) : "$0";
         const borrowable = await text(block.locator("[data-ltv-borrowable]"));
-        check(
-          `${fx.label}: LTV cell reads "Still borrowable: ${room}"`,
-          borrowable === `Still borrowable: ${room}`,
-          borrowable,
-        );
+        check(`${fx.label}: the row reads "Still borrowable" ${room}`, borrowable === room, borrowable);
       }
     }
     // The eMode card draws only where a category is in use on either side.

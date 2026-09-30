@@ -7,7 +7,7 @@
 // chart. Drawn only on a page that ties the panel to its timeline.
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { ChartBarBig, X } from "lucide-react";
 import { FilterDropdown, type FilterOption } from "@/components/shared/filter-dropdown";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { fillStyle } from "@/components/shared/lifetime-flows-tip";
@@ -77,6 +77,7 @@ export function FlowFilterMenu() {
         variant="button"
         align="right"
         verbatimLabels
+        triggerIcon={<ChartBarBig size={12} />}
       />
     </span>
   );

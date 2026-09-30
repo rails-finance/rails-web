@@ -25,7 +25,11 @@ export interface FocusEvent {
   id: string;
   /** Unix seconds. */
   ts: number;
-  legs: { bucket: string; usd: number | null }[];
+  /** The transaction: a card states the account once its transaction had
+   *  run, so the sum runs to the transaction's last event. */
+  tx?: string;
+  /** Each leg's bucket, its USD, and the token amount it moved. */
+  legs: { bucket: string; usd: number | null; amount?: number; symbol?: string }[];
 }
 
 /** A line of the panel a filter can name: a side's held segment, or a bucket. */
@@ -164,7 +168,8 @@ export function folderUnderFilter(
 
 // ── The lifetime sum at one event ───────────────────────────────────────────
 
-/** The running totals per bucket just before and just after one event. */
+/** The running totals per bucket once the event's transaction had run
+ *  (`after`), and that less this event's own legs (`before`). */
 export interface EventCum {
   before: Record<string, number>;
   after: Record<string, number>;
@@ -173,8 +178,9 @@ export interface EventCum {
   exact: boolean;
   /** The event's day, as a stop of the model. */
   stop: number;
-  /** The buckets this event filled. */
+  /** The buckets this event filled, and its own legs. */
   buckets: Set<string>;
+  legs: FocusEvent["legs"];
   /** Events after this one in the position's history. */
   later: boolean;
 }
@@ -184,7 +190,8 @@ export interface EventCum {
 const agrees = (a: number, b: number): boolean => Math.abs(a - b) <= Math.max(1, Math.abs(b) * 1e-4);
 
 /** The running totals around one event: the day row before its day, plus the
- *  legs of that day's events up to it, where the page holds all of them and
+ *  legs of that day's events through its transaction (the account the card
+ *  states is the transaction's), where the page holds all of them and
  *  they add to the day row's move; else the day's close. `events` ascending;
  *  `model` the whole life (not a window). */
 export function eventCum(model: FlowModel, events: FocusEvent[], id: string): EventCum | null {
@@ -208,10 +215,10 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
   const exact = priced && keys.every((k) => agrees(dayMove[k], (row.cum[k] ?? 0) - (prev[k] ?? 0)));
   const after: Record<string, number> = Object.fromEntries(keys.map((k) => [k, prev[k] ?? 0]));
   if (exact) {
-    for (const e of sameDay) {
-      add(after, e);
-      if (e.id === id) break;
-    }
+    // Through this event and the rest of its transaction.
+    let last = sameDay.findIndex((e) => e.id === id);
+    while (ev.tx && last + 1 < sameDay.length && sameDay[last + 1].tx === ev.tx) last++;
+    for (let i = 0; i <= last; i++) add(after, sameDay[i]);
   } else for (const k of keys) after[k] = row.cum[k] ?? 0;
   const before = { ...after };
   add(before, ev, -1);
@@ -221,6 +228,7 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
     exact,
     stop,
     buckets: new Set(ev.legs.map((l) => l.bucket)),
+    legs: ev.legs,
     later: at < events.length - 1 || ri < model.rows.length - 1,
   };
 }

@@ -2,14 +2,13 @@
 
 // The open Aave V3 family card's position block: the account as it stood
 // immediately before the event's transaction and once it had run (rails-ops
-// TO-DO-ui-jobs §19, §213). Four cells: Collateral, Debt, Health factor, LTV,
-// and eMode where the account used a category.
-//   • Collateral: total collateral in USD (before → after), each collateral
-//     reserve beneath it, and the supplied reserves with their switch off under
-//     "Supplied, not collateral" — the total leaves them out.
-//   • Debt: total debt in USD (before → after), each borrowed reserve beneath.
-//   • LTV: debt ÷ collateral (before → after), of the weighted max LTV, with
-//     the liquidation threshold, and what the account could still borrow.
+// TO-DO-ui-jobs §19, §213, §141), laid out as a receipt
+// (aave-family-event-receipt.tsx): a Collateral and a Debt cell, each its
+// total before → after with every reserve beneath (supplies with the switch
+// off under "Supplied, not collateral"), then one row: health factor, LTV
+// against the weighted max LTV and the liquidation threshold, what the account
+// could still borrow, and eMode where the account used a category. The card's
+// calculator turns each cell into the side's lifetime sum as of the event.
 // The paragraph on how the weighted limits move is in the card's (i)
 // (LtvWeightingNote, drawn by the explainer).
 //

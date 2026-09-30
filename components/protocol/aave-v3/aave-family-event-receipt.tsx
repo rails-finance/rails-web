@@ -112,6 +112,15 @@ function sideFacts(state: AaveV3PositionState, side: FlowSide, touched: TouchedL
       else parts.push({ symbol: reserveSymbol(r), usd: rawToUsd(r.supply.after, r.priceBase, r.decimals) });
     }
   const held = offSupply ? (priced ? parts.reduce((a, p) => a + p.usd, 0) : null) : after;
+  // What every supplied balance was worth before the transaction, where the
+  // sum's total adds them.
+  let heldBefore: number | null = offSupply ? 0 : before;
+  if (offSupply)
+    for (const r of state.reserves) {
+      if (big(r.supply.before) <= BigInt(0)) continue;
+      if (r.priceBase == null || r.decimals == null) heldBefore = null;
+      else if (heldBefore != null) heldBefore += rawToUsd(r.supply.before, r.priceBase, r.decimals);
+    }
   return {
     leg,
     before,
@@ -121,6 +130,7 @@ function sideFacts(state: AaveV3PositionState, side: FlowSide, touched: TouchedL
     moved,
     offSupply,
     held,
+    heldBefore,
     parts,
   };
 }
@@ -300,8 +310,17 @@ function SideSum({
               : (state.account?.after.totalDebtBase ?? "0"),
           poolRevision: state.sources.poolRevision,
         });
-  const changed = facts.changed && facts.before != null && !facts.offSupply;
-  const grid = "grid grid-cols-[12px_12px_minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg px-1.5 -mx-1.5 py-1";
+  const heldBefore = facts.heldBefore;
+  const changed = heldBefore != null && Math.round(heldBefore) !== Math.round(facts.held);
+  // The label keeps its room; a wide before → after wraps under itself.
+  const grid = "grid grid-cols-[12px_12px_minmax(7.5rem,1fr)_auto] items-center gap-x-2 rounded-lg px-1.5 -mx-1.5 py-1";
+  const pair = (before: string | null, after: ReactNode) => (
+    <span className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
+      {before != null && <span className="whitespace-nowrap font-normal text-rb-500">{before} →</span>}
+      <span className="whitespace-nowrap">{after}</span>
+    </span>
+  );
+  const dirOf = (key: string) => model.buckets.find((b) => b.key === key)?.dir;
   return (
     <div className="flex flex-col text-[13px] tabular-nums" data-receipt-sum={side}>
       {rows.lines.map((l) => (
@@ -322,12 +341,13 @@ function SideSum({
           {swatch(l.seg, l.kind)}
           <span className="min-w-0">
             {l.label}
-            {l.hl && <small className="block text-xs font-normal text-rb-500">{hlNote(cum, l.key, facts.moved)}</small>}
+            {l.hl && (
+              <small className="block text-xs font-normal text-rb-500">
+                {hlNote(cum, l.key, dirOf(l.key) === "in" ? "+" : "−")}
+              </small>
+            )}
           </span>
-          <span className="whitespace-nowrap text-right">
-            {l.hl && l.before != null && <span className="font-normal text-rb-500">{l.before} → </span>}
-            <Prov info={lineProv(l)}>{l.amount}</Prov>
-          </span>
+          {pair(l.hl ? l.before : null, <Prov info={lineProv(l)}>{l.amount}</Prov>)}
         </div>
       ))}
       <div
@@ -339,28 +359,30 @@ function SideSum({
         <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: HUE[side] }} />
         <span className="min-w-0">
           {side === "collateral" ? "Held at this event" : "Owed at this event"}
-          {changed && facts.before != null && facts.after != null && (
+          {changed && heldBefore != null && (
             <small className="block text-xs font-normal text-rb-500">
-              {`${facts.after - facts.before < 0 ? "−" : "+"}${wholeUsd(facts.after - facts.before)}`}
+              {`${facts.held - heldBefore < 0 ? "−" : "+"}${wholeUsd(facts.held - heldBefore)}`}
               {facts.moved.length > 0 && ` (${facts.moved.join(", ")})`}
             </small>
           )}
         </span>
-        <span className="whitespace-nowrap text-right">
-          {changed && facts.before != null && (
-            <span className="font-normal text-rb-500">{wholeUsd(facts.before)} → </span>
-          )}
-          <Prov info={totalProv}>{rows.total.amount}</Prov>
-        </span>
+        {pair(
+          changed && heldBefore != null ? wholeUsd(heldBefore) : null,
+          <Prov info={totalProv}>{rows.total.amount}</Prov>,
+        )}
       </div>
     </div>
   );
 }
 
 /** The highlighted line's note: what this event put on it. */
-function hlNote(cum: EventCum, key: string, tokens: string[]): string {
-  const moved = wholeUsd((cum.after[key] ?? 0) - (cum.before[key] ?? 0));
-  return tokens.length > 0 ? `${tokens.join(", ")} (${moved}) at this event` : `${moved} at this event`;
+function hlNote(cum: EventCum, key: string, sign: string): string {
+  const legs = cum.legs.filter((l) => l.bucket === key);
+  const usd = `${sign}${wholeUsd(legs.reduce((a, l) => a + (l.usd ?? 0), 0))}`;
+  const tokens = legs
+    .filter((l) => l.amount != null && l.symbol)
+    .map((l) => `${sign}${fmtPositionAmount(l.amount)} ${l.symbol}`);
+  return tokens.length > 0 ? `${tokens.join(", ")} (${usd.slice(sign.length)}) at this event` : `${usd} at this event`;
 }
 
 /** "Since this event": where the position has later events, what the side
