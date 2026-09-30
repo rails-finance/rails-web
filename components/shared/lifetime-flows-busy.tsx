@@ -354,6 +354,7 @@ export function Rescaled({
   isLive,
   assets,
   headlines = true,
+  outline = false,
 }: {
   model: FlowModel;
   s: ReturnType<typeof stateAt>;
@@ -363,6 +364,9 @@ export function Rescaled({
   assets: ReturnType<typeof assetsAt>;
   /** False where the view draws the headlines above (Combined). */
   headlines?: boolean;
+  /** Draw the dashed outline of each bar's length at the last stop, as the
+   *  plain bars do (Combined; the Flows view's busy bars draw none). */
+  outline?: boolean;
 }) {
   // Fixed per position: the most either side has held or owed at any stop.
   const axis = useMemo(() => {
@@ -371,6 +375,7 @@ export function Rescaled({
     return axisFor(peak);
   }, [model]);
   const sides: FlowSide[] = hasDebt ? ["collateral", "debt"] : ["collateral"];
+  const live = { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
   return (
     <div>
       {headlines && (
@@ -401,6 +406,14 @@ export function Rescaled({
                 className="absolute inset-y-0 left-0 block rounded-[3px] transition-all duration-200 ease-out motion-reduce:transition-none"
                 style={{ width: `${Math.max(0, (st.now / axis.max) * 100)}%`, background: HUE[side] }}
               />
+              {outline && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-0 rounded-md border border-dashed border-rb-500 transition-all duration-200 ease-out motion-reduce:transition-none"
+                  style={{ width: `${Math.max(0, (live[side] / axis.max) * 100)}%` }}
+                  data-flow-outline=""
+                />
+              )}
             </div>
             {i === sides.length - 1 && <AxisLabels ticks={axis.ticks} max={axis.max} />}
             <NetLine side={side} st={st} when={when} isLive={isLive} daily={model.daily} />

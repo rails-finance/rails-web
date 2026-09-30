@@ -43,6 +43,7 @@ import {
   rateInForceProv,
   transferProv,
   atBlockPriceProv,
+  gasCompEscrowProv,
   crAtEventProv,
   crBeforeAtEventProv,
   crChangeAtEventProv,
@@ -53,6 +54,11 @@ import {
 import { crPct1, crPct2, polarisCrAtEvent, polarisCrReceipt, type PolarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber, formatExact } from "@/lib/utils/format";
+import { TipLabel } from "@/components/shared/tip-label";
+
+/** The primary rate, glossed where a row first states it. */
+const PRIMARY_RATE_TIP =
+  "The primary rate is the part of the market's interest rate that moves with its stablecoin's peg: it rises when traders redeem through the PSM and falls when they mint. The market adds a secondary rate, which rises with its debt-to-reserve ratio, and a CDP pays both on its debt.";
 
 /** The market's own unit — USDp to 2dp, GOLDp to 4dp (the finer precision an
  *  ounce of gold's own price needs). Stated once, beside the forensics that
@@ -255,16 +261,41 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
     liq("collSurplus", "Of which surplus for the owner to claim", PETH.symbol, PETH.address);
     liq("debtLiquidated", "Debt absorbed by the pool", stable, stableAddr);
     liq("debtRedistributed", "Debt redistributed", stable, stableAddr);
-    liq("flatComp", "Gas compensation, from the escrow set aside at opening", PETH.symbol, PETH.address);
+    if (ctx.flatComp != null && num(ctx.flatComp) !== 0) {
+      // A round constant, stated whole so it reads as the open row's escrow.
+      const flat = num(ctx.flatComp).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      stats.push({
+        label: "Gas compensation, from the escrow sent at the open",
+        value: flat,
+        display: flat,
+        symbol: PETH.symbol,
+        address: PETH.address,
+        prov: liquidationFieldProv("flatComp", coords, ctx.raw?.flatComp),
+      });
+    }
   }
 
   // The protocol's legs at this touch — grouped: interest · gains · PSM · settle.
   leg("accruedInterest", "Interest charged · debt", stable, stableAddr);
   leg("stableGain", "Stability gain · debt", stable, stableAddr, true);
   leg("bcTokenGain", "Reward pETH · collateral", PETH.symbol, PETH.address);
-  leg("mintRedeemCollGain", "PSM share · collateral", PETH.symbol, PETH.address);
-  leg("mintRedeemDebtGain", "PSM share · debt", stable, stableAddr);
-  leg("stablesMintedToEnsureZeroDebt", "Minted to settle · debt", stable, stableAddr);
+  leg("mintRedeemCollGain", "Net PSM share · collateral", PETH.symbol, PETH.address);
+  leg("mintRedeemDebtGain", "Net PSM share · debt", stable, stableAddr);
+  leg("stablesMintedToEnsureZeroDebt", "Settled to zero · debt", stable, stableAddr);
+
+  // The open's escrow: the holder sends the collateral and, beside it, the
+  // fixed gas compensation the CDP holds for a liquidator — returned on
+  // close, paid out on a liquidation. The log does not carry it; the amount is
+  // the protocol's constant (POLARIS_LIQ_CONSTANTS.gasComp).
+  if (ctx.eventType === "open")
+    stats.push({
+      label: "Gas compensation escrow, sent with the collateral",
+      value: String(POLARIS_LIQ_CONSTANTS.gasComp.amount),
+      display: `+${POLARIS_LIQ_CONSTANTS.gasComp.amount}`,
+      symbol: PETH.symbol,
+      address: PETH.address,
+      prov: gasCompEscrowProv(coords),
+    });
 
   const forensics =
     ctx.eventType === "liquidate" ? buildPolarisLiquidationForensics(ctx, coords, ctx.market) : undefined;
@@ -309,7 +340,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
           <Prov info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={`${(ctx.primaryRate * 100).toFixed(2)}%`}>
             <span>{(ctx.primaryRate * 100).toFixed(2)}%</span>
           </Prov>{" "}
-          primary rate in force
+          <TipLabel text="primary rate in force" tip={PRIMARY_RATE_TIP} />
         </div>
       )}
     </div>

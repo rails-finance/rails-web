@@ -175,9 +175,13 @@ export function computePolarisEconomics(view: PolarisPositionView, events?: Base
 
   // On the chain lane the debt figure is the entire debt, and the interest
   // pending since the last touch is its own getter — so the split is real:
-  // principal-to-date beneath, pending interest on top, summing to the whole.
-  const pendingInterest = view.basis === "chain" ? (view.pendingInterest ?? 0) : 0;
-  const principal = Math.max(0, view.debt - Math.min(pendingInterest, view.debt));
+  // the rest beneath, pending interest on top, summing to the entire debt the
+  // card states. An entire debt at or below zero owes nothing (the pending
+  // legs cleared more than the recorded debt), so it has no lines at all; the
+  // interest inside it is capped at the whole, never stated above it.
+  const owed = Math.max(0, view.debt);
+  const pendingInterest = view.basis === "chain" ? Math.min(view.pendingInterest ?? 0, owed) : 0;
+  const principal = owed - pendingInterest;
   const debtLines: TowerLine[] =
     principal > DUST ? [{ key: "debt", symbol: stable, amount: principal, usd: null, prov: debtProv }] : [];
   const interestLine: TowerLine | null =
@@ -258,7 +262,7 @@ export function computePolarisEconomics(view: PolarisPositionView, events?: Base
           address: PETH.address,
         }),
         ...line(collOk, "coll-to-psm", PETH.symbol, lifetime?.collToPsm ?? 0, "pETH to PSM redemptions", {
-          flowLabel: "PSM redemption share",
+          flowLabel: "Net PSM shares",
           flowKind: "redeemed",
           address: PETH.address,
         }),
@@ -268,7 +272,7 @@ export function computePolarisEconomics(view: PolarisPositionView, events?: Base
       }),
       received: [
         ...line(collOk, "coll-from-psm", PETH.symbol, lifetime?.collFromPsm ?? 0, "pETH from PSM mints", {
-          flowLabel: "PSM mint share",
+          flowLabel: "Net PSM shares",
           flowKind: "external",
           address: PETH.address,
         }),
@@ -288,23 +292,27 @@ export function computePolarisEconomics(view: PolarisPositionView, events?: Base
           flowLabel: "Stability gains",
         }),
         ...line(debtOk, "debt-to-psm", stable, lifetime?.debtToPsm ?? 0, "debt cleared by PSM redemptions", {
-          flowLabel: "PSM redemption share",
+          flowLabel: "Net PSM shares",
           flowKind: "redeemed",
         }),
       ],
       liquidated: line(debtOk, "debt-liquidated", stable, lifetime?.debtLiquidated ?? 0, "debt liquidated"),
       received: [
         ...line(debtOk, "debt-from-psm", stable, lifetime?.debtFromPsm ?? 0, "debt from PSM mints", {
-          flowLabel: "PSM mint share",
+          flowLabel: "Net PSM shares",
           flowKind: "external",
         }),
+      ],
+      // The settle-to-zero mint is its own line, apart from what the holder
+      // borrowed: it offsets a net PSM share that cleared more than the debt.
+      costs: [
+        ...line(debtOk, "debt-interest-charged", stable, lifetime?.interestCharged ?? 0, "interest charged", {
+          flowLabel: "Interest charged",
+        }),
         ...line(debtOk, "debt-minted-to-settle", stable, lifetime?.mintedToSettle ?? 0, "minted to settle", {
-          flowLabel: "Minted to settle",
+          flowLabel: "Settled to zero",
         }),
       ],
-      costs: line(debtOk, "debt-interest-charged", stable, lifetime?.interestCharged ?? 0, "interest charged", {
-        flowLabel: "Interest charged",
-      }),
       lifetimeInflow: debtOk ? (lifetime?.borrowed ?? 0) : 0,
     },
     interestLabel: "Pending interest",

@@ -18,6 +18,8 @@
 // cached immutable; a miss keeps the card token-only — the safe state.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
 import {
   ChainTruthDetail,
@@ -86,6 +88,13 @@ interface AtBlockPrices {
   heldPriceRaw: string;
   owedPriceRaw: string;
   spreadRaw: string | null;
+  /** The spread's parts at the same block (Decimal.D256 strings). */
+  baseSpreadRaw: string | null;
+  heldSpreadPremiumRaw: string | null;
+  owedSpreadPremiumRaw: string | null;
+  overrideSpreadRaw: string | null;
+  /** The account's health at the end of the previous block. */
+  healthBefore: number | null;
 }
 
 /** The at-block reads for a liquidation row — fetched once on mount (the
@@ -113,6 +122,11 @@ function useLiqPricesAtBlock(
             heldPriceRaw: d.heldPriceRaw,
             owedPriceRaw: d.owedPriceRaw,
             spreadRaw: typeof d.spreadRaw === "string" ? d.spreadRaw : null,
+            baseSpreadRaw: typeof d.baseSpreadRaw === "string" ? d.baseSpreadRaw : null,
+            heldSpreadPremiumRaw: typeof d.heldSpreadPremiumRaw === "string" ? d.heldSpreadPremiumRaw : null,
+            owedSpreadPremiumRaw: typeof d.owedSpreadPremiumRaw === "string" ? d.owedSpreadPremiumRaw : null,
+            overrideSpreadRaw: typeof d.overrideSpreadRaw === "string" ? d.overrideSpreadRaw : null,
+            healthBefore: typeof d.healthBefore === "number" ? d.healthBefore : null,
           });
         }
       })
@@ -176,7 +190,7 @@ function buildDolomiteLiqForensics(
     ...(spread != null && spread > 0
       ? {
           premiumReference: {
-            label: "Engine spread at block",
+            label: "Liquidation spread",
             value: `+${(spread * 100).toFixed(2)}%`,
             prov: dolomiteLiqSpreadRefProv(coords, {
               heldSym: held.marketSymbol,
@@ -200,6 +214,59 @@ function buildDolomiteLiqForensics(
       },
     ],
   };
+}
+
+const pctOf = (raw: string | null): number | null => (raw == null ? null : Number(raw) / 1e18);
+const pctText = (f: number): string => `${Number((f * 100).toFixed(2))}%`;
+
+/** Where the liquidation spread comes from, and why the liquidator repaid
+ *  the share it did, in words, from the at-block reads. */
+function liquidationNotes(
+  held: DolomiteContext,
+  owed: DolomiteContext,
+  atBlock: AtBlockPrices,
+  repaidShare: number | null,
+): string[] {
+  const out: string[] = [];
+  const spread = pctOf(atBlock.spreadRaw);
+  const base = pctOf(atBlock.baseSpreadRaw);
+  const hp = pctOf(atBlock.heldSpreadPremiumRaw);
+  const op = pctOf(atBlock.owedSpreadPremiumRaw);
+  const override = pctOf(atBlock.overrideSpreadRaw);
+  if (spread != null && override != null) {
+    out.push(
+      `The liquidation spread was ${pctText(spread)}: this account carries a risk override that sets its own spread, in place of the ${base != null ? `${pctText(base)} base spread and ` : ""}market premiums.`,
+    );
+  } else if (spread != null && base != null && hp != null && op != null) {
+    const parts = [
+      hp > 0 ? `(1 + ${pctText(hp)} ${held.marketSymbol} premium)` : null,
+      op > 0 ? `(1 + ${pctText(op)} ${owed.marketSymbol} premium)` : null,
+    ].filter(Boolean);
+    out.push(
+      parts.length > 0
+        ? `The liquidation spread was ${pctText(spread)}: Dolomite's ${pctText(base)} base spread × ${parts.join(" × ")}. Each market can carry a spread premium, and the seized collateral is worth the repaid debt plus this spread.`
+        : `The liquidation spread was ${pctText(spread)}, Dolomite's base spread: neither ${held.marketSymbol} nor ${owed.marketSymbol} carries a spread premium.`,
+    );
+  }
+  const h = atBlock.healthBefore;
+  if (repaidShare != null) {
+    const half = Math.abs(repaidShare - 0.5) < 0.005;
+    const all = repaidShare > 0.995;
+    const hText = h != null ? ` The account's health factor at the end of the previous block was ${h.toFixed(3)}.` : "";
+    if (half)
+      out.push(
+        `The liquidator repaid half the debt. Dolomite sets that share: when an account's health factor is 0.95 or above and its collateral market allows partial liquidation, a liquidation clears 50% of the debt instead of all of it.${hText}`,
+      );
+    else if (all)
+      out.push(
+        `The liquidator repaid the whole debt. Dolomite clears all of it when the health factor is below 0.95 or the collateral market does not allow partial liquidation.${hText}`,
+      );
+    else
+      out.push(
+        `The liquidator repaid ${(repaidShare * 100).toFixed(1)}% of the debt, less than the protocol's cap: the liquidator chose the amount, or the collateral ran out.${hText}`,
+      );
+  }
+  return out;
 }
 
 export function DolomiteEventDetail({
@@ -255,6 +322,15 @@ export function DolomiteEventDetail({
   );
   const forensics =
     bothLegs != null ? buildDolomiteLiqForensics(bothLegs.held, bothLegs.owed, coords, atBlock) : undefined;
+  // The share of the debt the liquidation repaid, from the debt leg's own
+  // balance before (the borrower's page only: the liquidator's page does not
+  // hold the borrower's balance).
+  const repaidShare =
+    ctx.eventType === "liquidation" && ctx.balanceBefore != null && ctx.weiDelta != null
+      ? Math.abs(Number(ctx.weiDelta)) / Math.abs(Number(ctx.balanceBefore)) || null
+      : null;
+  const notes =
+    forensics && bothLegs && atBlock ? liquidationNotes(bothLegs.held, bothLegs.owed, atBlock, repaidShare) : [];
 
   // The lane states the token balance the core held: par × the market's index
   // at the block (a negative balance IS debt). A payload without the index
@@ -301,10 +377,40 @@ export function DolomiteEventDetail({
     },
   ];
 
+  // A transfer's other side: the account number it came from or went to,
+  // linked to that account's own page.
+  const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+  const other =
+    isTransfer && ctx.counterparty != null && ctx.counterpartyAccountNumber != null
+      ? { owner: ctx.counterparty, number: ctx.counterpartyAccountNumber }
+      : null;
+  const sameWallet = other != null && wallet != null && other.owner === wallet.toLowerCase();
+
   return (
     <>
       <ChainTruthDetail stats={stats} />
+      {other && (
+        <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
+          {ctx.eventType === "transfer_in" ? "Came from" : "Went to"}{" "}
+          <Link
+            href={`/ethereum/dolomite/${other.owner}/${other.number}`}
+            className="font-medium text-foreground underline decoration-dotted underline-offset-2"
+          >
+            {sameWallet
+              ? `${otherAccountName(other.number)} of this wallet`
+              : `${otherAccountName(other.number)} of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`}
+          </Link>
+          , inside Dolomite: no tokens left the protocol.
+        </p>
+      )}
       {forensics && <LiquidationForensics {...forensics} />}
+      {notes.length > 0 && (
+        <div className="mt-2 space-y-1 px-5 text-xs text-rb-500" data-dolomite-liq-notes="">
+          {notes.map((n) => (
+            <p key={n}>{n}</p>
+          ))}
+        </div>
+      )}
     </>
   );
 }

@@ -31,6 +31,11 @@ const MARGIN_ABI = parseAbi([
   "function getMarketPrice(uint256 marketId) view returns ((uint256 value))",
   "function getLiquidationSpreadForPair(uint256 heldMarketId, uint256 owedMarketId) view returns ((uint256 value))",
   "function getLiquidationSpreadForAccountAndPair(Info account, uint256 heldMarketId, uint256 owedMarketId) view returns ((uint256 value))",
+  "function getLiquidationSpread() view returns ((uint256 value))",
+  "function getMarketSpreadPremium(uint256 marketId) view returns ((uint256 value))",
+  "function getAccountRiskOverrideByAccount(Info account) view returns ((uint256 value) marginRatioOverride, (uint256 value) liquidationSpreadOverride)",
+  "function getAdjustedAccountValues(Info account) view returns ((uint256 value) supplyValue, (uint256 value) borrowValue)",
+  "function getMarginRatioForAccount(Info account) view returns ((uint256 value))",
 ]);
 
 export async function GET(request: NextRequest) {
@@ -84,6 +89,54 @@ export async function GET(request: NextRequest) {
     if (heldRaw == null || owedRaw == null) {
       return NextResponse.json({ error: "oracle price unavailable at block" }, { status: 502 });
     }
+    // What the spread is made of, at the same block: the global base spread,
+    // each market's spread premium, and the account's override where one is
+    // set (a nonzero liquidationSpreadOverride replaces base × premiums).
+    // And the account's health at the end of the block BEFORE: adjusted
+    // supply ÷ (adjusted borrow × its margin requirement). Dolomite
+    // liquidates half the debt when that is 0.95 or above and the collateral
+    // market allows partial liquidation (docs.dolomite.io, risk management).
+    const [base, heldPrem, owedPrem, override] = await alchemyClient().multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: [
+        { address: MARGIN, abi: MARGIN_ABI, functionName: "getLiquidationSpread" },
+        { address: MARGIN, abi: MARGIN_ABI, functionName: "getMarketSpreadPremium", args: [held] },
+        { address: MARGIN, abi: MARGIN_ABI, functionName: "getMarketSpreadPremium", args: [owed] },
+        liquidAccount
+          ? {
+              address: MARGIN,
+              abi: MARGIN_ABI,
+              functionName: "getAccountRiskOverrideByAccount",
+              args: [liquidAccount],
+            }
+          : { address: MARGIN, abi: MARGIN_ABI, functionName: "getLiquidationSpread" },
+      ] as const,
+    });
+    let healthBefore: number | null = null;
+    if (liquidAccount) {
+      const [adj, ratio] = await alchemyClient().multicall({
+        allowFailure: true,
+        blockNumber: blockNumber - BigInt(1),
+        contracts: [
+          { address: MARGIN, abi: MARGIN_ABI, functionName: "getAdjustedAccountValues", args: [liquidAccount] },
+          { address: MARGIN, abi: MARGIN_ABI, functionName: "getMarginRatioForAccount", args: [liquidAccount] },
+        ],
+      });
+      if (adj.status === "success" && ratio.status === "success") {
+        const [supply, borrow] = adj.result as readonly [{ value: bigint }, { value: bigint }];
+        const req = 1 + Number((ratio.result as { value: bigint }).value) / 1e18;
+        const b = Number(borrow.value);
+        if (b > 0) healthBefore = Number(supply.value) / (b * req);
+      }
+    }
+    const d256 = (r: { status: string; result?: unknown }): string | null =>
+      r.status === "success" ? (r.result as { value: bigint }).value.toString() : null;
+    const overrideSpread =
+      liquidAccount && override.status === "success"
+        ? (override.result as readonly [{ value: bigint }, { value: bigint }])[1].value
+        : null;
+
     // The spread getter degrades independently: the two legs still value
     // without it, only the self-audit reference drops.
     const spreadRaw =
@@ -104,6 +157,16 @@ export async function GET(request: NextRequest) {
         // pair spread otherwise; null when the read missed.
         spreadRaw: spreadRaw?.toString() ?? null,
         spreadBasis: liquidAccount ? "account-aware" : "pair",
+        // The spread's parts (Decimal.D256 strings; null where the read
+        // missed): base × (1 + held premium) × (1 + owed premium) unless the
+        // override spread is nonzero.
+        baseSpreadRaw: d256(base),
+        heldSpreadPremiumRaw: d256(heldPrem),
+        owedSpreadPremiumRaw: d256(owedPrem),
+        overrideSpreadRaw: overrideSpread != null && overrideSpread > BigInt(0) ? overrideSpread.toString() : null,
+        // Health just before the liquidation (end of the previous block);
+        // null when the account was not named or the read missed.
+        healthBefore,
       },
       { headers: { "Cache-Control": "public, max-age=31536000, immutable" } },
     );

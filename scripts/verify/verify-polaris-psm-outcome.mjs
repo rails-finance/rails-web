@@ -10,9 +10,8 @@
 //      "at settle" figures match the pinned sums (compact formatting); the
 //      "today" figure is recomputed from the live overlay (0.5% tolerance,
 //      since the feed moves); the strip carries no "profit" and no "%".
-//   2. usdp/27: +124.509 total (+43.571 / +80.938); usdp/166: +0.719, no
-//      mint clause (it has no priced mint share).
-//   3. The tower's "PSM redemption share" and "PSM mint share" breakdown
+//   2. usdp/27: +124.509 total; usdp/166: +0.719, no mint clause.
+//   3. The tower's "− Net PSM shares" and "+ Net PSM shares" breakdown
 //      swatches carry the pink checker (a background-image containing "244"
 //      and "114" and "182", none containing "251" "146" "60").
 //   4. A Liquity V2 trove with a redemption also draws the pink checker on
@@ -110,18 +109,22 @@ const econSection = (page) => page.locator('[data-skel-section="detail-economics
 const outcomeStrip = (page) => econSection(page).locator("div.justify-end.pl-2").first();
 
 /** A breakdown-row's swatch `background-image`, by its exact label text. */
-async function swatchOf(page, label) {
-  return econSection(page).evaluate((root, label) => {
-    for (const tr of root.querySelectorAll("tr")) {
-      const tds = tr.querySelectorAll("td");
-      if (tds.length < 3) continue;
-      if (tds[2].textContent?.trim().startsWith(label)) {
-        const swatch = tds[1].querySelector("span[style]");
-        return swatch ? swatch.getAttribute("style") : null;
+async function swatchOf(page, label, sign) {
+  return econSection(page).evaluate(
+    (root, [label, sign]) => {
+      for (const tr of root.querySelectorAll("tr")) {
+        const tds = tr.querySelectorAll("td");
+        if (tds.length < 3) continue;
+        if (sign && tds[0].textContent?.trim() !== sign) continue;
+        if (tds[2].textContent?.trim().startsWith(label)) {
+          const swatch = tds[1].querySelector("span[style]");
+          return swatch ? swatch.getAttribute("style") : null;
+        }
       }
-    }
-    return null;
-  }, label);
+      return null;
+    },
+    [label, sign],
+  );
 }
 
 console.log("Polaris — PSM net-outcome strip, valued at the feed at settle\n");
@@ -164,9 +167,12 @@ check(
   `wanted "${signedCompact(PIN_8.effect)}" in: ${stripText8.slice(0, 300)}`,
 );
 check(
-  "1c. the strip states the redemption-share and mint-share splits (pinned +431.18K / +1.21M)",
-  stripText8.includes(signedCompact(PIN_8.redemption)) && stripText8.includes(signedCompact(PIN_8.mint)),
-  `wanted "${signedCompact(PIN_8.redemption)}" and "${signedCompact(PIN_8.mint)}"`,
+  // Each row's share is the net of every mint and redemption since the
+  // previous touch, so the strip states one net figure and no split named
+  // after either trade.
+  "1c. the strip names no redemption-share / mint-share split",
+  !/redemption shares|mint shares/i.test(stripText8),
+  stripText8.slice(0, 300),
 );
 
 const chain8 = await api(`/api/chain/polaris/position?market=usdp&id=8`);
@@ -187,17 +193,17 @@ check(
 );
 
 // ── 3. the tower's PSM swatches carry the pink checker ──────────────────────
-const redemptionSwatch = await swatchOf(page8, "PSM redemption share");
-const mintSwatch = await swatchOf(page8, "PSM mint share");
+const redemptionSwatch = await swatchOf(page8, "Net PSM shares", "−");
+const mintSwatch = await swatchOf(page8, "Net PSM shares", "+");
 const isPink = (style) => !!style && style.includes("244") && style.includes("114") && style.includes("182");
 const isOrange = (style) => !!style && style.includes("251") && style.includes("146") && style.includes("60");
 check(
-  '3a. the "PSM redemption share" breakdown row carries the pink checker',
+  '3a. a "− Net PSM shares" breakdown row carries the pink checker',
   isPink(redemptionSwatch) && !isOrange(redemptionSwatch),
   redemptionSwatch ?? "row not found",
 );
 check(
-  '3b. the "PSM mint share" breakdown row carries the pink checker',
+  '3b. a "+ Net PSM shares" breakdown row carries the pink checker',
   isPink(mintSwatch) && !isOrange(mintSwatch),
   mintSwatch ?? "row not found",
 );
@@ -211,10 +217,8 @@ const page27 = await open(context, polarisUrl("usdp", "27"));
 const strip27Text =
   (await outcomeStrip(page27).count()) > 0 ? (await outcomeStrip(page27).innerText()).replace(/\s+/g, " ") : "";
 check(
-  "2a. usdp/27's strip states the pinned total and split (+124.509; +43.571 / +80.938)",
-  strip27Text.includes(signedCompact(PIN_27.effect)) &&
-    strip27Text.includes(signedCompact(PIN_27.redemption)) &&
-    strip27Text.includes(signedCompact(PIN_27.mint)),
+  "2a. usdp/27's strip states the pinned total (+124.509)",
+  strip27Text.includes(signedCompact(PIN_27.effect)),
   strip27Text,
 );
 await page27.close();

@@ -51,7 +51,11 @@ import {
   viewFromSummary,
   type DolomitePositionView,
 } from "@/components/protocol/dolomite/dolomite-position-card";
-import { DolomitePositionExplanation } from "@/components/protocol/dolomite/dolomite-position-explanation";
+import {
+  DolomitePositionExplanation,
+  DolomiteClosedPositionExplanation,
+} from "@/components/protocol/dolomite/dolomite-position-explanation";
+import { dolomiteLiquidationStories, withTokenPeaks } from "@/lib/dolomite/closed-record";
 import { DolomiteRiskSlot } from "@/components/protocol/dolomite/dolomite-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import {
@@ -215,6 +219,18 @@ export default function DolomitePositionView({
   }, [view, chain]);
 
   const dolomiteEvents = useMemo(() => events.filter(isDolomiteEvent), [events]);
+
+  // A closed card's peaks as each row's token balance before and after it,
+  // and what each liquidation did, where the page holds every row.
+  const cardView = useMemo<DolomitePositionView | null>(() => {
+    if (!liveView || liveView.status === "open" || cutoffBlock != null || dolomiteEvents.length === 0) return liveView;
+    return {
+      ...liveView,
+      liquidations: dolomiteLiquidationStories(dolomiteEvents),
+      peakSupplies: withTokenPeaks(liveView.peakSupplies, dolomiteEvents, "supply"),
+      peakBorrows: withTokenPeaks(liveView.peakBorrows, dolomiteEvents, "debt"),
+    };
+  }, [liveView, cutoffBlock, dolomiteEvents]);
   // The tx-sibling seam: each card reaches its same-tx legs so the liquidation
   // narrator (the debt leg) can name the collateral seized on a sibling leg.
   const siblingsByTx = useMemo(() => groupEventsByTx(dolomiteEvents), [dolomiteEvents]);
@@ -317,7 +333,7 @@ export default function DolomitePositionView({
           <DolomiteExportMenu
             owner={owner}
             accountNumber={accountNumber}
-            view={liveView}
+            view={cardView ?? liveView}
             chain={chain}
             events={dolomiteEvents}
             csvFilename={`dolomite-${owner.slice(0, 10)}-${accountNumber.slice(0, 8)}-activity.csv`}
@@ -332,9 +348,9 @@ export default function DolomitePositionView({
         <DetailBodySkeleton />
       ) : (
         <>
-          {liveView && (
+          {liveView && cardView && (
             <DolomitePositionCard
-              v={liveView}
+              v={cardView}
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
@@ -360,12 +376,16 @@ export default function DolomitePositionView({
               // card. A closed account, or an open one whose read is pending,
               // narrates nothing.
               explanation={
-                <DolomitePositionExplanation
-                  chain={liveView.status === "open" ? chain : null}
-                  liquidationCount={liveView.liquidationCount}
-                  txCount={liveView.txCount}
-                  externalActivity={externalActivityWithOpening}
-                />
+                liveView.status === "open" ? (
+                  <DolomitePositionExplanation
+                    chain={chain}
+                    liquidationCount={liveView.liquidationCount}
+                    txCount={liveView.txCount}
+                    externalActivity={externalActivityWithOpening}
+                  />
+                ) : (
+                  <DolomiteClosedPositionExplanation v={cardView} />
+                )
               }
             />
           )}

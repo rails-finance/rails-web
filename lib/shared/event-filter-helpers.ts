@@ -8,6 +8,7 @@
 // arm to both, plus optional demoted / default-hidden entries below.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import {
   isLiquityEvent,
@@ -97,10 +98,11 @@ export function getEventActionKey(e: BaseActivityEvent): string {
     return e.context.data.eventType ?? e.actionType ?? "unknown";
   }
   if (isDolomiteEvent(e)) {
-    // Dolomite's eventType is already a clean per-leg bucket (deposit,
-    // withdraw, transfer_in/out, the trade legs, the liquidation legs), so it
-    // doubles as the filter key.
-    return e.context.data.eventType ?? e.actionType ?? "unknown";
+    // Dolomite's eventType is a per-leg bucket (deposit, withdraw,
+    // transfer_in/out, the trade legs, the liquidation legs); a deposit or
+    // withdrawal is keyed by what it did to the balance (borrow, repay, …),
+    // the same word its row shows.
+    return dolomiteBalanceAction(e.context.data) ?? e.context.data.eventType ?? e.actionType ?? "unknown";
   }
   if (isLiquityV1Event(e)) {
     // Liquity V1's eventType is already a clean per-action bucket (openTrove,
@@ -352,8 +354,7 @@ const COMPOUND_V2_OP_LABELS: Record<string, string> = {
 // which account lost or gained what (a seizure is not something the borrower
 // did).
 const DOLOMITE_OP_LABELS: Record<string, string> = {
-  deposit: "Deposit",
-  withdraw: "Withdraw",
+  ...DOLOMITE_BALANCE_ACTION_LABELS,
   transfer_in: "Transfer in",
   transfer_out: "Transfer out",
   trade_taker: "Trade (spent)",

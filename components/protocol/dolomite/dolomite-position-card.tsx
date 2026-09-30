@@ -41,10 +41,12 @@ import {
   positionParProv,
   dolomiteUsdProv,
   dolomitePeakParProv,
+  dolomitePeakTokenProv,
   borrowRateProv,
   avgBorrowRateProv,
 } from "@/lib/dolomite/event-provenance";
 import type { DolomiteCardCaptions } from "@/lib/dolomite/economics";
+import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { dolomitePositionContent } from "@/lib/dolomite/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
@@ -54,6 +56,8 @@ import type {
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { TipLabel } from "@/components/shared/tip-label";
+import { accountLabelTip } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface DolomitePositionView {
@@ -77,6 +81,9 @@ export interface DolomitePositionView {
   priceByMarket?: Record<string, number>;
   /** Live APRs per market id (percent). */
   ratesByMarket?: Record<string, { borrowAprPct: number | null; supplyAprPct: number | null }>;
+  /** What each liquidation did, read from the rows (a page holding the whole
+   *  history only). */
+  liquidations?: LiquidationStory[];
 }
 
 /** The figure a line asserts: the current token amount (par × current index,
@@ -193,14 +200,18 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
         <StatValue key={r.marketId}>
-          <Prov info={dolomitePeakParProv(r.symbol, side)}>
+          <Prov info={r.tokens ? dolomitePeakTokenProv(r.symbol, side) : dolomitePeakParProv(r.symbol, side)}>
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded label={r.symbol} />
             ) : (
               <AssetAmount
                 value={r.amount}
                 symbol={r.symbol}
-                exact={`${formatUnitsExact(r.amountRaw, r.decimals)} (par — × the market's index for tokens)`}
+                exact={
+                  r.tokens
+                    ? formatUnitsExact(r.amountRaw, r.decimals)
+                    : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
+                }
               />
             )}
           </Prov>
@@ -211,12 +222,15 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
 }
 
 /** The account-grain identity: the owner (address) + which of its accounts
- *  this is, in Dolomite's own vocabulary. */
-function AccountIdentity({ v }: { v: DolomitePositionView }) {
+ *  this is, in Dolomite's own vocabulary. On the detail page the label
+ *  explains itself on hover or tap (the listing card sits inside a link). */
+function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean }) {
   return (
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />
-      <span className="text-xs text-rb-500">{v.accountLabel}</span>
+      <span className="text-xs text-rb-500">
+        <TipLabel text={v.accountLabel} tip={tip ? accountLabelTip(v.accountNumber) : undefined} />
+      </span>
     </span>
   );
 }
@@ -260,11 +274,16 @@ export function DolomitePositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={dolomitePositionContent({ status: v.status })}
+        learnMore={dolomitePositionContent({
+          status: v.status,
+          peaksInTokens: [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens),
+          liquidations: v.liquidations,
+          liquidationCount: v.liquidationCount,
+        })}
       >
         <ClosedPositionStats
           outcome={v.status}
-          leadingIdentity={<AccountIdentity v={v} />}
+          leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
           identity={
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
@@ -273,6 +292,7 @@ export function DolomitePositionCard({
             />
           }
           closedAt={v.lastActivityAt}
+          outcomeDates={outcomeDates(v)}
           collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
           debt={<PeakStack lines={v.peakBorrows} side="debt" />}
         />
@@ -308,7 +328,7 @@ export function DolomitePositionCard({
             <LifecyclePill status={v.status} />
           )
         }
-        leadingIdentity={<AccountIdentity v={v} />}
+        leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
         identity={
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
@@ -357,6 +377,18 @@ export function DolomitePositionCard({
       />
     </PositionCardShell>
   );
+}
+
+/** A liquidated card's two dates: the last liquidation, then the closing,
+ *  when they fall on different days. */
+function outcomeDates(v: DolomitePositionView): { label: string; at: number }[] | undefined {
+  const last = v.liquidations?.at(-1)?.at;
+  if (v.status !== "liquidated" || last == null) return undefined;
+  if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  return [
+    { label: "Liquidated", at: last },
+    { label: "Closed", at: v.lastActivityAt },
+  ];
 }
 
 /** Build a card view from the listing summary row. */

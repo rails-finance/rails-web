@@ -84,3 +84,27 @@ export function accountLabel(accountNumber: string): string {
   if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER) return "Borrow Position (WLFI frontend account)";
   return `Borrow Position #${shortAccountNumber(norm)}`;
 }
+
+/** The other side of a transfer between two accounts of one wallet, named by
+ *  its account number ("account 0", "account 0xd010…e722"). */
+export function otherAccountName(accountNumber: string): string {
+  const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
+  if (norm === "0") return "account 0 (Dolomite Balance)";
+  if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER) return "the WLFI frontend account";
+  return `account ${shortAccountNumber(norm)}`;
+}
+
+/** What an account label means, for the tip on its first appearance. */
+export function accountLabelTip(accountNumber: string): string {
+  const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
+  const numbers =
+    "A wallet keeps its Dolomite balances in numbered accounts. Each account number is a separate position: its balances back each other, and it is margined and liquidated on its own.";
+  if (norm === "0")
+    return `${numbers} Account 0 is the wallet's Dolomite Balance, its default account, which usually funds the others.`;
+  if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER)
+    return `${numbers} The World Liberty Financial (WLFI) app, which runs on Dolomite, opens every borrow position under one account number (0x4747…4747). Many wallets share the number, and each wallet's account under it is its own.`;
+  const hex = shortAccountNumber(norm);
+  return hex === norm
+    ? `${numbers} This is account ${norm}; account 0 is the wallet's Dolomite Balance.`
+    : `${numbers} This is account ${hex}, the number in hexadecimal and shortened (the page address carries it in decimal); account 0 is the wallet's Dolomite Balance.`;
+}

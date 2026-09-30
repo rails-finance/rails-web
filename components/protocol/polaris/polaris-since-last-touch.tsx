@@ -127,20 +127,23 @@ export function PolarisSinceLastTouchRow({
       `Everything the protocol has done to this CDP since that touch — valued at the feed now. Each leg is its own ` +
       `getter on the cdpManager, pending until the CDP's next touch settles it into the stated figures: interest ` +
       `charged on the debt, the Protocol Safety Rate's stability gain against it, the pETH reward on the debt, and ` +
-      `the CDP's pro-rata share of every PSM mint and redemption since — which moves both sides at once.`,
-    formula: "(mintRedeemCollChange + bcTokenGain) × price − accruedInterest − mintRedeemDebtChange + accruedStables",
+      `the CDP's net pro-rata share of every PSM mint and redemption since, whose two sides can move in opposite ` +
+      `directions. Where those legs clear more than the debt, the part below zero is taken back out: the next touch ` +
+      `settles the debt to zero rather than paying the difference to the CDP.`,
+    formula:
+      "(mintRedeemCollChange + bcTokenGain) × price − accruedInterest − mintRedeemDebtChange + accruedStables + min(0, entireDebt)",
     inputs: [
       ...(Math.abs(w.raw.psmColl) > DUST || Math.abs(w.raw.psmDebt) > DUST
         ? [
             {
-              label: "PSM share, collateral leg",
+              label: "net PSM share, collateral side",
               value: formatExact(w.raw.psmColl),
               kind: "chain" as const,
               pclass: "state" as const,
               note: "getCDPMintRedeemCollChange(id), in pETH",
             },
             {
-              label: "PSM share, debt leg",
+              label: "net PSM share, debt side",
               value: formatExact(w.raw.psmDebt),
               kind: "chain" as const,
               pclass: "state" as const,
@@ -198,7 +201,7 @@ export function PolarisSinceLastTouchRow({
       `protocol's, which is all of it: the holder did nothing inside this window, so no other cause exists. Equity ` +
       `here is a valuation at a block, not a profit; naming a profit would need a price for the holder's own ` +
       `deposits, which is a choice about basis rather than a fact of the chain.`,
-    formula: "(entireColl × price now − entireDebt) − (coll × price at the touch − debt)",
+    formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
     inputs: [
       {
         label: "equity at the touch",
@@ -211,7 +214,7 @@ export function PolarisSinceLastTouchRow({
         value: formatExact(w.equityNow),
         kind: "chain-derived",
         pclass: "state",
-        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt at the head block",
+        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt (zero at or below zero) at the head block",
       },
     ],
   };

@@ -2050,8 +2050,8 @@ export function dolomiteLiquidationContent(): LearnMoreContent {
     intro:
       "An account becomes liquidatable when its adjusted collateral value falls below the margin requirement times its adjusted debt — the requirement being the global 117.65% minimum scaled up by each market's margin premium (multiplicatively), or the account's own risk override (111.11% on the LST/ETH category) where one applies.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt from their own Dolomite balances and takes collateral worth that repayment plus the liquidation spread (5% globally, scaled by per-market spread premiums; 4% under the risk override). One liquidation event moves FOUR balances: the borrower's debt and collateral, and the liquidator's payout and receipt — each account's timeline shows its own two legs.",
-      "Liquidation is partial and repeatable: it clears what the liquidator chooses to repay, and the account continues with whatever remains. The timeline shows each liquidation as an event in the account's life.",
+      "A liquidator repays part of the account's debt from their own Dolomite balances and takes collateral worth that repayment plus the liquidation spread. The spread is a 5% base multiplied by (1 + the spread premium) of the collateral market and of the debt market: collateral with a 200% premium against a debt with none is seized at 5% × 3 = 15%. An account with a risk override is seized at the override's own spread instead. The opened liquidation row states the spread that applied and its parts. One liquidation event moves FOUR balances: the borrower's debt and collateral, and the liquidator's payout and receipt — each account's timeline shows its own two legs.",
+      "How much is repaid is set by the protocol: when the account's health factor (adjusted collateral ÷ (margin requirement × adjusted debt)) is 0.95 or above and the collateral market allows partial liquidation, a liquidation clears half the debt; below 0.95 it can clear all of it. The account continues with whatever remains and can be liquidated again.",
     ],
     detailsHeading: "Key concepts:",
     details: [
@@ -4610,7 +4610,11 @@ export function polarisCdpContent(): LearnMoreContent {
       },
       {
         bold: "The PSM",
-        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint share raises a CDP's debt and collateral; a redemption share lowers both. The trade's fees go to the CDPs, so the net share can move the two sides by different amounts. It is not a Liquity redemption, and no one chose this CDP.",
+        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint adds debt and collateral to each CDP; a redemption takes both away. A row states the net share of every mint and redemption since the CDP's previous touch, so its two sides can move in opposite directions, and the trades' fees, which go to the CDPs, make their sizes differ. It is not a Liquity redemption, and no one chose this CDP.",
+      },
+      {
+        bold: "Settled to zero",
+        text: "when a net PSM share clears more debt than a CDP owes, the protocol adds the difference back to the debt at that touch, so the debt lands on zero rather than below.",
       },
       {
         bold: "Stability gain",
@@ -4618,7 +4622,7 @@ export function polarisCdpContent(): LearnMoreContent {
       },
       {
         bold: "Reward pETH",
-        text: "a share of the pETH yield Polaris pays to minters, added to the collateral in proportion to the debt the CDP holds.",
+        text: "pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the docs), shared between CDPs in proportion to the debt each holds and added to the collateral.",
       },
       {
         bold: "Minimum collateral ratio",
