@@ -609,14 +609,16 @@ export function StateInterestLine({
 /** The price chip's entries once the position read has landed: every reserve
  *  whose balance the card prices (a dust row hidden behind its count line
  *  aside, unless the event touched it), at the oracle price the read took,
- *  printed to the decimals that reproduce the card's USD figures. */
+ *  printed to the decimals that reproduce the card's USD figures. The
+ *  reserves the event touched lead. */
 export function statePricePills(
   state: AaveV3PositionState,
   coords: V3Coords,
   touched: TouchedLeg[],
 ): AtBlockPricePill[] {
   const isTouched = (r: AaveV3PositionStateReserve) => touched.some((t) => t.reserve === r.reserve);
-  return state.reserves.flatMap((r) => {
+  const ordered = [...state.reserves.filter(isTouched), ...state.reserves.filter((r) => !isTouched(r))];
+  return ordered.flatMap((r) => {
     if (r.priceBase == null || r.decimals == null) return [];
     const sides = (["supply", "debt"] as const).filter((s) => legHeld(s === "supply" ? r.supply : r.debt));
     if (sides.length === 0) return [];
