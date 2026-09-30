@@ -23,7 +23,7 @@
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const BOOK = "/ethereum/pwn/book";
 // The loans in escrow ARE the listing's resting view (lib/pwn/listing-visibility.ts),
-// so this link names no status and the listing draws no chip for it.
+// so this link names no status and the listing draws its fixed default chip for it.
 const OPEN_HREF = "/ethereum/pwn?sortBy=due&sortOrder=asc";
 const DEFAULTS_HREF = "/ethereum/pwn?status=unclaimed,defaulted&sortBy=due&sortOrder=desc";
 /** The listing pages at this size — a full page means there is a page 2 behind it. */
@@ -95,7 +95,7 @@ assert(loanRows === 0, `the book page renders no per-loan rows (found ${loanRows
 const fetchOrder = (rows) => [...rows].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).map((l) => l.loanId);
 
 for (const [label, href, expected, sortLabel, universe, chipWord] of [
-  ["in escrow", OPEN_HREF, expectedOpen, "Due", inEscrow, null],
+  ["in escrow", OPEN_HREF, expectedOpen, "Due", inEscrow, "in escrow"],
   ["defaulted", DEFAULTS_HREF, expectedDefaulted, "Due", defaulted, "defaulted"],
 ]) {
   console.log(`\n-- ${label}`);

@@ -41,7 +41,18 @@ import { PwnEventCard } from "@/components/protocol/pwn/pwn-event-card";
 import { PwnPositionCard, viewFromSummary } from "@/components/protocol/pwn/pwn-position-card";
 import { PwnPositionExplanation } from "@/components/protocol/pwn/pwn-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { accrueTo, computePwnEconomics, isAccruing, loanCost, loanDeadlineAt } from "@/lib/pwn/economics";
+import {
+  accrueTo,
+  computePwnEconomics,
+  isAccruing,
+  loanCost,
+  loanDeadlineAt,
+  loanDueAt,
+  pwnLoanState,
+} from "@/lib/pwn/economics";
+import { PwnDeadlinePassedRow, PwnLoanTenure } from "@/components/protocol/pwn/pwn-loan-clock";
+import { shortTokenId } from "@/lib/pwn/asset-catalog";
+import { formatNumber } from "@/lib/utils/format";
 import { fetchPwnCollateralTransfers } from "@/lib/api/fetch-pwn-collateral-transfer";
 import type { PwnCollateralReturn, PwnContext } from "@/lib/shared/types/event-shape";
 import { pwnEconomicsExplanation, pwnEconomicsContent } from "@/lib/pwn/economics-explanation";
@@ -324,6 +335,20 @@ export default function PwnLoanView({
         )
       : null;
   const returned = collateralReturn && collateralReturn.key === returnKey ? collateralReturn.value : undefined;
+  // Where the loan stands by the clock: past its deadline with no repayment or
+  // claim it has defaulted, though the index still calls it open.
+  const loanState = view ? pwnLoanState(view) : null;
+  const unclaimed = loanState === "unclaimed";
+  // The loan's rows run from its creation to its close (or to now); the
+  // header states that span against the term the loan was struck for.
+  // A repaid loan ran to its repayment (the note holder may claim much later);
+  // a defaulted one to the lender's claim.
+  const closedAt =
+    view?.status === "repaid"
+      ? (view.repaidAt ?? null)
+      : view?.status === "defaulted" && loanEvents.length > 0
+        ? loanEvents[loanEvents.length - 1].timestamp
+        : null;
   const pwnEvents = loanEvents.map((e) => {
     const d = e.context.data;
     if (!view) return e;
@@ -445,7 +470,12 @@ export default function PwnLoanView({
             viewHref={tl.viewHref}
             explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
           />
-          {view.status === "open" &&
+          {/* The tower stacks the collateral and the credit on one scale, so it
+              mounts only where both are fungible amounts and the loan is
+              running: an NFT or a bundle has no unit in common with the
+              credit, and a loan past its deadline has no debt to draw. */}
+          {loanState === "running" &&
+            view.collateral?.category === "ERC20" &&
             (() => {
               const towerData = computePwnEconomics(view);
               return (
@@ -453,7 +483,7 @@ export default function PwnLoanView({
                   data={towerData}
                   title={`Loan #${view.loanId} · Lifetime flows`}
                   explanation={pwnEconomicsExplanation(towerData)}
-                  learnMore={pwnEconomicsContent()}
+                  learnMore={pwnEconomicsContent(isAccruing(view))}
                 />
               );
             })()}
@@ -463,19 +493,62 @@ export default function PwnLoanView({
             // lets pinned mode (the per-event share route) force a landed
             // card's detail panel open on its first mount.
             persistKeyPrefix="pwn"
-            closed={view.status !== "open"}
+            // A loan past its deadline is not live: no pulsing tip.
+            closed={view.status !== "open" || unclaimed}
             tl={tl}
+            liveWindow={
+              unclaimed && deadline != null
+                ? ({ isFirst }) => (
+                    <PwnDeadlinePassedRow
+                      isFirst={isFirst}
+                      deadline={deadline}
+                      extended={view.extendedDueAt != null && view.extendedDueAt !== loanDueAt(view)}
+                      dueKind={view.dueKind}
+                      loanId={view.loanId}
+                      version={view.version}
+                      owed={cost && view.credit ? `${formatNumber(cost.total)} ${view.credit.symbol}` : null}
+                      collateral={
+                        view.collateral
+                          ? view.collateral.tokenId != null && view.collateral.category !== "ERC20"
+                            ? `${view.collateral.symbol} #${shortTokenId(view.collateral.tokenId)}`
+                            : `${formatNumber(view.collateral.amount)} ${view.collateral.symbol}`
+                          : "The collateral"
+                      }
+                    />
+                  )
+                : undefined
+            }
             // Tenure-first header (the V4 spoke treatment): when this LOAN
             // actually opened, not when the wallet's window does — `firstAt`
             // only overrides the tenure toward an EARLIER timestamp, so on the
             // no-op path (every real PWN wallet today) this is inert.
             toolbarLeading={
-              <TimelineActivityHeader
-                events={pwnEvents}
-                closed={view.status !== "open"}
-                firstAt={opening?.firstTimestamp}
-                tenurePending={!lifetimeFiguresKnown(historyWindow)}
-              />
+              loanState !== "running" &&
+              lifetimeFiguresKnown(historyWindow) &&
+              view.createdAt != null &&
+              loanEvents.length > 0 ? (
+                <PwnLoanTenure
+                  state={loanState!}
+                  createdAt={view.createdAt}
+                  deadline={deadline}
+                  closedAt={closedAt}
+                  lastAt={loanEvents[loanEvents.length - 1].timestamp}
+                  fallback={
+                    <TimelineActivityHeader
+                      events={pwnEvents}
+                      closed={view.status !== "open"}
+                      firstAt={opening?.firstTimestamp}
+                    />
+                  }
+                />
+              ) : (
+                <TimelineActivityHeader
+                  events={pwnEvents}
+                  closed={view.status !== "open"}
+                  firstAt={opening?.firstTimestamp}
+                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                />
+              )
             }
             renderCard={(event, meta) =>
               isPwnEvent(event) ? (

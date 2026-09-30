@@ -112,7 +112,12 @@ export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings =
       prov: creditAdvancedProv(ctx.creditSymbol, coords),
     });
     const r = rowRepay(ctx, coords);
-    if (ctx.accruingInterestApr != null && !r) {
+    // The LOAN note's rows (minted, burned) state the note and the collateral;
+    // the loan's cost belongs to the rows that set or settle it.
+    const noteRow = ctx.eventType === "minted" || ctx.eventType === "burned";
+    if (noteRow) {
+      // The credit tile alone.
+    } else if (ctx.accruingInterestApr != null && !r) {
       // A v1.2/v1.3 loan before it settles: its terms state a rate, and the
       // total is known only at repayment (or at the deadline, on a default).
       stats.push({

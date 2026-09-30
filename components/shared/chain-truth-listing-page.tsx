@@ -98,8 +98,9 @@ export function serverStrategy<T, F extends BaseListFilters, Ext = undefined>(
 }
 
 export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = undefined> {
-  /** Page heading, e.g. "SparkLend Positions". */
-  title: string;
+  /** Page heading, e.g. "SparkLend Positions" — or read from the selection,
+   *  where the resting view lists a subset the heading should name. */
+  title: string | ((filters: F) => string);
   /** Noun for the loading / empty / pagination states, e.g. "positions". */
   noun: string;
   /** Route this listing lives at, e.g. "/ethereum/spark" — URL updates push here. */
@@ -465,7 +466,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
 
   return (
     <ChainTruthListing<T, F>
-      title={title}
+      title={typeof title === "function" ? title(filters) : title}
       protocol={directoryEntry}
       headerExtra={headerExtra}
       above={above}

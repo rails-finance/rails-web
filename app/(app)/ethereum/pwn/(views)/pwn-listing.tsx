@@ -15,6 +15,7 @@ import {
   PWN_APPLY,
   type PwnListFilters,
 } from "@/lib/pwn/list-filter-dimensions";
+import { effectiveStatuses, sameStatusSet, UNSETTLED_PWN_STATUS_BUCKETS } from "@/lib/pwn/listing-visibility";
 
 export interface PwnListingProps {
   initialItems?: PwnPositionSummary[];
@@ -26,7 +27,10 @@ export interface PwnListingProps {
 export function PwnListing({ initialItems, initialTotal, initialKey, initialSearch }: PwnListingProps) {
   return (
     <ChainTruthListingPage<PwnPositionSummary, PwnListFilters>
-      title="PWN Loans"
+      // The bare directory lists the loans still in escrow, and says so.
+      title={(f) =>
+        sameStatusSet(effectiveStatuses(f), UNSETTLED_PWN_STATUS_BUCKETS) ? "PWN Loans in Escrow" : "PWN Loans"
+      }
       noun="loans"
       basePath="/ethereum/pwn"
       bookmarksProtocol="pwn"
@@ -36,10 +40,13 @@ export function PwnListing({ initialItems, initialTotal, initialKey, initialSear
       renderCard={(p) => <PwnPositionCard v={viewFromSummary(p)} />}
       // The whole book's size beside the filtered view: the memory tier holds
       // every loan, so the SSR set is the denominator.
-      renderAbove={({ total }) =>
+      renderAbove={({ total, filters }) =>
         initialItems && initialItems.length > 0 ? (
           <p className="mb-2 text-[11px] tabular-nums text-rb-500">
             {total} of {initialItems.length} loans
+            {sameStatusSet(effectiveStatuses(filters), UNSETTLED_PWN_STATUS_BUCKETS)
+              ? ": the loans in escrow, running or defaulted and not yet claimed"
+              : null}
           </p>
         ) : null
       }

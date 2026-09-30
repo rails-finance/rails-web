@@ -108,7 +108,7 @@ export function pwnPositionToMarkdown(args: PwnPositionMarkdownArgs): string {
   const rate = cost?.rate ?? null;
   if (view.repayAmount != null) {
     lines.push(
-      `- **Repayment owed (fixed):** ${view.credit?.decimalsUnread ? notLoaded(view.credit) : `${amt(view.repayAmount)} ${creditSym}`}`,
+      `- **${state === "unclaimed" ? "Owed at the deadline (fixed; no longer repayable, the deadline passed)" : "Repayment owed (fixed)"}:** ${view.credit?.decimalsUnread ? notLoaded(view.credit) : `${amt(view.repayAmount)} ${creditSym}`}`,
     );
     if (view.fixedInterest != null && view.fixedInterest > 0)
       lines.push(

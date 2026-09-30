@@ -291,10 +291,12 @@ if (wants("Liquity V2")) {
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -390,7 +392,7 @@ if (wants("Liquity V2")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && clearedTotal.total === openTotal,
+    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
   );
 
@@ -484,10 +486,12 @@ if (wants("Polaris")) {
     barePills.length > 0 && barePills.every((p) => p === "OPEN"),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -633,7 +637,7 @@ if (wants("Polaris")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && clearedTotal.total === openTotal,
+    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
   );
 
@@ -793,10 +797,12 @@ async function runRestingViewSection(spec) {
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS_ROSTER.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -945,7 +951,7 @@ async function runRestingViewSection(spec) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openAfter, clearedIndex),
+    clearedChips.statusChip === "Status: in escrow" && withinIndex(clearedTotal.total, openAfter, clearedIndex),
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
   );
   await picked.close();
@@ -1330,10 +1336,12 @@ if (wants("PWN")) {
       barePills.every((p) => p != null && (OPEN_PILLS_ROSTER.has(p) || p === "DEFAULTED · UNCLAIMED")),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -1453,7 +1461,7 @@ if (wants("PWN")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null &&
+    clearedChips.statusChip === "Status: in escrow" &&
       withinIndex(clearedPills.length, openAfter, now.filter((r) => r.status === "open").length),
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedPills.length} rows vs index ${openAfter} open`,
   );

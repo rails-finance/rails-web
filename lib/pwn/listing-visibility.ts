@@ -10,12 +10,13 @@
 // param. The resting view is the first two: the loans whose collateral is still in escrow.
 //
 // `status` on the filter object carries RAW user intent: [] is "no opinion" and resolves here
-// at read time, a concrete set is an explicit choice. The default is never written into the
-// filter object, so clearing a selection returns to whatever the current context rests on, and
-// an identity search relaxes the view without the reader touching the Status facet. Because the
-// default is contextual rather than a selection it draws NO chip and NO Reset link (the shared
-// driver hides a dimension sitting on its `defaultValues`) and the bare directory URL stays
-// clean.
+// at read time, a concrete set is an explicit choice, and ["none"] is every box unticked. The
+// default is never written into the filter object, so clearing a selection returns to whatever
+// the current context rests on, and an identity search relaxes the view without the reader
+// touching the Status facet. The default draws no removable chip and no Reset link (the shared
+// driver treats a dimension sitting on its `defaultValues` as inactive); the bare directory
+// names it in a fixed chip instead ("Status: in escrow", `defaultChip` in
+// list-filter-dimensions.tsx), and its URL stays clean.
 
 import { namesIdentity } from "@/lib/pwn/search";
 
@@ -39,7 +40,7 @@ export function canonicalStatuses(values: string[]): PwnStatusBucket[] {
 }
 
 /** Order-independent equality of two bucket selections. */
-export function sameStatusSet(a: PwnStatusBucket[], b: PwnStatusBucket[]): boolean {
+export function sameStatusSet(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   const bs = new Set(b);
   return a.every((x) => bs.has(x));
@@ -58,9 +59,15 @@ export function defaultStatuses(f: PwnVisibilityInput): PwnStatusBucket[] {
   return namesIdentity(f.q) ? [...ALL_PWN_STATUS_BUCKETS] : [...UNSETTLED_PWN_STATUS_BUCKETS];
 }
 
-/** The selection actually in effect: an explicit non-empty choice wins; an empty selection
- *  resolves to the contextual default (zero buckets is not a view). */
-export function effectiveStatuses(f: PwnVisibilityInput): PwnStatusBucket[] {
+/** The explicit empty selection: every box unticked. Written as `status=none` so that
+ *  unticking the last box leaves them all unticked and lists no loans, where an empty
+ *  selection would snap back to the default and tick two boxes the reader never touched. */
+export const NO_PWN_STATUS = "none";
+
+/** The selection in effect: an explicit choice wins (`none` among it, nothing);
+ *  an empty selection resolves to the contextual default. */
+export function effectiveStatuses(f: PwnVisibilityInput): string[] {
+  if ((f.status ?? []).includes(NO_PWN_STATUS)) return [NO_PWN_STATUS];
   const sel = canonicalStatuses(f.status ?? []);
   return sel.length > 0 ? sel : defaultStatuses(f);
 }

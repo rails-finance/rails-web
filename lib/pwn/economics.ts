@@ -76,9 +76,20 @@ const pctText = (p: number): string => {
   return `${p.toFixed(digits)}%`;
 };
 
+/** The term's share of the principal at the fewest decimals that give the
+ *  interest back to within 0.05%: 50 USDC at 0.411% is 0.2055, the
+ *  terms' 0.205479 — where 0.4% would give 0.2. Whole shares stay whole ("8%"). */
+export function termPctText(p: number): string {
+  for (let d = 0; d <= 6; d++) {
+    const shown = Number(p.toFixed(d));
+    if (p === 0 || Math.abs(shown - p) / p < 0.0005) return `${p.toFixed(d)}%`;
+  }
+  return `${p.toFixed(6)}%`;
+}
+
 /** "8% for 30 days, 97% a year" — the rate as the card and the rows state it. */
 export const interestRateText = (r: PwnInterestRate): string =>
-  `${pctText(r.termPct)} for ${r.termDays} ${r.termDays === 1 ? "day" : "days"}, ${pctText(r.annualPct)} a year`;
+  `${termPctText(r.termPct)} for ${r.termDays} ${r.termDays === 1 ? "day" : "days"}, ${pctText(r.annualPct)} a year`;
 
 /** The loan's fixed interest as a rate over the term the parties struck. */
 export function loanInterestRate(v: PwnPositionView): PwnInterestRate | null {

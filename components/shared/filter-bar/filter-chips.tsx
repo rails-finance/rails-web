@@ -21,7 +21,13 @@ interface FilterChipsProps<F> {
 
 export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsProps<F>) {
   const activeDims = dimensions.filter((d) => isDimensionActive(d, filters));
-  if (activeDims.length === 0) return null;
+  // A dimension resting on a default that constrains the list names it in a
+  // fixed chip (FilterDimension.defaultChip).
+  const defaultChips = dimensions
+    .filter((d) => !isDimensionActive(d, filters))
+    .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null }))
+    .filter((c): c is { id: string; text: string } => c.text != null);
+  if (activeDims.length === 0 && defaultChips.length === 0) return null;
 
   const chipText = (dim: FilterDimension<F>) => {
     const vals = dim.get(filters);
@@ -38,6 +44,16 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {defaultChips.map((c) => (
+        <span
+          key={c.id}
+          data-default-chip={c.id}
+          className="inline-flex items-center rounded-full bg-rb-100 dark:bg-rb-800 px-2.5 py-1 text-xs text-foreground"
+          title="The list's default view"
+        >
+          {c.text}
+        </span>
+      ))}
       {activeDims.map((dim) => (
         <span
           key={dim.id}
@@ -54,9 +70,11 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
           </button>
         </span>
       ))}
-      <button type="button" onClick={resetAll} className={`${RESET_LINK} ml-0.5`}>
-        Reset
-      </button>
+      {activeDims.length > 0 && (
+        <button type="button" onClick={resetAll} className={`${RESET_LINK} ml-0.5`}>
+          Reset
+        </button>
+      )}
     </div>
   );
 }

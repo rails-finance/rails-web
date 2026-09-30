@@ -9,12 +9,19 @@
 // render and run this. Twin patterns in lib/morpho + lib/liquity-v1.
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { defaultChipLabel, type FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import { loanDeadlineAt, pwnLoanState } from "@/lib/pwn/economics";
-import { canonicalStatuses, defaultStatuses, effectiveStatuses, sameStatusSet } from "@/lib/pwn/listing-visibility";
+import {
+  ALL_PWN_STATUS_BUCKETS,
+  NO_PWN_STATUS,
+  canonicalStatuses,
+  defaultStatuses,
+  effectiveStatuses,
+  sameStatusSet,
+} from "@/lib/pwn/listing-visibility";
 
 export interface PwnListFilters extends BaseListFilters {
   status: string[];
@@ -57,6 +64,14 @@ const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "defaulted", label: "Defaulted and claimed" },
 ];
 
+/** "0 running" — a bucket's word after a zero count. */
+const ZERO_WORD: Record<string, string> = {
+  open: "running",
+  unclaimed: "unclaimed",
+  repaid: "repaid",
+  defaulted: "claimed",
+};
+
 /** The loan's bucket now (lib/pwn/economics.ts `pwnLoanState`, "running" → "open"). */
 export function pwnStatusBucket(row: PwnPositionSummary): string {
   const s = pwnLoanState({ ...row, extendedDueAt: row.latestDefaultAt });
@@ -83,6 +98,13 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
         }
       : null;
   const creditOptions = distinct(rows, (r) => assetOption(r.credit));
+  // A bucket with no loan in it says so beside its box ("0 running"), so ticking
+  // it and seeing nothing change reads as the answer.
+  const bucketCounts = new Map<string, number>();
+  for (const r of rows) bucketCounts.set(pwnStatusBucket(r), (bucketCounts.get(pwnStatusBucket(r)) ?? 0) + 1);
+  const statusOptions: FilterOptionDef[] = STATUS_OPTIONS.map((o) =>
+    rows.length > 0 && !bucketCounts.get(o.value) ? { ...o, meta: `0 ${ZERO_WORD[o.value] ?? ""}`.trim() } : o,
+  );
   const collateralOptions = distinct(rows, (r) => assetOption(r.collateral));
 
   return [
@@ -92,13 +114,24 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
       group: "Status",
       cardinality: "multi",
       param: "status",
-      options: STATUS_OPTIONS,
+      options: statusOptions,
       get: (f) => effectiveStatuses(f),
       defaultValues: (f) => defaultStatuses(f),
+      // Each box adds or removes that option: unticking the last one leaves none
+      // ticked (and no loans listed); only a selection equal to the default
+      // returns to the clean URL.
       set: (f, v) => {
         const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        return {
+          ...f,
+          status: sel.length === 0 ? [NO_PWN_STATUS] : sameStatusSet(sel, defaultStatuses(f)) ? [] : sel,
+        };
       },
+      chipLabel: (values, options) =>
+        values.includes(NO_PWN_STATUS) ? "Status: none ticked" : defaultChipLabel("Status", values, options),
+      // The bare directory rests on the loans still in escrow; the chip says so.
+      // A search naming a loan or a party rests on every status, which needs no chip.
+      defaultChip: (f) => (defaultStatuses(f).length < ALL_PWN_STATUS_BUCKETS.length ? "Status: in escrow" : null),
       matches: (row, v) => v.includes(pwnStatusBucket(row)),
     },
     {

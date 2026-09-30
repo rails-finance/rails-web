@@ -34,6 +34,7 @@ import { formatNumber } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
+import { utcMinuteText } from "@/components/protocol/pwn/pwn-loan-clock";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -273,6 +274,15 @@ export function PwnPositionExplanation({
               </>
             )}{" "}
             passed with the repayment unmade, and the lender&rsquo;s claim on the collateral followed.
+          </>
+        ) : repaidAt != null && repaidAt <= dueAt && dateOf(repaidAt) === dateOf(dueAt) ? (
+          // Repaid on the deadline's day: the times tell the two apart.
+          <>
+            The borrower repaid at {utcMinuteText(repaidAt)},{" "}
+            {dueAt - repaidAt < 3600
+              ? `${Math.floor((dueAt - repaidAt) / 60)} min`
+              : minutesText(Math.floor((dueAt - repaidAt) / 60))}{" "}
+            before {extended ? "the extended deadline" : "its deadline"} of <H>{utcMinuteText(dueAt)}</H>.
           </>
         ) : repaidAt != null && repaidAt <= dueAt ? (
           <>

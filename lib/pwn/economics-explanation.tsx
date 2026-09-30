@@ -42,9 +42,8 @@ export function pwnEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
 
   bullets.push(
     <span key="mechanic">
-      A PWN loan is peer-to-peer and fixed-term: the collateral, the credit and the repayment total are struck between
-      lender and borrower at origination, and the loan settles only by repayment or by default at the deadline — nothing
-      accrues in between.
+      A PWN loan is peer-to-peer and fixed-term: the collateral, the credit and the interest terms are struck between
+      lender and borrower at origination, and the loan settles only by repayment or by default at the deadline.
     </span>,
   );
 
@@ -70,24 +69,34 @@ export function pwnEconomicsExplanation(data: ChainTruthTowerData): ReactNode {
 
 const PWN_DOC_URL = "https://docs.pwn.xyz";
 
-/** The tower's "?" FAQ for PWN. */
-export function pwnEconomicsContent(): LearnMoreContent {
+/** The tower's "?" FAQ for PWN. It states when the panel is drawn, which is
+ *  the page's rule (position-view.tsx): a running loan whose collateral is a
+ *  fungible token. */
+export function pwnEconomicsContent(accruing = false): LearnMoreContent {
   return {
     title: "About the Economics",
-    intro:
-      "This panel reads the loan's struck terms — collateral, credit principal and fixed interest — straight from the loan's own on-chain terms. A PWN loan is fixed by construction: no oracle, no health factor and no accrual, so there is no lifetime flow to replay.",
+    intro: accruing
+      ? "This panel reads the loan's struck terms — collateral and credit principal — from the loan's on-chain terms. The interest accrues by the minute at the rate the terms state, so its total is known only at repayment and the panel draws the principal alone. No oracle and no health factor stand behind either side."
+      : "This panel reads the loan's struck terms — collateral, credit principal and fixed interest — from the loan's on-chain terms. The repayment total is fixed at origination: no oracle, no health factor and no accrual, so there is no lifetime flow to replay.",
     stepsHeading: "How the tower is built:",
     steps: [
-      "Collateral and credit principal are the amounts locked into the loan's terms at origination.",
-      "Fixed interest is the repayment total agreed at origination minus the principal — it never changes.",
-      "A closed loan (repaid or defaulted) has no live balance, so the tower shows nothing for it — the timeline carries the settled story instead.",
+      "Collateral and credit principal are the amounts locked into the loan's terms at origination, each drawn in its token.",
+      accruing
+        ? "Interest is left off the credit side: the terms state a yearly rate, and what it comes to depends on the minute the borrower repays."
+        : "Fixed interest is the repayment total agreed at origination minus the principal; it never changes.",
+      "The panel is drawn only for a running loan whose collateral is a fungible token. An NFT or a bundle has no unit in common with the credit, a loan past its deadline can no longer be repaid, and a settled loan holds nothing; for those the card and the timeline tell the loan.",
     ],
     detailsHeading: "Key concepts:",
     details: [
-      {
-        bold: "Fixed by construction",
-        text: "nothing accrues and nothing floats — the repayment owed on the last day is the number struck on the first.",
-      },
+      accruing
+        ? {
+            bold: "Rate fixed, total by the clock",
+            text: "the rate was agreed at origination; the interest is the principal times that rate for each whole minute until repayment, and stops at the deadline, after which the contract refuses a repayment.",
+          }
+        : {
+            bold: "Fixed by construction",
+            text: "nothing accrues and nothing floats — the repayment owed on the last day is the number struck on the first.",
+          },
       {
         bold: "Two outcomes",
         text: "a loan settles by repayment (the lender collects principal plus interest) or by default at the deadline (the lender claims the collateral instead).",

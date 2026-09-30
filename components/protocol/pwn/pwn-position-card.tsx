@@ -103,12 +103,13 @@ export interface PwnPositionView {
 }
 
 /** A fungible amount in `asset`, or "Not loaded" where its decimals did not
- *  load (the amount has no known scale). */
+ *  load (the amount has no known scale). Stated in full to three decimals, the
+ *  rows' rounding, so the card and the rows print one figure ("3,239.365"). */
 function FungibleAmount({ asset, value }: { asset: PwnAsset; value: number }) {
   return asset.decimalsUnread ? (
     <TokenAmountNotLoaded address={asset.address} label={asset.symbol} />
   ) : (
-    <AssetAmount value={value} symbol={asset.symbol} />
+    <AssetAmount value={value} symbol={asset.symbol} display={formatNumber(value)} />
   );
 }
 
@@ -244,15 +245,17 @@ const dueDateTitle = (unix: number): string => {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 };
 
-/** The cost tile's footnote: the interest, and how it was reached. */
-function costFootnote(v: PwnPositionView, cost: PwnLoanCost): React.ReactNode {
+/** The cost tile's footnote: the interest, and how it was reached. A loan past
+ *  its deadline and unclaimed says first that the sum can no longer be repaid. */
+function costFootnote(v: PwnPositionView, cost: PwnLoanCost, unclaimed = false): React.ReactNode {
   const sym = v.credit?.symbol ?? "";
+  const lapsed = unclaimed ? <>no longer repayable · </> : null;
   if (cost.shape === "fixed") {
-    if (!(cost.interest > 0)) return <StatFootnote>no interest</StatFootnote>;
+    if (!(cost.interest > 0)) return <StatFootnote>{lapsed}no interest</StatFootnote>;
     const ext = v.extensionCount ?? 0;
     return (
       <StatFootnote>
-        principal + {formatNumber(cost.interest)} {sym} fixed interest
+        {lapsed}principal + {formatNumber(cost.interest)} {sym} fixed interest
         {cost.rate ? <> · {interestRateText(cost.rate)}</> : null}
         {ext > 0 ? <> · unchanged by the {ext === 1 ? "extension" : `${ext} extensions`}</> : null}
       </StatFootnote>
@@ -261,7 +264,7 @@ function costFootnote(v: PwnPositionView, cost: PwnLoanCost): React.ReactNode {
   const a = cost.accrual!;
   return (
     <StatFootnote>
-      principal + {formatNumber(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
+      {lapsed}principal + {formatNumber(cost.interest)} {sym} interest · accrues {aprText(a.apr)}
       {cost.basis === "paid" ? <> · to the repayment</> : <> · counted to the deadline</>}
     </StatFootnote>
   );
@@ -522,9 +525,11 @@ export function PwnPositionCard({
           },
           { label: "Principal", value: principalValue, footnote: principalFootnote },
           {
-            label: cost?.shape === "accruing" ? "Owed at deadline" : "Repay",
+            // Past the deadline the contract refuses a repayment, so the sum is
+            // what the loan owed when it lapsed, never a figure to repay.
+            label: unclaimed ? "Owed at the deadline" : cost?.shape === "accruing" ? "Owed at deadline" : "Repay",
             value: cost && v.credit ? <CostValue v={v} cost={cost} /> : <StatDash />,
-            footnote: cost ? costFootnote(v, cost) : undefined,
+            footnote: cost ? costFootnote(v, cost, unclaimed) : undefined,
           },
           {
             label: "Due",

@@ -3725,7 +3725,7 @@ export function pwnRepaymentContent(eventType: "paid_back" | "claimed", accruing
       accruing
         ? {
             bold: "The rate was agreed, the total follows the clock",
-            text: "interest is the principal times the terms' yearly rate for each whole minute the loan ran. The contract refuses a repayment once the deadline has passed, so the deadline caps it.",
+            text: "interest is the principal times the terms' yearly rate for each whole minute the loan ran. The deadline is the last minute to repay: the contract refuses a repayment after it, so the interest never runs past it.",
           }
         : {
             bold: "The amount was never in question",
