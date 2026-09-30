@@ -12,7 +12,7 @@
 //       maxima those widths are measured against equal the listing row's
 //       peakColl / peakDebt. Both flags off: no bar on any row.
 //   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
-//       read the restated `${round(cr)}% CR`, neither red; usdp/175's
+//       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
 //       liquidation row's chip is the at-fire ratio and is red (asserted on
 //       the marker, not the text: 114.78 rounds to 115); its open row is not
 //       red. Flag off: no chip anywhere.
@@ -99,8 +99,17 @@ const crAtFirePct = (d) => {
   if (price == null || !seized || !cleared) return null;
   return ((seized * price) / cleared) * 100;
 };
-const chipText = (pct) => `${Math.round(pct)}% CR`;
-const pct1 = (pct) => `${pct.toFixed(1)}%`;
+// lib/polaris/ratio-format.ts: one decimal, the site's separators, a second
+// decimal where one would put the ratio on the 115% minimum, "over 10,000%"
+// above the ceiling. The chip states the metric's figure.
+const fx = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct1 = (pct) => {
+  if (pct > 10000) return "over 10,000%";
+  let d = 1;
+  while (d < 2 && pct !== 115 && fx(pct, d) === fx(115, d)) d++;
+  return `${fx(pct, d)}%`;
+};
+const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
 const MENU_LABELS = [
   "Timestamps (UTC)",
@@ -452,7 +461,8 @@ try {
     chipOpen175 != null && chipOpen175.text === chipText(crOpen175) && !chipOpen175.red,
     JSON.stringify(chipOpen175),
   );
-  // The forensics explainer states the same at-fire figure to 2 dp.
+  // The forensics explainer states the same at-fire figure at the metric's
+  // grain (one decimal, two where one would read as the minimum).
   await expandRow(page175, liq175.id);
   const liqRow = rowOf(page175, liq175.id);
   const explBtn = liqRow.getByRole("button", { name: /explanation/i }).first();
@@ -461,9 +471,12 @@ try {
   const liqText = (await liqRow.innerText()).replace(/\s+/g, " ");
   const liqStat = await readRatioStat(page175, liq175.id);
   check(
-    `c5. the liquidation row's metric (${pct1(fire)}) and the forensics clause (${pct2(fire)}) state the same ratio at fire`,
-    liqStat != null && liqStat.text.includes(pct1(fire)) && liqText.includes(pct2(fire)) && liqStat.change == null,
-    JSON.stringify({ liqStat, has2dp: liqText.includes(pct2(fire)) }),
+    `c5. the liquidation row's metric and the forensics clause both state ${pct1(fire)} at fire`,
+    liqStat != null &&
+      liqStat.text.includes(pct1(fire)) &&
+      liqText.includes(`ratio at liquidation at ${pct1(fire)}`) &&
+      liqStat.change == null,
+    JSON.stringify({ liqStat, inClause: liqText.includes(`ratio at liquidation at ${pct1(fire)}`) }),
   );
   await page175.close();
 

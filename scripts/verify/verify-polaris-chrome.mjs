@@ -73,7 +73,17 @@ async function api(path_, tries = 4) {
 }
 
 /** The header's compact form for a sub-1 magnitude, restated. */
-const compactSub1 = (x) => parseFloat(Number(x).toFixed(4)).toString();
+// Polaris states every row figure in full, three decimals (the house
+// formatNumber: en-US, at most 3 fraction digits; a non-zero amount that would
+// round to 0 reads to 3 significant digits) — restated, not imported.
+function fmtFullLike(n) {
+  const a = Math.abs(Number(n));
+  if (!a || !isFinite(a)) return "";
+  const s = a.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  if (parseFloat(s.replace(/,/g, "")) === 0)
+    return a < 1e-6 ? "<0.000001" : a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+  return s;
+}
 const DOCS_HOST = "docs.polaris.finance";
 const APP_URL = "https://testnet.polaris.finance";
 
@@ -188,7 +198,7 @@ for (const id of ["175", "166"]) {
     const text = (el.textContent ?? "").replace(/\s+/g, " ");
     return { figure, text, order: [text.indexOf("Seized"), text.indexOf("Cleared"), text.indexOf("Claimable")] };
   });
-  const want = compactSub1(surplus);
+  const want = fmtFullLike(surplus);
   check(
     `4b. usdp/${id}: the liquidation header states "Claimable ${want} pETH"`,
     header.figure === want,

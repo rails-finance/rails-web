@@ -1,29 +1,21 @@
 "use client";
 
-// The SparkLend position card's risk slot — both risk reads, always on,
-// riding the card's heading-button row. Near-clone of aave-v3-risk-slot.tsx
-// (SparkLend is an Aave V3 fork). (The Display menu is retired: one framing no
-// longer hides behind the other.) Everything it draws is ON the card face and
-// inside the card's receipts scope, so the Provenance list holds exactly these
-// figures —
-//
-//   • the "% from liquidation" runway (health factor traced by the card's own
-//     HF stat; the slot adds no new receipts) — the spatial story, and
-//   • the stated loan-to-value lines riding the same strip: the current ratio, the borrow
-//     cap, the liquidation threshold and "available to borrow".
+// The SparkLend position card's risk detail (ui-jobs 209): the distance bar
+// under Health factor in the card's opened layer. The health factor is traced
+// by the card's HF stat; the bar adds no receipts.
 
 import { SparkRunway } from "@/components/protocol/spark/spark-runway";
-import { SparkLtvView } from "@/components/protocol/spark/spark-ltv-card";
-import { RiskFooterStrip, RiskMeter } from "@/components/shared/risk-footer-strip";
 import type { SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 
-export function SparkRiskSlot({ chain }: { chain: SparkPositionChainResponse }) {
+/** The opened card's distance bar under Health factor, beside its
+ *  "Liquidates on a N% drop". The card carries no loan-to-value or e-mode
+ *  line: the Explanation states the ratio, the borrow cap, the threshold and
+ *  the e-mode category. */
+export function SparkRiskDetail({ chain }: { chain: SparkPositionChainResponse }) {
+  if (chain.healthFactor == null || chain.healthFactor <= 0) return null;
   return (
-    <RiskFooterStrip>
-      <SparkLtvView chain={chain} />
-      <RiskMeter>
-        <SparkRunway compact healthFactor={chain.healthFactor} />
-      </RiskMeter>
-    </RiskFooterStrip>
+    <div className="mt-1.5 max-w-72">
+      <SparkRunway compact barOnly healthFactor={chain.healthFactor} />
+    </div>
   );
 }

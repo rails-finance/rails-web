@@ -507,7 +507,7 @@ export function CompoundPositionCard({
             />
           }
           closedAt={v.lastActivityAt ?? undefined}
-          outcomeAt={v.status === "liquidated" ? (v.lastLiquidationAt ?? undefined) : undefined}
+          outcomeDates={outcomeDates(v)}
           collateralLabel={supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
           collateral={supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : <StatDash />}
           collateralFootnote={noPeaksNote}
@@ -676,6 +676,19 @@ export function CompoundPositionCard({
 }
 
 /** Build a card view from the listing summary row. */
+/** A liquidated card's dates: the last absorb, then the closing when it
+ *  falls on a different day. */
+function outcomeDates(v: CompoundPositionView): { label: string; at: number }[] | undefined {
+  const last = v.lastLiquidationAt;
+  if (v.status !== "liquidated" || last == null) return undefined;
+  if (v.lastActivityAt == null) return [{ label: "Liquidated", at: last }];
+  if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  return [
+    { label: "Liquidated", at: last },
+    { label: "Closed", at: v.lastActivityAt },
+  ];
+}
+
 export function viewFromSummary(s: CompoundPositionSummary): CompoundPositionView {
   return {
     market: s.market,

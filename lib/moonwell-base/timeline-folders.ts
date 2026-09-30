@@ -109,6 +109,9 @@ function moonwellLegs(members: BaseActivityEvent[], marketOf: (key: string) => M
   const sent = new Map<string, Sum>();
   const received = new Map<string, Sum>();
   const repaidOrder: string[] = [];
+  // A liquidation's seizure leaves as two mToken transfers in its own
+  // transaction; they are the Seized figure, not transfers the owner sent.
+  const liquidationTxs = new Set(members.filter((e) => dataOf(e)?.eventType === "liquidation").map((e) => e.txHash));
   const noteRepaid = (key: string) => {
     if (!repaidOrder.includes(key)) repaidOrder.push(key);
   };
@@ -126,7 +129,7 @@ function moonwellLegs(members: BaseActivityEvent[], marketOf: (key: string) => M
         add(seized, d.collateralMarket, d.raw?.seizeTokens);
         break;
       case "transfer_out":
-        add(sent, d.market, d.raw?.mTokens);
+        if (!liquidationTxs.has(e.txHash)) add(sent, d.market, d.raw?.mTokens);
         break;
       case "transfer_in":
         add(received, d.market, d.raw?.mTokens);

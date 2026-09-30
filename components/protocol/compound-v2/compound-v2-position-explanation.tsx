@@ -14,6 +14,11 @@
 // panel only narrates it, under the explanation-copy charter: what each number
 // MEANS, never how it was read.
 
+import {
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  isCompoundV2Deprecated,
+} from "@/lib/compound-v2/deprecated-markets";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
@@ -22,6 +27,7 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
+import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -125,8 +131,27 @@ export function CompoundV2PositionExplanation({
         <H>
           <AmountText value={m.supplyUnderlying} /> {m.symbol}
         </H>
-        {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}, earning the
-        market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}% APR).
+        {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}
+        {m.supplyApr === 0 ? (
+          <>
+            , earning nothing: the market&rsquo;s reserve factor is 100%, so all the interest borrowers pay goes to
+            reserves.
+          </>
+        ) : (
+          <>
+            , earning the market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}%
+            APR).
+          </>
+        )}
+      </>,
+    );
+  }
+
+  if (entered.length > 0) {
+    list.push(
+      <>
+        The {joinSymbols(entered.map((m) => m.symbol))} supply is <H>entered as collateral</H>: the wallet entered its
+        market, which is what lets a supply count toward the borrow limit.
       </>,
     );
   }
@@ -134,8 +159,8 @@ export function CompoundV2PositionExplanation({
   if (unentered.length > 0) {
     list.push(
       <>
-        The {joinSymbols(unentered.map((m) => m.symbol))} supply is <H>not entered as collateral</H> — supplying alone
-        doesn&rsquo;t enter a market, so it backs no borrowing and can&rsquo;t be seized. It only earns.
+        The {joinSymbols(unentered.map((m) => m.symbol))} supply is <H>not entered as collateral</H>: supplying alone
+        doesn&rsquo;t enter a market, so it backs no borrowing. A liquidation can still seize it.
       </>,
     );
   }
@@ -186,6 +211,16 @@ export function CompoundV2PositionExplanation({
         .
       </>,
     );
+    const deprecatedBorrows = borrowed.filter((m) => isCompoundV2Deprecated(m.market));
+    if (deprecatedBorrows.length > 0) {
+      list.push(
+        <>
+          The {joinSymbols(deprecatedBorrows.map((m) => m.symbol))} market
+          {deprecatedBorrows.length > 1 ? "s are" : " is"} <H>deprecated</H> ({DEPRECATED_CONDITIONS}):{" "}
+          {DEPRECATED_CONSEQUENCE}, so that borrow can be liquidated in full at any time.
+        </>,
+      );
+    }
     list.push(
       <>
         Compound&rsquo;s own risk check reports{" "}
@@ -214,8 +249,11 @@ export function CompoundV2PositionExplanation({
     if (hf != null) {
       list.push(
         <>
-          Compound states that margin as a liquidity-or-shortfall figure rather than a single ratio; expressed as one,
-          the collateral covers {hf.toFixed(2)}× the debt, where 1.0× is the shortfall line.
+          As one ratio, the borrowing limit is {hf.toFixed(2)}× the debt (1.0× is the shortfall line)
+          {chain.debtValueUsd > 0 && chain.collateralValueUsd > 0 ? (
+            <>, and the collateral is worth {(chain.collateralValueUsd / chain.debtValueUsd).toFixed(2)}× the debt</>
+          ) : null}
+          .
         </>,
       );
     }
@@ -236,10 +274,9 @@ export function CompoundV2PositionExplanation({
     }
     list.push(
       <>
-        A liquidation here repays at most {Math.round(chain.closeFactor * 100)}% of one borrowed market per seizure (the
-        close factor) and the liquidator takes collateral worth that repayment plus{" "}
-        {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}% — a partial nudge back over the line. The
-        protocol keeps its own burned share of every seizure.
+        A liquidation here repays at most {Math.round(chain.closeFactor * 100)}% of one borrowed market per call (the
+        close factor), or the whole borrow in a deprecated market, and the liquidator takes collateral worth that
+        repayment plus {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}%.
       </>,
     );
   } else if (entered.length > 0) {
@@ -378,9 +415,10 @@ export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2Positi
   if (v.liquidationCount > 0) {
     list.push(
       <>
-        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a liquidator
-        repaid part of what it owed and took collateral in exchange.
-        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
+        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
+        {v.liquidations && v.liquidations.length > 0
+          ? liquidationSentences(v.liquidations).join(" ")
+          : "Each time a liquidator repaid part of what it owed and took collateral in exchange."}
       </>,
     );
   }

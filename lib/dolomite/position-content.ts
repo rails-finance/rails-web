@@ -3,6 +3,7 @@
 // account number, isolated across them.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { liquidatedIntro, type LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 
 const DOLOMITE_DOC_URL = "https://docs.dolomite.io/";
 
@@ -11,25 +12,39 @@ const LINKS: LearnMoreContent["links"] = [{ label: "Dolomite docs", url: DOLOMIT
 export function dolomitePositionContent(opts: {
   status: "open" | "closed" | "liquidated";
   hasDebt?: boolean;
+  /** The card's peaks are token balances read from the rows (every market's). */
+  peaksInTokens?: boolean;
+  liquidations?: LiquidationStory[];
+  liquidationCount?: number;
 }): LearnMoreContent {
+  const peakConcept = opts.peaksInTokens
+    ? {
+        bold: "Highest recorded",
+        text: "each market's largest balance just before or just after any event, in tokens with interest included. The panel above states the same figures in words.",
+      }
+    : {
+        bold: "Highest recorded, in par",
+        text: "each peak is the maximum of the running par balance, the figure the protocol stores and interest does not move: multiply it by the market's interest index for tokens.",
+      };
+
   if (opts.status === "liquidated") {
+    const count = opts.liquidationCount ?? opts.liquidations?.length ?? 0;
     return {
       title: "About This Position",
       intro:
-        "This account was liquidated when its adjusted collateral value fell below the margin requirement times its adjusted debt. The panel above reconstructs its final state — the highest recorded par balance on each side.",
+        opts.liquidations && opts.liquidations.length > 0 && count > 0
+          ? liquidatedIntro(opts.liquidations, count)
+          : "This account was liquidated when its adjusted collateral value fell below the margin requirement times its adjusted debt, and has since closed: nothing remains supplied or borrowed.",
       detailsHeading: "Key concepts:",
       details: [
+        peakConcept,
         {
           bold: "Par × index",
-          text: "balances are stored scaled (par); the per-market interest index — accruing per second — carries all interest. Par × index is the token amount.",
+          text: "balances are stored scaled (par); the per-market interest index, accruing per second, carries all interest. Par × index is the token amount.",
         },
         {
           bold: "Cross-margin within, isolated across",
-          text: "all balances under this account number backed each other; a different account number of the same owner is independently margined and independently liquidated.",
-        },
-        {
-          bold: "Vaporization",
-          text: "if collateral ran out before the debt was cleared, the shortfall is written off, covered by the core's excess token balances.",
+          text: "all balances under this account number backed each other; a different account number of the same owner is margined and liquidated on its own.",
         },
       ],
       links: LINKS,
@@ -40,20 +55,17 @@ export function dolomitePositionContent(opts: {
     return {
       title: "About This Position",
       intro:
-        "This account's balances have returned to zero. The panel above shows its lifetime peaks — the highest recorded par balance on each side.",
+        "This account's balances have returned to zero. The panel above describes its life in words: the highest balance on each side, the closing date and the transaction count.",
       detailsHeading: "Key concepts:",
       details: [
-        {
-          bold: "Highest recorded, in par",
-          text: "each peak is the maximum of the running par balance — a scaled figure, not the token amount, since interest lives entirely in the market's index.",
-        },
+        peakConcept,
         {
           bold: "Par × index",
-          text: "balances are stored scaled (par); the per-market interest index — accruing per second — carries all interest. Par × index is the token amount.",
+          text: "balances are stored scaled (par); the per-market interest index, accruing per second, carries all interest. Par × index is the token amount.",
         },
         {
           bold: "Cross-margin within, isolated across",
-          text: "all balances under this account number back each other; a different account number of the same owner is independently margined and independently liquidated.",
+          text: "all balances under this account number back each other; a different account number of the same owner is margined and liquidated on its own.",
         },
       ],
       links: LINKS,
@@ -63,7 +75,7 @@ export function dolomitePositionContent(opts: {
   const details: LearnMoreContent["details"] = [
     {
       bold: "Par × index",
-      text: "the core stores each balance as par — a scaled figure. Par × the market's interest index = the token amount, and the index grows per second, so interest lives entirely in it.",
+      text: "par is the balance the protocol stores; the token amount is par × the market's index, which grows with interest, so par stays still between the account's events.",
     },
     {
       bold: "No separate Borrow action",

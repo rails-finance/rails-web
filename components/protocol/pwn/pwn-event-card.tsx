@@ -9,9 +9,9 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { creditAdvancedProv, repayAmountProv, type PwnCoords } from "@/lib/pwn/event-provenance";
+import { creditAdvancedProv, rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
 import { pwnExplainerTeaser, type PwnEvent } from "@/lib/pwn/explainer-clauses";
-import { PwnEventHeader } from "./pwn-event-header";
+import { PwnEventHeader, fullAmount } from "./pwn-event-header";
 import { PwnEventDetail } from "./pwn-event-detail";
 import { PwnEventExplainer, pwnLearnMoreContent } from "./pwn-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -52,7 +52,15 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
   // wrong contract states something untrue where a letter states nothing.
   const creditAddress = soleFlowAddress(event.flows, ctx.creditSymbol);
   let tokens:
-    | { symbol: string; address?: string; direction: "right" | "left"; value?: number; prov?: SpineValProv }[]
+    | {
+        symbol: string;
+        address?: string;
+        direction: "right" | "left";
+        value?: number;
+        display?: string;
+        unit?: string;
+        prov?: SpineValProv;
+      }[]
     | undefined;
   if (ctx.eventType === "created" && ctx.creditSymbol) {
     const v = Math.abs(Number(ctx.creditAmount ?? "0"));
@@ -63,6 +71,8 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           address: creditAddress,
           direction: "left",
           value: v,
+          display: fullAmount(v),
+          unit: ctx.creditSymbol,
           // Echoes the header's creditAdvancedProv (pwn-event-header.tsx) —
           // always positive, so the header's unlabeled (signed) value is "+".
           prov: {
@@ -73,17 +83,20 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
         },
       ];
   } else if (ctx.eventType === "paid_back" && ctx.creditSymbol) {
-    const v = Math.abs(Number(ctx.loanRepayAmount ?? "0"));
-    if (v > 0)
+    const r = rowRepay(ctx, coords);
+    const v = Math.abs(Number(r?.amount ?? "0"));
+    if (v > 0 && r)
       tokens = [
         {
           symbol: ctx.creditSymbol,
           address: creditAddress,
           direction: "right",
           value: v,
-          // Echoes the header's repayAmountProv — same "+"-signed grammar.
+          display: fullAmount(v),
+          unit: ctx.creditSymbol,
+          // Echoes the header's repayment receipt — same "+"-signed grammar.
           prov: {
-            info: repayAmountProv(ctx.creditSymbol, coords),
+            info: r.prov,
             value: chainTruthDeltaValue(v, false),
             symbol: ctx.creditSymbol,
           },
@@ -94,16 +107,19 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
     // to the wallet, mirroring `created` but in the opposite direction of
     // `paid_back`. Echoes the header's repayAmountProv (the collected amount
     // IS the terms' repay total), the same "+"-signed grammar as the others.
-    const v = Math.abs(Number(ctx.loanRepayAmount ?? "0"));
-    if (v > 0)
+    const r = rowRepay(ctx, coords);
+    const v = Math.abs(Number(r?.amount ?? "0"));
+    if (v > 0 && r)
       tokens = [
         {
           symbol: ctx.creditSymbol,
           address: creditAddress,
           direction: "left",
           value: v,
+          display: fullAmount(v),
+          unit: ctx.creditSymbol,
           prov: {
-            info: repayAmountProv(ctx.creditSymbol, coords),
+            info: r.prov,
             value: chainTruthDeltaValue(v, false),
             symbol: ctx.creditSymbol,
           },
@@ -159,12 +175,21 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           flows={event.flows}
         />
       }
-      detail={<PwnEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
+      detail={
+        <PwnEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          timestamp={event.timestamp}
+          siblings={sibs}
+        />
+      }
       detailLabel="Loan terms"
       explainer={<PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />}
       explainerLabel="Plain English"
       explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
       txHash={event.txHash}
+      txHashLabel="Transaction"
       learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
       persistKey={`pwn:${event.id}`}
     />

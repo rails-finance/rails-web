@@ -51,7 +51,10 @@ import {
   type MoonwellCoords,
 } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
+import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 
 export interface MoonwellEventDetailProps {
   ctx: MoonwellContext;
@@ -61,6 +64,17 @@ export interface MoonwellEventDetailProps {
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
+
+/** A price under $10 keeps four decimals: a stablecoin read at 0.9996 shows
+ *  as 0.9996. */
+const pillPrice = (n: number) =>
+  n < 10
+    ? n.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+    : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** "oracle at block 47,020,084": the price pill names the block it was read at. */
+const oracleNote = (block?: number) =>
+  block != null ? `oracle at block ${block.toLocaleString("en-US")}` : "oracle at block";
 
 /**
  * The valued two-leg liquidation breakdown at the Comptroller's OWN oracle
@@ -127,13 +141,13 @@ function buildMoonwellLiqForensics(
         symbol: collSym,
         priceUsd: collPrice,
         priceProv: atBlockPriceProv(collSym, coords, ctx.oracleAtBlock, ctx.raw?.collateralPriceRaw),
-        note: "oracle at block",
+        note: oracleNote(coords.blockNumber),
       },
       {
         symbol: debtSym,
         priceUsd: debtPrice,
         priceProv: atBlockPriceProv(debtSym, coords, ctx.oracleAtBlock, ctx.raw?.priceRaw),
-        note: "oracle at block",
+        note: oracleNote(coords.blockNumber),
       },
     ],
   };
@@ -258,18 +272,55 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: Moonwe
             symbol: ctx.marketSymbol,
             priceUsd: ctx.priceAtBlock.usd,
             priceProv: atBlockPriceProv(ctx.marketSymbol, coords, ctx.oracleAtBlock, ctx.raw?.priceRaw),
-            note: "oracle at block",
+            note: oracleNote(blockNumber),
           },
         ]
       : [];
+
+  const collMSym =
+    ctx.eventType === "liquidation" && ctx.collateralMarket
+      ? dep.market(ctx.collateralMarket, ctx.collateralSymbol).mSymbol
+      : `m${ctx.collateralSymbol ?? ""}`;
 
   return (
     <>
       <ChainTruthDetail stats={stats} />
       {forensics && <LiquidationForensics {...forensics} />}
+      {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
+        <CTokenLiquidationBreakdown
+          protocol={coords.chainId === BASE_CHAIN_ID ? "moonwell-base" : "moonwell"}
+          brand="Moonwell"
+          wallet={wallet}
+          block={blockNumber}
+          comptroller={{ name: dep.comptroller.name, address: dep.comptroller.address }}
+          collateralKey={ctx.collateralMarket}
+          debtKey={ctx.market}
+          repaidRaw={ctx.raw?.amount}
+          debtSymbol={ctx.marketSymbol}
+          repaid={Math.abs(Number(ctx.assetsDelta ?? "0"))}
+          debtBefore={null}
+          seizeTokens={Number(ctx.seizeTokens ?? "0")}
+          seizeSymbol={collMSym}
+          seizedValue={forensics?.seized.usd ?? null}
+          clearedValue={forensics?.cleared.usd ?? null}
+          incentive={ctx.incentiveAtBlock != null ? ctx.incentiveAtBlock - 1 : null}
+          protocolShareRow={`to the ${collMSym} market`}
+        />
+      )}
+      {ctx.eventType === "mint" && wallet && blockNumber != null && (
+        <CTokenMembershipLine
+          protocol={coords.chainId === BASE_CHAIN_ID ? "moonwell-base" : "moonwell"}
+          brand="Moonwell"
+          wallet={wallet}
+          block={blockNumber}
+          market={ctx.market}
+          symbol={ctx.marketSymbol}
+          comptroller={{ name: dep.comptroller.name, address: dep.comptroller.address }}
+        />
+      )}
       {footnote.length > 0 && (
         <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={footnote} />
+          <AtBlockPriceFootnote pills={footnote} format={pillPrice} />
         </div>
       )}
     </>

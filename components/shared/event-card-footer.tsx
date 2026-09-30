@@ -20,6 +20,8 @@ export interface EventCardFooterProps {
    *  Etherscan mark. Absent (and no control drawn) for a card rendered
    *  outside a timeline, where there is nothing to link to. */
   shareHref?: string;
+  /** A word before the hash ("Transaction"). Unset changes nothing. */
+  txHashLabel?: string;
 }
 
 /* ── The share control ───────────────────────────────────────────────── */
@@ -78,7 +80,7 @@ function CopyEventLink({ href }: { href: string }) {
   );
 }
 
-export function EventCardFooter({ txHash, extra, learnMore, shareHref }: EventCardFooterProps) {
+export function EventCardFooter({ txHash, extra, learnMore, shareHref, txHashLabel }: EventCardFooterProps) {
   // Layout per Miles (2026-07-23/24): the transaction links sit on the LEFT —
   // tx hash first, then the explorer link, then (2026-09-11) the copy-event-
   // link control. The right cluster holds `extra` (gas, run counts) and,
@@ -88,9 +90,7 @@ export function EventCardFooter({ txHash, extra, learnMore, shareHref }: EventCa
   return (
     <div className="pt-1 px-4 pb-2 flex flex-wrap justify-between items-center gap-2">
       <div className="flex items-center gap-2">
-        {/* The hash alone reads as an unlabelled code. */}
-        <span className="text-xs text-rb-500">Transaction</span>
-        <TxHashBadge txHash={txHash} />
+        <TxHashBadge txHash={txHash} label={txHashLabel} />
         <a
           href={explorerUrl(chainId, "tx-logs", txHash)}
           target="_blank"

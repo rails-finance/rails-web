@@ -18,6 +18,8 @@ import {
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { formatWait } from "@/lib/maple/row-times";
+import { formatNumber } from "@/lib/utils/format";
 
 export interface MapleEventHeaderProps {
   actionLabel: string;
@@ -38,7 +40,12 @@ export interface MapleEventHeaderProps {
    *  Each leg asks about its OWN symbol, which is what keeps the asset and the
    *  share apart in a deposit that moved both. */
   flows?: AssetFlow[];
+  /** Queue fills: unix seconds of the request this fill paid, where loaded. */
+  requestAt?: number;
 }
+
+/** The row's words for a share transfer: what the wallet did with shares. */
+const TRANSFER_LABEL = { transfer_in: "Shares received", transfer_out: "Shares sent" } as const;
 
 export function MapleEventHeader({
   actionLabel,
@@ -50,6 +57,7 @@ export function MapleEventHeader({
   externalBy,
   wallet,
   flows,
+  requestAt,
 }: MapleEventHeaderProps) {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const deltas: ChainTruthDelta[] = [];
@@ -57,13 +65,42 @@ export function MapleEventHeader({
   // The flanked leg — the same builder + signed-value convention the card's
   // spine echo calls, so the two can never disagree on the sign.
   const flanked = flankedLegProv(ctx, coords);
-  if (flanked) deltas.push({ ...flanked, address: soleFlowAddress(flows, flanked.symbol) });
+  // Each amount names its token in words (the phone row has no spine to
+  // carry it): a request moves shares, a fill pays the asset. One rounding
+  // rule, Polaris's: the row, the spine, the opened grid and the card state
+  // an amount in full to three decimals.
+  if (flanked)
+    deltas.push({
+      ...flanked,
+      address: soleFlowAddress(flows, flanked.symbol),
+      suffix: flanked.symbol,
+      display: formatNumber(Math.abs(flanked.value)),
+    });
 
   // The share leg rides beside the asset leg on deposits/withdraws (mint/burn).
   // The card draws it as the spine's second row from this same builder, so the
   // hand-off at ≥sm has somewhere to land.
   const shares = sharesLegProv(ctx, coords);
-  if (shares) deltas.push({ ...shares, address: soleFlowAddress(flows, shares.symbol) });
+  if (shares)
+    deltas.push({
+      ...shares,
+      address: soleFlowAddress(flows, shares.symbol),
+      suffix: shares.symbol,
+      display: formatNumber(Math.abs(shares.value)),
+    });
+
+  const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
+  // Which pool the row is in (a wallet's two pools interleave), then what
+  // the amount is and where it went.
+  const what =
+    ctx.eventType === "request"
+      ? "shares moved into the queue"
+      : ctx.eventType === "request_fill"
+        ? requestAt != null && timestamp >= requestAt
+          ? `paid to the wallet, ${formatWait(timestamp - requestAt)} after the request`
+          : "paid to the wallet"
+        : undefined;
+  const note = what ? `${ctx.assetSymbol} pool · ${what}` : `${ctx.assetSymbol} pool`;
 
   // Party chips: a transfer counterparty is a NEUTRAL party of the event
   // itself; only a true external action is a verdict. A known infrastructure
@@ -92,11 +129,15 @@ export function MapleEventHeader({
   return (
     <ChainTruthRow
       spec={{
-        label: actionLabel,
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-        custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
+        label: isTransfer ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL] : actionLabel,
+        // A transfer is a custody row: `Shares received 400 ◎ from 0x…`, the
+        // verb kept before the amount.
+        custody: isTransfer,
+        custodyLabel: isTransfer,
+        // The label says the direction; a sign read as a loss on a fill.
+        unsignedDeltas: true,
         deltas,
+        note,
         externalActor:
           externalBy && wallet && ctx.txFrom && ctx.caller
             ? {
@@ -105,6 +146,9 @@ export function MapleEventHeader({
                   { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
                   coords,
                 ),
+                tip: isTransfer
+                  ? "“by” is the address that sent the transaction; “from” is the wallet the shares came from."
+                  : undefined,
               }
             : undefined,
         party,

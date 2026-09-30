@@ -4,6 +4,7 @@
 // aave-v3 / spark code path), so the import paths point at the v4-namespaced
 // versions of constants / spoke-meta.
 
+import { formatDate } from "@/lib/date";
 import { CardSelectorShell, positionCardSurface } from "@/components/shared/card-selector-shell";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
@@ -24,7 +25,7 @@ import {
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { usdProv, usdProvOnchain, accumProv, healthFactorProv, interestProv } from "@/lib/aave-v4/position-provenance";
+import { usdProv, usdProvOnchain, accumProv, healthFactorProv, interestSinceZeroProv } from "@/lib/aave-v4/position-provenance";
 import { listSymbols, NO_PRICE_HINT, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
@@ -33,8 +34,8 @@ import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 // indexed event stream.
 const borrowRateProv = () =>
   accumProv("The latest borrow rate recorded on this spoke", { formula: "most recent on-chain borrow index → APR" });
-const supplyInterestProv = () => interestProv("Accrued supply interest");
-const borrowInterestProv = () => interestProv("Accrued borrow interest");
+const supplyInterestProv = () => interestSinceZeroProv("Supply interest inside the collateral");
+const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside the debt");
 const peakCollProv = () =>
   accumProv("The peak collateral this position has held", {
     formula: "max(Σ collateral × price)",
@@ -158,17 +159,15 @@ function SpokeIdentity({ name, hub, debtHubs }: { name: string; hub: HubTier; de
  *  gain — parallel to the debt side. Hidden when it rounds below a cent — dust
  *  isn't worth a line. Renders nothing without the chain overlay. */
 function SupplyInterestFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
-  const pnl = spoke.interestPnl;
-  if (!pnl || !pnl.hasData) return null;
-  const earnedUsd = pnl.assets.reduce((sum, a) => sum + a.supplyInterestUsd, 0);
-  if (earnedUsd < 0.01) return null;
-  const v = fmtUsd(earnedUsd);
+  const got = spoke.interestSinceZero?.supply;
+  if (!got || got.usd < 0.01) return null;
+  const v = fmtUsd(got.usd);
   return (
     <div
       className="text-xs mt-0.5 font-medium text-rb-500"
-      title={`${v.title} of the collateral is accrued supply interest to date — from on-chain balances vs. indexed deposits`}
+      title={`${v.title} of the collateral is supply interest added since ${formatDate(got.since)}, when the balance last started from zero`}
     >
-      incl. <Prov info={supplyInterestProv()}>{v.display}</Prov> interest
+      incl. <Prov info={supplyInterestProv()}>{v.display}</Prov> interest since {formatDate(got.since)}
     </div>
   );
 }
@@ -188,18 +187,17 @@ const YEARLY_COST_PROV: Provenance = {
  *  the two read as two figures. */
 function DebtFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
   const rate = spoke.latestBorrowRate;
-  const pnl = spoke.interestPnl;
-  const paidUsd = pnl?.hasData ? pnl.assets.reduce((sum, a) => sum + a.borrowInterestUsd, 0) : 0;
-  const interest = paidUsd >= 0.01 ? fmtUsd(paidUsd) : null;
+  const owed = spoke.interestSinceZero?.debt;
+  const interest = owed && owed.usd >= 0.01 ? fmtUsd(owed.usd) : null;
   const yearly = yearlyDebtCost(spoke);
   if (rate === null && !interest) return null;
   return (
     <div className="text-xs mt-0.5 text-rb-500 space-y-0.5">
       {interest && (
         <div
-          title={`${interest.title} of the debt is accrued borrow interest to date — from on-chain balances vs. indexed deposits`}
+          title={`${interest.title} of the debt is borrow interest added since ${formatDate(owed!.since)}, when the debt last started from zero`}
         >
-          incl. <Prov info={borrowInterestProv()}>{interest.display}</Prov> interest
+          incl. <Prov info={borrowInterestProv()}>{interest.display}</Prov> interest since {formatDate(owed!.since)}
         </div>
       )}
       {rate !== null && (

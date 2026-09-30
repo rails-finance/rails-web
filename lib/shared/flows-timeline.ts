@@ -41,16 +41,31 @@ export interface FlowBucket {
   /** Buckets sharing a link are one on-chain act seen from both sides (a
    *  repay with collateral, a liquidation): hovering one highlights all. */
   link?: string;
-  /** Outflows: the hatch that tells this kind of exit from the others
-   *  (standards/lexicon.md, chart grammar). Default "reverse". */
+  /** The pattern that tells this line from the side's others
+   *  (standards/lexicon.md, lifetime bars' fills). An outflow's is a hatch
+   *  (default "reverse"); an inflow's a texture over the side's faded hue
+   *  (none: the faded hue alone). No two lines of a side share a fill. */
   hatch?: FlowHatch;
 }
 
 /** The outflow hatches: reverse diagonal (a withdrawal or repayment), cross
  *  (withdrawn and swapped), vertical (swapped within the position), dots (sent
  *  to another account), horizontal (the two sides of a repay with collateral),
- *  forward diagonal (a liquidation or a redemption, in its tone's hue). */
-export type FlowHatch = "reverse" | "cross" | "vertical" | "dots" | "horizontal" | "forward";
+ *  dashes (a repay made with aTokens), forward diagonal (a liquidation or a
+ *  redemption, in its tone's hue). The inflow textures: grid (received by
+ *  transfer), checker (swapped in), rings (what was held when the window
+ *  opens). */
+export type FlowHatch =
+  | "reverse"
+  | "cross"
+  | "vertical"
+  | "dots"
+  | "horizontal"
+  | "dashes"
+  | "forward"
+  | "grid"
+  | "checker"
+  | "rings";
 
 export interface FlowEvent {
   id: string;
@@ -82,6 +97,10 @@ export interface FlowLive {
   /** Each asset held and owed now, as the ledger values it, for the zoom
    *  view; absent, the last day's balances at today's prices. */
   assets?: FlowAssetHeld[];
+  /** Flows a live read states that no event has recorded yet, added to their
+   *  buckets at the live stop only (a Liquity Trove's pending redistribution
+   *  and batch fee, from getLatestTroveData). */
+  pending?: { bucket: string; symbol: string; usd: number }[];
 }
 
 /** One asset held or owed at a stop. */
@@ -134,6 +153,11 @@ export interface FlowTimeline {
   labels?: { collateral: string; debt: string };
   /** A family's own words for the one-sided bar; each unset one keeps the default. */
   words?: FlowWords;
+  /** The daily series holds prices only on the days a price was recorded (a
+   *  family with no daily price lane builds it from its events): a day or a
+   *  line's bin between keeps the last one, and a price older than
+   *  STALE_DAYS is stated as such. */
+  seriesCarry?: boolean;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -149,6 +173,22 @@ export interface FlowWords {
    *  interest and price change are told apart only at the live stop, so no
    *  stop splits them (rails-ops reference/lifetime-flows-scrubber.md). */
   rest?: string;
+  /** Each side's balancing item by name, where a family can say what it
+   *  holds (Liquity: "Market move" on the collateral, "Interest since the
+   *  last event" on the debt). Signed, the remainder of the printed lines. */
+  restBySide?: Partial<Record<FlowSide, string>>;
+  /** What each side's balancing item holds, the clause the segment panel
+   *  and the receipt close its basis line with. */
+  restNote?: Partial<Record<FlowSide, string>>;
+  /** The panel's basis line for a side, where it is not "Each flow is
+   *  valued at the price on its own day." */
+  basis?: Partial<Record<FlowSide, string>>;
+  /** How a side's held or owed figure is valued between events, for its
+   *  receipt ("each Trove's …"). */
+  heldBasis?: Partial<Record<FlowSide, string>>;
+  /** The Explanation's clause on the prices the line is drawn at, where it is
+   *  not the index's daily prices. */
+  linePrices?: string;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -217,6 +257,18 @@ export interface FlowModel {
   axis: { max: number; ticks: number[] };
   /** Each bar's length at the live stop, for the "today" outline. */
   today: { collateral: number; debt: number };
+  /** A model cut to a window (`windowModel`): what was held and owed when
+   *  the window opens, at the close of the day before, with the counts
+   *  through that day. The bars' sources start with it. */
+  opening?: {
+    /** Unix seconds of the window's first day. */
+    ts: number;
+    collateral: number;
+    debt: number;
+    held: FlowAssetHeld[];
+    events: number;
+    txs: number | null;
+  };
 }
 
 export interface FlowSegment {
@@ -234,6 +286,11 @@ export interface FlowSegment {
   value: number;
   /** A balancing item that can go either way: its figure carries a sign. */
   signed?: boolean;
+  /** A balancing item: what it holds, for the basis line and its receipt. */
+  note?: string;
+  /** The basis line's opening sentence for the side, and (on the held
+   *  segment) how the held figure is valued between events. */
+  basis?: string;
 }
 
 export interface FlowSideState {
@@ -297,6 +354,15 @@ export function axisFor(peak: number): { max: number; ticks: number[] } {
   const ticks: number[] = [];
   for (let v = 0; v <= max + 1e-9; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
   return { max, ticks };
+}
+
+/** Whether the axis label at `i` of `count` is drawn below the sm breakpoint.
+ *  An axis of more than five labels keeps the first, the last and every other
+ *  one between that sits two steps clear of the last ("$12.5M$15.0M" ran
+ *  together at 390px). */
+export function axisLabelOnPhone(i: number, count: number): boolean {
+  const last = count - 1;
+  return !(last > 4 && i !== 0 && i !== last && (i % 2 === 1 || last - i < 2));
 }
 
 /** A page's events as day rows: each day's running totals, the balances its
@@ -387,7 +453,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const startDay = days[0].day;
   const start = startDay * DAY_MS;
   const daily = !!t.dailyPrices && Object.keys(t.dailyPrices).length > 0;
-  const gapDays = daily ? SERIES_GAP_DAYS : STALE_DAYS;
+  const gapDays = daily && !t.seriesCarry ? SERIES_GAP_DAYS : STALE_DAYS;
   const outOf = (side: FlowSide, c: Record<string, number>) =>
     t.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
 
@@ -529,6 +595,9 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       const kinds: string[] = [];
       for (const b of t.buckets) {
         const word = b.event ?? b.label;
+        // An empty event name: a bucket that moves on most events (interest)
+        // names none.
+        if (!word) continue;
         const now = d.cum[b.key];
         if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
       }
@@ -579,6 +648,12 @@ export function assetsAt(
   const upto = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const cells = new Map<string, { bucket: string; symbol: string; usd: number }>();
   for (let i = 0; i <= upto; i++) for (const c of m.rows[i].cells) cells.set(`${c.bucket}|${c.symbol}`, c);
+  if (isLive)
+    for (const p of m.live.pending ?? []) {
+      const k = `${p.bucket}|${p.symbol}`;
+      const had = cells.get(k);
+      cells.set(k, { bucket: p.bucket, symbol: p.symbol, usd: (had?.usd ?? 0) + p.usd });
+    }
   const flows = new Map<string, { symbol: string; usd: number }[]>();
   for (const c of cells.values()) {
     if (!(Math.abs(c.usd) >= 0.005)) continue;
@@ -613,7 +688,7 @@ function rowAt(m: FlowModel, stop: number): number {
 function sourcesFor(
   exact: FlowSegment[],
   total: number,
-  balancing: { key: string; label: string; value: number; signed?: boolean },
+  balancing: { key: string; label: string; value: number; signed?: boolean; note?: string; basis?: string },
 ): FlowSegment[] {
   let left = Math.max(0, total);
   const out: FlowSegment[] = [];
@@ -647,6 +722,7 @@ function sideState(
       fill: "held",
       width: heldNow,
       value: heldNow,
+      ...(m.words.heldBasis?.[side] ? { basis: m.words.heldBasis[side] } : {}),
     },
     ...outs.map((b) => {
       const v = Math.max(0, cum[b.key] ?? 0);
@@ -664,14 +740,42 @@ function sideState(
   ];
   const exact: FlowSegment[] = ins.map((b) => {
     const v = cum[b.key] ?? 0;
-    return { key: b.key, label: b.label, fill: "in", width: v, value: v };
+    return { key: b.key, label: b.label, fill: "in", ...(b.hatch ? { hatch: b.hatch } : {}), width: v, value: v };
   });
+  if (m.opening) {
+    const v = side === "collateral" ? m.opening.collateral : m.opening.debt;
+    exact.unshift({
+      key: `${side}-opening`,
+      label: `Held on ${longDay(m.opening.ts)}`,
+      fill: "in",
+      hatch: "rings",
+      width: v,
+      value: v,
+    });
+  }
   const rest = total - exact.reduce((s, x) => s + x.value, 0);
   const oneRest = side === "collateral" ? m.words.rest : undefined;
+  const named = m.words.restBySide?.[side];
+  const words = {
+    ...(m.words.restNote?.[side] ? { note: m.words.restNote[side] } : {}),
+    ...(m.words.basis?.[side] ? { basis: m.words.basis[side] } : {}),
+  };
   const balancing = oneRest
-    ? { key: interest != null ? `${side}-interest` : `${side}-market`, label: oneRest, value: interest ?? rest }
-    : { key: `${side}-market`, label: "Market move and interest", value: rest, signed: true };
+    ? {
+        key: interest != null ? `${side}-interest` : `${side}-market`,
+        label: oneRest,
+        value: interest ?? rest,
+        ...words,
+      }
+    : { key: `${side}-market`, label: named ?? "Market move and interest", value: rest, signed: true, ...words };
   return { now: heldNow, total, out, bar, sources: sourcesFor(exact, total, balancing) };
+}
+
+/** One side's bar and sources for a set of running totals and what is held
+ *  or owed, as `stateAt` builds each stop's: the event card's lifetime sum
+ *  (lib/shared/flow-focus.ts) reads a side at one event with it. */
+export function sideStateFor(m: FlowModel, side: FlowSide, cum: Record<string, number>, now: number): FlowSideState {
+  return sideState(m, side, cum, now, null);
 }
 
 /** The position as of the end of day `stop` (0 = the first event's day), or
@@ -680,7 +784,11 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
   const isLive = stop >= m.liveStop;
   const i = isLive ? m.rows.length - 1 : rowAt(m, stop);
   const row = i >= 0 ? m.rows[i] : null;
-  const cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
+  let cum = row?.cum ?? Object.fromEntries(m.buckets.map((b) => [b.key, 0]));
+  if (isLive && m.live.pending?.length) {
+    cum = { ...cum };
+    for (const p of m.live.pending) cum[p.bucket] = (cum[p.bucket] ?? 0) + p.usd;
+  }
   const v = !isLive && stop >= 0 ? m.valued[Math.min(stop, m.valued.length - 1)] : undefined;
   const collNow = isLive ? m.live.collateralUsd : (v?.collateral ?? 0);
   const debtNow = isLive ? m.live.debtUsd : (v?.debt ?? 0);
@@ -692,6 +800,81 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
     collateral: sideState(m, "collateral", cum, collNow, isLive ? (m.live.collateralInterestUsd ?? null) : null),
     debt: sideState(m, "debt", cum, debtNow, null),
     stale: isLive ? [] : (m.stale.get(stop) ?? []),
+  };
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "3 Mar 2025": the window's dates. */
+export function longDay(tsSec: number): string {
+  const d = new Date(tsSec * 1000);
+  return `${d.getUTCDate()} ${MONTH_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
+/** The model cut to the stops from `from` (a stop index) to the live one:
+ *  each running total less what it stood at when the window opens, the
+ *  counts kept whole, and the axis fixed to the window's own bars. What was
+ *  held and owed at the close of the day before is `opening`, from the same
+ *  replay. `from` at or before 0 returns the model unchanged. */
+export function windowModel(m: FlowModel, from: number): FlowModel {
+  if (from <= 0 || from >= m.liveStop) return m;
+  const base = rowAt(m, from - 1);
+  const baseCum: Record<string, number> = base >= 0 ? m.rows[base].cum : {};
+  const baseCells = new Map<string, number>();
+  for (let i = 0; i <= base; i++) for (const c of m.rows[i].cells) baseCells.set(`${c.bucket}|${c.symbol}`, c.usd);
+  const less = (cum: Record<string, number>) =>
+    Object.fromEntries(Object.entries(cum).map(([k, v]) => [k, v - (baseCum[k] ?? 0)]));
+  const rows = m.rows
+    .filter((r) => r.day >= from)
+    .map((r) => ({
+      ...r,
+      day: r.day - from,
+      cum: less(r.cum),
+      cells: r.cells.map((c) => ({ ...c, usd: c.usd - (baseCells.get(`${c.bucket}|${c.symbol}`) ?? 0) })),
+    }));
+  if (rows.length === 0) return m;
+  const shift = <T extends { day: number }>(xs: T[]) =>
+    xs.filter((x) => x.day >= from).map((x) => ({ ...x, day: x.day - from }));
+  const outOf = (side: FlowSide, c: Record<string, number>) =>
+    m.buckets.filter((b) => b.side === side && b.dir === "out").reduce((s, b) => s + (c[b.key] ?? 0), 0);
+  const liveStop = m.liveStop - from;
+  const valued = m.valued.slice(from);
+  const last = rows[rows.length - 1];
+  const today = {
+    collateral: m.live.collateralUsd + outOf("collateral", last.cum),
+    debt: m.live.debtUsd + outOf("debt", last.cum),
+  };
+  let peak = Math.max(today.collateral, today.debt);
+  let ri = 0;
+  for (let stop = 0; stop < liveStop; stop++) {
+    while (ri + 1 < rows.length && rows[ri + 1].day <= stop) ri++;
+    const c = rows[ri].day <= stop ? rows[ri].cum : {};
+    peak = Math.max(peak, valued[stop].collateral + outOf("collateral", c), valued[stop].debt + outOf("debt", c));
+  }
+  const before = m.valued[from - 1];
+  const baseRow = base >= 0 ? m.rows[base] : null;
+  return {
+    ...m,
+    rows,
+    start: m.start + from * DAY_MS,
+    lastDay: m.lastDay - from,
+    liveStop,
+    eventDays: m.eventDays.filter((d) => d >= from).map((d) => d - from),
+    ticks: shift(m.ticks),
+    repricings: shift(m.repricings),
+    valued,
+    stale: new Map([...m.stale].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
+    heldAt: m.heldAt.slice(from),
+    axis: axisFor(peak),
+    today,
+    opening: {
+      ts: (m.start + from * DAY_MS) / 1000,
+      collateral: before?.collateral ?? 0,
+      debt: before?.debt ?? 0,
+      held: m.heldAt[from - 1] ?? [],
+      events: baseRow?.events ?? 0,
+      txs: baseRow?.txs ?? null,
+    },
   };
 }
 
@@ -711,13 +894,16 @@ export function nextEventDay(m: FlowModel, stop: number): number {
 /** Unix seconds of the start of day `stop`. */
 export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop * DAY_MS) / 1000;
 
-/** "$123k" · "$5.5k" · "$363" · "$1.2M" · "−$5k": whole dollars under $1k, one
- *  decimal under $10k, whole thousands above. */
+/** "$123k" · "$5.5k" · "$363" · "$1.2M" · "$1.89B" · "−$5k": whole dollars
+ *  under $1k, one decimal under $10k, whole thousands under $1M, one decimal
+ *  of millions under $1B, then billions to two decimals with a trailing zero
+ *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
 export function formatFlowUsd(v: number): string {
   const a = Math.abs(v);
   const sign = v < 0 && a >= 0.5 ? "−" : "";
   let body: string;
-  if (a >= 1_000_000) body = `$${(a / 1_000_000).toFixed(1)}M`;
+  if (a >= 999_950_000) body = `$${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")}B`;
+  else if (a >= 1_000_000) body = `$${(a / 1_000_000).toFixed(1)}M`;
   else if (a >= 9_999.5) body = `$${Math.round(a / 1_000)}k`;
   else if (a >= 999.5) body = `$${(a / 1_000).toFixed(1)}k`;
   else body = `$${Math.round(a)}`;
@@ -728,6 +914,7 @@ export function formatFlowUsd(v: number): string {
 export function spokenUsd(v: number): string {
   const a = Math.abs(v);
   const sign = v < 0 ? "minus " : "";
+  if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion dollars`;
   if (a >= 1_000_000) return `${sign}${(a / 1_000_000).toFixed(1)} million dollars`;
   if (a >= 1_000) return `${sign}${Math.round(a / 1_000)} thousand dollars`;
   return `${sign}${Math.round(a)} dollars`;

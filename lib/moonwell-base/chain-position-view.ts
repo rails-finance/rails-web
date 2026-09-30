@@ -27,6 +27,9 @@ import type { MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { MTOKEN_DECIMALS } from "@/lib/moonwell/asset-catalog";
 import type { MoonwellChainTimelineResponse, MoonwellReplayedPosition } from "./chain-timeline";
 
+/** The larger of two raw integer strings. */
+const maxRaw = (a: string, b: string | undefined): string => (b != null && BigInt(b) > BigInt(a) ? b : a);
+
 /**
  * Adapt the live Comptroller read into the shared view.
  *
@@ -89,6 +92,12 @@ export function moonwellViewFromChain(
   const open = supplies.length > 0 || borrows.length > 0;
   const liquidationCount = timeline?.liquidationCount ?? 0;
 
+  // Each row's balance before and after, interest included, where the replay
+  // read the whole life; the replayed principal and emitted debt otherwise.
+  const balancePeak = (market: string, side: "supply" | "debt"): string | undefined => {
+    const b = timeline?.balancePeaks?.find((x) => x.market === market);
+    return b ? (side === "supply" ? b.supplyRaw : b.debtRaw) : undefined;
+  };
   const peaks = (pick: (p: MoonwellReplayedPosition) => string) =>
     whole && timeline
       ? timeline.positions
@@ -109,12 +118,15 @@ export function moonwellViewFromChain(
     status: open ? "open" : liquidationCount > 0 ? "liquidated" : "closed",
     supplies,
     borrows,
-    peakSupplies: peaks((p) => p.peakSupplyPrincipalRaw),
-    peakBorrows: peaks((p) => p.peakDebtRaw),
+    peakSupplies: peaks((p) => balancePeak(p.market, "supply") ?? p.peakSupplyPrincipalRaw),
+    peakBorrows: peaks((p) => maxRaw(p.peakDebtRaw, balancePeak(p.market, "debt"))),
     liquidationCount,
     txCount: whole ? (timeline?.txCount ?? 0) : 0,
     lastActivityAt: whole ? (timeline?.lastActivityAt ?? 0) : 0,
     priceByAddress,
     ratesByMarket,
+    ...(chain.entered ? { entered: chain.entered } : {}),
+    ...(timeline?.liquidations ? { liquidations: timeline.liquidations } : {}),
+    ...(whole && timeline ? { eventTotal: timeline.totalEvents } : {}),
   };
 }

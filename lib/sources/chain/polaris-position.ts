@@ -87,12 +87,14 @@ const E18 = 1e18;
 const n18 = (v: bigint | null | undefined): number => (v == null ? 0 : Number(v) / E18);
 const raw = (v: bigint | null | undefined): string => (v == null ? "0" : v.toString());
 
-/** getICR answers 0 for a debt-free or closed CDP and a value beyond any real
- *  ratio when the debt is dust; both are "no ratio", never a figure. */
+/** getICR answers 0 for a closed CDP and the uint256 maximum when the entire
+ *  debt is zero or below; both are "no ratio", never a figure. Any other
+ *  answer is the ratio, however large: the page states a ratio over its
+ *  ceiling in words (lib/polaris/ratio-format.ts) rather than dropping it. */
 function icrOf(v: bigint | null): number | null {
   if (v == null || v === BigInt(0)) return null;
   const f = Number(v) / E18;
-  return Number.isFinite(f) && f < 1e6 ? f : null;
+  return Number.isFinite(f) && f < 1e30 ? f : null;
 }
 
 function stub(market: PolarisMarket, cdpId: string): PolarisChainResponse {
@@ -218,19 +220,21 @@ export async function loadPolarisPositionFromChain(
   try {
     const client = chainClient(POLARIS_CHAIN_ID);
     // The head block itself, not just its number: its timestamp is what a live
-    // market note states its elapsed time from.
-    const [head, res] = await Promise.all([
-      client.getBlock(),
-      client.multicall({
-        allowFailure: true,
-        contracts: [
-          ...CDP_FNS.map((functionName) => ({ address: manager, abi: CDP_MANAGER_ABI, functionName, args: [id] })),
-          ...MARKET_FNS.map((functionName) => ({ address: manager, abi: CDP_MANAGER_ABI, functionName })),
-          { address: getAddress(cfg.cdpNft), abi: CDP_NFT_ABI, functionName: "ownerOf", args: [id] },
-          ...priceCalls(market),
-        ] as const,
-      }) as Promise<Res[]>,
-    ]);
+    // market note states its elapsed time from. Every getter is then read AT
+    // that block, so the debt, its pending legs, the ratio and the price the
+    // page states are one block's figures and add up (the pending legs move
+    // every block; two blocks' reads do not).
+    const head = await client.getBlock();
+    const res = (await client.multicall({
+      allowFailure: true,
+      blockNumber: head.number,
+      contracts: [
+        ...CDP_FNS.map((functionName) => ({ address: manager, abi: CDP_MANAGER_ABI, functionName, args: [id] })),
+        ...MARKET_FNS.map((functionName) => ({ address: manager, abi: CDP_MANAGER_ABI, functionName })),
+        { address: getAddress(cfg.cdpNft), abi: CDP_NFT_ABI, functionName: "ownerOf", args: [id] },
+        ...priceCalls(market),
+      ] as const,
+    })) as Res[];
 
     const cdp = ok<CdpStruct>(res[0]);
     // No struct means the manager did not answer — a stub, never invented state.

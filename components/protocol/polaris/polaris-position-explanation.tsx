@@ -28,6 +28,7 @@ import { Prov } from "@/components/shared/provenance";
 import { formatExact, formatNumber, formatUnitsExact, withRealMinus } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const signedNum = (n: number): string => (n < 0 ? `−${formatNumber(-n)}` : formatNumber(n));
@@ -85,6 +86,16 @@ export function PolarisPositionExplanation({
       </H>
       :
     </>
+  ) : hasColl && chain.recordedDebt > 0 ? (
+    <>
+      This CDP holds{" "}
+      <H>
+        <AmountText value={chain.entireColl} /> pETH
+      </H>{" "}
+      of collateral and has <H>no debt</H> at this block: the PSM share and stability gains pending since its last touch
+      exceed the <AmountText value={chain.recordedDebt} /> {stableSymbol} recorded then, and its next touch settles the
+      debt to zero:
+    </>
   ) : hasColl ? (
     <>
       This CDP holds{" "}
@@ -101,7 +112,7 @@ export function PolarisPositionExplanation({
     const below = chain.icr < mcr;
     bullets.push(
       <span key="ratio">
-        Its collateral ratio is <H>{pct(chain.icr)}</H> against a minimum of <H>{pct(mcr)}</H>
+        Its collateral ratio is <H>{formatPolarisRatio(chain.icr, 1, mcr)}</H> against a minimum of <H>{pct(mcr)}</H>
         {chain.defensiveMode ? " — the higher floor the market applies in defensive mode" : ""}.{" "}
         {below
           ? "It sits below that line, so anyone may liquidate it."
@@ -113,7 +124,9 @@ export function PolarisPositionExplanation({
   if (chain.isOpen && chain.price && hasColl) {
     const pethInDebt = chain.price.pethInDebt;
     const collWorth = chain.entireColl * pethInDebt;
-    const equity = collWorth - chain.entireDebt;
+    // An entire debt at or below zero owes nothing: it never adds to equity.
+    const owed = Math.max(0, chain.entireDebt);
+    const equity = collWorth - owed;
     const equityExact = withRealMinus(formatExact(equity));
     bullets.push(
       <span key="value">
@@ -146,7 +159,7 @@ export function PolarisPositionExplanation({
           symbol={stableSymbol}
         >
           <H>
-            <AmountText value={chain.entireDebt} /> {stableSymbol}
+            <AmountText value={owed} /> {stableSymbol}
           </H>
         </Prov>{" "}
         owed, an equity of{" "}
@@ -154,12 +167,13 @@ export function PolarisPositionExplanation({
           <H>
             {signedNum(equity)} {stableSymbol}
           </H>
-        </Prov>{" "}
-        — a Sepolia testnet figure, not money. That is a valuation at this block, not a profit. It moves with the feed,
-        with the interest and PSM share still pending, and with every mint and redemption the PSM settles onto the CDP.
-        A profit or loss is only fixed when the CDP closes and the holder&rsquo;s flows are complete. Valuing what the
-        holder put in before then means choosing a price for each deposit, which is a decision about basis rather than a
-        fact of the chain.
+        </Prov>
+        . The feed is the protocol&rsquo;s own price for pETH: the bonding curve&rsquo;s price in ETH times an ETH/USD
+        price
+        {chain.market === "goldp" ? ", divided by a gold price," : ""} that the protocol&rsquo;s medianiser takes as the
+        median of its oracles. The equity is a valuation at this block, not a profit, and moves with the feed and the
+        pending legs. A profit or loss would need a price for each of the holder&rsquo;s deposits (a basis), which the
+        chain does not state.
       </span>,
     );
   }
@@ -227,7 +241,7 @@ export function PolarisPositionExplanation({
     const psmClause: ReactNode | null =
       psmAdded || psmRemoved ? (
         <>
-          the PSM&rsquo;s shares {psmAdded}
+          its pro-rata shares of the PSM&rsquo;s mints and redemptions {psmAdded}
           {psmAdded && psmRemoved ? " and " : ""}
           {psmRemoved}
         </>
@@ -260,37 +274,37 @@ export function PolarisPositionExplanation({
       terminal === "liquidated" && (lifetime.collLiquidated > 0 || lifetime.debtLiquidated > 0) ? (
         <>
           {" "}
-          The liquidation took {legMoney("collateral liquidated", "pETH", lifetime.collLiquidated)} against{" "}
-          {legMoney("debt liquidated", stableSymbol, lifetime.debtLiquidated)}.
+          The liquidation seized {legMoney("collateral liquidated", "pETH", lifetime.collLiquidated)} and cleared{" "}
+          {legMoney("debt liquidated", stableSymbol, lifetime.debtLiquidated)} of debt.
         </>
       ) : null;
 
     bullets.push(
       <span key="lifetime">
         {lead1}
-        {liqSentence} The difference in each unit is the realised outcome. Converting the two units into one figure
-        requires a price for each flow at its own block, which the feed series can supply once a basis is chosen.
+        {liqSentence} The difference in each unit is the realised outcome. One figure across the two units would need a
+        price for each flow at its own block (a basis), which the feed series can supply once one is chosen.
       </span>,
     );
   }
 
-  if (chain.isOpen && hasDebt) {
+  if (chain.isOpen && (hasDebt || chain.recordedDebt > 0)) {
     bullets.push(
       <span key="rate">
-        Interest on its debt runs at <H>{(chain.interestRate * 100).toFixed(2)}%</H> per year, set by the market — a
-        primary rate of {(chain.primaryRate * 100).toFixed(2)}% plus a utilisation-driven{" "}
-        {(chain.secondaryRate * 100).toFixed(2)}% — and is written into the debt at its next touch
-        {/* The card's Costs figure, said in words and on the same base. "On
-            the debt as recorded" is load-bearing: the entire debt is printed
-            on the card a few inches away, and the two bases differ by
-            whatever the PSM has pending. */}
+        Interest on its debt runs at <H>{(chain.interestRate * 100).toFixed(2)}%</H> a year, set by the market: a
+        primary rate of {(chain.primaryRate * 100).toFixed(2)}%, which rises when traders redeem through the PSM and
+        falls when they mint, plus a secondary rate of {(chain.secondaryRate * 100).toFixed(2)}%, which rises with the
+        market&rsquo;s debt-to-reserve ratio. It is written into the debt at each touch
+        {/* The card's Costs figure, said in words and on the same base: the
+            debt as recorded, which is what the contract accrues on. */}
         {chain.recordedDebt > 0 ? (
           <>
-            {" — about "}
+            {": about "}
             <H>
               <AmountText value={chain.recordedDebt * chain.interestRate} />
             </H>{" "}
-            {stableSymbol} a year on the debt as recorded
+            {stableSymbol} a year on the <AmountText value={chain.recordedDebt} /> {stableSymbol} recorded at the last
+            touch
           </>
         ) : null}
         .
@@ -299,33 +313,80 @@ export function PolarisPositionExplanation({
   }
 
   if (chain.isOpen) {
-    const pending: string[] = [];
+    const pending: ReactNode[] = [];
     if (chain.accruedInterest > 0)
-      pending.push(`${formatNumber(chain.accruedInterest)} ${stableSymbol} of interest to be charged`);
-    if (chain.accruedStables > 0)
-      pending.push(`${formatNumber(chain.accruedStables)} ${stableSymbol} of stability gains to be credited`);
-    if (chain.bcTokenGain > 0) pending.push(`${formatNumber(chain.bcTokenGain)} pETH of reward to be added`);
-    if (chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0)
       pending.push(
-        `a PSM share of ${formatNumber(chain.mintRedeemCollChange)} pETH and ${formatNumber(chain.mintRedeemDebtChange)} ${stableSymbol}`,
+        <>
+          <AmountText value={chain.accruedInterest} /> {stableSymbol} of interest to be charged
+        </>,
+      );
+    if (chain.accruedStables > 0)
+      pending.push(
+        <>
+          <AmountText value={chain.accruedStables} /> {stableSymbol} of stability gains to be credited against the debt
+          (its share of the secondary-rate interest the market&rsquo;s CDPs pay, in proportion to its collateral)
+        </>,
+      );
+    if (chain.bcTokenGain > 0)
+      pending.push(
+        <>
+          <AmountText value={chain.bcTokenGain} /> pETH of reward to be added to the collateral (its share, in
+          proportion to its debt, of the pETH the protocol pays out of its fees: bonding-curve swap fees, reserve-loan
+          fees and pETH-to-POLAR conversions)
+        </>,
+      );
+    const psmDebt = chain.mintRedeemDebtChange;
+    if (chain.mintRedeemCollChange !== 0 || psmDebt !== 0)
+      pending.push(
+        <>
+          a net PSM share of {signedNum(chain.mintRedeemCollChange)} pETH on its collateral and {signedNum(psmDebt)}{" "}
+          {stableSymbol} on its debt
+        </>,
       );
     if (pending.length > 0) {
       bullets.push(
         <span key="pending">
-          Since its last touch it has {pending.join(", ")} — all applied the next time the CDP is touched.
+          A touch is any transaction on the CDP, and each one writes in what is pending. Since its last touch it has{" "}
+          {pending.map((n, i) => (
+            <Fragment key={i}>
+              {i > 0 ? (i === pending.length - 1 ? " and " : ", ") : ""}
+              {n}
+            </Fragment>
+          ))}
+          .
         </span>,
       );
     }
   }
 
+  // What the PSM is, said once, wherever the card has named a PSM share: a
+  // pending one on an open CDP, or a settled one in a closed CDP's lifetime.
+  const psmNamed = chain.isOpen
+    ? chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0
+    : !!(
+        terminal &&
+        lifetime &&
+        (lifetime.collFromPsm > 0 || lifetime.debtFromPsm > 0 || lifetime.collToPsm > 0 || lifetime.debtToPsm > 0)
+      );
+  if (psmNamed) {
+    bullets.push(
+      <span key="psm">
+        The PSM is the protocol&rsquo;s peg module: a trader mints {stableSymbol} there directly against pETH, or
+        redeems {stableSymbol} for pETH. Unlike a Liquity redemption, nobody picks a CDP: every open CDP in the market
+        takes a pro-rata share. A mint adds debt and collateral to each CDP, a redemption takes both away, and the
+        trades&rsquo; fees go to the CDPs. The share since a touch is the net of every mint and redemption in that
+        stretch, so its two sides can move in opposite directions, and the fees make their sizes differ.
+      </span>,
+    );
+  }
+
   bullets.push(
     <span key="mode">
-      The market is in {chain.defensiveMode ? "defensive" : "normal"} mode, with a reserve-to-debt ratio of{" "}
-      {chain.reserveToDebtRatio.toFixed(2)}
+      The market is in {chain.defensiveMode ? "defensive" : "normal"} mode: its reserve-to-debt ratio, the
+      protocol&rsquo;s measure of the market&rsquo;s backing against its debt, is {chain.reserveToDebtRatio.toFixed(2)}.
       {chain.defensiveMode
-        ? " — below the 1.10 threshold, so the minimum ratio is raised to 150% until it recovers"
-        : ""}
-      .
+        ? " That is below 1.10, so the minimum ratio is 150% until it recovers, and a CDP may borrow more or withdraw only if it stays at 150% or above."
+        : " Below 1.10 the market would enter defensive mode, where the minimum ratio rises to 150%."}
     </span>,
   );
 

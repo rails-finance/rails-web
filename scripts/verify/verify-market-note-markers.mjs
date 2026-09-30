@@ -2,7 +2,9 @@
 // Liquity V2 trove with notes.
 // ----------------------------------------------------------------------------
 // On desktop a closed note is a marker on the spine (`[data-note-marker]`, a
-// button) and takes no row height; a click or Enter/Space opens the note's row
+// button) that sits where its open row's node will stand, so it neither moves
+// nor misses a second click as the note opens and closes; between two rows it
+// takes the open row's header height above its node. A click or Enter/Space opens the note's row
 // and panel in place and moves focus to its header, and the open row's filled
 // diamond closes it and returns focus to the marker. Display carries
 // "Market notes" and "Open all market notes"; the toolbar's "Market
@@ -69,14 +71,19 @@ console.log(`Market notes — against ${BASE}\n`);
     '1c. the toolbar carries no "Market notes · N" pill',
     (await page.getByRole("button", { name: /^Market notes ·/i }).count()) === 0,
   );
-  // No row height: the rows either side of a marker keep the list's spacing.
+  // A single marker takes the height the open row's header takes above its
+  // node: the list's 8px and 32px (Miles, 30 Sep 2026).
   const gap = await page.evaluate(() => {
     const g = document.querySelector('[data-note-gap=""]');
     const prev = g?.previousElementSibling?.getBoundingClientRect();
     const next = g?.nextElementSibling?.getBoundingClientRect();
     return g && prev && next ? Math.round(next.top - prev.bottom) : null;
   });
-  check("1d. a single marker takes no row height (the rows either side stay 8px apart)", gap === 8, `${gap}px`);
+  check(
+    "1d. a single marker takes the open row's header height (the rows either side 40px apart)",
+    gap === 40,
+    `${gap}px`,
+  );
 
   const first = closedMarkers(page).first();
   const id = await first.getAttribute("data-note-marker");
@@ -96,9 +103,19 @@ console.log(`Market notes — against ${BASE}\n`);
     tip.text,
   );
 
+  // Measured from the row above the gap, so content landing higher on the
+  // page does not read as the diamond moving.
+  const yOf = (el) => {
+    const gap = el.closest("[data-note-gap]");
+    const above = gap?.previousElementSibling;
+    return Math.round(el.getBoundingClientRect().top - (above ? above.getBoundingClientRect().top : 0));
+  };
+  const yClosed = await first.evaluate(yOf);
   await first.focus();
   await page.keyboard.press("Enter");
   await page.waitForTimeout(400);
+  const yOpen = await page.locator(`[data-note-marker="${id}"][aria-expanded="true"]`).evaluate(yOf);
+  check("3d. the diamond stays where it stood as the note opens", yOpen === yClosed, `${yClosed} → ${yOpen}`);
   const row = page.locator(`[data-market-note="${id}"]`);
   check("3. Enter on a marker opens its row", (await row.count()) === 1);
   check("3b. …with its panel open", (await row.getAttribute("data-market-note-open")) !== null);
@@ -211,6 +228,101 @@ console.log(`Market notes — against ${BASE}\n`);
   } else {
     check("12. the phone spine view keeps its markers", false, "the spine view did not turn on");
   }
+  await ctx.close();
+}
+
+// ── Several live notes: one card ───────────────────────────────────────────
+// An Aave V3 Core wallet borrowing several reserves carries one live rate note
+// per borrowed reserve (five on 2026-09-30). They stand in the head slot as ONE
+// card: one marker, one spine node, one line per note, each line opening to
+// that note's panel. The number of lines is read off the page, never pinned.
+const URL_GROUP = `${BASE}/ethereum/aave-v3/0x0af11de52b8dc8bdafa9e10764d2b08202939a6a?market=core`;
+const GROUP_ID = "live-notes:head";
+{
+  const { ctx, page } = await open(1280, URL_GROUP);
+  const marker = page.locator(`[data-note-marker="${GROUP_ID}"]`);
+  await marker
+    .first()
+    .waitFor({ state: "attached", timeout: 60000 })
+    .catch(() => {});
+  const total = await marketNoteCount(page);
+  check("13. the live notes stand as one marker in the head slot", (await marker.count()) === 1, `${total} notes`);
+  const markers = await closedMarkers(page).count();
+  await marker.first().click();
+  await page.waitForTimeout(500);
+  const card = page.locator("[data-live-note-group]");
+  const lines = card.locator('[data-market-note$="-head"]');
+  const n = await lines.count();
+  const headRows = await page.locator('[data-market-note$="-head"]').count();
+  const markersAfter = await closedMarkers(page).count();
+  check(
+    "13b. opening it draws one card holding every live note as a line",
+    (await card.count()) === 1 &&
+      n >= 2 &&
+      headRows === n &&
+      Number(await card.getAttribute("data-live-note-group")) === n,
+    `${await card.count()} card(s), ${n} lines, ${headRows} live rows on the page`,
+  );
+  check(
+    // Markers beside rows the list has not drawn yet are not on the page, so
+    // the count held is the one the card's opening moves.
+    "13c. the card's notes are counted as notes, and take one marker between them",
+    markers - markersAfter === 1 && total >= n,
+    `${markers} → ${markersAfter} markers on opening, ${total} notes, ${n} in the card`,
+  );
+  check(
+    '13d. the card is headed "Market since the last event" with "Now"',
+    /^Market since the last event\s*Now/.test((await card.innerText()).trim()),
+  );
+  check(
+    "13e. focus moves to the card's first line",
+    await page.evaluate(() => !!document.activeElement?.closest("[data-live-note-group] [data-market-note]")),
+  );
+  const first = lines.first();
+  await first.getByRole("button", { expanded: false }).first().click();
+  await page.waitForTimeout(300);
+  check(
+    "14. a line opens to its note's panel, the other lines stay closed",
+    (await first.getAttribute("data-market-note-open")) !== null &&
+      (await card.locator("[data-market-note-open]").count()) === 1,
+  );
+  const info = first.getByRole("button", { name: /how this note was derived/i });
+  await info.click();
+  await page.waitForTimeout(200);
+  const infoOpen = (await info.getAttribute("aria-expanded")) === "true";
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(250);
+  check(
+    "14b. the line's (i) opens, and Escape closes it",
+    infoOpen && (await info.getAttribute("aria-expanded")) === "false",
+  );
+  const close = page.locator(`[data-note-marker="${GROUP_ID}"][aria-expanded="true"]`);
+  await close.click();
+  await page.waitForTimeout(400);
+  check(
+    "14c. the card's diamond puts it back to one marker",
+    (await card.count()) === 0 && (await marker.count()) === 1,
+  );
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  check("14d. no horizontal scroll at 1280", sw <= 1280, `scrollWidth ${sw}`);
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open(390, URL_GROUP);
+  const card = page.locator("[data-live-note-group]:visible");
+  await card
+    .first()
+    .waitFor({ state: "attached", timeout: 60000 })
+    .catch(() => {});
+  const n = await card.locator('[data-market-note$="-head"]').count();
+  const headRows = await page.locator('[data-market-note$="-head"]:visible').count();
+  check(
+    "15. the phone list view draws the live notes as one card",
+    (await card.count()) === 1 && n >= 2 && headRows === n,
+    `${await card.count()} card(s), ${n} lines, ${headRows} live rows`,
+  );
+  const sw = await page.evaluate(() => document.documentElement.scrollWidth);
+  check("15b. no horizontal scroll at 390", sw <= 390, `scrollWidth ${sw}`);
   await ctx.close();
 }
 

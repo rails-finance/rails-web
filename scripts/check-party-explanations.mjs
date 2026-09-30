@@ -136,7 +136,14 @@ const PARTY_ROLES = [
       /\banother (\w+ )?(account|wallet)\b/i,
     ],
   },
-  { role: "liquidator", prefixes: ["by", "liquidated by", "seized by"], phrases: [/\bliquidator\b/i] },
+  {
+    role: "liquidator",
+    prefixes: ["by", "liquidated by", "seized by", "to the liquidator"],
+    phrases: [/\bliquidator\b/i],
+  },
+  // The wallet that sent a transaction whose contract acted for it (a
+  // liquidation bot's wallet and its contract).
+  { role: "sender", prefixes: ["sent by"], phrases: [/\bsent the transaction\b/i, /\bsent by the wallet\b/i] },
   {
     role: "liquidated account",
     prefixes: ["borrower", "seized from", "repaid for"],
@@ -148,6 +155,13 @@ const PARTY_ROLES = [
     ],
   },
   { role: "challenger", prefixes: ["challenged by"], phrases: [/\bchalleng(er|ed)\b/i] },
+  // PWN: the wallet that moved a loan's deadline, which on v1.1 can only be
+  // the LOAN note's holder.
+  {
+    role: "extender",
+    prefixes: ["by the lender", "by the note holder"],
+    phrases: [/\bnote'?s holder\b/i, /\bholder of the LOAN note\b/i, /\bmoved the loan'?s deadline\b/i],
+  },
   { role: "depositor", prefixes: ["for this address by"], phrases: [/\bdeposited\b.*\bfor this address\b/i] },
   { role: "veto", prefixes: ["vetoed by"], phrases: [/\bveto\w*/i, /\bdenied\b/i] },
   { role: "delegate", prefixes: ["delegate"], phrases: [/\bbatch manager\b/i, /\bdelegat\w*/i] },

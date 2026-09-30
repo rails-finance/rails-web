@@ -12,14 +12,20 @@ const intro = (
   <>
     <p>
       Asymmetry Finance issues USDaf, a dollar-tracking stablecoin that is borrowed into existence. A borrower opens a
-      Trove — a collateralised loan — against one of seven collateral types (yield-bearing stablecoins and wrapped
-      bitcoin) and sets their own interest rate. Paying a higher rate buys protection: redemptions, the mechanism that
-      holds USDaf at a dollar by paying off the lowest-rate loans first, reach those Troves last.
+      Trove — a collateralised loan — against one collateral type and sets its interest rate. Paying a higher rate buys
+      protection: redemptions, the mechanism that holds USDaf at a dollar by paying off the lowest-rate loans first,
+      reach those Troves last.
+    </p>
+    <p>
+      This explorer covers seven collateral types: ysyBOLD, scrvUSD, sUSDS, sfrxUSD, tBTC and WBTC18 from USDaf&apos;s
+      collateral registry, and cbBTC18 from Asymmetry&apos;s first deployment. Asymmetry&apos;s docs count eight
+      collateral assets. The first deployment&apos;s registry lists eight (scrvUSD, sDAI, sUSDS, sfrxUSD, sUSDe, tBTC,
+      WBTC18 and cbBTC18); of those, only cbBTC18 is covered here.
     </p>
     <p>
       A redemption that cancels enough debt to drop a Trove below its branch&apos;s 2,000 USDaf minimum turns it into a
-      zombie: pulled out of the rate-ordered redemption queue and placed first in line the next time redemptions reach
-      the branch, until the owner borrows it back above the floor.
+      zombie: out of the rate-ordered redemption queue until the owner borrows it back above the floor. The
+      branch&apos;s most recent zombie is the first Trove the next redemption on the branch reaches.
     </p>
     <p>
       A borrower can delegate their rate to a batch manager instead of setting it themselves — the manager then sets and

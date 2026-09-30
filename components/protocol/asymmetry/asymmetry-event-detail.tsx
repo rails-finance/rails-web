@@ -12,6 +12,7 @@ import { LiquidationForensics } from "@/components/shared/liquidation-forensics"
 import {
   buildForkLiquidationForensics,
   forkLiquidationStats,
+  forkRedemptionStats,
 } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
 import {
   collAfterProv,
@@ -87,32 +88,17 @@ export function AsymmetryEventDetail({ ctx, txHash, blockNumber }: AsymmetryEven
   // the act, not read back), the fee the redeemer left in this Trove, and the
   // branch-wide redemption this Trove was a slice of. Redemptions are the bulk of
   // Asymmetry's timeline, so this is the block most of its cards will show.
-  const red = ctx.redemption;
-  if (ctx.eventType === "redeemCollateral" && red) {
-    const emitted = ctx.priceAtBlock?.source === "redemption-event-price" ? ctx.priceAtBlock.usd : null;
-    if (emitted != null) {
-      stats.push({
-        label: "Branch price",
-        value: formatUsdValue(emitted),
-        symbol: "",
-        prov: emittedRedemptionPriceProv(coords, emitted),
-      });
-    }
-    if (Number(red.feeKeptColl) > 0) {
-      stats.push({
-        label: "Redemption fee kept",
-        value: fmt(red.feeKeptColl),
-        symbol: ctx.collateralSymbol,
-        prov: redemptionFeeKeptProv(coords, { fee: red.feeKeptColl }),
-      });
-    }
-    stats.push({
-      label: "Branch redemption",
-      value: fmt(red.actual),
-      symbol: DEBT_SYMBOL,
-      prov: redemptionActProv(coords, { actual: red.actual, attempted: red.attempted }),
-    });
-  }
+  // A redemption's own facts: the price the branch acted at, the fee the
+  // redeemer left in this Trove, and the whole redemption with this Trove's
+  // part of it.
+  stats.push(
+    ...forkRedemptionStats(
+      ctx,
+      coords,
+      { emittedRedemptionPriceProv, redemptionFeeKeptProv, redemptionActProv },
+      DEBT_SYMBOL,
+    ),
+  );
 
   // Where a liquidation's debt went and the surplus left for the owner — the
   // Liquidation log's legs, the receipts the prose echoes.

@@ -26,8 +26,11 @@
 // transfers included. A row updates its own reserve with the `supplyAfter` /
 // `debtAfter` its own log recorded; a liquidation row updates two — the
 // collateral reserve with `supplyAfter` and the debt reserve with `debtAfter`
-// — because one LiquidationCall moves both sides at once. Nothing is
-// interpolated: every figure is one the index already recorded on the row.
+// — because one LiquidationCall moves both sides at once. A repay made with
+// aTokens (`useATokens`) also burns the supply of its reserve: the row states
+// only the debt, so the supply falls by the amount repaid, floored at zero.
+// Nothing is interpolated: every figure is one the index already recorded on
+// the row.
 //
 // THE TWO ENDS ARE READ AROUND THE POSITION'S OWN TRANSACTIONS, which is the
 // whole reason this kind needs an endpoint at all where the other three read
@@ -97,6 +100,8 @@ interface FamilyContext {
   interestRateMode?: number;
   supplyAfter?: string;
   debtAfter?: string;
+  /** Repay rows: the Pool burned the wallet's aTokens to pay the debt. */
+  useATokens?: boolean;
   /** Aave V3 swap rows only — the received reserve's resulting balance. */
   swap?: { receivedSupplyAfter?: string; receivedDebtAfter?: string };
 }
@@ -193,6 +198,11 @@ export function aaveFamilyHoldings(events: readonly BaseActivityEvent[]): AaveFa
         const b = num(d.debtAfter);
         if (s != null) at(own).supply = s;
         if (b != null) at(own).debt = b;
+        // repayWithATokens: the aTokens burned are the amount repaid.
+        if (d.eventType === "repay" && d.useATokens === true) {
+          const burned = Number(e.flows?.[0]?.amountFormatted);
+          if (Number.isFinite(burned)) at(own).supply = Math.max(0, at(own).supply - burned);
+        }
       }
       // A swap also lands its received reserve, the event's second flow.
       if (d.eventType === "swap" && d.swap) {

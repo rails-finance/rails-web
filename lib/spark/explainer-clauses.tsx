@@ -46,6 +46,7 @@ import { formatDate } from "@/lib/date";
 import { emodeLabel, type SparkEmodeRead, type SparkEventState } from "@/lib/spark/event-state";
 import {
   isGatewayWithdrawal,
+  isSparkTreasury,
   sparkFeeLiquidation,
   sparkLiquidationFee,
   type SparkTimelineEvent,
@@ -539,6 +540,23 @@ function sparkEventSlotsBase(ctx: SparkContext, coords: SparkCoords, opts: Spark
   }
 }
 
+/** How a row's title names it, in running text: "withdrawal as ETH" for a
+ *  gateway withdrawal, "liquidation fee" for the treasury's fee, else the act. */
+export function sparkRowTitle(ctx: SparkContext): string {
+  if (isGatewayWithdrawal(ctx)) return "withdrawal as ETH";
+  if (ctx.eventType === "transfer_out" && isSparkTreasury(ctx.counterparty)) return "liquidation fee";
+  const words: Record<string, string> = {
+    supply: "supply",
+    withdraw: "withdrawal",
+    borrow: "borrow",
+    repay: "repayment",
+    liquidation: "liquidation",
+    transfer_in: "transfer in",
+    transfer_out: "transfer out",
+  };
+  return words[ctx.eventType] ?? ctx.eventType.replace("_", " ");
+}
+
 /** The bonus a liquidation paid, read off its own figures: the collateral that
  *  left (seized + fee) against the debt cleared at the block's prices, and the
  *  fee's share of the bonus. */
@@ -581,8 +599,8 @@ function feeSlots(ctx: SparkContext, coords: SparkCoords, sym: string, liq: Spar
       b
         ? clause(
             <>
-              The liquidation in this transaction took {fmt2(b.total)} {sym} of collateral: {fmt2(seized)} {sym} to the
-              liquidator and {fmt2(b.feeAmt)} {sym} here
+              This row and the Liquidated row are one transaction: the Pool took {fmt2(b.total)} {sym} of collateral,{" "}
+              {fmt2(seized)} {sym} to the liquidator first and {fmt2(b.feeAmt)} {sym} here after it
               {b.feeShare != null ? (
                 <>, SparkLend&rsquo;s {pctPlain(b.feeShare)} share of the liquidation bonus</>
               ) : null}
@@ -641,7 +659,8 @@ function liquidationSlots(
     b && b.feeAmt > 0 ? (
       <>
         A liquidator repaid {clearedFig} of the account&rsquo;s debt and took {fmt2(b.total)} {collSym} of its
-        collateral: {seizedFig} to the liquidator + {fmt2(b.feeAmt)} {collSym} to the Spark treasury.
+        collateral: {seizedFig} to the liquidator + {fmt2(b.feeAmt)} {collSym} to the Spark treasury. The fee is the
+        Liquidation fee row, in this same transaction; the Pool paid it after the seizure.
       </>
     ) : (
       <>
@@ -653,8 +672,17 @@ function liquidationSlots(
   // oracle update inside this block ahead of the call.
   const hfCall = state?.liqHfAtCall ?? state?.before.hf ?? null;
   const prevName = opts.previousEvent
-    ? `the ${opts.previousEvent.context.data.eventType.replace("_", " ")} on ${formatDate(opts.previousEvent.timestamp)}`
+    ? `the ${sparkRowTitle(opts.previousEvent.context.data)} on ${formatDate(opts.previousEvent.timestamp)}`
     : "the previous event";
+  const collBefore = num(ctx.supplyBefore);
+  const debtBeforeAmt = num(ctx.debtBefore);
+  const heldBefore =
+    collBefore != null && debtBeforeAmt != null ? (
+      <>
+        : the {fmt2(collBefore)} {collSym} and {fmt2(debtBeforeAmt)} {debtSym} held before the call, valued at that
+        price
+      </>
+    ) : null;
   const pathLine: ClauseInput =
     state && hfCall != null
       ? sentence(
@@ -664,14 +692,15 @@ function liquidationSlots(
                 Since {prevName}, {state.priceMove.symbol}&rsquo;s oracle price{" "}
                 {(state.liqPriceMove?.from ?? state.priceMove.to) < state.priceMove.from ? "fell" : "rose"} from{" "}
                 {fmtPrice(state.priceMove.from)} to {fmtPrice(state.liqPriceMove?.from ?? state.priceMove.to)} and the
-                health factor from {hfLabelV4(state.prevHf)} to {hfLabelV4(state.before.hf)}.{" "}
+                health factor from {hfLabelV4(state.prevHf)} to {hfLabelV4(state.before.hf)} by the end of the block
+                before the liquidation.{" "}
               </>
             ) : null}
             {state.liqPriceMove && state.before.hf != null && state.liqHfAtCall != null ? (
               <>
                 In the liquidation&rsquo;s block the oracle moved {state.liqPriceMove.symbol} to{" "}
                 <H>{fmtPrice(state.liqPriceMove.to)}</H> before the call ran, which took the health factor to{" "}
-                <H>{hfLabelV4(hfCall)}</H>, below 1
+                <H>{hfLabelV4(hfCall)}</H>, below 1{heldBefore}
               </>
             ) : (
               <>
@@ -766,6 +795,10 @@ function liquidationSlots(
         )
       : null;
 
+  // What the account kept: after the fee, where the transaction paid one.
+  const finalColl = fee?.supplyAfter
+    ? { amount: fee.supplyAfter, raw: fee.raw?.supplyAfter }
+    : { amount: ctx.supplyAfter, raw: ctx.raw?.supplyAfter };
   const afterLine: ClauseInput =
     rs.supplyAfter != null && rs.debtAfter != null
       ? sentence(
@@ -779,10 +812,10 @@ function liquidationSlots(
               <>The account stays open with </>
             )}
             <Fig
-              info={supplyAfterProv(collSym, coords, ctx.raw?.supplyAfter)}
-              value={formatNumber(Number(ctx.supplyAfter))}
+              info={supplyAfterProv(collSym, coords, finalColl.raw)}
+              value={formatNumber(Number(finalColl.amount))}
             >
-              <AmountText value={Number(ctx.supplyAfter)} /> {collSym}
+              <AmountText value={Number(finalColl.amount)} /> {collSym}
             </Fig>{" "}
             supplied against{" "}
             <Fig info={debtAfterProv(debtSym, coords, ctx.raw?.debtAfter)} value={formatNumber(Number(ctx.debtAfter))}>

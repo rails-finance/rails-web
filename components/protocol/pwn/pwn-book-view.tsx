@@ -38,7 +38,7 @@ import {
   bookRepayOwedProv,
   bookCollateralLineProv,
   bookCreditCountProv,
-  bookPastDueProv,
+  bookAccruingAprProv,
   bookTermLengthProv,
   bookInterestShareProv,
 } from "@/lib/pwn/event-provenance";
@@ -60,41 +60,37 @@ const days = (d: number): string => (d < 1 ? `${(d * 24).toFixed(0)} h` : `${Mat
  *  listing ignores a param it doesn't recognise and serves its default view, which
  *  looks fine and shows the wrong loans. scripts/verify/verify-book-listing-link.mjs
  *  is what catches that. */
-const OPEN_BOOK_HREF = "/ethereum/pwn?status=open&sortBy=due&sortOrder=asc";
-const DEFAULTS_HREF = "/ethereum/pwn?status=defaulted&sortBy=settled&sortOrder=desc";
+const OPEN_BOOK_HREF = "/ethereum/pwn?sortBy=due&sortOrder=asc";
+const DEFAULTS_HREF = "/ethereum/pwn?status=unclaimed,defaulted&sortBy=due&sortOrder=desc";
 
 const CATEGORY_LABEL: Record<string, string> = { ERC20: "ERC-20", ERC721: "ERC-721", ERC1155: "ERC-1155" };
 
 // ── 1 · The open book ────────────────────────────────────────────────────────
 
 function OpenBookSection({ book }: { book: PwnLoanBook }) {
-  const pastDue = book.pastDueOpen;
+  const running = book.totals.open;
+  const unclaimed = book.totals.unclaimed;
+  const unsettled = running + unclaimed;
   return (
     <section>
       <h2 className="text-sm font-semibold text-foreground">The open book</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        Every loan standing open: created, not yet repaid, not yet claimed. Each holds its borrower&rsquo;s collateral
-        in escrow against a fixed repayment in the loan&rsquo;s own credit token. A loan past its deadline has defaulted
-        by the clock, and its lender may claim the collateral at any time.
+        Every loan not yet settled: its collateral still sits in escrow. A loan runs until its deadline (the latest one,
+        where it was extended). Past that deadline unpaid it has defaulted: the contract refuses any repayment, and the
+        loan waits only for the lender&rsquo;s claim on the collateral. Such a loan counts as defaulted everywhere on
+        this explorer, claimed or not.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-xs font-semibold text-foreground">Open loans</span>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="text-xs font-semibold text-foreground">Loans in escrow</span>
           <span className="text-[11px] tabular-nums text-rb-500">
-            <Prov info={bookStatusCountProv("open")}>
-              {book.totals.open} {book.totals.open === 1 ? "loan" : "loans"}
-            </Prov>
-            {pastDue > 0 && (
-              <>
-                {" "}
-                · <Prov info={bookPastDueProv()}>{pastDue} past due</Prov>
-              </>
-            )}
+            <Prov info={bookStatusCountProv("open")}>{running} running</Prov> ·{" "}
+            <Prov info={bookStatusCountProv("unclaimed")}>{unclaimed} defaulted, not yet claimed</Prov>
           </span>
         </div>
 
-        {book.totals.open === 0 ? (
+        {unsettled === 0 ? (
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
             No loan stands open — every loan ever struck has settled, by repayment or by the lender&rsquo;s claim. The
             rest of this page is the book&rsquo;s record.
@@ -102,11 +98,11 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
         ) : (
           <>
             <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-              The loans themselves are the listing&rsquo;s subject: filtered to open and ordered by deadline, it states
-              each one&rsquo;s collateral, credit, fixed repayment and due date.
+              The loans themselves are the listing&rsquo;s subject: ordered by deadline, it states each one&rsquo;s
+              collateral, principal, what it owes and its due date.
             </p>
             <Link href={OPEN_BOOK_HREF} className="mt-2 inline-block text-[13px] text-blue-500 hover:underline">
-              Open loans, soonest deadline first <span aria-hidden>→</span>
+              Loans in escrow, soonest deadline first <span aria-hidden>→</span>
             </Link>
           </>
         )}
@@ -133,7 +129,7 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
           <span>Asset</span>
           <span>Kind</span>
           <span className="text-right">Loans</span>
-          <span className="text-right">Open</span>
+          <span className="text-right">Running</span>
           <span className="text-right">Repaid</span>
           <span className="text-right">Defaulted</span>
         </div>
@@ -168,6 +164,7 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
               </div>
               <div className="text-xs tabular-nums text-foreground sm:text-right">
                 <Prov info={bookCollateralLineProv(c.symbol, "defaulted")}>{c.defaulted}</Prov>
+                {c.unclaimed > 0 && <span className="text-rb-500"> ({c.unclaimed} unclaimed)</span>}
               </div>
             </div>
           ))}
@@ -195,7 +192,7 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
           <span className="text-right">Loans</span>
           <span className="text-right">Advanced (lifetime)</span>
           <span className="text-right">Outstanding</span>
-          <span className="text-right">Owed at settlement</span>
+          <span className="text-right">Owed at deadline</span>
         </div>
         <div className="divide-y divide-rb-200 dark:divide-rb-500/20">
           {book.credit.map((t) => (
@@ -249,9 +246,10 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
         </div>
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
           &ldquo;Advanced&rdquo; is every principal ever handed over in the token; &ldquo;outstanding&rdquo; is the
-          principal of the loans still open; &ldquo;owed at settlement&rdquo; adds their fixed interest. A dash means no
-          open loan in the token — or, for the owed column, an open loan whose terms carry no fixed repay total
-          (v1.2/v1.3 terms state interest differently), in which case no partial sum is shown.
+          principal of the loans not yet settled, running or defaulted and unclaimed; &ldquo;owed at deadline&rdquo;
+          adds their interest: a v1.1 loan&rsquo;s fixed interest, or what a v1.2/v1.3 loan&rsquo;s rate accrues to its
+          deadline. A defaulted loan can no longer be repaid, so its figure is what went unpaid. A dash means no
+          unsettled loan in the token.
         </p>
       </div>
     </section>
@@ -321,11 +319,17 @@ function TermsSection({ book }: { book: PwnLoanBook }) {
           />
         </div>
         {t.accruingLoans > 0 && (
-          <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-            {t.accruingLoans} {t.accruingLoans === 1 ? "loan carries" : "loans carry"} an accruing rate instead of a
-            fixed total (the v1.2/v1.3 terms shape); their interest is stated per year, not as a repay figure, so they
-            sit outside the fixed-interest spread above.
-          </p>
+          <div className="mt-3">
+            <Spread
+              label="Accruing interest, a year"
+              value={t.accruingApr}
+              fmt={pct}
+              prov={bookAccruingAprProv()}
+              note={`The ${t.accruingLoans} ${
+                t.accruingLoans === 1 ? "loan" : "loans"
+              } struck through SimpleLoan v1.2 and v1.3 state a yearly rate in place of a fixed total; interest accrues by the minute from origination to repayment.`}
+            />
+          </div>
         )}
       </div>
     </section>
@@ -346,11 +350,17 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-xs font-semibold text-foreground">Settled by default</span>
+          <span className="text-xs font-semibold text-foreground">Defaulted</span>
           <span className="text-[11px] tabular-nums text-rb-500">
             <Prov info={bookStatusCountProv("defaulted")}>
               {book.totals.defaulted} of {book.totals.loans} {book.totals.loans === 1 ? "loan" : "loans"}
             </Prov>
+            {book.totals.unclaimed > 0 && (
+              <>
+                {" "}
+                · <Prov info={bookStatusCountProv("unclaimed")}>{book.totals.unclaimed} not yet claimed</Prov>
+              </>
+            )}
           </span>
         </div>
 
@@ -361,11 +371,11 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
         ) : (
           <>
             <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-              Which loans lapsed, what each lender took and what repayment it lapsed on is the listing, filtered to
-              defaulted and ordered by the date the claim settled.
+              Which loans lapsed, what each lender took or can still claim, and what repayment went unpaid is the
+              listing, filtered to the defaults and ordered by the deadline each one passed.
             </p>
             <Link href={DEFAULTS_HREF} className="mt-2 inline-block text-[13px] text-blue-500 hover:underline">
-              Loans settled by default, most recent first <span aria-hidden>→</span>
+              Defaulted loans, most recent deadline first <span aria-hidden>→</span>
             </Link>
           </>
         )}
@@ -415,7 +425,7 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
               <Prov info={bookStatusCountProv("open")}>
                 <span className="text-foreground">{book.totals.open}</span>
               </Prov>{" "}
-              open
+              running
             </span>
             <span>
               <Prov info={bookStatusCountProv("repaid")}>
@@ -428,6 +438,12 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
                 <span className="text-foreground">{book.totals.defaulted}</span>
               </Prov>{" "}
               defaulted
+              {book.totals.unclaimed > 0 && (
+                <>
+                  {" "}
+                  (<Prov info={bookStatusCountProv("unclaimed")}>{book.totals.unclaimed}</Prov> not yet claimed)
+                </>
+              )}
             </span>
           </>
         }
@@ -442,12 +458,34 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
   );
 }
 
+/** "v11" → "v1.1". */
+const versionName = (v: string): string => (/^v\d\d$/.test(v) ? `v${v[1]}.${v[2]}` : v);
+
 /** The page header's stamp — where the book comes from and how far it runs. */
 export function PwnBookStamp({ book }: { book: PwnLoanBook }) {
   if (book.stale || book.totals.loans === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans · most recent struck at{" "}
+      Indexed loan book · <span className="text-foreground">{book.totals.loans}</span> loans
+      {book.versions.length === 1 ? (
+        <>
+          {" "}
+          through SimpleLoan {versionName(book.versions[0].version)}
+          {book.versions[0].version === "v11" && <> (loans struck through v1.2 and v1.3 are not indexed yet)</>}
+        </>
+      ) : book.versions.length > 1 ? (
+        <>
+          {" "}
+          through SimpleLoan{" "}
+          {book.versions.map((v, i) => (
+            <span key={v.version}>
+              {i > 0 ? ", " : ""}
+              {versionName(v.version)} ({v.loans})
+            </span>
+          ))}
+        </>
+      ) : null}{" "}
+      · most recent struck at{" "}
       {book.latestCreatedBlock != null ? (
         <BlockRef block={book.latestCreatedBlock} chainId={MAINNET_CHAIN_ID} />
       ) : (

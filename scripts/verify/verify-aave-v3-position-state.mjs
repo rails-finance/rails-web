@@ -1,7 +1,10 @@
 // The open Aave V3 Ethereum card reads the position state around its event's
-// transaction (rails-ops TO-DO-ui-jobs §19): every supplied and borrowed reserve
-// with its exact before → after (USD, collateral on/off), total collateral, total
-// debt, health factor, LTV, liquidation threshold and eMode. A balance the block
+// transaction (rails-ops TO-DO-ui-jobs §19, §213): a Collateral cell (total
+// collateral in USD, each collateral reserve beneath, the switched-off supplies
+// under "Supplied, not collateral"), a Debt cell (total debt, each borrowed
+// reserve beneath), the health factor, an LTV cell (debt ÷ collateral of the
+// weighted max LTV, the liquidation threshold, what can still be borrowed)
+// and eMode. A balance the block
 // lists is stated there and nowhere else — the grid's cell for that reserve is
 // the statement only until the read lands (§47). A reserve row under a cent is
 // dust and sits behind a "N dust reserve(s) hidden" line per side, unless it is
@@ -158,8 +161,8 @@ const FIXTURES = [
     // straight to zero; Aave auto-flips the collateral switch off once the
     // balance is gone. USDT is untouched (a plain repay's own axis is the
     // debt side) and the position's sole dust reserve, so it sits under
-    // "Collateral off" with a "was on" flip note; WBTC, AAVE, sUSDe, WETH and
-    // cbBTC stay put, unflipped, under "Collateral on".
+    // "Supplied, not collateral" with a "was on" flip note; WBTC, AAVE, sUSDe,
+    // WETH and cbBTC stay put, unflipped, under the Collateral total.
     label: "core 0x37bc repay burns USDT collateral to zero, flag flips off",
     wallet: "0x37bcd52b5319cbb7e62b9947a34774cee513db4b",
     market: "core",
@@ -201,14 +204,14 @@ const fmtUsd = (v) =>
   v < 0.01 ? "< $0.01" : v < 1 ? `$${v.toFixed(2)}` : "$" + v.toLocaleString("en-US", { maximumFractionDigits: 0 });
 const rawToUsd = (raw, priceBase, decimals) => Number((big(raw) * big(priceBase)) / pow10(decimals + 4)) / 1e4;
 const baseToUsd = (base) => Number(big(base) / pow10(4)) / 1e4;
-// hfLabelV4 (lib/aave-v4/format.ts): a third decimal below 1.1, rounded down
-// under 1, ">100" from 100.
+// hfLabelV3 (lib/aave-v3/position-state.ts): four decimals below 1.1, rounded
+// down under 1, ">100" from 100.
 const hfLabel = (wad) => {
   if (wad == null) return "∞";
   const n = Number(big(wad) / pow10(14)) / 1e4;
   if (n >= 100) return ">100";
-  if (n < 1) return (Math.floor(n * 1000) / 1000).toFixed(3);
-  return n < 1.1 ? n.toFixed(3) : n.toFixed(2);
+  if (n < 1) return (Math.floor(n * 1e4 + 1e-9) / 1e4).toFixed(4);
+  return n < 1.1 ? n.toFixed(4) : n.toFixed(2);
 };
 const bpsPct = (bps) => `${(bps / 100).toFixed(2)}%`;
 const emodeName = (state, id) => (id === 0 ? "None" : state.emode?.categories?.[String(id)]?.label || `Category ${id}`);
@@ -410,8 +413,17 @@ for (const fx of FIXTURES) {
   // ── 2. The card ─────────────────────────────────────────────────────────
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, extraHTTPHeaders: bypassHeaders() });
   const asks = [];
+  // A key asked again after a refusal that can change (a 409, a 5xx, a
+  // network failure) is the hook's one retry, not a second read.
+  const retried = new Set();
   page.on("request", (r) => {
     if (r.url().includes(ROUTE)) asks.push(r.url());
+  });
+  page.on("response", (r) => {
+    if (r.url().includes(ROUTE) && !r.ok() && r.status() !== 400 && r.status() !== 404) retried.add(r.url());
+  });
+  page.on("requestfailed", (r) => {
+    if (r.url().includes(ROUTE)) retried.add(r.url());
   });
   try {
     const card = await openCard(page, fx);
@@ -448,10 +460,11 @@ for (const fx of FIXTURES) {
     // Supplied and borrowed lists: one line per held reserve, amount and USD.
     // A reserve under a cent is dust and sits behind a count line by default,
     // unless it is one of the reserves this event touched (§52) — that row
-    // always draws, whatever its side reads. The Supplied panel groups its
-    // rows under "Collateral on" / "Collateral off" by each reserve's AFTER
-    // flag, an empty group drawing no heading, and a row whose flag flipped
-    // carries "was on"/"was off" (§54).
+    // always draws, whatever its side reads. The Collateral cell places its
+    // rows by each reserve's AFTER flag: switched on, straight under the
+    // total; switched off, under "Supplied, not collateral" (§213). An empty
+    // group draws nothing, and a row whose flag flipped carries "was on"/"was
+    // off" (§54).
     for (const [side, rows] of [
       ["supply", supplied],
       ["debt", borrowed],
@@ -475,14 +488,23 @@ for (const fx of FIXTURES) {
       for (let i = 0; i < n; i++) texts.push(await text(lines.nth(i)));
 
       if (side === "supply") {
-        // A group with no rows in it draws no heading at all.
+        // A group with no rows in it draws nothing.
         for (const group of ["on", "off"]) {
           const wantsGroup = rows.some((r) => r.collateral && (r.collateral.after ? "on" : "off") === group);
           check(
-            `${fx.label}: "Collateral ${group}" heading draws only when it has rows`,
+            `${fx.label}: the collateral-${group} group draws only when it has rows`,
             (await scope.locator(`[data-collateral-group="${group}"]`).count()) === (wantsGroup ? 1 : 0),
           );
         }
+        const offGroup = scope.locator('[data-collateral-group="off"]');
+        const offText = (await offGroup.count()) > 0 ? await text(offGroup.first()) : "";
+        const scopeText = await text(scope);
+        check(
+          `${fx.label}: switched-off supplies read "Supplied, not collateral"; no "Collateral on" heading`,
+          !scopeText.includes("Collateral on") &&
+            (!rows.some((r) => r.collateral && !r.collateral.after) || offText.startsWith("Supplied, not collateral")),
+          offText.slice(0, 60),
+        );
       }
 
       for (const r of shownRows) {
@@ -503,7 +525,7 @@ for (const fx of FIXTURES) {
           const line = lines.nth(lineIdx);
           const gotGroup = await line.locator("xpath=..").getAttribute("data-collateral-group");
           check(
-            `${fx.label}: ${r.symbol} sits under the "Collateral ${wantGroup}" heading`,
+            `${fx.label}: ${r.symbol} sits in the collateral-${wantGroup} group`,
             gotGroup === wantGroup,
             `got ${gotGroup}`,
           );
@@ -601,21 +623,32 @@ for (const fx of FIXTURES) {
       }
     }
 
-    // Account figures.
+    // Account figures (§213): the totals head the Collateral and Debt cells;
+    // the LTV cell states the max LTV and the liquidation threshold, and what
+    // can still be borrowed.
     const cardText = async (key) => text(block.locator(`[data-position-card="${key}"]`));
     const a = state.account;
     if (a) {
+      const total = async (what) => text(block.locator(`[data-account-total="${what}"]`));
       check(
-        `${fx.label}: total collateral reads ${fmtUsd(baseToUsd(a.after.totalCollateralBase))}`,
-        (await cardText("total-collateral")).includes(
+        `${fx.label}: total collateral heads the Collateral cell at ${fmtUsd(baseToUsd(a.after.totalCollateralBase))}`,
+        (await total("collateral")).endsWith(
           big(a.after.totalCollateralBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalCollateralBase)),
         ),
       );
       check(
-        `${fx.label}: total debt reads ${fmtUsd(baseToUsd(a.after.totalDebtBase))}`,
-        (await cardText("total-debt")).includes(
+        `${fx.label}: total debt heads the Debt cell at ${fmtUsd(baseToUsd(a.after.totalDebtBase))}`,
+        (await total("debt")).endsWith(
           big(a.after.totalDebtBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalDebtBase)),
         ),
+      );
+      check(
+        `${fx.label}: no Supplied, Borrowed, Total or Max LTV cells`,
+        (await block
+          .locator(
+            '[data-position-card="supplied"], [data-position-card="borrowed"], [data-position-card="total-collateral"], [data-position-card="total-debt"], [data-position-card="liquidation-threshold"]',
+          )
+          .count()) === 0,
       );
       const hf = await cardText("health-factor");
       check(
@@ -623,14 +656,22 @@ for (const fx of FIXTURES) {
         hf.endsWith(hfLabel(a.after.healthFactor)),
         hf,
       );
-      check(
-        `${fx.label}: LTV reads ${bpsPct(a.after.ltvBps)}`,
-        (await cardText("ltv")).endsWith(bpsPct(a.after.ltvBps)),
-      );
-      check(
-        `${fx.label}: liquidation threshold reads ${bpsPct(a.after.liquidationThresholdBps)}`,
-        (await cardText("liquidation-threshold")).endsWith(bpsPct(a.after.liquidationThresholdBps)),
-      );
+      if (big(a.before.totalCollateralBase) > BigInt(0) || big(a.after.totalCollateralBase) > BigInt(0)) {
+        const limits = await text(block.locator("[data-ltv-limits]"));
+        check(
+          `${fx.label}: LTV cell reads "${bpsPct(a.after.ltvBps)} maximum; liquidation at ${bpsPct(a.after.liquidationThresholdBps)}"`,
+          limits.includes(`${bpsPct(a.after.ltvBps)} maximum; liquidation at`) &&
+            limits.endsWith(bpsPct(a.after.liquidationThresholdBps)),
+          limits,
+        );
+        // availableBorrowsBase: collateral × max LTV (percentMul, half up) − debt, floored at zero.
+        const roomBase =
+          (big(a.after.totalCollateralBase) * BigInt(a.after.ltvBps) + BigInt(5000)) / BigInt(10000) -
+          big(a.after.totalDebtBase);
+        const room = roomBase > BigInt(0) ? fmtUsd(baseToUsd(roomBase.toString())) : "$0";
+        const borrowable = await text(block.locator("[data-ltv-borrowable]"));
+        check(`${fx.label}: the row reads "Still borrowable" ${room}`, borrowable === room, borrowable);
+      }
     }
     // The eMode card draws only where a category is in use on either side.
     if (state.emode && (state.emode.before !== 0 || state.emode.after !== 0)) {
@@ -658,8 +699,10 @@ for (const fx of FIXTURES) {
     const own = asks.filter((u) => u.toLowerCase().includes(`tx=${fx.tx.toLowerCase()}`)).length;
     check(
       `${fx.label}: reopening draws the kept answer without a second request`,
-      again === "ready" && own === 1 && new Set(asks).size === asks.length,
-      `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct`,
+      again === "ready" &&
+        own === 1 &&
+        asks.filter((u) => !retried.has(u)).length === new Set(asks.filter((u) => !retried.has(u))).size,
+      `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct, ${retried.size} retried after a refusal that can change`,
     );
 
     if (fx.deep) {

@@ -73,8 +73,11 @@ export function MoonwellEventHeader({
       deltas.push({
         value: -seized,
         symbol: collMSym,
-        address: soleFlowAddress(flows, collMSym),
+        // No contract address for an mToken: the icon CDNs hold none, so the
+        // chip resolves the mark from the symbol.
         prov: seizeTokensProv(collMSym, coords),
+        // An mToken count, named so it does not read as the underlying.
+        suffix: collMSym,
       });
     }
   } else if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out") {
@@ -83,8 +86,8 @@ export function MoonwellEventHeader({
       deltas.push({
         value: d,
         symbol: mSym,
-        address: soleFlowAddress(flows, mSym),
         prov: transferAmountProv(mSym, ctx.eventType === "transfer_in" ? "in" : "out", coords),
+        suffix: mSym,
       });
   } else {
     const d = Number(ctx.assetsDelta ?? "0") || 0;
@@ -109,7 +112,20 @@ export function MoonwellEventHeader({
         }
       : ctx.eventType === "transfer_out" && ctx.counterparty
         ? {
-            prefix: "to",
+            // The protocol's share of a seizure goes to the market itself.
+            prefix:
+              coords.mtoken != null && ctx.counterparty === coords.mtoken.toLowerCase()
+                ? `to the ${mSym} market`
+                : // A seizure's transfer to the liquidator: the contract that
+                  // called the market is the one receiving, in a transaction
+                  // someone other than the owner sent.
+                  wallet &&
+                    ctx.caller &&
+                    ctx.caller.toLowerCase() === ctx.counterparty.toLowerCase() &&
+                    ctx.txFrom &&
+                    ctx.txFrom.toLowerCase() !== wallet.toLowerCase()
+                  ? "to the liquidator"
+                  : "to",
             address: ctx.counterparty,
             prov: transferAmountProv(mSym, "out", coords),
             ens: true,
@@ -139,6 +155,19 @@ export function MoonwellEventHeader({
                   { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
                   coords,
                 ),
+                // A contract made the repayment for the wallet that sent the
+                // transaction (a liquidation bot's contract, say): both named.
+                ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
+                  ? {
+                      prefix: "sent by",
+                      tip: (
+                        <>
+                          {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
+                          {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
+                        </>
+                      ),
+                    }
+                  : {}),
               }
             : undefined,
         party,

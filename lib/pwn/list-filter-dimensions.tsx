@@ -1,6 +1,7 @@
 // PWN listing filter registry (chain-state tier). A PWN position is a DISCRETE
-// fixed-term loan (one loan_id), so the facets are loan-shaped: Status (open /
-// repaid / defaulted, resting on a CONTEXTUAL default — lib/pwn/listing-visibility.ts)
+// fixed-term loan (one loan_id), so the facets are loan-shaped: Status (running /
+// defaulted not yet claimed / repaid / defaulted and claimed, resting on a
+// CONTEXTUAL default — lib/pwn/listing-visibility.ts)
 // and the two asset sides (Credit advanced, Collateral locked),
 // their option lists derived from the loans actually present. All chain-state — the
 // replayed status and the named loan assets. No CR/USD facet: a fixed-term P2P loan
@@ -8,12 +9,19 @@
 // render and run this. Twin patterns in lib/morpho + lib/liquity-v1.
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
+import { defaultChipLabel, type FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { ListDimension, BaseListFilters, ApplyConfig } from "@/lib/shared/list-filter";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
-import { loanDueAt } from "@/lib/pwn/economics";
-import { canonicalStatuses, defaultStatuses, effectiveStatuses, sameStatusSet } from "@/lib/pwn/listing-visibility";
+import { loanDeadlineAt, pwnLoanState } from "@/lib/pwn/economics";
+import {
+  ALL_PWN_STATUS_BUCKETS,
+  NO_PWN_STATUS,
+  canonicalStatuses,
+  defaultStatuses,
+  effectiveStatuses,
+  sameStatusSet,
+} from "@/lib/pwn/listing-visibility";
 
 export interface PwnListFilters extends BaseListFilters {
   status: string[];
@@ -47,11 +55,28 @@ export const PWN_SORT_OPTIONS: SortOption[] = [
   { value: "events", label: "Events" },
 ];
 
+// A loan past its deadline has defaulted on chain whether or not the lender has
+// claimed yet, so the two default buckets both say "Defaulted".
 const STATUS_OPTIONS: FilterOptionDef[] = [
-  { value: "open", label: "Open" },
+  { value: "open", label: "Running" },
+  { value: "unclaimed", label: "Defaulted, not yet claimed" },
   { value: "repaid", label: "Repaid" },
-  { value: "defaulted", label: "Defaulted" },
+  { value: "defaulted", label: "Defaulted and claimed" },
 ];
+
+/** "0 running" — a bucket's word after a zero count. */
+const ZERO_WORD: Record<string, string> = {
+  open: "running",
+  unclaimed: "unclaimed",
+  repaid: "repaid",
+  defaulted: "claimed",
+};
+
+/** The loan's bucket now (lib/pwn/economics.ts `pwnLoanState`, "running" → "open"). */
+export function pwnStatusBucket(row: PwnPositionSummary): string {
+  const s = pwnLoanState({ ...row, extendedDueAt: row.latestDefaultAt });
+  return s === "running" ? "open" : s;
+}
 
 /** Distinct option list keyed by `value`, preserving first-seen order. */
 function distinct<T>(rows: T[], pick: (r: T) => FilterOptionDef | null): FilterOptionDef[] {
@@ -73,6 +98,13 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
         }
       : null;
   const creditOptions = distinct(rows, (r) => assetOption(r.credit));
+  // A bucket with no loan in it says so beside its box ("0 running"), so ticking
+  // it and seeing nothing change reads as the answer.
+  const bucketCounts = new Map<string, number>();
+  for (const r of rows) bucketCounts.set(pwnStatusBucket(r), (bucketCounts.get(pwnStatusBucket(r)) ?? 0) + 1);
+  const statusOptions: FilterOptionDef[] = STATUS_OPTIONS.map((o) =>
+    rows.length > 0 && !bucketCounts.get(o.value) ? { ...o, meta: `0 ${ZERO_WORD[o.value] ?? ""}`.trim() } : o,
+  );
   const collateralOptions = distinct(rows, (r) => assetOption(r.collateral));
 
   return [
@@ -82,14 +114,25 @@ export function pwnListDimensions(rows: PwnPositionSummary[]): ListDimension<Pwn
       group: "Status",
       cardinality: "multi",
       param: "status",
-      options: STATUS_OPTIONS,
+      options: statusOptions,
       get: (f) => effectiveStatuses(f),
       defaultValues: (f) => defaultStatuses(f),
+      // Each box adds or removes that option: unticking the last one leaves none
+      // ticked (and no loans listed); only a selection equal to the default
+      // returns to the clean URL.
       set: (f, v) => {
         const sel = canonicalStatuses(v);
-        return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
+        return {
+          ...f,
+          status: sel.length === 0 ? [NO_PWN_STATUS] : sameStatusSet(sel, defaultStatuses(f)) ? [] : sel,
+        };
       },
-      matches: (row, v) => v.includes(row.status),
+      chipLabel: (values, options) =>
+        values.includes(NO_PWN_STATUS) ? "Status: none ticked" : defaultChipLabel("Status", values, options),
+      // The bare directory rests on the loans still in escrow; the chip says so.
+      // A search naming a loan or a party rests on every status, which needs no chip.
+      defaultChip: (f) => (defaultStatuses(f).length < ALL_PWN_STATUS_BUCKETS.length ? "Status: in escrow" : null),
+      matches: (row, v) => v.includes(pwnStatusBucket(row)),
     },
     {
       id: "credit",
@@ -124,11 +167,12 @@ export const PWN_APPLY: ApplyConfig<PwnPositionSummary> = {
   sort: {
     created: (r) => r.createdAt ?? 0,
     // A loan states its deadline as either an absolute expiry or a duration from
-    // creation, so the sortable moment is derived — `loanDueAt` is the same
-    // function the loan book and the position card resolve it with. A loan whose
+    // creation, and an extension moves it, so the sortable moment is derived —
+    // `loanDeadlineAt` is the function the loan book and the position card
+    // resolve it with. A loan whose
     // terms don't resolve to a deadline sorts LAST on ascending (the book's own
     // convention), never to the front as a 0 would put it.
-    due: (r) => loanDueAt(r) ?? Number.MAX_SAFE_INTEGER,
+    due: (r) => loanDeadlineAt({ ...r, extendedDueAt: r.latestDefaultAt }) ?? Number.MAX_SAFE_INTEGER,
     settled: (r) => r.closedAt ?? 0,
     events: (r) => r.eventCount,
   },

@@ -8,7 +8,9 @@
 // arm to both, plus optional demoted / default-hidden entries below.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { dolomiteBalanceAction, DOLOMITE_BALANCE_ACTION_LABELS } from "@/lib/dolomite/balance-action";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
+import { polarisFilterKey } from "@/lib/polaris/row-kinds";
 import {
   isLiquityEvent,
   isAaveV4Event,
@@ -24,6 +26,7 @@ import {
   isLiquityV1Event,
   isCompoundV2Event,
   isPwnEvent,
+  isPolarisEvent,
 } from "@/lib/shared/types/event-shape";
 
 /** Get the canonical action key for an event (used for type-level filtering) */
@@ -57,8 +60,18 @@ export function getEventActionKey(e: BaseActivityEvent): string {
   }
   if (isSparkEvent(e)) {
     // Spark's eventType is already a clean per-action bucket (supply, withdraw,
-    // borrow, repay, liquidation), so it doubles as the filter key.
-    return e.context.data.eventType ?? e.actionType ?? "unknown";
+    // borrow, repay, liquidation), so it doubles as the filter key — except
+    // for the two spToken transfers each row names as an act: one to the Spark
+    // WETH gateway is a withdrawal as ETH (the row reads "Withdraw"), one to
+    // the Spark treasury is a liquidation's fee (the row reads "Liquidation
+    // fee"). "Transfer out" is left to transfers between accounts.
+    const d = e.context.data;
+    if (d.eventType === "transfer_out") {
+      const to = d.counterparty?.toLowerCase();
+      if (to === SPARK_WETH_GATEWAY_ADDRESS) return "withdraw";
+      if (to === SPARK_TREASURY_ADDRESS) return "liquidation_fee";
+    }
+    return d.eventType ?? e.actionType ?? "unknown";
   }
   if (isMapleEvent(e)) {
     // Maple's eventType is already a clean per-action bucket (deposit,
@@ -87,15 +100,22 @@ export function getEventActionKey(e: BaseActivityEvent): string {
     return e.context.data.eventType ?? e.actionType ?? "unknown";
   }
   if (isDolomiteEvent(e)) {
-    // Dolomite's eventType is already a clean per-leg bucket (deposit,
-    // withdraw, transfer_in/out, the trade legs, the liquidation legs), so it
-    // doubles as the filter key.
-    return e.context.data.eventType ?? e.actionType ?? "unknown";
+    // Dolomite's eventType is a per-leg bucket (deposit, withdraw,
+    // transfer_in/out, the trade legs, the liquidation legs); a deposit or
+    // withdrawal is keyed by what it did to the balance (borrow, repay, …),
+    // the same word its row shows.
+    return dolomiteBalanceAction(e.context.data) ?? e.context.data.eventType ?? e.actionType ?? "unknown";
   }
   if (isLiquityV1Event(e)) {
     // Liquity V1's eventType is already a clean per-action bucket (openTrove,
     // adjustTrove, closeTrove, liquidation, redemption), so it doubles as the key.
     return e.context.data.eventType ?? e.actionType ?? "unknown";
+  }
+  if (isPolarisEvent(e)) {
+    // An adjust is keyed by the legs its row names ("Deposit, Borrow, Net PSM
+    // share"), so the menu reads the rows' words; open, close, liquidate and
+    // transfer keep their event type.
+    return polarisFilterKey(e.context.data);
   }
   return e.actionType ?? "unknown";
 }
@@ -293,7 +313,16 @@ const SPARK_OP_LABELS: Record<string, string> = {
   borrow: "Borrow",
   repay: "Repay",
   liquidation: "Liquidated",
+  liquidation_fee: "Liquidation fee",
+  transfer_in: "Transfer in",
+  transfer_out: "Transfer out",
+  emode: "E-mode",
 };
+
+/** SparkLend's WETH gateway and treasury (lib/spark/flows-timeline.ts names
+ *  them; repeated here so the filter keys import nothing of the tower). */
+const SPARK_WETH_GATEWAY_ADDRESS = "0xbd7d6a9ad7865463de44b05f04559f65e3b11704";
+const SPARK_TREASURY_ADDRESS = "0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5";
 
 // Moonwell (Compound v2 fork) — mint/redeem are the supply side (deposit
 // underlying ↔ mTokens), borrow/repay the debt side; transfer_in/out are
@@ -333,8 +362,7 @@ const COMPOUND_V2_OP_LABELS: Record<string, string> = {
 // which account lost or gained what (a seizure is not something the borrower
 // did).
 const DOLOMITE_OP_LABELS: Record<string, string> = {
-  deposit: "Deposit",
-  withdraw: "Withdraw",
+  ...DOLOMITE_BALANCE_ACTION_LABELS,
   transfer_in: "Transfer in",
   transfer_out: "Transfer out",
   trade_taker: "Trade (spent)",
@@ -513,6 +541,8 @@ const LLAMALEND_OP_LABELS: Record<string, string> = {
 // changing hands — custody, never an open or a close.
 const POLARIS_OP_LABELS: Record<string, string> = {
   open: "Open",
+  // An adjust keys by its row's leg names (lib/polaris/row-kinds.ts), which
+  // are their own labels; "adjust" is left for a touch that moved nothing.
   adjust: "Adjust",
   close: "Close",
   liquidate: "Liquidated",

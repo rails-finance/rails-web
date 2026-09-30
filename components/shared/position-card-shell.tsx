@@ -21,6 +21,10 @@ import type { ReactNode } from "react";
 import { ProvReceiptsScope, ProvUnscoped, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import {
+  PositionCardDisclosureProvider,
+  usePositionCardDisclosureState,
+} from "@/components/shared/position-card-disclosure";
 
 export function PositionCardShell({
   receipts = false,
@@ -30,6 +34,7 @@ export function PositionCardShell({
   viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
+  disclosureKey,
   children,
 }: {
   receipts?: boolean;
@@ -56,9 +61,16 @@ export function PositionCardShell({
   /** Fires when the Explanation section opens/closes — passed straight
    *  through, for a surface that persists that state. */
   onExplanationToggle?: (open: boolean) => void;
+  /** Opt in to progressive disclosure (ui-jobs 209): one stable key per
+   *  position. The card then draws closed by default, a chevron in the
+   *  header's activity meta opens it, and the Explanation row shows only
+   *  while it is open (components/shared/position-card-disclosure.tsx). Only
+   *  meaningful with `receipts`: a listing row never discloses. */
+  disclosureKey?: string;
   children: ReactNode;
 }) {
   const registry = useReceiptRegistry();
+  const disclosure = usePositionCardDisclosureState(receipts ? disclosureKey : undefined);
   const frame = (
     // group-hover/listing-row: the blue navigation hover border when the card sits
     // inside a listing's row <Link> (which declares the group) — inert everywhere else.
@@ -69,7 +81,7 @@ export function PositionCardShell({
       className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500"
     >
       {children}
-      {receipts && (
+      {receipts && (!disclosure || disclosure.open) && (
         <ProvenanceInfoTabs
           className="mt-3"
           rowExtra={rowExtra}
@@ -83,7 +95,9 @@ export function PositionCardShell({
     </div>
   );
   return receipts ? (
-    <ProvReceiptsScope registry={registry}>{frame}</ProvReceiptsScope>
+    <ProvReceiptsScope registry={registry}>
+      <PositionCardDisclosureProvider value={disclosure}>{frame}</PositionCardDisclosureProvider>
+    </ProvReceiptsScope>
   ) : (
     <ProvUnscoped>{frame}</ProvUnscoped>
   );

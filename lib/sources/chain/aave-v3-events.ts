@@ -107,6 +107,9 @@ const LABELS: Record<AaveV3EventType, string> = {
   // Never produced here: the sweep reads the Pool topics above and
   // DeficitCreated is not among them. Named so the roster stays total.
   bad_debt_written_off: "Debt written off",
+  // Never produced here either: the page reads it from the Pool's logs
+  // (lib/aave-v3/account-switches.ts).
+  emode: "E-mode",
 };
 
 /** V3 Pool event emitting each action's `amount` param — the origin envelope's
@@ -799,7 +802,8 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     if (address && meta(address)?.unresolved) cur.decimalsUnread = true;
     return cur;
   };
-  // The highest running principal on each axis — noted after every bump, so a
+  // The highest balance on each axis — the principal after every bump, and
+  // where the chain lane values a row, its balance before and after — so a
   // closed account's card can say what it held at its height. Same replay,
   // same rows; only the maximum is kept beside the sums. Keyed by SYMBOL: two
   // reserves sharing one take the higher of the two.
@@ -1089,6 +1093,12 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       const lc = cm && dm ? { coll: cm, debt: dm } : null;
       notePeak("supply", collMeta, coll.after);
       notePeak("debt", rMeta, debt.after);
+      // The chain balances either side, interest to the block included: what
+      // the liquidation found is a height the account held.
+      if (lc) {
+        notePeak("supply", collMeta, lc.coll.before);
+        notePeak("debt", rMeta, lc.debt.before);
+      }
       // One liquidation, two lanes on two reserves — the collateral seized on
       // the collateral asset, the debt covered on the debt asset. Both raw.
       if (d.collateralAsset) rawFlowsOf(d.collateralAsset).liquidatedCollateral += d.liquidatedCollateralAmount ?? ZERO;
@@ -1179,6 +1189,12 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       });
     // The row's own figures: the chain's where the lane is valued.
     const fig = mv ? { before: mv.before, after: mv.after } : run;
+    // Each row's balance before and after counts toward the peak, interest to
+    // the block included, so no row shows a balance above "highest recorded".
+    if (mv) {
+      notePeak(isSupplySide ? "supply" : "debt", rMeta, mv.before);
+      notePeak(isSupplySide ? "supply" : "debt", rMeta, mv.after);
+    }
     // repayWithATokens burns the wallet's aTokens for the debt it clears: the
     // Repay says so (`useATokens`, `amount` = the aTokens burned), so the
     // supply lane falls by the same amount. The row draws its debt lane, as

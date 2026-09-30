@@ -41,7 +41,20 @@ import { PwnEventCard } from "@/components/protocol/pwn/pwn-event-card";
 import { PwnPositionCard, viewFromSummary } from "@/components/protocol/pwn/pwn-position-card";
 import { PwnPositionExplanation } from "@/components/protocol/pwn/pwn-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computePwnEconomics } from "@/lib/pwn/economics";
+import {
+  accrueTo,
+  computePwnEconomics,
+  isAccruing,
+  loanCost,
+  loanDeadlineAt,
+  loanDueAt,
+  pwnLoanState,
+} from "@/lib/pwn/economics";
+import { PwnDeadlinePassedRow, PwnLoanTenure } from "@/components/protocol/pwn/pwn-loan-clock";
+import { shortTokenId } from "@/lib/pwn/asset-catalog";
+import { formatNumber } from "@/lib/utils/format";
+import { fetchPwnCollateralTransfers } from "@/lib/api/fetch-pwn-collateral-transfer";
+import type { PwnCollateralReturn, PwnContext } from "@/lib/shared/types/event-shape";
 import { pwnEconomicsExplanation, pwnEconomicsContent } from "@/lib/pwn/economics-explanation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
@@ -207,19 +220,155 @@ export default function PwnLoanView({
     };
   }, [bundleKey]);
 
-  const view = selected
-    ? {
-        ...viewFromSummary(selected),
-        bundleContents: bundle && bundle.key === bundleKey ? bundle.assets : undefined,
-      }
-    : null;
+  // Collateral reused from an earlier loan's default: the same NFT (or bundle)
+  // the lender claimed on a previous loan among this wallet's, posted again by
+  // the borrower. How it came back is read from the token's transfers
+  // between that claim and this loan's creation.
+  const prior =
+    selected?.collateral &&
+    selected.collateral.tokenId != null &&
+    (selected.collateral.category === "ERC721" || selected.collateral.category === "ERC1155") &&
+    selected.createdBlock != null
+      ? summaries
+          .filter(
+            (s) =>
+              s.loanId !== selected.loanId &&
+              s.status === "defaulted" &&
+              s.lender != null &&
+              s.collateral?.address === selected.collateral!.address &&
+              s.collateral?.tokenId === selected.collateral!.tokenId &&
+              s.closedBlock != null &&
+              s.closedBlock <= selected.createdBlock!,
+          )
+          .sort((a, b) => (b.closedBlock ?? 0) - (a.closedBlock ?? 0))[0]
+      : undefined;
+  const returnKey =
+    prior && selected?.borrower && selected.collateral
+      ? [
+          selected.collateral.address,
+          selected.collateral.category,
+          selected.collateral.tokenId,
+          prior.lender,
+          selected.borrower,
+          prior.closedBlock,
+          selected.createdBlock,
+          prior.loanId,
+        ].join("|")
+      : null;
+  const [collateralReturn, setCollateralReturn] = useState<{
+    key: string;
+    value: PwnCollateralReturn | "unknown";
+  } | null>(null);
+  useEffect(() => {
+    if (!returnKey) return;
+    const [asset, category, id, lender, borrower, fromBlock, toBlock, priorLoanId] = returnKey.split("|");
+    let cancelled = false;
+    fetchPwnCollateralTransfers({
+      asset,
+      category: category as "ERC721" | "ERC1155",
+      id,
+      lender,
+      borrower,
+      fromBlock: Number(fromBlock),
+      toBlock: Number(toBlock),
+    })
+      .then((rows) => {
+        // The last transfer that landed with the borrower before this loan.
+        const back = [...rows].reverse().find((r) => r.to === borrower);
+        if (!cancelled) setCollateralReturn({ key: returnKey, value: back ? { ...back, priorLoanId } : "unknown" });
+      })
+      .catch(() => {
+        if (!cancelled) setCollateralReturn({ key: returnKey, value: "unknown" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [returnKey]);
 
   // Slice the timeline to the selected loan so each loan shows only its own
   // events; the export serializer wants them oldest-first.
-  const pwnEvents = events
+  const loanEvents = events
     .filter(isPwnEvent)
     .filter((e) => selectedLoanId == null || e.context.data.loanId === selectedLoanId)
     .sort((a, b) => a.blockNumber - b.blockNumber);
+
+  // What the loan's rows say that its listing row may not yet: the
+  // deadline the latest extension set (the timeline carries v1.1 extensions
+  // read from the chain until the index does), and how many transactions
+  // stand behind its events.
+  const extensionRows = loanEvents.filter((e) => e.context.data.eventType === "extended");
+  const lastExtension = extensionRows[extensionRows.length - 1]?.context.data.extendedDefaultTimestamp;
+  const summaryView = selected ? viewFromSummary(selected) : null;
+  const view = summaryView
+    ? {
+        ...summaryView,
+        bundleContents: bundle && bundle.key === bundleKey ? bundle.assets : undefined,
+        ...(loanEvents.length > 0
+          ? {
+              eventCount: loanEvents.length,
+              txCount: new Set(loanEvents.map((e) => e.txHash)).size,
+              txParts: txPartsOf(loanEvents),
+              extensionCount: extensionRows.length,
+              extensionsBy: extensionRows.map((e) => e.context.data.extendedBy ?? ""),
+              repaidAt: loanEvents.find((e) => e.context.data.eventType === "paid_back")?.timestamp ?? null,
+              extendedDueAt: lastExtension != null ? Number(lastExtension) : (summaryView.extendedDueAt ?? null),
+            }
+          : {}),
+      }
+    : null;
+
+  // What the loan's rows state that the index's event rows do not carry: the
+  // v1.2/v1.3 rate and the sums it gives (what a repayment paid, what a default
+  // owed at the deadline), where the deadline ended up, and how reused
+  // collateral came back. Each row still reads only its event.
+  const cost = view ? loanCost(view) : null;
+  const deadline = view ? loanDeadlineAt(view) : null;
+  const owedAtDeadline =
+    view && isAccruing(view) && view.credit?.decimals != null && view.createdAt != null && deadline != null
+      ? accrueTo(
+          view.credit.amountRaw,
+          view.credit.decimals,
+          view.accruingInterestApr!,
+          view.fixedInterestRaw,
+          view.createdAt,
+          deadline,
+        )
+      : null;
+  const returned = collateralReturn && collateralReturn.key === returnKey ? collateralReturn.value : undefined;
+  // Where the loan stands by the clock: past its deadline with no repayment or
+  // claim it has defaulted, though the index still calls it open.
+  const loanState = view ? pwnLoanState(view) : null;
+  const unclaimed = loanState === "unclaimed";
+  // The loan's rows run from its creation to its close (or to now); the
+  // header states that span against the term the loan was struck for.
+  // A repaid loan ran to its repayment (the note holder may claim much later);
+  // a defaulted one to the lender's claim.
+  const closedAt =
+    view?.status === "repaid"
+      ? (view.repaidAt ?? null)
+      : view?.status === "defaulted" && loanEvents.length > 0
+        ? loanEvents[loanEvents.length - 1].timestamp
+        : null;
+  const pwnEvents = loanEvents.map((e) => {
+    const d = e.context.data;
+    if (!view) return e;
+    const add: Partial<PwnContext> = {};
+    if (isAccruing(view)) add.accruingInterestApr = view.accruingInterestApr!;
+    if (cost?.shape === "accruing" && cost.accrual && cost.basis === "paid") {
+      if (d.eventType === "paid_back" || (d.eventType === "claimed" && !d.defaulted))
+        add.accrued = { ...cost.accrual, basis: "paid" };
+    }
+    if (owedAtDeadline && d.eventType === "claimed" && d.defaulted)
+      add.accrued = { ...owedAtDeadline, basis: "at-deadline" };
+    if (d.eventType === "created") {
+      add.finalDeadline = deadline ?? undefined;
+      add.extensionCount = view.extensionCount ?? 0;
+      add.extensionsByLender =
+        (view.extensionsBy?.length ?? 0) > 0 && view.extensionsBy!.every((a) => a === view.lender);
+      if (returnKey) add.collateralReturn = returned;
+    }
+    return Object.keys(add).length > 0 ? { ...e, context: { protocol: "pwn" as const, data: { ...d, ...add } } } : e;
+  });
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the window
   // under a whole-history filename. It is narrowed to the SAME life/loan the
@@ -316,11 +465,17 @@ export default function PwnLoanView({
         <>
           <PwnPositionCard
             v={view}
+            viewer={wallet}
             receipts
             viewHref={tl.viewHref}
             explanation={<PwnPositionExplanation v={view} wallet={wallet} />}
           />
-          {view.status === "open" &&
+          {/* The tower stacks the collateral and the credit on one scale, so it
+              mounts only where both are fungible amounts and the loan is
+              running: an NFT or a bundle has no unit in common with the
+              credit, and a loan past its deadline has no debt to draw. */}
+          {loanState === "running" &&
+            view.collateral?.category === "ERC20" &&
             (() => {
               const towerData = computePwnEconomics(view);
               return (
@@ -328,7 +483,7 @@ export default function PwnLoanView({
                   data={towerData}
                   title={`Loan #${view.loanId} · Lifetime flows`}
                   explanation={pwnEconomicsExplanation(towerData)}
-                  learnMore={pwnEconomicsContent()}
+                  learnMore={pwnEconomicsContent(isAccruing(view))}
                 />
               );
             })()}
@@ -338,19 +493,62 @@ export default function PwnLoanView({
             // lets pinned mode (the per-event share route) force a landed
             // card's detail panel open on its first mount.
             persistKeyPrefix="pwn"
-            closed={view.status !== "open"}
+            // A loan past its deadline is not live: no pulsing tip.
+            closed={view.status !== "open" || unclaimed}
             tl={tl}
+            liveWindow={
+              unclaimed && deadline != null
+                ? ({ isFirst }) => (
+                    <PwnDeadlinePassedRow
+                      isFirst={isFirst}
+                      deadline={deadline}
+                      extended={view.extendedDueAt != null && view.extendedDueAt !== loanDueAt(view)}
+                      dueKind={view.dueKind}
+                      loanId={view.loanId}
+                      version={view.version}
+                      owed={cost && view.credit ? `${formatNumber(cost.total)} ${view.credit.symbol}` : null}
+                      collateral={
+                        view.collateral
+                          ? view.collateral.tokenId != null && view.collateral.category !== "ERC20"
+                            ? `${view.collateral.symbol} #${shortTokenId(view.collateral.tokenId)}`
+                            : `${formatNumber(view.collateral.amount)} ${view.collateral.symbol}`
+                          : "The collateral"
+                      }
+                    />
+                  )
+                : undefined
+            }
             // Tenure-first header (the V4 spoke treatment): when this LOAN
             // actually opened, not when the wallet's window does — `firstAt`
             // only overrides the tenure toward an EARLIER timestamp, so on the
             // no-op path (every real PWN wallet today) this is inert.
             toolbarLeading={
-              <TimelineActivityHeader
-                events={pwnEvents}
-                closed={view.status !== "open"}
-                firstAt={opening?.firstTimestamp}
-                tenurePending={!lifetimeFiguresKnown(historyWindow)}
-              />
+              loanState !== "running" &&
+              lifetimeFiguresKnown(historyWindow) &&
+              view.createdAt != null &&
+              loanEvents.length > 0 ? (
+                <PwnLoanTenure
+                  state={loanState!}
+                  createdAt={view.createdAt}
+                  deadline={deadline}
+                  closedAt={closedAt}
+                  lastAt={loanEvents[loanEvents.length - 1].timestamp}
+                  fallback={
+                    <TimelineActivityHeader
+                      events={pwnEvents}
+                      closed={view.status !== "open"}
+                      firstAt={opening?.firstTimestamp}
+                    />
+                  }
+                />
+              ) : (
+                <TimelineActivityHeader
+                  events={pwnEvents}
+                  closed={view.status !== "open"}
+                  firstAt={opening?.firstTimestamp}
+                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                />
+              )
             }
             renderCard={(event, meta) =>
               isPwnEvent(event) ? (
@@ -369,4 +567,48 @@ export default function PwnLoanView({
       )}
     </div>
   );
+}
+
+/** What each of the loan's transactions did, oldest first: "the creation,
+ *  which also minted the note", "4 extensions", "the repayment", "the note
+ *  holder's claim, which also burned the note". Consecutive extensions read as
+ *  one count. */
+function txPartsOf(events: { txHash: string; context: { data: PwnContext } }[]): string[] {
+  const byTx = new Map<string, PwnContext["eventType"][]>();
+  for (const e of events) byTx.set(e.txHash, [...(byTx.get(e.txHash) ?? []), e.context.data.eventType]);
+  const parts: string[] = [];
+  let ext = 0;
+  const flush = () => {
+    const words = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    if (ext > 0) parts.push(`${words[ext] ?? ext} extension${ext === 1 ? "" : "s"}`);
+    ext = 0;
+  };
+  for (const [, kinds] of byTx) {
+    const has = (k: PwnContext["eventType"]) => kinds.includes(k);
+    if (has("extended") && kinds.length === 1) {
+      ext += 1;
+      continue;
+    }
+    flush();
+    const also: string[] = [];
+    let head: string;
+    if (has("created")) {
+      head = "the creation";
+      if (has("minted")) also.push("minted the note");
+    } else if (has("paid_back")) {
+      head = "the repayment";
+      if (has("claimed")) also.push("paid the note holder");
+      if (has("burned")) also.push("burned the note");
+    } else if (has("claimed")) {
+      head = events.some((e) => e.context.data.eventType === "claimed" && e.context.data.defaulted)
+        ? "the lender's claim on the collateral"
+        : "the note holder's claim";
+      if (has("burned")) also.push("burned the note");
+    } else {
+      head = kinds.join(" and ");
+    }
+    parts.push(also.length > 0 ? `${head}, which also ${also.join(" and ")}` : head);
+  }
+  flush();
+  return parts;
 }

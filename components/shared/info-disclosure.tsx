@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { forwardRef, useCallback, useRef, useState } from "react";
+import { useEscapeClose } from "@/components/shared/use-escape-close";
 
 /**
  * Standard "plain language" help affordance — the single info grammar for every
@@ -62,59 +63,56 @@ export interface InfoDisclosureTriggerProps {
  * Split out of `InfoDisclosure` so the glyph has one source: /coverage's matrix
  * rows need the same trigger driving a panel that can't be a descendant.
  */
-export function InfoDisclosureTrigger({
-  open,
-  onToggle,
-  label = "details",
-  warning = false,
-  surface = "background",
-  ariaControls,
-  children,
-  className,
-}: InfoDisclosureTriggerProps) {
-  const surfaceBg = surface === "raised" ? "bg-raised" : "bg-background";
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={open}
-      aria-controls={ariaControls}
-      aria-label={open ? `Hide ${label}` : `Show ${label}`}
-      className={`group/info inline-flex cursor-pointer items-center gap-1 rounded-full p-1 ${surfaceBg}${
-        className ? ` ${className}` : ""
-      }`}
-    >
-      {/* duration-200 matches the chevron below, which needs that long for its
+export const InfoDisclosureTrigger = forwardRef<HTMLButtonElement, InfoDisclosureTriggerProps>(
+  function InfoDisclosureTrigger(
+    { open, onToggle, label = "details", warning = false, surface = "background", ariaControls, children, className },
+    ref,
+  ) {
+    const surfaceBg = surface === "raised" ? "bg-raised" : "bg-background";
+    return (
+      <button
+        ref={ref}
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={ariaControls}
+        aria-label={open ? `Hide ${label}` : `Show ${label}`}
+        className={`group/info inline-flex cursor-pointer items-center gap-1 rounded-full p-1 ${surfaceBg}${
+          className ? ` ${className}` : ""
+        }`}
+      >
+        {/* duration-200 matches the chevron below, which needs that long for its
           rotate. Without it this glyph takes Tailwind's default 150ms and the
           two halves of one control reach the hover colour 50ms apart. */}
-      <svg
-        className={`h-5 w-5 transition-colors duration-200 ${
-          warning ? "text-red-500 dark:text-red-400" : "text-rb-500 group-hover/info:text-foreground"
-        }`}
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path fillRule="evenodd" d={warning ? WARNING_PATH : INFO_PATH} clipRule="evenodd" />
-      </svg>
-      <svg
-        className={`mr-0.5 h-3 w-3 text-rb-500 transition-[color,transform] duration-200 group-hover/info:text-foreground ${
-          open ? "rotate-180" : ""
-        }`}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="m6 9 6 6 6-6" />
-      </svg>
-      {children}
-    </button>
-  );
-}
+        <svg
+          className={`h-5 w-5 transition-colors duration-200 ${
+            warning ? "text-red-500 dark:text-red-400" : "text-rb-500 group-hover/info:text-foreground"
+          }`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path fillRule="evenodd" d={warning ? WARNING_PATH : INFO_PATH} clipRule="evenodd" />
+        </svg>
+        <svg
+          className={`mr-0.5 h-3 w-3 text-rb-500 transition-[color,transform] duration-200 group-hover/info:text-foreground ${
+            open ? "rotate-180" : ""
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+        {children}
+      </button>
+    );
+  },
+);
 
 export interface InfoDisclosureProps {
   /** Controlled open state. Omit to use internal (uncontrolled) state. */
@@ -170,10 +168,29 @@ export function InfoDisclosure({
     [open, isControlled, onToggle],
   );
 
+  // Escape closes the most recently opened panel and hands focus back to its
+  // (i) button (use-escape-close.ts).
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEscapeClose(
+    open,
+    () => {
+      if (!isControlled) setInternalOpen(false);
+      onToggle?.(false);
+    },
+    triggerRef,
+  );
+
   // The panel encloses the trigger in both states, so no `ariaControls` is
   // needed here — the association is structural.
   const trigger = (
-    <InfoDisclosureTrigger open={open} onToggle={toggle} label={label} warning={warning} surface={surface} />
+    <InfoDisclosureTrigger
+      ref={triggerRef}
+      open={open}
+      onToggle={toggle}
+      label={label}
+      warning={warning}
+      surface={surface}
+    />
   );
 
   if (!open) {
@@ -259,6 +276,14 @@ export function InfoTabsDisclosure({
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
+  // Escape closes the most recently opened pane and hands focus back to the
+  // open section's (i) button (use-escape-close.ts).
+  const buttons = useRef(new Map<string, HTMLButtonElement>());
+  useEscapeClose(
+    open != null,
+    () => onOpenTabChange(null),
+    () => (open ? (buttons.current.get(open.key) ?? null) : null),
+  );
 
   return (
     <div className={className}>
@@ -273,6 +298,10 @@ export function InfoTabsDisclosure({
           return (
             <button
               key={t.key}
+              ref={(el) => {
+                if (el) buttons.current.set(t.key, el);
+                else buttons.current.delete(t.key);
+              }}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();

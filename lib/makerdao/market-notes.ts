@@ -388,6 +388,8 @@ export function liveMakerRateStepNote(
 
   const a = rated[rated.length - 1];
   const rateA = asFraction(a.set.aprPct);
+  // The fee today equals the fee at the last event: no note (the 0.01 pp floor).
+  if (Math.abs(live.aprPct - rateA) * 100 < 0.005) return null;
   // Today's debt when the overlay has it: the fee is read now, so the yearly
   // figure is what it costs on what the vault owes now.
   const today = live.debtNow != null && live.debtNow > 0 ? live.debtNow : null;

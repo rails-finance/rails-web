@@ -23,7 +23,18 @@ import type { ReactNode } from "react";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { RevealTip } from "@/components/shared/reveal-tip";
 
-export function ExternalActorChip({ address, prov, tip }: { address: string; prov: Provenance; tip?: ReactNode }) {
+export function ExternalActorChip({
+  address,
+  prov,
+  tip,
+  prefix = "by",
+}: {
+  address: string;
+  prov: Provenance;
+  tip?: ReactNode;
+  /** The word before the address; "sent by" where a contract acted for it. */
+  prefix?: string;
+}) {
   const name = useEnsName(address);
   const label = (
     <span className="font-medium text-pink-600 dark:text-pink-400">
@@ -32,7 +43,7 @@ export function ExternalActorChip({ address, prov, tip }: { address: string; pro
   );
   return (
     <Prov info={prov} value={name ?? address} className="inline-flex items-center gap-1 text-sm">
-      <span className="text-rb-500">by</span>
+      <span className="text-rb-500">{prefix}</span>
       {tip ? <RevealTip tip={tip}>{label}</RevealTip> : label}
     </Prov>
   );

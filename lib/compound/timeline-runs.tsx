@@ -96,6 +96,7 @@ const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   tone: "danger",
   warningLabel: "Liquidations",
   folderBadge: DANGER_FOLDER_BADGE,
+  readingLine: true,
 };
 
 /** One member of an owner run, by the action it repeats. */
@@ -111,4 +112,6 @@ const OWNER_RUN_NOUN: Record<string, string> = {
 };
 
 export const COMPOUND_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
-  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : LIQUIDATION_FOLDER;
+  folder.kind === OWNER_RUN_KIND
+    ? { ...ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event"), readingLine: true }
+    : LIQUIDATION_FOLDER;

@@ -36,6 +36,12 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
+import { TipLabel } from "@/components/shared/tip-label";
+import {
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  isCompoundV2Deprecated,
+} from "@/lib/compound-v2/deprecated-markets";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
   positionSupplyCurrentProv,
@@ -68,6 +74,7 @@ import type {
   CompoundV2PeakAmount,
 } from "@/lib/sources/api/compound-v2-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface CompoundV2PositionView {
@@ -94,6 +101,10 @@ export interface CompoundV2PositionView {
   priceFixedByMarket?: Record<string, boolean>;
   /** Annualized per-block rates per market key (from the same multicall). */
   ratesByMarket?: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** Each liquidation as the rows tell it, where the page holds them. */
+  liquidations?: LiquidationStory[];
+  /** Every row of the history, beside the transaction count (the detail page). */
+  eventTotal?: number;
 }
 
 /** The figure a supply line asserts: the current value (interest included)
@@ -155,7 +166,7 @@ const borrowProv = (r: CompoundV2BorrowAmount) => {
 function FixedPriceFlag({ symbol }: { symbol: string }) {
   return (
     <span className="ml-1">
-      · <Prov info={fixedPriceLineProv(symbol)}>price fixed, no feed</Prov>
+      · <Prov info={fixedPriceLineProv(symbol)}>fixed price set by governance</Prov>
     </span>
   );
 }
@@ -302,6 +313,22 @@ function PeakStack({ lines, side }: { lines: CompoundV2PeakAmount[]; side: "supp
   );
 }
 
+/** A borrow in a deprecated market can be repaid in full by any liquidator,
+ *  however healthy the account (lib/compound-v2/deprecated-markets.ts). */
+function DeprecatedBorrowNote({ v }: { v: CompoundV2PositionView }) {
+  const hit = v.borrows.filter((b) => isCompoundV2Deprecated(b.market));
+  if (hit.length === 0) return null;
+  return (
+    <div className="text-xs mt-1 text-amber-700 dark:text-amber-400" data-compound-v2-deprecated-borrow="">
+      <TipLabel
+        text={`${hit.map((b) => b.symbol).join(" and ")} market deprecated`}
+        tip={`A deprecated market has ${DEPRECATED_CONDITIONS}: ${DEPRECATED_CONSEQUENCE}.`}
+      />
+      : this borrow can be liquidated in full at any time.
+    </div>
+  );
+}
+
 export function CompoundV2PositionCard({
   v,
   receipts = false,
@@ -359,7 +386,11 @@ export function CompoundV2PositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={compoundV2PositionContent({ status: v.status })}
+        learnMore={compoundV2PositionContent({
+          status: v.status,
+          liquidations: v.liquidations,
+          liquidationCount: v.liquidationCount,
+        })}
       >
         <ClosedPositionStats
           outcome={v.status}
@@ -370,10 +401,13 @@ export function CompoundV2PositionCard({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
+              eventTotal={v.eventTotal}
+              countNote={txCountNote(v.liquidationCount)}
               liquidationCount={v.liquidationCount}
             />
           }
           closedAt={v.lastActivityAt}
+          outcomeDates={outcomeDates(v)}
           collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
           debt={<PeakStack lines={v.peakBorrows} side="debt" />}
         />
@@ -414,6 +448,8 @@ export function CompoundV2PositionCard({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            eventTotal={v.eventTotal}
+            countNote={txCountNote(v.liquidationCount)}
             liquidationCount={v.liquidationCount}
           />
         }
@@ -486,6 +522,7 @@ export function CompoundV2PositionCard({
                   usd={captions?.debtInterestUsd}
                   live={v.borrows.length > 0 && v.borrows.every((b) => b.live)}
                 />
+                <DeprecatedBorrowNote v={v} />
               </>
             ),
           },
@@ -497,6 +534,24 @@ export function CompoundV2PositionCard({
       />
     </PositionCardShell>
   );
+}
+
+/** Why the transaction count and the event count differ. */
+const txCountNote = (liquidations: number) =>
+  liquidations > 0
+    ? "the count leaves out each liquidation, which is the liquidator's transaction, and one transaction can hold several rows (a liquidation and its seizure, or a repayment and a withdrawal)"
+    : "one transaction can hold several rows (a repayment and a withdrawal)";
+
+/** A liquidated card's two dates: the last liquidation, then the closing,
+ *  when they fall on different days. */
+function outcomeDates(v: CompoundV2PositionView): { label: string; at: number }[] | undefined {
+  const last = v.liquidations?.at(-1)?.at;
+  if (v.status !== "liquidated" || last == null) return undefined;
+  if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  return [
+    { label: "Liquidated", at: last },
+    { label: "Closed", at: v.lastActivityAt },
+  ];
 }
 
 /** Build a card view from the listing summary row. */

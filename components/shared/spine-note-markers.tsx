@@ -34,7 +34,12 @@ import { useLayoutEffect, useRef } from "react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import { useTimelineScale } from "@/components/shared/activity-timeline";
-import { MarketNoteRow, noteMarkerText } from "@/components/shared/market-note-row";
+import {
+  LiveNoteGroupRow,
+  liveGroupMarkerText,
+  MarketNoteRow,
+  noteMarkerText,
+} from "@/components/shared/market-note-row";
 import {
   SPINE_LINE_OVERSHOOT,
   spineLineKey,
@@ -43,7 +48,7 @@ import {
   useSpineView,
 } from "@/components/shared/mobile-spine";
 import { PulsingDot, SPINE_COLORS, type SpineTip } from "@/components/shared/spine-column";
-import type { MarketNote } from "@/lib/shared/market-note";
+import { isLiveNoteGroup, type LiveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
 import { formatDate } from "@/lib/date";
 
 /** The marker's tap target: 44px tall on the phone, 64px wide. */
@@ -55,13 +60,28 @@ const CAPTION_PAD = 10;
 /** A note's line: dotted and neutral, since the account did nothing here. */
 const NOTE_LINE = spineLineKey(true, SPINE_COLORS.default);
 
-export const noteOpenId = (note: MarketNote) => `note:${note.id}`;
+/** What a gap holds: a note, or the head slot's live notes as one card. The
+ *  group takes one marker, one open state and one row, as a note does. */
+export type GapItem = MarketNote | LiveNoteGroup;
 
-function markerLabel(note: MarketNote): string {
+export const noteOpenId = (item: GapItem) => `note:${item.id}`;
+
+const markerText = (item: GapItem) => (isLiveNoteGroup(item) ? liveGroupMarkerText(item) : noteMarkerText(item));
+
+function markerLabel(item: GapItem): string {
+  if (isLiveNoteGroup(item)) return liveGroupMarkerText(item).spoken;
+  const note = item;
   const when = note.live ? "now" : note.to.timestamp > 0 ? formatDate(note.to.timestamp) : null;
   const title = (note.kind === "vault-terms" && note.title) || "Market note";
   return `${title}${when ? `, ${when}` : ""}: ${noteMarkerText(note).spoken}`;
 }
+
+/** Where focus lands when an item opens: the note's header, or the group's
+ *  first line. */
+const openFocusSelector = (item: GapItem) =>
+  isLiveNoteGroup(item)
+    ? `[data-live-note-group] [role="button"]`
+    : `[data-market-note="${CSS.escape(item.id)}"] [role="button"]`;
 
 function Diamond({ filled }: { filled: boolean }) {
   return (
@@ -80,9 +100,18 @@ function Diamond({ filled }: { filled: boolean }) {
   );
 }
 
-function Direction({ note }: { note: MarketNote }) {
-  if (note.kind === "vault-terms") return null;
-  const Icon = note.to.value >= note.from.value ? ArrowUpRight : ArrowDownRight;
+function Direction({ note }: { note: GapItem }) {
+  // A group draws the direction its notes share, and none where they part.
+  let rising: boolean;
+  if (isLiveNoteGroup(note)) {
+    const ups = note.notes.filter((n) => n.to.value >= n.from.value).length;
+    if (ups !== 0 && ups !== note.notes.length) return null;
+    rising = ups > 0;
+  } else {
+    if (note.kind === "vault-terms") return null;
+    rising = note.to.value >= note.from.value;
+  }
+  const Icon = rising ? ArrowUpRight : ArrowDownRight;
   return <Icon size={14} strokeWidth={2} className="block shrink-0 text-rb-500" aria-hidden="true" />;
 }
 
@@ -90,8 +119,8 @@ const MARKER_CLASS =
   "group/mk absolute z-20 flex w-16 items-center gap-0.5 rounded-lg pl-[14px] text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-teal-500";
 
 /** One closed marker, with its tooltip on hover and keyboard focus. */
-function Marker({ note, top, onOpen }: { note: MarketNote; top: number; onOpen: () => void }) {
-  const { tip } = noteMarkerText(note);
+function Marker({ note, top, onOpen }: { note: GapItem; top: number; onOpen: () => void }) {
+  const { tip } = markerText(note);
   return (
     <button
       type="button"
@@ -122,8 +151,8 @@ function MarkerSlot({
   onOpen,
   head,
 }: {
-  notes: MarketNote[];
-  onOpen: (note: MarketNote) => void;
+  notes: GapItem[];
+  onOpen: (note: GapItem) => void;
   /** In the head slot, above the newest event: nothing stands above it, so
    *  the slot draws its own line (and the tip's dot, when it holds the tip). */
   head: boolean;
@@ -150,8 +179,8 @@ function MarkerSlot({
 
 /** An open note: the filled diamond on the line with the note's figure beside
  *  it, then the note row with its panel open. */
-function OpenNote({ note, datePrefix, onClose }: { note: MarketNote; datePrefix: string | null; onClose: () => void }) {
-  const { tip } = noteMarkerText(note);
+function OpenNote({ note, datePrefix, onClose }: { note: GapItem; datePrefix: string | null; onClose: () => void }) {
+  const { tip } = markerText(note);
   return (
     <div data-note-open={note.id} className="relative isolate pb-2">
       <div
@@ -182,7 +211,11 @@ function OpenNote({ note, datePrefix, onClose }: { note: MarketNote; datePrefix:
         </span>
       </div>
       <div data-spine-card={noteOpenId(note)}>
-        <MarketNoteRow note={note} datePrefix={datePrefix} defaultOpen />
+        {isLiveNoteGroup(note) ? (
+          <LiveNoteGroupRow group={note} />
+        ) : (
+          <MarketNoteRow note={note} datePrefix={datePrefix} defaultOpen />
+        )}
       </div>
     </div>
   );
@@ -196,7 +229,7 @@ export function SpineNoteGap({
   datePrefixFor,
   head,
 }: {
-  notes: MarketNote[];
+  notes: GapItem[];
   datePrefixFor: (note: MarketNote) => string | null;
   head?: { tip: SpineTip | null };
 }) {
@@ -215,15 +248,13 @@ export function SpineNoteGap({
   });
   if (!spine) return null;
 
-  const toggle = (note: MarketNote, opening: boolean) => {
-    focusNext.current = opening
-      ? `[data-market-note="${CSS.escape(note.id)}"] [role="button"]`
-      : `[data-note-marker="${CSS.escape(note.id)}"]`;
+  const toggle = (note: GapItem, opening: boolean) => {
+    focusNext.current = opening ? openFocusSelector(note) : `[data-note-marker="${CSS.escape(note.id)}"]`;
     if (ref.current) spine.toggle(noteOpenId(note), ref.current);
   };
 
   // Closed notes side by side share one slot; the open one breaks the run.
-  const groups: ({ open: false; notes: MarketNote[] } | { open: true; note: MarketNote })[] = [];
+  const groups: ({ open: false; notes: GapItem[] } | { open: true; note: GapItem })[] = [];
   for (const note of notes) {
     if (spine.openId === noteOpenId(note)) groups.push({ open: true, note });
     else {
@@ -260,7 +291,7 @@ export function SpineNoteGap({
           <OpenNote
             key={g.note.id}
             note={g.note}
-            datePrefix={datePrefixFor(g.note)}
+            datePrefix={isLiveNoteGroup(g.note) ? null : datePrefixFor(g.note)}
             onClose={() => toggle(g.note, false)}
           />
         ) : (
@@ -276,13 +307,23 @@ export function SpineNoteGap({
 /** The desktop marker's target: 28px tall, so it clears the glyphs above and
  *  below it, and 64px wide. */
 const LIST_TARGET = 28;
-/** Where the first marker's centre sits below the slot's top. A slot follows
- *  the row above it with the list's 8px gap cancelled, so its top is that
- *  row's bottom edge, which is about where the glyph above ends; the next
- *  node's halo starts 24px further down (the gap, the next row's 4px padding
- *  and its column's 16px top padding, less the 4px halo). The marker is
- *  centred on that bare line. */
+/** How far the last closed marker's centre sits above the slot's bottom, so
+ *  above the next row's node: a slot follows its gap's rows with the list's
+ *  8px gap cancelled, and the next node's halo starts 24px below the slot's
+ *  end (the gap, the next row's padding and its column's 16px top padding,
+ *  less the 4px halo). */
 const LIST_FIRST_CENTRE = 12;
+/** The open row's node: 32px below its column's top (ListNodeControl). */
+const LIST_NODE_Y = 32;
+/** A closed marker sits where the node of its open row will stand, so a
+ *  marker opens and closes under the pointer (Miles, 30 Sep 2026): a closed
+ *  slot takes the height the open row's header takes above its node. Where
+ *  the first marker's centre sits below its slot's top: between two rows the
+ *  open row starts 8px down (its `pt-2`), then the row's padding; in the
+ *  head slot, at the slot's top. Markers after the first step by the same
+ *  distance, less the 12px a closed run leaves below its last marker. */
+const listFirstCentre = (cardPad: number, head: boolean) => (head ? 0 : 8) + cardPad + LIST_NODE_Y;
+const listStep = (cardPad: number) => 8 + cardPad + LIST_NODE_Y - LIST_FIRST_CENTRE;
 /** The spine's x in a row: the centre of the `w-2/5` column inside the row's
  *  `--card-pad`. */
 const LIST_SPINE_X = "calc(var(--card-pad) + (100% - 2 * var(--card-pad)) * 0.2)";
@@ -295,7 +336,7 @@ const LIST_TIP_CLASS =
   "after:content-[attr(data-tip)] after:pointer-events-none after:absolute after:left-full after:top-1/2 after:ml-1.5 after:-translate-y-1/2 after:whitespace-nowrap after:rounded-md after:border after:border-rb-200 after:bg-raised after:px-2 after:py-1 after:text-xs after:font-medium after:text-foreground after:opacity-0 after:shadow-md after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 dark:after:border-rb-700";
 
 /** One closed desktop marker. */
-function ListMarker({ note, top, onOpen }: { note: MarketNote; top: number; onOpen: () => void }) {
+function ListMarker({ note, top, onOpen }: { note: GapItem; top: number; onOpen: () => void }) {
   return (
     <button
       type="button"
@@ -303,7 +344,7 @@ function ListMarker({ note, top, onOpen }: { note: MarketNote; top: number; onOp
       aria-expanded={false}
       aria-label={markerLabel(note)}
       onClick={onOpen}
-      data-tip={noteMarkerText(note).tip}
+      data-tip={markerText(note).tip}
       className={`${LIST_MARKER_CLASS} ${LIST_TIP_CLASS}`}
       style={{ left: `calc(${LIST_SPINE_X} - 22px)`, top, height: LIST_TARGET }}
     >
@@ -315,7 +356,7 @@ function ListMarker({ note, top, onOpen }: { note: MarketNote; top: number; onOp
 
 /** The filled diamond over an open note's node, which puts it back to a
  *  marker. Inert while "Open all market notes" is on. */
-function ListNodeControl({ note, openAll, onClose }: { note: MarketNote; openAll: boolean; onClose: () => void }) {
+function ListNodeControl({ note, openAll, onClose }: { note: GapItem; openAll: boolean; onClose: () => void }) {
   return (
     <button
       type="button"
@@ -324,10 +365,10 @@ function ListNodeControl({ note, openAll, onClose }: { note: MarketNote; openAll
       aria-disabled={openAll || undefined}
       aria-label={markerLabel(note)}
       onClick={openAll ? undefined : onClose}
-      data-tip={noteMarkerText(note).tip}
+      data-tip={markerText(note).tip}
       className={`${LIST_MARKER_CLASS} ${LIST_TIP_CLASS} ${openAll ? "cursor-default" : ""}`}
       // The column's node is centred 16px + half a glyph below its top.
-      style={{ left: "calc(50% - 22px)", top: 32 - LIST_TARGET / 2, height: LIST_TARGET }}
+      style={{ left: "calc(50% - 22px)", top: LIST_NODE_Y - LIST_TARGET / 2, height: LIST_TARGET }}
     >
       <span aria-hidden className="block h-4 w-4 shrink-0" />
     </button>
@@ -353,13 +394,13 @@ export function ListNoteGap({
   onToggle,
   head,
 }: {
-  notes: MarketNote[];
+  notes: GapItem[];
   datePrefixFor: (note: MarketNote) => string | null;
   /** The notes opened from their markers. */
   openIds: ReadonlySet<string>;
   /** "Open all market notes": every note shows its header row. */
   openAll: boolean;
-  onToggle: (note: MarketNote) => void;
+  onToggle: (note: GapItem) => void;
   /** The gap draws its own line: `tip` the dot above it, `above` a row above
    *  it whose line reaches it, `below` a row below it to reach. */
   head?: { tip: SpineTip | null; above: boolean; below: boolean };
@@ -374,16 +415,14 @@ export function ListNoteGap({
     ref.current.querySelector<HTMLElement>(want)?.focus({ preventScroll: true });
   });
 
-  const toggle = (note: MarketNote, opening: boolean) => {
+  const toggle = (note: GapItem, opening: boolean) => {
     // Focus follows the click: opening a marker moves it to the note's
     // header, closing returns it to the marker.
-    focusNext.current = opening
-      ? `[data-market-note="${CSS.escape(note.id)}"] [role="button"]`
-      : `[data-note-marker="${CSS.escape(note.id)}"]`;
+    focusNext.current = opening ? openFocusSelector(note) : `[data-note-marker="${CSS.escape(note.id)}"]`;
     onToggle(note);
   };
 
-  const groups: ({ open: false; notes: MarketNote[] } | { open: true; note: MarketNote; panel: boolean })[] = [];
+  const groups: ({ open: false; notes: GapItem[] } | { open: true; note: GapItem; panel: boolean })[] = [];
   for (const note of notes) {
     const panel = openIds.has(note.id);
     if (panel || openAll) groups.push({ open: true, note, panel });
@@ -412,7 +451,7 @@ export function ListNoteGap({
           className="absolute w-px -translate-x-1/2"
           style={{
             left: LIST_SPINE_X,
-            top: tip ? 16 : head.above ? 0 : padTop + LIST_TARGET / 2,
+            top: tip ? 16 : head.above ? 0 : padTop + listFirstCentre(scale.cardPad, true),
             bottom: head.below ? "calc(-1 * var(--card-pad) - 28px)" : lastGroupClosed ? -LIST_FIRST_CENTRE : 0,
             ...spineLineStyle(NOTE_LINE),
           }}
@@ -426,14 +465,23 @@ export function ListNoteGap({
       {groups.map((g, gi) =>
         g.open ? (
           <div key={g.note.id} className={head ? "" : "pt-2"}>
-            <MarketNoteRow
-              // Remounts when a marker opens it, so the panel opens with it.
-              key={g.panel ? "panel" : "row"}
-              note={g.note}
-              datePrefix={datePrefixFor(g.note)}
-              defaultOpen={g.panel}
-              nodeControl={<ListNodeControl note={g.note} openAll={openAll} onClose={() => toggle(g.note, false)} />}
-            />
+            {isLiveNoteGroup(g.note) ? (
+              // The group opens to its lines, each closed, whether its marker
+              // or "Open all" opened it.
+              <LiveNoteGroupRow
+                group={g.note}
+                nodeControl={<ListNodeControl note={g.note} openAll={openAll} onClose={() => toggle(g.note, false)} />}
+              />
+            ) : (
+              <MarketNoteRow
+                // Remounts when a marker opens it, so the panel opens with it.
+                key={g.panel ? "panel" : "row"}
+                note={g.note}
+                datePrefix={datePrefixFor(g.note)}
+                defaultOpen={g.panel}
+                nodeControl={<ListNodeControl note={g.note} openAll={openAll} onClose={() => toggle(g.note, false)} />}
+              />
+            )}
           </div>
         ) : (
           <ListMarkerSlot
@@ -459,20 +507,22 @@ function ListMarkerSlot({
   last,
   onOpen,
 }: {
-  notes: MarketNote[];
+  notes: GapItem[];
   head: boolean;
   last: boolean;
-  onOpen: (note: MarketNote) => void;
+  onOpen: (note: GapItem) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { cardPad } = useTimelineScale();
   const n = notes.length;
-  const height = !head
-    ? LIST_TARGET * (n - 1)
-    : last
-      ? LIST_TARGET / 2 + LIST_TARGET * (n - 1) - LIST_FIRST_CENTRE
-      : LIST_TARGET * n;
+  const first = listFirstCentre(cardPad, head);
+  const step = listStep(cardPad);
+  // A run stops LIST_FIRST_CENTRE below its last marker, which between rows
+  // is `step` a marker; in the head slot a run with more after it takes a
+  // whole step for each.
+  const height = head && !last ? step * n : first + step * (n - 1) - LIST_FIRST_CENTRE;
   useExtendLineAbove(ref, height, !head && height > 0, "[data-list-line]");
-  const centre = (i: number) => (head ? LIST_TARGET / 2 : LIST_FIRST_CENTRE) + i * LIST_TARGET;
+  const centre = (i: number) => first + i * step;
   return (
     <div ref={ref} className="relative" style={{ height }}>
       {notes.map((note, i) => (

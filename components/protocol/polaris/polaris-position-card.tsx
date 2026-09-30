@@ -38,10 +38,9 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { StatValue, StatDash, StatFootnote } from "@/components/shared/stat-value";
-import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatUnitsExact, formatUsdValue, withRealMinus } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -68,6 +67,7 @@ import type { PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 // erased before the client bundle is built (the markets view does the same).
 import type { PolarisMarketsChainResponse } from "@/lib/sources/chain/polaris-position";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 
 export interface PolarisPositionView {
   market: PolarisMarket;
@@ -88,8 +88,13 @@ export interface PolarisPositionView {
    *  chain lane, the market board's own legs on the index lane. */
   collUsd: number | null;
   /** Chain lane only — entireColl × the feed's pETH-in-debt-unit price, minus
-   *  entireDebt. A valuation at the block, not a profit — may be negative. */
+   *  the debt owed. A valuation at the block, not a profit — may be negative.
+   *  An entire debt at or below zero owes nothing (the next touch settles it
+   *  to zero), so it never adds to the equity. */
   equity: number | null;
+  /** Chain lane only — the debt as recorded at the last touch, the base the
+   *  entire debt's pending legs are added to. */
+  recordedDebt: number | null;
   /** The collateral ratio as a fraction; null without debt, or without a
    *  price. On the chain lane it is getICR(id); on the index lane the row's
    *  own coll × the market's feed ÷ its own debt — an approximation, and the
@@ -108,11 +113,20 @@ export interface PolarisPositionView {
   pendingInterest: number | null;
   pendingStables: number | null;
   pendingReward: number | null;
+  /** Chain lane only — the net PSM share pending on the debt, signed. */
+  pendingPsmDebt: number | null;
   /** Chain lane only — the rate in force, fraction. */
   interestRate: number | null;
   /** Terminal-card headlines (lifetime maxima). */
   peakColl: number;
   peakDebt: number;
+  /** The peaks count a liquidation's own seized state (the detail page reads
+   *  the rows; the listing has only the index's maxima). */
+  peaksCountLiquidation?: boolean;
+  /** A liquidated CDP's collateral surplus, set aside for the owner to claim
+   *  (the liquidation row's `_collSurplus`); the detail page reads it from
+   *  the rows. */
+  surplus?: number;
   lastActivityAt: number | null;
   eventCount: number;
   liqCount: number;
@@ -134,6 +148,13 @@ const debtProv = (v: PolarisPositionView): Provenance =>
   v.basis === "chain" ? liveEntireProv("debt", v.market) : latestStateProv("debt", v.market);
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
+
+/** What the lead badge on an open CDP's card says, on hover or tap. */
+const BADGE_TIPS = {
+  borrowing: "Borrowing: the CDP owes debt at this block — the Debt figure beside it.",
+  collateralOnly:
+    "Collateral only: the CDP owes nothing at this block. Polaris allows a CDP with no debt; the PSM's shares can still add debt to it at a later touch.",
+} as const;
 
 /** A liquidation price in the market's own unit — never "$": GOLDp's unit is
  *  a troy ounce of gold, and the protocol prices nothing in dollars here.
@@ -163,6 +184,57 @@ const LISTING_ICR_TIP =
  *  sentence needs its own width and normal prose settings, declared on the
  *  child so they win over the bubble's own. */
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
+
+/** Why the highest collateral can exceed every deposit: pETH reaches a CDP
+ *  without the holder depositing it. */
+const PEAK_COLL_ABOVE_DEPOSITS =
+  "It can be more than the holder deposited: the difference is the market's net PSM share and reward pETH, which add collateral at a touch without a deposit.";
+
+/** Three decimals, trailing zeros kept ("2,035.800"), so the card's figures
+ *  read at one grain; a magnitude too small for three decimals keeps
+ *  formatNumber's non-zero rule. */
+const cardFigure = (value: number): string =>
+  value !== 0 && Math.abs(value) < 0.0005
+    ? formatNumber(value)
+    : value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+/** A card headline in full — the row's and the grid's rule, three decimals —
+ *  with the token named in words and by its glyph. The word and the glyph
+ *  wrap under the figure where the column is too narrow for all three (a
+ *  five-figure debt at phone width), so a full figure never pushes the glyph
+ *  off the card. The exact decimal rides the tip and the inspector's
+ *  `data-prov-exact`, as AssetAmount's does. */
+function CardAmount({
+  value,
+  symbol,
+  address,
+  exact,
+  signed = false,
+}: {
+  value: number;
+  symbol: string;
+  address: string;
+  exact?: string;
+  signed?: boolean;
+}) {
+  const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
+  const shown = signed ? withRealMinus(cardFigure(value)) : cardFigure(value);
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2">
+      <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`}>
+        <span data-prov-exact={full} data-prov-symbol={symbol}>
+          {shown}
+        </span>
+      </RevealTip>
+      <span data-prov-hidden="" className="inline-flex items-center gap-2">
+        <span className="text-[0.55em] font-medium text-rb-500">{symbol}</span>
+        <span className="inline-flex items-center justify-center rounded-full bg-raised p-0.5">
+          <TokenChipIcon symbol={symbol} address={address} size={28} filterable={false} />
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /** The CDP-grain identity: market chip · CDP id, then the two things a reader
  *  wants to do with the id — take it away, and look at the NFT it names.
@@ -298,8 +370,8 @@ export function PolarisPositionCard({
           collateral={
             v.peakColl > 0 ? (
               <StatValue>
-                <Prov info={peakProv("coll", v.market)}>
-                  <AssetAmount value={v.peakColl} symbol={PETH.symbol} address={PETH.address} />
+                <Prov info={peakProv("coll", v.market, v.peaksCountLiquidation)}>
+                  <CardAmount value={v.peakColl} symbol={PETH.symbol} address={PETH.address} />
                 </Prov>
               </StatValue>
             ) : (
@@ -309,8 +381,8 @@ export function PolarisPositionCard({
           debt={
             v.peakDebt > 0 ? (
               <StatValue>
-                <Prov info={peakProv("debt", v.market)}>
-                  <AssetAmount
+                <Prov info={peakProv("debt", v.market, v.peaksCountLiquidation)}>
+                  <CardAmount
                     value={v.peakDebt}
                     symbol={stable}
                     address={POLARIS_MARKET_CONFIG[v.market].stable.address}
@@ -322,6 +394,33 @@ export function PolarisPositionCard({
             )
           }
           debtLabel={CARD_VOCAB.peakDebt}
+          extra={
+            v.status === "liquidated" && v.surplus != null && v.surplus > 0
+              ? {
+                  label: "Surplus to claim",
+                  value: (
+                    <>
+                      <StatValue>
+                        <CardAmount value={v.surplus} symbol={PETH.symbol} address={PETH.address} />
+                      </StatValue>
+                      <div className="text-xs mt-0.5 text-rb-500">
+                        set aside at the liquidation for the owner to claim; this page does not show claims
+                      </div>
+                    </>
+                  ),
+                }
+              : undefined
+          }
+          labelTips={{
+            collateral: `${
+              v.peaksCountLiquidation
+                ? "The most pETH the CDP held at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in."
+                : "The most pETH the CDP held after any of its touches (a touch is any transaction on it)."
+            } ${PEAK_COLL_ABOVE_DEPOSITS}`,
+            debt: v.peaksCountLiquidation
+              ? `The most ${stable} the CDP owed at any touch (a touch is any transaction on it), its liquidation included, once the pending legs — interest, stability gains, reward pETH and the PSM's share, which build up between touches — were written in.`
+              : `The most ${stable} the CDP owed after any of its touches (a touch is any transaction on it).`,
+          }}
         />
       </PositionCardShell>
     );
@@ -343,9 +442,16 @@ export function PolarisPositionCard({
       <OpenPositionStats
         statusPill={
           surface === "detail" ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {v.debt > 0 ? "Borrowing" : "Collateral only"}
-            </span>
+            <RevealTip
+              tip={<span className={TIP_PROSE}>{v.debt > 0 ? BADGE_TIPS.borrowing : BADGE_TIPS.collateralOnly}</span>}
+              label={v.debt > 0 ? BADGE_TIPS.borrowing : BADGE_TIPS.collateralOnly}
+              focusable
+              className="focus-ring rounded-sm"
+            >
+              <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
+                {v.debt > 0 ? "Borrowing" : "Collateral only"}
+              </span>
+            </RevealTip>
           ) : (
             <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
           )
@@ -359,7 +465,7 @@ export function PolarisPositionCard({
               v.coll > 0 ? (
                 <StatValue>
                   <Prov info={collProv(v)}>
-                    <AssetAmount
+                    <CardAmount
                       value={v.coll}
                       symbol={PETH.symbol}
                       address={PETH.address}
@@ -403,7 +509,7 @@ export function PolarisPositionCard({
               v.debt > 0 ? (
                 <StatValue>
                   <Prov info={debtProv(v)}>
-                    <AssetAmount
+                    <CardAmount
                       value={v.debt}
                       symbol={stable}
                       address={POLARIS_MARKET_CONFIG[v.market].stable.address}
@@ -411,22 +517,27 @@ export function PolarisPositionCard({
                     />
                   </Prov>
                 </StatValue>
+              ) : v.coll > 0 ? (
+                // A CDP holding collateral and no debt: a word, not a dash a
+                // reader takes for a missing figure.
+                <StatValue>
+                  <span className="text-rb-500">none</span>
+                </StatValue>
               ) : (
                 <StatDash />
               ),
             footnote: (
               <>
-                {v.pendingInterest != null && v.pendingInterest > 0 && (
-                  <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                    <Prov info={livePendingProv("accruedInterest", v.market)}>
-                      <span>
-                        <AmountText value={v.pendingInterest} /> {stable}
-                      </span>
-                    </Prov>{" "}
-                    interest pending
+                {v.basis === "chain" && v.debt <= 0 && v.recordedDebt != null && v.recordedDebt > 0 && (
+                  // The pending legs have cleared more than the recorded debt:
+                  // the entire debt is at or below zero, and the next touch
+                  // mints the difference so it lands on zero.
+                  <div className="text-xs mt-0.5 text-rb-500 max-w-64">
+                    no debt: the pending PSM share and stability gains exceed the <AmountText value={v.recordedDebt} />{" "}
+                    {stable} recorded at the last touch; the next touch settles it to zero
                   </div>
                 )}
-                {v.interestRate != null ? (
+                {v.interestRate != null && (v.basis === "index" ? v.debt > 0 : (v.recordedDebt ?? 0) > 0) ? (
                   <div className="text-xs mt-0.5 text-rb-500">
                     <Prov info={liveRateProv("combined", v.market, v.basis === "index")}>
                       <span>{(v.interestRate * 100).toFixed(2)}%</span>
@@ -441,6 +552,13 @@ export function PolarisPositionCard({
                     <span className="inline-block h-3 w-36 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
                   </div>
                 ) : null}
+                {v.basis === "chain" && v.blockNumber != null && (
+                  // Every figure on the card is read at this one block (the
+                  // pending legs move at every block): said once, here.
+                  <div className="text-xs mt-0.5 text-rb-500">
+                    <span data-prov-exempt="">as of block {v.blockNumber.toLocaleString("en-US")}</span>
+                  </div>
+                )}
               </>
             ),
           },
@@ -456,13 +574,15 @@ export function PolarisPositionCard({
                     <Prov info={listingIcrProv(v.market)} value={`≈ ${pct(v.icr)}`}>
                       <RevealTip tip={<span className={TIP_PROSE}>{LISTING_ICR_TIP}</span>}>
                         <span className={belowMin ? "text-red-500" : undefined}>
-                          {"≈"}&nbsp;{pct(v.icr)}
+                          {"≈"}&nbsp;{formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
                         </span>
                       </RevealTip>
                     </Prov>
                   ) : (
                     <Prov info={liveIcrProv(v.market)} value={pct(v.icr)}>
-                      <span className={belowMin ? "text-red-500" : undefined}>{pct(v.icr)}</span>
+                      <span className={belowMin ? "text-red-500" : undefined}>
+                        {formatPolarisRatio(v.icr, 1, mcrInForce ?? undefined)}
+                      </span>
                     </Prov>
                   )}
                 </StatValue>
@@ -486,8 +606,9 @@ export function PolarisPositionCard({
                       // the stated figures reach the floor, in the market's
                       // own unit (USDp or a troy ounce of gold), never "$".
                       <span className="inline-flex items-center gap-1">
-                        <span className="text-rb-400">·</span> Liquidates at
+                        <span className="text-rb-400">·</span> Liquidates if
                         <TokenChipIcon symbol={PETH.symbol} address={PETH.address} size={14} filterable={false} />
+                        pETH falls to
                         <Prov
                           info={listingLiqPriceProv(v.defensiveMode, v.market)}
                           value={formatPethPrice(v.liqPrice)}
@@ -518,7 +639,7 @@ export function PolarisPositionCard({
                   value: (
                     <StatValue>
                       <Prov info={liveEquityProv(v.market)}>
-                        <AssetAmount
+                        <CardAmount
                           value={v.equity}
                           symbol={stable}
                           address={POLARIS_MARKET_CONFIG[v.market].stable.address}
@@ -569,6 +690,7 @@ export function viewFromSummary(
     debtRaw: s.debtRaw,
     collUsd: board && s.coll > 0 ? s.coll * board.price.pethUsd : null,
     equity: null,
+    recordedDebt: null,
     icr: priced && board ? (s.coll * board.price.pethInDebt) / s.debt : null,
     mcr: mcrInForce,
     defensiveMode: board?.defensiveMode ?? false,
@@ -577,6 +699,7 @@ export function viewFromSummary(
     pendingInterest: null,
     pendingStables: null,
     pendingReward: null,
+    pendingPsmDebt: null,
     interestRate: board?.interestRate ?? null,
     peakColl: s.peakColl,
     peakDebt: s.peakDebt,
@@ -606,7 +729,8 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     debt: c.entireDebt,
     debtRaw: c.entireDebtRaw,
     collUsd: c.price ? c.entireColl * c.price.pethUsd : null,
-    equity: c.price ? c.entireColl * c.price.pethInDebt - c.entireDebt : null,
+    equity: c.price ? c.entireColl * c.price.pethInDebt - Math.max(0, c.entireDebt) : null,
+    recordedDebt: c.recordedDebt,
     icr: c.icr,
     mcr: c.defensiveMode ? c.defensiveMcr : c.mcr,
     defensiveMode: c.defensiveMode,
@@ -618,6 +742,7 @@ export function viewFromChain(c: PolarisChainResponse): PolarisPositionView {
     pendingInterest: c.accruedInterest,
     pendingStables: c.accruedStables,
     pendingReward: c.bcTokenGain,
+    pendingPsmDebt: c.mintRedeemDebtChange,
     interestRate: c.interestRate,
     peakColl: 0,
     peakDebt: 0,

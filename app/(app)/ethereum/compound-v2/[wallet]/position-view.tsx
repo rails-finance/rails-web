@@ -65,12 +65,16 @@ import {
   computeCompoundV2CardCaptions,
 } from "@/lib/compound-v2/economics";
 import { compoundV2EconomicsExplanation, compoundV2EconomicsContent } from "@/lib/compound-v2/economics-explanation";
+import { compoundV2Ledger, compoundV2PricePairs } from "@/lib/compound-v2/ledger";
+import { fetchCompoundV2PricesAt } from "@/lib/api/fetch-compound-v2-prices-at";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
+import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
+import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
+import { balancePeaks, withBalancePeaks } from "@/lib/shared/ctoken-peaks";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the Moonwell page.
@@ -361,8 +365,74 @@ export default function CompoundV2PositionView({
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest splits; the rates ride the listing row's per-market chain read.
+  // The ledger (each flow at its own block's price, the transfers, seizures
+  // and interest on both sides) needs every row on the page: a windowed or
+  // grouped history keeps the lifetime layer above.
+  const wholeRows = historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0 && v2Events.length > 0;
+  const [eventPrices, setEventPrices] = useState<Map<string, number> | null>(null);
+  const pricePairs = useMemo(() => (wholeRows ? compoundV2PricePairs(v2Events) : []), [wholeRows, v2Events]);
+  useEffect(() => {
+    if (pricePairs.length === 0) return;
+    const ac = new AbortController();
+    fetchCompoundV2PricesAt(pricePairs, ac.signal)
+      .then((m) => setEventPrices(m))
+      .catch(() => {
+        // Today's prices stand in; the receipts say which.
+      });
+    return () => ac.abort();
+  }, [pricePairs]);
+  const ledger = useMemo(
+    () => (wholeRows && eventPrices ? compoundV2Ledger(v2Events, eventPrices) : null),
+    [wholeRows, eventPrices, v2Events],
+  );
+
+  // What each liquidation did, and a closed card's peaks as each row's balance
+  // before and after it (interest included), where the page holds every row.
+  const cardView = useMemo<CompoundV2PositionView | null>(() => {
+    if (!liveView) return liveView;
+    const counted = { ...liveView, eventTotal: lifetimeKnown ? tl.totalCount : undefined };
+    if (!wholeRows) return counted;
+    const liquidations = liquidationStories(
+      v2Events.map((e) => {
+        const d = e.context.data;
+        return {
+          timestamp: e.timestamp,
+          txHash: e.txHash,
+          kind: d.eventType === "liquidation" ? "liquidation" : d.eventType === "repay" ? "repay" : "other",
+          market: d.market,
+          symbol: d.marketSymbol,
+          amount: d.assetsDelta != null ? Math.abs(Number(d.assetsDelta)) : undefined,
+          debtBefore: d.debtBefore != null ? Number(d.debtBefore) : undefined,
+          debtAfter: d.debtAfter != null ? Number(d.debtAfter) : undefined,
+          byOwner: externalActor({ txFrom: d.txFrom, poolCaller: d.caller }, e.wallet) == null,
+        };
+      }),
+    );
+    if (liveView.status === "open") return { ...counted, liquidations };
+    const peaks = balancePeaks(
+      v2Events.map((e) => {
+        const d = e.context.data;
+        return {
+          market: d.market,
+          decimals: COMPOUND_V2_MARKET_BY_KEY[d.market]?.decimals ?? 18,
+          side: d.side,
+          supplyBefore: d.supplyBefore,
+          supplyAfter: d.supplyAfter,
+          debtBefore: d.debtBefore,
+          debtAfter: d.debtAfter,
+        };
+      }),
+    );
+    return {
+      ...counted,
+      liquidations,
+      peakSupplies: withBalancePeaks(liveView.peakSupplies, peaks, "supply"),
+      peakBorrows: withBalancePeaks(liveView.peakBorrows, peaks, "debt"),
+    };
+  }, [liveView, wholeRows, v2Events, lifetimeKnown, tl.totalCount]);
+
   const captions = liveView ? computeCompoundV2CardCaptions(liveView, lifetimeEvents, precomputedLifetime) : null;
-  const towerData = liveView ? computeCompoundV2Economics(liveView, lifetimeEvents, precomputedLifetime) : null;
+  const towerData = liveView ? computeCompoundV2Economics(liveView, lifetimeEvents, precomputedLifetime, ledger) : null;
 
   // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches. Deduped by the underlying token
@@ -415,9 +485,9 @@ export default function CompoundV2PositionView({
         <DetailBodySkeleton />
       ) : (
         <>
-          {liveView && (
+          {liveView && cardView && (
             <CompoundV2PositionCard
-              v={liveView}
+              v={cardView}
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
@@ -442,7 +512,7 @@ export default function CompoundV2PositionView({
               // closed mood never waits on the chain lane.
               explanation={
                 liveView.status !== "open" ? (
-                  <CompoundV2ClosedPositionExplanation v={liveView} />
+                  <CompoundV2ClosedPositionExplanation v={cardView} />
                 ) : (
                   // Passed before the chain read lands (the Fluid treatment):
                   // the pane, and the copy-view link at its foot, mount with

@@ -29,6 +29,7 @@
 // captured price's footnote pill sits under the grid. A block with no price
 // keeps the card token-only.
 
+import { createPortal } from "react-dom";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -72,16 +73,34 @@ import {
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
-import { AaveV3PositionStateBlock, exactLeg, exactUsd, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
+import {
+  AaveV3PositionStateBlock,
+  StateInterestLine,
+  exactLeg,
+  exactUsd,
+  reserveSymbol,
+  statePricePills,
+  type TouchedLeg,
+} from "./aave-v3-position-state";
 import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
-import { findReserve, groupExact, humanOf, legChange, legHeld, sincePrevious } from "@/lib/aave-v3/position-state";
+import {
+  findReserve,
+  groupExact,
+  humanOf,
+  legChange,
+  legHeld,
+  sincePrevious,
+  type AaveV3PositionState,
+} from "@/lib/aave-v3/position-state";
 import { AmountText } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
+import { v3Protocol } from "@/lib/aave-v3/protocol-name";
+import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE } from "@/lib/seamless/asset-catalog";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -102,6 +121,12 @@ export interface AaveV3CtEventDetailProps {
   /** The previous transaction: its after-state is where this event's
    *  interest line starts. */
   previous?: { blockNumber: number; txHash: string };
+  /** The timeline event: the card's lifetime sum and its link to the chart. */
+  eventId?: string;
+  eventTs?: number;
+  /** Where the card's (i) takes the interest line and the prices, which sit
+   *  behind it (components/protocol/aave-v3/aave-family-event-receipt.tsx). */
+  notesSlot?: HTMLElement | null;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -159,6 +184,9 @@ export function AaveV3CtEventDetail({
   feeOf,
   fee,
   previous,
+  eventId,
+  eventTs,
+  notesSlot,
 }: AaveV3CtEventDetailProps) {
   const coords: V3Coords = {
     txHash,
@@ -195,6 +223,9 @@ export function AaveV3CtEventDetail({
   // The interest line of a stat that gave way to the block's row: drawn under
   // the grid, so the row still states it.
   const interestLines: (NonNullable<ChainTruthStat["interestSincePrevious"]> & { symbol: string })[] = [];
+  // The balances whose interest line runs from the previous event: the note
+  // under them states the reserve's rate at both ends.
+  const rated: { reserve: string; symbol: string; side: "supply" | "debt" }[] = [];
 
   /** Interest since the previous event, from the two position reads; where
    *  they are not in hand, the row's own figure, which runs from the last
@@ -205,13 +236,20 @@ export function AaveV3CtEventDetail({
     const since = ready ? sincePrevious(ready, prevReady, reserve, a.side) : undefined;
     // Interest under a millionth of a token is below what the line can show.
     if (since && Number(since.interest) < 1e-6) return undefined;
-    if (since) return { value: since.interest, prov: prevEventInterestProv(a.symbol, a.side, stateCoords) };
+    if (since && reserve && !rated.some((x) => x.reserve === reserve && x.side === a.side))
+      rated.push({ reserve, symbol: a.symbol, side: a.side });
+    if (since)
+      return {
+        value: since.interest,
+        prov: prevEventInterestProv(a.symbol, a.side, stateCoords),
+        label: `${a.side === "debt" ? "Interest on the debt" : "Supply interest"} since the previous event`,
+      };
     if (since || (ready && previous && prevState?.status === "loading")) return undefined;
     return a.chain?.interest
       ? {
           value: a.chain.interest,
           prov: rowInterestProv(a.symbol, a.side, coords),
-          label: "Interest since this balance last moved",
+          label: `${a.side === "debt" ? "Interest on the debt" : "Supply interest"} since this balance last moved`,
         }
       : undefined;
   };
@@ -349,7 +387,7 @@ export function AaveV3CtEventDetail({
     // Seized collateral reduces the supply balance (change negative).
     push(
       statFor({
-        label: "Collateral",
+        label: "Supplied",
         symbol: collSym,
         reserve: ctx.collateralAsset,
         side: "supply",
@@ -600,7 +638,7 @@ export function AaveV3CtEventDetail({
   // Ordinary events gain the at-block price footnote pill for the touched
   // reserve — the read the USD chip above derives from. Liquidations carry
   // their two pills inside the forensics block instead.
-  const pricePills: AtBlockPricePill[] = [
+  const ctxPills: AtBlockPricePill[] = [
     ...(ctx.eventType !== "liquidation" && ctx.price && ctx.reserveSymbol
       ? [
           {
@@ -621,23 +659,66 @@ export function AaveV3CtEventDetail({
         ]
       : []),
   ];
+  // Once the position read has priced the account, the chip lists every price
+  // the card's USD figures use, the event's own asset among them; an asset the
+  // read does not hold (a swap's bought token that left the position) keeps
+  // its captured price.
+  const readPills = ready?.sources.market ? statePricePills(ready, stateCoords, touched) : [];
+  const pricePills: AtBlockPricePill[] =
+    readPills.length > 0
+      ? [...readPills, ...ctxPills.filter((p) => !readPills.some((q) => q.symbol === p.symbol))]
+      : ctxPills;
+  // The interest line runs from the two position reads where both landed; a
+  // previous read that failed leaves the supply interest on the collateral out.
+  const prevUnread = !!ready && !!previous && prevState?.status === "unavailable";
+
+  // Behind the card's (i): the interest since the previous event, the rates
+  // behind it, and every price the card's USD figures use. Without a slot (a
+  // card outside a timeline) they stay under the grid.
+  const readNotes = (
+    <div data-card-read-notes="">
+      {/* The interest line: from the two position reads where both landed,
+          else the given-way balance's since its last move. */}
+      {ready && prevReady ? (
+        <div className="pb-1">
+          <StateInterestLine here={ready} prev={prevReady} coords={stateCoords} />
+        </div>
+      ) : (
+        interestLines.map((l) => (
+          <div key={`${l.label ?? ""}:${l.symbol}`} className="pb-1">
+            <StatSubline>
+              {l.label ?? "Interest since previous event"}:{" "}
+              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
+                <span title={l.value}>
+                  <AmountText value={Number(l.value)} />
+                </span>
+              </Prov>{" "}
+              {l.symbol}
+            </StatSubline>
+          </div>
+        ))
+      )}
+      {prevUnread && (
+        <div className="pb-1">
+          <StatSubline>
+            Supply interest on the collateral is left out: the position after the previous event was not read.
+          </StatSubline>
+        </div>
+      )}
+      {ready && prevReady && rated.length > 0 && (
+        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
+      )}
+      {pricePills.length > 0 && (
+        <div className="pb-2">
+          <AtBlockPriceFootnote pills={pricePills} />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
       {stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {interestLines.map((l) => (
-        <div key={`${l.label ?? ""}:${l.symbol}`} className="px-5 pb-1">
-          <StatSubline>
-            {l.label ?? "Interest since previous event"}:{" "}
-            <Prov info={l.prov} value={l.value} symbol={l.symbol}>
-              <span title={l.value}>
-                <AmountText value={Number(l.value)} />
-              </span>
-            </Prov>{" "}
-            {l.symbol}
-          </StatSubline>
-        </div>
-      ))}
       {state?.status === "loading" && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
           Reading the position at this block…
@@ -649,10 +730,21 @@ export function AaveV3CtEventDetail({
           data-position-state="unavailable"
           data-position-code={state.code}
         >
-          Position state isn&rsquo;t available for this event.
+          {state.lasting
+            ? "Position state isn’t available for this event."
+            : "The position at this block was not read. Reload to try again."}
         </div>
       )}
-      {ready && <AaveV3PositionStateBlock state={ready} coords={stateCoords} touched={touched} />}
+      {ready && (
+        <AaveV3PositionStateBlock
+          state={ready}
+          coords={stateCoords}
+          touched={touched}
+          liquidation={ctx.eventType === "liquidation"}
+          eventId={eventId}
+          eventTs={eventTs}
+        />
+      )}
       {forensics && <LiquidationForensics {...forensics} />}
       {fee && ctx.collateralSymbol && (
         <div className="px-5 pb-2 text-xs text-rb-500">
@@ -675,11 +767,69 @@ export function AaveV3CtEventDetail({
           the liquidation&rsquo;s card.
         </div>
       )}
-      {pricePills.length > 0 && (
-        <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={pricePills} />
-        </div>
-      )}
+      {notesSlot
+        ? createPortal(readNotes, notesSlot)
+        : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
     </>
+  );
+}
+
+/** A reserve's yearly rate (ray) as a percentage. */
+const rayPct = (ray: string): number => (Number(BigInt(ray) / BigInt(10) ** BigInt(21)) / 1e6) * 100;
+/** Two decimals, or two significant figures under 0.1% so a small rate does not read 0.00%. */
+const pctText = (p: number): string =>
+  p > 0 && p < 0.1
+    ? `${p.toLocaleString("en-US", { maximumSignificantDigits: 2 })}%`
+    : `${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+/** The rate behind each interest line at both ends: the reserve's
+ *  getReserveData rate once the previous event's block had run, and once this
+ *  one's had. Interest accrues at each moment's rate, which moves with the
+ *  share of the reserve on loan. On Seamless, a stretch that spans the freeze
+ *  and whose rate rose says what the freeze did. */
+function RateNote({
+  here,
+  prev,
+  rated,
+  seamless,
+}: {
+  here: AaveV3PositionState;
+  prev: AaveV3PositionState;
+  rated: { reserve: string; symbol: string; side: "supply" | "debt" }[];
+  seamless: boolean;
+}) {
+  const rows = rated.flatMap((x) => {
+    const h = here.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
+    const p = prev.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
+    const hr = h ? (x.side === "debt" ? h.debt.rate : h.supply.rate) : null;
+    const pr = p ? (x.side === "debt" ? p.debt.rate : p.supply.rate) : null;
+    if (!hr || !pr) return [];
+    return [{ ...x, then: rayPct(pr), now: rayPct(hr) }];
+  });
+  // The at-block reads carry each reserve's getReserveData rate at the block;
+  // the index's rows carry the rate of the last reserve update, not the block's.
+  const atBlock = (s: AaveV3PositionState) => s.sources.balances === "chain-read-at-block";
+  if (rows.length === 0 || !atBlock(here) || !atBlock(prev)) return null;
+  const spansFreeze = seamless && prev.block < SEAMLESS_FREEZE_BLOCK && here.block >= SEAMLESS_FREEZE_BLOCK;
+  const rose = rows.filter((r) => r.side === "debt" && r.now > r.then * 2);
+  return (
+    <div className="px-5 pb-2 text-xs leading-relaxed text-rb-500" data-rate-note="">
+      <p>
+        {rows.map((r) => (
+          <span key={`${r.reserve}:${r.side}`}>
+            {r.symbol} {r.side === "debt" ? "borrow" : "supply"} rate: {pctText(r.then)} a year after the previous event
+            (block {prev.block.toLocaleString("en-US")}), {pctText(r.now)} at this block.{" "}
+          </span>
+        ))}
+        Interest accrues at each moment&rsquo;s rate, which rises and falls with the share of the reserve on loan.
+      </p>
+      {spansFreeze && rose.length > 0 && (
+        <p>
+          Every Seamless reserve was frozen on {SEAMLESS_FREEZE_DATE} (block{" "}
+          {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}): lenders could still withdraw and nobody could supply, so the
+          share of {rose.map((r) => r.symbol).join(" and ")} on loan rose and the borrow rate with it.
+        </p>
+      )}
+    </div>
   );
 }

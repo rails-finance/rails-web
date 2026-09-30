@@ -103,6 +103,10 @@ export interface DolomitePeakAmount {
   amountRaw: string;
   /** As DolomiteBalanceAmount.decimalsUnread. */
   decimalsUnread?: true;
+  /** Set when the page replaced the par peak with the token balance read
+   *  from the rows (the highest before or after any event, interest
+   *  included). */
+  tokens?: true;
 }
 
 /** One market leg as the rails route returns it (pre-presentation).

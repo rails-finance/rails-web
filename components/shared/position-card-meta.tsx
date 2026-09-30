@@ -15,6 +15,7 @@ import { Icon } from "@/components/icons/icon";
 import { formatDuration } from "@/lib/date";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { LiquidatedBadge } from "@/components/shared/liquidated-badge";
+import { PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
 
 export interface PositionCardMetaProps {
   /** Unix epoch of the most recent event. Omit/null when the protocol carries no
@@ -39,6 +40,14 @@ export interface PositionCardMetaProps {
   redemptionCount?: number | null;
   /** What the liquidation count counts, added to its tip. */
   liquidationRule?: string;
+  /** Why the events and transactions differ, added to the count's tip after
+   *  the two figures (SparkLend: a liquidation's fee is its own row). */
+  countNote?: string;
+  /** What the count counts, added to its tip whatever the event total. */
+  countRule?: string;
+  /** Print the count's noun beside it ("19 transactions") rather than only in
+   *  its tip. Opt-in; unset, the count is the icon and the figure as before. */
+  countNounVisible?: boolean;
 }
 
 // formatDuration treats a bare number as SECONDS. Unix seconds are ~1.7e9 today;
@@ -63,6 +72,9 @@ export function PositionCardMeta({
   liquidated,
   redemptionCount,
   liquidationRule,
+  countNote,
+  countRule,
+  countNounVisible = false,
 }: PositionCardMetaProps) {
   const showTime = lastActivityAt != null && lastActivityAt > 0;
   const showEvents = eventCount != null && eventCount > 0;
@@ -70,7 +82,9 @@ export function PositionCardMeta({
   const hasLiqCount = liquidationCount != null && liquidationCount > 0;
   const showLiquidation = hasLiqCount || liquidated === true;
 
-  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return null;
+  // The disclosure chevron closes the cluster on a card whose shell opted in
+  // (PositionCardShell `disclosureKey`); it renders nothing anywhere else.
+  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return <PositionCardDisclosureToggle />;
 
   return (
     // data-prov-exempt: activity-meta chrome — the time-ago, event count and
@@ -95,8 +109,9 @@ export function PositionCardMeta({
           const label =
             `${n.toLocaleString("en-US")} ${eventCountNoun}${n === 1 ? "" : "s"}` +
             (eventTotal != null && eventTotal > 0 && eventTotal !== n
-              ? ` · ${eventTotal.toLocaleString("en-US")} event${eventTotal === 1 ? "" : "s"}`
-              : "");
+              ? ` · ${eventTotal.toLocaleString("en-US")} event${eventTotal === 1 ? "" : "s"}${countNote ? `: ${countNote}` : ""}`
+              : "") +
+            (countRule ? `. ${countRule}` : "");
           return (
             <RevealTip
               tip={countTip ? `${label}. ${countTip}` : label}
@@ -105,7 +120,10 @@ export function PositionCardMeta({
               className="focus-ring rounded-sm"
             >
               <Icon name="arrow-left-right" size={12} />
-              <span className="ml-1">{n.toLocaleString("en-US")}</span>
+              <span className="ml-1">
+                {n.toLocaleString("en-US")}
+                {countNounVisible ? ` ${eventCountNoun}${n === 1 ? "" : "s"}` : ""}
+              </span>
             </RevealTip>
           );
         })()}
@@ -127,6 +145,7 @@ export function PositionCardMeta({
       {showLiquidation && (
         <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} rule={liquidationRule} />
       )}
+      <PositionCardDisclosureToggle />
     </span>
   );
 }

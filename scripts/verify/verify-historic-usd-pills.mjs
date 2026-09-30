@@ -18,6 +18,16 @@
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
 
+/** The price chip sits behind the card's (i) (rails-ops TO-DO-ui-jobs 141):
+ *  open it before reading the chip. */
+async function openInfo(card) {
+  const b = card.locator('button[aria-label="Show explanation"]').first();
+  if (await b.count()) {
+    await b.click();
+    await card.page().waitForTimeout(300);
+  }
+}
+
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
 let failures = 0;
@@ -318,6 +328,7 @@ async function runProtocol(proto, wallet, cases) {
       check(`${proto}: priced ordinary chip amount ≈ expected`, text.includes(chipText), text);
     }
 
+    await openInfo(card);
     const footnote = card.getByText(/oracle at block/).first();
     check(`${proto}: priced ordinary AtBlockPriceFootnote pill renders`, (await footnote.count()) > 0);
     if ((await footnote.count()) > 0) {

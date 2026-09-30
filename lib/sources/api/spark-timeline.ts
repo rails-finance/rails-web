@@ -130,6 +130,7 @@ const LABELS: Record<SparkEventType, string> = {
   liquidation: "Liquidated",
   transfer_in: "Transferred in",
   transfer_out: "Transferred out",
+  emode: "E-mode",
 };
 
 const ZERO = BigInt(0);
@@ -230,10 +231,11 @@ export async function buildSparkTimeline(rows: MvRow[], walletRaw: string): Prom
  *  address): what `buildSparkTimeline` runs after its read, and what an
  *  offline test runs with the index's token names and decimals. */
 export function sparkRowsToEvents(
-  rows: MvRow[],
+  rowsIn: MvRow[],
   walletRaw: string,
   metas: Map<string, Erc20Meta>,
 ): SparkTimelineResult {
+  const rows = feeAfterSeizure(rowsIn);
   const wallet = walletRaw.toLowerCase();
   const fallback = (addr: string): Erc20Meta => ({
     address: addr,
@@ -483,6 +485,76 @@ export function sparkRowsToEvents(
   }
 
   return { wallet, events, totalEvents: events.length };
+}
+
+/** The Spark treasury: a liquidation's protocol fee is paid to it. */
+const TREASURY = "0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5";
+
+/**
+ * A liquidation's fee transfer, placed after the seizure it follows on chain.
+ *
+ * Inside `liquidationCall` the Pool burns (or moves) the seized spTokens first
+ * and then sends the fee to the treasury with `transferOnLiquidation`; the
+ * LiquidationCall log comes last (0xe613…ea42's liquidation, tx 0x7872…c3ca:
+ * the Burn is log 10, the fee's BalanceTransfer log 15, LiquidationCall log
+ * 17). The index serves the fee row first and runs the collateral balance
+ * through it in that order, so the fee read 106.010 → 105.782 WETH and the
+ * seizure 105.782 → 58.062. Here the two swap places and the balances are
+ * rebuilt from the chain figures in hand: the seizure runs from the balance
+ * before the transaction, the fee from what the seizure left to the balance
+ * after it. Rows the index already orders this way pass through unchanged.
+ */
+export function feeAfterSeizure(rows: MvRow[]): MvRow[] {
+  const out = [...rows];
+  const txOf = (r: MvRow) => hexFromBytea(r.tx_hash).toLowerCase();
+  for (let j = 0; j < out.length; j += 1) {
+    const liq = out[j];
+    if (liq.action !== "liquidation" || !liq.collateral_asset) continue;
+    const coll = liq.collateral_asset.toLowerCase();
+    const i = out.findIndex(
+      (r, k) =>
+        k < j &&
+        r.action === "transfer_out" &&
+        r.counterparty?.toLowerCase() === TREASURY &&
+        r.reserve?.toLowerCase() === coll &&
+        txOf(r) === txOf(liq),
+    );
+    if (i < 0) continue;
+    const fee = out[i];
+    const seized = bigintOf(liq.liquidated_collateral_amount);
+    // Only a pair whose balances chain fee → seizure is rebuilt.
+    const chained = (feeAfter: string | null | undefined, liqBefore: string | null | undefined) =>
+      feeAfter != null && liqBefore != null && bigintOf(feeAfter) === bigintOf(liqBefore);
+    const plain = chained(fee.supply_after, liq.supply_before);
+    const onChain = chained(fee.chain_supply_after, liq.chain_supply_before);
+    if (!plain && !onChain) continue;
+    const mid = (before: string | null | undefined) => (before == null ? null : String(bigintOf(before) - seized));
+    const newLiq: MvRow = { ...liq };
+    const newFee: MvRow = { ...fee };
+    if (plain) {
+      newLiq.supply_before = fee.supply_before;
+      newLiq.supply_after = mid(fee.supply_before);
+      newFee.supply_before = newLiq.supply_after;
+      newFee.supply_after = liq.supply_after;
+    }
+    if (onChain) {
+      newLiq.chain_supply_before = fee.chain_supply_before;
+      newLiq.chain_supply_after = mid(fee.chain_supply_before);
+      newFee.chain_supply_before = newLiq.chain_supply_after;
+      newFee.chain_supply_after = liq.chain_supply_after;
+      // The collateral's interest since its previous move lands on the first
+      // row of the transaction; the scaled balance between the two is not read.
+      newLiq.supply_interest = fee.supply_interest ?? null;
+      newFee.supply_interest = null;
+      newFee.supply_scaled_after = liq.supply_scaled_after ?? null;
+      newLiq.supply_scaled_after = null;
+    }
+    out.splice(i, 1);
+    // The liquidation moved up one place; the fee goes right after it.
+    out.splice(j, 0, newFee);
+    out[j - 1] = newLiq;
+  }
+  return out;
 }
 
 function flowFor(m: Erc20Meta, raw: bigint, direction: "in" | "out"): AssetFlow {

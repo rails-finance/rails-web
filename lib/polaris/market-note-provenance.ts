@@ -109,7 +109,7 @@ export const rateStepProv = (
       ? `The ${pair} at each end of the stretch — its last PrimaryRateSet at or before this CDP's own two touches, ` +
         `the same as-of figure already on each touch's own row. Algorithmic: the market sets it on the PSM's mints ` +
         `and redemptions, never chosen by the holder — the wallet that fired either log did nothing to this CDP. ` +
-        `The secondary, utilisation-driven rate is added on top and is not on this log. Nothing between the two ` +
+        `The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log. Nothing between the two ` +
         `touches is drawn, because this CDP transacted nothing between them.`
       : part === "delta"
         ? `How far the ${pair} moved across the stretch — the later reading against the earlier one, both the ` +
@@ -536,6 +536,39 @@ export const polarisPriceGapPositionProv = (
             ? `The same collateral and debt at the live price — what the ratio recorded at block ${p?.atBlock} is worth now that the pETH price reads ${formatPrice(note.to.value, priceDecimals(note))}. The chain was never asked this: the CDP has done nothing since that touch, so nothing recorded it. Only the price moves; interest has kept accruing since.`
             : `The same collateral and debt at the later price — what the ratio recorded at block ${p?.atBlock} came to be worth once the pETH price was ${formatPrice(note.to.value, priceDecimals(note))}. The chain was never asked this: the CDP did nothing between the two touches, so nothing recorded it. Only the price moves between the two figures; interest kept accruing across the stretch, and this CDP's own next touch states where the debt actually stood.`;
   const derived = part === "crBefore" || part === "crAfter";
+  if (part === "crAfter" && p?.atFire) {
+    // The stretch ended in a liquidation: the later figure is the ratio it
+    // fired at, the same figure the liquidation row states.
+    return {
+      kind: "chain-derived",
+      pclass: "oracle",
+      summary: `This CDP's collateral ratio at the liquidation that ends the stretch — the whole collateral seized over the debt cleared (the Liquidation log's \`_collLiquidated\` and \`_debtLiquidated\`, after the interest, stability gain and PSM share pending since block ${p.atBlock} were written in), at the pETH price of ${formatPrice(note.to.value, priceDecimals(note))} at that block. The liquidation row states the same figure.`,
+      contract: managerContract(market),
+      via: "Liquidation._collLiquidated × price at the liquidation's block ÷ Liquidation._debtLiquidated",
+      formula: "(collateral seized × price) ÷ debt cleared × 100",
+      verify: {
+        kind: "recompute",
+        text: `Open the liquidation row at block ${note.to.block}: multiply its collateral seized by ${formatPrice(note.to.value, priceDecimals(note))} and divide by its debt cleared.`,
+      },
+      inputs: [
+        {
+          label: "collateral seized",
+          value: String(p.atFire.coll),
+          kind: "chain" as const,
+          pclass: "emitted" as const,
+          note: `Liquidation._collLiquidated at block ${note.to.block}`,
+        },
+        {
+          label: "debt cleared",
+          value: String(p.atFire.debt),
+          kind: "chain" as const,
+          pclass: "emitted" as const,
+          note: `Liquidation._debtLiquidated at block ${note.to.block}`,
+        },
+        polarisPriceLeaf(note.to, "later", stable, priceDecimals(note), false),
+      ],
+    };
+  }
   return {
     kind: derived ? "chain-derived" : "chain",
     pclass: part === "mcr" ? "indexed" : derived ? "state" : "emitted",

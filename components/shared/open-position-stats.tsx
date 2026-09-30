@@ -36,6 +36,10 @@ export interface OpenPositionStatsProps {
    *  lifecycle pill no consumer used — dead chrome that would have violated
    *  the settled grammar for the first consumer that forgot the prop. */
   statusPill: ReactNode;
+  /** Below `sm`, one headline per row, value and asset icons side by side.
+   *  Opt-in: the closed card of ui-jobs 209, whose nine-digit headlines
+   *  collide two to a row at 390px. */
+  stackOnPhone?: boolean;
 }
 
 const GRID_WITH_ICONS: Record<number, string> = {
@@ -51,15 +55,23 @@ const GRID_WITHOUT_ICONS: Record<number, string> = {
   4: "grid grid-cols-2 sm:grid-cols-4 gap-4",
 };
 
-export function OpenPositionStats({ columns, icons, identity, leadingIdentity, statusPill }: OpenPositionStatsProps) {
+export function OpenPositionStats({
+  columns,
+  icons,
+  identity,
+  leadingIdentity,
+  statusPill,
+  stackOnPhone = false,
+}: OpenPositionStatsProps) {
   const count = columns.length;
   // When any column carries its own asset cluster, drop the leading icons
   // slot — the cluster moves into the column it describes.
   const hasInColumnAssets = columns.some((c) => c?.assetIcons != null);
   const useLeadingIcons = !!icons && !hasInColumnAssets;
-  const gridClass = useLeadingIcons
+  const baseGrid = useLeadingIcons
     ? (GRID_WITH_ICONS[count] ?? GRID_WITH_ICONS[3])
     : (GRID_WITHOUT_ICONS[count] ?? GRID_WITHOUT_ICONS[3]);
+  const gridClass = stackOnPhone ? baseGrid.replace("grid-cols-2 ", "grid-cols-1 ") : baseGrid;
   const visibleCount = columns.filter(Boolean).length;
   return (
     <div>
@@ -79,7 +91,7 @@ export function OpenPositionStats({ columns, icons, identity, leadingIdentity, s
           // Single-visible-column 3-col layouts span both mobile cells so the
           // value isn't stranded next to a phantom slot; multi-column layouts
           // keep the original 3-cols-spanning-last behaviour.
-          const spanLast = visibleCount === 3 && i === columns.length - 1;
+          const spanLast = !stackOnPhone && visibleCount === 3 && i === columns.length - 1;
           return (
             <div key={col.label || `col-${i}`} className={spanLast ? "col-span-2 sm:col-span-1" : undefined}>
               <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">

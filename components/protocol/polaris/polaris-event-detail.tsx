@@ -43,6 +43,7 @@ import {
   rateInForceProv,
   transferProv,
   atBlockPriceProv,
+  gasCompEscrowProv,
   crAtEventProv,
   crBeforeAtEventProv,
   crChangeAtEventProv,
@@ -52,7 +53,12 @@ import {
 } from "@/lib/polaris/event-provenance";
 import { crPct1, crPct2, polarisCrAtEvent, polarisCrReceipt, type PolarisCrAtEvent } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
-import { formatNumber, formatCompact, formatExact } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
+import { TipLabel } from "@/components/shared/tip-label";
+
+/** The primary rate, glossed where a row first states it. */
+const PRIMARY_RATE_TIP =
+  "The primary rate is the part of the market's interest rate that moves with its stablecoin's peg: it rises when traders redeem through the PSM and falls when they mint. The market adds a secondary rate, which rises with its debt-to-reserve ratio, and a CDP pays both on its debt.";
 
 /** The market's own unit — USDp to 2dp, GOLDp to 4dp (the finer precision an
  *  ounce of gold's own price needs). Stated once, beside the forensics that
@@ -85,10 +91,10 @@ function transitionOf(
   if (changeN === 0) return undefined;
   const sign = changeN >= 0 ? "+" : "−";
   return {
-    before: formatCompact(beforeN),
+    before: formatNumber(beforeN),
     beforeExact: formatExact(beforeN),
     beforeProv: beforeProv(what, coords, rawBefore),
-    change: `${sign}${formatCompact(Math.abs(changeN))}`,
+    change: `${sign}${formatNumber(Math.abs(changeN))}`,
     changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
     changeProv: netChangeProv(what, coords),
   };
@@ -153,10 +159,21 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   }
 
   const stats: ChainTruthStat[] = [];
-  const leg = (field: PolarisLedgerField, label: string, symbol: string, address: string): void => {
+  /** A protocol leg, signed by what it does to the CDP: "+" adds to the
+   *  collateral or the debt, "−" takes from it. `lowers` flips a field the
+   *  log states as a magnitude that comes OFF the debt (a stability gain). */
+  const leg = (field: PolarisLedgerField, label: string, symbol: string, address: string, lowers = false): void => {
     const v = ctx[field];
     if (v == null || num(v) === 0) return;
-    stats.push({ label, value: fmt(v), symbol, address, prov: ledgerFieldProv(field, coords, ctx.raw?.[field]) });
+    const signedN = lowers ? -Math.abs(num(v)) : num(v);
+    stats.push({
+      label,
+      value: fmt(v),
+      display: `${signedN < 0 ? "−" : "+"}${fmt(v)}`,
+      symbol,
+      address,
+      prov: ledgerFieldProv(field, coords, ctx.raw?.[field]),
+    });
   };
   const liq = (field: PolarisLiquidationField, label: string, symbol: string, address: string): void => {
     const v = ctx[field];
@@ -168,7 +185,10 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   if (ctx.newColl != null)
     stats.push({
       label: "Collateral",
-      value: fmt(ctx.newColl),
+      // Shown to three decimals; the tip and the receipt carry the exact
+      // decimal, as the before figure beside it does.
+      value: formatExact(num(ctx.newColl)),
+      display: fmt(ctx.newColl),
       symbol: PETH.symbol,
       address: PETH.address,
       prov: ledgerFieldProv("newColl", coords, ctx.raw?.newColl),
@@ -178,7 +198,10 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   if (ctx.newDebt != null)
     stats.push({
       label: "Debt",
-      value: fmt(ctx.newDebt),
+      // Shown to three decimals; the tip and the receipt carry the exact
+      // decimal, as the before figure beside it does.
+      value: formatExact(num(ctx.newDebt)),
+      display: fmt(ctx.newDebt),
       symbol: stable,
       address: stableAddr,
       prov: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt),
@@ -227,30 +250,58 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
     // and the liquidator's compensation come out of it — so the row says
     // "seized" and the pool's own leg is stated separately, derived from the
     // three emitted fields.
+    // One sum that closes: the seized collateral, then the three places it
+    // went. The gas compensation comes last and apart — it is the escrow the
+    // CDP set aside at opening, outside the seized figure.
     liq("collLiquidated", "Collateral seized", PETH.symbol, PETH.address);
     if (figures?.path === "sp")
       stats.push({
-        label: "Collateral to the pool",
+        label: "Of which to the stability pool",
         value: formatNumber(figures.leg),
         symbol: PETH.symbol,
         address: PETH.address,
         prov: polarisPoolLegProv(ctx, coords),
       });
+    liq("collRedistributed", "Of which redistributed to other CDPs", PETH.symbol, PETH.address);
+    liq("collateralComp", "Of which to the liquidator (0.5%)", PETH.symbol, PETH.address);
+    liq("collSurplus", "Of which surplus for the owner to claim", PETH.symbol, PETH.address);
     liq("debtLiquidated", "Debt absorbed by the pool", stable, stableAddr);
-    liq("collRedistributed", "Collateral redistributed", PETH.symbol, PETH.address);
     liq("debtRedistributed", "Debt redistributed", stable, stableAddr);
-    liq("collSurplus", "Collateral surplus", PETH.symbol, PETH.address);
-    liq("flatComp", "Gas compensation", PETH.symbol, PETH.address);
-    liq("collateralComp", "Collateral compensation", PETH.symbol, PETH.address);
+    if (ctx.flatComp != null && num(ctx.flatComp) !== 0) {
+      // A round constant, stated whole so it reads as the open row's escrow.
+      const flat = num(ctx.flatComp).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      stats.push({
+        label: "Gas compensation, from the escrow sent at the open",
+        value: flat,
+        display: flat,
+        symbol: PETH.symbol,
+        address: PETH.address,
+        prov: liquidationFieldProv("flatComp", coords, ctx.raw?.flatComp),
+      });
+    }
   }
 
   // The protocol's legs at this touch — grouped: interest · gains · PSM · settle.
-  leg("accruedInterest", "Interest charged", stable, stableAddr);
-  leg("stableGain", "Stability gain", stable, stableAddr);
-  leg("bcTokenGain", "Reward pETH", PETH.symbol, PETH.address);
-  leg("mintRedeemCollGain", "PSM share · collateral", PETH.symbol, PETH.address);
-  leg("mintRedeemDebtGain", "PSM share · debt", stable, stableAddr);
-  leg("stablesMintedToEnsureZeroDebt", "Minted to settle", stable, stableAddr);
+  leg("accruedInterest", "Interest charged · debt", stable, stableAddr);
+  leg("stableGain", "Stability gain · debt", stable, stableAddr, true);
+  leg("bcTokenGain", "Reward pETH · collateral", PETH.symbol, PETH.address);
+  leg("mintRedeemCollGain", "Net PSM share · collateral", PETH.symbol, PETH.address);
+  leg("mintRedeemDebtGain", "Net PSM share · debt", stable, stableAddr);
+  leg("stablesMintedToEnsureZeroDebt", "Settled to zero · debt", stable, stableAddr);
+
+  // The open's escrow: the holder sends the collateral and, beside it, the
+  // fixed gas compensation the CDP holds for a liquidator — returned on
+  // close, paid out on a liquidation. The log does not carry it; the amount is
+  // the protocol's constant (POLARIS_LIQ_CONSTANTS.gasComp).
+  if (ctx.eventType === "open")
+    stats.push({
+      label: "Gas compensation escrow, sent with the collateral",
+      value: String(POLARIS_LIQ_CONSTANTS.gasComp.amount),
+      display: `+${POLARIS_LIQ_CONSTANTS.gasComp.amount}`,
+      symbol: PETH.symbol,
+      address: PETH.address,
+      prov: gasCompEscrowProv(coords),
+    });
 
   const forensics =
     ctx.eventType === "liquidate" ? buildPolarisLiquidationForensics(ctx, coords, ctx.market) : undefined;
@@ -273,7 +324,14 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
 
   return (
     <div className="space-y-2">
-      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
+      {stats.length > 0 && (
+        <ChainTruthDetail
+          // In full, three decimals — the row's and the card's rule — with the
+          // token named after each figure.
+          stats={stats.map((st) => (st.symbol && st.display == null ? { ...st, display: st.value } : st))}
+          symbolText
+        />
+      )}
       {forensics && <LiquidationForensics {...forensics} />}
       {priceFootnote.length > 0 && (
         <div className="px-5 pb-2">
@@ -288,7 +346,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
           <Prov info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={`${(ctx.primaryRate * 100).toFixed(2)}%`}>
             <span>{(ctx.primaryRate * 100).toFixed(2)}%</span>
           </Prov>{" "}
-          primary rate in force
+          <TipLabel text="primary rate in force" tip={PRIMARY_RATE_TIP} />
         </div>
       )}
     </div>

@@ -166,6 +166,7 @@ export function CompoundEventCard({
   return (
     <EventCard
       avatar={null}
+      txHashLabel="Transaction"
       iconColumn={iconSlot}
       header={
         <CompoundEventHeader

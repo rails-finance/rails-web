@@ -74,8 +74,20 @@ export function sparkPositionContent(opts: {
       text: "Σ (collateral value × its liquidation threshold) ÷ debt value, at SparkLend's oracle prices. Below 1 the account can be liquidated.",
     },
     {
+      bold: "spTokens",
+      text: "a supply is held as spTokens, SparkLend's receipt for it (spWETH for WETH). Their balance grows as interest accrues, with no event of its own; a withdrawal burns them.",
+    },
+    {
+      bold: "Oracle",
+      text: "the price feed SparkLend reads for each asset. Every dollar figure on this card, and every liquidation, uses its price.",
+    },
+    {
+      bold: "Borrow rate",
+      text: "each reserve's variable rate follows its utilisation, the share of what is supplied to that reserve that is lent out. DAI's and USDS's rate also follows a rate Sky governance sets.",
+    },
+    {
       bold: "E-mode",
-      text: "an account can choose one category of price-correlated assets (ETH-correlated, or stablecoins); collateral inside it then counts at the category's higher loan-to-value and threshold, and only assets of that category can be borrowed.",
+      text: "an account can choose one category of price-correlated assets (ETH-correlated, or stablecoins); collateral inside it then counts at the category's higher loan-to-value and threshold, and only assets of that category can be borrowed. The card says whether this account uses one; with none, its limits are each asset's own figures.",
     },
     {
       bold: "sDAI and DAI",

@@ -6,7 +6,8 @@
 // to rails-server `api/src/services/fixtures/aave-v3-flow-legs.json`. Each case
 // is served timeline rows (`/api/aave-v3/timeline?swaps=1`, swaps merged, chain
 // balances attached) and the token names and decimals the index holds. The
-// fixture states, per event, the legs `aaveV3EventLegs` gives, and for a whole
+// fixture states, per event, the legs `aaveV3FlowLegs` gives (the ledger's
+// `aaveV3EventLegs` with a repay made with aTokens' collateral leg), and for a whole
 // history the state after each active day. This test runs the web's own
 // transform and classifier over the rows and must give the fixture's answer;
 // the server's test runs its port over the same rows and must give the same.
@@ -22,8 +23,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import type { V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
-import { aaveV3EventLegs, aaveV3LiquidationTxs } from "@/lib/aave-v3/chain-truth-tower";
-import { aaveV3FlowEvents, AAVE_V3_FLOW_BUCKETS } from "@/lib/aave-v3/flows-timeline";
+import { aaveV3LiquidationTxs } from "@/lib/aave-v3/chain-truth-tower";
+import { aaveV3FlowEvents, aaveV3FlowLegs, AAVE_V3_FLOW_BUCKETS } from "@/lib/aave-v3/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import { dayStates, type DayState } from "./lib/flow-day-states";
 
@@ -70,7 +71,7 @@ function answer(f: Fixture, c: Case): { legs: Record<string, Leg[]>; days?: DayS
   const { events } = aaveV3RowsToEvents(c.rows, c.wallet, metasOf(f));
   const liq = aaveV3LiquidationTxs(events);
   const legs: Record<string, Leg[]> = {};
-  for (const ev of events) legs[ev.id] = aaveV3EventLegs(ev, liq).map((l) => clean(l as Leg));
+  for (const ev of events) legs[ev.id] = aaveV3FlowLegs(ev, liq).map((l) => clean(l as Leg));
   if (!c.whole) return { legs };
   // No today's prices: every leg in a whole case carries its block's price.
   const flows = aaveV3FlowEvents(events, undefined);
@@ -92,7 +93,7 @@ if (process.env.WRITE === "1") {
   input.about =
     "Aave V3 flow legs, shared by rails-web scripts/verify/verify-aave-v3-flow-legs.ts and rails-server " +
     "api/src/services/aave-v3-flow-series.test.ts. Byte-identical in both repos. Rows from victoria's " +
-    "/api/aave-v3/timeline?swaps=1 on 2026-09-29; answers from the web's aaveV3EventLegs.";
+    "/api/aave-v3/timeline?swaps=1 on 2026-09-29; answers from the web's aaveV3FlowLegs.";
   writeFileSync(FIXTURE, JSON.stringify(input, null, 1) + "\n");
   console.log(`wrote ${FIXTURE}: ${createHash("sha256").update(readFileSync(FIXTURE)).digest("hex")}`);
 } else {
@@ -120,6 +121,7 @@ if (process.env.WRITE === "1") {
       "liquidatedDebt",
       "writtenOff",
       "soldToRepay",
+      "usedToRepay",
       "withdrawnSwapped",
       "swappedOut",
       "transferredIn",

@@ -57,6 +57,11 @@ export interface PoolFlows {
    *  each transfer's block. */
   transferredIn: number;
   transferredOut: number;
+  /** The share counts behind `transferredIn` / `transferredOut`, where every
+   *  transfer in the pool was a loaded row. Null where part of them sits in an
+   *  opening balance, which carries values but no share counts. */
+  sharesIn: number | null;
+  sharesOut: number | null;
   /** A share transfer in this pool has no value: the index holds no rate for
    *  its block (or the answer predates the rate). Without it the principal does
    *  not bracket the claim — a received share redeemed later reads as a
@@ -74,6 +79,8 @@ const emptyFlows = (pool: string, assetSymbol: string): PoolFlows => ({
   withdrawn: 0,
   transferredIn: 0,
   transferredOut: 0,
+  sharesIn: 0,
+  sharesOut: 0,
   sharesMoved: false,
 });
 
@@ -94,9 +101,13 @@ function replayMapleLifetime(events: BaseActivityEvent[]): Map<string, PoolFlows
     if (SHARE_TRANSFERS.has(ctx.eventType)) {
       const f = get(ctx.pool, ctx.assetSymbol);
       const value = ctx.transferValue == null ? NaN : Number(ctx.transferValue);
+      const shares = Math.abs(Number(ctx.sharesDelta ?? "NaN"));
       if (!Number.isFinite(value)) f.sharesMoved = true;
       else if (ctx.eventType === "transfer_in") f.transferredIn += value;
       else f.transferredOut += value;
+      if (ctx.eventType === "transfer_in")
+        f.sharesIn = Number.isFinite(shares) && f.sharesIn != null ? f.sharesIn + shares : null;
+      else f.sharesOut = Number.isFinite(shares) && f.sharesOut != null ? f.sharesOut + shares : null;
       continue;
     }
     const mag = Math.abs(Number(ctx.assetsDelta ?? "0"));
@@ -190,6 +201,9 @@ export function mapleLifetimeWithOpening(
     }
     const f = get(bucket.key, maplePoolOf(bucket.key).assetSymbol);
     for (const leg of LEGS) f[leg] += scaled[leg] ?? 0;
+    // The summary values its transfers but does not count their shares.
+    if ((scaled.transferredIn ?? 0) > 0) f.sharesIn = null;
+    if ((scaled.transferredOut ?? 0) > 0) f.sharesOut = null;
     const unvalued = bucket.legs.unvaluedTransfers;
     if (unvalued !== undefined && unvalued !== "0") f.sharesMoved = true;
   }
@@ -198,6 +212,8 @@ export function mapleLifetimeWithOpening(
     if (unscalable.has(pool)) continue;
     const f = get(pool, windowFlows.assetSymbol);
     for (const leg of LEGS) f[leg] += windowFlows[leg];
+    f.sharesIn = f.sharesIn != null && windowFlows.sharesIn != null ? f.sharesIn + windowFlows.sharesIn : null;
+    f.sharesOut = f.sharesOut != null && windowFlows.sharesOut != null ? f.sharesOut + windowFlows.sharesOut : null;
     f.sharesMoved ||= windowFlows.sharesMoved;
   }
 
@@ -289,6 +305,56 @@ export interface MapleCardCaptions {
    *  says so and leaves the figure to the Lifetime flows panel. Never set
    *  beside `interestEarned`. */
   interestWithdrawn: boolean;
+  /** Interest earned in pools the claim no longer holds any of (a pool the
+   *  wallet has left), one line per asset, so the card's interest figure
+   *  covers every token the position earned in. */
+  earnedElsewhere: { amount: number; symbol: string }[];
+}
+
+/** One pool's lifetime flows as the Lifetime flows explanation states them,
+ *  each in the pool's own asset. Only pools whose flows reconcile with the
+ *  claim. */
+export interface MaplePoolFlowSummary {
+  pool: string;
+  poolSymbol: string;
+  assetSymbol: string;
+  deposited: number;
+  withdrawn: number;
+  /** Shares received by transfer, valued at the pool rate in each block. */
+  received: number;
+  /** The share count received, where every transfer is a loaded row. */
+  receivedShares: number | null;
+  sent: number;
+  sentShares: number | null;
+  /** The claim now (0 for a pool the wallet has left). */
+  held: number;
+  /** Lifetime interest, where it can be stated. */
+  earned: number | null;
+}
+
+export function mapleFlowSummaries(
+  view: MaplePositionView,
+  events?: BaseActivityEvent[],
+  precomputedLifetime?: Map<string, PoolFlows>,
+): MaplePoolFlowSummary[] {
+  const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayMapleLifetime(events) : null);
+  if (!lifetime) return [];
+  const earned = new Map(lifetimeInterest(view, lifetime).map((i) => [i.pool, i.earned]));
+  return [...lifetime.values()]
+    .filter((f) => poolReconciles(view, f))
+    .map((f) => ({
+      pool: f.pool,
+      poolSymbol: maplePoolOf(f.pool).symbol,
+      assetSymbol: f.assetSymbol,
+      deposited: f.deposited,
+      withdrawn: f.withdrawn,
+      received: f.transferredIn,
+      receivedShares: f.sharesIn,
+      sent: f.transferredOut,
+      sentShares: f.sharesOut,
+      held: heldIn(view, f.pool),
+      earned: earned.get(f.pool) ?? null,
+    }));
 }
 
 export function computeMapleCardCaptions(
@@ -315,7 +381,14 @@ export function computeMapleCardCaptions(
     lifetime != null &&
     lifetimeInterest(view, lifetime).some((i) => i.earned >= CAPTION_FLOOR) &&
     live.every((p) => p.currentValue != null && p.currentValue < CAPTION_FLOOR);
-  return { interestEarned, interestWithdrawn };
+  // Pools the wallet has left, whose interest the claim above no longer holds.
+  const earnedElsewhere =
+    interestEarned != null && lifetime != null
+      ? lifetimeInterest(view, lifetime)
+          .filter((i) => i.held < CAPTION_FLOOR && i.earned >= CAPTION_FLOOR && i.pool !== live[0]?.pool)
+          .map((i) => ({ amount: i.earned, symbol: i.symbol }))
+      : [];
+  return { interestEarned, interestWithdrawn, earnedElsewhere };
 }
 
 export function computeMapleEconomics(
@@ -393,6 +466,25 @@ export function computeMapleEconomics(
       }))
     : [];
 
+  // A pool the wallet has left keeps a claim line at 0 where the panel lists
+  // more than one asset (the list form), so every pool in the flows below
+  // shows on the panel's face. A one-asset panel draws bars and has no list.
+  if (new Set(okFlows.map((f) => f.assetSymbol)).size > 1) {
+    const heldPools = new Set(claimLines.map((l) => l.key));
+    claimLines = [
+      ...claimLines,
+      ...okFlows
+        .filter((f) => !heldPools.has(f.pool))
+        .map((f) => ({
+          key: f.pool,
+          symbol: f.assetSymbol,
+          amount: 0,
+          usd: null,
+          prov: positionCurrentValueProv(f.assetSymbol, maplePoolOf(f.pool).symbol),
+        })),
+    ];
+  }
+
   // Lifetime inflow (the faded side bar) — a token amount is only meaningful
   // when one pool flowed, else suppressed. Shares received ride `received`,
   // which the tower adds to the bar.
@@ -426,10 +518,7 @@ export function computeMapleEconomics(
     // and a lender has no debt axis at all, so the empty Debt column goes too.
     collateralListLabel: "Pool claim",
     debtAxisAbsent: true,
-    interestNote:
-      "The claim column shows what the position would redeem for now: its pool shares valued at the pool's exit rate. The amount above what was put in is interest earned; shares received or sent by transfer count at the pool rate in their block. Amounts stay in the pool's own asset, USDC or USDT — pinning a stablecoin to a dollar would hide exactly the depeg the token amounts exist to reveal. One caveat rides the value: it rests on a loan book whose collateral is held off-chain, so it shows what Maple's books record rather than something the chain itself can prove." +
-      (earned.length > 0
-        ? ""
-        : " Interest earned appears when a pool's flows reconcile with its claim and every share transfer is valued."),
+    // No grey note under the list: the Explanation beneath the panel says
+    // what the figures are and which of them the chain proves.
   };
 }

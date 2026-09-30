@@ -17,8 +17,9 @@
 //     non-modal sheet Apple and Material both reserve for filters that apply
 //     as you go, as opposed to the Apply-button modal a commerce filter uses.
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
+import { X } from "lucide-react";
 import { OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
 
 type MobileSheetMode = "modal" | "live";
@@ -32,6 +33,10 @@ interface MobileSheetProps {
   /** Pinned above the scrolling body — a heading row, a live count — so a
    *  long option list scrolls underneath it rather than carrying it away. */
   header?: React.ReactNode;
+  /** A drag handle at the top edge (dragging it down closes the sheet) and a
+   *  close button in the top corner, for a sheet whose content is not a menu
+   *  a tap on an option closes (the Lifetime flows panel). */
+  dismiss?: boolean;
   children: React.ReactNode;
 }
 
@@ -75,8 +80,14 @@ export function MobileSheetFilterHeader({
  *  slide animate rather than snap into place: the panel first lays out
  *  off-screen (translate-y-full), then `visible` flips so the transform
  *  transition has a starting style to run from. */
-export function MobileSheet({ label, onClose, mode = "modal", header, children }: MobileSheetProps) {
+/** How far, in px, the handle must be dragged down to close the sheet. */
+const DRAG_CLOSE_PX = 80;
+
+export function MobileSheet({ label, onClose, mode = "modal", header, dismiss = false, children }: MobileSheetProps) {
   const [visible, setVisible] = useState(false);
+  // The handle's drag: how far down the sheet follows the finger.
+  const [drag, setDrag] = useState(0);
+  const dragFrom = useRef<number | null>(null);
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const live = mode === "live";
@@ -103,7 +114,9 @@ export function MobileSheet({ label, onClose, mode = "modal", header, children }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      // A press already spent closing an (i) panel inside the sheet
+      // (use-escape-close.ts) leaves the sheet open.
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -122,6 +135,20 @@ export function MobileSheet({ label, onClose, mode = "modal", header, children }
       document.body.style.overflow = prev;
     };
   }, []);
+
+  const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    dragFrom.current = e.clientY;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onHandleMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragFrom.current != null) setDrag(Math.max(0, e.clientY - dragFrom.current));
+  };
+  const onHandleUp = () => {
+    if (dragFrom.current == null) return;
+    dragFrom.current = null;
+    if (drag > DRAG_CLOSE_PX) close();
+    else setDrag(0);
+  };
 
   // Focus goes into the sheet on open.
   useEffect(() => {
@@ -155,9 +182,36 @@ export function MobileSheet({ label, onClose, mode = "modal", header, children }
         // rb-800 cards beneath it.
         className={`absolute inset-x-0 bottom-0 flex flex-col rounded-t-2xl bg-raised dark:bg-rb-900 p-6 shadow-xl transition-transform duration-300 focus:outline-none ${
           live ? "max-h-[50vh] border-t border-rb-300 dark:border-rb-700" : "max-h-[75vh]"
-        } ${visible ? "translate-y-0" : "translate-y-full"}`}
-        style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
+        } ${visible ? "translate-y-0" : "translate-y-full"} ${dismiss ? "pt-2" : ""}`}
+        style={{
+          paddingBottom: "max(24px, env(safe-area-inset-bottom))",
+          ...(drag > 0 && visible ? { transform: `translateY(${drag}px)`, transition: "none" } : {}),
+        }}
       >
+        {dismiss && (
+          <>
+            <div
+              className="-mx-6 -mt-2 mb-2 flex h-6 shrink-0 cursor-grab touch-none items-center justify-center"
+              onPointerDown={onHandleDown}
+              onPointerMove={onHandleMove}
+              onPointerUp={onHandleUp}
+              onPointerCancel={onHandleUp}
+              aria-hidden="true"
+              data-sheet-handle=""
+            >
+              <span className="h-1 w-10 rounded-full bg-rb-300 dark:bg-rb-600" />
+            </div>
+            <button
+              type="button"
+              onClick={close}
+              aria-label="Close"
+              className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-md text-rb-500 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400"
+              data-sheet-close=""
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </>
+        )}
         {header}
         <div className="min-h-0 overflow-y-auto">{children}</div>
       </div>

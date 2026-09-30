@@ -26,8 +26,9 @@ import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-t
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { ledgerFieldProv, liquidatorProv, transferProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
-import { crChipText, polarisCrAtEvent, polarisCrReceipt } from "@/lib/polaris/cr-at-event";
+import { CR_CHIP_TITLE, crChipText, polarisCrAtEvent, polarisCrReceipt } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
+import { formatNumber } from "@/lib/utils/format";
 
 export interface PolarisEventHeaderProps {
   actionLabel: string;
@@ -65,7 +66,7 @@ export function PolarisEventHeader({
   const ratioChip = cr
     ? (() => {
         const r = polarisCrReceipt(ctx, coords, cr);
-        return { text: crChipText(cr.pct), value: r.value, belowMin: cr.belowMin, prov: r.info };
+        return { text: crChipText(cr.pct), value: r.value, belowMin: cr.belowMin, prov: r.info, title: CR_CHIP_TITLE };
       })()
     : undefined;
   const dColl = num(ctx.collChange);
@@ -88,22 +89,30 @@ export function PolarisEventHeader({
   // mints/redemptions. Not an axis verb (no holder chose it) and no spine
   // counterpart (the spine draws the holder's own flows only), so the
   // header keeps the figure at ≥sm.
+  // The share is the NET of every mint and redemption since the CDP's
+  // previous touch, so its two sides can carry opposite signs: one name for
+  // the pair, on the first leg, and each side signed by what it did.
   const pushPsmLegs = (): void => {
-    if (mrColl !== 0)
+    let named = false;
+    const signed = (v: number): string => `${v < 0 ? "−" : "+"}${formatNumber(Math.abs(v))}`;
+    if (mrColl !== 0) {
       deltas.push({
         value: mrColl,
         symbol: PETH.symbol,
         address: PETH.address,
-        label: mrColl > 0 ? "PSM added" : "PSM redeemed",
+        label: "Net PSM share",
+        display: signed(mrColl),
         prov: ledgerFieldProv("mintRedeemCollGain", coords, ctx.raw?.mintRedeemCollGain),
         noSpineCounterpart: true,
       });
+      named = true;
+    }
     if (mrDebt !== 0)
       deltas.push({
         value: mrDebt,
         symbol: stable,
         address: stableAddr,
-        label: mrDebt > 0 ? "PSM minted" : "PSM cleared",
+        ...(named ? {} : { label: "Net PSM share", display: signed(mrDebt) }),
         prov: ledgerFieldProv("mintRedeemDebtGain", coords, ctx.raw?.mintRedeemDebtGain),
         noSpineCounterpart: true,
       });
@@ -165,6 +174,15 @@ export function PolarisEventHeader({
       break;
   }
 
+  // One rounding rule for a figure wherever it appears — the row, the spine,
+  // the opened grid and the card all state it in full to three decimals —
+  // and each amount names its token in words beside the glyph.
+  const shown: ChainTruthDelta[] = deltas.map((d) => ({
+    ...d,
+    display: d.display ?? formatNumber(Math.abs(d.value)),
+    suffix: d.symbol,
+  }));
+
   const party =
     ctx.eventType === "liquidate" && ctx.liquidator
       ? { prefix: "liquidated by", address: ctx.liquidator, prov: liquidatorProv(coords) }
@@ -183,7 +201,7 @@ export function PolarisEventHeader({
         label: isOpen ? "Open" : isAdjust && holderDeltaCount > 0 ? "" : actionLabel,
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidate",
-        deltas,
+        deltas: shown,
         party,
         ratioChip,
       }}

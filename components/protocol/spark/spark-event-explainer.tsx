@@ -25,6 +25,7 @@ import { sparkEventSlots } from "@/lib/spark/explainer-clauses";
 import type { AaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import { useSparkEventState } from "./use-spark-event-state";
+import { LtvWeightingNote } from "@/components/protocol/aave-v3/aave-v3-position-state";
 
 export interface SparkEventExplainerProps {
   ctx: SparkContext;
@@ -87,6 +88,11 @@ export function SparkEventExplainer({
     sparkEventSlots(ctx, coords, { owner, siblings, state: read.state, previousEvent: previous?.event }),
   );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
+  // The health-factor bullet needs the account reads; say so when they failed.
+  if (read.status === "unavailable" && !read.lasting)
+    items.push(<>The health factor before and after this transaction was not read. Reload to try again.</>);
+  // How the card's LTV and its limits are figured, where the account read landed.
+  if (read.status === "ready") items.push(<LtvWeightingNote brand="Spark" />);
 
   return <ProseExplainer items={items} />;
 }

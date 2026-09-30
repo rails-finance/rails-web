@@ -51,7 +51,7 @@ function legUsd(view: CompoundV2PositionView, market: string, amount: number): n
 function tokenWithUsd(view: CompoundV2PositionView, market: string, amount: number, symbol: string): string {
   const u = legUsd(view, market, amount);
   const fixed = view.priceFixedByMarket?.[market] === true;
-  return `${amt(amount)} ${symbol}${u != null ? ` (${usd(u)}${fixed ? " — oracle price is a stored constant, no feed" : ""})` : ""}`;
+  return `${amt(amount)} ${symbol}${u != null ? ` (${usd(u)}${fixed ? " — a fixed price set by governance, no feed" : ""})` : ""}`;
 }
 
 export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArgs): string {
@@ -163,7 +163,7 @@ export function compoundV2PositionToMarkdown(args: CompoundV2PositionMarkdownArg
                 ? `, collateral disabled`
                 : "") +
             (m.priceUsd != null
-              ? `, oracle price ${usd(m.priceUsd)}${m.priceHasFeed ? "" : " (stored constant, no feed)"}`
+              ? `, oracle price ${usd(m.priceUsd)}${m.priceHasFeed ? "" : " (a fixed price set by governance, no feed)"}`
               : ""),
         );
       }

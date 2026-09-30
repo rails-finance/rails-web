@@ -43,6 +43,15 @@ export interface LiquityForkCoords {
 
 /** Operand values for the delta reconstructions — pass the emitted after and
  *  the reconstructed previous-event value so the receipt traces both. */
+/** A Liquidation log leg a fork row states. */
+export type LiquityForkLiquidationLeg =
+  | "offset"
+  | "redistributed"
+  | "surplus"
+  | "collToPool"
+  | "collRedistributed"
+  | "gasComp";
+
 export interface DeltaOps {
   after?: number | string | null;
   before?: number | string | null;
@@ -52,6 +61,11 @@ export interface DeltaOps {
   fromOperation?: number | string | null;
   /** The event is a redemption, whose TroveOperation the redemption emitter logs. */
   redemption?: boolean;
+  /** The act's own collateral move, TroveOperation `_collChangeFromOperation`
+   *  (human, signed). Present where a redistribution landed on the same touch,
+   *  so the collateral receipt names the act's field and leaves the inherited
+   *  collateral to its own receipt. */
+  collFromOperation?: number | string | null;
 }
 
 /** A lifetime gross flow — the sum of one kind of signed delta across the
@@ -177,7 +191,54 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
 
   // ── Header: the signed collateral / debt this event applied ────────────────
 
-  const collDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance => ({
+  const collDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance =>
+    ops?.collFromOperation != null ? collMoveProv(coords, ops) : collNetDeltaProv(coords, ops, origin);
+
+  /** The act's own collateral move, where a redistribution shares the touch. */
+  const collMoveProv = (coords: LiquityForkCoords, ops: DeltaOps): Provenance => ({
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary: `Collateral moved by this act — the amount the contract logged for the operation. Collateral passed on from a liquidated Trove on the same touch is logged as a separate figure.`,
+    contract: troveManagerContract(coords),
+    via: `${streamVia()} · TroveOperation log · _collChangeFromOperation · ÷10^${collDecimals(coords)}`,
+    inputs: [
+      {
+        label: "coll from operation",
+        value: opVal(ops.collFromOperation),
+        kind: "chain",
+        pclass: "emitted",
+        note: "_collChangeFromOperation",
+      },
+      ...eventInputs(coords),
+    ],
+  });
+
+  /** A liquidated neighbour's redistribution, applied to this Trove on this
+   *  touch — TroveOperation's own redistribution legs. */
+  const redistProv = (coords: LiquityForkCoords, vals: { leg: "debt" | "coll"; amount: string }): Provenance => ({
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(coords),
+    summary:
+      vals.leg === "debt"
+        ? `${cfg.stablecoin} debt this Trove received from a liquidation on its branch — the part of a liquidated Trove's debt the Stability Pool could not absorb, shared among the branch's other Troves in proportion to their collateral, and added to this Trove when it was next touched.`
+        : `Collateral this Trove received from a liquidation on its branch, with the debt above — the liquidated Trove's collateral that went with its redistributed debt, shared in the same proportion.`,
+    contract: troveManagerContract(coords),
+    via: `${streamVia()} · TroveOperation log · ${vals.leg === "debt" ? "_debtIncreaseFromRedist · ÷10^18" : `_collIncreaseFromRedist · ÷10^${collDecimals(coords)}`}`,
+    inputs: [
+      {
+        label: vals.leg === "debt" ? "_debtIncreaseFromRedist" : "_collIncreaseFromRedist",
+        value: vals.amount,
+        kind: "chain",
+        pclass: "emitted",
+        note: vals.leg === "debt" ? cfg.stablecoin : collSym(coords),
+      },
+      ...eventInputs(coords),
+    ],
+  });
+
+  const collNetDeltaProv = (coords: LiquityForkCoords, ops?: DeltaOps, origin?: OriginEnvelope | null): Provenance => ({
     kind: "chain-derived",
     pclass: "indexed",
     verify: txVerify(coords),
@@ -605,9 +666,24 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
    *  only where the transaction liquidated this Trove alone. */
   const liquidationLegProv = (
     coords: LiquityForkCoords,
-    vals: { leg: "offset" | "redistributed" | "surplus"; amount: string },
+    vals: { leg: LiquityForkLiquidationLeg; amount: string },
   ): Provenance => {
     const legs = {
+      collToPool: {
+        param: "_collSentToSP",
+        unit: collSym(coords),
+        summary: `Collateral sent to the Stability Pool — what the pool's depositors received for the debt they absorbed: that debt plus the branch's pool liquidation penalty, at the branch's price.`,
+      },
+      collRedistributed: {
+        param: "_collRedistributed",
+        unit: collSym(coords),
+        summary: `Collateral redistributed — what went with the redistributed debt to the branch's other Troves: that debt plus the branch's redistribution penalty, at the branch's price.`,
+      },
+      gasComp: {
+        param: "_collGasCompensation",
+        unit: collSym(coords),
+        summary: `Gas compensation — the small part of the collateral paid to the liquidator.`,
+      },
       offset: {
         param: "_debtOffsetBySP",
         unit: cfg.stablecoin,
@@ -630,7 +706,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       verify: txVerify(coords),
       summary: legs.summary,
       contract: troveManagerContract(coords),
-      via: `${streamVia()} · Liquidation log · ${legs.param} · ÷10^${vals.leg === "surplus" ? collDecimals(coords) : 18}`,
+      via: `${streamVia()} · Liquidation log · ${legs.param} · ÷10^${vals.leg === "offset" || vals.leg === "redistributed" ? 18 : collDecimals(coords)}`,
       inputs: [
         { label: legs.param, value: vals.amount, kind: "chain", pclass: "emitted", note: legs.unit },
         ...eventInputs(coords),
@@ -646,20 +722,37 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   ): Provenance => ({
     kind: "chain-derived",
     pclass: "oracle",
-    formula: "seized ÷ cleared − 1",
+    formula: "collateral value ÷ cleared debt",
     verify: txVerify(coords),
-    summary: `Premium over the cleared debt — the Trove's collateral ratio at liquidation less 100%, measured on the balances logged at its previous change. It is the most the liquidation could pass on: the contract pays the liquidator a small part of the collateral, gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) at most the debt plus the branch's liquidation penalty, and leaves anything above that for the owner to claim.${
+    summary: `Collateral ratio at liquidation — the Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
       vals.mcrPct != null
-        ? ` A Trove can be liquidated only below the branch's minimum collateral ratio of ${vals.mcrPct}%, so this figure tops out near +${Math.round(vals.mcrPct - 100)}%.`
+        ? ` A Trove can be liquidated only below the branch's minimum collateral ratio of ${vals.mcrPct}%.`
         : ""
     }`,
     contract: troveManagerContract(coords),
-    via: "seized ÷ cleared − 1",
+    via: "collateral × price ÷ cleared debt",
     inputs: [
-      { label: "seized", value: vals.seizedUsd, kind: "chain", note: "collateral × price at block" },
+      { label: "collateral value", value: vals.seizedUsd, kind: "chain", note: "collateral × price at block" },
       { label: "cleared", value: vals.clearedUsd, kind: "chain", note: "debt at $1 face" },
       ...eventInputs(coords),
     ],
+  });
+
+  /** A branch's liquidation penalty — the constant the branch applies to the
+   *  debt the Stability Pool absorbs, or to the debt it redistributes. Where
+   *  the fork's catalogue carries a chain read of it. */
+  const liqPenaltyProv = (
+    coords: LiquityForkCoords,
+    vals: { which: "pool" | "redistribution"; pct: string; source: string },
+  ): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    summary:
+      vals.which === "pool"
+        ? `The branch's liquidation penalty on debt the Stability Pool absorbs: the pool receives that debt plus this share of it, in collateral at the branch's price.`
+        : `The branch's liquidation penalty on redistributed debt: the other Troves receive that debt plus this share of it, in collateral at the branch's price.`,
+    via: vals.source,
+    inputs: [{ label: "penalty", value: vals.pct, kind: "chain", pclass: "state" }, ...eventInputs(coords)],
   });
 
   // ── Position card + economics tower: the Trove's latest logged state ───────
@@ -999,6 +1092,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     liqClearedFaceProv,
     liqPremiumProv,
     liquidationLegProv,
+    liqPenaltyProv,
+    redistProv,
     positionCollateralProv,
     positionDebtProv,
     positionRateProv,

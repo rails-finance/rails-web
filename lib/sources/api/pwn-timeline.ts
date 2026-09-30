@@ -190,6 +190,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
       dueValue: r.due_value ?? undefined,
       originalDefaultTimestamp: r.original_default_timestamp ?? undefined,
       extendedDefaultTimestamp: r.extended_default_timestamp ?? undefined,
+      extendedBy: kind === "extended" ? (r.tx_from?.toLowerCase() ?? undefined) : undefined,
       defaulted: kind === "claimed" ? (r.defaulted ?? undefined) : undefined,
       isOpen: kind === "created",
     };

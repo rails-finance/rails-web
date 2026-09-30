@@ -65,6 +65,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-operator-denominator.mjs
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
 
@@ -202,6 +203,8 @@ async function openAndRead(deadlineMs = 25_000) {
   let idx = -1;
   let opened = 0;
   while (Date.now() < deadline) {
+    // A closed position card (ui-jobs 209) holds its Explanation row back.
+    await openPositionCards(page, 2000);
     const collapsed = page.locator(SHOW);
     if ((await collapsed.count()) > 0) {
       await collapsed

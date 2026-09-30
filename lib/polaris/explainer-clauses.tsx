@@ -50,6 +50,7 @@ import { PETH, POLARIS_CHAIN_ID, shortAddress } from "@/lib/polaris/asset-catalo
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatGasCost } from "@/lib/shared/format-event";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 
 const EPS = 1e-9;
 
@@ -59,6 +60,10 @@ const num = (s?: string): number => {
 };
 const fmt = (h?: string): string => formatNumber(Math.abs(Number(h)));
 const pct = (f: number): string => `${(f * 100).toFixed(2)}%`;
+/** An amount to six decimals at most, trailing zeros dropped: the open's
+ *  collateral and escrow read as the sum the holder sent (0.0125 + 0.0375 =
+ *  0.05), which three decimals would round apart. */
+const upTo6 = (n: number): string => n.toLocaleString("en-US", { maximumFractionDigits: 6 });
 
 function Fig({
   info,
@@ -161,15 +166,16 @@ function valuedLiquidationClauses(ctx: PolarisContext, coords: PolarisCoords, st
       })}
       value={pct(f.icrAtFire)}
     >
-      {pct(f.icrAtFire)}
+      {formatPolarisRatio(f.icrAtFire, 1, POLARIS_LIQ_CONSTANTS.mcr.fraction)}
     </Fig>
   );
   return [
     clause(
       <>
         At the feed&rsquo;s price at that block the {holder}&rsquo;s {legFigure} came to {legValueFigure} against{" "}
-        {clearedFigure} of debt cleared — a premium of {premiumFigure}, the protocol&rsquo;s own liquidation penalty of{" "}
-        {constant.label}.
+        {clearedFigure} of debt cleared — a premium of {premiumFigure}, the protocol&rsquo;s liquidation penalty of{" "}
+        {constant.label}. The penalty is the owner&rsquo;s cost: the CDP&rsquo;s collateral pays it to the {holder}, and
+        it comes out of what the owner could have kept as surplus.
       </>,
     ),
     clause(
@@ -255,31 +261,58 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
     gain > EPS ? clause(<>It credited {legFig("stableGain", stable)} of stability gains against the debt.</>) : null,
     reward > EPS ? clause(<>It added {legFig("bcTokenGain", "pETH")} of reward pETH to the collateral.</>) : null,
     Math.abs(mrColl) > EPS || Math.abs(mrDebt) > EPS
-      ? clause(
-          <>
-            The market&rsquo;s PSM activity since its last touch moved this CDP&rsquo;s share:{" "}
-            {Math.abs(mrColl) > EPS ? (
-              <>
-                {legFig("mintRedeemCollGain", "pETH")} {mrColl > 0 ? "in" : "out"} on the collateral side
-              </>
-            ) : null}
-            {Math.abs(mrColl) > EPS && Math.abs(mrDebt) > EPS ? " and " : ""}
-            {Math.abs(mrDebt) > EPS ? (
-              <>
-                {legFig("mintRedeemDebtGain", stable)} {mrDebt > 0 ? "added to" : "cleared from"} the debt
-              </>
-            ) : null}
-            .
-          </>,
-        )
+      ? (() => {
+          // The share is the net of every mint and redemption since the
+          // previous touch: each side is stated with its own sign, and the
+          // pair is never named after one of the two trades.
+          const signedLeg = (field: "mintRedeemCollGain" | "mintRedeemDebtGain", v: number, unit: string) => (
+            <Fig info={ledgerFieldProv(field, coords, ctx.raw?.[field])} value={fmt(ctx[field])}>
+              {v < 0 ? "−" : "+"}
+              {fmt(ctx[field])} {unit}
+            </Fig>
+          );
+          const hasDebtLeg = Math.abs(mrDebt) > EPS;
+          const hasCollLeg = Math.abs(mrColl) > EPS;
+          const opposite = hasDebtLeg && hasCollLeg && Math.sign(mrDebt) !== Math.sign(mrColl);
+          return clause(
+            <>
+              Since its previous touch traders minted and redeemed {stable} at the market&rsquo;s PSM; this CDP&rsquo;s
+              net pro-rata share of all of it came to{" "}
+              {hasDebtLeg ? <>{signedLeg("mintRedeemDebtGain", mrDebt, stable)} on its debt</> : null}
+              {hasDebtLeg && hasCollLeg ? " and " : ""}
+              {hasCollLeg ? <>{signedLeg("mintRedeemCollGain", mrColl, "pETH")} on its collateral</> : null}.
+              {opposite
+                ? " Mints add to both sides and redemptions take from both, so a net share over a stretch holding both can move the two sides in opposite directions; the trades’ fees make the sizes differ."
+                : ""}
+            </>,
+          );
+        })()
       : null,
     zeroMint > EPS
-      ? clause(
-          <>
-            Its pending gains exceeded the remaining debt, so the protocol minted{" "}
-            {legFig("stablesMintedToEnsureZeroDebt", stable)} to settle it exactly to zero.
-          </>,
-        )
+      ? (() => {
+          // What the reader can check: the debt before the net share (the
+          // previous debt, the holder's change, the interest, less the
+          // stability gain), the share that cleared more than that, and the
+          // difference the protocol adds so the debt lands on zero.
+          const owedBefore = num(ctx.debtBefore) + dDebt + interest - gain;
+          const cleared = -mrDebt;
+          return clause(
+            cleared > owedBefore + EPS ? (
+              <>
+                Its net PSM share cleared <AmountText value={cleared} /> {stable}, more than the{" "}
+                <AmountText value={Math.max(0, owedBefore)} /> {stable} it owed before the share (
+                <AmountText value={num(ctx.debtBefore) + dDebt + interest} /> {stable} with interest, less the stability
+                gain), so the protocol added {legFig("stablesMintedToEnsureZeroDebt", stable)} to the debt to settle it
+                to zero rather than below.
+              </>
+            ) : (
+              <>
+                Its pending gains exceeded the remaining debt, so the protocol added{" "}
+                {legFig("stablesMintedToEnsureZeroDebt", stable)} to the debt to settle it to zero rather than below.
+              </>
+            ),
+          );
+        })()
       : null,
   ];
 
@@ -291,7 +324,7 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
             <Fig info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={pct(ctx.primaryRate)}>
               {pct(ctx.primaryRate)}
             </Fig>{" "}
-            per year — set by the market, not chosen by the holder.
+            per year, set by the market.
           </>,
         )
       : null;
@@ -327,8 +360,10 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
         meansNow: [
           clause(
             <>
-              Its collateral is pETH and its debt is {stable}; a fixed gas compensation in pETH is escrowed alongside
-              for a liquidator, returned on close.
+              Its collateral is pETH and its debt is {stable}. The holder sent{" "}
+              {upTo6(dColl + POLARIS_LIQ_CONSTANTS.gasComp.amount)} pETH: {upTo6(dColl)} pETH is the collateral, and the
+              fixed {POLARIS_LIQ_CONSTANTS.gasComp.label} is gas compensation the CDP holds in escrow, returned on close
+              or paid to the liquidator if the CDP is liquidated.
             </>,
           ),
           rateClause(),
@@ -407,6 +442,30 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
           <AmountText value={seized} /> pETH
         </Fig>
       );
+      // The pool's share of the seizure: what is left once the redistributed
+      // collateral, the owner's surplus and the liquidator's share are out.
+      const poolLeg = seized - redistColl - surplus - collComp;
+      const poolFig =
+        ctx.spAbsorbed && poolLeg > EPS ? (
+          <Fig info={polarisPoolLegProv(ctx, coords)} value={formatNumber(poolLeg)} symbol={PETH.symbol}>
+            <AmountText value={poolLeg} /> pETH
+          </Fig>
+        ) : poolLeg > EPS ? (
+          <>
+            <AmountText value={poolLeg} /> pETH
+          </>
+        ) : null;
+      const liqFig = (field: "collSurplus" | "flatComp" | "collateralComp") => (
+        <Fig
+          info={liquidationFieldProv(field, coords, ctx.raw?.[field])}
+          value={field === "flatComp" ? upTo6(num(ctx[field])) : fmt(ctx[field])}
+          symbol="pETH"
+        >
+          {/* The flat compensation is a round constant: stated whole, so it
+              reads as the escrow the open row names. */}
+          {field === "flatComp" ? upTo6(num(ctx[field])) : fmt(ctx[field])} pETH
+        </Fig>
+      );
       const clearedFig = (
         <Fig
           info={liquidationFieldProv("debtLiquidated", coords, ctx.raw?.debtLiquidated)}
@@ -433,37 +492,45 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
         ],
         changed: [
           ctx.spAbsorbed
-            ? clause(
-                <>
-                  The stability pool absorbed {clearedFig} of its debt and took {seizedFig} of its collateral in
-                  exchange.
-                </>,
-              )
+            ? clause(<>The stability pool absorbed {clearedFig} of its debt.</>)
             : clause(
                 <>
-                  The stability pool absorbed {clearedFig} of its debt and took {seizedFig} of its collateral; the rest
-                  — <AmountText value={redistDebt} /> {stable} of debt with <AmountText value={redistColl} /> pETH — was
-                  redistributed across the market&rsquo;s other CDPs.
+                  The stability pool absorbed {clearedFig} of its debt; the rest — <AmountText value={redistDebt} />{" "}
+                  {stable} of debt with <AmountText value={redistColl} /> pETH — was redistributed across the
+                  market&rsquo;s other CDPs.
                 </>,
               ),
-          flat > EPS || collComp > EPS
+          // The seizure as one sum: where each part of it went.
+          clause(
+            <>
+              Of the {seizedFig} seized, {poolFig ?? <>none</>} went to the stability pool
+              {redistColl > EPS ? (
+                <>
+                  , <AmountText value={redistColl} /> pETH to the market&rsquo;s other CDPs
+                </>
+              ) : null}
+              {collComp > EPS ? (
+                <>
+                  {surplus > EPS ? ", " : " and "}
+                  {liqFig("collateralComp")} to the liquidator as its collateral compensation (0.5% of the seized
+                  collateral)
+                </>
+              ) : null}
+              {surplus > EPS ? <> and {liqFig("collSurplus")} was set aside for the owner to claim</> : null}.
+            </>,
+          ),
+          flat > EPS
             ? clause(
                 <>
-                  The liquidator received the escrowed gas compensation of <AmountText value={flat} /> pETH
-                  {collComp > EPS ? (
-                    <>
-                      {" "}
-                      plus <AmountText value={collComp} /> pETH of the collateral
-                    </>
-                  ) : null}
-                  .
+                  The liquidator also received the {liqFig("flatComp")} of gas compensation the holder sent into escrow
+                  at the open, which sits outside the seized collateral.
                 </>,
               )
             : null,
           surplus > EPS
             ? clause(
                 <>
-                  <AmountText value={surplus} /> pETH of collateral was left over for its owner to claim.
+                  The owner claims the surplus from the protocol&rsquo;s surplus pool; this page does not show claims.
                 </>,
               )
             : null,

@@ -21,22 +21,63 @@ import type { MapleCardCaptions } from "@/lib/maple/economics";
 import type { MaplePoolAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
-import { formatCompact } from "@/lib/utils/format";
+import { shortAddress } from "@/lib/maple/asset-catalog";
 import { formatCompact as bandCompact } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatDate, formatDateRange } from "@/lib/date";
+import type { MaplePoolHolding } from "@/lib/maple/row-times";
 
 /** The figure the card's claim line asserts — the current redeemable value
  *  when the chain read landed, the recorded net deposits otherwise (the same
  *  fallback the card renders). */
 const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.depositedPrincipal;
 
+/** The yield a pool's holding shows: the rate's rise over the stretches the
+ *  wallet held shares, the open one up to the exit rate at head, compounded
+ *  to a year over the days held. Null under a week held, or with no rise. */
+function yieldWindow(h: MaplePoolHolding | undefined, st: MaplePoolState) {
+  if (!h || h.stretches.length === 0 || !(st.exitRate > 0)) return null;
+  const now = Date.now() / 1000;
+  const legs: { from: number; to: number; today: boolean }[] = [];
+  let heldSec = 0;
+  // Whole days per stretch, as the header counts each stretch.
+  let heldWhole = 0;
+  let growth = 1;
+  for (const s of h.stretches) {
+    const today = s.toAt == null;
+    const to = today ? st.exitRate : s.toRate;
+    if (to == null || !(s.fromRate > 0)) return null;
+    legs.push({ from: s.fromRate, to, today });
+    heldSec += (s.toAt ?? now) - s.fromAt;
+    heldWhole += Math.floor(((s.toAt ?? now) - s.fromAt) / 86400);
+    growth *= to / s.fromRate;
+  }
+  // A pool the wallet holds now ends in an open stretch.
+  if (!legs[legs.length - 1].today) return null;
+  const days = heldSec / 86400;
+  if (days < 7 || growth <= 1) return null;
+  const gaps = h.stretches.slice(1).map((s, i) => ({ from: h.stretches[i].toAt!, to: s.fromAt }));
+  return {
+    firstAt: h.stretches[0].fromAt,
+    heldDays: heldWhole,
+    totalDays: Math.floor((now - h.stretches[0].fromAt) / 86400),
+    gaps,
+    legs,
+    rise: growth - 1,
+    yearly: Math.pow(growth, 365 / days) - 1,
+  };
+}
+
 export function MaplePositionExplanation({
   v,
   captions,
   externalActivity,
+  holdings,
+  cancelledRequests,
+  receivedPools,
 }: {
   v: MaplePositionView;
   /** The card's stat captions (earned interest) — the same computed value the
@@ -46,6 +87,13 @@ export function MaplePositionExplanation({
    *  same verdict the event cards render. The page derives it from the events
    *  already on the page; omit to skip the operator bullet. */
   externalActivity?: ExternalActorSummary;
+  /** Per pool, the stretches the wallet held shares and the rate at each
+   *  end: the window a yield figure covers. Omit to state none. */
+  holdings?: Map<string, MaplePoolHolding>;
+  /** Requests the wallet cancelled, where the page holds its whole history. */
+  cancelledRequests?: number;
+  /** The assets of the pools the wallet received shares in by transfer. */
+  receivedPools?: string[];
 }) {
   // Hooks first — the pane declines below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
@@ -93,14 +141,13 @@ export function MaplePositionExplanation({
       <span key="operators">
         {operatorLead(ext, null, "recorded on this account")}
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        this one. Another address may lend on the account&rsquo;s behalf without asking it first — a deposit needs the
-        pool&rsquo;s entry permission, and Maple&rsquo;s own deposit route grants it inside the deposit transaction —
-        but nothing can leave the position that way unless the account granted a share allowance for it. The shares
-        themselves move wallet-to-wallet as freely as any token.
+        this one: shares another wallet transferred in, or a deposit made on the account&rsquo;s behalf. Neither needs
+        the account to act. Nothing can leave the position that way unless the account first granted a share allowance:
+        a permission, signed by the account, that lets another address move up to a set number of its shares.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`
-            : " A single address accounts for all of it."
+            : ` All of it ran through one address, ${shortAddress(ext.actors[0].address)}.`
           : leadName
             ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
             : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
@@ -122,14 +169,14 @@ export function MaplePositionExplanation({
         <span key={`peak-${p.pool}`}>
           {peaks.length > 1 ? <>In the {p.assetSymbol} pool its holdings</> : <>Its holdings</>} peaked at{" "}
           <H>
-            <AmountText value={p.peakShares} format="compact" /> {p.symbol}
+            <AmountText value={p.peakShares} format="number" /> {p.symbol}
           </H>
           , the highest balance its own history records
           {p.peakDeposited > 0 ? (
             <>
               , with{" "}
               <H>
-                <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
+                <AmountText value={p.peakDeposited} format="number" /> {p.assetSymbol}
               </H>{" "}
               of deposited principal recorded at its height.
             </>
@@ -177,11 +224,11 @@ export function MaplePositionExplanation({
     <>
       This position holds{" "}
       <H>
-        <AmountText value={one.shares} format="compact" /> {one.symbol}
+        <AmountText value={one.shares} format="number" /> {one.symbol}
       </H>
       , shares in Maple&rsquo;s {one.assetSymbol} lending pool, with a claim on{" "}
       <H>
-        <AmountText value={one.currentValue} format="compact" /> {one.assetSymbol}
+        <AmountText value={one.currentValue} format="number" /> {one.assetSymbol}
       </H>
       :
     </>
@@ -189,11 +236,11 @@ export function MaplePositionExplanation({
     <>
       This position holds{" "}
       <H>
-        <AmountText value={one.shares} format="compact" /> {one.symbol}
+        <AmountText value={one.shares} format="number" /> {one.symbol}
       </H>
       , shares in Maple&rsquo;s {one.assetSymbol} lending pool, with{" "}
       <H>
-        <AmountText value={one.depositedPrincipal} format="compact" /> {one.assetSymbol}
+        <AmountText value={one.depositedPrincipal} format="number" /> {one.assetSymbol}
       </H>{" "}
       of net deposits recorded:
     </>
@@ -208,11 +255,11 @@ export function MaplePositionExplanation({
         <span key={`claim-${p.pool}`}>
           In the {p.assetSymbol} pool it holds{" "}
           <H>
-            <AmountText value={p.shares} format="compact" /> {p.symbol}
+            <AmountText value={p.shares} format="number" /> {p.symbol}
           </H>{" "}
           with a claim on{" "}
           <H>
-            <AmountText value={claimAmount(p)} format="compact" /> {p.assetSymbol}
+            <AmountText value={claimAmount(p)} format="number" /> {p.assetSymbol}
           </H>
           .
         </span>,
@@ -229,6 +276,33 @@ export function MaplePositionExplanation({
       );
     }
 
+    // A yield figure only over a window the page can name: the stretches
+    // this wallet held shares in the pool, up to today's exit rate.
+    const y = st != null ? yieldWindow(holdings?.get(p.pool), st) : null;
+    if (y) {
+      const pairs = y.legs.map((l) => `${l.from.toFixed(4)} to ${l.to.toFixed(4)}${l.today ? " today" : ""}`);
+      bullets.push(
+        <span key={`yield-${p.pool}`}>
+          {y.gaps.length === 0 ? (
+            <>
+              The wallet has held shares in {multi ? `the ${p.assetSymbol} pool` : "the pool"} since{" "}
+              {formatDate(y.firstAt)} ({y.heldDays} days), and over that time the pool&rsquo;s rate, in {p.assetSymbol}{" "}
+              per share, rose from {pairs[0]}
+            </>
+          ) : (
+            <>
+              The wallet held shares in {multi ? `the ${p.assetSymbol} pool` : "the pool"} for {y.heldDays} of the{" "}
+              {y.totalDays} days since {formatDate(y.firstAt)}; it was out of the pool{" "}
+              {y.gaps.map((g) => formatDateRange(g.from, g.to)).join(" and ")}. While it held them the pool&rsquo;s
+              rate, in {p.assetSymbol} per share, rose from {pairs.join(", then from ")}
+            </>
+          )}
+          : {(y.rise * 100).toFixed(2)}%, or about {(y.yearly * 100).toFixed(1)}% a year if that pace compounded for a
+          full year. Past rates do not set future ones.
+        </span>,
+      );
+    }
+
     if (p.escrowedShares > 0) {
       const escrowValue = st != null ? mapleExitAssets(p.escrowedSharesRaw, st) : null;
       bullets.push(
@@ -236,14 +310,14 @@ export function MaplePositionExplanation({
           {escrowValue != null ? (
             <>
               <H>
-                <AmountText value={escrowValue} format="compact" /> {p.assetSymbol}
+                <AmountText value={escrowValue} format="number" /> {p.assetSymbol}
               </H>{" "}
               of the claim sits escrowed in the withdrawal queue.
             </>
           ) : (
             <>
               <H>
-                <AmountText value={p.escrowedShares} format="compact" /> {p.symbol}
+                <AmountText value={p.escrowedShares} format="number" /> {p.symbol}
               </H>{" "}
               of the shares sit escrowed in the withdrawal queue.
             </>
@@ -261,9 +335,27 @@ export function MaplePositionExplanation({
       bullets.push(
         <span key="interest">
           <H>
-            <AmountText value={it.amount} format="compact" /> {it.symbol}
+            <AmountText value={it.amount} format="number" /> {it.symbol}
           </H>{" "}
           of that claim is interest earned to date, already included in the figure above.
+          {receivedPools && receivedPools.includes(it.symbol) && (
+            <>
+              {" "}
+              For shares the wallet received from another wallet, the interest counts from what each batch was worth
+              when it arrived.
+            </>
+          )}
+        </span>,
+      );
+    }
+    for (const e of captions?.earnedElsewhere ?? []) {
+      bullets.push(
+        <span key={`earned-${e.symbol}`}>
+          It also earned{" "}
+          <H>
+            <AmountText value={e.amount} format="number" /> {e.symbol}
+          </H>{" "}
+          in the {e.symbol} pool, which it has left: withdrawals took all of that out.
         </span>,
       );
     }
@@ -334,7 +426,15 @@ export function MaplePositionExplanation({
     bullets.push(
       <span key="requests">
         The wallet has made <H>{v.requestCount}</H> withdrawal request{v.requestCount === 1 ? "" : "s"} over its
-        lifetime.
+        lifetime
+        {cancelledRequests != null && cancelledRequests > 0 && cancelledRequests <= v.requestCount
+          ? cancelledRequests === v.requestCount
+            ? v.requestCount === 1
+              ? " and cancelled it, so the shares came back to the wallet"
+              : " and cancelled all of them, so the shares came back to the wallet"
+            : `; it cancelled ${cancelledRequests}, and those shares came back to the wallet`
+          : ""}
+        .
       </span>,
     );
   }

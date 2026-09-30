@@ -36,7 +36,13 @@
 
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
-import { shortAddress } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKETS, shortAddress } from "@/lib/compound-v2/asset-catalog";
+import {
+  COMPOUND_V2_DEPRECATED,
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  deprecationDate,
+} from "@/lib/compound-v2/deprecated-markets";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
@@ -52,6 +58,7 @@ import {
   cvKinkProv,
   cvRateProv,
   cvCollateralFactorProv,
+  cvReserveFactorProv,
 } from "@/lib/compound-v2/markets-provenance";
 import type { CompoundV2MarketRow, CompoundV2MarketsResponse } from "@/lib/sources/chain/compound-v2-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -84,7 +91,17 @@ const coordsFor = (m: CompoundV2MarketRow, block: number, oracle: string | null)
   interestRateModel: m.interestRateModel,
 });
 
+/** The catalog key for a cToken address. */
+const keyOf = (cToken: string) => COMPOUND_V2_MARKETS.find((c) => c.ctoken === cToken.toLowerCase())?.key;
+
+/** The cToken's name on screen. The SAI market's cToken calls itself "cDAI"
+ *  on chain, the same as the DAI market's. */
+const cTokenLabel = (m: CompoundV2MarketRow) =>
+  keyOf(m.cToken) === "sai" ? "cSAI (the original cDAI)" : m.cTokenSymbol;
+
 function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: number; oracle: string | null }) {
+  const key = keyOf(m.cToken);
+  const deprecatedOn = key && COMPOUND_V2_DEPRECATED[key] ? deprecationDate(key) : null;
   const coords = coordsFor(m, block, oracle);
   const ticks: RatioBarTick[] = [];
   if (m.kink != null)
@@ -106,7 +123,7 @@ function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: numbe
             className="link-external text-[11px] text-rb-500"
             title={m.identityNote ?? undefined}
           >
-            {m.cTokenSymbol} · {shortAddress(m.cToken)}
+            {cTokenLabel(m)} · {shortAddress(m.cToken)}
           </a>
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
@@ -120,12 +137,11 @@ function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: numbe
         </Prov>{" "}
         supplied
         {!m.priceHasFeed && m.priceUsd != null && (
-          <span title="The oracle prices this market from a constant it stores, with no price feed behind it — nothing updates this number.">
+          <span title="Governance set this price and the oracle stores it, with no price feed behind it: nothing updates it.">
             {" · "}
             <span className="text-foreground">
-              price fixed at <Prov info={cvPriceProv(false, coords)}>{usd(m.priceUsd)}</Prov>
+              fixed price set by governance: <Prov info={cvPriceProv(false, coords)}>{usd(m.priceUsd)}</Prov>
             </span>
-            , no feed
           </span>
         )}
       </div>
@@ -146,21 +162,30 @@ function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: numbe
           <Prov info={cvMarketValueProv("borrowed", coords)}>{usd(m.totalBorrowsUsd)}</Prov> borrowed
         </span>
         {m.kink != null ? (
-          <span>
+          <span title="The kink is the utilisation at which this market's borrow rate starts climbing much faster, to pull borrowers back and suppliers in.">
             kink <Prov info={cvKinkProv(coords)}>{pctText(m.kink, 0)}</Prov>
           </span>
         ) : (
-          <span title="This market runs the original WhitePaper rate model — a straight line with no turn, so there is no kink to mark.">
+          <span title="This market runs the original rate model: the borrow rate rises evenly with utilisation, with no point where it turns steeper.">
             no kink
           </span>
         )}
       </div>
 
+      {deprecatedOn && (
+        <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400" data-compound-v2-deprecated="">
+          <span title={`A deprecated market has ${DEPRECATED_CONDITIONS}: ${DEPRECATED_CONSEQUENCE}.`}>
+            deprecated since {deprecatedOn}
+          </span>
+          : a borrow here can be liquidated in full at any time
+        </p>
+      )}
+
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         {m.collateralDisabled ? (
           <span
             className="text-foreground"
-            title="The Comptroller's collateral factor for this market is zero: nothing supplied here backs any borrowing. It is not a 0% limit — the market is switched off as collateral."
+            title="The Comptroller's collateral factor for this market is zero: nothing supplied here backs any borrowing."
           >
             disabled as collateral
           </span>
@@ -278,14 +303,39 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
               // again a count of a condition, exempt rather than over-claimed.
               <span
                 data-prov-exempt=""
-                title="A count over each market's oracle getConfig — the number priced by a stored constant with no feed. A JSX sum over per-market reads, not a single chain figure."
+                title="A count over each market's oracle getConfig: the markets with a fixed price set by governance and no price feed."
               >
-                <span className="text-foreground">{s.fixedPrice}</span> priced without a feed
+                <span className="text-foreground">{s.fixedPrice}</span> with a fixed price
               </span>
             )}
           </>
         }
       />
+
+      {data.markets.length > 0 && data.markets.every((m) => m.reserveFactor != null && m.reserveFactor >= 0.9999) && (
+        <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-reserve-factor-note="">
+          Supply pays <span className="text-foreground">0.00%</span> on every market: governance has set every
+          market&rsquo;s <span className="text-foreground">reserve factor</span> (the share of borrow interest kept by
+          the market) to <Prov info={cvReserveFactorProv(summaryCoords)}>100%</Prov>, so all interest goes to reserves
+          and suppliers earn nothing. The last sixteen markets moved in one governance transaction on 8 Dec 2025 (block
+          23,969,453).
+        </p>
+      )}
+
+      <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-deprecated-note="">
+        Borrowing is paused in all twenty markets: fifteen were paused in the same governance transaction on 8 Dec 2025
+        (block 23,969,453), the other five earlier. Eight markets are also{" "}
+        <span className="text-foreground">deprecated</span> ({DEPRECATED_CONDITIONS}):{" "}
+        {data.markets
+          .filter((m) => {
+            const k = keyOf(m.cToken);
+            return k != null && COMPOUND_V2_DEPRECATED[k] != null;
+          })
+          .map((m) => m.underlyingSymbol)
+          .join(", ")}
+        . For a borrower that means the Comptroller skips the shortfall check and the close factor on that borrow:{" "}
+        {DEPRECATED_CONSEQUENCE}. The Comptroller has no pause on repaying or withdrawing.
+      </p>
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         {data.markets.map((m) => (
@@ -295,13 +345,11 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
 
       {fixedPriceMarkets.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold text-foreground">Priced by a constant, with no feed</h2>
+          <h2 className="text-sm font-semibold text-foreground">Fixed prices set by governance</h2>
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-            The oracle&rsquo;s own config gives {fixedPriceMarkets.length} markets a stored{" "}
-            <span className="text-foreground">fixedPrice</span> and no price feed at all — governance set a number and
-            nothing has updated it since. These are the prices the Comptroller itself would use, so they are shown as
-            found rather than corrected; what the view will not do is present them as prices that still update. The
-            clearest case is the legacy SAI market, priced at{" "}
+            The oracle&rsquo;s config gives {fixedPriceMarkets.length} markets a fixed price set by governance and no
+            price feed: nothing has updated these numbers since. They are the prices the Comptroller uses, so they are
+            shown as they are. The clearest case is the legacy SAI market, priced at{" "}
             <span className="text-foreground">
               {sai ? (
                 <Prov info={cvPriceProv(false, coordsFor(sai, data.blockNumber, data.oracle))}>
@@ -329,7 +377,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
             <span className="text-foreground">
               <Prov info={cvWithFeedValueProv("borrowed", summaryCoords)}>{usd(s.totalBorrowedUsdWithFeed)}</Prov>
             </span>{" "}
-            borrowed — the same story either way, which is why the headline is not quietly resting on them.
+            borrowed.
           </p>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums text-rb-500">
             {fixedPriceMarkets.map((m) => (
@@ -340,7 +388,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
                 rel="noopener noreferrer"
                 className="link-external"
               >
-                {m.cTokenSymbol} · {m.underlyingSymbol} at{" "}
+                {cTokenLabel(m)} · {m.underlyingSymbol} at{" "}
                 <Prov info={cvPriceProv(false, coordsFor(m, data.blockNumber, data.oracle))}>{usd(m.priceUsd)}</Prov>
               </a>
             ))}

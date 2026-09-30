@@ -137,7 +137,7 @@ async function readPills(page, rowSel) {
     // yet — no state recorded, and never "closed" (rails-ops decision 0018).
     // It is a lifecycle word like the rest, so it is read as one; which sections
     // accept it is each section's own business.
-    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED"];
+    const words = ["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED", "NOT LOADED", "DEFAULTED · UNCLAIMED"];
     const rows = [...document.querySelectorAll(sel)];
     return rows.map((row) => {
       for (const el of row.querySelectorAll("span")) {
@@ -291,10 +291,12 @@ if (wants("Liquity V2")) {
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -390,7 +392,7 @@ if (wants("Liquity V2")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && clearedTotal.total === openTotal,
+    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
   );
 
@@ -484,10 +486,12 @@ if (wants("Polaris")) {
     barePills.length > 0 && barePills.every((p) => p === "OPEN"),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -633,7 +637,7 @@ if (wants("Polaris")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && clearedTotal.total === openTotal,
+    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
   );
 
@@ -793,10 +797,12 @@ async function runRestingViewSection(spec) {
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS_ROSTER.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -945,7 +951,7 @@ async function runRestingViewSection(spec) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openAfter, clearedIndex),
+    clearedChips.statusChip === "Status: in escrow" && withinIndex(clearedTotal.total, openAfter, clearedIndex),
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
   );
   await picked.close();
@@ -1285,8 +1291,10 @@ for (const spec of ROSTER) {
 // Check 1 below is what fails if that line is reverted: PWN's index carries 35
 // loans and one of them is open, so the two views are a page apart.
 //
-// Vocabulary: PWN's buckets are open / repaid / defaulted, and both terminal
-// ones draw the shared CLOSED badge with the outcome word in its own column.
+// Vocabulary: PWN's buckets are open (running) / unclaimed / repaid / defaulted.
+// The resting view is the index's open loans: running ones draw OPEN, and those
+// past their deadline draw DEFAULTED · UNCLAIMED (lib/pwn/economics.ts
+// `pwnLoanState`); both terminal ones draw the shared CLOSED badge.
 if (wants("PWN")) {
   const ROWS = 'a[href^="/ethereum/pwn/0x"]';
   // The memory tier draws no pagination strip (the driver only builds one for
@@ -1323,14 +1331,17 @@ if (wants("PWN")) {
     `page ${bareTotal.total} (${bareTotal.from}) vs index ${openBefore}→${openAfter} open, ${before.length} loans in all`,
   );
   check(
-    label("2. every card on the bare directory is still open"),
-    barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS_ROSTER.has(p)),
+    label("2. every card on the bare directory is unsettled (open, or defaulted and unclaimed)"),
+    barePills.length > 0 &&
+      barePills.every((p) => p != null && (OPEN_PILLS_ROSTER.has(p) || p === "DEFAULTED · UNCLAIMED")),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
+  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
+  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label("3. the bare directory draws no Status chip and no Reset"),
-    bareChips.statusChip == null && !bareChips.reset,
-    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
+    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
+    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
+    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -1450,7 +1461,7 @@ if (wants("PWN")) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip == null &&
+    clearedChips.statusChip === "Status: in escrow" &&
       withinIndex(clearedPills.length, openAfter, now.filter((r) => r.status === "open").length),
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedPills.length} rows vs index ${openAfter} open`,
   );

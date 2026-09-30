@@ -50,11 +50,9 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov } from "@/components/shared/provenance";
-import { formatNumber } from "@/lib/utils/format";
 import {
   polarisPriceGapNotesFor,
   rateStepNotesFor,
@@ -62,18 +60,60 @@ import {
   liveRateStepNote,
   type MarketNote,
 } from "@/lib/shared/market-note";
-import { livePendingProv, polarisAnnualCostProv } from "@/lib/polaris/live-provenance";
+import {
+  curvePriceAtBlockProv,
+  liveCurvePriceProv,
+  liveEntireProv,
+  liveMedianiserProv,
+  livePendingProv,
+  liveRecordedDebtProv,
+  polarisAnnualCostProv,
+} from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
 import { AmountText } from "@/components/shared/amount-text";
 
-// Signed figure for the pending-PSM-share strip — U+2212 minus, never a plain
-// hyphen (the receipt's own convention, e.g. netChangeProv's formulas).
-const signedPending = (n: number): string => `${n < 0 ? "−" : "+"}${formatNumber(Math.abs(n))}`;
+/** What the ETH/USD row is, and why it is in the menu. */
+const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
+const ETH_USD_TIP =
+  "ETH in USD from the protocol's ETH/USD medianiser, the median of its testnet oracles. pETH's USD price is its bonding-curve price in ETH times this.";
+
+/** A figure in the card's cost and debt-sum lines, at the card's grain:
+ *  three decimals with trailing zeros kept ("24.040"), so the sum reads at the
+ *  same grain as the Debt figure above it. A magnitude too small for three
+ *  decimals keeps AmountText's floor and tooltip. */
+function CardSumAmount({ value }: { value: number }) {
+  if (value !== 0 && Math.abs(value) < 0.0005) return <AmountText value={value} />;
+  return <>{value.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</>;
+}
+
+/** What the trigger's pETH-in-ETH figure is, and why it is above one. */
+const PETH_CURVE_TIP =
+  "pETH's price in ETH on the protocol's bonding curve. ETH paid into the curve mints pETH at a price that rises as ETH enters it, so one pETH costs more than one ETH.";
 
 const PolarisExportMenu = dynamic(
   () => import("@/components/protocol/polaris/polaris-export-menu").then((m) => m.PolarisExportMenu),
   { ssr: false },
 );
+
+/** The card's "Highest recorded" peaks, with the liquidation's own state
+ *  counted: the index takes its peaks over each touch's resulting figures, and
+ *  a liquidation's resulting figures are zero — the collateral and debt it
+ *  seized and cleared, after the pending legs settled, are the CDP's last and
+ *  often its largest state. */
+function withLiquidationPeaks(v: PolarisView, events: BaseActivityEvent[]): PolarisView {
+  let coll = v.peakColl;
+  let debt = v.peakDebt;
+  let surplus = 0;
+  let found = false;
+  for (const e of events) {
+    if (!isPolarisEvent(e) || e.context.data.eventType !== "liquidate") continue;
+    found = true;
+    coll = Math.max(coll, Number(e.context.data.collLiquidated ?? 0) || 0);
+    debt = Math.max(debt, Number(e.context.data.debtLiquidated ?? 0) || 0);
+    surplus += Number(e.context.data.collSurplus ?? 0) || 0;
+  }
+  return found ? { ...v, peakColl: coll, peakDebt: debt, peaksCountLiquidation: true, surplus } : v;
+}
 
 interface PolarisPositionViewProps {
   market: PolarisMarket;
@@ -158,7 +198,7 @@ export default function PolarisPositionView({
   const view = useMemo<PolarisView | null>(() => {
     if (chain) {
       const v = viewFromChain(chain);
-      return summary ? mergeChainAndSummary(v, summary) : v;
+      return summary ? withLiquidationPeaks(mergeChainAndSummary(v, summary), events) : v;
     }
     // `!chainSettled` is the index lane's `pending` flag — the same one the
     // listing passes while its market-board read is in flight. Without it the
@@ -167,8 +207,8 @@ export default function PolarisPositionView({
     // and then flipped to a figure, which states "there is none" and then
     // corrects itself. With it they hold a pulse, and settle to the dash if
     // the overlay never answers.
-    return summary ? viewFromSummary(summary, undefined, !chainSettled) : null;
-  }, [chain, summary, chainSettled]);
+    return summary ? withLiquidationPeaks(viewFromSummary(summary, undefined, !chainSettled), events) : null;
+  }, [chain, summary, chainSettled, events]);
 
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
 
@@ -261,19 +301,31 @@ export default function PolarisPositionView({
   // distinct key and a distinct tooltip. Empty while the overlay is in
   // flight, and empty if it never answers: the strip states a price or
   // nothing.
-  const stripAssets: PriceStripAsset[] = useMemo(() => {
+  const stripAssets: LatestPriceAsset[] = useMemo(() => {
     if (!chain || chain.chainStale || !chain.price) return [];
     const cfg = POLARIS_MARKET_CONFIG[market];
-    const out: PriceStripAsset[] = [
+    const out: LatestPriceAsset[] = [
       {
         symbol: PETH.symbol,
         address: PETH.address,
         price: chain.price.curve,
         unit: "ETH",
         label: `${PETH.symbol} — bonding curve, native`,
+        // "2.84 ETH" alone read as a gas price: the trigger names the token.
+        triggerLabel: PETH.symbol,
+        tip: PETH_CURVE_TIP,
+        info: liveCurvePriceProv(),
       },
       { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
     ];
+    if (chain.price.ethUsd > 0)
+      out.push({
+        symbol: "ETH",
+        price: chain.price.ethUsd,
+        label: ETH_USD_LABEL,
+        tip: ETH_USD_TIP,
+        info: liveMedianiserProv("eth"),
+      });
     const stableUsd = market === "usdp" ? 1 : chain.price.xauUsd;
     if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });
     return out;
@@ -295,10 +347,15 @@ export default function PolarisPositionView({
           price: p.curve,
           unit: "ETH",
           label: `${PETH.symbol} — bonding curve, native`,
+          triggerLabel: PETH.symbol,
+          tip: PETH_CURVE_TIP,
+          info: curvePriceAtBlockProv(row.blockNumber),
         },
       ];
-      if (p.ethUsd != null && p.ethUsd > 0)
+      if (p.ethUsd != null && p.ethUsd > 0) {
         out.push({ symbol: PETH.symbol, address: PETH.address, price: p.curve * p.ethUsd });
+        out.push({ symbol: "ETH", price: p.ethUsd, label: ETH_USD_LABEL, tip: ETH_USD_TIP });
+      }
       const stableUsd = market === "usdp" ? 1 : p.xauUsd;
       if (stableUsd != null) out.push({ symbol: stable, address: cfg.stable.address, price: stableUsd });
       return out;
@@ -331,7 +388,10 @@ export default function PolarisPositionView({
   const hasPendingLegs =
     chain != null &&
     chain.isOpen &&
-    (chain.accruedInterest > 0 || chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0);
+    (chain.accruedInterest > 0 ||
+      chain.accruedStables > 0 ||
+      chain.mintRedeemCollChange !== 0 ||
+      chain.mintRedeemDebtChange !== 0);
 
   const riskStrip =
     annualCost != null || belowMinimum || hasPendingLegs ? (
@@ -340,10 +400,16 @@ export default function PolarisPositionView({
           <RiskFigure label="Costs">
             <Prov info={polarisAnnualCostProv(market)} value={String(annualCost)} symbol={stable}>
               <RiskStrong>
-                ~<AmountText value={annualCost} />
+                ~<CardSumAmount value={annualCost} />
               </RiskStrong>
             </Prov>{" "}
-            {stable} / year
+            {stable} / year on the{" "}
+            <Prov info={liveRecordedDebtProv(market)} value={String(chain?.recordedDebt ?? 0)}>
+              <span>
+                <CardSumAmount value={chain?.recordedDebt ?? 0} />
+              </span>
+            </Prov>{" "}
+            {stable} recorded at the last touch
           </RiskFigure>
         )}
         {belowMinimum && chain?.icr != null ? (
@@ -352,34 +418,63 @@ export default function PolarisPositionView({
             {((chain.defensiveMode ? chain.defensiveMcr : chain.mcr) * 100).toFixed(0)}%; anyone may liquidate it
           </RiskFigure>
         ) : hasPendingLegs && chain ? (
+          // The entire debt as a sum the reader can add up: the debt the last
+          // touch recorded, then each leg pending since, at the card's block.
           <RiskFigure>
-            {chain.accruedInterest > 0 && (
-              <>
-                <Prov info={livePendingProv("accruedInterest", market)} value={String(chain.accruedInterest)}>
-                  <span>
-                    <AmountText value={chain.accruedInterest} />
-                  </span>
-                </Prov>{" "}
-                {stable} interest
-              </>
-            )}
-            {chain.accruedInterest > 0 &&
-              (chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0) &&
-              " and "}
-            {(chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0) && (
-              <>
-                a PSM share of{" "}
-                <Prov info={livePendingProv("mintRedeemColl", market)} value={String(chain.mintRedeemCollChange)}>
-                  <span>{signedPending(chain.mintRedeemCollChange)}</span>
-                </Prov>{" "}
-                pETH /{" "}
-                <Prov info={livePendingProv("mintRedeemDebt", market)} value={String(chain.mintRedeemDebtChange)}>
-                  <span>{signedPending(chain.mintRedeemDebtChange)}</span>
-                </Prov>{" "}
-                {stable}
-              </>
-            )}{" "}
-            pending since the last touch
+            <span data-polaris-debt-sum="">
+              Owed at this block:{" "}
+              <Prov info={liveRecordedDebtProv(market)} value={String(chain.recordedDebt)}>
+                <span>
+                  <CardSumAmount value={chain.recordedDebt} />
+                </span>
+              </Prov>{" "}
+              recorded at the last touch
+              {chain.accruedInterest > 0 && (
+                <>
+                  {" + "}
+                  <Prov info={livePendingProv("accruedInterest", market)} value={String(chain.accruedInterest)}>
+                    <span>
+                      <CardSumAmount value={chain.accruedInterest} />
+                    </span>
+                  </Prov>{" "}
+                  interest
+                </>
+              )}
+              {chain.accruedStables > 0 && (
+                <>
+                  {" − "}
+                  <Prov info={livePendingProv("accruedStables", market)} value={String(chain.accruedStables)}>
+                    <span>
+                      <CardSumAmount value={chain.accruedStables} />
+                    </span>
+                  </Prov>{" "}
+                  stability gain
+                </>
+              )}
+              {chain.mintRedeemDebtChange !== 0 && (
+                <>
+                  {chain.mintRedeemDebtChange < 0 ? " − " : " + "}
+                  <Prov info={livePendingProv("mintRedeemDebt", market)} value={String(chain.mintRedeemDebtChange)}>
+                    <span>
+                      <CardSumAmount value={Math.abs(chain.mintRedeemDebtChange)} />
+                    </span>
+                  </Prov>{" "}
+                  net PSM share
+                </>
+              )}
+              {" = "}
+              <Prov info={liveEntireProv("debt", market)} value={String(chain.entireDebt)}>
+                <RiskStrong>
+                  {chain.entireDebt < 0 ? "−" : ""}
+                  <CardSumAmount value={Math.abs(chain.entireDebt)} />
+                </RiskStrong>
+              </Prov>{" "}
+              {stable}
+              {chain.entireDebt <= 0
+                ? ": at or below zero, so it owes nothing, and the next touch settles the debt to zero"
+                : ""}
+              . A touch is any transaction on the CDP; these pending legs are written into its figures at the next one.
+            </span>
           </RiskFigure>
         ) : null}
       </RiskFooterStrip>

@@ -18,9 +18,15 @@
 // lifetime-flows-aave-v3-folders-eca2.json, read 2026-09-29) meets the bars
 // row by row from the route's `lifetime`, where its own rows do not. On
 // 0x685f…128c, whose repayments exceed its borrowing, the debt states no
-// negative principal and its lines add to what is owed.
+// negative principal and its lines add to what is owed. The bars' window
+// (`windowModel`): its opening segment is what the replay held the day before,
+// and every line still adds up to its bar. The Lifetime series
+// (lib/shared/flows-series.ts): calendar bins from the open to today, each the
+// scrubber's state where the bin's last day recorded every held asset's price,
+// and a bin with no price recorded for a held asset a gap.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
+import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -35,6 +41,7 @@ import {
   aaveV3FlowEvents,
   aaveV3FlowSeriesTimeline,
   aaveV3FlowTimeline,
+  aaveV3FocusEvents,
   lifetimeFromSeries,
 } from "@/lib/aave-v3/flows-timeline";
 import type { AaveV3FlowSeries, FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -48,18 +55,44 @@ import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeli
 import {
   assetsAt,
   axisFor,
+  axisLabelOnPhone,
+  DAY_MS,
   buildFlowModel,
   daysFromEvents,
   dayStart,
   formatFlowUsd,
+  longDay,
   nextEventDay,
   prevEventDay,
   stateAt,
   type FlowModel,
   type FlowSideState,
   type FlowTimeline,
+  windowModel,
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
+import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
+import {
+  binInputFromWire,
+  binRanges,
+  binSeries,
+  lifetimeBinFor,
+  seriesRouteBinFor,
+  weekStart,
+  WINDOW_ACTIVE_DAYS,
+  windowFromDay,
+  type BinInput,
+} from "@/lib/shared/flows-series";
+import {
+  axisSpanDays,
+  combinedAt,
+  combinedStops,
+  eventStep,
+  nearestStop,
+  stopForDay,
+} from "@/lib/shared/flows-combined";
+import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
+import { eventCum, eventSideSum } from "@/lib/shared/flow-focus";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -190,6 +223,24 @@ test("the axis rule", () => {
   assert.deepEqual(axisFor(122_043), { max: 125_000, ticks: [0, 25_000, 50_000, 75_000, 100_000, 125_000] });
 });
 
+test("the axis's labels at phone width: the ends always, never two neighbours, the last two steps clear", () => {
+  for (let count = 1; count <= 14; count++) {
+    const shown = Array.from({ length: count }, (_, i) => i).filter((i) => axisLabelOnPhone(i, count));
+    assert.equal(shown[0], 0, `count ${count}: the first`);
+    assert.equal(shown[shown.length - 1], count - 1, `count ${count}: the last`);
+    if (count <= 5) assert.equal(shown.length, count, `count ${count}: five or fewer all shown`);
+    else
+      for (let k = 1; k < shown.length; k++)
+        assert.ok(shown[k] - shown[k - 1] >= 2, `count ${count}: ${shown.join(",")} has neighbours`);
+  }
+  // The screenshot wallet's scale: $50k steps, $0 / $100k / $200k / $300k on a phone.
+  const { ticks } = axisFor(290_000);
+  assert.deepEqual(
+    ticks.filter((_, i) => axisLabelOnPhone(i, ticks.length)),
+    [0, 100_000, 200_000, 300_000],
+  );
+});
+
 test("the number format", () => {
   assert.equal(formatFlowUsd(363.4), "$363");
   assert.equal(formatFlowUsd(5_473), "$5.5k");
@@ -197,6 +248,530 @@ test("the number format", () => {
   assert.equal(formatFlowUsd(-5_000), "−$5.0k");
   assert.equal(formatFlowUsd(1_234_567), "$1.2M");
   assert.equal(formatFlowUsd(9_999.7), "$10k");
+  assert.equal(formatFlowUsd(1_000_000_000), "$1.0B");
+  assert.equal(formatFlowUsd(1_887_545_149), "$1.89B");
+  assert.equal(formatFlowUsd(1_500_000_000), "$1.5B");
+  assert.equal(formatFlowUsd(999_960_000), "$1.0B");
+  assert.equal(formatFlowUsd(999_940_000), "$999.9M");
+});
+
+test("the busy treatment: bins, throughput, operations", () => {
+  assert.equal(isBusy(model), false);
+  // Turnover is measured against the most the collateral has been: one
+  // deposit mostly withdrawn is not busy, the same funds cycled six times are.
+  const cycled = (n: number) =>
+    buildFlowModel({
+      buckets: [
+        { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
+        { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
+      ],
+      days: Array.from({ length: 2 * n }, (_, i) => ({
+        day: 20_000 + i,
+        events: i + 1,
+        tick: "collateral" as const,
+        cum: {
+          deposited: Math.ceil((i + 1) / 2) * 1000,
+          withdrawn: Math.floor((i + 1) / 2) * (i === 2 * n - 1 ? 980 : 1000),
+        },
+        balances: [
+          {
+            asset: "a",
+            symbol: "A",
+            side: "collateral" as const,
+            amount: i % 2 === 0 ? 1000 : i === 2 * n - 1 ? 20 : 0,
+          },
+        ],
+        prices: [{ asset: "a", usd: 1, ts: (20_000 + i) * 86_400 }],
+      })),
+      live: { collateralUsd: 20, debtUsd: 0 },
+    }) as FlowModel;
+  assert.equal(isBusy(cycled(1)), false, "deposited once, withdrawn to $20");
+  assert.equal(isBusy(cycled(6)), true, "the same $1k in and out six times");
+  // The turnover count takes the same base: held down to $20, the $1k cycled
+  // six times turned over 6 times (against today's $20 it read 300).
+  assert.equal(throughput(cycled(1)).turnover, null, "one deposit is no turnover");
+  assert.equal(throughput(cycled(6)).turnover, 6, "turnover against the peak");
+  assert.deepEqual(
+    [binUnitFor(90), binUnitFor(91), binUnitFor(1095), binUnitFor(1096)],
+    ["day", "week", "week", "month"],
+  );
+  // The bins cover every stop before the live one, once, and count every row.
+  const { bins } = flowBins(model);
+  assert.equal(bins[0].from, 0);
+  assert.equal(bins[bins.length - 1].to, model.liveStop - 1);
+  for (let i = 1; i < bins.length; i++) assert.equal(bins[i].from, bins[i - 1].to + 1);
+  const last = model.rows[model.rows.length - 1];
+  assert.equal(
+    bins.reduce((a, b) => a + b.count, 0),
+    last.txs ?? last.events,
+  );
+  assert.equal(throughput(model).txs, model.totalTxs ?? model.totalEvents);
+  const ops = groupOperations([
+    { txHash: "0x1", actionType: "supply", txFrom: "0xa" },
+    { txHash: "0x1", actionType: "borrow", txFrom: "0xa" },
+    { txHash: "0x2", actionType: "repay", txFrom: "0xa" },
+    { txHash: "0x2", actionType: "withdraw" },
+    { txHash: "0x3", actionType: "withdraw" },
+    { txHash: "0x4", actionType: "withdraw", txFrom: "0xa" },
+    { txHash: "0x4", actionType: "supply" },
+    { txHash: "0x4", actionType: "borrow" },
+  ]);
+  assert.deepEqual(ops?.kinds, [
+    { label: "Leverage up", count: 1 },
+    { label: "Unwind", count: 1 },
+    { label: "Withdraw", count: 1 },
+    { label: "Withdraw, supply and borrow", count: 1 },
+  ]);
+  assert.deepEqual(ops?.executor, { address: "0xa", count: 3, known: 3 });
+});
+
+// ── the bars' window and the Lifetime series ────────────────────────────────
+
+test("the window is the last 300 active days, or the whole life", () => {
+  assert.equal(WINDOW_ACTIVE_DAYS, 300);
+  const days = Array.from({ length: 350 }, (_, i) => 1000 + i * 2);
+  assert.equal(windowFromDay(days), days[50]);
+  assert.equal(windowFromDay(days.slice(0, 300)), 1000);
+  assert.equal(windowFromDay([7]), 7);
+  assert.equal(windowFromDay([]), 0);
+  assert.equal(longDay(Date.UTC(2025, 2, 3) / 1000), "3 Mar 2025");
+  assert.deepEqual([lifetimeBinFor(1095), lifetimeBinFor(1096)], ["week", "month"]);
+  // The Aave family's line (a series route) goes by day up to a year.
+  assert.deepEqual([0, 365, 366, 1095, 1096].map(seriesRouteBinFor), ["day", "day", "week", "week", "month"]);
+  assert.equal(lifetimeBinFor(30), "week", "the rows binned on the page keep weeks");
+});
+
+test("the window's opening segment: what was held when it opens, and every length still adds up", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress);
+  const full = buildFlowModel(route!) as FlowModel;
+  assert.equal(windowModel(full, 0), full, "a window from the first day is the whole model");
+  const from = full.eventDays[12];
+  const w = windowModel(full, from);
+  assert.equal(w.liveStop, full.liveStop - from);
+  assert.equal(w.eventDays.length, full.eventDays.filter((d) => d >= from).length);
+  assert.equal(w.start, full.start + from * 86_400_000);
+  const open = w.opening!;
+  assert.ok(open, "a cut model states its opening");
+  assert.equal(open.collateral, full.valued[from - 1].collateral);
+  assert.equal(open.debt, full.valued[from - 1].debt);
+  assert.equal(open.events, stateAt(full, from - 1).count);
+  const outs = (st: FlowSideState) => st.bar.filter((x) => x.fill === "out").reduce((a, x) => a + x.value, 0);
+  for (let stop = 0; stop <= w.liveStop; stop++) {
+    const a = stateAt(w, stop);
+    const b = stateAt(full, stop + from);
+    const base = stateAt(full, from - 1);
+    assert.equal(a.count, b.count, `stop ${stop}: the counts stay whole`);
+    for (const side of ["collateral", "debt"] as const) {
+      // Held is the full model's; the exits are the window's own.
+      assert.ok(near(a[side].now, b[side].now, 1e-6), `stop ${stop}: ${side} held`);
+      assert.ok(
+        near(outs(a[side]), outs(b[side]) - outs(base[side]), 1e-6),
+        `stop ${stop}: ${side} exits since the window`,
+      );
+      // The line under the bar starts with the opening, and its terms add up to the bar.
+      const first = a[side].sources[0];
+      assert.equal(first.key, `${side}-opening`);
+      assert.equal(first.label, `Held on ${longDay(open.ts)}`);
+      assert.equal(first.value, side === "collateral" ? open.collateral : open.debt);
+      const sum = a[side].sources.reduce((acc, x) => acc + x.value, 0);
+      assert.ok(near(sum, a[side].total, 1e-6), `stop ${stop}: ${side} sources add up to the bar`);
+      assert.ok(near(a[side].total, a[side].now + outs(a[side]), 1e-6));
+    }
+  }
+  // The density strip counts only the window's transactions.
+  const { bins } = flowBins(w);
+  const last = full.rows[full.rows.length - 1];
+  assert.equal(
+    bins.reduce((acc, b) => acc + b.count, 0),
+    (last.txs ?? last.events) - (open.txs ?? open.events),
+  );
+  assert.equal(throughput(w).txs, (full.totalTxs ?? full.totalEvents) - (open.txs ?? open.events));
+});
+
+// ── the segment panel's sum ─────────────────────────────────────────────────
+
+/** Reads the panel's printed sum back: each line's sign and figure, and the
+ *  total, as the reader would add them. */
+const printedAdds = (st: FlowSideState): { lines: number; total: number; text: string } => {
+  const rows = sideSumRows(st);
+  const dollars = (amount: string) => Number(amount.replace(/[$,]/g, ""));
+  const lines = rows.lines.reduce((a, l) => a + (l.sign === "−" ? -1 : 1) * dollars(l.amount), 0);
+  const text = rows.lines.map((l) => `${l.sign}${l.label} ${l.amount}`).join(" · ") + ` = ${rows.total.amount}`;
+  return { lines, total: dollars(rows.total.amount), text };
+};
+
+test("the panel's sum: the printed lines add to the printed held figure, on plain, windowed and busy bars", () => {
+  const check = (m: FlowModel, stops: number[], what: string) => {
+    for (const stop of stops)
+      for (const side of ["collateral", "debt"] as const) {
+        const st = stateAt(m, stop)[side];
+        if (!(st.total > 0)) continue;
+        const p = printedAdds(st);
+        assert.equal(p.lines, p.total, `${what} at stop ${stop}, ${side}: ${p.text}`);
+        assert.equal(p.total, Math.round(st.now), `${what} at stop ${stop}, ${side}: the total is what is held`);
+        const rows = sideSumRows(st);
+        // The first line reads unsigned; each later one carries its sign.
+        assert.ok(
+          rows.lines.slice(1).every((l) => l.sign !== ""),
+          `${what} at stop ${stop}, ${side}: signs`,
+        );
+        // Only the balancing item is a remainder, and it comes last.
+        assert.ok(rows.lines.filter((l) => l.kind === "rest").length <= 1);
+        if (rows.lines.some((l) => l.kind === "rest")) assert.equal(rows.lines[rows.lines.length - 1].kind, "rest");
+        // The outflows come in the bar's order.
+        const outs = rows.lines.filter((l) => l.kind === "out").map((l) => l.key);
+        const bar = st.bar.filter((x) => outs.includes(x.key)).map((x) => x.key);
+        assert.deepEqual(outs, bar, `${what} at stop ${stop}, ${side}: the bar's order`);
+      }
+  };
+  // Plain bars, whole life: 9 Nov 2025 (Miles's screenshot), a liquidation-free
+  // stop early on, and the live stop.
+  check(model, [dayOf("2025-11-09T00:00:00Z"), model.eventDays[3], model.liveStop], "0xfb93, whole");
+  // The bars' window: the sum opens with what was held when it opens.
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const w = windowModel(full, full.eventDays[12]);
+  check(w, [0, Math.floor(w.liveStop / 2), w.liveStop], "0xfb93, windowed");
+  assert.equal(sideSumRows(stateAt(w, 0).collateral).lines[0].kind, "opening");
+  // A busy window: the same $1k cycled forty times, held at $20 with a price
+  // off the dollar, so every line rounds.
+  const busy = buildFlowModel({
+    buckets: [
+      { key: "deposited", label: "Deposited", side: "collateral", dir: "in" },
+      { key: "withdrawn", label: "Withdrawn", side: "collateral", dir: "out" },
+    ],
+    days: Array.from({ length: 80 }, (_, i) => ({
+      day: 20_000 + i,
+      events: i + 1,
+      tick: "collateral" as const,
+      cum: {
+        deposited: Math.ceil((i + 1) / 2) * 1000.37,
+        withdrawn: Math.floor((i + 1) / 2) * (i === 79 ? 980.61 : 1000.29),
+      },
+      balances: [{ asset: "a", symbol: "A", side: "collateral" as const, amount: i % 2 === 0 ? 1000 : 20 }],
+      prices: [{ asset: "a", usd: 1 + i / 997, ts: (20_000 + i) * 86_400 }],
+    })),
+    live: { collateralUsd: 20.49, debtUsd: 0 },
+  }) as FlowModel;
+  assert.equal(isBusy(busy), true);
+  check(busy, [0, 1, 17, 40, 78, busy.liveStop], "busy");
+  // Every figure is whole dollars, and the held assets add to the total.
+  assert.equal(wholeUsd(79_411.6), "$79,412");
+  assert.equal(wholeUsd(-90_118.2), "$90,118");
+  assert.deepEqual(apportionDollars([150_920.6, 12_714.7], 163_635), [150_920, 12_715]);
+  const parts = apportionDollars([0.4, 0.4, 0.4], 1);
+  assert.equal(
+    parts.reduce((a, v) => a + v, 0),
+    1,
+  );
+});
+
+test("the Lifetime series: calendar bins from the open to today, each at the replay's balances and its last recorded price", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const input = binInputFromWire(series);
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const first = series.days[0][0];
+  for (const bin of ["day", "week", "month"] as const) {
+    const out = binSeries(input, bin)!;
+    assert.equal(out.first, first);
+    assert.equal(out.points[0][0], first, `${bin}: the first bin starts at the open`);
+    assert.equal(out.points[out.points.length - 1][1], series.today, `${bin}: the last ends today`);
+    for (let i = 1; i < out.points.length; i++) {
+      assert.equal(out.points[i][0], out.points[i - 1][1] + 1, `${bin}: bins are contiguous`);
+      if (bin === "day") assert.equal(out.points[i][0], out.points[i][1], "a day is one day");
+      else if (bin === "week") assert.equal(weekStart(out.points[i][0]), out.points[i][0], "weeks start on Monday");
+      else assert.equal(new Date(out.points[i][0] * 86_400_000).getUTCDate(), 1, "months start on the 1st");
+    }
+    // Where every held asset recorded its price on the bin's last day, the bin
+    // is the scrubber's state at that day: the same replay, the same price.
+    let checked = 0;
+    for (const [from, to, coll, debt] of out.points) {
+      if (to >= series.today) continue;
+      const stop = to - first;
+      const held = route.heldAt[Math.min(stop, route.heldAt.length - 1)] ?? [];
+      const allOnDay = held
+        .filter((h) => (h.amount ?? 0) > 0)
+        .every((h) => {
+          const asset = Object.keys(input.symbols).find((a) => input.symbols[a] === h.symbol)!;
+          return (input.prices[asset] ?? []).some(([d]) => d === to);
+        });
+      if (!allOnDay || stop >= route.valued.length) continue;
+      assert.ok(from <= to);
+      assert.ok(
+        coll != null && near(coll, route.valued[stop].collateral, Math.max(0.01, coll * 1e-7)),
+        `${bin} ${to}: held`,
+      );
+      assert.ok(debt != null && near(debt, route.valued[stop].debt, Math.max(0.01, debt * 1e-7)), `${bin} ${to}: owed`);
+      checked++;
+    }
+    assert.ok(checked > 0, `${bin}: some bins checked against the scrubber`);
+    assert.ok(
+      out.points.length <= Math.ceil((series.today - first) / (bin === "day" ? 1 : bin === "week" ? 7 : 28)) + 1,
+    );
+  }
+});
+
+test("the Lifetime series: a bin with no price recorded for a held asset is a gap, never the older price", () => {
+  const monday = weekStart(20_000);
+  const input: BinInput = {
+    days: [
+      {
+        day: monday,
+        balances: [
+          { side: "collateral", asset: "a", amount: 2 },
+          { side: "debt", asset: "b", amount: 5 },
+        ],
+      },
+      { day: monday + 16, balances: [{ side: "collateral", asset: "a", amount: 3 }] },
+    ],
+    prices: {
+      a: [
+        [monday - 3, 9],
+        [monday + 2, 10],
+        [monday + 17, 12],
+      ],
+      b: Array.from({ length: 30 }, (_, i) => [monday + i, 1] as [number, number]),
+    },
+    symbols: { a: "AAA", b: "BBB" },
+    today: monday + 24,
+  };
+  const out = binSeries(input, "week")!;
+  assert.deepEqual(
+    out.points.map(([from, to]) => [from - monday, to - monday]),
+    [
+      [0, 6],
+      [7, 13],
+      [14, 20],
+      [21, 24],
+    ],
+  );
+  assert.deepEqual(
+    out.points.map(([, , c, d]) => [c, d]),
+    [
+      [20, 5],
+      [null, 5], // AAA recorded no price that week: a gap on its side only
+      [36, 5],
+      [null, 5],
+    ],
+  );
+  assert.deepEqual(out.gaps, [
+    [1, "collateral", "AAA"],
+    [3, "collateral", "AAA"],
+  ]);
+  assert.deepEqual(binRanges(monday + 3, monday + 3, "week"), [[monday + 3, monday + 3]]);
+});
+
+test("Combined: the cursor stops on the line's points and every day with events", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const startDay = full.start / DAY_MS;
+  for (const bin of ["day", "week", "month"] as const) {
+    const line = binSeries(binInputFromWire(series), bin)!;
+    const from = full.eventDays[12];
+    const stops = combinedStops(full, line, from);
+    const days = stops.map((s) => s.stop);
+    assert.deepEqual(
+      days,
+      [...new Set(days)].sort((x, y) => x - y),
+      `${bin}: ascending, one stop per day`,
+    );
+    const last = stops[stops.length - 1];
+    assert.ok(last.live && last.stop === full.liveStop && last.point === line.points.length - 1, `${bin}: today last`);
+    // Every point of the line but today's is a stop, at the point's last day.
+    line.points.slice(0, -1).forEach(([, to], i) => {
+      const at = stops.find((s) => s.point === i);
+      assert.ok(at, `${bin}: point ${i} is a stop`);
+      assert.equal(at.stop, to - startDay);
+    });
+    // Every day with events is a stop, marked as one.
+    for (const d of full.eventDays) {
+      if (d >= full.liveStop) continue;
+      const at = stops.find((s) => s.stop === d);
+      assert.ok(at?.event, `${bin}: event day ${d} is a stop`);
+    }
+    // Nothing else: a stop is a point's day, an event day or today.
+    for (const s of stops) assert.ok(s.live || s.point != null || s.event, `${bin}: stop ${s.stop} has a reason`);
+    assert.equal(
+      stops.length,
+      new Set([...line.points.slice(0, -1).map(([, to]) => to - startDay), ...full.eventDays]).size + 1,
+    );
+    // Snapping: each stop is its own nearest; a day between two stops goes to the nearer.
+    stops.forEach((s, i) => assert.equal(nearestStop(stops, s.stop), i));
+    for (let i = 1; i < stops.length; i++) {
+      const [a, b] = [stops[i - 1].stop, stops[i].stop];
+      if (b - a < 3) continue;
+      assert.equal(nearestStop(stops, a + 1), i - 1);
+      assert.equal(nearestStop(stops, b - 1), i);
+    }
+    assert.equal(nearestStop(stops, -5), 0);
+    assert.equal(nearestStop(stops, full.liveStop + 5), stops.length - 1);
+  }
+  // Without the series: the event days and today.
+  const bare = combinedStops(full, null, 0);
+  assert.deepEqual(
+    bare.map((s) => s.stop),
+    [...full.eventDays.filter((d) => d < full.liveStop), full.liveStop],
+  );
+});
+
+test("Combined: the back and forward steps go by days with events; a day's mark lands on its day's close", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "week")!;
+  const stops = combinedStops(full, line, 0);
+  const last = stops.length - 1;
+  // Forward from the first stop visits every event day once, in order, then today.
+  const visited: number[] = [];
+  for (let at = 0, next = eventStep(stops, 0, 1); next !== at; at = next, next = eventStep(stops, at, 1))
+    visited.push(stops[next].stop);
+  const days = full.eventDays.filter((d) => d < full.liveStop);
+  assert.deepEqual(visited, [...days.filter((d) => d > stops[0].stop), full.liveStop]);
+  // Back from today visits them the other way, and stops at the first.
+  const back: number[] = [];
+  for (let at = last, prev = eventStep(stops, last, -1); prev !== at; at = prev, prev = eventStep(stops, at, -1))
+    back.push(stops[prev].stop);
+  assert.deepEqual(
+    back,
+    [...days].reverse().filter((d) => d !== stops[last].stop),
+  );
+  // A point of the line between events is stepped over.
+  const between = stops.findIndex((s) => !s.event && !s.live);
+  assert.ok(between > 0, "the weekly line has a point between events");
+  assert.ok(stops[eventStep(stops, between, 1)].event || stops[eventStep(stops, between, 1)].live);
+  // Every event day's mark finds that day's stop; today or later finds the live stop.
+  for (const d of days) assert.equal(stops[stopForDay(stops, d)!].stop, d);
+  assert.equal(stopForDay(stops, full.liveStop + 3), last);
+});
+
+test("Combined: on a daily line a day's mark lands on that day's point", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "day")!;
+  const stops = combinedStops(full, line, 0);
+  const startDay = full.start / DAY_MS;
+  // Every day of the life before today is a stop on its day's point (today's
+  // point is the live stop's).
+  for (let d = 0; startDay + d < line.today; d++) {
+    const at = stops[stopForDay(stops, d)!];
+    assert.equal(at.stop, d);
+    assert.ok(at.point != null && line.points[at.point][1] === startDay + d, `day ${d} is its point`);
+  }
+});
+
+test("the rewind: the list up to a day's close, its rows moved up by what was cut", () => {
+  const ev = (id: string, timestamp: number) => ({ id, timestamp });
+  // Newest first, as the timeline draws them.
+  const events = [ev("e", 500), ev("d", 400), ev("c", 300), ev("b", 200), ev("a", 100)];
+  assert.deepEqual(
+    rewindEvents(events, 350).map((e) => e.id),
+    ["c", "b", "a"],
+  );
+  assert.equal(rewindEvents(events, null), events, "no cut, the list whole");
+  assert.deepEqual(rewindEvents(events, 50), [], "before the first event, nothing");
+  // Rows over it: a folder (oldest 250, newest 450) straddles a cut at 350
+  // and stays, first; the event rows newer than the cut go, and each row
+  // left moves up by the cut events above it.
+  type Row = { id: string; flatIdx: number; oldest: number };
+  const rows: Row[] = [
+    { id: "e", flatIdx: 0, oldest: 500 },
+    { id: "folder", flatIdx: 1, oldest: 250 },
+    { id: "d", flatIdx: 1, oldest: 400 },
+    { id: "c", flatIdx: 2, oldest: 300 },
+    { id: "a", flatIdx: 3, oldest: 100 },
+  ];
+  const cutOff = events.length - rewindEvents(events, 350).length;
+  assert.deepEqual(
+    rewindRows(rows, 350, (r) => r.oldest, cutOff).map((r) => [r.id, r.flatIdx]),
+    [
+      ["folder", 0],
+      ["c", 0],
+      ["a", 1],
+    ],
+  );
+  assert.equal(
+    rewindRows(rows, null, (r) => r.oldest, 0),
+    rows,
+  );
+});
+
+test("Combined: the strip's time axis spans a week at least, and a longer life whole", () => {
+  const d = 20_361; // 30 Sep 2025, any day serves
+  // A life of one day, today: the day takes a seventh of the axis after the
+  // lead-in, and the rest stays empty past today's close.
+  assert.equal(axisSpanDays(d, d), 7);
+  // Three days: three sevenths.
+  assert.equal(axisSpanDays(d, d + 2), 7);
+  // Two event days a week apart, and a long life: the life, as before.
+  assert.equal(axisSpanDays(d, d + 7), 8);
+  assert.equal(axisSpanDays(d, d + 400), 401);
+});
+
+test("Combined: the headlines and the bars state one figure at every stop, between events, on event days and outside the window", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  // A life of more than three years: the line is monthly, so every event day
+  // but a month's last falls between the line's points.
+  const bin = lifetimeBinFor(series.today - full.start / DAY_MS);
+  assert.equal(bin, "month", "a long position");
+  const line = binSeries(binInputFromWire(series), bin)!;
+  // A window opening on the 13th active day, so the early months fall before it.
+  const from = full.eventDays[12];
+  const bars = windowModel(full, from);
+  const stops = combinedStops(full, line, from);
+  const events = new Set(full.eventDays);
+  const rowOf = new Map(full.rows.map((r) => [r.day, r]));
+  const amounts = (stop: number) =>
+    full.heldAt[stop]
+      .map((h) => `${h.side}:${h.symbol}:${h.amount}`)
+      .sort()
+      .join("|");
+  let between = 0;
+  let outside = 0;
+  let onEvent = 0;
+  let lineChecked = 0;
+  stops.forEach((at, i) => {
+    const { head, bars: b } = combinedAt(full, bars, at);
+    if (at.stop < from) {
+      assert.equal(at.barStop, null, `stop ${i}: before the window the bars have no stop`);
+      assert.equal(b, null);
+      outside++;
+      return;
+    }
+    assert.equal(at.barStop, at.stop - from);
+    assert.ok(b);
+    for (const side of ["collateral", "debt"] as const) {
+      assert.ok(near(head[side].now, b[side].now, 1e-6), `stop ${i}: ${side} headline and bar agree`);
+      // The solid part of the bar is the headline's figure.
+      const held = b[side].bar.find((x) => x.fill === "held")?.value ?? 0;
+      assert.ok(near(held, head[side].now, 1e-6), `stop ${i}: ${side} solid part is the headline`);
+    }
+    if (at.live) return;
+    if (at.event) {
+      // An event day inside a month: the day's own balances, at its prices.
+      assert.ok(events.has(at.stop));
+      const row = rowOf.get(at.stop)!;
+      assert.equal(head.count, row.events, `stop ${i}: the day's events are counted`);
+      if (at.point == null) onEvent++;
+    } else {
+      const prev = full.eventDays.filter((d) => d < at.stop).pop()!;
+      assert.equal(amounts(at.stop), amounts(prev), `stop ${i}: the makeup is the last event's`);
+      between++;
+    }
+    // The line's point, where priced, is the same figure.
+    if (at.point != null) {
+      const [, , coll, debt] = line.points[at.point];
+      if (coll != null && debt != null) {
+        assert.ok(near(coll, head.collateral.now, Math.max(0.01, coll * 1e-6)), `stop ${i}: the line's held`);
+        assert.ok(near(debt, head.debt.now, Math.max(0.01, debt * 1e-6)), `stop ${i}: the line's owed`);
+        lineChecked++;
+      }
+    }
+  });
+  assert.ok(between > 0, "some stops fall between events");
+  assert.ok(onEvent > 0, "some stops are event days inside a month");
+  assert.ok(outside > 0, "some stops fall before the window");
+  assert.ok(lineChecked > 0, "some points checked against the line");
 });
 
 // ── the route's day rows ────────────────────────────────────────────────────
@@ -725,4 +1300,87 @@ test("the counter counts the card's transactions", () => {
   assert.equal(s.count, 33);
   assert.equal(s.txs, 28);
   assert.equal(m.totalTxs, 28);
+});
+
+// ── The flows panel and the timeline tied together (lib/shared/flow-focus.ts) ──
+
+test("the event card's sum: the running totals around each event meet the route's day rows, and the printed lines add", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  assert.equal(focus.length, 63);
+  let exact = 0;
+  for (const ev of focus) {
+    const cum = eventCum(route, focus, ev.id);
+    assert.ok(cum, `a sum for ${ev.id}`);
+    if (cum.exact) exact++;
+    // The event's own legs are the move from before to after.
+    for (const l of ev.legs) if (l.usd != null) assert.ok(cum.after[l.bucket] - cum.before[l.bucket] >= l.usd - 1e-6);
+    // The last event of a day lands on the day row.
+    const sameDay = focus.filter((e) => Math.floor(e.ts / 86_400) === Math.floor(ev.ts / 86_400));
+    if (sameDay[sameDay.length - 1].id === ev.id) {
+      const row = route.rows.find((r) => r.day === cum.stop)!;
+      for (const b of route.buckets) assert.ok(near(cum.after[b.key], row.cum[b.key] ?? 0, 1), `${b.key} at ${ev.id}`);
+    }
+    // Held at the event: any figure; the printed lines add to the printed total.
+    for (const side of ["collateral", "debt"] as const) {
+      const held: number = stateAt(route, cum.stop)[side].now;
+      const sum = eventSideSum(route, side, cum, held);
+      assert.equal(
+        sum.lines.reduce((a, l) => a + l.dollars, 0),
+        sum.total.dollars,
+        `${side} at ${ev.id}`,
+      );
+      assert.equal(sum.total.amount, wholeUsd(held));
+      for (const l of sum.lines) assert.equal(l.hl, cum.buckets.has(l.key));
+    }
+  }
+  assert.equal(exact, 63, "the page holds the whole history, so every event's totals are its own");
+  // The 29 Sep 2026 Borrow of 200 USDC: Borrowed moves by $200 and is the highlighted line.
+  const borrow = fixture.events.find(
+    (e) =>
+      e.timestamp >= Date.UTC(2026, 8, 29) / 1000 &&
+      (e.context?.data as { eventType?: string } | undefined)?.eventType === "borrow",
+  );
+  if (borrow) {
+    const cum = eventCum(route, focus, borrow.id)!;
+    assert.ok(near(cum.after.borrowed - cum.before.borrowed, 200, 1));
+  }
+});
+
+test("the event card's sum where the page lacks some of a day's events: the day's close, said so", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const all = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  // A day with two or more events, one of them left off the page.
+  const byDay = new Map<number, typeof all>();
+  for (const e of all) byDay.set(Math.floor(e.ts / 86_400), [...(byDay.get(Math.floor(e.ts / 86_400)) ?? []), e]);
+  const busyDay = [...byDay.values()].find((xs) => xs.length >= 2 && xs.some((x) => x.legs.length > 0));
+  assert.ok(busyDay, "the fixture has a day with two events");
+  const dropped = busyDay[busyDay.length - 1];
+  const page = all.filter((e) => e.id !== dropped.id);
+  const cum = eventCum(route, page, busyDay[0].id)!;
+  if (dropped.legs.some((l) => (l.usd ?? 0) > 1)) {
+    assert.equal(cum.exact, false);
+    const row = route.rows.find((r) => r.day === cum.stop)!;
+    for (const b of route.buckets) assert.ok(near(cum.after[b.key], row.cum[b.key] ?? 0, 1e-6));
+  }
+});
+
+test("the fill rule: no two lines of a side share a fill", () => {
+  // A line's fill (lifetime-flows-tip.tsx fillStyle): held solid; an outflow
+  // its hatch in its tone; an inflow the faded hue with its texture, or none.
+  const fillOf = (b: (typeof AAVE_V3_FLOW_BUCKETS)[number]) =>
+    b.dir === "in"
+      ? `in:${b.hatch ?? "plain"}`
+      : `out:${b.tone ?? "exit"}:${b.hatch ?? (b.tone && b.tone !== "exit" ? "forward" : "reverse")}`;
+  for (const side of ["collateral", "debt"] as const) {
+    const fills = ["held", ...AAVE_V3_FLOW_BUCKETS.filter((b) => b.side === side).map(fillOf)];
+    // The window's opening line ("Held on …") takes the rings.
+    if (side === "collateral") fills.push("in:rings");
+    assert.equal(new Set(fills).size, fills.length, `${side}: ${fills.join(", ")}`);
+  }
+  const used = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "usedToRepay");
+  const sold = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "soldToRepay");
+  assert.notEqual(used?.hatch, sold?.hatch, "Used to repay has its own hatch");
 });

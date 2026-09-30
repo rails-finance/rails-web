@@ -47,7 +47,9 @@ import {
   liqIncentiveRefProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
+import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
 
@@ -59,6 +61,10 @@ export interface CompoundV2EventDetailProps {
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
+
+/** "oracle at block 47,020,084": the price pill names the block it was read at. */
+const oracleNote = (block?: number) =>
+  block != null ? `oracle at block ${block.toLocaleString("en-US")}` : "oracle at block";
 
 /**
  * The valued two-leg liquidation breakdown, at Compound's OWN oracle price
@@ -120,13 +126,13 @@ function buildCompoundV2LiqForensics(
         symbol: collSym,
         priceUsd: collPrice,
         priceProv: liqAtBlockPriceProv(collSym, numeraire, coords),
-        note: "oracle at block",
+        note: oracleNote(coords.blockNumber),
       },
       {
         symbol: debtSym,
         priceUsd: debtPrice,
         priceProv: liqAtBlockPriceProv(debtSym, numeraire, coords),
-        note: "oracle at block",
+        note: oracleNote(coords.blockNumber),
       },
     ],
     // ETH before the oracle migration, USD after — Compound's own numeraire.
@@ -271,11 +277,46 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
   // The valued two-leg breakdown, beneath the chain-state grid — only once the
   // oracle-at-block walk has priced BOTH legs (token-only until then).
   const forensics = ctx.eventType === "liquidation" ? buildCompoundV2LiqForensics(ctx, coords) : undefined;
+  const values = ctx.eventType === "liquidation" ? compoundV2LiquidationValues(ctx) : undefined;
+  const collM = ctx.collateralMarket ? COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket] : undefined;
 
   return (
     <>
       <ChainTruthDetail stats={stats} />
       {forensics && <LiquidationForensics {...forensics} />}
+      {ctx.eventType === "mint" && wallet && blockNumber != null && (
+        <CTokenMembershipLine
+          protocol="compound-v2"
+          brand="Compound"
+          wallet={wallet}
+          block={blockNumber}
+          market={ctx.market}
+          symbol={ctx.marketSymbol}
+          comptroller={{ name: "Comptroller", address: COMPOUND_V2_ADDRESSES.COMPTROLLER }}
+        />
+      )}
+      {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
+        <CTokenLiquidationBreakdown
+          protocol="compound-v2"
+          brand="Compound"
+          wallet={wallet}
+          block={blockNumber}
+          comptroller={{ name: "Comptroller", address: COMPOUND_V2_ADDRESSES.COMPTROLLER }}
+          collateralKey={ctx.collateralMarket}
+          debtKey={ctx.market}
+          repaidRaw={ctx.raw?.amount}
+          debtSymbol={ctx.marketSymbol}
+          repaid={Math.abs(Number(ctx.assetsDelta ?? "0"))}
+          debtBefore={ctx.debtBefore != null ? Number(ctx.debtBefore) : null}
+          seizeTokens={Number(ctx.seizeTokens ?? "0")}
+          seizeSymbol={collM?.cSymbol ?? `c${ctx.collateralSymbol ?? ""}`}
+          seizedValue={values?.seizedValue ?? null}
+          clearedValue={values?.clearedValue ?? null}
+          incentive={values?.incPct ?? null}
+          protocolShareRow="Protocol seize share"
+          format={values?.numeraire === "ETH" ? (n: number) => `${formatNumber(n)} ETH` : undefined}
+        />
+      )}
     </>
   );
 }

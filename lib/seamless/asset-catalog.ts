@@ -42,6 +42,19 @@ export const SEAMLESS_ORACLE = "0xfdd4e83890bccd1fbf9b10d71a5cc0a738753b01" as c
 /** The chain every address here lives on. */
 export const SEAMLESS_CHAIN_ID = BASE_CHAIN_ID;
 
+/** Reserves the oracle prices at a fixed $1.00: SEAM, DEGEN and BRETT. Their
+ *  source (`getSourceOfAsset`) is 0x6028…6072, a contract whose
+ *  `latestAnswer()` returns 1e8 with no feed description (read at Base block
+ *  51,970,584). All three carry LTV 0 and liquidation threshold 0, so the
+ *  price moves no health factor; it is no market price, and the market page
+ *  leaves them out of its dollar totals. */
+export const SEAMLESS_FIXED_PRICE_SOURCE = "0x602823807c919a92b63cf5c126387c4759976072" as const;
+export const SEAMLESS_FIXED_PRICE_RESERVES: ReadonlySet<string> = new Set([
+  "0x1c7a460413dd4e964f96d8dfc56e7223ce88cd85", // SEAM
+  "0x4ed4e862860bed51a9570b96d89af5e1b0efefed", // DEGEN
+  "0x532f27101965dd16442e59d40670faf5ebb142e4", // BRETT
+]);
+
 /** The block every reserve was frozen in — one action, all eighteen. Found by
  *  binary search over the frozen bit of each reserve's configuration word using
  *  archive `eth_call` (frozen at 28,952,883, not frozen at 28,952,882), then

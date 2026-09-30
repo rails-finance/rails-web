@@ -90,22 +90,25 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
   if (view.liquidationCount > 0) {
     lines.push(
       `- **Liquidations:** ${view.liquidationCount}` +
-        (view.status === "open" ? " — the account remains open: Dolomite liquidations are partial and repeatable" : ""),
+        (view.status === "open"
+          ? " — the account remains open: a liquidation repays half or all of the debt, and the collateral left over stays in the account"
+          : ""),
     );
   }
   lines.push("");
 
   if (view.status !== "open") {
-    // Unwound: the headline is what each market lane held at its height —
-    // PAR amounts (the oracle prices the PRESENT, not history).
+    // Unwound: the headline is what each market lane held at its height, in
+    // tokens where the page read them from the rows, else in PAR (the oracle
+    // prices the PRESENT, not history).
     for (const p of view.peakSupplies) {
       lines.push(
-        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
+        `- **Highest recorded balance (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     for (const p of view.peakBorrows) {
       lines.push(
-        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol} (par)`}`,
+        `- **Highest recorded debt (${p.symbol}, market ${p.marketId}):** ${p.decimalsUnread ? notLoaded(p.symbol, p.marketId) : `${amt(p.amount)} ${p.symbol}${p.tokens ? "" : " (par)"}`}`,
       );
     }
     if (view.peakSupplies.length > 0 || view.peakBorrows.length > 0) lines.push("");

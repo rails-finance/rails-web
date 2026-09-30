@@ -22,9 +22,11 @@ import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
 import type { PositionCardModel } from "@/lib/share/position-card";
+import { loanCost, pwnLoanState, viewFromSummary } from "@/lib/pwn/economics";
 
-const STATUS_WORD: Record<PwnPositionSummary["status"], string> = {
-  open: "Open",
+const STATUS_WORD: Record<ReturnType<typeof pwnLoanState>, string> = {
+  running: "Open",
+  unclaimed: "Defaulted, not yet claimed",
   repaid: "Repaid",
   defaulted: "Defaulted",
 };
@@ -53,25 +55,29 @@ export function pwnShareCardModel(summaries: PwnPositionSummary[] | null, wallet
 
   const stats: PositionCardModel["stats"] = [];
   if (loan.status === "open") {
-    // Mirrors the open card's own three leading columns (Collateral, Debt,
-    // Repay) — the fourth, "Due", is a date rather than a value stat and sits
-    // outside the three-stat cap here.
+    // Mirrors the open card's three leading columns (Collateral,
+    // Principal, Repay or Owed at deadline) — the fourth, "Due", is a date
+    // rather than a value stat and sits outside the three-stat cap here.
     if (loan.collateral) stats.push({ label: CARD_VOCAB.collateral, value: assetValue(loan.collateral) });
-    if (loan.credit) stats.push({ label: CARD_VOCAB.debt, value: assetValue(loan.credit) });
-    if (loan.repayAmount != null && loan.credit && !loan.credit.decimalsUnread) {
-      stats.push({ label: "Repay", value: `${formatCompact(loan.repayAmount)} ${loan.credit.symbol}` });
+    if (loan.credit) stats.push({ label: "Principal", value: assetValue(loan.credit) });
+    const cost = loanCost(viewFromSummary(loan));
+    if (cost && loan.credit) {
+      stats.push({
+        label: cost.shape === "accruing" ? "Owed at deadline" : "Repay",
+        value: `${formatCompact(cost.total)} ${loan.credit.symbol}`,
+      });
     }
   } else {
     // Repaid/defaulted: the struck collateral and credit terms, same as the
     // open card's own figures — a settled loan's terms don't change.
     if (loan.collateral) stats.push({ label: CARD_VOCAB.collateral, value: assetValue(loan.collateral) });
-    if (loan.credit) stats.push({ label: CARD_VOCAB.debt, value: assetValue(loan.credit) });
+    if (loan.credit) stats.push({ label: "Principal", value: assetValue(loan.credit) });
   }
 
   return {
     session: "pwn",
     subject: shortSubject(wallet),
-    status: STATUS_WORD[loan.status],
+    status: STATUS_WORD[pwnLoanState({ ...loan, extendedDueAt: loan.latestDefaultAt })],
     stats,
     asOf: new Date(),
   };

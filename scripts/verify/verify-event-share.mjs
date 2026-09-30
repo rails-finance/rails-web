@@ -74,6 +74,7 @@
 //   BASE=http://localhost:3101 FAMILIES=spark,fluid node scripts/verify/verify-event-share.mjs
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 import {
   exhaustPaging,
   waitForCountSettled,
@@ -276,6 +277,8 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
   // `-closed` entries pin a closed account, which narrates nothing and still
   // draws the control.
   if (EXPLANATION_FROM_FIRST_PAINT.has(label)) {
+    // A closed position card (ui-jobs 209) draws its Explanation row once open.
+    await openPositionCards(page);
     const copyView = page.locator('button[aria-label="Copy a link to this view"]').first();
     await copyView.waitFor({ state: "attached", timeout: 5000 }).catch(() => {});
     check(`${label} @${width}: the card's Explanation pane carries the copy-view link`, (await copyView.count()) > 0);

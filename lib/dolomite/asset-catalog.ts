@@ -84,3 +84,36 @@ export function accountLabel(accountNumber: string): string {
   if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER) return "Borrow Position (WLFI frontend account)";
   return `Borrow Position #${shortAccountNumber(norm)}`;
 }
+
+/** The other side of a transfer, named as the listing and the card header name
+ *  that account ("account 0 (Dolomite Balance)", "Borrow Position #0xd010…e722"). */
+export function otherAccountName(accountNumber: string): string {
+  const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
+  if (norm === "0") return "account 0 (Dolomite Balance)";
+  if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER) return "the WLFI frontend account";
+  return accountLabel(norm);
+}
+
+/** A price in dollars without the sign: two decimals from $1, four
+ *  significant digits below it, so a token worth a few cents keeps the digits
+ *  that tell two prices apart ($0.05303, not $0.05). */
+export function formatDolomitePrice(n: number): string {
+  if (Number.isFinite(n) && n > 0 && n < 1)
+    return n.toLocaleString("en-US", { minimumSignificantDigits: 4, maximumSignificantDigits: 4 });
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** What an account label means, for the tip on its first appearance. */
+export function accountLabelTip(accountNumber: string): string {
+  const norm = normalizeAccountNumber(accountNumber) ?? accountNumber;
+  const numbers =
+    "A wallet keeps its Dolomite balances in numbered accounts. Each account number is a separate position: its balances back each other, and it is margined and liquidated on its own.";
+  if (norm === "0")
+    return `${numbers} Account 0 is the wallet's Dolomite Balance, its default account, which usually funds the others.`;
+  if (norm === WLFI_FRONTEND_ACCOUNT_NUMBER)
+    return `${numbers} The World Liberty Financial (WLFI) app, which runs on Dolomite, opens every borrow position under one account number (0x4747…4747). Many wallets share the number, and each wallet's account under it is its own.`;
+  const hex = shortAccountNumber(norm);
+  return hex === norm
+    ? `${numbers} This is account ${norm}; account 0 is the wallet's Dolomite Balance.`
+    : `${numbers} This is account ${hex}, the number in hexadecimal and shortened (the page address carries it in decimal); account 0 is the wallet's Dolomite Balance.`;
+}

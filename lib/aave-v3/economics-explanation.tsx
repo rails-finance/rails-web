@@ -9,14 +9,11 @@ import type { TowerLine, TowerSideData } from "@/lib/shared/chain-truth-economic
 import type { AaveV3TowerData } from "@/lib/aave-v3/chain-truth-tower";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 import { formatCompactUsd } from "@/components/shared/economics-chart-primitives";
-import { formatCompact } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { WRITTEN_OFF_KEY } from "@/lib/aave-v3/chain-truth-tower";
-
-/** Signed dollars for a net: "−$295". */
-const signedUsd = (n: number): string => `${n < 0 ? "−" : "+"}${formatCompactUsd(Math.abs(n))}`;
 
 /** "67.36 AAVE and 1.2 WETH" — each line's own token amount. */
 const tokenList = (lines: TowerLine[]): string =>
@@ -40,6 +37,12 @@ export interface AaveV3EconomicsOpts {
   /** The liquidation card states the split, the bonus and the net, so the
    *  pane keeps one line pointing at it (SparkLend). */
   liquidationOnCard?: boolean;
+  /** Dollar figures in whole dollars, as the panel's rows print them where
+   *  the tower sets `fullUsdAmounts` (SparkLend). */
+  fullUsd?: boolean;
+  /** Bullets the market adds after the flows (SparkLend: the debts behind
+   *  the debt side's price change). */
+  extraItems?: ReactNode[];
 }
 
 const sumScalar = (lines: TowerLine[], valued: boolean): number =>
@@ -56,8 +59,21 @@ function sideSymbol(side: TowerSideData): string | null {
   return syms.size === 1 ? [...syms][0] : null;
 }
 
-function fmt(scalar: number, valued: boolean, symbol: string | null): string {
-  return valued ? formatCompactUsd(scalar) : symbol ? `${formatCompact(scalar)} ${symbol}` : formatCompact(scalar);
+/** Whole dollars: "$6,412,345". */
+export const wholeUsd = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/** Whole dollars, with a positive figure under half a dollar as "<$1". */
+const wholeOrUnder = (n: number): string => (n > 0 && n < 0.5 ? "<$1" : wholeUsd(n));
+
+function fmtWith(full: boolean) {
+  return (scalar: number, valued: boolean, symbol: string | null): string =>
+    valued
+      ? full
+        ? wholeOrUnder(scalar)
+        : formatCompactUsd(scalar)
+      : symbol
+        ? `${formatCompact(scalar)} ${symbol}`
+        : formatCompact(scalar);
 }
 
 function Fig({ children }: { children: ReactNode }) {
@@ -66,6 +82,9 @@ function Fig({ children }: { children: ReactNode }) {
 
 export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3EconomicsOpts = {}): ReactNode {
   const label = opts.label ?? "Aave V3";
+  const fmt = fmtWith(opts.fullUsd === true);
+  const usdOnly = (n: number) => (opts.fullUsd ? wholeUsd(n) : formatCompactUsd(n));
+  const signedUsd = (n: number): string => `${n < 0 ? "−" : "+"}${usdOnly(Math.abs(n))}`;
   const valued = data.valued;
   const collSym = sideSymbol(data.collateral);
   const debtSym = sideSymbol(data.debt);
@@ -150,7 +169,18 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
             {" "}
             and earned <Fig>{fmt(collEarned, valued, collSym)}</Fig> of interest on it
             {valued && earnedLines.length > 1 ? (
-              <> ({earnedLines.map((l) => `${formatCompactUsd(l.usd ?? 0)} on ${l.symbol}`).join(" and ")})</>
+              <>
+                {" "}
+                (
+                {earnedLines
+                  .map((l) =>
+                    opts.fullUsd && (l.usd ?? 0) < 0.5
+                      ? `${formatNumber(l.amount)} ${l.symbol}`
+                      : `${usdOnly(l.usd ?? 0)} on ${l.symbol}`,
+                  )
+                  .join(" and ")}
+                )
+              </>
             ) : null}
           </>
         )}
@@ -175,7 +205,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {Math.abs(collPrice) >= 0.5 && (
           <>
             ; price moves while the tokens were held {collPrice > 0 ? "add" : "take away"}{" "}
-            <Fig>{formatCompactUsd(Math.abs(collPrice))}</Fig>
+            <Fig>{usdOnly(Math.abs(collPrice))}</Fig>
           </>
         )}
         {currentColl > 0 ? (
@@ -200,6 +230,17 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           <>
             {" "}
             and <Fig>{fmt(debtInterest, valued, debtSym)}</Fig> of interest accrued on it
+            {opts.fullUsd &&
+            valued &&
+            interest?.symbol &&
+            (data.debt.earned ?? []).every((l) => l.flowLabel === "Interest repaid") &&
+            debtInterest - (interest.usd ?? 0) > 0.5 ? (
+              <>
+                {" "}
+                ({usdOnly(debtInterest - (interest.usd ?? 0))} paid in repayments of debts no longer held,{" "}
+                {usdOnly(interest.usd ?? 0)} on {interest.symbol} over its whole life)
+              </>
+            ) : null}
           </>
         )}
         {debtRepaid > 0 && (
@@ -227,7 +268,7 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
         {Math.abs(debtPrice) >= 0.5 && (
           <>
             ; price moves while the debt was owed {debtPrice > 0 ? "add" : "take away"}{" "}
-            <Fig>{formatCompactUsd(Math.abs(debtPrice))}</Fig>
+            <Fig>{usdOnly(Math.abs(debtPrice))}</Fig>
           </>
         )}
         {currentDebt > 0 ? (
@@ -279,7 +320,13 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
           {tokenList(data.debt.liquidated.filter((l) => !isWrittenOff(l)))} of debt:{" "}
           <Fig>{fmt(collLiquidated, valued, collSym)}</Fig> against <Fig>{fmt(debtLiquidated, valued, debtSym)}</Fig>
           {data.flowsPricedAtEvents ? " at the prices of the day" : ""}, a net {signedUsd(net)} to the borrower: the
-          liquidation bonus, part of which went to the {treasury} treasury.
+          liquidation bonus
+          {data.liquidationFeeZero
+            ? `, all of it to the liquidator (the ${treasury} protocol fee on the bonus was 0)`
+            : split.length > 0
+              ? `, part of which went to the ${treasury} treasury`
+              : ""}
+          .
         </span>,
       );
   } else if (collLiquidated > 0) {
@@ -293,8 +340,8 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
     items.push(
       <span key="price-basis">
         {data.flowsPricedAtEvents
-          ? "Each flow is valued at the oracle price at its block, interest and what is held now at today's price"
-          : "Flows are valued at the oracle price at their block where the event carries one, the rest, interest and what is held now at today's price"}
+          ? "Each flow is valued at the oracle price at its block, interest at the price of the event that closed each stretch it built up over (since the last event at today's), and what is held now at today's price"
+          : "Flows are valued at the oracle price at their block where the event carries one, interest at the price of the event that closed each stretch it built up over, and the rest and what is held now at today's price"}
         ; the Price change row is the difference, what the tokens gained or lost in value while the position held them.
         In tokens, what came in plus interest less what left equals what is held now.
       </span>,
@@ -316,6 +363,8 @@ export function aaveV3EconomicsExplanation(data: AaveV3TowerData, opts: AaveV3Ec
       </span>,
     );
   }
+
+  items.push(...(opts.extraItems ?? []));
 
   if (items.length === 0) return null;
 
@@ -389,13 +438,15 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
         : []),
       {
         bold: "Interest",
-        text: "supplied balances earn interest and debts accrue it without an event. On the supply side each asset's interest is a separate row beside what was deposited, valued at today's price; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed.",
+        text: "supplied balances earn interest and debts accrue it without an event. On the supply side each asset's interest is a separate row beside what was deposited; on the debt side, interest still owed is a segment of the debt bar and interest already repaid is a row beside what was borrowed. A row of interest is valued stretch by stretch, at the oracle price of the event that ended each stretch, and interest since the last event at today's price; interest still owed is part of the debt now, at today's price.",
       },
       ...(shows(hasLiquidated)
         ? [
             {
               bold: "Liquidated",
-              text: "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
+              text: data?.liquidationFeeZero
+                ? "the collateral a liquidation took, all of it to the liquidator (no protocol fee on the bonus), and the debt it cleared, valued at the prices when it happened."
+                : "the collateral a liquidation took (the liquidator's share and the treasury's fee) and the debt it cleared, valued at the prices when it happened.",
             },
           ]
         : []),

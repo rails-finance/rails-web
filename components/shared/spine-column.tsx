@@ -104,6 +104,11 @@ export interface SpineTokenRow {
   /** The symbol printed after the flanking value (opt-in; the icon alone
    *  identifies the token elsewhere). */
   unit?: string;
+  /** Whole units below a million on the flanking value (SpineVal `full`). */
+  fullValue?: boolean;
+  /** The flanking value as shown, where the family states amounts at its own
+   *  precision. Wins over `fullValue`. Default: the compact spine form. */
+  display?: string;
   /** Optional badge overlay on the token icon. "check"/"cross" are an
    *  event's own meaning (a collateral toggle); "send" is the custody mark —
    *  the paper plane in a neutral disc, the asset changed hands. "swap" is the
@@ -1342,7 +1347,10 @@ export function SpineColumn({
                   // coverage tripwire would otherwise ask for a receipt for
                   // "how many rows are in this folder".
                   <span data-prov-exempt="" className="justify-self-start -ml-2" style={{ gridColumn: "4 / 6" }}>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10">
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
+                      title={`${folderCount.toLocaleString("en-US")} events grouped in this folder`}
+                    >
                       {folderCount.toLocaleString("en-US")}
                     </span>
                   </span>
@@ -1414,6 +1422,8 @@ export function SpineColumn({
               max={row.valueMax}
               prov={row.prov}
               unit={row.unit}
+              full={row.fullValue}
+              text={row.display}
             />
             {row.direction === "left" ? <ArrowFromDot direction="left" size={scale.arrowSize} /> : <span />}
             {/* One corner, one badge. An explicit row badge WINS over the
@@ -1461,6 +1471,8 @@ export function SpineColumn({
               max={row.valueMax}
               prov={row.prov}
               unit={row.unit}
+              full={row.fullValue}
+              text={row.display}
             />
           </div>
         ))}

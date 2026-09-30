@@ -44,6 +44,11 @@ export interface FilterDimension<F> {
    *  and treated as "inactive" (e.g. visibility relaxing to "all" on a wallet
    *  view, so it never shows a chip). Defaults to [] (empty). */
   defaultValues?: (f: F) => string[];
+  /** Chip text for the default selection, where the default is a
+   *  constraint worth naming ("Status: in escrow"). Drawn as a fixed chip, with
+   *  no remove control and no Reset, while the dimension is inactive. Null or
+   *  unset draws nothing. */
+  defaultChip?: (f: F) => string | null;
   /** Chip text for an active selection. Default: `${label}: a, b (+N)`. */
   chipLabel?: (values: string[], options: FilterOptionDef[]) => string;
   /** Optional grouping header in the + Filter menu (insertion order preserved). */

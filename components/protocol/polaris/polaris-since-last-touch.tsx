@@ -127,20 +127,23 @@ export function PolarisSinceLastTouchRow({
       `Everything the protocol has done to this CDP since that touch — valued at the feed now. Each leg is its own ` +
       `getter on the cdpManager, pending until the CDP's next touch settles it into the stated figures: interest ` +
       `charged on the debt, the Protocol Safety Rate's stability gain against it, the pETH reward on the debt, and ` +
-      `the CDP's pro-rata share of every PSM mint and redemption since — which moves both sides at once.`,
-    formula: "(mintRedeemCollChange + bcTokenGain) × price − accruedInterest − mintRedeemDebtChange + accruedStables",
+      `the CDP's net pro-rata share of every PSM mint and redemption since, whose two sides can move in opposite ` +
+      `directions. Where those legs clear more than the debt, the part below zero is taken back out: the next touch ` +
+      `settles the debt to zero rather than paying the difference to the CDP.`,
+    formula:
+      "(mintRedeemCollChange + bcTokenGain) × price − accruedInterest − mintRedeemDebtChange + accruedStables + min(0, entireDebt)",
     inputs: [
       ...(Math.abs(w.raw.psmColl) > DUST || Math.abs(w.raw.psmDebt) > DUST
         ? [
             {
-              label: "PSM share, collateral leg",
+              label: "net PSM share, collateral side",
               value: formatExact(w.raw.psmColl),
               kind: "chain" as const,
               pclass: "state" as const,
               note: "getCDPMintRedeemCollChange(id), in pETH",
             },
             {
-              label: "PSM share, debt leg",
+              label: "net PSM share, debt side",
               value: formatExact(w.raw.psmDebt),
               kind: "chain" as const,
               pclass: "state" as const,
@@ -198,7 +201,7 @@ export function PolarisSinceLastTouchRow({
       `protocol's, which is all of it: the holder did nothing inside this window, so no other cause exists. Equity ` +
       `here is a valuation at a block, not a profit; naming a profit would need a price for the holder's own ` +
       `deposits, which is a choice about basis rather than a fact of the chain.`,
-    formula: "(entireColl × price now − entireDebt) − (coll × price at the touch − debt)",
+    formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
     inputs: [
       {
         label: "equity at the touch",
@@ -211,7 +214,7 @@ export function PolarisSinceLastTouchRow({
         value: formatExact(w.equityNow),
         kind: "chain-derived",
         pclass: "state",
-        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt at the head block",
+        note: "getCDPEntireColl × previewPrice − getCDPEntireDebt (zero at or below zero) at the head block",
       },
     ],
   };
@@ -236,6 +239,8 @@ export function PolarisSinceLastTouchRow({
       header={
         <>
           <span className="text-sm text-foreground">Since its last touch</span>
+          {/* The closed row names its figure: a bare number read as nothing. */}
+          <span className="text-xs text-rb-500">change in equity at the feed</span>
           {/* An ECHO of the "Change in equity at the feed" receipt below, not a
               second receipt for the same figure: one fact, stated where the row
               is closed and again where it opens. */}
@@ -244,15 +249,17 @@ export function PolarisSinceLastTouchRow({
               <Signed value={w.total} unit={stable} />
             </span>
           </Prov>
-          <span className="ml-auto text-xs text-rb-500">
-            <BlockRef block={w.from.block} /> · {elapsed} ago
+          {/* The block is a link to the touch's block on the chain's explorer,
+              chrome rather than a figure of this row. */}
+          <span className="ml-auto text-xs text-rb-500" data-prov-exempt="">
+            from block <BlockRef block={w.from.block} /> · {elapsed} ago
           </span>
         </>
       }
     >
       <div className="px-5 pb-3 pt-1 text-xs">
         <Row
-          label="The feed"
+          label="The feed:"
           detail={
             <>
               pETH {formatPethPrice(w.from.pethInDebt)} → {formatPethPrice(w.to.pethInDebt)} {stable}, on the collateral
@@ -266,8 +273,14 @@ export function PolarisSinceLastTouchRow({
           }
         />
         <Row
-          label="The protocol"
-          detail={legNames.length > 0 ? legNames.join(", ") : "the legs pending since that touch"}
+          label="The protocol's pending legs:"
+          detail={
+            legNames.length > 1
+              ? `${legNames.slice(0, -1).join(", ")} and ${legNames[legNames.length - 1]}`
+              : legNames.length === 1
+                ? legNames[0]
+                : "the legs pending since that touch"
+          }
           value={
             <Prov info={protocolProv} value={formatExact(w.protocol)}>
               <Signed value={w.protocol} unit={stable} />

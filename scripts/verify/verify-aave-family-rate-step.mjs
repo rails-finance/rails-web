@@ -22,6 +22,15 @@
 // `aave_family_reserve_data` on the onboarding box, 2026-09-06, and never derived from
 // this code either.
 //
+// RE-PINNED 2026-09-30 (the amounts and the set of held sides). The 09-06 pin
+// took each side's held amount from index rows that have since been settled:
+// the whale's USDe debt at block 24,914,653 was pinned at 589,839 and the
+// archive node reads 514,941; a PYUSD debt of 208,717 pinned there was 0.
+// The rates and the two observations per note were unaffected and are the
+// 09-06 psql values; the amounts are the routes' figures, spot-checked
+// against `balanceOf` at each note's earlier block (72 of 82 changed amounts
+// within 0.1%, the rest a few interest days apart).
+//
 // ⚠️ THE PINS ARE A PAST, AND THESE WALLETS KEEP TRADING. A note whose later
 // end is at or before the pin's newest block (`pinnedThrough`) is history: it
 // must match the pin field for field, forever. Everything after that block is
@@ -79,7 +88,7 @@ const PAGES = [
     wallet: "0x763c12108c37e19d3c23d7348daff7af802893fd",
     market: "core",
     url: "/ethereum/aave-v3/0x763c12108c37e19d3c23d7348daff7af802893fd?market=core",
-    pill: 23,
+    pill: 20,
   },
   {
     key: "spark:0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6",
@@ -167,7 +176,8 @@ const txOf = (id) => (id.match(/0x[0-9a-fA-F]{64}/)?.[0] ?? "").toLowerCase();
 const TOUCH = new Set(["supply", "withdraw", "borrow", "repay", "liquidation"]);
 
 /** The position's own touches, each with what it held once the row landed —
- *  a running map over ALL rows in chain order, transfers included. */
+ *  a running map over ALL rows in chain order, transfers included; a repay
+ *  made with aTokens lowers the supply by the amount repaid. */
 function holdings(events) {
   const rows = [...events].sort((a, b) => a.blockNumber - b.blockNumber || logIndexOf(a.id) - logIndexOf(b.id));
   const held = new Map();
@@ -189,6 +199,20 @@ function holdings(events) {
       if (own) {
         if (d.supplyAfter != null) at(own).supply = Number(d.supplyAfter);
         if (d.debtAfter != null) at(own).debt = Number(d.debtAfter);
+        // A repay made with aTokens burns the supply it repaid; the row
+        // states only the debt.
+        if (d.eventType === "repay" && d.useATokens === true) {
+          const burned = Number(e.flows?.[0]?.amountFormatted);
+          if (Number.isFinite(burned)) at(own).supply = Math.max(0, at(own).supply - burned);
+        }
+      }
+      // A swap row (a CoW collateral or debt swap, grouped into one row) also
+      // lands its received reserve, the event's second flow — the other leg is
+      // not a row of its own, so its balance rides here.
+      if (d.eventType === "swap" && d.swap) {
+        const other = (e.flows?.[1]?.token ?? "").toLowerCase();
+        if (other && d.swap.receivedSupplyAfter != null) at(other).supply = Number(d.swap.receivedSupplyAfter);
+        if (other && d.swap.receivedDebtAfter != null) at(other).debt = Number(d.swap.receivedDebtAfter);
       }
     }
     if (!TOUCH.has(d.eventType)) continue;
@@ -587,7 +611,10 @@ for (const p of PAGES) {
           .filter(Boolean)
           .join(" · "),
   );
-  data.expected = { historical: got, since, above, below, through };
+  // SparkLend draws no live note whose move rounds to 0.00 points (newcomer
+  // round 2, R7), so those sides are expected off the page there.
+  const drawn = p.proto === "spark" ? above.filter((n) => Math.abs(n.liveRate - n.fromRate) >= 0.005) : above;
+  data.expected = { historical: got, since, above: drawn, below, through };
 }
 
 // 1c. BREAK the rule: read B's OWN transaction for the later end, and show the
@@ -671,7 +698,7 @@ for (const p of PAGES) {
   const noteCount = await marketNoteCount(page);
   check(
     `2c0. ${p.wallet.slice(0, 10)}… — the timeline states a note count (the notes computation ran at all)`,
-    noteCount > 0,
+    noteCount > 0 || pillWanted === 0,
     noteCount > 0
       ? ""
       : "no count after 180s — the reserve-rates fetch never landed, so every count above is a silent zero",
@@ -802,18 +829,17 @@ for (const p of PAGES) {
   }
 }
 
-// 4b. the flat live note — 0xbdfa…'s USDS borrow, Δ 0.00, which MUST render.
-// Since 2026-09-10 a flat move is invisible in the HEADER (which states the
-// later rate, and on a flat note that is the same rate the earlier end had),
-// so the row is opened and the move read where it now lives: under the rate
-// card, as "+0.00 points".
+// 4b. the flat live note — 0xbdfa…'s USDS borrow, Δ 0.00. SparkLend leaves a
+// live note whose move rounds to 0.00 points off the page (newcomer round 2,
+// R7: the note modal promises a move), so no head row may read "0.00 points".
 {
   const p = PAGES[4];
   const page = pages[p.key];
   const ids = await noteIdsOn(page);
   const head = ids.filter((i) => i.endsWith("-head"));
-  const row = page.locator(`[data-market-note="${head[0]}"]`);
-  if (head.length === 1) {
+  let flat = false;
+  for (const id of head) {
+    const row = page.locator(`[data-market-note="${id}"]`);
     await row.scrollIntoViewIfNeeded();
     await row
       .getByRole("button", { expanded: false })
@@ -821,12 +847,12 @@ for (const p of PAGES) {
       .click()
       .catch(() => {});
     await page.waitForTimeout(300);
+    if (/[+−-]0\.00 points/.test((await row.textContent()).replace(/\s+/g, " "))) flat = true;
   }
-  const text = head.length ? (await row.textContent()).replace(/\s+/g, " ") : "";
   check(
-    "4b. 0xbdfa… renders its live note even at Δ 0.00 points (nothing having moved is the fact)",
-    head.length === 1 && /0\.00 points/.test(text),
-    head.length ? text.slice(0, 160) : "no head row",
+    "4b. 0xbdfa… draws no live note whose move rounds to 0.00 points (SparkLend hides them)",
+    !flat,
+    `${head.length} head row(s)`,
   );
 }
 

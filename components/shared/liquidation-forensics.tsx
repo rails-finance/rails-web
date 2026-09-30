@@ -57,6 +57,10 @@ export interface AtBlockPricePill {
    *  letter instead of a mark. */
   address?: string;
   priceUsd: number;
+  /** The price as printed, where the adapter sets its precision (the Aave
+   *  V3 family prints the decimals that reproduce its USD figures); the
+   *  footnote's `format` otherwise. */
+  display?: string;
   priceProv: Provenance;
   /** Source note after the price (default "oracle at block"). */
   note?: string;
@@ -83,6 +87,10 @@ export interface LiquidationForensicsProps {
    *  single governing constant (Maker's penalty settles at a later auction)
    *  passes nothing. */
   premiumReference?: { label: string; value: string; prov: Provenance };
+  /** State the third cell as the collateral ratio at liquidation
+   *  ((1 + premium) × 100%, "122.09%") rather than a signed premium — for a
+   *  protocol whose seized-over-cleared figure is that ratio, not a bonus. */
+  premiumAsRatio?: boolean;
   /** The at-block prices the legs derive from, one pill per asset. */
   pricePills: AtBlockPricePill[];
   /** Denomination formatters — default USD. A protocol whose own unit is not
@@ -204,6 +212,7 @@ export function LiquidationForensics({
   format,
   seizedLabel,
   clearedLabel,
+  premiumAsRatio,
 }: LiquidationForensicsProps) {
   const fmtValue = format?.value ?? formatUsdValue;
   const fmtPrice = format?.price ?? formatPrice;
@@ -217,7 +226,9 @@ export function LiquidationForensics({
       </div>
     );
   const sign = premium >= 0 ? "+" : "−";
-  const premiumPct = `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
+  const premiumPct = premiumAsRatio
+    ? `${((1 + premium) * 100).toFixed(2)}%`
+    : `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
   return (
     <div className="px-5 pb-2">
       <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">
@@ -262,10 +273,10 @@ export function AtBlockPriceFootnote({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500">
       {pills.map((pill, i) => (
-        <Prov key={i} info={pill.priceProv} value={format(pill.priceUsd)} symbol={pill.symbol}>
+        <Prov key={i} info={pill.priceProv} value={pill.display ?? format(pill.priceUsd)} symbol={pill.symbol}>
           <span className="inline-flex items-center gap-1 tabular-nums">
             <TokenChipIcon symbol={pill.symbol} address={pill.address} size={14} />
-            {pill.symbol} {format(pill.priceUsd)}
+            {pill.symbol} {pill.display ?? format(pill.priceUsd)}
             <span className="text-rb-400">· {pill.note ?? "oracle at block"}</span>
           </span>
         </Prov>

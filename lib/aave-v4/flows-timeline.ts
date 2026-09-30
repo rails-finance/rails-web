@@ -27,7 +27,9 @@ import {
   LIQUIDATIONS_NOT_COUNTED,
   flowEventsFromLegs,
   flowSeriesTimeline,
+  focusEventsFromLegs,
 } from "@/lib/aave-v3/flows-timeline";
+import type { FocusEvent } from "@/lib/shared/flow-focus";
 
 export type AaveV4FlowLeg =
   | "supplied"
@@ -190,6 +192,31 @@ export function aaveV4FlowTimeline(
     todayPrices,
     totalEvents: flows.events.length,
   };
+}
+
+/** A spoke position's events for the flow lines (lib/shared/flow-focus.ts).
+ *  `todayPrices` is by symbol. */
+export function aaveV4FocusEvents(
+  events: BaseActivityEvent[],
+  wallet: string,
+  spokeName: string,
+  todayPrices: Record<string, number> | undefined,
+): FocusEvent[] {
+  const ordered = events
+    .filter((e) => isAaveV4PositionEvent(e, wallet, spokeName))
+    .sort((a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber);
+  return focusEventsFromLegs(
+    ordered,
+    (ev) =>
+      aaveV4EventLegs(ev).map((l) => ({
+        symbol: l.symbol,
+        address: l.symbol,
+        leg: l.leg,
+        amount: l.amount,
+        price: l.price,
+      })),
+    todayPrices,
+  );
 }
 
 /** Aave V3's buckets under the V4 timeline's event names (its liquidation

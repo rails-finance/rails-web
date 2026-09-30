@@ -16,6 +16,7 @@ import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { ledgerFieldProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { polarisExplainerTeaser } from "@/lib/polaris/explainer-clauses";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
+import { formatNumber } from "@/lib/utils/format";
 import { PolarisEventHeader } from "./polaris-event-header";
 import { PolarisBarsSlot } from "./polaris-bars-slot";
 import { PolarisEventDetail } from "./polaris-event-detail";
@@ -60,6 +61,9 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
       // A deposit moves pETH INTO the position; a withdrawal out of it.
       direction: dColl > 0 ? "left" : "right",
       value: Math.abs(dColl),
+      // The header's rule: in full, three decimals, the token named.
+      display: formatNumber(Math.abs(dColl)),
+      unit: PETH.symbol,
       prov: {
         info: ledgerFieldProv("collChange", coords, ctx.raw?.collChange),
         value: chainTruthDeltaValue(dColl, labeled),
@@ -73,6 +77,8 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
       // A borrow sends the stablecoin OUT to the holder; a repay brings it in.
       direction: dDebt > 0 ? "right" : "left",
       value: Math.abs(dDebt),
+      display: formatNumber(Math.abs(dDebt)),
+      unit: stable,
       prov: {
         info: ledgerFieldProv("debtChange", coords, ctx.raw?.debtChange),
         value: chainTruthDeltaValue(dDebt, labeled),

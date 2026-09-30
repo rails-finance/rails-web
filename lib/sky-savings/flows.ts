@@ -1,5 +1,5 @@
 // Lifetime flows for a Sky Savings position: the scrubber's FlowTimeline
-// (lib/shared/flows-timeline.ts) and the ledger under it.
+// (lib/shared/flows-timeline.ts).
 //
 // ONE SIDE. A savings position has no debt, so every bucket sits on the
 // collateral side and the scrubber draws one bar (rails-ops
@@ -8,20 +8,18 @@
 //
 // THE USD AXIS IS THE PSM. USDS is valued at 1 ÷ (1 + tout) USDC at each
 // block (/rates `psm`); held sUSDS on a day is its shares × chi at that day's
-// end (/rates `chiDaily`) at that rate. The ledger stays in USDS, where every
-// figure is exact.
+// end (/rates `chiDaily`) at that rate. The Explanation states the totals in
+// USDS, where every figure is exact.
 
-import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { FlowBucket, FlowDayRow, FlowTimeline } from "@/lib/shared/flows-timeline";
-import { ledgerLineProv } from "@/lib/sky-savings/provenance";
-import { SUSDS, USDS } from "@/lib/sky-savings/constants";
+import { SUSDS } from "@/lib/sky-savings/constants";
 import { rayNumber, units, usdcPerUsdsAt } from "@/lib/sky-savings/math";
 import type { SkyFlowDay, SkyPosition, SkyRates } from "@/lib/sky-savings/types";
 import type { SkySavingsContext } from "@/lib/shared/types/event-shape";
 
 const BUCKETS: FlowBucket[] = [
   { key: "deposited", label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
-  { key: "received", label: "Received by transfer", event: "Received", side: "collateral", dir: "in" },
+  { key: "received", label: "Received by transfer", event: "Received", side: "collateral", dir: "in", hatch: "grid" },
   { key: "withdrawn", label: "Withdrawn", event: "Withdrawal", side: "collateral", dir: "out", hatch: "reverse" },
   { key: "sent", label: "Sent to another account", event: "Sent", side: "collateral", dir: "out", hatch: "dots" },
 ];
@@ -102,67 +100,6 @@ export function skyFlowTimeline(
       live: `At block ${asOf.block.toLocaleString("en-US")}`,
       rest: "Interest earned",
     },
-  };
-}
-
-const line = (
-  key: "held" | "deposited" | "received" | "withdrawn" | "sent" | "earned",
-  raw: bigint | string,
-  block: number,
-  flowLabel?: string,
-): TowerLine => ({
-  key,
-  symbol: USDS.symbol,
-  address: USDS.address,
-  amount: units(raw),
-  usd: null,
-  prov: ledgerLineProv(key, block),
-  ...(flowLabel ? { flowLabel } : {}),
-});
-
-/** The ledger under the scrubber, in USDS. Without the day rows it keeps the
- *  two totals the position row states (in and out) and names them so. */
-export function skyTowerData(
-  position: SkyPosition,
-  totals: SkyLifetimeTotals | null,
-  block: number,
-): ChainTruthTowerData {
-  const zero = BigInt(0);
-  const held = position.value ? [line("held", position.value.raw, block)] : [];
-  held.forEach((l) => (l.heldLabel = "Worth now"));
-  const earned =
-    position.earned && BigInt(position.earned.raw) !== zero
-      ? [line("earned", position.earned.raw, block, "Interest earned")]
-      : [];
-  const exited: TowerLine[] = totals
-    ? [
-        ...(totals.withdrawn > zero ? [line("withdrawn", totals.withdrawn, block, "Withdrawn")] : []),
-        ...(totals.sent > zero ? [line("sent", totals.sent, block, "Sent")] : []),
-      ]
-    : BigInt(position.usdsOut.raw) > zero
-      ? [line("withdrawn", position.usdsOut.raw, block, "Withdrawn and sent")]
-      : [];
-  const received: TowerLine[] =
-    totals && totals.received > zero ? [line("received", totals.received, block, "Received")] : [];
-  return {
-    valued: false,
-    collateral: {
-      current: held,
-      interest: null,
-      earned,
-      exited,
-      received,
-      liquidated: [],
-      lifetimeInflow: units(totals ? totals.deposited : position.usdsIn.raw),
-    },
-    debt: { current: [], interest: null, exited: [], liquidated: [], lifetimeInflow: 0 },
-    collateralUnit: USDS.symbol,
-    collateralTitle: "Savings",
-    collateralListLabel: "Savings",
-    collateralInflowLabel: totals ? "Deposited" : "Deposited and received",
-    debtAxisAbsent: true,
-    wrapFlowLabels: true,
-    unitOnEveryRow: true,
   };
 }
 

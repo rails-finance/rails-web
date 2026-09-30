@@ -49,6 +49,18 @@ import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/li
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { SparkEventCard } from "@/components/protocol/spark/spark-event-card";
+import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
+import {
+  emodeSwitchEvents,
+  fetchAccountSwitches,
+  switchesInWindow,
+  withEmodeRows,
+  withEmodeServedRows,
+  type AaveFamilyAccountSwitches,
+} from "@/lib/aave-v3/account-switches";
+import { sparkLives } from "@/lib/spark/lives";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import {
@@ -59,11 +71,14 @@ import {
 import {
   SparkPositionExplanation,
   SparkClosedPositionExplanation,
+  type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
-import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { SparkRiskDetail } from "@/components/protocol/spark/spark-risk-slot";
+import { SparkBorrowRoom } from "@/components/protocol/spark/spark-ltv-card";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
+import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import {
@@ -118,6 +133,9 @@ interface SparkPositionDetailProps {
    *  0033), from the server read; null on an SSR miss or an older api. */
   initialLaneInterest?: AaveLaneInterest[] | null;
 }
+
+/** How long the card waits on the live Pool read before saying it was not read. */
+const HF_READ_WAIT_MS = 30_000;
 
 export default function SparkPositionDetail({
   wallet,
@@ -270,28 +288,61 @@ export default function SparkPositionDetail({
   // below) — a fresh array identity every render would cancel the in-flight
   // fetch whenever anything else (e.g. the chain read) re-rendered the page.
   const sparkEvents = useMemo(() => events.filter(isSparkEvent), [events]);
+  // The account's e-mode changes and the reserves it ever turned on as
+  // collateral, from the Pool's logs (the index serves neither). Each e-mode
+  // change is a timeline row; nothing else on the page counts it.
+  const [switches, setSwitches] = useState<AaveFamilyAccountSwitches | null>(null);
+  useEffect(() => {
+    const ac = new AbortController();
+    setSwitches(null);
+    fetchAccountSwitches("/api/chain/spark/account-switches", wallet, ac.signal)
+      .then(setSwitches)
+      .catch(() => {
+        // The rows and the card read as they did without it.
+      });
+    return () => ac.abort();
+  }, [wallet]);
+  // The e-mode rows the timeline draws among the served ones: those inside the
+  // loaded window (on a grouped answer, from its oldest row on).
+  const emodeRows = useMemo(() => {
+    if (!switches) return [];
+    let floor = cutoffBlock;
+    if (groupedTail && floor != null) {
+      const blocks = [
+        ...sparkEvents.map((e) => e.blockNumber),
+        ...groupedTail.rowPlan.flatMap((r) => (r.kind === "folder" ? [r.folder.firstBlock] : [])),
+      ];
+      if (blocks.length > 0) floor = Math.min(...blocks);
+    }
+    return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "spark", MAINNET_CHAIN_ID);
+  }, [switches, groupedTail, sparkEvents, wallet, cutoffBlock]);
+  const timelineEvents = useMemo(() => withEmodeRows(sparkEvents, emodeRows), [sparkEvents, emodeRows]);
   // Each row's same-transaction rows (a liquidation and its fee transfer) and
   // the previous transaction, for the account read at blocks N−1 and N; a
   // block holding two of the owner's transactions gets no read (it would mix
   // them), as on Aave V3 Base.
-  const neighbours = useMemo(() => aaveV3Neighbours(sparkEvents as SparkTimelineEvent[]), [sparkEvents]);
+  const neighbours = useMemo(
+    () => aaveV3Neighbours(timelineEvents.filter(isSparkEvent) as SparkTimelineEvent[]),
+    [timelineEvents],
+  );
   const sharedBlocks = useMemo(() => {
     const txs = new Map<number, Set<string>>();
-    for (const e of sparkEvents) {
+    for (const e of timelineEvents) {
       const set = txs.get(e.blockNumber) ?? new Set<string>();
       set.add((e.txHash ?? e.id).toLowerCase());
       txs.set(e.blockNumber, set);
     }
     return new Set([...txs].filter(([, set]) => set.size > 1).map(([b]) => b));
-  }, [sparkEvents]);
+  }, [timelineEvents]);
 
   // The served list as ROWS. `sparkEvents` holds the grouped answer's own
   // events when one is in hand — the read above put them there — so the plan
   // and the events it interleaves always come from the same answer, and two
   // partitions can never meet on one page.
   const servedRows = useMemo(
-    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, sparkEvents) : undefined),
-    [groupedTail, sparkEvents],
+    () =>
+      groupedTail ? withEmodeServedRows(interleaveRowPlan(groupedTail.rowPlan, sparkEvents), emodeRows) : undefined,
+    [groupedTail, sparkEvents, emodeRows],
   );
   /** The folders the index served, whole and UNFILTERED — the third contributor
    *  to the page's partition, and what every whole-history reduction below adds
@@ -358,18 +409,21 @@ export default function SparkPositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? sparkEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet]);
@@ -421,8 +475,15 @@ export default function SparkPositionDetail({
   // rows do not hold is read from the index as its segment
   // (hooks/useTimelineSegment.ts, shared with the Aave V3 page). The preload
   // stays the page's whole-history record; the timeline alone swaps.
+  // The Lifetime flows panel filters this timeline, and each card states the
+  // lifetime sum as of its event (components/shared/flow-focus-context.tsx).
+  const focusEvents = useMemo(
+    () => sparkFocusEvents(sparkEvents, view?.priceByAddress),
+    [sparkEvents, view?.priceByAddress],
+  );
+  const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: sparkEvents,
+    events: timelineEvents,
     groupedTail,
     servedRows,
     servedFolders,
@@ -519,6 +580,8 @@ export default function SparkPositionDetail({
     [sparkEvents, reserveRates, noteOptions, servedFolders],
   );
 
+  // A live note whose move rounds to 0.00 points says nothing; SparkLend
+  // leaves it out (the note modal says so).
   const liveNotes = useMemo<MarketNote[]>(
     () =>
       reserveRates && chain && !chain.chainStale
@@ -527,7 +590,7 @@ export default function SparkPositionDetail({
             reserveRates,
             { blockNumber: chain.blockNumber, timestamp: head?.blockTimestamp, reserves: chain.reserves },
             noteOptions,
-          )
+          ).filter((n) => n.kind !== "rate-step" || Math.abs(n.deltaPp) >= 0.005)
         : [],
     [sparkEvents, reserveRates, chain, head, noteOptions],
   );
@@ -572,6 +635,27 @@ export default function SparkPositionDetail({
     [sparkEvents, opening, servedFolders],
   );
 
+  // The account's lives, where the page holds every row of the history.
+  const lives = useMemo(
+    () => (historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0 ? sparkLives(sparkEvents) : null),
+    [historyWindow.state, servedFolders, sparkEvents],
+  );
+
+  // What the wallet did, by act, where the page holds the whole history: the
+  // card's explanation says it in one line on a long record.
+  const activity = useMemo<SparkActivityCounts | null>(() => {
+    if (historyWindow.state !== "whole" || (servedFolders?.length ?? 0) > 0) return null;
+    const c: SparkActivityCounts = { supply: 0, withdraw: 0, borrow: 0, repay: 0 };
+    for (const e of sparkEvents) {
+      const d = e.context.data;
+      if (d.eventType === "supply") c.supply += 1;
+      else if (d.eventType === "withdraw" || isGatewayWithdrawal(d)) c.withdraw += 1;
+      else if (d.eventType === "borrow") c.borrow += 1;
+      else if (d.eventType === "repay") c.repay += 1;
+    }
+    return c;
+  }, [historyWindow.state, servedFolders, sparkEvents]);
+
   // Once the live Pool read lands, the card renders ITS health factor — the
   // HF headline, the liquidation footnote (both pure functions of HF), the
   // risk slot, and the explanation then all read the same figure. Without
@@ -579,16 +663,31 @@ export default function SparkPositionDetail({
   // risk slot's live one — two "drop to liquidation" percentages from two
   // blocks on one card. The listing keeps the snapshot; this page re-reads
   // live (which the snapshot receipt itself states).
+  // Until the read lands the card says the health factor is reading; a read
+  // that failed, or has not answered in HF_READ_WAIT_MS, says it was not read.
+  const [chainSlow, setChainSlow] = useState(false);
+  useEffect(() => {
+    setChainSlow(false);
+    const t = setTimeout(() => setChainSlow(true), HF_READ_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [wallet]);
   const liveView = useMemo<SparkPositionView | null>(
-    () => (view && chain ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false } : view),
-    [view, chain],
+    () =>
+      view && chain
+        ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false }
+        : view && view.status === "open"
+          ? { ...view, hfRead: chainSettled || chainSlow ? "unread" : "reading" }
+          : view,
+    [view, chain, chainSettled, chainSlow],
   );
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime) : null;
+  const captions = view
+    ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
+    : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -597,10 +696,33 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
   );
+  const flowFocus = useFlowFocusValue(focusRoot, flowTimeline);
+  // The supplies that back no borrowing, which the card lists apart: open, the
+  // live read's collateral switch and threshold (the e-mode category's where
+  // the reserve is in it); closed, the reserves the account never turned on
+  // as collateral (the Pool's logs).
+  const notCollateral = useMemo<Set<string> | null>(() => {
+    if (!view) return null;
+    if (view.status === "open") {
+      if (!chain) return null;
+      const out = new Set<string>();
+      for (const r of chain.reserves) {
+        if (r.supplyBalanceRaw === "0") continue;
+        const lt = r.inEmode && chain.emode?.lt ? chain.emode.lt : r.lt;
+        if (!r.isCollateral || !lt) out.add(r.address.toLowerCase());
+      }
+      return out;
+    }
+    if (!switches) return null;
+    const on = new Set(switches.collateralEnabled);
+    return new Set(view.peakSupplies.map((r) => r.address.toLowerCase()).filter((a) => !on.has(a)));
+  }, [view, chain, switches]);
+
   // The card's count counts transactions; its tip gives the events too.
   const cardView = useMemo(
     () => (liveView && flowSeries ? { ...liveView, eventTotal: flowSeries.totalEvents } : liveView),
@@ -624,151 +746,168 @@ export default function SparkPositionDetail({
   }, [view]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="spark"
-        wallet={wallet}
-        assets={stripAssets}
-        closed={view != null && view.status !== "open"}
-      >
-        {view && (
-          <SparkExportMenu
-            wallet={wallet}
-            view={view}
-            chain={chain}
-            captions={captions}
-            events={sparkEvents}
-            notes={notes}
-            liveNotes={liveNotes}
-            csvFilename={`spark-${wallet.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            queued={{
-              protocol: "spark",
-              params: { wallet },
-              totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-            }}
-            history={markdownHistoryScope(historyWindow, sparkEvents, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, sparkEvents, "this wallet's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="spark"
+          wallet={wallet}
+          assets={stripAssets}
+          closed={view != null && view.status !== "open"}
+        >
+          {view && (
+            <SparkExportMenu
+              wallet={wallet}
+              view={view}
+              chain={chain}
+              captions={captions}
+              events={sparkEvents}
+              notes={notes}
+              liveNotes={liveNotes}
+              csvFilename={`spark-${wallet.slice(0, 10)}-activity.csv`}
+              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+              queued={{
+                protocol: "spark",
+                params: { wallet },
+                totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+              }}
+              history={markdownHistoryScope(historyWindow, sparkEvents, servedFolders)}
+              scopeNote={exportScopeNote(historyWindow, sparkEvents, "this wallet's whole history", servedFolders)}
+            />
+          )}
+        </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {liveView && (
-            <SparkPositionCard
-              v={cardView ?? liveView}
-              receipts
-              viewHref={tl.viewHref}
-              outcomeAt={lastLiquidationAt}
-              captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the V2 trove
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway or the loan-to-value bar (LTV/CR framing +
-              // "available to borrow"). Whatever it draws is on the card face and
-              // in the card's receipts scope, so the Provenance list stays 1:1
-              // with the face figures. Shown only with debt (both views need it).
-              rowExtra={
-                chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                  <SparkRiskSlot chain={chain} />
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {liveView && (
+              <SparkPositionCard
+                v={cardView ?? liveView}
+                receipts
+                viewHref={tl.viewHref}
+                outcomeAt={lastLiquidationAt}
+                notCollateral={notCollateral}
+                lives={lives}
+                captions={captions ?? undefined}
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The room left to borrow and the distance bar from the
+                // Pool read sit in the opened layer under Debt and Health
+                // factor, inside the card's receipts scope.
+                disclosureKey={`spark:${wallet.toLowerCase()}`}
+                debtDetail={chain ? <SparkBorrowRoom chain={chain} /> : undefined}
+                riskDetail={chain ? <SparkRiskDetail chain={chain} /> : undefined}
+                // The Explanation is now pure layman prose about those same face
+                // figures — no secondary figure-strips. The LTV strip is absorbed
+                // into the risk slot above; the reserve rates live on the market
+                // view (where pool-wide rate context belongs).
+                explanation={
+                  liveView.status !== "open" ? (
+                    // Terminal accounts need no live Pool read — the pane
+                    // narrates how the record ended from the rows already here.
+                    <SparkClosedPositionExplanation v={liveView} events={sparkEvents} folders={servedFolders} />
+                  ) : (
+                    // Passed before the Pool read lands (the Fluid treatment):
+                    // the pane, and the copy-view link at its foot, mount with
+                    // the card rather than with the read.
+                    <SparkPositionExplanation
+                      chain={chain}
+                      captions={captions}
+                      view={liveView}
+                      externalActivity={externalActivity}
+                      activity={activity}
+                    />
+                  )
+                }
+              />
+            )}
+            {towerData && (
+              <LifetimeFlowsPanel
+                read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
+                explanation={sparkEconomicsExplanation(
+                  towerData,
+                  sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
+                  activity ? sparkEvents : null,
+                  (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
+                )}
+                learnMore={sparkEconomicsContent(towerData)}
+                scrubber={
+                  flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
+                }
+              />
+            )}
+            <ChainTruthTimeline
+              // The queued export (rails-ops decision 0029) has no row cap: the
+              // card offers the CSV whenever the total is known.
+              csvExportCeiling={null}
+              // Matches `SparkEventCard`'s own `persistKey={`spark:${event.id}`}` —
+              // lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="spark"
+              closed={view ? view.status !== "open" : undefined}
+              notes={notes}
+              liveNotes={liveNotes}
+              liveNotesPending={liveNotesPending}
+              tl={tl}
+              // Both grouping paths, side by side: the specs group the flat
+              // answer client-side, the register draws the folders the index
+              // served. Only one is ever in force on a given load — see the
+              // `?folders=1` block above.
+              runs={SPARK_TIMELINE_RUNS}
+              folderRegister={SPARK_FOLDER_REGISTER}
+              readFolderMembers={readFolderMembers}
+              // The month grid in the Date panel, on a served page.
+              segments={segments}
+              // The USD-values toggle joins the chain-state items: the detail
+              // grid renders after-balance USD chips off the captured
+              // oracle-at-block prices (mig 092).
+              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+              // Tenure-first header (the V4 spoke treatment): when the account
+              // started, how long it has run, how fresh the latest activity is.
+              toolbarLeading={
+                view ? (
+                  <TimelineActivityHeader
+                    events={sparkEvents}
+                    folders={servedFolders}
+                    closed={view.status !== "open"}
+                    // When the position actually opened, not when the window
+                    // does — otherwise a wallet with 28,000 events reads as days
+                    // old because its oldest loaded card is.
+                    firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                    lives={lives}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  />
                 ) : undefined
               }
-              // The Explanation is now pure layman prose about those same face
-              // figures — no secondary figure-strips. The LTV strip is absorbed
-              // into the risk slot above; the reserve rates live on the market
-              // view (where pool-wide rate context belongs).
-              explanation={
-                liveView.status !== "open" ? (
-                  // Terminal accounts need no live Pool read — the pane
-                  // narrates how the record ended from the rows already here.
-                  <SparkClosedPositionExplanation v={liveView} events={sparkEvents} folders={servedFolders} />
-                ) : (
-                  // Passed before the Pool read lands (the Fluid treatment):
-                  // the pane, and the copy-view link at its foot, mount with
-                  // the card rather than with the read.
-                  <SparkPositionExplanation
-                    chain={chain}
-                    captions={captions}
-                    view={liveView}
-                    externalActivity={externalActivity}
+              renderCard={(event, meta) =>
+                isSparkEvent(event) && event.context.data.emodeSwitch ? (
+                  <AaveFamilyEmodeSwitchCard
+                    event={event}
+                    sw={event.context.data.emodeSwitch}
+                    pool={SPARK_POOL_IDENTITY}
+                    persistPrefix="spark"
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
                   />
-                )
+                ) : isSparkEvent(event) ? (
+                  <SparkEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
+                    siblings={neighbours.get(event.id)?.siblings}
+                    previous={neighbours.get(event.id)?.previous}
+                  />
+                ) : null
               }
             />
-          )}
-          {towerData && (
-            <ChainTruthTower
-              data={towerData}
-              explanation={sparkEconomicsExplanation(
-                towerData,
-                sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
-              )}
-              learnMore={sparkEconomicsContent(towerData)}
-              timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
-            />
-          )}
-          <ChainTruthTimeline
-            // The queued export (rails-ops decision 0029) has no row cap: the
-            // card offers the CSV whenever the total is known.
-            csvExportCeiling={null}
-            // Matches `SparkEventCard`'s own `persistKey={`spark:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="spark"
-            closed={view ? view.status !== "open" : undefined}
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={liveNotesPending}
-            tl={tl}
-            // Both grouping paths, side by side: the specs group the flat
-            // answer client-side, the register draws the folders the index
-            // served. Only one is ever in force on a given load — see the
-            // `?folders=1` block above.
-            runs={SPARK_TIMELINE_RUNS}
-            folderRegister={SPARK_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            // The month grid in the Date panel, on a served page.
-            segments={segments}
-            // The USD-values toggle joins the chain-state items: the detail
-            // grid renders after-balance USD chips off the captured
-            // oracle-at-block prices (mig 092).
-            displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
-            // Tenure-first header (the V4 spoke treatment): when the account
-            // started, how long it has run, how fresh the latest activity is.
-            toolbarLeading={
-              view ? (
-                <TimelineActivityHeader
-                  events={sparkEvents}
-                  folders={servedFolders}
-                  closed={view.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does — otherwise a wallet with 28,000 events reads as days
-                  // old because its oldest loaded card is.
-                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isSparkEvent(event) ? (
-                <SparkEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
-                  siblings={neighbours.get(event.id)?.siblings}
-                  previous={neighbours.get(event.id)?.previous}
-                />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+            {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }

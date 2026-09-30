@@ -222,6 +222,10 @@ export interface ChainTruthTowerData {
   /** Token-mode rows name their token after the figure ("5.09K USDS") on
    *  every row, compact or full. Unset: only `fullTokenAmounts` names it. */
   unitOnEveryRow?: boolean;
+  /** Valued rows print whole dollars ("$6,412,345") instead of compact
+   *  ("$6.4M"), so each column adds up on its face to the dollar. Unset:
+   *  compact, as every other feeder renders. */
+  fullUsdAmounts?: boolean;
 }
 
 /** The scalar a tower stacks by: USD when valued, else the token amount. */

@@ -66,6 +66,7 @@ import {
   buildSpokeCards,
   groupBySpoke,
   computeAaveV4InterestPnl,
+  computeAaveV4InterestSinceZero,
   resolveFallbackCollateral,
 } from "@/lib/aave-v4/spoke-cards";
 import { AAVE_V4_FALLBACK_LT, isDollarRail } from "@/lib/aave-v4/liquidation-thresholds";
@@ -90,7 +91,9 @@ import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-
 import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChartBarBig, ChevronDown } from "lucide-react";
 import { FlowsLedgerNoteContext, LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { aaveV4FlowLive, aaveV4FlowSeriesTimeline } from "@/lib/aave-v4/flows-timeline";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
+import type { FlowTimeline } from "@/lib/shared/flows-timeline";
+import { aaveV4FlowLive, aaveV4FlowSeriesTimeline, aaveV4FocusEvents } from "@/lib/aave-v4/flows-timeline";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { shortAddr } from "@/lib/shared/format-event";
 import { useWalletContext } from "@/components/nav/wallet-context";
@@ -330,12 +333,28 @@ function AaveV4SpokePageInner({
     return {
       ...patched,
       interestPnl: computeAaveV4InterestPnl(patchedReserves, chainTruthPrices),
+      // The interest inside today's balances, for the card's "incl." lines:
+      // since each balance last started from zero, on this spoke's rows.
+      interestSinceZero: computeAaveV4InterestSinceZero(
+        sortedEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
+        patchedReserves,
+        chainTruthPrices,
+      ),
       // On-chain-oracle valuation of the headline totals, from the same chain
       // balances at Aave's own oracle price — lets On-chain-values show these
       // as chain-derived instead of middotting the DefiLlama figure.
       onchainUsd: computeOnchainUsd(chainPosition, oraclePrices),
     };
-  }, [eventActiveCard, eventActiveGroup, chainPosition, prices, chainTruthPrices, oraclePrices]);
+  }, [
+    eventActiveCard,
+    eventActiveGroup,
+    chainPosition,
+    prices,
+    chainTruthPrices,
+    oraclePrices,
+    sortedEvents,
+    spokeName,
+  ]);
   const activeGroup = useMemo(() => {
     if (!eventActiveGroup) return undefined;
     if (!chainPosition || chainPosition.chainStale) {
@@ -519,6 +538,15 @@ function AaveV4SpokePageInner({
   // windowing and the months heatmap all live here + in ChainTruthTimeline.
   // Keyed per spoke (not just per wallet) since each spoke is its own
   // position with its own filter/sort preference.
+  // The Lifetime flows panel filters this timeline (components/shared/
+  // flow-focus-context.tsx); the panel's block reports its day rows up.
+  const focusEvents = useMemo(
+    () => aaveV4FocusEvents(spokeScopedEvents, wallet, spokeName, undefined),
+    [spokeScopedEvents, wallet, spokeName],
+  );
+  const focusRoot = useFlowFocusRoot(focusEvents);
+  const [focusTimeline, setFocusTimeline] = useState<FlowTimeline | null>(null);
+  const flowFocus = useFlowFocusValue(focusRoot, focusTimeline);
   const tl = useTimelineEvents(spokeScopedEvents, {
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
@@ -764,7 +792,7 @@ function AaveV4SpokePageInner({
   }
 
   return (
-    <>
+    <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
         <DetailTopRow session={session} wallet={wallet} assets={stripAssets} closed={positionClosed}>
           {activeCard && (
@@ -838,6 +866,7 @@ function AaveV4SpokePageInner({
             gasEth={activeGroup.result.totalGasCostEth}
             gasUsd={activeGroup.result.totalGasCostUsd}
             historyComplete={olderCount === 0}
+            onFlowTimeline={setFocusTimeline}
           />
         ) : null}
 
@@ -884,7 +913,7 @@ function AaveV4SpokePageInner({
         </AaveV4BarsProvider>
       </div>
       <ProvInspectorLayer />
-    </>
+    </FlowFocusContext.Provider>
   );
 }
 
@@ -927,7 +956,10 @@ function AaveV4SpokeTowerBlock({
   gasEth,
   gasUsd,
   historyComplete,
+  onFlowTimeline,
 }: {
+  /** Told the day rows the panel draws, for the page's flow filter. */
+  onFlowTimeline?: (t: FlowTimeline | null) => void;
   wallet: string;
   spokeName: string;
   /** The index serves the day rows for Ethereum's spokes. */
@@ -1049,6 +1081,9 @@ function AaveV4SpokeTowerBlock({
         : null,
     [flowSeries, totals, todayPrices, reserves, prices],
   );
+  useEffect(() => {
+    onFlowTimeline?.(flowTimeline);
+  }, [onFlowTimeline, flowTimeline]);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [ledgerNote, setLedgerNote] = useState<string | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
@@ -1075,7 +1110,10 @@ function AaveV4SpokeTowerBlock({
               <div className="flex min-h-[28px] items-center">{title}</div>
               <div className="mt-2">
                 <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                  <LifetimeFlowsScrubber timeline={flowTimeline} />
+                  <LifetimeFlowsScrubber
+                    timeline={flowTimeline}
+                    series={{ path: "/api/aave-v4/flows/series", params: { wallet, spoke: spokeName } }}
+                  />
                 </FlowsLedgerNoteContext.Provider>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-2">

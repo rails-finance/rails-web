@@ -517,7 +517,10 @@ export type AaveV3EventType =
   // `amount` is the log's amountCreated on the written-off reserve. Emitted
   // inside executeLiquidationCall, so it always sits in a liquidation's
   // transaction, before that liquidation's own row (rails-ops TO-DO-ui-jobs §20).
-  | "bad_debt_written_off";
+  | "bad_debt_written_off"
+  // emode: the account's e-mode change, a row the page reads from the Pool's
+  // logs (lib/aave-v3/account-switches.ts; Seamless). It moves no balance.
+  | "emode";
 
 /** Provenance of an Aave V3 historic price (mirror of aave-v3.ts). */
 export type AaveV3PriceSource = "iaave-oracle";
@@ -653,6 +656,8 @@ export interface AaveV3ContextOrigin {
  *  strings to preserve precision across the wire. */
 export interface AaveV3Context {
   eventType: AaveV3EventType;
+  /** emode only — the switch. */
+  emodeSwitch?: EmodeSwitchFields;
   amount?: string;
   reserveSymbol?: string;
   /** The reserve `reserveSymbol` names, lowercase: the row's own reserve, a
@@ -918,7 +923,24 @@ export type SparkEventType =
   | "repay"
   | "liquidation"
   | "transfer_in"
-  | "transfer_out";
+  | "transfer_out"
+  // emode: the account's e-mode change (Pool UserEModeSet), read from the
+  // Pool's logs by the page (/api/chain/spark/account-switches); the index
+  // serves no such row. It moves no balance.
+  | "emode";
+
+/** An Aave V3-family account's e-mode change (Pool UserEModeSet), read from
+ *  the Pool's logs by the page (lib/aave-v3/account-switches.ts): the category
+ *  before and after, with the new category's limits read at the switch's
+ *  block (basis points). */
+export interface EmodeSwitchFields {
+  fromId: number;
+  fromLabel: string | null;
+  toId: number;
+  toLabel: string | null;
+  ltvBps: number | null;
+  liquidationThresholdBps: number | null;
+}
 
 /** Provenance of a SparkLend historic price — the protocol's own oracle
  *  (IAaveOracle fork) read at the event's block by the price filler. A named
@@ -998,6 +1020,8 @@ export interface SparkContext {
   interestRateMode?: number;
   /** Repay only — repaid with spTokens instead of the underlying. */
   useATokens?: boolean;
+  /** emode only — the switch (EmodeSwitchFields). */
+  emodeSwitch?: EmodeSwitchFields;
   /** transfer_in/transfer_out only — the OTHER account in the position move
    *  (the sender on an inflow, the recipient on an outflow), lowercased. A
    *  true counterparty of the event, not a verdict about who acted (renders
@@ -1189,6 +1213,22 @@ export interface LiquityForkRedemptionFacts {
  *  where the transaction liquidated this one Trove on the branch, so the totals
  *  are this Trove's. Human decimal strings: debt legs in the stablecoin (18),
  *  collateral legs in the branch's own units. */
+/** A liquidation whose redistribution reached a Trove — the liquidated Trove
+ *  and the whole redistributed legs of its Liquidation log. A receiving
+ *  Trove's share is its `debtFromRedist` over the sum of these legs. */
+export interface LiquityForkRedistSource {
+  /** The liquidated Trove, on the same branch. */
+  troveId: string;
+  blockNumber: number;
+  /** Unix seconds. */
+  timestamp: number;
+  txHash: string;
+  /** Liquidation `_debtRedistributed`, human decimal (the stablecoin). */
+  debtRedistributed: string;
+  /** Liquidation `_collRedistributed`, human decimal (the branch's units). */
+  collRedistributed: string;
+}
+
 export interface LiquityForkLiquidationFacts {
   /** Debt the Stability Pool absorbed — `_debtOffsetBySP`. */
   debtOffsetBySP: string;
@@ -1203,6 +1243,11 @@ export interface LiquityForkLiquidationFacts {
   collSurplus: string;
   /** Collateral paid to the liquidator as gas compensation — `_collGasCompensation`. */
   collGasCompensation: string;
+  /** The branch's liquidation penalties in force (fractions: 0.05 = 5%), on
+   *  debt the Stability Pool absorbs and on redistributed debt — where the
+   *  fork's catalogue carries a chain read of them. */
+  penaltySp?: number;
+  penaltyRedist?: number;
 }
 
 // ───────────────────────── Ebisu (Liquity V2 fork) detail types ─────────────────────────
@@ -1300,6 +1345,14 @@ export interface EbisuContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Asymmetry (Liquity V2 fork) detail types ─────────────────────────
@@ -1397,6 +1450,14 @@ export interface AsymmetryContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Basedollar (Liquity V2 fork on Base) detail types ─────────────────────────
@@ -1495,6 +1556,14 @@ export interface BasedollarContext {
   /** setBatchManagerAnnualInterestRate / lowerBatchManagerAnnualFee rows only —
    *  the batch manager's change this Trove carried (server mig 342). */
   batchRate?: LiquityForkBatchRateFacts;
+  /** Rows that carry a redistribution (`operation.debtFromRedist` or
+   *  `collFromRedist` above zero) — the liquidations on this branch whose
+   *  redistribution this touch applied: every one with a redistributed leg
+   *  between the Trove's previous touch and this one, read from the
+   *  liquidated Troves' own Liquidation logs by the timeline route. Absent
+   *  where the route could not read them; the row then states the amounts
+   *  without naming their source. */
+  redistSources?: LiquityForkRedistSource[];
 }
 
 // ───────────────────────── Compound V3 (Comet) detail types ─────────────────────────
@@ -1656,10 +1725,55 @@ export interface PwnContext {
   /** `extended` only — the default timestamp before / after the renegotiation. */
   originalDefaultTimestamp?: string;
   extendedDefaultTimestamp?: string;
+  /** `extended` only — the sender of the extension (lowercase). On v1.1 only
+   *  the LOAN holder can extend, and nothing is paid for it. */
+  extendedBy?: string;
   /** `claimed` only — true when the lender seized collateral (borrower defaulted). */
   defaulted?: boolean;
   /** True for the loan's first event (`created`). */
   isOpen?: boolean;
+  /** v1.2/v1.3 terms' accruing APR, two decimals (6000 = 60%). The loan page
+   *  sets it from the loan's terms; the index's event rows do not carry it. */
+  accruingInterestApr?: number;
+  /** The accrued total this row states, summed by the loan page as the
+   *  contract sums it (lib/pwn/economics.ts `accrueTo`): what a repayment
+   *  paid, or what a defaulted loan owed at its deadline. */
+  accrued?: PwnAccrual & { basis: "paid" | "at-deadline" };
+  /** `created` only, set by the loan page: the deadline the loan ran to after
+   *  its extensions, how many there were, and whether the lender sent all. */
+  finalDeadline?: number;
+  extensionCount?: number;
+  extensionsByLender?: boolean;
+  /** `created` only, set by the loan page: how the collateral came back to the
+   *  borrower after an earlier loan's default passed it to the lender — the
+   *  token's transfer between the two loans, or "unknown" when it can't be read. */
+  collateralReturn?: PwnCollateralReturn | "unknown";
+}
+
+/** One transfer of a loan's NFT collateral, read from its token contract. */
+export interface PwnCollateralReturn {
+  from: string;
+  to: string;
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+  /** The earlier loan whose default passed the collateral to the lender. */
+  priorLoanId: string;
+}
+
+/** A v1.2/v1.3 accrual sum (lib/pwn/economics.ts `accrueTo`). */
+export interface PwnAccrual {
+  principal: number;
+  interest: number;
+  total: number;
+  principalRaw: string;
+  interestRaw: string;
+  totalRaw: string;
+  fixedRaw: string;
+  apr: number;
+  minutes: number;
+  from: number;
+  to: number;
 }
 
 // ───────────────────────── Sky Savings (sUSDS) ─────────────────────────

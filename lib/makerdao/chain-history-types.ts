@@ -11,6 +11,9 @@ export interface MakerIlkAt {
   mat: number | null;
   /** The ilk's minimum debt per vault, DAI. */
   dustDai: number | null;
+  /** LockStake's capped feed at the block: the cap and the OSM price behind
+   *  it; `priceUsd` is the lower. Absent for a plain OSM. */
+  priceCap?: { capUsd: number; oracleUsd: number | null };
 }
 
 export interface MakerIlkAtResponse {

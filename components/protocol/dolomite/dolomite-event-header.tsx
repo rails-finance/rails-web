@@ -18,6 +18,7 @@ import {
   externalActorProv,
   type DolomiteCoords,
 } from "@/lib/dolomite/event-provenance";
+import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 
 export interface DolomiteEventHeaderProps {
   actionLabel: string;
@@ -78,6 +79,12 @@ export function DolomiteEventHeader({
           prefix: ctx.eventType === "transfer_in" ? "from" : "to",
           address: ctx.counterparty,
           prov: transferLegProv(sym, ctx.eventType === "transfer_in" ? "in" : "out", coords),
+          // Between two accounts of the same wallet the address says nothing:
+          // the chip names the other account number instead.
+          name:
+            wallet != null && ctx.counterparty === wallet.toLowerCase() && ctx.counterpartyAccountNumber != null
+              ? otherAccountName(ctx.counterpartyAccountNumber)
+              : undefined,
         }
       : ctx.eventType === "liquidation" && ctx.liquidator
         ? { prefix: "by", address: ctx.liquidator, prov: liquidationDebtProv(sym, coords, raw) }

@@ -15,6 +15,8 @@ import { assetsDeltaProv, swapLegNet, swapLegProv, swapLegSign, type V3Coords } 
 import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
 import { AaveV3CtEventHeader, isAaveV3LossRow, signedAmount } from "./aave-v3-ct-event-header";
 import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
+import { ReceiptCalcButton, ReceiptCalcContext, useEventCum } from "./aave-family-event-receipt";
+import { useMemo, useState } from "react";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
@@ -52,7 +54,7 @@ export interface AaveV3CtEventCardProps {
 // is the exception: its value left the position, so it draws the withdrawn
 // amount on the left flank, the reserve wearing the swap badge (D3).
 const DIRECTION: Record<
-  Exclude<AaveV3Context["eventType"], "transfer_in" | "transfer_out" | "swap">,
+  Exclude<AaveV3Context["eventType"], "transfer_in" | "transfer_out" | "swap" | "emode">,
   "right" | "left"
 > = {
   supply: "right",
@@ -78,6 +80,13 @@ export function AaveV3CtEventCard({
 }: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
+  // The receipt's calculator (aave-family-event-receipt.tsx): shown where the
+  // page's flow model holds this event's day.
+  const [calcOn, setCalcOn] = useState(false);
+  const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);
+  const hasSum = useEventCum(event.id) != null;
+  // The (i)'s slot for the interest line and the prices.
+  const [notesSlot, setNotesSlot] = useState<HTMLElement | null>(null);
   const prefetch = () => {
     if (!market) return;
     const wallet = event.wallet;
@@ -287,59 +296,68 @@ export function AaveV3CtEventCard({
   );
 
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        // The pointer on the header starts the position reads the open card
-        // makes (this transaction's and the previous one's), so the state is
-        // usually in hand by the time the card opens. `contents` keeps the
-        // layout; the pointer events still bubble through it.
-        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
-          <AaveV3CtEventHeader
+    <ReceiptCalcContext.Provider value={calc}>
+      <EventCard
+        avatar={null}
+        headerAction={hasSum && market && !feeOf ? <ReceiptCalcButton /> : undefined}
+        iconColumn={iconSlot}
+        header={
+          // The pointer on the header starts the position reads the open card
+          // makes (this transaction's and the previous one's), so the state is
+          // usually in hand by the time the card opens. `contents` keeps the
+          // layout; the pointer events still bubble through it.
+          <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
+            <AaveV3CtEventHeader
+              ctx={ctx}
+              timestamp={event.timestamp}
+              txHash={event.txHash}
+              blockNumber={event.blockNumber}
+              eventNumber={eventNumber}
+              externalBy={extBy ?? undefined}
+              wallet={event.wallet}
+              flows={event.flows}
+              feeOf={feeOf}
+            />
+          </div>
+        }
+        detail={
+          <AaveV3CtEventDetail
             ctx={ctx}
-            timestamp={event.timestamp}
             txHash={event.txHash}
             blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
             wallet={event.wallet}
-            flows={event.flows}
+            market={market}
             feeOf={feeOf}
+            fee={fee}
+            previous={previous}
+            eventId={event.id}
+            eventTs={event.timestamp}
+            notesSlot={notesSlot}
           />
-        </div>
-      }
-      detail={
-        <AaveV3CtEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          market={market}
-          feeOf={feeOf}
-          fee={fee}
-          previous={previous}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <AaveV3EventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          owner={event.wallet}
-          market={market}
-          siblings={siblings}
-          previous={previous}
-          timestamp={event.timestamp}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />}
-      persistKey={`aave-v3:${event.id}`}
-    />
+        }
+        detailLabel="Position state"
+        explainer={
+          <>
+            <div ref={setNotesSlot} className="mb-2 empty:hidden" />
+            <AaveV3EventExplainer
+              ctx={ctx}
+              txHash={event.txHash}
+              blockNumber={event.blockNumber}
+              owner={event.wallet}
+              market={market}
+              siblings={siblings}
+              previous={previous}
+              timestamp={event.timestamp}
+              skipLead
+            />
+          </>
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />}
+        persistKey={`aave-v3:${event.id}`}
+      />
+    </ReceiptCalcContext.Provider>
   );
 }

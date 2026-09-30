@@ -191,7 +191,11 @@ for (const c of cards) {
     }
     const wantLiq = `${fmtLiq(expectedLiqPrice(row, m))} ${row.stableSymbol}`;
     const wantMin = `min ${(mcrInForce(m) * 100).toFixed(1)}%`;
-    if (!c.footnote.includes(wantMin) || !c.footnote.includes(`Liquidates at`) || !c.footnote.includes(wantLiq)) {
+    if (
+      !c.footnote.includes(wantMin) ||
+      !/Liquidates if\s*pETH falls to/.test(c.footnote) ||
+      !c.footnote.includes(wantLiq)
+    ) {
       footnoteBad.push(`${row.market}/${row.cdpId}: footnote "${c.footnote}" wanted "${wantMin}" + "${wantLiq}"`);
     }
   } else {
@@ -227,15 +231,20 @@ check(
 );
 check(
   "1f. no listing card states a liquidation price in dollars",
-  !cards.some((c) => /Liquidates at[^·]*\$/.test(c.footnote)),
+  !cards.some((c) => /Liquidates if[^·]*\$/.test(c.footnote)),
 );
+// A card with debt states the board's rate; a collateral-only card states
+// none (nothing accrues on a debt of "none").
 check(
-  "1g. the rate line renders on the debt column from the board's own rate",
+  "1g. the rate line renders on a card with debt from the board's own rate, and not on a debt-free card",
   cards
     .filter((c) => c.market)
     .every((c) => {
       const m = byMarket[c.market];
-      return !m || c.cardText.includes(`${(m.interestRate * 100).toFixed(2)}% per year, set by the market`);
+      const row = c.cdpId ? rows[`${c.market}:${c.cdpId}`] : null;
+      if (!m || !row) return true;
+      const has = c.cardText.includes(`${(m.interestRate * 100).toFixed(2)}% per year, set by the market`);
+      return row.debt > 0 ? has : !/per year, set by the market/.test(c.cardText);
     }),
   `usdp ${(byMarket.usdp.interestRate * 100).toFixed(2)}% / goldp ${(byMarket.goldp.interestRate * 100).toFixed(2)}%`,
 );
@@ -394,7 +403,7 @@ const cards7 = await readCards(page7);
 check(
   "7. with the board aborted every ratio slot is a dash — no ≈, no liquidation price, no rate line",
   cards7.length > 0 &&
-    cards7.every((c) => !c.valueText.includes("≈") && !c.pulse && !/Liquidates at/.test(c.footnote)) &&
+    cards7.every((c) => !c.valueText.includes("≈") && !c.pulse && !/Liquidates if/.test(c.footnote)) &&
     !cards7.some((c) => /per year, set by the market/.test(c.cardText)),
   `${cards7.length} cards; first slot "${cards7[0]?.valueText}" footnote "${cards7[0]?.footnote}"`,
 );
@@ -495,7 +504,7 @@ await page7.close();
   const cards9 = await readCards(page9);
   check(
     "9c. the Collateral-only view renders only dash cards — no ≈, no liquidation price",
-    cards9.length > 0 && cards9.every((c) => c.dash && !c.valueText.includes("≈") && !/Liquidates at/.test(c.footnote)),
+    cards9.length > 0 && cards9.every((c) => c.dash && !c.valueText.includes("≈") && !/Liquidates if/.test(c.footnote)),
     `${cards9.length} cards; first "${cards9[0]?.valueText}" footnote "${cards9[0]?.footnote}"`,
   );
   const chrome9 = await page9.evaluate(() => {

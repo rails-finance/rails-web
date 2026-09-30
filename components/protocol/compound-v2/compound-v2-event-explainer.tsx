@@ -46,16 +46,16 @@ export function compoundV2LearnMoreContent(ctx: CompoundV2Context): LearnMoreCon
       return compoundV2SupplyWithdrawContent(ctx.eventType);
     case "borrow":
     case "repay":
-      return compoundV2BorrowRepayContent(ctx.eventType);
+      return compoundV2BorrowRepayContent(ctx.eventType, ctx.market);
     case "transfer_in":
     case "transfer_out":
       return compoundV2TransferContent(ctx.eventType);
     case "liquidation":
-      return compoundV2LiquidationContent();
+      return compoundV2LiquidationContent(ctx.market);
     case "seize_out":
     case "seize_in":
     case "seize_burn":
-      return compoundV2SeizeContent(ctx.eventType);
+      return compoundV2SeizeContent(ctx.eventType, ctx.collateralMarket ?? ctx.market);
     default:
       return compoundV2EventFallbackContent();
   }

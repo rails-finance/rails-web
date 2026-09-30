@@ -62,6 +62,10 @@ export interface SparkEventState {
    *  oracle prices of block N, which the call ran at (seized = repaid × bonus ÷
    *  price reproduces at these prices), beside the end-of-N−1 figure. */
   liqHfAtCall?: number | null;
+  /** A liquidation: the loan-to-value on the same basis as `liqHfAtCall` —
+   *  the debt before the call over the collateral before it, both at block N's
+   *  prices — so the two before figures are read at one price. */
+  liqLtvAtCall?: number | null;
   /** A liquidation: the collateral's price at the end of N−1 and at N. */
   liqPriceMove?: { symbol: string; from: number; to: number };
 }
@@ -102,20 +106,30 @@ function effective(r: AaveV3PositionStateReserve, emode: SparkEmodeRead): { lt: 
 const priceOf = (r: AaveV3PositionStateReserve): number | null =>
   r.priceBase == null ? null : Number(r.priceBase) / 1e8;
 
-/** The health factor from the balances before the transaction, valued at the
- *  block's oracle prices: Σ collateral × price × threshold ÷ Σ debt × price. */
-function hfAtBlockPrices(state: AaveV3PositionState, emode: SparkEmodeRead): number | null {
+/** The balances before the transaction, valued at the block's oracle prices:
+ *  the health factor (Σ collateral × price × threshold ÷ Σ debt × price) and
+ *  the loan-to-value (Σ debt × price ÷ Σ collateral × price, the collateral the
+ *  Pool counts: switched on, threshold above 0). */
+function atBlockPrices(
+  state: AaveV3PositionState,
+  emode: SparkEmodeRead,
+): { hf: number | null; ltv: number | null } | null {
   let weighted = 0;
+  let coll = 0;
   let debt = 0;
   for (const r of state.reserves) {
     const p = priceOf(r);
     if (p == null || r.decimals == null) return null;
     const supply = Number(humanOf(r.supply.before, r.decimals));
     const owed = Number(humanOf(r.debt.before, r.decimals));
-    if (r.collateral?.before && supply > 0) weighted += supply * p * (effective(r, emode).lt / 1e4);
+    const lt = effective(r, emode).lt;
+    if (r.collateral?.before && supply > 0 && lt > 0) {
+      weighted += supply * p * (lt / 1e4);
+      coll += supply * p;
+    }
     debt += owed * p;
   }
-  return debt > 0 ? weighted / debt : null;
+  return { hf: debt > 0 ? weighted / debt : null, ltv: coll > 0 ? debt / coll : null };
 }
 
 export function sparkEventState(
@@ -162,7 +176,9 @@ export function sparkEventState(
     if (best && Math.abs(best.to / best.from - 1) >= 0.005) out.priceMove = best;
   }
   if (isLiq) {
-    out.liqHfAtCall = hfAtBlockPrices(here, emodeBefore);
+    const atCall = atBlockPrices(here, emodeBefore);
+    out.liqHfAtCall = atCall?.hf ?? null;
+    out.liqLtvAtCall = atCall?.ltv ?? null;
     // The collateral's price at the end of N−1: its USD share of the account's
     // collateral then, over the balance before (the only collateral, or the
     // move is not stated).

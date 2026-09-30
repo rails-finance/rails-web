@@ -5,16 +5,22 @@
 // ((shares + escrowed) × the pool's rate in the row's block, the chain's
 // convertToAssets there; decision 0033) and the interest it earned since the
 // previous row in the pool. Then the lanes an event touches:
-//   deposit / withdraw / fill — the net-deposited lane (a running sum of the
-//     flows) AND the share lane (slot-exact transfer replay) side by side.
+//   deposit / withdraw / fill — the share lane (slot-exact transfer replay)
+//     and the rate the operation settled at. The net-deposited lane is not
+//     shown: it counts no transfers and is clamped at zero, so its
+//     before→after did not chain from row to row (Maple newcomer round 1).
 //   queue events — the escrow lane (shares waiting in the queue) beside the
 //     share lane (escrowing moves shares out of the wallet's balance).
 //   transfers — the share lane (a position can arrive or leave by transfer).
 
 import type { MapleContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
 import {
-  assetsDeltaProv,
+  ChainTruthDetail,
+  reconstructTransition,
+  type ChainTruthStat,
+  type ChainTruthTransition,
+} from "@/components/shared/chain-truth-event";
+import {
   sharesDeltaProv,
   requestSharesProv,
   requestCancelSharesProv,
@@ -23,26 +29,49 @@ import {
   sharesBeforeProv,
   escrowAfterProv,
   escrowBeforeProv,
-  principalAfterProv,
-  principalBeforeProv,
   eventRateProv,
   claimAfterProv,
   claimBeforeProv,
   interestSincePrevProv,
+  flankedLegProv,
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
+import { formatDayMonth, formatDuration } from "@/lib/date";
 
 export interface MapleEventDetailProps {
   ctx: MapleContext;
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
+  /** Unix seconds of this row and of the previous row in its pool. */
+  timestamp?: number;
+  prevAt?: number;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
 
-export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEventDetailProps) {
+/** One rounding rule, Polaris's: the opened grid states the before and the
+ *  change in full to three decimals, as the row and the card do. */
+const num = (s: string): number => Number(s.replace(/,/g, ""));
+const full = (t: ChainTruthTransition | undefined): ChainTruthTransition | undefined =>
+  t && {
+    ...t,
+    before: formatNumber(num(t.beforeExact)),
+    change: `${t.change.charAt(0)}${formatNumber(Math.abs(num(t.changeExact.slice(1))))}`,
+  };
+
+/** What the row did, for the claim's "before → after this …" label. */
+const ACT: Partial<Record<MapleContext["eventType"], string>> = {
+  deposit: "deposit",
+  withdraw: "withdrawal",
+  request: "request",
+  request_decrease: "request change",
+  request_cancel: "cancellation",
+  request_fill: "fill",
+};
+
+export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, prevAt }: MapleEventDetailProps) {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
 
@@ -55,41 +84,59 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
       changeProv: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
       beforeProv: claimBeforeProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords),
     });
+    const interest = Number(ctx.interestSincePrev ?? "0");
+    // A wallet's two pools interleave, so the period runs from the previous
+    // row in this pool, which need not be the row below.
+    const since =
+      prevAt != null && timestamp != null && timestamp >= prevAt
+        ? `Interest since the pool's previous row (${formatDayMonth(prevAt)}, ${formatDuration(prevAt, timestamp)})`
+        : "Interest since the pool's previous row";
+    const act = ACT[ctx.eventType];
     stats.push({
-      label: "Pool claim",
+      // The wallet's own claim: a − on a fill is the claim shrinking as the
+      // assets leave for the wallet.
+      // On a transfer the before is the claim just before the shares arrived
+      // or left — a figure that can round to the flows' "received" total
+      // without being it (Maple newcomer round 2, M5).
+      label:
+        ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out"
+          ? "Wallet's pool claim, just before and after this transfer"
+          : transition != null && act
+            ? `Wallet's pool claim, before → after this ${act}`
+            : "Wallet's pool claim",
       value: fmt(ctx.valueAfter),
       symbol: ctx.assetSymbol,
       prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
       transition,
       changed: transition != null,
+      interestSincePrevious:
+        ctx.interestSincePrev != null && interest !== 0
+          ? {
+              value: ctx.interestSincePrev,
+              prov: interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev),
+              label: since,
+              display: interest < 0 ? `−${fmt(String(-interest))}` : fmt(ctx.interestSincePrev),
+              after: ", the rise in the claim's value from the exit rate; nothing is paid out",
+            }
+          : undefined,
     });
-    const interest = Number(ctx.interestSincePrev ?? "0");
-    if (ctx.interestSincePrev != null && interest !== 0) {
+  }
+
+  // What left for the wallet, on the card that shows the claim fall by it.
+  if (ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
+    const paid = flankedLegProv(ctx, coords);
+    if (paid)
       stats.push({
-        label: "Interest since previous event",
-        value: interest < 0 ? `−${fmt(String(-interest))}` : fmt(ctx.interestSincePrev),
+        label: "Paid to the wallet",
+        value: formatNumber(Math.abs(paid.value)),
         symbol: ctx.assetSymbol,
-        prov: interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev),
-        changed: false,
+        prov: paid.prov,
       });
-    }
   }
 
   if (ctx.eventType === "deposit" || ctx.eventType === "withdraw" || ctx.eventType === "request_fill") {
     stats.push({
-      label: "Net deposited",
-      value: fmt(ctx.principalAfter),
-      symbol: ctx.assetSymbol,
-      prov: principalAfterProv(ctx.assetSymbol, coords, ctx.raw?.principalAfter),
-      transition: reconstructTransition({
-        after: ctx.principalAfter,
-        change: ctx.assetsDelta,
-        changeProv: assetsDeltaProv(ctx.assetSymbol, ctx.eventType, coords, ctx.raw?.assets),
-        beforeProv: principalBeforeProv(ctx.assetSymbol, coords),
-      }),
-    });
-    stats.push({
-      label: "Share balance",
+      label: "Wallet's shares",
       value: fmt(ctx.sharesAfter),
       symbol: ctx.poolSymbol,
       prov: sharesAfterProv(ctx.poolSymbol, coords, ctx.raw?.sharesAfter),
@@ -115,13 +162,16 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
       stats.push({
         label: "Rate at this event",
         value: (assets / shares).toFixed(6),
-        symbol: `${ctx.assetSymbol}/${ctx.poolSymbol}`,
+        // The asset's own icon beside the figure, the unit spelled out under
+        // it: a compound "USDC/syrupUSDC" has no icon and drew a bare letter.
+        symbol: ctx.assetSymbol,
+        sub: `${ctx.assetSymbol} per ${ctx.poolSymbol}`,
         prov: eventRateProv(ctx.assetSymbol, ctx.poolSymbol, ctx.eventType, coords),
       });
     }
     if (ctx.eventType === "request_fill") {
       stats.push({
-        label: "In withdrawal queue",
+        label: "Wallet's shares in the queue",
         value: fmt(ctx.escrowAfter),
         symbol: ctx.poolSymbol,
         prov: escrowAfterProv(ctx.poolSymbol, coords, ctx.raw?.escrowAfter),
@@ -145,7 +195,7 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
           : String(-Number(ctx.requestShares))
         : undefined;
     stats.push({
-      label: "In withdrawal queue",
+      label: "Wallet's shares in the queue",
       value: fmt(ctx.escrowAfter),
       symbol: ctx.poolSymbol,
       prov: escrowAfterProv(ctx.poolSymbol, coords, ctx.raw?.escrowAfter),
@@ -160,7 +210,7 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
       }),
     });
     stats.push({
-      label: "Share balance",
+      label: "Wallet's shares",
       value: fmt(ctx.sharesAfter),
       symbol: ctx.poolSymbol,
       prov: sharesAfterProv(ctx.poolSymbol, coords, ctx.raw?.sharesAfter),
@@ -181,7 +231,7 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
     });
   } else if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out") {
     stats.push({
-      label: "Share balance",
+      label: "Wallet's shares",
       value: fmt(ctx.sharesAfter),
       symbol: ctx.poolSymbol,
       prov: sharesAfterProv(ctx.poolSymbol, coords, ctx.raw?.sharesAfter),
@@ -199,5 +249,9 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet }: MapleEven
     });
   }
 
-  return <ChainTruthDetail stats={stats} />;
+  return (
+    <ChainTruthDetail
+      stats={stats.map((st) => ({ ...st, display: st.display ?? st.value, transition: full(st.transition) }))}
+    />
+  );
 }

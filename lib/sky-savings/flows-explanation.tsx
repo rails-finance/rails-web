@@ -40,7 +40,7 @@ export function skyFlowsExplanation(p: SkyPosition, totals: SkyLifetimeTotals | 
     );
   items.push(
     <>
-      The bar and its scrubber cover all <H>{p.activity.events.toLocaleString("en-US")}</H> event
+      The bar and the line under it cover all <H>{p.activity.events.toLocaleString("en-US")}</H> event
       {p.activity.events === 1 ? "" : "s"}; the last stop is the page&rsquo;s block. On the dollar axis one USDS is
       valued at the PSM rate, one USDC for the whole life of sUSDS.
     </>,

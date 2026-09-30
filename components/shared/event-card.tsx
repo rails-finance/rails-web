@@ -58,6 +58,8 @@ export interface EventCardProps {
   explainerTeaserVariant?: "bullet" | "prose";
   /** Transaction hash — enables shared footer with Etherscan + TxHashBadge */
   txHash?: string;
+  /** A word before the footer's hash ("Transaction"). Unset changes nothing. */
+  txHashLabel?: string;
   /** Extra content in the footer row (e.g., Liquity collateral price) */
   footerExtra?: React.ReactNode;
   /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), rendered at the
@@ -84,6 +86,9 @@ export interface EventCardProps {
   /** The phone spine view's caption kind, where the card's label differs from
    *  the event's `actionLabel` (which the timeline provides by default). */
   caption?: string;
+  /** A control beside the chevron while the card is open (the Aave family's
+   *  calculator). It takes its clicks; the header's toggle ignores them. */
+  headerAction?: React.ReactNode;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -105,12 +110,14 @@ export function EventCard({
   explainerTeaser: explainerTeaserProp,
   explainerTeaserVariant = "bullet",
   txHash,
+  txHashLabel,
   footerExtra,
   learnMore,
   hideDetailChevron,
   persistKey,
   muted,
   caption,
+  headerAction,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -211,15 +218,23 @@ export function EventCard({
       : []),
   ];
   const footerNode = txHash ? (
-    <EventCardFooter txHash={txHash} extra={footerExtra} learnMore={learnMore} shareHref={shareHref ?? undefined} />
+    <EventCardFooter
+      txHash={txHash}
+      txHashLabel={txHashLabel}
+      extra={footerExtra}
+      learnMore={learnMore}
+      shareHref={shareHref ?? undefined}
+    />
   ) : undefined;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   const contentTiers = (
     <div className="min-w-0 grow">
       {/* ── Header panel ─────────────────────────────────────────── */}
+      {/* The ring: the header of a day's last event flashes after the Lifetime
+          flows chart's "Timeline to …" (flow-day-mark.tsx). */}
       <div
-        className={`overflow-visible rounded-xl transition-colors ${
+        className={`overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
           showDetail ? "rounded-b-none bg-raised" : hasDetail ? "hover:bg-raised" : ""
         }`}
       >
@@ -244,8 +259,18 @@ export function EventCard({
               header's `.evt-meta` row lines up beside it, reserving width
               for the chevron when present — see the `.evt-meta` rules in
               app/globals.css. */}
-          <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
+          <div
+            className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}${showDetail && headerAction ? " evt-has-action" : ""}`}
+          >
             <div className="flex-1 min-w-0">{header}</div>
+            {showDetail && headerAction && (
+              <div
+                className={`absolute top-0 mt-2.5 flex items-center sm:static sm:mt-3 ${showChevron ? "right-10 sm:right-auto" : "right-3 sm:right-auto"}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {headerAction}
+              </div>
+            )}
             {showChevron && (
               <div className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static">
                 <ExpandChevron isOpen={showDetail} group="evt" />

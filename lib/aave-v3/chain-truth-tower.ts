@@ -30,6 +30,7 @@ import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-positi
 import { scaleV3ChainBalance } from "@/lib/api/fetch-aave-v3-position";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
+import { interestSinceZero, numOrNull, type LaneRow } from "@/lib/shared/interest-since-zero";
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -630,10 +631,15 @@ export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3Liquidati
 /** Position-card stat captions (the V4 spoke-card grammar, computed with this
  *  tier's gates). null = the gate failed and the caption simply doesn't render. */
 export interface AaveV3CardCaptions {
-  /** USD of accrued supply interest included in the collateral balance. */
+  /** USD of the supply interest accrued since each collateral balance last
+   *  started from zero (sinceZeroInterest), inside the balance shown. */
   supplyInterestUsd: number | null;
-  /** USD of accrued borrow interest included in the debt balance. */
+  /** The same for the debt. */
   debtInterestUsd: number | null;
+  /** Unix seconds each side's figure counts from: the earliest of its
+   *  reserves' starts from zero. Null with the figure. */
+  supplyInterestSince?: number | null;
+  debtInterestSince?: number | null;
   /** Current variable borrow APR (%). `avg` when debt-USD-weighted across
    *  several borrowed reserves; `symbol` names the reserve when single. */
   borrowRate: { pct: number; avg: boolean; symbol?: string } | null;
@@ -641,37 +647,94 @@ export interface AaveV3CardCaptions {
   pool?: string;
 }
 
-/** USD of accrued interest included in one side's balance — per live reserve,
- *  (current rebased balance − net event principal) × oracle price, summed.
- *  STRICT: a reserve that can't attribute (no captured inflow, negative
- *  interest = missed principal, interest > gross inflow = a transfer-fed
- *  balance whose custody moves are deliberately not flows, or an unpriced
- *  reserve) nulls the whole caption rather than understate it; a genuinely
- *  ~zero interest just contributes nothing. */
-function sideInterestUsd(
+/** The address an event moved on a side, or null where it did not touch that
+ *  side; `undefined` marks an event of a kind the lane walk does not read (a
+ *  swap, a write-off) whose flows name the reserve. */
+function laneAddressOf(e: BaseActivityEvent, side: "supply" | "debt"): string | null {
+  const d = (e.context as { data?: Record<string, unknown> } | undefined)?.data ?? {};
+  const t = d.eventType as string | undefined;
+  const flowToken = (i: number) => e.flows?.[i]?.token?.toLowerCase() ?? null;
+  const reserve = typeof d.reserve === "string" ? d.reserve.toLowerCase() : null;
+  if (t === "liquidation") {
+    const coll = typeof d.collateralAsset === "string" ? d.collateralAsset.toLowerCase() : flowToken(0);
+    if (side === "supply") return coll;
+    const other = (e.flows ?? []).map((f) => f.token?.toLowerCase()).find((a) => a && a !== coll);
+    return other ?? reserve;
+  }
+  const supplySide = t === "supply" || t === "withdraw" || t === "transfer_in" || t === "transfer_out";
+  const debtSide = t === "borrow" || t === "repay";
+  if ((side === "supply" && supplySide) || (side === "debt" && debtSide)) return reserve ?? flowToken(0);
+  return null;
+}
+
+const KNOWN_LANE_TYPES = new Set([
+  "supply",
+  "withdraw",
+  "transfer_in",
+  "transfer_out",
+  "borrow",
+  "repay",
+  "liquidation",
+]);
+
+/** Interest accrued since a balance last started from zero (the shared rule,
+ *  lib/shared/interest-since-zero.ts), read off Aave V3 or SparkLend rows. A
+ *  kind the lane walk does not read (a swap) that moved the reserve after the
+ *  start nulls it. */
+export function sinceZeroInterest(
+  events: readonly BaseActivityEvent[],
+  side: "supply" | "debt",
+  address: string,
+  current: number,
+  dustAmount: number,
+): { amount: number; since: number } | null {
+  const addr = address.toLowerCase();
+  const rows: LaneRow[] = [];
+  let unreadAt: number | null = null;
+  const ordered = [...events].sort((a, b) => a.blockNumber - b.blockNumber);
+  for (const e of ordered) {
+    const d = (e.context as { data?: Record<string, unknown> } | undefined)?.data ?? {};
+    const t = d.eventType as string | undefined;
+    if (!t || !KNOWN_LANE_TYPES.has(t)) {
+      if ((e.flows ?? []).some((f) => f.token?.toLowerCase() === addr)) unreadAt = e.timestamp;
+      continue;
+    }
+    if (laneAddressOf(e, side) !== addr) continue;
+    rows.push({
+      timestamp: e.timestamp,
+      before: numOrNull(side === "supply" ? d.supplyBefore : d.debtBefore),
+      after: numOrNull(side === "supply" ? d.supplyAfter : d.debtAfter),
+    });
+  }
+  const got = interestSinceZero(rows, current, dustAmount);
+  if (got && unreadAt != null && unreadAt >= got.since) return null;
+  return got;
+}
+
+/** One side's since-zero interest in USD, summed over its live reserves, and
+ *  the earliest start among them. STRICT: a reserve that cannot state it, or an
+ *  unpriced one, nulls the side. */
+function sideSinceZeroUsd(
   side: "supply" | "debt",
   view: AaveFamilyTowerView,
-  lifetime: Map<string, ReserveFlows> | null,
+  events: readonly BaseActivityEvent[] | undefined,
   usdOf: (address: string | undefined, amount: number) => number | null,
-): number | null {
-  if (!lifetime) return null;
-  const live = (side === "supply" ? view.supplies : view.borrows).filter((r) => r.amount > 0);
+): { usd: number; since: number } | null {
+  if (!events || events.length === 0) return null;
+  const live = (side === "supply" ? view.supplies : view.borrows).filter((r) => r.amount > 0 && !r.decimalsUnread);
   if (live.length === 0) return null;
-  let sum = 0;
-  for (const cur of live) {
-    const f = lifetime.get(cur.symbol);
-    if (!f) return null;
-    const gross = side === "supply" ? supplyIn(f) : f.borrowed;
-    const net = side === "supply" ? supplyIn(f) - supplyOut(f) : f.borrowed - debtOut(f);
-    if (gross <= 0) return null;
-    const interest = cur.amount - net;
-    if (interest < -DUST || interest > gross) return null;
-    if (interest <= DUST) continue;
-    const usd = usdOf(cur.address, interest);
-    if (usd == null) return null;
-    sum += usd;
+  let usd = 0;
+  let since = Infinity;
+  for (const r of live) {
+    const unit = usdOf(r.address, 1);
+    if (unit == null || unit <= 0) return null;
+    // A balance worth under a cent counts as starting from zero.
+    const got = sinceZeroInterest(events, side, r.address, r.amount, 0.01 / unit);
+    if (!got) return null;
+    usd += got.amount * unit;
+    since = Math.min(since, got.since);
   }
-  return sum;
+  return Number.isFinite(since) ? { usd, since } : null;
 }
 
 export function computeAaveV3CardCaptions(
@@ -683,6 +746,9 @@ export function computeAaveV3CardCaptions(
    *  interest split then attributes against the whole life rather than a
    *  recent window. When present `events` is not reduced here at all. */
   precomputedLifetime?: ReserveFlows[],
+  /** The rows on the page, for the interest since each balance last started
+   *  from zero. Defaults to `events`. */
+  rowEvents?: BaseActivityEvent[],
 ): AaveV3CardCaptions {
   const prices = view.priceByAddress;
   const usdOf = (address: string | undefined, amount: number): number | null => {
@@ -690,16 +756,6 @@ export function computeAaveV3CardCaptions(
     const p = prices?.[address.toLowerCase()];
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
-  const leftOut = new Set(aaveV3NotLoaded(view, events ?? [], precomputedLifetime).map((t) => t.label));
-  const lifetime = withoutLeftOut(
-    precomputedLifetime
-      ? bySymbol(precomputedLifetime)
-      : events && events.length > 0
-        ? reduceAaveFamilyLifetime(events)
-        : null,
-    leftOut,
-  );
-
   // Borrow rate — from the live Pool read (getReserveData @ head). One borrowed
   // reserve → its own rate; several → the debt-USD-weighted average, with the
   // strict guard (every borrowed reserve rated AND oracle-priced, else omit).
@@ -724,9 +780,15 @@ export function computeAaveV3CardCaptions(
     }
   }
 
+  // The interest inside today's balances: since each last started from zero.
+  const rows = rowEvents ?? events;
+  const supplyInterest = sideSinceZeroUsd("supply", view, rows, usdOf);
+  const debtInterest = sideSinceZeroUsd("debt", view, rows, usdOf);
   return {
-    supplyInterestUsd: sideInterestUsd("supply", view, lifetime, usdOf),
-    debtInterestUsd: sideInterestUsd("debt", view, lifetime, usdOf),
+    supplyInterestUsd: supplyInterest?.usd ?? null,
+    debtInterestUsd: debtInterest?.usd ?? null,
+    supplyInterestSince: supplyInterest?.since ?? null,
+    debtInterestSince: debtInterest?.since ?? null,
     borrowRate,
     pool: chain?.pool,
   };
@@ -765,6 +827,9 @@ export type AaveV3TowerData = ChainTruthTowerData & {
   /** Each liquidated collateral asset: what left in all, and of it the fee
    *  the Aave treasury took (the liquidator had the rest). */
   liquidationSplit?: { symbol: string; total: number; fee: number }[];
+  /** Every liquidation in the rows read a protocol fee of 0 at its block, so
+   *  the liquidator kept the whole bonus (Seamless). */
+  liquidationFeeZero?: true;
 };
 
 export function computeAaveV3Economics(
@@ -787,6 +852,46 @@ export function computeAaveV3Economics(
     if (!address) return null;
     const p = prices?.[address.toLowerCase()];
     return typeof p === "number" && p > 0 ? amount * p : null;
+  };
+
+  // Interest rows beside the flows, at the prices it accrued at: each row's
+  // interest since the balance last moved, valued at that row's oracle price
+  // (the stretch it closes); what accrued since the last row at today's. The
+  // interest segment of a debt still owed is part of what is owed now and
+  // stays at today's price.
+  const interestAtEvent = new Map<string, { amount: number; usd: number }>();
+  for (const e of events ?? []) {
+    if (!isAaveV3Event(e)) continue;
+    const c = e.context.data;
+    const liq = c.eventType === "liquidation";
+    const legs: [string | undefined, "supply" | "debt", string | undefined, number | undefined][] = [
+      [
+        liq ? c.collateralSymbol : c.reserveSymbol,
+        "supply",
+        c.supplyInterestSincePrevious,
+        (liq ? c.collateralPrice : c.price)?.usd,
+      ],
+      [c.reserveSymbol, "debt", c.debtInterestSincePrevious, (liq ? c.debtPrice : c.price)?.usd],
+    ];
+    for (const [sym, side, amt, px] of legs) {
+      const n = Number(amt ?? "0");
+      if (!sym || !(n > 0) || px == null || !(px > 0)) continue;
+      const key = `${side}:${sym}`;
+      const cur = interestAtEvent.get(key) ?? { amount: 0, usd: 0 };
+      interestAtEvent.set(key, { amount: cur.amount + n, usd: cur.usd + n * px });
+    }
+  }
+  const interestUsd = (
+    side: "supply" | "debt",
+    symbol: string,
+    address: string | undefined,
+    amount: number,
+  ): number | null => {
+    const at = interestAtEvent.get(`${side}:${symbol}`);
+    if (!at || at.amount <= DUST) return usdOf(address, amount);
+    if (at.amount >= amount) return at.usd * (amount / at.amount);
+    const rest = usdOf(address, amount - at.amount);
+    return rest == null ? null : at.usd + rest;
   };
 
   // Tokens whose decimals did not load are left out of every line and total,
@@ -992,7 +1097,7 @@ export function computeAaveV3Economics(
             symbol: f.symbol,
             address: lane.reserve,
             amount,
-            usd: usdOf(lane.reserve, amount),
+            usd: interestUsd(side, f.symbol, lane.reserve, amount),
             prov: laneInterestProv(f.symbol, side),
             flowLabel: side === "supply" ? "Interest earned" : "Interest accrued",
           },
@@ -1023,7 +1128,7 @@ export function computeAaveV3Economics(
         symbol: cur.symbol,
         address: cur.key.toLowerCase(),
         amount: amt,
-        usd: usdOf(cur.key, amt),
+        usd: interestUsd("supply", cur.symbol, cur.key, amt),
         prov: laneInterestProv(cur.symbol, "supply"),
         flowLabel: "Interest earned",
       });
@@ -1055,7 +1160,7 @@ export function computeAaveV3Economics(
           symbol: cur.symbol,
           address: cur.key.toLowerCase(),
           amount: amt,
-          usd: usdOf(cur.key, amt),
+          usd: interestUsd("debt", cur.symbol, cur.key, amt),
           prov: vocab.debtInterest(cur.symbol),
           flowLabel: "Interest accrued",
         });
@@ -1158,6 +1263,14 @@ export function computeAaveV3Economics(
         .map((r) => ({ symbol: r.symbol, total: r.liquidatedCollateral, fee: r.treasuryFee ?? 0 }))
     : [];
 
+  // Every liquidation in the rows paid no protocol fee (the fee bps its
+  // block's configuration read), and none sent a fee row to a treasury.
+  const liqRows = (events ?? []).filter((e) => isAaveV3Event(e) && e.context.data.eventType === "liquidation");
+  const liquidationFeeZero =
+    liqRows.length > 0 &&
+    liquidationSplit.length === 0 &&
+    liqRows.every((e) => isAaveV3Event(e) && e.context.data.liquidationBonusAtBlock?.protocolFeeBps === 0);
+
   return {
     valued,
     // On-chain oracle price → chain-derived, so the USD bars survive On-chain-values.
@@ -1189,6 +1302,7 @@ export function computeAaveV3Economics(
     ...(notLoaded.length > 0 ? { notLoaded } : {}),
     flowsPricedAtEvents: valued && flowsAtEventPrices,
     ...(liquidationSplit.length > 0 ? { liquidationSplit } : {}),
+    ...(liquidationFeeZero ? { liquidationFeeZero: true as const } : {}),
   };
 }
 

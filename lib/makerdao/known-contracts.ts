@@ -29,6 +29,14 @@ export const MAKER_KNOWN_CONTRACTS: Record<string, MakerKnownContract> = {
     role: "maker",
     source: "ScdMcdMigration.tub() on chain",
   },
+  // Chainlog LOCKSTAKE_ENGINE, read on chain 2026-09-30; its urnOwners() and
+  // ilk() (LSEV2-SKY-A) resolve every LockStake urn.
+  "0xce01c90de7fd1bcfa39e237fe6d8d9f569e8a6a3": {
+    name: "Sky's LockStake Engine",
+    short: "LockStake Engine",
+    role: "maker",
+    source: "Sky chainlog: LOCKSTAKE_ENGINE",
+  },
   "0x5c55b921f590a89c1ebe84df170e655a82b62126": {
     name: "DeFi Saver",
     short: "DeFi Saver",

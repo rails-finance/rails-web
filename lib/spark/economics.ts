@@ -137,8 +137,10 @@ export function computeSparkCardCaptions(
   chain?: SparkPositionChainResponse | null,
   /** The merged lifetime on a windowed page; when present `events` is not reduced. */
   precomputedLifetime?: ReserveFlows[],
+  /** The rows on the page, for the interest inside today's balances. */
+  rowEvents?: BaseActivityEvent[],
 ): SparkCardCaptions {
-  return computeAaveV3CardCaptions(view, events, chain, lifetimeOf(events, precomputedLifetime));
+  return computeAaveV3CardCaptions(view, events, chain, lifetimeOf(events, precomputedLifetime), rowEvents);
 }
 
 export function computeSparkEconomics(
@@ -149,5 +151,38 @@ export function computeSparkEconomics(
   /** Per lane: the net its events moved beside the chain balance (decision 0033). */
   laneInterest?: readonly AaveLaneInterest[] | null,
 ): AaveV3TowerData {
-  return computeAaveV3Economics(view, events, SPARK_VOCABULARY, lifetimeOf(events, precomputedLifetime), laneInterest);
+  const data = computeAaveV3Economics(
+    view,
+    events,
+    SPARK_VOCABULARY,
+    lifetimeOf(events, precomputedLifetime),
+    laneInterest,
+  );
+  return sparkTowerWords(data, view);
+}
+
+/**
+ * SparkLend's words on the tower (newcomer round 2, R5 and R10): whole dollars
+ * so each column adds up on its face, labels that wrap rather than clip, and
+ * two names for the debt's interest rows — interest on a debt no longer held
+ * went out with its repayments, while the interest line on a debt still held
+ * counts that debt's whole life.
+ */
+function sparkTowerWords(data: AaveV3TowerData, view: SparkPositionView): AaveV3TowerData {
+  const held = new Set(view.borrows.filter((r) => r.amount > 0).map((r) => r.address.toLowerCase()));
+  const interest = data.debt.interest;
+  return {
+    ...data,
+    fullUsdAmounts: data.valued ? true : data.fullUsdAmounts,
+    wrapFlowLabels: true,
+    interestLabel: interest?.symbol ? `Interest on ${interest.symbol}, all time` : data.interestLabel,
+    debt: {
+      ...data.debt,
+      earned: data.debt.earned?.map((l) =>
+        l.flowLabel === "Interest accrued" && l.address && !held.has(l.address.toLowerCase())
+          ? { ...l, flowLabel: "Interest repaid" }
+          : l,
+      ),
+    },
+  };
 }

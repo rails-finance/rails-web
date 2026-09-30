@@ -10,6 +10,7 @@
 
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { interestSinceZero, numOrNull, type LaneRow } from "@/lib/shared/interest-since-zero";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { pricesHaveLoaded, UNPRICED_DUST_TOKENS } from "@/lib/aave-v4/unpriced";
@@ -233,6 +234,10 @@ export interface AaveSpokeCardInfo {
    *  borrow interest paid. Present only when chain-state balances have been
    *  applied (see computeAaveV4InterestPnl); null otherwise. */
   interestPnl?: AaveV4InterestPnl | null;
+  /** The interest inside today's balances: since each last started from zero
+   *  (computeAaveV4InterestSinceZero). The card's "incl. $X interest" reads
+   *  this; null where a side cannot state it. */
+  interestSinceZero?: AaveV4InterestSinceZero | null;
   /** On-chain-oracle valuation of the headline totals — each the chain-state
    *  balance × Aave's own on-chain oracle price (see useAaveV4OraclePrices), so
    *  it survives On-chain-values as chain-derived. Each field is null unless
@@ -374,6 +379,82 @@ export function computeAaveV4InterestPnl(
   // Nothing reliable to show and no gap to explain → let callers render nothing.
   if (assets.length === 0 && !unattributed) return null;
   return { assets, netUsd, hasData, unattributed };
+}
+
+/** Per side, USD of the interest since each balance last started from zero,
+ *  and the earliest such start (unix seconds); null where the side cannot say. */
+export interface AaveV4InterestSinceZero {
+  supply: { usd: number; since: number } | null;
+  debt: { usd: number; since: number } | null;
+}
+
+/** The lane rows one spoke's events give a reserve on one side, oldest first,
+ *  and the hubs they came from. A liquidation's supply figures are its
+ *  collateral's, its debt figures the debt reserve's. */
+function v4LaneRows(
+  events: readonly BaseActivityEvent[],
+  side: "supply" | "debt",
+  symbol: string,
+): { rows: LaneRow[]; hubs: Set<string> } {
+  const rows: LaneRow[] = [];
+  const hubs = new Set<string>();
+  for (const e of events) {
+    if (e.context?.protocol !== "aave-v4") continue;
+    const d = e.context.data as AaveV4Context;
+    const t = d.eventType;
+    const lane =
+      t === "liquidation"
+        ? side === "supply"
+          ? d.collateralSymbol
+          : d.reserveSymbol
+        : (side === "supply" && (t === "supply" || t === "withdraw")) ||
+            (side === "debt" && (t === "borrow" || t === "repay"))
+          ? d.reserveSymbol
+          : undefined;
+    if (lane !== symbol) continue;
+    hubs.add(d.hub ?? "");
+    rows.push({
+      timestamp: e.timestamp,
+      before: numOrNull(side === "supply" ? d.supplyBefore : d.debtBefore),
+      after: numOrNull(side === "supply" ? d.supplyAfter : d.debtAfter),
+    });
+  }
+  return { rows, hubs };
+}
+
+/** The card's interest captions on a V4 spoke: per live reserve, the interest
+ *  since its balance last started from zero (lib/shared/interest-since-zero),
+ *  priced now and summed. STRICT: a reserve that cannot state it, or an
+ *  unpriced one, nulls its side. */
+export function computeAaveV4InterestSinceZero(
+  events: readonly BaseActivityEvent[],
+  reserves: ReserveStats[],
+  prices: Record<string, PriceEntry | number>,
+): AaveV4InterestSinceZero {
+  const ordered = [...events].sort((a, b) => a.blockNumber - b.blockNumber);
+  const side = (which: "supply" | "debt"): { usd: number; since: number } | null => {
+    let usd = 0;
+    let since = Infinity;
+    let any = false;
+    for (const r of reserves) {
+      const current = which === "supply" ? r.currentSupplied : r.currentBorrowed;
+      if (current == null || current <= 0) continue;
+      const price = resolvePrice(r.symbol, prices);
+      if (price == null || price <= 0) return null;
+      // One symbol drawn from two hubs is two balances the card adds into one
+      // current figure; the rows cannot be split against it, so the side is
+      // left out (0xcd5a…c641 borrows USDC on Bluechip from Core and Prime).
+      const lane = v4LaneRows(ordered, which, r.symbol);
+      if (lane.hubs.size > 1) return null;
+      const got = interestSinceZero(lane.rows, current, 0.01 / price);
+      if (!got) return null;
+      usd += got.amount * price;
+      since = Math.min(since, got.since);
+      any = true;
+    }
+    return any && Number.isFinite(since) ? { usd, since } : null;
+  };
+  return { supply: side("supply"), debt: side("debt") };
 }
 
 // ---- Guard ----

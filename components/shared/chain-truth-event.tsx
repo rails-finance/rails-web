@@ -54,6 +54,7 @@ import {
   formatUsdValue,
 } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
+import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -145,6 +146,10 @@ export interface ChainTruthDelta {
    *  (formatNumber) rather than the exact decimal: for dust, where the exact
    *  decimal is eighteen digits no one reads aloud. */
   readableLabel?: boolean;
+  /** The magnitude as shown, where the family states amounts at its own
+   *  precision (Polaris: every figure in full, to three decimals). Unsigned:
+   *  the sign rule above still applies. Default: the compact header form. */
+  display?: string;
 }
 
 /** "−0.00534 wstETH": a figure's accessible name in the site's number format. */
@@ -182,7 +187,7 @@ export interface ChainTruthRowSpec {
    *  tracing both facts (tx sender + Pool caller vs owner). Like `critical`,
    *  it keeps the moved amounts in the header — the glyph spine carries no
    *  flanking numbers. */
-  externalActor?: { address: string; prov: Provenance; tip?: ReactNode };
+  externalActor?: { address: string; prov: Provenance; tip?: ReactNode; prefix?: string };
   /** Neutral party chip — "<prefix> 0x12…34" beside the deltas (e.g. Maker's
    *  give: "to <new owner>"). Unlike `externalActor` it carries no
    *  external-party signal: neutral tint, no spine hand-off — a named
@@ -256,7 +261,7 @@ export interface ChainTruthRowSpec {
    *  Optional and drawn only when set, so no other explorer's row changes.
    *  The adapter gates it on the display flag and echoes the detail metric's
    *  receipt, so chip and metric pulse as one identity. */
-  ratioChip?: { text: string; value: string; belowMin?: boolean; prov: Provenance };
+  ratioChip?: { text: string; value: string; belowMin?: boolean; prov: Provenance; title?: string };
   /** Signed amounts moved (0–2 in practice). A combined adjust omits the row
    *  `label` (empty string) and lets each delta's own `label` carry its per-axis
    *  verb — V2's grammar — so the header never shows a merged "Deposit & Borrow"
@@ -333,6 +338,8 @@ export interface ChainTruthStat {
     /** The line's words where the gap is not interest alone (f(x): funding,
      *  rebalances). Default "Interest since previous event". */
     label?: string;
+    /** A hover/tap tip on the label (opt-in). */
+    labelTip?: string;
     /** The figure as shown, where the family states its amounts at its own
      *  precision. Default: formatNumber of `value`. */
     display?: string;
@@ -544,7 +551,7 @@ export function ChainTruthRow({
         // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
         // keeps the sign from running into the "<" ("− <0.01").
         const bare = Boolean(d.label) || Boolean(spec.custody);
-        const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
+        const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
         const text =
           bare || spec.unsignedDeltas
             ? magnitude
@@ -674,6 +681,7 @@ export function ChainTruthRow({
             address={spec.externalActor.address}
             prov={spec.externalActor.prov}
             tip={spec.externalActor.tip}
+            prefix={spec.externalActor.prefix}
           />
         </span>
       )}
@@ -688,6 +696,7 @@ export function ChainTruthRow({
           <span
             className={`text-xs tabular-nums ${spec.ratioChip.belowMin ? "text-red-500" : "text-rb-500"}`}
             data-ratio-chip={spec.ratioChip.belowMin ? "below-min" : "ok"}
+            title={spec.ratioChip.title}
           >
             {spec.ratioChip.text}
           </span>
@@ -862,7 +871,11 @@ export function ChainTruthDetail({
               </StateTransition>
               {s.interestSincePrevious && (
                 <StatSubline>
-                  {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
+                  <TipLabel
+                    text={s.interestSincePrevious.label ?? "Interest since previous event"}
+                    tip={s.interestSincePrevious.labelTip}
+                  />
+                  :{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <ExactTip
                       always

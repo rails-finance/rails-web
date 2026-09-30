@@ -18,6 +18,9 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatDate } from "@/lib/date";
+import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
+import type { DolomitePositionView } from "@/components/protocol/dolomite/dolomite-position-card";
 
 /** Oxford-join asset symbols ("wstETH and WETH"). */
 function joinSymbols(syms: string[]): string {
@@ -31,6 +34,7 @@ export function DolomitePositionExplanation({
   chain,
   liquidationCount,
   txCount,
+  eventTotal,
   externalActivity,
 }: {
   /** The live chain read. Null until it lands (or for a closed account):
@@ -41,6 +45,8 @@ export function DolomitePositionExplanation({
   liquidationCount?: number;
   /** The card's transaction count (the count badge). Omit to skip. */
   txCount?: number;
+  /** The account's timeline rows, when the whole history is known. */
+  eventTotal?: number;
   /** Who executed the account's events, reduced over its whole history. The
    *  page derives it from the events already on the page; omit to skip the
    *  operator bullet. */
@@ -198,12 +204,12 @@ export function DolomitePositionExplanation({
     }
     bullets.push(
       <span key="mechanics">
-        A liquidation here repays part of the debt and takes collateral worth that repayment plus{" "}
+        A liquidation here repays half or all of the debt and takes collateral worth that repayment plus{" "}
         {chain.override.active && chain.override.liquidationSpread != null
           ? `${(chain.override.liquidationSpread * 100).toFixed(0)}%`
           : `${(chain.liquidationSpread * 100).toFixed(0)}%`}
-        . It is partial and repeatable, moving four balances in one event across the borrower&rsquo;s and the
-        liquidator&rsquo;s accounts.
+        : half when the health factor is 0.95 or above and the collateral market allows it, all of it otherwise. It
+        moves four balances in one event across the borrower&rsquo;s and the liquidator&rsquo;s accounts.
       </span>,
     );
   }
@@ -221,7 +227,7 @@ export function DolomitePositionExplanation({
     bullets.push(
       <span key="survivor">
         The account has been liquidated <H>{liquidationCount}</H> time{liquidationCount === 1 ? "" : "s"} and remains
-        open. Liquidation here is partial and repeatable — an event in the account&rsquo;s life rather than its end.
+        open: a liquidation repays half or all of the debt, and the collateral left over stays in the account.
       </span>,
     );
   }
@@ -229,7 +235,17 @@ export function DolomitePositionExplanation({
   if (txCount != null && txCount > 0) {
     bullets.push(
       <span key="tx-count">
-        The account has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date.
+        The account has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date
+        {liquidationCount != null && liquidationCount > 0 ? ", liquidations left out" : ""}
+        {eventTotal != null && eventTotal !== txCount ? (
+          <>
+            ; its timeline holds {eventTotal} events
+            {liquidationCount != null && liquidationCount > 0
+              ? ", because each liquidation writes two rows"
+              : ", because one transaction can write a row per market it moves"}
+          </>
+        ) : null}
+        .
       </span>,
     );
   }
@@ -270,4 +286,82 @@ export function DolomitePositionExplanation({
   if (lead == null && bullets.length === 0) return null;
 
   return <ProseExplainer paragraph={lead} items={bullets} />;
+}
+
+/** Closed/liquidated mood: narration from the index and the rows alone (a
+ *  terminal account has no live state to read): the peaks, the liquidation
+ *  record, the closure. Figures bold only where the card shows the same
+ *  figure (the peaks, the closure date, the counts). */
+export function DolomiteClosedPositionExplanation({ v }: { v: DolomitePositionView }) {
+  const liquidated = v.status === "liquidated";
+  const peakText = (rs: { amount: number; symbol: string }[]) =>
+    rs.map((r, i) => (
+      <span key={r.symbol + i}>
+        {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
+        <H>
+          <AmountText value={r.amount} /> {r.symbol}
+        </H>
+      </span>
+    ));
+  const inTokens = [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens);
+
+  const lead = liquidated ? (
+    <>This account closed with liquidation in its record, and nothing remains supplied or borrowed:</>
+  ) : (
+    <>This account ran its course and closed, and nothing remains supplied or borrowed:</>
+  );
+
+  const list: React.ReactNode[] = [];
+  if (v.peakSupplies.length > 0 || v.peakBorrows.length > 0) {
+    list.push(
+      <>
+        At its height the account
+        {v.peakSupplies.length > 0 && <> held as much as {peakText(v.peakSupplies)}</>}
+        {v.peakSupplies.length > 0 && v.peakBorrows.length > 0 && <> and</>}
+        {v.peakBorrows.length > 0 && <> owed as much as {peakText(v.peakBorrows)}</>}
+        {inTokens ? (
+          <>: each market&rsquo;s largest balance just before or after any event, interest included.</>
+        ) : (
+          <>, in par: multiply by each market&rsquo;s interest index for tokens.</>
+        )}
+      </>,
+    );
+  }
+  if (v.liquidationCount > 0) {
+    list.push(
+      <>
+        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
+        {v.liquidations && v.liquidations.length > 0
+          ? liquidationSentences(v.liquidations).join(" ")
+          : "Each time a liquidator repaid half or all of the debt and took collateral worth that repayment plus the liquidation spread."}
+      </>,
+    );
+  }
+  list.push(
+    <>
+      Its last activity landed on <H>{formatDate(v.lastActivityAt)}</H>, after <H>{v.txCount}</H> transaction
+      {v.txCount === 1 ? "" : "s"}
+      {v.liquidationCount > 0 ? " (liquidations left out)" : ""}
+      {v.eventTotal != null && v.eventTotal !== v.txCount ? (
+        <>
+          {" "}
+          and {v.eventTotal} events
+          {v.liquidationCount > 0 ? (
+            <>
+              : each liquidation is the liquidator&rsquo;s transaction and writes two rows, the debt repaid and the
+              collateral seized
+            </>
+          ) : (
+            <>: one transaction can write a row per market it moves</>
+          )}
+        </>
+      ) : null}
+      .
+    </>,
+  );
+  list.push(
+    <>The wallet can come back at any time: a new deposit into this account number reopens this same timeline.</>,
+  );
+
+  return <ProseExplainer paragraph={lead} items={list} />;
 }

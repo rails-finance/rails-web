@@ -123,12 +123,12 @@ const FIXTURES = [
     kind: "Debt swap",
     axis: "debt",
     venue: PARASWAP_VENUE,
-    // D4: the open card reads the Borrowed balance ending at the net 18,76x (the
+    // D4: the open card reads the debt balance ending at the net 18,76x (the
     // gross borrow alone would end at 18.8K), the Borrow row at its gross, and the
     // leftover as its own "Repaid back unused" row. The balance is the exact one read when
     // the card opens (rails-ops TO-DO-ui-jobs §19) and is stated by the position
-    // block's Borrowed row alone (§47), so the account beneath it shows too.
-    readsWhenOpen: [/Borrowed .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back unused 37.528", "Health factor"],
+    // block's Debt cell alone (§47, §213), so the account beneath it shows too.
+    readsWhenOpen: [/Debt .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back unused 37.528", "Health factor"],
   },
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",
@@ -157,12 +157,11 @@ const FIXTURES = [
     mark: "flow",
     // The bought WETH has no position row: it reads from the adapter's Swapped log,
     // so it keeps its grid cell. The WBTC it sold is stated by the position block's
-    // Supplied row (§47), exact, interest to the block included: 0.00913 down to 0.
-    // The pattern stopped requiring the amounts to follow "Supplied" directly on
-    // 2026-09-25 — 30d7665 groups that panel under "Collateral on" / "Collateral
-    // off" headings, which now sit between the two. The panel and the figures are
-    // what the check is about, and both still read.
-    readsWhenOpen: [/Supplied\b.{0,200}?\b0\.00913 0\b/, "Bought 0.339", "Total collateral"],
+    // Collateral cell (§47, §213), exact, interest to the block included: 0.00913
+    // down to 0, after the cell's total and, the switch having gone off with the
+    // balance, the "Supplied, not collateral" line. The LTV cell's borrowable
+    // line shows the account figures drew.
+    readsWhenOpen: [/Collateral\b.{0,200}?\b0\.00913 0\b/, "Bought 0.339", "Still borrowable"],
   },
 ];
 

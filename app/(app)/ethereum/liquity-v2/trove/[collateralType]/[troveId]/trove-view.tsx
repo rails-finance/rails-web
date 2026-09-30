@@ -18,7 +18,10 @@ import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { liquityFlowTimeline, liquityV2FlowEvents, unpricedEvents } from "@/lib/shared/liquity-flows";
+import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { liquityEconomicsExplanation, liquityRedemptionOutcome } from "@/lib/liquity/economics-explanation";
 import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
@@ -348,6 +351,81 @@ export default function TroveView({
     [lastLiquidation, surplus],
   );
 
+  // The Lifetime flows panel replays the Trove's whole history. The page
+  // holds it unless the timeline read stopped short (`totalEvents` set); then
+  // the panel reads the rest, a page of 1,000 rows at a time, as far as the
+  // route serves.
+  const [flowHistory, setFlowHistory] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
+    events: null,
+    read: "reading",
+  });
+  useEffect(() => {
+    if (totalEvents == null) return;
+    let cancelled = false;
+    (async () => {
+      const seen = new Map<string, BaseActivityEvent>();
+      try {
+        for (let offset = 0; offset <= 10_000; offset += 1_000) {
+          const page = await fetchTroveTimeline({ collateralType, troveId, limit: 1_000, offset });
+          for (const e of page.events ?? []) seen.set(e.id, e);
+          if (!page.pagination?.hasMore) {
+            if (!cancelled) setFlowHistory({ events: [...seen.values()], read: "done" });
+            return;
+          }
+        }
+        if (!cancelled) setFlowHistory({ events: null, read: "failed" });
+      } catch (err) {
+        console.warn("Lifetime flows history not read:", err);
+        if (!cancelled) setFlowHistory({ events: null, read: "failed" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [totalEvents, collateralType, troveId]);
+  const flowEvents = useMemo(
+    () => liquityV2FlowEvents(totalEvents == null ? liquityEvents : (flowHistory.events ?? [])),
+    [totalEvents, liquityEvents, flowHistory.events],
+  );
+  const flowsRead: FlowsRead = totalEvents == null ? "done" : flowHistory.read;
+  // Until the clock is set the panel says it is reading.
+  // The clock the replay reads (the interest since the last event): set on
+  // mount, so the server's render and the first client render agree (the
+  // panel reads as loading until then).
+  const [flowsNow, setFlowsNow] = useState<number | null>(null);
+  useEffect(() => setFlowsNow(Date.now() / 1000), []);
+  const flowCollSymbol = troveData?.collateralType ?? collateralType;
+  const flowDebtSymbol = liquityEvents[0]?.context.data.assetType || "BOLD";
+  const flowPrice = prices?.[flowCollSymbol.toLowerCase() as keyof OraclePricesData];
+  const flowOpen = troveData?.status === "open";
+  const flowSurplusClaimed = surplus?.claimed != null;
+  const flowTimeline = useMemo(
+    () =>
+      flowsNow == null
+        ? null
+        : liquityFlowTimeline(flowEvents, {
+            collSymbol: flowCollSymbol,
+            debtSymbol: flowDebtSymbol,
+            surplusClaimed: flowSurplusClaimed,
+            now: flowsNow,
+            live: flowOpen
+              ? {
+                  price: flowPrice ?? null,
+                  ...(liveState
+                    ? {
+                        coll: liveState.collateral.entire,
+                        debt: liveState.debt.entire,
+                        redistColl: liveState.collateral.redistGain,
+                        redistDebt: liveState.debt.redistGain,
+                        batchFee: liveState.rates.accruedBatchManagementFee,
+                      }
+                    : {}),
+                }
+              : null,
+          }),
+    [flowEvents, flowCollSymbol, flowDebtSymbol, flowSurplusClaimed, flowsNow, flowOpen, flowPrice, liveState],
+  );
+
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `liquity-v2-${troveKey}`,
@@ -523,11 +601,11 @@ export default function TroveView({
           }}
         />
 
-        {/* Lifetime-flow tower — the shared <ChainTruthTower> every other
-            explorer draws, fed by the trove's own event replay. The runway
-            that used to share this panel now lives in the position card with
-            the current-state stats. A mixed wallet (owns this trove AND
-            redeemed against others) gets the redeemer block underneath. */}
+        {/* Lifetime flows: the bars and the line over the Trove's own event
+            replay (lib/shared/liquity-flows.ts). The runway that used to share
+            this panel lives in the position card with the current-state
+            stats. A mixed wallet (owns this trove AND redeemed against
+            others) gets the redeemer block underneath. */}
         {(() => {
           const currentPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
           const result = computeLiquityEconomics(tl.sortedEvents, {
@@ -538,15 +616,26 @@ export default function TroveView({
           if (!result) return null;
           return (
             <>
-              <ChainTruthTower
-                data={result.data}
-                title="Lifetime flows"
-                explanation={liquityEconomicsExplanation(
-                  result.economics,
-                  result.economics._meta,
-                  currentPrice,
-                  surplus?.claimed != null,
-                )}
+              <LifetimeFlowsPanel
+                scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
+                read={flowsNow == null ? "reading" : flowsRead}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    {liquityEconomicsExplanation(
+                      result.economics,
+                      result.economics._meta,
+                      currentPrice,
+                      surplus?.claimed != null,
+                    )}
+                    <LiquityFlowsNote
+                      collSymbol={flowCollSymbol}
+                      debtSymbol={flowDebtSymbol}
+                      unpriced={unpricedEvents(flowEvents)}
+                      lives={troveLives(flowEvents)}
+                      zombie={result.economics._meta.isZombie}
+                    />
+                  </div>
+                }
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
                 rowExtra={liquityRedemptionOutcome(result.economics, currentPrice)}
               />

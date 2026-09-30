@@ -93,6 +93,8 @@ import type {
   MoonwellReplayedPosition,
 } from "@/lib/moonwell-base/chain-timeline";
 import type { MoonwellEventType } from "@/lib/shared/types/event-shape";
+import { reduceCTokenLedger, type LedgerRow } from "@/lib/shared/ctoken-ledger";
+import { liquidationStories, type StoryRow } from "@/lib/shared/ctoken-liquidation-story";
 
 const MTOKEN_EVENTS_ABI = parseAbi([
   "event Mint(address minter, uint256 mintAmount, uint256 mintTokens)",
@@ -835,6 +837,33 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     }
     return out.length > 0 ? out : null;
   };
+  // The ledger and the balance peaks (each row's balance before and after,
+  // interest included) need every row of the life: a seeded replay holds the
+  // rows before its cut as sums, so it states neither.
+  const ledgerRows: LedgerRow[] | null = seeded ? null : [];
+  const balancePeaks: Map<string, { supply: bigint; debt: bigint }> | null =
+    seeded || p.peakWithheld ? null : new Map();
+  const unrated = new Set<string>();
+  const storyRows: StoryRow[] | null = seeded ? null : [];
+  const liqByTx = new Map<string, Row>();
+  for (const d of rows) if (d.kind === "liquidation") liqByTx.set(d.txHash, d);
+  const priceOf = (d: Row, decimals: number): number | null => {
+    const raw = d.oracleAtBlock?.price_raw;
+    if (!raw || raw === "0") return null;
+    try {
+      return scaleUnits(BigInt(raw), 36 - decimals);
+    } catch {
+      return null;
+    }
+  };
+  const notePeakBalance = (key: string, supply: bigint, debt: bigint) => {
+    if (!balancePeaks) return;
+    const cur = balancePeaks.get(key) ?? { supply: ZERO, debt: ZERO };
+    if (supply > cur.supply) cur.supply = supply;
+    if (debt > cur.debt) cur.debt = debt;
+    balancePeaks.set(key, cur);
+  };
+
   rows.forEach((d, i) => {
     const m = marketByMtoken.get(d.market)!;
     if (i === cutoff && cutState === undefined) cutState = snapshotAtCut();
@@ -867,6 +896,56 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
       notePeak(peakDebtRaw, d.market, d.accountBorrows!);
     }
     if (d.kind === "liquidation") liquidationCount++;
+
+    if (ledgerRows || balancePeaks) {
+      const supplySide =
+        d.kind === "mint" || d.kind === "redeem" || d.kind === "transfer_in" || d.kind === "transfer_out";
+      if (supplySide && rate == null) unrated.add(d.market);
+      const sb = supplySide && rate != null ? (t.before * rate) / WAD : null;
+      const sa = supplySide && rate != null ? (t.after * rate) / WAD : null;
+      const debtRow = d.kind === "borrow" || d.kind === "repay";
+      const db = debtRow ? (d.kind === "borrow" ? d.accountBorrows! - d.amount! : d.accountBorrows! + d.amount!) : null;
+      const da = debtRow ? d.accountBorrows! : null;
+      notePeakBalance(
+        d.market,
+        sb != null && sb > (sa ?? ZERO) ? sb : (sa ?? ZERO),
+        db != null && db > (da ?? ZERO) ? db : (da ?? ZERO),
+      );
+      const ts = tsOf.get(d.blockNumber);
+      if (storyRows && ts != null && (d.kind === "liquidation" || debtRow))
+        storyRows.push({
+          timestamp: ts,
+          txHash: d.txHash,
+          kind: d.kind === "liquidation" ? "liquidation" : d.kind === "repay" ? "repay" : "other",
+          market: d.market,
+          symbol: m.symbol,
+          amount: d.amount != null ? scaleUnits(d.amount, m.decimals) : undefined,
+          debtBefore: db != null ? scaleUnits(db, m.decimals) : undefined,
+          debtAfter: da != null ? scaleUnits(da, m.decimals) : undefined,
+          byOwner: d.txFrom?.toLowerCase() === wallet.toLowerCase() || d.caller?.toLowerCase() === wallet.toLowerCase(),
+        });
+      if (ledgerRows) {
+        const liq = d.kind === "transfer_out" ? liqByTx.get(d.txHash) : undefined;
+        const role =
+          liq && (!liq.collateralMarket || liq.collateralMarket === d.market)
+            ? d.caller?.toLowerCase() === d.market.toLowerCase()
+              ? "seize_protocol"
+              : "seize_liquidator"
+            : null;
+        ledgerRows.push({
+          market: m.key,
+          symbol: m.symbol,
+          address: m.underlying,
+          kind: role ?? d.kind,
+          amount: d.amount != null ? scaleUnits(d.amount, m.decimals) : undefined,
+          supplyBefore: sb != null ? scaleUnits(sb, m.decimals) : undefined,
+          supplyAfter: sa != null ? scaleUnits(sa, m.decimals) : undefined,
+          debtBefore: db != null ? scaleUnits(db, m.decimals) : undefined,
+          debtAfter: da != null ? scaleUnits(da, m.decimals) : undefined,
+          price: priceOf(d, m.decimals),
+        });
+      }
+    }
 
     if (d.kind === "liquidation") flowsFor(m).liquidatedDebt += d.amount!;
     else if (d.kind === "mint") flowsFor(m).supplied += d.amount!;
@@ -1004,6 +1083,19 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
     lifetime,
     lifetimeRaw: lifetimeWire,
     positions,
+    ...(ledgerRows ? { ledger: reduceCTokenLedger(ledgerRows, { repaidIncludesLiquidations: true }) } : {}),
+    ...(storyRows ? { liquidations: liquidationStories(storyRows) } : {}),
+    ...(balancePeaks
+      ? {
+          balancePeaks: [...balancePeaks.entries()]
+            .filter(([market]) => !unrated.has(market))
+            .map(([market, v]) => ({
+              market,
+              supplyRaw: v.supply.toString(),
+              debtRaw: v.debt.toString(),
+            })),
+        }
+      : {}),
     coverage: {
       ...p.coverage,
       firstEventAt: seeded ? whole.firstTimestamp : tailFirstAt,

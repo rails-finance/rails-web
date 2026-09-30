@@ -53,7 +53,7 @@
 // spine, same mark, same panel. A third kind is a third arm of that switch
 // plus its own provenance module, never a branch in the layout.
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import { usePathname } from "next/navigation";
@@ -62,6 +62,10 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
+import { useTimelineScale } from "@/components/shared/activity-timeline";
+import { ExpandChevron } from "@/components/shared/expand-chevron";
+import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { SpineColumn } from "@/components/shared/spine-column";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -129,6 +133,7 @@ import {
   priceGapReason,
   rateStepFigures,
   formatRatePercent,
+  type LiveNoteGroup,
   type MarketNote,
   type MarketNotePoint,
   type PriceGapNote,
@@ -285,6 +290,31 @@ export function MarketNoteRow({
   isFirst?: boolean;
   isLast?: boolean;
 }) {
+  const body = useNoteBody(note);
+  return (
+    <NoteRowShell
+      icon={nodeControl ? "market-open" : "market"}
+      nodeControl={nodeControl}
+      isFirst={isFirst}
+      isLast={isLast}
+      label={body.label}
+      marker={{ attr: "data-market-note", value: note.id }}
+      defaultOpen={defaultOpen}
+      header={
+        <>
+          <NoteHeadline note={note} body={body} />
+          <NoteTime note={note} datePrefix={datePrefix} />
+        </>
+      }
+    >
+      <NoteBodyPanel body={body} />
+    </NoteRowShell>
+  );
+}
+
+/** What one note hands the row: its label, headline, cells and (i). The one
+ *  switch on `kind` is here, shared by the lone row and a live group's line. */
+function useNoteBody(note: MarketNote): NoteBody {
   const chainId = useChainId();
   const pathname = usePathname() ?? "";
   // The position's own path, on the position page and on a pinned event page
@@ -318,40 +348,38 @@ export function MarketNoteRow({
   const { prefs } = usePreferences();
 
   // The one switch. Everything below it is the same row whatever was observed.
-  const body =
-    note.kind === "price-gap"
-      ? priceGapBody(note, links, prefs.ratioMode)
-      : note.kind === "rate-step"
-        ? rateStepBody(note, links)
-        : note.kind === "vault-terms"
-          ? vaultTermsBody(note, links)
-          : shareRateBody(note, links);
+  return note.kind === "price-gap"
+    ? priceGapBody(note, links, prefs.ratioMode)
+    : note.kind === "rate-step"
+      ? rateStepBody(note, links)
+      : note.kind === "vault-terms"
+        ? vaultTermsBody(note, links)
+        : shareRateBody(note, links);
+}
 
+/** The header's figures: the marks, the direction, the headline and its
+ *  quantity word, and the step mark where the kind draws one. */
+function NoteHeadline({ note, body }: { note: MarketNote; body: NoteBody }) {
   return (
-    <NoteRowShell
-      icon={nodeControl ? "market-open" : "market"}
-      nodeControl={nodeControl}
-      isFirst={isFirst}
-      isLast={isLast}
-      label={body.label}
-      marker={{ attr: "data-market-note", value: note.id }}
-      defaultOpen={defaultOpen}
-      header={
-        <>
-          <MarkPair asset={note.marketSymbol} measure={body.measure} />
-          {/* `>=`, not `>`: a live note is never gated on any move
-              happening at all (see market-note.ts's `live` doc) — a
-              truly flat read must not read as a fall. A historical
-              note's selector always guards against an exact tie, so
-              this only ever matters for a live one. */}
-          {body.direction !== false && <DirectionGlyph rising={note.to.value >= note.from.value} />}
-          <Figure figure={body.headline} className="text-sm font-semibold" />
-          <span className="text-xs text-rb-500">{body.quantity}</span>
-          {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
-          <NoteTime note={note} datePrefix={datePrefix} />
-        </>
-      }
-    >
+    <>
+      <MarkPair asset={note.marketSymbol} measure={body.measure} />
+      {/* `>=`, not `>`: a live note is never gated on any move
+          happening at all (see market-note.ts's `live` doc) — a
+          truly flat read must not read as a fall. A historical
+          note's selector always guards against an exact tie, so
+          this only ever matters for a live one. */}
+      {body.direction !== false && <DirectionGlyph rising={note.to.value >= note.from.value} />}
+      <Figure figure={body.headline} className="text-sm font-semibold" />
+      <span className="text-xs text-rb-500">{body.quantity}</span>
+      {body.format && <StepMark from={note.from.value} to={note.to.value} format={body.format} />}
+    </>
+  );
+}
+
+/** The opened note: the lead line, the cells, the price chip and the (i). */
+function NoteBodyPanel({ body }: { body: NoteBody }) {
+  return (
+    <>
       {body.intro && (
         <p className="px-5 pt-3 text-xs text-rb-500">
           {body.intro.lead}
@@ -441,7 +469,7 @@ export function MarketNoteRow({
           )}
         </InfoDisclosure>
       </div>
-    </NoteRowShell>
+    </>
   );
 }
 
@@ -470,8 +498,113 @@ export function noteMarkerText(note: MarketNote): { tip: string; spoken: string 
     const text = `${note.marketName ?? sym} fee ${f.fromRate} → ${f.toRate}`;
     return { tip: text, spoken: `${note.marketName ?? sym} fee from ${f.fromRate} to ${f.toRate}` };
   }
+  // Polaris's primary-rate notes state both ends too: "GOLDp primary rate 2.15% → 0.00%".
+  if (note.kind === "rate-step" && note.protocol == null) {
+    const f = rateStepFigures(note);
+    return {
+      tip: `${sym} primary rate ${f.fromRate} → ${f.toRate}`,
+      spoken: `${sym} primary rate from ${f.fromRate} to ${f.toRate}`,
+    };
+  }
   const text = `${sym} ${noun} ${note.to.value >= note.from.value ? "up" : "down"}`;
   return { tip: text, spoken: text };
+}
+
+/** The live group card's header. */
+const LIVE_GROUP_TITLE = "Market since the last event";
+
+/** The live group as its spine marker states it: the tooltip counts the
+ *  notes, and a screen reader hears each one. */
+export function liveGroupMarkerText(group: LiveNoteGroup): { tip: string; spoken: string } {
+  return {
+    tip: `${group.notes.length} market notes since the last event`,
+    spoken: `${LIVE_GROUP_TITLE}: ${group.notes.map((n) => noteMarkerText(n).spoken).join("; ")}`,
+  };
+}
+
+/** The head slot's live notes as ONE card (`liveNoteGroup` in
+ *  lib/shared/market-note.ts): one spine node, a header naming the card with
+ *  "Now", and one line per note in the group's order. A line states what the
+ *  note's lone row states at rest, and opens to that row's panel beneath it,
+ *  so each note's cells and (i) stay one click away. A single live note keeps
+ *  its lone row. */
+export function LiveNoteGroupRow({
+  group,
+  isFirst = false,
+  isLast = false,
+  nodeControl,
+}: {
+  group: LiveNoteGroup;
+  /** Spine terminus flags, as on a lone note row in the head slot. */
+  isFirst?: boolean;
+  isLast?: boolean;
+  /** The desktop marker's close control over the node (spine-note-markers.tsx). */
+  nodeControl?: ReactNode;
+}) {
+  const scale = useTimelineScale();
+  const { showTimestamps } = useTimelineDisplay();
+  return (
+    <div
+      data-live-note-group={group.notes.length}
+      className={`relative flex w-full items-start ${scale.cardRounded}`}
+      style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+    >
+      <div className="relative hidden w-2/5 shrink-0 self-stretch items-stretch justify-center sm:flex">
+        <SpineColumn icon={nodeControl ? "market-open" : "market"} spine="dotted" isFirst={isFirst} isLast={isLast} />
+        {nodeControl}
+      </div>
+      <div className="min-w-0 grow rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
+        <div className="flex items-center gap-2 px-5 pb-1 pt-4">
+          <span className="text-xs font-medium text-rb-500">{LIVE_GROUP_TITLE}</span>
+          {showTimestamps && <span className="ml-auto text-xs text-rb-500">Now</span>}
+        </div>
+        {group.notes.map((note) => (
+          <LiveNoteLine key={note.id} note={note} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One line of the live group: the note's headline, a chevron, and the note's
+ *  panel beneath while open. Its own receipt scope, as a lone row has. */
+function LiveNoteLine({ note }: { note: MarketNote }) {
+  const body = useNoteBody(note);
+  const registry = useReceiptRegistry();
+  const [open, setOpen] = useState(false);
+  const toggle = () => setOpen((o) => !o);
+  return (
+    <ProvReceiptsScope registry={registry}>
+      <div data-market-note={note.id} data-market-note-open={open ? "" : undefined}>
+        <div
+          className="group/evt cursor-pointer rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
+          role="button"
+          tabIndex={0}
+          aria-expanded={open}
+          aria-label={body.label}
+          onClick={toggle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggle();
+            }
+          }}
+        >
+          <div className="flex items-center gap-2 pr-5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 py-1.5 pl-5">
+              <NoteHeadline note={note} body={body} />
+            </div>
+            <ExpandChevron isOpen={open} group="evt" className="shrink-0" />
+          </div>
+        </div>
+        {open && (
+          <div className="mx-2 mb-1.5 rounded-lg border border-rb-200 dark:border-rb-700">
+            <NoteBodyPanel body={body} />
+          </div>
+        )}
+      </div>
+    </ProvReceiptsScope>
+  );
 }
 
 /** The asset's mark with the measure's overlapping it — WETH under the dollar,
@@ -639,6 +772,12 @@ function Echo({
   );
   return muted ? echoed : <H>{echoed}</H>;
 }
+
+/** "25 Aug" — a touch's day, in UTC, the way the timeline dates a row. */
+const utcDayMonth = (ts: number): string => {
+  const d = new Date(ts * 1000);
+  return `${d.getUTCDate()} ${d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" })}`;
+};
 
 /** The T3 ratio-pair rule (rails-ops standards/detail-page-anatomy.md, "The
  *  disclosure ladder"): a T3 statement of the collateral ratio states the LTV
@@ -924,6 +1063,9 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
   let valueFigs: { before: NoteFigure; after: NoteFigure } | undefined;
   let crFigs: { before: NoteFigure; after: NoteFigure } | undefined;
   let mcrFig: NoteFigure | undefined;
+  // A Polaris stretch ending in a liquidation: the liquidation's own seized
+  // collateral and cleared debt, which the later end states.
+  let fireFigs: { coll: NoteFigure; debt: NoteFigure } | undefined;
   if (p) {
     const vd = separatingDecimals(p.coll * note.from.value, p.coll * note.to.value, 0, 2);
     const money = (n: number) => (stable ? `${grouped(n, vd)} ${stable}` : `$${grouped(n, vd)}`);
@@ -960,18 +1102,77 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
         ),
       },
     };
-    stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
-    stats.push({
-      label: "Debt",
-      figure: {
-        text: amountText(p.debt),
-        exact: String(p.debt),
-        ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
-        muted: true,
-        prov: heldAmountProv(note, "debt", String(p.debt), held),
-      },
-    });
+    const debtFig: NoteFigure = {
+      text: amountText(p.debt),
+      exact: String(p.debt),
+      ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+      muted: true,
+      prov: heldAmountProv(note, "debt", String(p.debt), held),
+    };
+    if (isPolaris && p.atFire) {
+      // A Polaris stretch that ends in a liquidation: the later end is the
+      // liquidation's own seized collateral and cleared debt, the figures its
+      // row and its ratio state, once the pending legs were written in.
+      const fire = p.atFire;
+      const liqProv = (what: string, field: string): Provenance => ({
+        kind: "chain",
+        pclass: "emitted",
+        summary: `The ${what} at the liquidation that ends the stretch — the Liquidation log's \`${field}\` at block ${note.to.block}, after the interest, stability gain and PSM share pending since the earlier touch were written in.`,
+        via: `Liquidation.${field}`,
+      });
+      const seizedValue = fire.coll * note.to.value;
+      fireFigs = {
+        coll: {
+          text: grouped(fire.coll, 4),
+          exact: String(fire.coll),
+          symbol: note.marketSymbol,
+          muted: true,
+          prov: liqProv("collateral seized", "_collLiquidated"),
+        },
+        debt: {
+          text: amountText(fire.debt),
+          exact: String(fire.debt),
+          ...(p.debtSymbol ? { symbol: p.debtSymbol } : {}),
+          muted: true,
+          prov: liqProv("debt cleared", "_debtLiquidated"),
+        },
+      };
+      valueFigs = {
+        before: valueFigs.before,
+        after: {
+          text: money(seizedValue),
+          exact: String(seizedValue),
+          prov: {
+            kind: "chain-derived",
+            pclass: "oracle",
+            summary: `The collateral seized at the liquidation, valued — at that block's pETH price, the figure the ratio at the liquidation divides by the debt cleared.`,
+            formula: "collateral seized × price",
+            inputs: [
+              {
+                label: "collateral seized",
+                value: `${fire.coll} ${note.marketSymbol}`,
+                kind: "chain",
+                pclass: "emitted",
+              },
+              { label: "price", value: `${priceText(note.to.value)} ${priceUnit}`, kind: "chain", pclass: "oracle" },
+            ],
+          },
+        },
+      };
+      stats.push({ label: "Collateral", transition: { before: collFig, after: fireFigs.coll }, values: valueFigs });
+      stats.push({ label: "Debt", transition: { before: debtFig, after: fireFigs.debt } });
+    } else {
+      stats.push({ label: "Collateral", figure: collFig, values: valueFigs });
+      stats.push({ label: "Debt", figure: debtFig });
+    }
   }
+  // A Polaris ratio here holds the earlier touch's recorded debt and
+  // collateral fixed while the CDP card's ratio adds what is pending since, so
+  // the figure names its basis where it stands.
+  const recordedDebtAt =
+    isPolaris && p && !p.atFire && note.from.timestamp > 0
+      ? `at the recorded debt of the ${utcDayMonth(note.from.timestamp)} touch`
+      : null;
   if (p && f.crBefore && f.crAfter && f.mcr) {
     crFigs = {
       before: { text: f.crBefore, prov: positionProv(note, "crBefore"), exact: String(p.crBefore) },
@@ -979,7 +1180,11 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
     };
     mcrFig = { text: f.mcr, prov: positionProv(note, "mcr"), exact: String(p.mcrPct) };
     stats.push({
-      label: isPolaris ? "Collateral ratio" : "Collateral Ratio",
+      label: isPolaris
+        ? recordedDebtAt
+          ? `Collateral ratio, ${recordedDebtAt}`
+          : "Collateral ratio"
+        : "Collateral Ratio",
       transition: crFigs,
       sub: { text: minimumLabel, figure: mcrFig },
     });
@@ -1055,21 +1260,40 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
         between the two events, so nothing between them is drawn.
       </>
     ),
-    collFig && valueFigs && (
-      <>
-        The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
-        <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
-        <Echo figure={valueFigs.after} /> {nowWord}.
-      </>
-    ),
+    collFig &&
+      valueFigs &&
+      (fireFigs ? (
+        <>
+          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+          <Echo figure={valueFigs.before} /> {thenWord}. At the liquidation, once the interest, stability gain and PSM
+          share pending since then were written in, the CDP held{" "}
+          <Echo figure={fireFigs.coll} suffix={` ${note.marketSymbol}`} />, worth <Echo figure={valueFigs.after} />,
+          against <Echo figure={fireFigs.debt} suffix={p?.debtSymbol ? ` ${p.debtSymbol}` : ""} /> of debt.
+        </>
+      ) : (
+        <>
+          The <Echo figure={collFig} suffix={` ${note.marketSymbol}`} /> of collateral was worth{" "}
+          <Echo figure={valueFigs.before} /> {thenWord} and {note.live ? "is" : "was"} worth{" "}
+          <Echo figure={valueFigs.after} /> {nowWord}.
+        </>
+      )),
     crFigs && mcrFig && p && (
       <>
         The collateral ratio was {ratioPairNote(p.crBefore, crFigs.before, mode)} {thenWord} and{" "}
-        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}, against{" "}
+        {note.live ? "is" : "was"} {ratioPairNote(p.crAfter, crFigs.after, mode)} {nowWord}
+        {recordedDebtAt ? `, ${recordedDebtAt}` : ""}, against{" "}
         {isPolaris ? "the market's normal-mode minimum" : "the branch minimum"} of <Echo figure={mcrFig} />.
       </>
     ),
-    atBlock && <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>,
+    atBlock &&
+      (fireFigs ? (
+        <>
+          The earlier ratio uses the debt and collateral recorded at block {atBlock}; the later one uses the
+          liquidation&rsquo;s seized collateral and cleared debt, as its row does.
+        </>
+      ) : (
+        <>Both ratios use the debt and collateral recorded at block {atBlock}; only the price moves.</>
+      )),
     p &&
       (note.live ? (
         <>
@@ -1657,7 +1881,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Rate resets in between",
+      label: "Rate re-sets in between, one per PSM mint or redemption",
       figure: { text: f.sets, prov: rateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }
@@ -1695,32 +1919,40 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     label: `${note.marketSymbol} primary rate`,
     measure: { kind: "protocol", id: "polaris" },
     headline: { text: f.toRate, prov: rateStepProv(note, "rate"), exact: String(note.to.value) },
-    quantity: "primary rate",
+    // The headline is the later rate, so the earlier one and the direction
+    // ride beside it in words, and no glyph: "↓ 0.00%" read as a move of
+    // nothing on a rate that fell to zero.
+    quantity: `primary rate, ${note.to.value >= note.from.value ? "up" : "down"} from ${f.fromRate}`,
+    direction: false,
     ...liftTimeCells(stats),
     learnMore: marketNoteRateStepContent("polaris"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
-        market&rsquo;s own PSM mints and redemptions, never chosen by this CDP&rsquo;s holder. The earlier value is the
-        rate in force at this CDP&rsquo;s own last touch; the later is the cdpManager&rsquo;s own rate read now —{" "}
-        {observation("from")}, {observation("to")}. Shown whenever this CDP is open, whatever the move — nothing having
-        moved is itself the fact this note states.
+        market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this CDP&rsquo;s own last
+        touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}. Shown
+        whenever this CDP is open, whatever the move — nothing having moved is itself the fact this note states.
         {note.setsBetween != null && (
-          <> The market has reset the rate {f.sets} times since this CDP&rsquo;s own last touch.</>
+          <>
+            {" "}
+            The market has re-set the rate {f.sets} times since this CDP&rsquo;s last touch: the primary rate is re-set
+            at every PSM mint or redemption in the market.
+          </>
         )}
         {note.interest && (
           <>
             {" "}
             The interest figures hold this CDP&rsquo;s own debt at that touch fixed and move only the rate; the
-            secondary, utilisation-driven rate is added on top by the protocol and is not on this log.
+            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
+            and is not on this log.
           </>
         )}
       </>
     ) : (
       <>
         The primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the market&rsquo;s own PSM mints
-        and redemptions, never chosen by this CDP&rsquo;s holder. The two values are the rate in force at the two
-        touches this note runs between — {observation("from")}, {observation("to")}.{" "}
+        and redemptions. The two values are the rate in force at the two touches this note runs between —{" "}
+        {observation("from")}, {observation("to")}.{" "}
         {note.steps != null && (
           <>
             Those two ends are {f.steps} of this CDP&rsquo;s touches apart: the rate moved the same way at every step in
@@ -1731,8 +1963,9 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         )}
         {note.setsBetween != null && (
           <>
-            The market reset the rate {f.sets} times in between; nothing between the two touches is drawn, because
-            nothing between them was observed on this CDP.{" "}
+            The market re-set the rate {f.sets} times in between: the primary rate is re-set at every PSM mint or
+            redemption in the market, and {f.sets} of them fell between these two touches. Nothing between the two
+            touches is drawn, because nothing between them was observed on this CDP.{" "}
           </>
         )}
         A stretch is stated only where the primary rate moved at least one percentage point, and consecutive stretches
@@ -1741,7 +1974,8 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
           <>
             {" "}
             The interest figures hold this CDP&rsquo;s own debt at the earlier touch fixed and move only the rate; the
-            secondary, utilisation-driven rate is added on top by the protocol and is not on this log.
+            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
+            and is not on this log.
           </>
         )}
       </>
@@ -1793,9 +2027,9 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   ];
   if (f.steps && note.steps != null) {
     stats.push({
-      label: "Merges",
+      label: "Covers",
       figure: {
-        text: `${f.steps} stretches between the vault's events`,
+        text: `${f.steps} gaps between the vault's events, as one note`,
         prov: makerRateStepProv(note, "steps"),
         exact: String(note.steps),
       },
@@ -1803,7 +2037,7 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
   }
   if (f.sets && note.setsBetween != null) {
     stats.push({
-      label: "Fee changes in between",
+      label: "Times governance changed the fee",
       figure: { text: f.sets, prov: makerRateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }
@@ -2007,7 +2241,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
   if (note.interest && f.debt && f.before && f.after) {
     const interest = note.interest;
     stats.push({
-      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} recorded at block ${f.fromBlock}`,
+      label: `Yearly interest on the ${isSupply ? "supply" : "debt"} held on ${formatDate(note.from.timestamp)}`,
       transition: {
         before: {
           text: f.before,

@@ -147,6 +147,10 @@ export interface PriceRunwayProps {
   label?: string;
   /** Let a long `label` wrap on a phone, as the price-fall wording does. */
   wrapLabel?: boolean;
+  /** Compact only: draw the bar alone, the figure kept for screen readers —
+   *  for a host line that states the same figure beside it (the Aave V3
+   *  card's "Liquidates on a 77% drop"). */
+  barOnly?: boolean;
 }
 
 export function PriceRunway({
@@ -158,6 +162,7 @@ export function PriceRunway({
   asset,
   label,
   wrapLabel,
+  barOnly,
 }: PriceRunwayProps) {
   const hasLiq = liqPrice != null && liqPrice > 0;
   if (!hasLiq) return null; // no debt / fully covered — nothing to plot
@@ -252,7 +257,11 @@ export function PriceRunway({
             it may wrap onto a second line on a phone rather than squeeze the
             bar below its minimum. */}
         <span
-          className={`text-[11px] tabular-nums text-rb-500 ${asset || wrapLabel ? "min-w-0" : "shrink-0 whitespace-nowrap"}`}
+          className={
+            barOnly && !underwater
+              ? "sr-only"
+              : `text-[11px] tabular-nums text-rb-500 ${asset || wrapLabel ? "min-w-0" : "shrink-0 whitespace-nowrap"}`
+          }
         >
           {underwater ? (
             <span className="font-semibold text-red-600 dark:text-red-400">Liquidatable now</span>

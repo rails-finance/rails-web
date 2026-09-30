@@ -29,6 +29,8 @@ export function WalletPill({
   bookmarkProtocol,
   bookmarkListing,
   vault,
+  href: hrefOverride,
+  hrefLabel,
 }: {
   wallet: string;
   ensName: string | null;
@@ -58,10 +60,17 @@ export function WalletPill({
    *  vault's own page rather than a wallet-filtered listing. The hex stays
    *  reachable — the tooltip states it, and the copy button still copies it. */
   vault?: { name: string; href: string } | null;
+  /** Where the label goes in place of the wallet-filtered listing, with the
+   *  words its accessible name states (PWN: the same loan read from this
+   *  party's side). A vault's href still wins. */
+  href?: string;
+  hrefLabel?: string;
 }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
-  const href = vault ? vault.href : filterProtocol ? listingHrefForWallet(filterProtocol, wallet) : null;
+  const href = vault
+    ? vault.href
+    : (hrefOverride ?? (filterProtocol ? listingHrefForWallet(filterProtocol, wallet) : null));
   // A name is the primary label for an EOA wherever one exists. Nearly every
   // call site passes `ensName={null}` — only Aave V4's listing carries a
   // backend-supplied name — so the pill resolves its own rather than leaving
@@ -107,14 +116,28 @@ export function WalletPill({
               startNavigationProgress(href);
               router.push(href);
             }}
-            aria-label={vault ? `Open vault ${label}` : `Filter positions by wallet ${label}`}
+            aria-label={
+              vault
+                ? `Open vault ${label}`
+                : hrefOverride && hrefLabel
+                  ? hrefLabel
+                  : `Filter positions by wallet ${label}`
+            }
             // A name is a convenience layer OVER the address, never a
             // replacement: the hex stays one hover away here, on the copy
             // button's clipboard payload, and in the receipt. The name joins it
             // in the tooltip because the label above may be truncated, and a
             // clipped name with no way to read it in full would be worse than
             // the hex it replaced.
-            title={vault ? `${vault.name} — a MetaMorpho vault · ${wallet}` : name ? `${name} · ${wallet}` : undefined}
+            title={
+              vault
+                ? `${vault.name} — a MetaMorpho vault · ${wallet}`
+                : hrefOverride && hrefLabel
+                  ? `${hrefLabel} · ${name ?? wallet}`
+                  : name
+                    ? `${name} · ${wallet}`
+                    : undefined
+            }
             // Structural hook for the identity itself, so a check can find the
             // label and ask whether it resolved without keying on the typeface
             // — `verify-ens-pills.mjs` selected on `.font-mono` and therefore

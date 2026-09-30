@@ -104,6 +104,9 @@ export function LearnMoreModal({ content, onClose }: { content: LearnMoreContent
       />
       <div className="relative min-h-full flex items-start sm:items-center justify-center p-4">
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={content.title}
           className="relative rounded-2xl max-w-lg w-full my-8 p-6 shadow-xl"
           style={{ background: "var(--surface-overlay)" }}
           onClick={(e) => e.stopPropagation()}

@@ -5,16 +5,17 @@
 // next CDPUpdated as `_mintRedeemCollGain` / `_mintRedeemDebtGain`.
 // This script proves:
 //
-//   1. the three pinned fixture touches on usdp CDP 8 show the right two PSM
-//      labels + magnitudes on the row HEADER (not the expanded detail), and
-//      the holder's own verb still renders;
-//   2. the four zero-share rows on the same CDP show none of the four labels;
-//   3. the page-wide PSM-label count equals the timeline route's own
-//      independent count of non-zero legs;
-//   4. the economics tower says "PSM redemption share" / "PSM mint share",
-//      never "PSM redemptions";
-//   5. the pending-share strip states the live overlay's own pending PSM
-//      share (fetched independently, compared with tolerance — it's live);
+//   1. the three pinned fixture touches on usdp CDP 8 show one "Net PSM
+//      share" label and both signed magnitudes on the row HEADER (not the
+//      expanded detail), and the holder's own verb still renders;
+//   2. the four zero-share rows on the same CDP show no such label;
+//   3. the page-wide label count equals the timeline route's own independent
+//      count of touches with a non-zero share (one label per touch: the share
+//      is the net of every mint and redemption since the previous touch);
+//   4. the economics tower names the net shares "Net PSM shares" on both
+//      signs, never "PSM redemptions";
+//   5. the debt-sum strip states the live overlay's own pending net PSM
+//      share on the debt (fetched independently, compared with tolerance);
 //   6. a control CDP (usdp/296) — face count agrees with the route's count,
 //      whatever it is;
 //   7. the two sibling verifiers (rate-step, market-note-placement) still
@@ -59,21 +60,15 @@ async function api(path_, tries = 4) {
   throw last ?? new Error(`failed ${path_}`);
 }
 
-// ── Formatting, restated from the house helpers rather than imported
-// (lib/shared/header-values.ts fmtHeaderMagnitude → components/shared/
-// activity-timeline.tsx fmtSpine) — an expected value computed by IMPORTING
-// the code under test could never catch that code being wrong. ────────────
-function fmtSpineLike(n) {
-  const a = Math.abs(n);
+// Polaris states every row figure in full, three decimals (the house
+// formatNumber: en-US, at most 3 fraction digits; a non-zero amount that would
+// round to 0 reads to 3 significant digits) — restated, not imported.
+function fmtFullLike(n) {
+  const a = Math.abs(Number(n));
   if (!a || !isFinite(a)) return "";
-  if (a < 0.01) return "<0.01";
-  if (a >= 1_000_000) return `${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000) {
-    const k = a / 1_000;
-    return a >= 10_000 ? `${Math.round(k)}K` : `${parseFloat(k.toFixed(1))}K`;
-  }
-  if (a >= 1) return a.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  const s = parseFloat(a.toFixed(4)).toString();
+  const s = a.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  if (parseFloat(s.replace(/,/g, "")) === 0)
+    return a < 1e-6 ? "<0.000001" : a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
   return s;
 }
 
@@ -98,7 +93,7 @@ async function open(context, url) {
   return page;
 }
 
-const PSM_LABEL_RE = /^PSM (added|redeemed|minted|cleared)$/;
+const PSM_LABEL_RE = /^Net PSM share$/;
 
 async function rowText(page, eventKey) {
   const row = page.locator(`[data-event-id="${cssEscape(eventKey)}"]`);
@@ -126,6 +121,7 @@ const dColl = (e) => Number(e.context?.data?.collChange ?? 0);
 const dDebt = (e) => Number(e.context?.data?.debtChange ?? 0);
 const nonZeroLegCount = (events) =>
   events.reduce((acc, e) => acc + (mrColl(e) !== 0 ? 1 : 0) + (mrDebt(e) !== 0 ? 1 : 0), 0);
+const nonZeroTouchCount = (events) => events.filter((e) => mrColl(e) !== 0 || mrDebt(e) !== 0).length;
 
 const eventsByBlock8 = new Map(j8.events.map((e) => [e.blockNumber, e]));
 check(
@@ -153,10 +149,11 @@ for (const f of FIXTURES) {
   const e = eventsByBlock8.get(f.block);
   check(`1. usdp/8 block ${f.block} is on the route`, e != null);
   if (e == null) continue;
-  const collLabel = mrColl(e) > 0 ? "PSM added" : "PSM redeemed";
-  const debtLabel = mrDebt(e) > 0 ? "PSM minted" : "PSM cleared";
-  const collMag = fmtSpineLike(mrColl(e));
-  const debtMag = fmtSpineLike(mrDebt(e));
+  const collLabel = "Net PSM share";
+  const debtLabel = "Net PSM share";
+  const sign = (v) => (v < 0 ? "−" : "+");
+  const collMag = `${sign(mrColl(e))}${fmtFullLike(mrColl(e))}`;
+  const debtMag = `${sign(mrDebt(e))}${fmtFullLike(mrDebt(e))}`;
   const text = await rowText(page8, e.id);
   check(`1. usdp/8 block ${f.block} row found on the page (event_key ${e.id})`, text != null);
   if (text == null) continue;
@@ -191,17 +188,16 @@ for (const block of ZERO_BLOCKS) {
   );
   const text = await rowText(page8, e.id);
   check(`2. usdp/8 block ${block} row found on the page`, text != null);
-  const hasAnyLabel =
-    text != null && ["PSM added", "PSM redeemed", "PSM minted", "PSM cleared"].some((l) => text.includes(l));
+  const hasAnyLabel = text != null && text.includes("Net PSM share");
   check(`2. usdp/8 block ${block} header shows NO PSM label`, !hasAnyLabel, text?.slice(0, 200) ?? "");
 }
 
 // ── 3. page-wide PSM-label count vs the route's own independent count ─────
 
-const wantLegs8 = nonZeroLegCount(j8.events);
+const wantLegs8 = nonZeroTouchCount(j8.events);
 const domLabelCount8 = await page8.getByText(PSM_LABEL_RE).count();
 check(
-  `3. usdp/8: ${wantLegs8} PSM labels on the page (41 touches × 2 legs, pinned) match the DOM count`,
+  `3. usdp/8: ${wantLegs8} "Net PSM share" labels on the page (41 touches, pinned) match the DOM count`,
   domLabelCount8 === wantLegs8,
   `DOM ${domLabelCount8}, route ${wantLegs8}`,
 );
@@ -210,16 +206,15 @@ check(
 
 const bodyText8 = (await page8.locator("body").innerText()).replace(/\s+/g, " ");
 check(
-  '4. "PSM redemption share" appears on the page (the renamed collateral/debt flow label)',
-  bodyText8.includes("PSM redemption share"),
+  '4. "Net PSM shares" appears on the page (the flows panel\'s one name for both signs)',
+  bodyText8.includes("Net PSM shares"),
 );
-check('4. "PSM mint share" appears on the page', bodyText8.includes("PSM mint share"));
 check('4. the string "PSM redemptions" appears nowhere on the page', !bodyText8.includes("PSM redemptions"));
 
 // ── 5. the pending-share strip — fetched independently, live tolerance ────
 
 const chain8 = await api("/api/chain/polaris/position?market=usdp&id=8");
-const pendingLocator = page8.getByText(/pending since the last touch/);
+const pendingLocator = page8.locator("[data-polaris-debt-sum]");
 // The strip depends on the page's OWN client-side chain fetch (separate from
 // ours above) — give it a beat to land before deciding it's absent.
 await pendingLocator
@@ -228,35 +223,24 @@ await pendingLocator
   .catch(() => {});
 const pendingCount = await pendingLocator.count();
 const pendingText = pendingCount > 0 ? ((await pendingLocator.first().textContent()) ?? "").replace(/\s+/g, " ") : "";
-const shareNonZero = chain8.mintRedeemCollChange !== 0 || chain8.mintRedeemDebtChange !== 0;
+const shareNonZero = chain8.mintRedeemDebtChange !== 0;
 
 if (shareNonZero) {
-  check("5. usdp/8's pending strip is present (interest or PSM share pending)", pendingCount > 0, pendingText);
-  check(
-    '5. the strip states "PSM share" when the live share is non-zero',
-    pendingText.includes("PSM share"),
-    pendingText,
-  );
-  const m = pendingText.match(/PSM share of ([+−][\d,.]+) pETH \/ ([+−][\d,.]+) (\S+)/);
-  check("5. the strip's PSM-share sentence parses (signed pETH / signed stable)", m != null, pendingText);
+  check("5. usdp/8's debt-sum strip is present", pendingCount > 0, pendingText);
+  const m = pendingText.match(/([+−]) ([\d,.]+) net PSM share/);
+  check("5. the strip names the net PSM share on the debt, signed", m != null, pendingText);
   if (m) {
-    const gotColl = Number(m[1].replace(/,/g, "").replace("−", "-"));
-    const gotDebt = Number(m[2].replace(/,/g, "").replace("−", "-"));
+    const got = Number(m[2].replace(/,/g, "")) * (m[1] === "−" ? -1 : 1);
     check(
-      "5. the strip's pETH figure matches the live overlay within 0.5%",
-      relClose(gotColl, chain8.mintRedeemCollChange),
-      `strip ${gotColl}, overlay ${chain8.mintRedeemCollChange}`,
-    );
-    check(
-      "5. the strip's stable figure matches the live overlay within 0.5%",
-      relClose(gotDebt, chain8.mintRedeemDebtChange),
-      `strip ${gotDebt}, overlay ${chain8.mintRedeemDebtChange}`,
+      "5. the strip's net PSM share matches the live overlay within 0.5%",
+      relClose(got, chain8.mintRedeemDebtChange),
+      `strip ${got}, overlay ${chain8.mintRedeemDebtChange}`,
     );
   }
 } else {
   check(
-    '5. the live PSM share is zero, so the strip (if any) states no "PSM share"',
-    !pendingText.includes("PSM share"),
+    '5. the live PSM share is zero, so the strip (if any) states no "net PSM share"',
+    !/net PSM share/.test(pendingText),
     pendingText || "(no strip)",
   );
 }
@@ -266,7 +250,7 @@ await page8.close();
 // ── 6. control — face count agrees with the route's count, unpinned ───────
 
 const j296 = await api("/api/polaris/timeline?market=usdp&id=296");
-const wantLegs296 = nonZeroLegCount(j296.events);
+const wantLegs296 = nonZeroTouchCount(j296.events);
 const page296 = await open(context, polarisUrl("usdp", "296"));
 const domLabelCount296 = await page296.getByText(PSM_LABEL_RE).count();
 check(

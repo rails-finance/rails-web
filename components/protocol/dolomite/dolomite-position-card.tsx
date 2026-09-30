@@ -41,10 +41,12 @@ import {
   positionParProv,
   dolomiteUsdProv,
   dolomitePeakParProv,
+  dolomitePeakTokenProv,
   borrowRateProv,
   avgBorrowRateProv,
 } from "@/lib/dolomite/event-provenance";
 import type { DolomiteCardCaptions } from "@/lib/dolomite/economics";
+import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { dolomitePositionContent } from "@/lib/dolomite/position-content";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
@@ -54,6 +56,8 @@ import type {
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { accountLabelTip } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
 export interface DolomitePositionView {
@@ -71,12 +75,20 @@ export interface DolomitePositionView {
   peakSupplies: DolomitePeakAmount[];
   peakBorrows: DolomitePeakAmount[];
   liquidationCount: number;
+  /** The owner's transactions (the index leaves out each liquidation, which is
+   *  the liquidator's transaction). */
   txCount: number;
+  /** The account's rows on the timeline, when the page knows the whole
+   *  history: the count's tip gives both figures. */
+  eventTotal?: number;
   lastActivityAt: number;
   /** The core's own oracle USD per whole token, keyed by MARKET ID string. */
   priceByMarket?: Record<string, number>;
   /** Live APRs per market id (percent). */
   ratesByMarket?: Record<string, { borrowAprPct: number | null; supplyAprPct: number | null }>;
+  /** What each liquidation did, read from the rows (a page holding the whole
+   *  history only). */
+  liquidations?: LiquidationStory[];
 }
 
 /** The figure a line asserts: the current token amount (par × current index,
@@ -193,14 +205,18 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
     <div className="flex flex-col gap-1">
       {lines.map((r) => (
         <StatValue key={r.marketId}>
-          <Prov info={dolomitePeakParProv(r.symbol, side)}>
+          <Prov info={r.tokens ? dolomitePeakTokenProv(r.symbol, side) : dolomitePeakParProv(r.symbol, side)}>
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded label={r.symbol} />
             ) : (
               <AssetAmount
                 value={r.amount}
                 symbol={r.symbol}
-                exact={`${formatUnitsExact(r.amountRaw, r.decimals)} (par — × the market's index for tokens)`}
+                exact={
+                  r.tokens
+                    ? formatUnitsExact(r.amountRaw, r.decimals)
+                    : `${formatUnitsExact(r.amountRaw, r.decimals)} (par: multiply by the market's interest index for tokens)`
+                }
               />
             )}
           </Prov>
@@ -210,13 +226,33 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
   );
 }
 
+/** An account's name that explains the account number on hover or tap: the
+ *  card header and a transfer row's other account carry the same tip. The
+ *  tip is a paragraph, so it wraps at a fixed width. */
+export function DolomiteAccountLabel({ text, accountNumber }: { text: string; accountNumber: string }) {
+  const tip = accountLabelTip(accountNumber);
+  return (
+    <RevealTip
+      tip={<span className="block w-72 whitespace-normal text-left font-normal normal-nums leading-snug">{tip}</span>}
+      label={`${text}: ${tip}`}
+      focusable
+      className="focus-ring rounded-sm"
+    >
+      <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">{text}</span>
+    </RevealTip>
+  );
+}
+
 /** The account-grain identity: the owner (address) + which of its accounts
- *  this is, in Dolomite's own vocabulary. */
-function AccountIdentity({ v }: { v: DolomitePositionView }) {
+ *  this is, in Dolomite's own vocabulary. On the detail page the label
+ *  explains itself on hover or tap (the listing card sits inside a link). */
+function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean }) {
   return (
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />
-      <span className="text-xs text-rb-500">{v.accountLabel}</span>
+      <span className="text-xs text-rb-500">
+        {tip ? <DolomiteAccountLabel text={v.accountLabel} accountNumber={v.accountNumber} /> : v.accountLabel}
+      </span>
     </span>
   );
 }
@@ -260,19 +296,27 @@ export function DolomitePositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={dolomitePositionContent({ status: v.status })}
+        learnMore={dolomitePositionContent({
+          status: v.status,
+          peaksInTokens: [...v.peakSupplies, ...v.peakBorrows].every((r) => r.tokens),
+          liquidations: v.liquidations,
+          liquidationCount: v.liquidationCount,
+        })}
       >
         <ClosedPositionStats
           outcome={v.status}
-          leadingIdentity={<AccountIdentity v={v} />}
+          leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
           identity={
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
+              eventTotal={v.eventTotal}
+              countNote={dolomiteCountNote(v.liquidationCount)}
               liquidationCount={v.liquidationCount}
             />
           }
           closedAt={v.lastActivityAt}
+          outcomeDates={outcomeDates(v)}
           collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
           debt={<PeakStack lines={v.peakBorrows} side="debt" />}
         />
@@ -308,11 +352,13 @@ export function DolomitePositionCard({
             <LifecyclePill status={v.status} />
           )
         }
-        leadingIdentity={<AccountIdentity v={v} />}
+        leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
         identity={
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            eventTotal={v.eventTotal}
+            countNote={dolomiteCountNote(v.liquidationCount)}
             liquidationCount={v.liquidationCount}
           />
         }
@@ -357,6 +403,29 @@ export function DolomitePositionCard({
       />
     </PositionCardShell>
   );
+}
+
+/** Why the transaction count and the event count differ. The index counts
+ *  the account's transactions with its liquidations left out (each is the
+ *  liquidator's transaction; the triangle counts them). */
+function dolomiteCountNote(liquidations: number): string {
+  if (liquidations === 1)
+    return "the count leaves out the liquidation (the triangle counts it), which writes two rows here";
+  return liquidations > 1
+    ? `the count leaves out the ${liquidations} liquidations (the triangle counts them), and each writes two rows here`
+    : "one transaction can write a row per market it moves";
+}
+
+/** A liquidated card's two dates: the last liquidation, then the closing,
+ *  when they fall on different days. */
+function outcomeDates(v: DolomitePositionView): { label: string; at: number }[] | undefined {
+  const last = v.liquidations?.at(-1)?.at;
+  if (v.status !== "liquidated" || last == null) return undefined;
+  if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  return [
+    { label: "Liquidated", at: last },
+    { label: "Closed", at: v.lastActivityAt },
+  ];
 }
 
 /** Build a card view from the listing summary row. */

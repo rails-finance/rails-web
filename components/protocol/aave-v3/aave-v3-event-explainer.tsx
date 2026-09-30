@@ -31,7 +31,8 @@ import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
-import type { V3Protocol } from "@/lib/aave-v3/protocol-name";
+import { v3Brand, v3Protocol, type V3Protocol } from "@/lib/aave-v3/protocol-name";
+import { LtvWeightingNote } from "./aave-v3-position-state";
 
 export interface AaveV3EventExplainerProps {
   ctx: AaveV3Context;
@@ -133,6 +134,9 @@ export function AaveV3EventExplainer({
     aaveV3EventSlots(ctx, coords, { owner, siblings, state, previousEvent: previous?.event, timestamp }),
   );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
+  // How the card's LTV and its limits are figured, where the account read landed.
+  if (here?.status === "ready" && here.data.account)
+    items.push(<LtvWeightingNote brand={v3Brand(v3Protocol(coords.pool))} />);
 
   return <ProseExplainer items={items} />;
 }

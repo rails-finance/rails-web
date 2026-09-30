@@ -13,9 +13,10 @@
 // this panel only narrates it. Third person throughout, under the
 // explanation-copy charter: what each number MEANS, never how we know it.
 
+import { usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerVaultView } from "./makerdao-vault-card";
 import { formatUsd } from "@/lib/shared/format-event";
-import { ilkDebtSymbol, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
+import { ilkDebtSymbol, MAKER_ADDRESSES, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -96,11 +97,31 @@ export function MakerdaoPositionExplanation({
 
   const bullets: React.ReactNode[] = [];
 
+  // LockStake's feed is capped: the Vat values SKY at the lower of the cap
+  // and the OSM (lib/sources/chain/makerdao-lse-oracle.ts).
+  const cap = v.priceCap ?? null;
+  const capBinds = cap != null && cap.oracleUsd != null && cap.oracleUsd > cap.capUsd;
   if (v.collateralUsd != null && v.priceUsd != null) {
     bullets.push(
-      <span key="worth">
-        At Maker&rsquo;s oracle price, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
-      </span>,
+      cap ? (
+        <span key="worth">
+          At Maker&rsquo;s price for {v.collateralSymbol}, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
+          Governance caps the price Maker uses for {v.ilk} at <H>{usdPrice(cap.capUsd)}</H>
+          {cap.oracleUsd != null ? (
+            <>
+              ; the oracle reads {v.collateralSymbol} at {usdPrice(cap.oracleUsd)}
+              {capBinds
+                ? ", so the vault is valued at the cap"
+                : ", under the cap, so the vault is valued at the oracle price"}
+            </>
+          ) : null}
+          .
+        </span>
+      ) : (
+        <span key="worth">
+          At Maker&rsquo;s oracle price, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
+        </span>
+      ),
     );
   }
 
@@ -153,8 +174,33 @@ export function MakerdaoPositionExplanation({
     if (v.liquidationPriceUsd != null && dropPct != null && dropPct > 0) {
       bullets.push(
         <span key="drop">
-          {v.collateralSymbol} can fall <H>{dropText(1 - v.liquidationPriceUsd / (v.priceUsd as number))}</H> (to{" "}
-          <H>{formatUsd(v.liquidationPriceUsd)}</H>) before liquidation.
+          {capBinds ? <>Maker&rsquo;s price for {v.collateralSymbol}</> : v.collateralSymbol} can fall{" "}
+          <H>{dropText(1 - v.liquidationPriceUsd / (v.priceUsd as number))}</H> (to{" "}
+          <H>{usdPrice(v.liquidationPriceUsd, formatUsd)}</H>) before liquidation
+          {capBinds && cap?.oracleUsd != null ? (
+            <>
+              . With the cap in place that takes the oracle price falling{" "}
+              {dropText(1 - v.liquidationPriceUsd / cap.oracleUsd)}, from {usdPrice(cap.oracleUsd)}
+            </>
+          ) : null}
+          .
+        </span>,
+      );
+    }
+    if (v.auction != null) {
+      const penalty = Math.round((v.auction.chop - 1) * 100);
+      bullets.push(
+        <span key="auctions">
+          Below the minimum, anyone can start an auction that sells the collateral to cover the debt plus a {penalty}%
+          penalty
+          {v.lse ? <>; the engine first takes the SKY out of the farm and back from the delegate</> : null}.
+          {v.auction.stopped > 0 ? (
+            <>
+              {" "}
+              Governance has switched these auctions off for {v.ilk}: its auction contract refuses new auctions
+              {v.auction.stopped >= 3 ? " and bids" : ""}, so for now a vault under the minimum is not sold.
+            </>
+          ) : null}
         </span>,
       );
     }
@@ -180,9 +226,42 @@ export function MakerdaoPositionExplanation({
   bullets.push(
     <span key="osm">
       Maker prices the collateral through its Oracle Security Module (OSM), which passes each price on an hour late by
-      design. The vault is judged against that delayed price, and that is the price shown here.
+      design. The vault is judged against that delayed price
+      {cap ? <>, or the cap when it is lower,</> : null} and that is the price shown here.
     </span>,
   );
+
+  if (v.lse) {
+    const ls = v.lockstake ?? null;
+    bullets.push(
+      <span key="lockstake">
+        This is a LockStake urn. Its owner, {v.owner ? shortAddr(v.owner) : "the owner"}, works it through Sky&rsquo;s
+        LockStake Engine ({shortAddr(MAKER_ADDRESSES.LOCKSTAKE_ENGINE)}), which made the urn {shortAddr(v.urn)} for it:
+        the urn is the address the Vat records the SKY and the debt under. The engine stakes the locked SKY in a rewards
+        farm the owner picks and passes its voting power to a delegate the owner picks
+        {ls ? (
+          <>
+            {" "}
+            (now farm {ls.farm ? shortAddr(ls.farm) : "none"}, delegate{" "}
+            {ls.voteDelegate ? shortAddr(ls.voteDelegate) : "none"})
+          </>
+        ) : null}
+        ; the owner claims the farm&rsquo;s rewards.
+        {ls ? (
+          ls.exitFee > 0 ? (
+            <> SKY taken out pays an exit fee of {(ls.exitFee * 100).toFixed(2)}%.</>
+          ) : (
+            <> Taking SKY out has no exit fee now.</>
+          )
+        ) : null}{" "}
+        Picking a farm or a delegate and claiming rewards are engine events this page does not show.
+      </span>,
+      <span key="usds">
+        USDS and DAI are exchangeable one for one, both ways, through Sky&rsquo;s DAI–USDS converter (
+        {shortAddr(MAKER_ADDRESSES.DAI_USDS)}).
+      </span>,
+    );
+  }
 
   // Who has been operating the vault, across its whole history — the same
   // verdict each event card renders on its spine, reduced once so the pane can

@@ -167,6 +167,9 @@ export interface TimelineRunCardProps {
    *  note changes: the figure is the same chain-derived Σ either way, and the
    *  leaves arrive when the folder opens. */
   summedByIndex?: boolean;
+  /** While a served folder's members are read, a line above the skeleton
+   *  saying so ("Reading 12 deposits…"). Unset draws the skeleton alone. */
+  readingLine?: boolean;
 }
 
 /** Roughly three member rows — what the skeleton reserves while a served
@@ -213,6 +216,7 @@ export function TimelineRunCard({
   stale,
   forceOpen,
   summedByIndex,
+  readingLine,
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
@@ -377,8 +381,16 @@ export function TimelineRunCard({
                   </span>
                 </Prov>
                 <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
+                {/* A receipt token wearing its underlying's mark names itself,
+                    so 0.0675 mWETH does not read as 0.0675 WETH. */}
+                {agg.iconSymbol && agg.iconSymbol !== agg.symbol && (
+                  <span className="text-xs text-rb-500">{agg.symbol}</span>
+                )}
                 {agg.count != null && (
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10">
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
+                    title={`${agg.count.toLocaleString("en-US")} ${agg.verb.toLowerCase()} rows, grouped in this row; open it to see each`}
+                  >
                     {agg.count.toLocaleString("en-US")}
                   </span>
                 )}
@@ -434,15 +446,15 @@ export function TimelineRunCard({
       // Undefined members and no error means the read is still out. There is
       // no spinner: a spinner implies a fast answer is coming, and a first
       // open on a cold position pays for the whole grouping pass.
-      // The line says what the shape is, so the opened folder never reads
-      // as empty while its events are on their way.
-      body = (
-        <>
-          <p role="status" className="px-5 text-[11px] leading-relaxed text-rb-500">
-            Loading this folder&rsquo;s {count.toLocaleString("en-US")} event{count === 1 ? "" : "s"}…
-          </p>
+      body = readingLine ? (
+        <div className="relative" aria-busy="true">
           <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
-        </>
+          <p className="absolute inset-x-0 top-5 px-5 text-center text-xs text-rb-500" role="status">
+            Reading {count.toLocaleString("en-US")} {count === 1 ? memberNoun : memberPlural}&hellip;
+          </p>
+        </div>
+      ) : (
+        <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
       );
     }
   }

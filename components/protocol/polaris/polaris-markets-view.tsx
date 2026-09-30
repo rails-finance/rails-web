@@ -61,17 +61,17 @@ function formatSpP(raw: string): string {
   } catch {
     return raw;
   }
-  if (p === P_AT_DEPLOY) return "unchanged since deploy";
-  if (p <= BigInt(0)) return "0 × deploy";
+  if (p === P_AT_DEPLOY) return "1";
+  if (p <= BigInt(0)) return "0";
   const scaled = (p * P_SCALE) / P_AT_DEPLOY;
   if (scaled === BigInt(0)) {
     // Liquidations have taken P below 1e-10 of deploy — state the order of
     // magnitude rather than ten zeros after the point.
-    return `~1e${p.toString().length - 37} × deploy`;
+    return `~1e${p.toString().length - 37}`;
   }
   const s = scaled.toString().padStart(11, "0");
   const frac = `${s.slice(0, s.length - 10)}.${s.slice(-10)}`.replace(/0+$/, "").replace(/\.$/, "");
-  return `${frac} × deploy`;
+  return frac;
 }
 
 function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; book: PolarisMarketBook | null }) {
@@ -93,21 +93,24 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         <>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <Stat
-              label="Collateral in CDPs"
+              label="Collateral in CDPs, now"
               note={
-                <Prov
-                  info={liveUsdValueProv("The market's collateral", true)}
-                  value={formatUsdValue(chain.totalColl * chain.price.pethUsd)}
-                >
-                  <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
-                </Prov>
+                <>
+                  <Prov
+                    info={liveUsdValueProv("The market's collateral", true)}
+                    value={formatUsdValue(chain.totalColl * chain.price.pethUsd)}
+                  >
+                    <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
+                  </Prov>{" "}
+                  · the market&rsquo;s own total, PSM shares included
+                </>
               }
             >
               <Prov info={liveTotalProv("coll", market)} value={formatExact(chain.totalColl)}>
                 <AmountText value={chain.totalColl} format="compact" /> pETH
               </Prov>
             </Stat>
-            <Stat label="Debt across CDPs">
+            <Stat label="Debt across CDPs, now" note="the market's own total, PSM shares included">
               <Prov info={liveTotalProv("debt", market)} value={formatExact(chain.totalDebt)}>
                 <AmountText value={chain.totalDebt} format="compact" /> {stable}
               </Prov>
@@ -136,7 +139,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 {chain.defensiveMode ? "defensive" : "normal"}
               </Prov>
               <span className="ml-1 text-rb-500">
-                · reserve/debt{" "}
+                · reserve-to-debt{" "}
                 <Prov info={liveReserveRatioProv(market, true)} value={chain.reserveToDebtRatio.toFixed(4)}>
                   {chain.reserveToDebtRatio.toFixed(2)}
                 </Prov>
@@ -154,10 +157,11 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               label="Stability pool"
               note={
                 <>
-                  P{" "}
+                  each {stable} deposited when the pool opened is now worth{" "}
                   <Prov info={liveSpPProv(market)} value={chain.spP}>
                     {formatSpP(chain.spP)}
-                  </Prov>
+                  </Prov>{" "}
+                  {stable}; the rest paid off liquidated debt and came back to the depositor as pETH
                 </>
               }
             >
@@ -220,7 +224,10 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 · {book.openCount} open, {book.closedCount} closed, {book.liquidatedCount} liquidated
               </span>
             </Stat>
-            <Stat label="Open book">
+            <Stat
+              label="Open CDPs, at their last touch"
+              note="each CDP as its last touch wrote it; the market's totals above add what is pending since"
+            >
               <Prov info={openBookProv("coll", market)} value={formatExact(book.openColl)}>
                 <AmountText value={book.openColl} format="compact" /> pETH
               </Prov>
@@ -230,7 +237,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               </Prov>
             </Stat>
             {book.psmMintCount != null && (
-              <Stat label="PSM">
+              <Stat label="PSM" note={`direct ${stable} mints and redemptions against pETH, shared by every open CDP`}>
                 <Prov
                   info={bookCountProv(
                     "PSM mints and redemptions",
@@ -247,9 +254,19 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 <Prov info={bookCountProv("Liquidations", market, "Liquidation logs on the market's cdpManager.")}>
                   {book.liquidationCount}
                 </Prov>
-                {book.spDepositOps != null && (
-                  <span className="ml-1 text-rb-500">· {book.spDepositOps} pool deposit operations</span>
-                )}
+              </Stat>
+            )}
+            {book.spDepositOps != null && (
+              <Stat label="Stability pool operations" note="deposits, withdrawals and gain claims">
+                <Prov
+                  info={bookCountProv(
+                    "Stability pool operations",
+                    market,
+                    "DepositOperation logs on the market's stability pool: deposits, withdrawals and gain claims.",
+                  )}
+                >
+                  {book.spDepositOps}
+                </Prov>
               </Stat>
             )}
           </div>
@@ -296,10 +313,15 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
           ))}
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-          Both markets mint against the same collateral, pETH — the protocol&rsquo;s bonding-curve wrapper of ETH — and
-          differ in the unit they price it in: USDp values it through the ETH/USD medianiser, GOLDp through ETH/USD and
-          XAU/USD, so a GOLDp debt is a claim on ounces of gold. The stability pool is what absorbs a
-          liquidation&rsquo;s debt; the reserve loans against POLAR are captured by the index but not shown here.
+          Both markets mint against the same collateral, pETH, which ETH buys from the protocol&rsquo;s bonding curve at
+          a price that rises as ETH enters it. They differ in the unit they price it in: USDp values it through the
+          ETH/USD medianiser, GOLDp through ETH/USD and XAU/USD, so a GOLDp debt is a claim on ounces of gold. A
+          medianiser takes the median of the oracles it reads. The rate is a primary rate, which moves with the
+          PSM&rsquo;s mints and redemptions, plus a secondary rate that rises with the market&rsquo;s debt-to-reserve
+          ratio. A market whose reserve-to-debt ratio falls below 1.10 enters defensive mode and its minimum rises to
+          150%. The stability pool is what absorbs a liquidation&rsquo;s debt. Reserve loans, which lend ETH against
+          fpETH, are captured by the index but not shown here. fpETH is the floor part of pETH: the component whose
+          price in ETH the protocol guarantees can only rise, which is why a loan against it cannot be liquidated.
         </p>
       </section>
       <ProvenanceInfoTabs className="mt-6" />

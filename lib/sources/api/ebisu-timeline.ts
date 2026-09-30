@@ -28,6 +28,7 @@ import {
   forkRateChangeLabel,
   FORK_DEBT_DUST,
   forkDebtMoveRaw,
+  forkCollMoveRaw,
   forkMcrAt,
 } from "@/lib/shared/liquity-fork-ops";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -392,7 +393,15 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
       operation: operationOf(r, debtDelta, r.is_batched, collDec),
       redemption: kind === "redeemCollateral" ? redemptionOf(r, collDec) : undefined,
       ...(kind === "liquidate"
-        ? { mcrAtEvent: forkMcrAt(branch, { block }), liquidation: liquidationOf(r, collDec) }
+        ? {
+            mcrAtEvent: forkMcrAt(branch, { block }),
+            liquidation: (() => {
+              const liq = liquidationOf(r, collDec);
+              return liq
+                ? { ...liq, penaltySp: branch.liquidationPenaltySp, penaltyRedist: branch.liquidationPenaltyRedist }
+                : undefined;
+            })(),
+          }
         : {}),
       // Mirrors mig 068's two arms. Batched rows: coll comes off the trove's
       // own BatchedTroveUpdated, the rate off the batch's BatchUpdated, and
@@ -455,7 +464,13 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
     // actionColumn keys on the same figure.
     const debtMove = forkDebtMoveRaw(debtDelta, r.debt_change_from_operation);
     const absDebtMove = debtMove < ZERO ? -debtMove : debtMove;
-    const isNoChange = kind === "adjustTrove" && collDelta === ZERO && absDebtMove < FORK_DEBT_DUST;
+    // The collateral the act moved, apart from a liquidated neighbour's
+    // redistribution landing on the same touch: that arrives with no token
+    // leaving the wallet, so it is neither a deposit nor a flow.
+    const collMove = forkCollMoveRaw(collDelta, r.coll_increase_from_redist);
+    const redistLanded =
+      bigintOf(r.debt_increase_from_redist ?? null) > ZERO || bigintOf(r.coll_increase_from_redist ?? null) > ZERO;
+    const isNoChange = kind === "adjustTrove" && collMove === ZERO && absDebtMove < FORK_DEBT_DUST && !redistLanded;
 
     // Derive the verb where the event type underdetermines it (mirrors
     // fx-timeline). AFTER the isNoChange check — a run's summed dust can exceed
@@ -466,7 +481,7 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
     const actionLabel = isNoChange
       ? "No change"
       : kind === "adjustTrove"
-        ? (forkAdjustLabel(classifyTroveAdjust({ collDelta, debtDelta: debtMove })) ?? LABELS[kind])
+        ? (forkAdjustLabel(classifyTroveAdjust({ collDelta: collMove, debtDelta: debtMove })) ?? LABELS[kind])
         : kind === "adjustTroveInterestRate" || kind === "setBatchManagerAnnualInterestRate"
           ? forkRateChangeLabel(rateBefore, ctx.interestRate, r.is_batched)
           : (LABELS[kind] ?? kind);
@@ -475,8 +490,8 @@ export function buildEbisuTimeline(rows: MvRow[], collateralType: string, troveI
     // "out" = leaves the wallet toward the protocol (collateral deposit / debt repay);
     // "in" = comes to the wallet (collateral withdraw / debt draw).
     const flows: AssetFlow[] = [];
-    if (collDelta !== ZERO)
-      flows.push(flowFor(branch.collateralAddr, branch.symbol, collDec, collDelta, collDelta > ZERO ? "out" : "in"));
+    if (collMove !== ZERO)
+      flows.push(flowFor(branch.collateralAddr, branch.symbol, collDec, collMove, collMove > ZERO ? "out" : "in"));
     if (debtMove !== ZERO)
       flows.push(flowFor(DEBT_ADDRESS, DEBT_SYMBOL, DEBT_DECIMALS, debtMove, debtMove > ZERO ? "in" : "out"));
 
