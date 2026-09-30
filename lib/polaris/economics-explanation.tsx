@@ -40,18 +40,13 @@ export function polarisPsmOutcomeSentence(
   pethInDebt?: number,
 ): string | null {
   if (!hasPsmOutcome(lifetime)) return null;
-  const hasRedemption = Math.abs(lifetime.psmRedemptionEffectAtSettle) > DUST;
-  const hasMint = Math.abs(lifetime.psmMintEffectAtSettle) > DUST;
   const netCollLeg = lifetime.collFromPsm - lifetime.collToPsm;
   const netDebtLeg = lifetime.debtFromPsm - lifetime.debtToPsm;
   const todayEffect = pethInDebt != null ? netCollLeg * pethInDebt - netDebtLeg : null;
 
   let s =
-    `The PSM's shares, valued at the feed at each settling block, changed the CDP's equity by ` +
+    `The net PSM shares, valued at the feed at each settling block, changed the CDP's equity by ` +
     `${signedText(lifetime.psmEffectAtSettle, stable)}`;
-  if (hasRedemption && hasMint) {
-    s += ` (redemption shares ${signedText(lifetime.psmRedemptionEffectAtSettle, stable)}, mint shares ${signedText(lifetime.psmMintEffectAtSettle, stable)})`;
-  }
   if (todayEffect != null) {
     s += `; at today's feed the same legs come to ${signedText(todayEffect, stable)}`;
   }
@@ -139,7 +134,7 @@ export function polarisEconomicsExplanation(
   if (psmCollIn + psmCollOut + psmDebtIn + psmDebtOut > DUST) {
     bullets.push(
       <span key="psm">
-        The market&rsquo;s PSM activity moved this CDP&rsquo;s share pro rata:{" "}
+        Its net PSM shares, touch by touch, each side summed by its own sign:{" "}
         {psmCollIn > DUST && <>{fig(psmCollIn, collSym)} in</>}
         {psmCollOut > DUST && (
           <>
@@ -235,7 +230,11 @@ export function polarisEconomicsContent(): LearnMoreContent {
       },
       {
         bold: "PSM shares",
-        text: "when the market's PSM mints or redeems, every CDP takes a pro-rata share of the collateral and debt that moved.",
+        text: "when the market's PSM mints or redeems, every CDP takes a pro-rata share of the collateral and debt that moved. A touch settles the net of every mint and redemption since the previous one, so its two sides can move in opposite directions; the panel sums each side by its sign.",
+      },
+      {
+        bold: "Settled to zero",
+        text: "when a net PSM share clears more debt than the CDP owes, the protocol adds the difference back to the debt so it lands on zero. It is its own line, apart from what the holder borrowed.",
       },
       {
         bold: "Native units",
@@ -259,8 +258,6 @@ export function polarisEconomicsContent(): LearnMoreContent {
  *  and an open CDP's own position is not scored here. */
 export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pethInDebt?: number): ReactNode {
   if (!hasPsmOutcome(lifetime)) return undefined;
-  const hasRedemption = Math.abs(lifetime.psmRedemptionEffectAtSettle) > DUST;
-  const hasMint = Math.abs(lifetime.psmMintEffectAtSettle) > DUST;
   const netCollLeg = lifetime.collFromPsm - lifetime.collToPsm;
   const netDebtLeg = lifetime.debtFromPsm - lifetime.debtToPsm;
   const todayEffect = pethInDebt != null ? netCollLeg * pethInDebt - netDebtLeg : null;
@@ -275,20 +272,20 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
   const effectProv: Provenance = {
     kind: "derived",
     summary:
-      "The PSM's shares' effect on this CDP's equity — valued at the feed at the end of the block each share settled onto this CDP at its own touch, never the price the PSM's own mint or redemption used (the share accrued between touches at a different price, and the settling block's own feed is what this CDP's equity is judged against). A redemption share's effect is debt cleared minus the pETH taken × that feed; a mint share's is the pETH added × that feed minus the debt added.",
+      "The net PSM shares' effect on this CDP's equity — valued at the feed at the end of the block each share settled onto this CDP at its own touch, never the price the PSM's own mints or redemptions used (the share accrued between touches at a different price, and the settling block's own feed is what this CDP's equity is judged against). Each row's share is the net of every mint and redemption since the previous touch; its effect is the pETH it added or took × that feed, minus the debt it added or cleared.",
     formula: "Σ (mintRedeemCollGain × priceAtBlock − mintRedeemDebtGain)",
     inputs: [
       {
-        label: "redemption shares",
+        label: "rows whose net share took pETH",
         value: formatExact(lifetime.psmRedemptionEffectAtSettle),
         kind: "derived",
-        note: "Σ over rows whose PSM share is a redemption",
+        note: "Σ over rows whose net PSM share moved the collateral down (or, with no collateral leg, the debt)",
       },
       {
-        label: "mint shares",
+        label: "rows whose net share added pETH",
         value: formatExact(lifetime.psmMintEffectAtSettle),
         kind: "derived",
-        note: "Σ over rows whose PSM share is a mint",
+        note: "Σ over rows whose net PSM share moved the collateral up (or, with no collateral leg, the debt)",
       },
       ...(lifetime.psmRowsUnpriced > 0
         ? [
@@ -335,16 +332,10 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
 
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
-      <span>The PSM&rsquo;s shares, valued at the feed at each settling block, changed the CDP&rsquo;s equity by</span>
+      <span>The net PSM shares, valued at the feed at each settling block, changed the CDP&rsquo;s equity by</span>
       <Prov info={effectProv} value={formatExact(lifetime.psmEffectAtSettle)}>
         {signed(lifetime.psmEffectAtSettle)}
       </Prov>
-      {hasRedemption && hasMint && (
-        <span>
-          (redemption shares {signedText(lifetime.psmRedemptionEffectAtSettle, stable)}, mint shares{" "}
-          {signedText(lifetime.psmMintEffectAtSettle, stable)})
-        </span>
-      )}
       {todayEffect != null && todayProv && (
         <>
           {/* Pulled back over the flex gap so the semicolon sits on the figure before it. */}

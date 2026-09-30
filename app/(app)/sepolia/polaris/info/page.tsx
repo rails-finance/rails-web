@@ -37,8 +37,9 @@ const intro = (
     <p>
       Every number on this explorer is a Sepolia testnet number: the tokens are test tokens and the ETH and gold prices
       come from the protocol&rsquo;s own testnet medianisers, so none of it is money. Two things the protocol has are
-      not shown yet — the reserve loans, which lend ETH against fpETH (the floor part of pETH) and which the index
-      captures but no page renders, and the stability-pool deposits, which are positions of their own kind.
+      not shown yet — the reserve loans, which lend ETH against fpETH and which the index captures but no page renders,
+      and the stability-pool deposits, which are positions of their own kind. fpETH is the floor part of pETH: the
+      component whose price in ETH the protocol guarantees can only rise, so a loan against it cannot be liquidated.
     </p>
   </>
 );

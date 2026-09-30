@@ -124,7 +124,7 @@ function ledgerSummary(field: PolarisLedgerField, stable: string): string {
     case "stableGain":
       return `${stable} credited against the debt at this touch — the CDPUpdated log's own \`_stableGain\` field: the CDP's share of the market revenue the stability pool distributes, applied as a debt reduction.`;
     case "stablesMintedToEnsureZeroDebt":
-      return `${stable} minted to settle a residual — the CDPUpdated log's own \`_stablesMintedToEnsureZeroDebt\` field: on a close whose gains exceed the remaining debt, the manager mints the difference so the debt lands exactly on zero.`;
+      return `${stable} added to settle the debt to zero — the CDPUpdated log's own \`_stablesMintedToEnsureZeroDebt\` field: on a touch whose net PSM share and gains clear more than the debt owed, the manager adds the difference to the debt so it lands on zero rather than below.`;
     case "bcTokenGain":
       return `Reward pETH added to the collateral at this touch — the CDPUpdated log's own \`_bcTokenGain\` field: the CDP's share of bonding-curve token rewards, settled into the collateral here.`;
   }
@@ -344,6 +344,18 @@ export const liqPremiumProv = (
     ]),
   };
 };
+
+/** The open's gas-compensation escrow — the protocol's fixed amount, sent by
+ *  the holder beside the collateral. Not on the CDPUpdated log. */
+export const gasCompEscrowProv = (coords: PolarisCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  verify: txVerify(coords),
+  summary:
+    "Gas compensation held in escrow since the open — the fixed amount every Polaris CDP holds apart from its collateral, sent by the holder in the same transaction: returned on close, paid to the liquidator on a liquidation. The CDPUpdated log carries only the collateral; the open transaction's pETH transfer to the cdpManager carries both (collateral + 0.0375 pETH), and getCDP(id).gasCompDeposit reads 0.0375 on an open CDP.",
+  contract: managerContract(coords),
+  via: "the protocol's fixedGasComp constant · the open transaction's pETH transfer",
+});
 
 /** The CDP's collateral ratio at the moment it fired — the WHOLE seized
  *  collateral valued at the same price over the whole debt cleared. A

@@ -12,7 +12,7 @@
 //       maxima those widths are measured against equal the listing row's
 //       peakColl / peakDebt. Both flags off: no bar on any row.
 //   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
-//       read the restated `${round(cr)}% CR`, neither red; usdp/175's
+//       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
 //       liquidation row's chip is the at-fire ratio and is red (asserted on
 //       the marker, not the text: 114.78 rounds to 115); its open row is not
 //       red. Flag off: no chip anywhere.
@@ -99,8 +99,17 @@ const crAtFirePct = (d) => {
   if (price == null || !seized || !cleared) return null;
   return ((seized * price) / cleared) * 100;
 };
-const chipText = (pct) => `${Math.round(pct)}% CR`;
-const pct1 = (pct) => `${pct.toFixed(1)}%`;
+// lib/polaris/ratio-format.ts: one decimal, the site's separators, a second
+// decimal where one would put the ratio on the 115% minimum, "over 10,000%"
+// above the ceiling. The chip states the metric's figure.
+const fx = (v, d) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct1 = (pct) => {
+  if (pct > 10000) return "over 10,000%";
+  let d = 1;
+  while (d < 2 && pct !== 115 && fx(pct, d) === fx(115, d)) d++;
+  return `${fx(pct, d)}%`;
+};
+const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
 const MENU_LABELS = [
   "Timestamps (UTC)",

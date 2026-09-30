@@ -249,7 +249,7 @@ export interface ChainTruthRowSpec {
    *  Optional and drawn only when set, so no other explorer's row changes.
    *  The adapter gates it on the display flag and echoes the detail metric's
    *  receipt, so chip and metric pulse as one identity. */
-  ratioChip?: { text: string; value: string; belowMin?: boolean; prov: Provenance };
+  ratioChip?: { text: string; value: string; belowMin?: boolean; prov: Provenance; title?: string };
   /** Signed amounts moved (0–2 in practice). A combined adjust omits the row
    *  `label` (empty string) and lets each delta's own `label` carry its per-axis
    *  verb — V2's grammar — so the header never shows a merged "Deposit & Borrow"
@@ -665,6 +665,7 @@ export function ChainTruthRow({
           <span
             className={`text-xs tabular-nums ${spec.ratioChip.belowMin ? "text-red-500" : "text-rb-500"}`}
             data-ratio-chip={spec.ratioChip.belowMin ? "below-min" : "ok"}
+            title={spec.ratioChip.title}
           >
             {spec.ratioChip.text}
           </span>

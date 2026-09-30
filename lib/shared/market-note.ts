@@ -264,6 +264,10 @@ export interface PriceGapPosition {
   /** Liquity V2: the annual interest rate the earlier event logged, in percent
    *  (4.1 = 4.1%), for the opened note's Interest Rate cell. */
   rate?: number;
+  /** Polaris: the stretch ended in a liquidation, and `crAfter` is the ratio
+   *  it fired at — the collateral seized and the debt cleared, once the
+   *  pending legs settled, at the later price. */
+  atFire?: { coll: number; debt: number };
 }
 
 /** An ERC-4626 vault's OWN TERMS, changed for every holder at once — the
@@ -1315,7 +1319,15 @@ export function polarisPriceGapNotesFor(
     if (!(debt > 0) || !(coll > 0)) continue;
 
     const crBefore = ((coll * priceA) / debt) * 100;
-    const crAfter = (crBefore * priceB) / priceA;
+    // A stretch that ends in a liquidation states the ratio the liquidation
+    // fired at — the whole seized collateral at the later price over the debt
+    // cleared, the figure the liquidation row states — because the pending
+    // legs settled at that moment moved both figures away from the earlier
+    // touch's. Every other stretch moves only the price.
+    const seized = Number(db.collLiquidated ?? 0);
+    const cleared = Number(db.debtLiquidated ?? 0);
+    const atFire = db.eventType === "liquidate" && seized > 0 && cleared > 0;
+    const crAfter = atFire ? ((seized * priceB) / cleared) * 100 : (crBefore * priceB) / priceA;
     const runway = 1 - opts.mcr / (crBefore / 100);
     const move = Math.abs(priceB / priceA - 1);
     const consumed = runway > 0 ? move / runway : Infinity;
@@ -1338,7 +1350,16 @@ export function polarisPriceGapNotesFor(
       consumed,
       runway,
       endedBy,
-      position: { crBefore, crAfter, mcrPct, debt, coll, atBlock: a.blockNumber, debtSymbol: opts.stable },
+      position: {
+        crBefore,
+        crAfter,
+        mcrPct,
+        debt,
+        coll,
+        atBlock: a.blockNumber,
+        debtSymbol: opts.stable,
+        ...(atFire ? { atFire: { coll: seized, debt: cleared } } : {}),
+      },
       measureKind: "protocol",
       measureProtocolId: "polaris",
       polarisMarket: opts.market,
@@ -2031,7 +2052,15 @@ export function priceGapFigures(note: PriceGapNote): PriceGapFigures {
   // Every pair in the note is stated at the grain it separates at, so no cell
   // reads "x → x" while the header states a move.
   const pd = priceDecimals(note);
-  const rd = p ? separatingDecimals(p.crBefore, p.crAfter, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP) : 0;
+  // The pair separates from each other AND from the minimum they are read
+  // against: a ratio of 114.9% must not read "115%" beside a 115% minimum.
+  const rd = p
+    ? Math.max(
+        separatingDecimals(p.crBefore, p.crAfter, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
+        separatingDecimals(p.crBefore, p.mcrPct, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
+        separatingDecimals(p.crAfter, p.mcrPct, RATIO_DECIMALS_FLOOR, RATIO_DECIMALS_CAP),
+      )
+    : 0;
   const hd = h ? healthDecimals(h) : HEALTH_DECIMALS_FLOOR;
   return {
     fromPrice: formatPrice(note.from.value, pd),
@@ -2165,12 +2194,18 @@ export interface RateStepFigures {
   after?: string;
 }
 
+/** The move as the difference of the two rates AS SHOWN (each to two
+ *  decimals), so "3.61% → 2.41%" states 1.20 points and never the 1.21 the
+ *  raw figures round to. The receipt keeps the raw move. */
+const shownDeltaPp = (note: RateStepNote): number =>
+  (Math.round(note.to.value * 10_000) - Math.round(note.from.value * 10_000)) / 100;
+
 export function rateStepFigures(note: RateStepNote): RateStepFigures {
   return {
     fromRate: formatRatePercent(note.from.value),
     toRate: formatRatePercent(note.to.value),
-    deltaMagnitude: formatDeltaPpMagnitude(note.deltaPp),
-    delta: formatDeltaPpSigned(note.deltaPp),
+    deltaMagnitude: formatDeltaPpMagnitude(shownDeltaPp(note)),
+    delta: formatDeltaPpSigned(shownDeltaPp(note)),
     fromBlock: formatBlock(note.from.block),
     toBlock: formatBlock(note.to.block),
     ...elapsedFigure(note),
@@ -2423,6 +2458,14 @@ export function marketNoteSentence(note: MarketNote): string {
       `The ${note.marketSymbol} oracle price moved ${f.fromPrice} → ${f.toPrice} ${note.unitLabel}, ` +
       `${f.change}, between blocks ${f.fromBlock} and ${f.toBlock}.`;
     if (!note.position) return moved;
+    if (isPolaris && note.position.atFire) {
+      return (
+        `${moved} At the debt and collateral recorded at block ${f.atBlock} this CDP's collateral ratio was ` +
+        `${f.crBefore} at the earlier price. At the liquidation it was ${f.crAfter}: the collateral seized over the ` +
+        `debt cleared, once the interest, stability gain and PSM share pending since then were written in, at the ` +
+        `later price — below the market's normal-mode minimum of ${f.mcr}.`
+      );
+    }
     return (
       `${moved} At the debt and collateral recorded at block ${f.atBlock} this trove's collateral ratio was ` +
       `${f.crBefore} at the earlier price and ${f.crAfter} at the later one, against the branch minimum of ${f.mcr}.`
@@ -2474,7 +2517,7 @@ export function marketNoteSentence(note: MarketNote): string {
       let sentence =
         `Since this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} the ${note.marketSymbol} market's ` +
         `primary rate has moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, at the latest block ${f.toBlock}`;
-      sentence += f.sets ? `; the market reset it ${f.sets} times since.` : `.`;
+      sentence += f.sets ? `; the market set a new primary rate ${f.sets} times since.` : `.`;
       if (note.interest && f.debt && f.before && f.after) {
         sentence +=
           ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +
@@ -2493,7 +2536,7 @@ export function marketNoteSentence(note: MarketNote): string {
       : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
         `between this CDP's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
         `${polarisEndLabel(note.to)} at block ${f.toBlock}`;
-    sentence += f.sets ? `; the market reset it ${f.sets} times in between.` : `.`;
+    sentence += f.sets ? `; the market set a new primary rate ${f.sets} times in between.` : `.`;
     if (note.interest && f.debt && f.before && f.after) {
       sentence +=
         ` On the ${f.debt} of debt recorded at block ${f.fromBlock} that is ${f.before} a year of interest before ` +

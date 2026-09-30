@@ -27,6 +27,7 @@ import {
 import { crAtEventProv, liqIcrAtFireProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatExact } from "@/lib/utils/format";
+import { formatPolarisRatioPct } from "@/lib/polaris/ratio-format";
 
 /** The market's NORMAL-MODE minimum, as a percentage. A defensive-mode
  *  minimum (150%) in force at a past block is not indexed, so every row
@@ -83,14 +84,20 @@ export function polarisCrAtEvent(ctx: PolarisContext): PolarisCrAtEvent | undefi
   return { pct, belowMin: pct < POLARIS_NORMAL_MCR_PCT, source: "formula", beforePct, price };
 }
 
-/** The metric's own precision: one decimal on the page. */
-export const crPct1 = (pct: number): string => `${pct.toFixed(1)}%`;
+/** The metric's own precision: one decimal on the page, the site's number
+ *  format and ceiling (lib/polaris/ratio-format.ts), and a second decimal
+ *  where one would put the ratio on the minimum. */
+export const crPct1 = (pct: number): string => formatPolarisRatioPct(pct, 1, POLARIS_NORMAL_MCR_PCT);
 /** Two decimals: the receipt's value key, and the export's precision for
  *  every ratio it states (the same key the explainer's ratio at fire
  *  registers, so the three surfaces of a liquidation share one receipt). */
 export const crPct2 = (pct: number): string => `${pct.toFixed(2)}%`;
-/** The header chip: whole percent, the V2 chip's precision. */
-export const crChipText = (pct: number): string => `${Math.round(pct)}% CR`;
+/** The header chip: the metric's figure, so the row states one ratio. */
+export const crChipText = (pct: number): string => `${crPct1(pct)} CR`;
+
+/** What the chip's "CR" stands for, on hover. */
+export const CR_CHIP_TITLE =
+  "Collateral ratio (CR): the collateral's value at this block's price divided by the debt. Under 115% anyone may liquidate the CDP.";
 
 /** The receipt behind the ratio and the value key it registers under, built
  *  once so the header chip (an echo) and the detail metric (the primary) name
