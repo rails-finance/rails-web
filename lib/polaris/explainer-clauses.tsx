@@ -255,23 +255,34 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
     gain > EPS ? clause(<>It credited {legFig("stableGain", stable)} of stability gains against the debt.</>) : null,
     reward > EPS ? clause(<>It added {legFig("bcTokenGain", "pETH")} of reward pETH to the collateral.</>) : null,
     Math.abs(mrColl) > EPS || Math.abs(mrDebt) > EPS
-      ? clause(
-          <>
-            The market&rsquo;s PSM activity since its last touch moved this CDP&rsquo;s share:{" "}
-            {Math.abs(mrColl) > EPS ? (
-              <>
-                {legFig("mintRedeemCollGain", "pETH")} {mrColl > 0 ? "in" : "out"} on the collateral side
-              </>
-            ) : null}
-            {Math.abs(mrColl) > EPS && Math.abs(mrDebt) > EPS ? " and " : ""}
-            {Math.abs(mrDebt) > EPS ? (
-              <>
-                {legFig("mintRedeemDebtGain", stable)} {mrDebt > 0 ? "added to" : "cleared from"} the debt
-              </>
-            ) : null}
-            .
-          </>,
-        )
+      ? (() => {
+          const debtVerb = mrDebt > 0 ? "added" : "cleared";
+          const collVerb = mrColl > 0 ? "added" : "took";
+          const hasDebt = Math.abs(mrDebt) > EPS;
+          const hasColl = Math.abs(mrColl) > EPS;
+          return clause(
+            <>
+              {mrDebt > EPS
+                ? `Traders minted more ${stable} than they redeemed at the market’s PSM since its previous touch; this CDP’s pro-rata share `
+                : mrDebt < -EPS
+                  ? `Traders redeemed more ${stable} than they minted at the market’s PSM since its previous touch; this CDP’s pro-rata share `
+                  : "The market’s PSM activity since its previous touch gave this CDP a pro-rata share that "}
+              {hasDebt ? (
+                <>
+                  {debtVerb} {legFig("mintRedeemDebtGain", stable)} {mrDebt > 0 ? "to" : "from"} its debt
+                </>
+              ) : null}
+              {hasDebt && hasColl ? " and " : ""}
+              {hasColl ? (
+                <>
+                  {hasDebt && collVerb === debtVerb ? "" : `${collVerb} `}
+                  {legFig("mintRedeemCollGain", "pETH")} {mrColl > 0 ? "to" : "from"} its collateral
+                </>
+              ) : null}
+              .
+            </>,
+          );
+        })()
       : null,
     zeroMint > EPS
       ? clause(
@@ -407,6 +418,24 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
           <AmountText value={seized} /> pETH
         </Fig>
       );
+      // The pool's share of the seizure: what is left once the redistributed
+      // collateral, the owner's surplus and the liquidator's share are out.
+      const poolLeg = seized - redistColl - surplus - collComp;
+      const poolFig =
+        ctx.spAbsorbed && poolLeg > EPS ? (
+          <Fig info={polarisPoolLegProv(ctx, coords)} value={formatNumber(poolLeg)} symbol={PETH.symbol}>
+            <AmountText value={poolLeg} /> pETH
+          </Fig>
+        ) : poolLeg > EPS ? (
+          <>
+            <AmountText value={poolLeg} /> pETH
+          </>
+        ) : null;
+      const liqFig = (field: "collSurplus" | "flatComp" | "collateralComp") => (
+        <Fig info={liquidationFieldProv(field, coords, ctx.raw?.[field])} value={fmt(ctx[field])} symbol="pETH">
+          {fmt(ctx[field])} pETH
+        </Fig>
+      );
       const clearedFig = (
         <Fig
           info={liquidationFieldProv("debtLiquidated", coords, ctx.raw?.debtLiquidated)}
@@ -433,37 +462,45 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
         ],
         changed: [
           ctx.spAbsorbed
-            ? clause(
-                <>
-                  The stability pool absorbed {clearedFig} of its debt and took {seizedFig} of its collateral in
-                  exchange.
-                </>,
-              )
+            ? clause(<>The stability pool absorbed {clearedFig} of its debt.</>)
             : clause(
                 <>
-                  The stability pool absorbed {clearedFig} of its debt and took {seizedFig} of its collateral; the rest
-                  — <AmountText value={redistDebt} /> {stable} of debt with <AmountText value={redistColl} /> pETH — was
-                  redistributed across the market&rsquo;s other CDPs.
+                  The stability pool absorbed {clearedFig} of its debt; the rest — <AmountText value={redistDebt} />{" "}
+                  {stable} of debt with <AmountText value={redistColl} /> pETH — was redistributed across the
+                  market&rsquo;s other CDPs.
                 </>,
               ),
-          flat > EPS || collComp > EPS
+          // The seizure as one sum: where each part of it went.
+          clause(
+            <>
+              Of the {seizedFig} seized, {poolFig ?? <>none</>} went to the stability pool
+              {redistColl > EPS ? (
+                <>
+                  , <AmountText value={redistColl} /> pETH to the market&rsquo;s other CDPs
+                </>
+              ) : null}
+              {collComp > EPS ? (
+                <>
+                  {surplus > EPS ? ", " : " and "}
+                  {liqFig("collateralComp")} to the liquidator as its collateral compensation (0.5% of the seized
+                  collateral)
+                </>
+              ) : null}
+              {surplus > EPS ? <> and {liqFig("collSurplus")} was set aside for the owner to claim</> : null}.
+            </>,
+          ),
+          flat > EPS
             ? clause(
                 <>
-                  The liquidator received the escrowed gas compensation of <AmountText value={flat} /> pETH
-                  {collComp > EPS ? (
-                    <>
-                      {" "}
-                      plus <AmountText value={collComp} /> pETH of the collateral
-                    </>
-                  ) : null}
-                  .
+                  The liquidator also received the {liqFig("flatComp")} of gas compensation the CDP set aside at
+                  opening, which sits outside the seized collateral.
                 </>,
               )
             : null,
           surplus > EPS
             ? clause(
                 <>
-                  <AmountText value={surplus} /> pETH of collateral was left over for its owner to claim.
+                  The owner claims the surplus from the protocol&rsquo;s surplus pool; this page does not show claims.
                 </>,
               )
             : null,

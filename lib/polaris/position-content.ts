@@ -19,8 +19,16 @@ export function polarisPositionContent(opts: { status: "open" | "closed" | "liqu
           text: "the market's stability pool repaid the debt and received the collateral, where its deposits allowed; the rest was redistributed across other CDPs.",
         },
         {
-          bold: "Gas compensation",
-          text: "the liquidator was paid the fixed pETH the CDP escrowed at open plus a share of its collateral.",
+          bold: "The liquidator's pay",
+          text: "the fixed 0.0375 pETH the CDP set aside at opening (the gas compensation), plus 0.5% of the seized collateral (the collateral compensation).",
+        },
+        {
+          bold: "Surplus",
+          text: "seized collateral left after the pool's take and the liquidator's share is set aside for the owner to claim. This page does not show claims.",
+        },
+        {
+          bold: "Highest recorded",
+          text: "the most collateral and debt the CDP held at any touch, the liquidation's included, after the pending legs settled.",
         },
       ],
       links: [
@@ -47,7 +55,7 @@ export function polarisPositionContent(opts: { status: "open" | "closed" | "liqu
           text: "where the CDP's pending gains exceeded its remaining debt, the protocol minted the difference so the close landed exactly on zero.",
         },
       ],
-      links: [POLARIS_DOC_LINKS.interestRates, POLARIS_DOC_LINKS.conversions, POLARIS_APP_LINK],
+      links: [POLARIS_DOC_LINKS.interestRates, POLARIS_DOC_LINKS.pegDefence, POLARIS_APP_LINK],
     };
   }
   return {
@@ -70,7 +78,7 @@ export function polarisPositionContent(opts: { status: "open" | "closed" | "liqu
       },
       {
         bold: "Algorithmic rate",
-        text: "the market sets its primary rate and adds a utilisation-driven secondary rate; the holder does not choose one.",
+        text: "the market sets a primary rate, which moves with the PSM's mints and redemptions, and adds a secondary rate that rises with the market's debt-to-reserve ratio. The holder does not choose one.",
       },
       {
         // The closed and liquidated intros above already say the NFT is

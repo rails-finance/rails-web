@@ -28,6 +28,7 @@ import { ledgerFieldProv, liquidatorProv, transferProv, type PolarisCoords } fro
 import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
 import { crChipText, polarisCrAtEvent, polarisCrReceipt } from "@/lib/polaris/cr-at-event";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
+import { formatNumber } from "@/lib/utils/format";
 
 export interface PolarisEventHeaderProps {
   actionLabel: string;
@@ -165,6 +166,15 @@ export function PolarisEventHeader({
       break;
   }
 
+  // One rounding rule for a figure wherever it appears — the row, the spine,
+  // the opened grid and the card all state it in full to three decimals —
+  // and each amount names its token in words beside the glyph.
+  const shown: ChainTruthDelta[] = deltas.map((d) => ({
+    ...d,
+    display: formatNumber(Math.abs(d.value)),
+    suffix: d.symbol,
+  }));
+
   const party =
     ctx.eventType === "liquidate" && ctx.liquidator
       ? { prefix: "liquidated by", address: ctx.liquidator, prov: liquidatorProv(coords) }
@@ -183,7 +193,7 @@ export function PolarisEventHeader({
         label: isOpen ? "Open" : isAdjust && holderDeltaCount > 0 ? "" : actionLabel,
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidate",
-        deltas,
+        deltas: shown,
         party,
         ratioChip,
       }}

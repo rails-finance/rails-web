@@ -98,6 +98,7 @@ export function SpineVal({
   prov,
   unit,
   full,
+  text,
 }: {
   value?: string | number;
   side: "left" | "right";
@@ -105,13 +106,16 @@ export function SpineVal({
   unit?: string;
   /** Whole units below a million instead of "8.8K" (fmtSpine's `full`). */
   full?: boolean;
+  /** The figure as shown, in place of fmtSpine's (a family's own precision). */
+  text?: string;
   onChange?: (v: number) => void;
   decimals?: number;
   max?: number;
   /** Echo this figure into the receipt it re-renders (see SpineValProv). */
   prov?: SpineValProv;
 }) {
-  const txt = fmtSpine(value, full);
+  const compact = fmtSpine(value, full);
+  const txt = compact && text != null ? text : compact;
   if (!txt) return <span />;
   const sideClass = side === "left" ? "justify-self-end pr-5" : "justify-self-start pl-5";
   if (onChange && typeof value === "number") {

@@ -246,7 +246,9 @@ if (explanation166) {
   const wantDebt = fmtNum(PIN_166.debtLiquidated);
   check(
     "4b. the liquidation clause carries both pinned figures",
-    explanation166.includes(wantColl) && explanation166.includes(wantDebt) && /liquidation took/i.test(explanation166),
+    explanation166.includes(wantColl) &&
+      explanation166.includes(wantDebt) &&
+      /liquidation seized/i.test(explanation166),
     `wanted "${wantColl}" and "${wantDebt}" in: ${explanation166.slice(0, 400)}`,
   );
 }
