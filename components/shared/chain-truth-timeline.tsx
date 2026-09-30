@@ -89,7 +89,12 @@ import {
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { MarketNoteRow } from "@/components/shared/market-note-row";
-import { PhoneNoteRun, type PhoneNoteRunWords } from "@/components/shared/phone-note-run";
+import {
+  PhoneNoteLine,
+  PhoneNoteRun,
+  type PhoneNoteLineWords,
+  type PhoneNoteRunWords,
+} from "@/components/shared/phone-note-run";
 import { ListNoteGap, SpineNoteGap } from "@/components/shared/spine-note-markers";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -115,7 +120,7 @@ import {
   useSpineViewActive,
   type MobileSpineConfig,
 } from "@/components/shared/mobile-spine";
-import { dayKey, shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
 import { setCardOpen } from "@/lib/shared/card-open-store";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -362,6 +367,10 @@ export interface ChainTruthTimelineProps {
    *  that names how many and the dates they span, and opens to each note
    *  (components/shared/phone-note-run.tsx). Unset: every note is its own row. */
   phoneNoteRun?: PhoneNoteRunWords;
+  /** In the phone list view, each rate-step note draws as one short line that
+   *  opens to its row (components/shared/phone-note-run.tsx PhoneNoteLine).
+   *  Unset: every note is its own row. */
+  phoneNoteLine?: PhoneNoteLineWords;
   /** True while this OPEN position's live reads are still in flight —
    *  reserves the live-note slot's height (`LIVE_NOTE_SKELETON_HEIGHT`) so
    *  the list does not shift under a reader once they land. Never pass this
@@ -640,6 +649,7 @@ function ChainTruthTimelineBody({
   liveNotes,
   liveNotesPending,
   phoneNoteRun,
+  phoneNoteLine,
   liveWindow,
   footer,
   notice,
@@ -679,6 +689,15 @@ function ChainTruthTimelineBody({
   const phoneNoteRows = (list: MarketNote[], key: string, one: (note: MarketNote, i: number) => ReactNode) =>
     phoneNoteRun && list.length > 1 ? (
       <PhoneNoteRun key={`noterun_${key}`} notes={list} words={phoneNoteRun} renderNote={one} />
+    ) : phoneNoteLine ? (
+      list.map((note, i) => (
+        <PhoneNoteLine
+          key={`noteline_${key}_${note.id}`}
+          note={note}
+          words={phoneNoteLine}
+          renderNote={(n) => one(n, i)}
+        />
+      ))
     ) : (
       list.map(one)
     );
@@ -1214,37 +1233,21 @@ function ChainTruthTimelineBody({
   // `verify-timeline-navigator.mjs` asserts that every row of a loaded
   // segment falls inside its month.
 
-  // Day-grouping over the FLAT displayed list (run members included). The date
-  // shows on the NEWEST and the OLDEST card of each calendar day, whether or
-  // not a neighbour sits inside a collapsed run. Only the newest used to carry
-  // it, so a day's older cards read as a bare time sitting directly above a
-  // card dated the day before, and a reader going back in time gave them that
-  // earlier date (eth-alusd/1221: three 1 September cards read as 27 August).
-  // `lastIdx` is the last flat index the row covers, for a one-transaction run.
-  const datePrefixAt = (flatIdx: number, lastIdx: number = flatIdx) => {
+  // Every card carries its date. Grouping by day (the date on the newest, then
+  // the newest and oldest card of each day) left the middle cards of a busy
+  // day as a bare time a reader dated from the card below it (MakerDAO 19103,
+  // 2026-09-29). `lastIdx` stays in the signature for a one-transaction run.
+  const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) => {
     const event = events[flatIdx];
-    const last = events[lastIdx] ?? event;
-    const prev = flatIdx > 0 ? events[flatIdx - 1] : undefined;
-    const next = lastIdx + 1 < events.length ? events[lastIdx + 1] : undefined;
-    const showDate =
-      !prev ||
-      !next ||
-      dayKey(event.timestamp) !== dayKey(prev.timestamp) ||
-      dayKey(last.timestamp) !== dayKey(next.timestamp);
-    return showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
+    return `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`;
   };
 
-  /** A market note's day stamp, on the same rule: the note is dated by its
-   *  stretch's later end and sits in the list just below the row it anchors
-   *  on (`lastIdx` is that row's last flat index), so it carries the date when
-   *  its day differs from the row above it or the row below it. */
-  const noteDatePrefixAfter = (note: MarketNote, lastIdx: number): string | null => {
+  /** A market note's day stamp, on the same rule: dated by its stretch's
+   *  later end. */
+  const noteDatePrefixAfter = (note: MarketNote, _lastIdx: number): string | null => {
     const ts = note.to.timestamp;
     if (!(ts > 0)) return null;
-    const prev = events[lastIdx];
-    const next = lastIdx + 1 < events.length ? events[lastIdx + 1] : undefined;
-    const showDate = !prev || !next || dayKey(ts) !== dayKey(prev.timestamp) || dayKey(ts) !== dayKey(next.timestamp);
-    return showDate ? `${shortDate(ts)} ${shortDateYear(ts)}` : null;
+    return `${shortDate(ts)} ${shortDateYear(ts)}`;
   };
   /** The head slot's notes: a live note reads "Now" on its own; a historical
    *  one there has no row above it, so it always carries its date. */

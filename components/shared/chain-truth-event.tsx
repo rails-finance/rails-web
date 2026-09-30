@@ -46,6 +46,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
+import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 
@@ -321,6 +322,8 @@ export interface ChainTruthStat {
     /** The line's words where the gap is not interest alone (f(x): funding,
      *  rebalances). Default "Interest since previous event". */
     label?: string;
+    /** A hover/tap tip on the label (opt-in). */
+    labelTip?: string;
     /** The figure as shown, where the family states its amounts at its own
      *  precision. Default: formatNumber of `value`. */
     display?: string;
@@ -831,7 +834,11 @@ export function ChainTruthDetail({
               </StateTransition>
               {s.interestSincePrevious && (
                 <StatSubline>
-                  {s.interestSincePrevious.label ?? "Interest since previous event"}:{" "}
+                  <TipLabel
+                    text={s.interestSincePrevious.label ?? "Interest since previous event"}
+                    tip={s.interestSincePrevious.labelTip}
+                  />
+                  :{" "}
                   <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
                     <ExactTip
                       always

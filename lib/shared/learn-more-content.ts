@@ -3046,7 +3046,12 @@ export type MakerVaultAct =
 const MAKER_FROB_SOURCE =
   "On chain every one of these acts is one call to the Vat, frob, which carries a change to the collateral (dink) and a change to the debt (dart); the debt is stored divided by the rate accumulator (art).";
 
-export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreContent {
+export function makerdaoVaultContent(
+  kind: MakerVaultAct = "adjust",
+  opts: { debtSym?: string; ilk?: string } = {},
+): LearnMoreContent {
+  // DAI on CdpManager vaults, USDS on LockStake urns.
+  const d = opts.debtSym ?? "DAI";
   const links = [
     { label: "Vat — the core accounting", url: MAKER_DOCS.VAT },
     { label: "Rates module (stability fees)", url: MAKER_DOCS.RATES },
@@ -3056,8 +3061,7 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
     case "open":
       return {
         title: "How Opening a Maker Vault Works",
-        intro:
-          "A vault holds one type of collateral (ETH-A, ETH-C and WSTETH-B are types, each with its own terms) and lets its owner draw DAI against it. Opening one is usually a deposit and a first draw in the same transaction.",
+        intro: `A vault holds one type of collateral (${opts.ilk ? `this vault's type is ${opts.ilk}` : "ETH-A, ETH-C and WSTETH-B are types"}, each with its own terms) and lets its owner draw ${d} against it. Opening one is usually a deposit and a first draw in the same transaction.`,
         stepsHeading: "What to watch from the start:",
         steps: [
           "The collateral ratio: the collateral's value divided by the debt. It must stay above the type's minimum; below it the vault can be liquidated.",
@@ -3071,8 +3075,7 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
     case "deposit":
       return {
         title: "How Depositing Collateral Works",
-        intro:
-          "A deposit locks more collateral in the vault. It raises the collateral ratio, which lowers the price at which the vault could be liquidated and leaves room to draw more DAI.",
+        intro: `A deposit locks more collateral in the vault. It raises the collateral ratio, which lowers the price at which the vault could be liquidated and leaves room to draw more ${d}.`,
         stepsHeading: "What it changes:",
         steps: [
           "Nothing is charged for a deposit, and the debt does not change.",
@@ -3098,13 +3101,13 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
       };
     case "generate":
       return {
-        title: "How Drawing DAI Works",
-        intro:
-          "Drawing (generating) DAI mints new DAI to the owner and adds it to the vault's debt. It lowers the collateral ratio, and Maker refuses a draw that would take the vault under its type's minimum.",
+        title: `How Drawing ${d} Works`,
+        intro: `Drawing (generating) ${d} mints new ${d} to the owner and adds it to the vault's debt. It lowers the collateral ratio, and Maker refuses a draw that would take the vault under its type's minimum.`,
         stepsHeading: "What it changes:",
         steps: [
           "The debt grows by the amount drawn, and from then on by the stability fee on it, until it is repaid.",
           "The fee is not a separate bill: it is added to the debt continuously, so repaying costs more than was drawn.",
+          "The fee reaches the debt in lumps: Maker adds it when someone updates the collateral type's rate (a call to Jug.drip). A draw or a repayment makes that call first, a deposit or a withdrawal does not, so the fee a row shows since the previous event can include fee that built up before it.",
           "After a draw the debt must be at least the type's minimum debt.",
         ],
         extraParagraphs: [MAKER_FROB_SOURCE],
@@ -3112,12 +3115,12 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
       };
     case "repay":
       return {
-        title: "How Repaying DAI Works",
-        intro:
-          "Repaying returns DAI to the vault, which burns it and reduces the debt. It raises the collateral ratio and frees collateral to withdraw.",
+        title: `How Repaying ${d} Works`,
+        intro: `Repaying returns ${d} to the vault, which burns it and reduces the debt. It raises the collateral ratio and frees collateral to withdraw.`,
         stepsHeading: "What it changes:",
         steps: [
-          "The DAI owed includes the stability fee added since the draws, so clearing a debt takes more DAI than was drawn.",
+          `The ${d} owed includes the stability fee added since the draws, so clearing a debt takes more ${d} than was drawn.`,
+          `Maker keeps one debt figure. This page splits it into principal (${d} drawn less ${d} repaid) and fee (the rest), so a repayment counts against principal first and against fee only once principal reaches zero.`,
           "A repayment must leave either no debt or at least the type's minimum debt; a smaller remainder is refused.",
           "Anyone can repay a vault's debt directly at the Vat; the collateral stays the owner's.",
         ],
@@ -3132,12 +3135,13 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
         stepsHeading: "Who the owner is:",
         steps: [
           "The recorded owner is usually a DSProxy, a small contract wallet each user deploys once and controls from their own address. The page names the address behind the proxy as the owner.",
-          "Some tools hold a vault in a contract of their own for part of a transaction (a migration contract, an automation account) and hand it on or back before the transaction ends.",
+          "The CDP manager makes whoever opens a vault its owner, so a contract that opens a vault for someone gives it to them in the same transaction.",
+          "Some tools hold a vault in a contract for part of a transaction (a migration contract, an automation account) and hand it on or back before the transaction ends.",
           "Only the owner, or an address the owner allowed on this vault, can give it away.",
         ],
         detailsHeading: "What the owner can do:",
         details: [
-          { bold: "Borrow and withdraw", text: "draw DAI and take collateral out, within the minimum ratio." },
+          { bold: "Borrow and withdraw", text: `draw ${d} and take collateral out, within the minimum ratio.` },
           {
             bold: "Allow others",
             text: "let another address act on the vault, and withdraw that permission at any time.",
@@ -3169,12 +3173,12 @@ export function makerdaoVaultContent(kind: MakerVaultAct = "adjust"): LearnMoreC
     default:
       return {
         title: "How Maker Vault Adjustments Work",
-        intro:
-          "A vault can take collateral in or out and draw or repay DAI, one or several of these at once. Adding collateral or repaying raises the collateral ratio; withdrawing or drawing lowers it.",
+        intro: `A vault can take collateral in or out and draw or repay ${d}, one or several of these at once. Adding collateral or repaying raises the collateral ratio; withdrawing or drawing lowers it.`,
         stepsHeading: "The rules every change meets:",
         steps: [
           "The vault must stay above its type's minimum collateral ratio at Maker's oracle price, unless the change only adds collateral or repays.",
           "The debt includes the stability fee added since the draws.",
+          "The fee reaches the debt in lumps: Maker adds it when someone updates the collateral type's rate (a call to Jug.drip). A draw or a repayment makes that call first, a deposit or a withdrawal does not, so the fee a row shows since the previous event can include fee that built up before it.",
           "A vault's debt is either zero or at least the type's minimum debt.",
         ],
         extraParagraphs: [MAKER_FROB_SOURCE],
@@ -4448,7 +4452,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
     case "makerdao":
       return {
         title: "How the stability fee moves a vault",
-        intro: `${marketNoteLead("vault")} This kind states a step in the collateral type's stability fee between two of the vault's own touches.`,
+        intro: `${marketNoteLead("vault")} This kind states a change in the collateral type's stability fee between two of the vault's events.`,
         detailsHeading: "Key concepts:",
         details: [
           {
@@ -4456,12 +4460,16 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
             text: "the yearly rate a collateral type's debt compounds at. Governance sets it, and it is stored on Maker's Jug contract.",
           },
           {
-            bold: "Fee in force at a touch",
-            text: "a vault's rows carry no fee. The fee in force at each of the vault's touches is worked out from how fast the collateral type's debt grew around it, then checked against the rate stored on the Jug at that block; the note states the checked figure.",
+            bold: "Fee in force at an event",
+            text: "a vault's rows carry no fee. The fee in force at each of the vault's events is worked out from how fast the collateral type's debt grew around it, then checked against the rate stored on the Jug at that block; the note states the checked figure.",
           },
           {
-            bold: "Which stretches are stated",
-            text: "a stretch is shown when the fee moved by at least one percentage point between the vault's two touches, in either direction. Consecutive moves in the same direction are stated as one note.",
+            bold: "Which changes are stated",
+            text: "every change governance made to the fee, of 0.01 percentage points or more, between two of the vault's events.",
+          },
+          {
+            bold: "When the fee is booked",
+            text: "the fee reaches the debt when someone updates the collateral type's rate (a call to Jug.drip). A draw or a repayment makes that call first, so the fee since the previous event lands in lumps on those rows.",
           },
           {
             bold: "A live note",

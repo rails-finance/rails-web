@@ -1339,7 +1339,10 @@ export function SpineColumn({
                   // coverage tripwire would otherwise ask for a receipt for
                   // "how many rows are in this folder".
                   <span data-prov-exempt="" className="justify-self-start -ml-2" style={{ gridColumn: "4 / 6" }}>
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10">
+                    <span
+                      className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
+                      title={`${folderCount.toLocaleString("en-US")} events grouped in this folder`}
+                    >
                       {folderCount.toLocaleString("en-US")}
                     </span>
                   </span>

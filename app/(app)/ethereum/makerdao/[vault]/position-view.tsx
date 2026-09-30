@@ -62,6 +62,7 @@ import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-ma
 import { liveMakerRateStepNote, makerRateStepNotesFor } from "@/lib/makerdao/market-notes";
 import type { MarketNote } from "@/lib/shared/market-note";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
+import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import {
   useMakerAuctions,
   useMakerIlkAt,
@@ -86,6 +87,9 @@ import {
  *  minimum ratio and minimum debt. Past it the flows stay at today's price and
  *  a row reads its own block when opened. */
 const ILK_AT_PAGE_LIMIT = 60;
+/** How many of the vault's newest non-ownership transactions the page reads
+ *  for their sender (one route call each). */
+const TX_CONTEXT_LIMIT = 40;
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -129,6 +133,9 @@ function mergeView(chain: MakerVaultState | null, summary: MakerVaultSummary | n
       dustDai: chain.dustDai,
       lineDai: chain.lineDai,
       ilkDebtDai: chain.ilkDebtDai,
+      priceCap: chain.priceCap ?? null,
+      auction: chain.auction ?? null,
+      lockstake: chain.lockstake ?? null,
     };
   }
   return summary ? viewFromSummary(summary) : null;
@@ -341,17 +348,24 @@ export default function MakerVaultDetailView({
     [sortedMaker],
   );
   const auctions = useMakerAuctions(grabRows);
-  // The transactions that moved the vault's ownership, read for who the
-  // parties are and what else ran in them (lib/sources/chain/makerdao-tx-context.ts).
+  // The vault's transactions, read for who sent each and through what, and on
+  // an ownership transaction who the parties are and what else ran in it
+  // (lib/sources/chain/makerdao-tx-context.ts). Every ownership transaction,
+  // and the newest TX_CONTEXT_LIMIT of the rest.
   const txRows = useMemo(() => makerTxRows(sortedMaker), [sortedMaker]);
   const txRequests = useMemo(() => {
     const out: { txHash: string; addresses: string[] }[] = [];
+    const plain: string[] = [];
     for (const [tx, rows] of txRows) {
       const gives = rows.filter((r) => r.context.data.eventType === "give");
-      if (gives.length === 0) continue;
+      if (gives.length === 0) {
+        if (rows.some((r) => r.context.data.eventType === "frob")) plain.push(tx);
+        continue;
+      }
       const addrs = gives.flatMap((g) => [g.context.data.giveDst, g.context.data.giveCaller]);
       out.push({ txHash: tx, addresses: [...new Set(addrs.filter((a): a is string => !!a))].slice(0, 8) });
     }
+    for (const tx of plain.slice(-TX_CONTEXT_LIMIT)) out.push({ txHash: tx, addresses: [] });
     return out;
   }, [txRows]);
   const txContext = useMakerTxContexts(txRequests);
@@ -388,8 +402,9 @@ export default function MakerVaultDetailView({
       txContext,
       matSteps,
       owners: ownership.owners,
+      owner: view?.owner?.toLowerCase() ?? null,
     }),
-    [ilkAtRead, auctions, sortedMaker, debtSplit, ownership, txRows, txContext, matSteps],
+    [ilkAtRead, auctions, sortedMaker, debtSplit, ownership, txRows, txContext, matSteps, view?.owner],
   );
   // The card's debt split, from the newest row's.
   const lastSplit = sortedMaker.length ? debtSplit.get(sortedMaker[sortedMaker.length - 1].id) : undefined;
@@ -641,8 +656,13 @@ export default function MakerVaultDetailView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={makerdaoEconomicsExplanation(towerData)}
-                  learnMore={makerdaoEconomicsContent()}
+                  explanation={makerdaoEconomicsExplanation(towerData, { capped: (cardView ?? view).priceCap != null })}
+                  learnMore={makerdaoEconomicsContent({
+                    debtSym: ilkDebtSymbol((cardView ?? view).ilk),
+                    ilk: (cardView ?? view).ilk,
+                    priceChangeRow: towerData.collateral.priceChange?.usd != null,
+                    capped: (cardView ?? view).priceCap != null,
+                  })}
                 />
               );
             })()}
@@ -662,6 +682,8 @@ export default function MakerVaultDetailView({
             folderRegister={MAKERDAO_FOLDER_REGISTER}
             readFolderMembers={readFolderMembers}
             segments={segments}
+            phoneNoteLine={MAKER_PHONE_NOTE_LINE}
+            notice={<MakerSpineKey debtSym={ilkDebtSymbol(view?.ilk ?? "")} />}
             toolbarLeading={
               <TimelineActivityHeader
                 events={tl.sortedEvents}
@@ -670,6 +692,8 @@ export default function MakerVaultDetailView({
                 // When the vault actually opened, not when the window does.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                labelLastActivity
+                labelTenure
               />
             }
             renderCard={(event, meta) =>
@@ -687,5 +711,20 @@ export default function MakerVaultDetailView({
         </MakerVaultHistoryProvider>
       )}
     </div>
+  );
+}
+
+const MAKER_PHONE_NOTE_LINE = { rate: "stability fee" };
+
+/** What the desktop spine's marks mean, once, above the first row. The phone
+ *  list states each row in words. */
+function MakerSpineKey({ debtSym }: { debtSym: string }) {
+  return (
+    <p className="hidden px-1 text-xs text-rb-500 sm:block" data-spine-key="">
+      Key: <span aria-hidden>&rarr;</span> after a coin: into the vault (collateral deposited, {debtSym} repaid) ·{" "}
+      <span aria-hidden>&larr;</span> before a coin: out to the owner ({debtSym} drawn, collateral withdrawn) ·{" "}
+      <span aria-hidden>&#9671;</span> governance changed the stability fee (click for the note) ·{" "}
+      <span className="inline-block size-2 rounded-full bg-green-500 align-middle" aria-hidden /> now
+    </p>
   );
 }

@@ -13,9 +13,10 @@
 // this panel only narrates it. Third person throughout, under the
 // explanation-copy charter: what each number MEANS, never how we know it.
 
+import { usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerVaultView } from "./makerdao-vault-card";
 import { formatUsd } from "@/lib/shared/format-event";
-import { ilkDebtSymbol, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
+import { ilkDebtSymbol, MAKER_ADDRESSES, MAKER_STATUS_DUST } from "@/lib/makerdao/asset-catalog";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -35,6 +36,20 @@ export function MakerdaoPositionExplanation({
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   const history = useMakerVaultHistory();
+  // The minimum at the vault's newest row, and the governance change since it
+  // when today's differs (the Spotter's file logs, read by chain call).
+  const newestRead = [...history.ilkAt.values()].reduce<{ block: number; mat: number | null } | null>(
+    (m, r) => (m == null || r.block > m.block ? { block: r.block, mat: r.mat } : m),
+    null,
+  );
+  const matMoved =
+    newestRead?.mat != null && v.matRatio != null && Math.abs(newestRead.mat - v.matRatio) > 1e-9 && v.atBlock != null;
+  const matSpan = useMemo(
+    () => (matMoved && newestRead && v.atBlock != null ? [{ from: newestRead.block, to: v.atBlock }] : []),
+    [matMoved, newestRead?.block, v.atBlock],
+  );
+  const matRead = useMakerMatChanges(matMoved ? v.ilk : null, matSpan);
+  const matChange = matSpan.length ? matRead.get(`${matSpan[0].from}-${matSpan[0].to}`)?.changes.at(-1) : undefined;
   // Narrates the LIVE vault only — the summary can't supply the ilk parameters
   // (liquidation ratio, fee, minimum debt), so without the overlay this panel
   // declines.
@@ -82,11 +97,31 @@ export function MakerdaoPositionExplanation({
 
   const bullets: React.ReactNode[] = [];
 
+  // LockStake's feed is capped: the Vat values SKY at the lower of the cap
+  // and the OSM (lib/sources/chain/makerdao-lse-oracle.ts).
+  const cap = v.priceCap ?? null;
+  const capBinds = cap != null && cap.oracleUsd != null && cap.oracleUsd > cap.capUsd;
   if (v.collateralUsd != null && v.priceUsd != null) {
     bullets.push(
-      <span key="worth">
-        At Maker&rsquo;s own oracle price, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
-      </span>,
+      cap ? (
+        <span key="worth">
+          At Maker&rsquo;s price for {v.collateralSymbol}, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
+          Governance caps the price Maker uses for {v.ilk} at <H>{usdPrice(cap.capUsd)}</H>
+          {cap.oracleUsd != null ? (
+            <>
+              ; the oracle reads {v.collateralSymbol} at {usdPrice(cap.oracleUsd)}
+              {capBinds
+                ? ", so the vault is valued at the cap"
+                : ", under the cap, so the vault is valued at the oracle price"}
+            </>
+          ) : null}
+          .
+        </span>
+      ) : (
+        <span key="worth">
+          At Maker&rsquo;s oracle price, that collateral is worth <H>{formatUsd(v.collateralUsd)}</H>.
+        </span>
+      ),
     );
   }
 
@@ -103,18 +138,19 @@ export function MakerdaoPositionExplanation({
       bullets.push(
         <span key="fee">
           The debt grows at {v.ilk}&rsquo;s stability fee, <H>{(v.stabilityFeeApr * 100).toFixed(2)}%</H> a year, about{" "}
-          <AmountText value={yearly} format="compact" /> {dsym} a year on today&rsquo;s debt
+          <AmountText value={yearly} format="compact" /> {dsym} a year on today&rsquo;s debt.
           {feeInDebt != null && v.drawnDai != null ? (
             <>
-              {": "}
+              {" "}
+              Of the {dai2(v.debtDai as number)} {dsym} owed, {dai2(v.drawnDai)} {dsym} is principal (drawn less repaid)
+              and{" "}
               <H>
                 {dai2(feeInDebt)} {dsym}
               </H>{" "}
-              of what it owes is fee on the {dai2(v.drawnDai)} {dsym} drawn
-              {v.drawnSince != null ? <> since {formatDate(v.drawnSince)}</> : null}
+              is fee. Maker keeps one debt figure; the page splits it as fee = debt − principal, so a repayment counts
+              against principal first and against fee only once principal reaches zero.
             </>
           ) : null}
-          .
         </span>,
       );
     }
@@ -122,15 +158,49 @@ export function MakerdaoPositionExplanation({
       bullets.push(
         <span key="ratio">
           Collateral ratio <H>{(ratio * 100).toFixed(0)}%</H> — the collateral is worth {ratio.toFixed(2)}× the debt;
-          below {(v.matRatio * 100).toFixed(0)}% the vault becomes liquidatable.
+          below {(v.matRatio * 100).toFixed(0)}% the vault becomes liquidatable
+          {matMoved && newestRead?.mat != null ? (
+            <>
+              {" "}
+              ({v.ilk}&rsquo;s minimum is {Number((v.matRatio * 100).toFixed(2))}%
+              {matChange ? <> since {formatDate(matChange.timestamp)}</> : null};{" "}
+              {Number((newestRead.mat * 100).toFixed(2))}% at the vault&rsquo;s last event)
+            </>
+          ) : null}
+          .
         </span>,
       );
     }
     if (v.liquidationPriceUsd != null && dropPct != null && dropPct > 0) {
       bullets.push(
         <span key="drop">
-          {v.collateralSymbol} can fall about <H>{dropPct}%</H> (to <H>{formatUsd(v.liquidationPriceUsd)}</H>) before
-          liquidation.
+          {capBinds ? <>Maker&rsquo;s price for {v.collateralSymbol}</> : v.collateralSymbol} can fall{" "}
+          <H>{dropText(1 - v.liquidationPriceUsd / (v.priceUsd as number))}</H> (to{" "}
+          <H>{usdPrice(v.liquidationPriceUsd, formatUsd)}</H>) before liquidation
+          {capBinds && cap?.oracleUsd != null ? (
+            <>
+              . With the cap in place that takes the oracle price falling{" "}
+              {dropText(1 - v.liquidationPriceUsd / cap.oracleUsd)}, from {usdPrice(cap.oracleUsd)}
+            </>
+          ) : null}
+          .
+        </span>,
+      );
+    }
+    if (v.auction != null) {
+      const penalty = Math.round((v.auction.chop - 1) * 100);
+      bullets.push(
+        <span key="auctions">
+          Below the minimum, anyone can start an auction that sells the collateral to cover the debt plus a {penalty}%
+          penalty
+          {v.lse ? <>; the engine first takes the SKY out of the farm and back from the delegate</> : null}.
+          {v.auction.stopped > 0 ? (
+            <>
+              {" "}
+              Governance has switched these auctions off for {v.ilk}: its auction contract refuses new auctions
+              {v.auction.stopped >= 3 ? " and bids" : ""}, so for now a vault under the minimum is not sold.
+            </>
+          ) : null}
         </span>,
       );
     }
@@ -138,7 +208,16 @@ export function MakerdaoPositionExplanation({
       bullets.push(
         <span key="dust">
           {v.ilk} enforces a minimum debt of <AmountText value={v.dustDai} /> {dsym} per vault — a repayment may not
-          leave a smaller remainder (only exactly zero).
+          leave a smaller remainder (zero is allowed).
+        </span>,
+      );
+    }
+    if (v.lineDai != null && v.lineDai > 0 && v.ilkDebtDai != null) {
+      bullets.push(
+        <span key="ceiling">
+          {v.ilk}&rsquo;s debt ceiling, <AmountText value={v.lineDai} format="compact" /> {dsym}, is the most all{" "}
+          {v.ilk} vaults together may owe; they owe <AmountText value={v.ilkDebtDai} format="compact" /> {dsym} now. At
+          the ceiling no {v.ilk} vault can draw more until it is raised; repaying and adding collateral still work.
         </span>,
       );
     }
@@ -146,10 +225,43 @@ export function MakerdaoPositionExplanation({
 
   bullets.push(
     <span key="osm">
-      Prices reach this vault through an oracle that delays each feed by an hour by design. The vault is judged against
-      that delayed price, and that is the price shown here.
+      Maker prices the collateral through its Oracle Security Module (OSM), which passes each price on an hour late by
+      design. The vault is judged against that delayed price
+      {cap ? <>, or the cap when it is lower,</> : null} and that is the price shown here.
     </span>,
   );
+
+  if (v.lse) {
+    const ls = v.lockstake ?? null;
+    bullets.push(
+      <span key="lockstake">
+        This is a LockStake urn. Its owner, {v.owner ? shortAddr(v.owner) : "the owner"}, works it through Sky&rsquo;s
+        LockStake Engine ({shortAddr(MAKER_ADDRESSES.LOCKSTAKE_ENGINE)}), which made the urn {shortAddr(v.urn)} for it:
+        the urn is the address the Vat records the SKY and the debt under. The engine stakes the locked SKY in a rewards
+        farm the owner picks and passes its voting power to a delegate the owner picks
+        {ls ? (
+          <>
+            {" "}
+            (now farm {ls.farm ? shortAddr(ls.farm) : "none"}, delegate{" "}
+            {ls.voteDelegate ? shortAddr(ls.voteDelegate) : "none"})
+          </>
+        ) : null}
+        ; the owner claims the farm&rsquo;s rewards.
+        {ls ? (
+          ls.exitFee > 0 ? (
+            <> SKY taken out pays an exit fee of {(ls.exitFee * 100).toFixed(2)}%.</>
+          ) : (
+            <> Taking SKY out has no exit fee now.</>
+          )
+        ) : null}{" "}
+        Picking a farm or a delegate and claiming rewards are engine events this page does not show.
+      </span>,
+      <span key="usds">
+        USDS and DAI are exchangeable one for one, both ways, through Sky&rsquo;s DAI–USDS converter (
+        {shortAddr(MAKER_ADDRESSES.DAI_USDS)}).
+      </span>,
+    );
+  }
 
   // Who has been operating the vault, across its whole history — the same
   // verdict each event card renders on its spine, reduced once so the pane can
@@ -190,7 +302,7 @@ export function MakerdaoPositionExplanation({
     );
   }
 
-  bullets.push(...ownershipBullets(history, v.txCount, ext?.external ?? 0));
+  bullets.push(...ownershipBullets(history, v.txCount, ext?.external ?? 0, v.owner));
 
   return <ProseExplainer paragraph={lead} items={bullets} />;
 }
@@ -200,9 +312,40 @@ export function MakerdaoPositionExplanation({
  *  transactions the owner signed or sent through its own proxy, and the
  *  ownership transfers another contract made inside them. Nothing where the
  *  vault never changed hands. */
-function ownershipBullets(history: MakerVaultHistory, txCount: number, external: number): React.ReactNode[] {
+function ownershipBullets(
+  history: MakerVaultHistory,
+  txCount: number,
+  external: number,
+  owner?: string | null,
+): React.ReactNode[] {
   const owners = history.owners;
-  if (owners.length < 2) return [];
+  if (owners.length < 2) {
+    // One owner over the loaded history: say so, with the proxy it acts through
+    // and how many of its transactions it sent, where the page read them.
+    if (!owner || history.ownership.size > 0) return [];
+    const who = owner.toLowerCase();
+    const ctxs = [...history.txContext.values()];
+    const proxy = ctxs
+      .map((c) => (c.to ? c.parties[c.to] : undefined))
+      .find((p) => p?.kind === "dsproxy" && p.owner === who)?.address;
+    const sent = ctxs.filter((c) => c.from === who).length;
+    return [
+      <span key="owners">
+        It has had one owner since it opened: {shortAddr(who)}
+        {proxy ? <>, through its DSProxy {shortAddr(proxy)} (a contract wallet the owner acts through)</> : null}.
+        {ctxs.length === txCount && txCount > 0 ? (
+          sent === txCount ? (
+            <> The owner sent all {txCount.toLocaleString("en-US")} of its transactions.</>
+          ) : (
+            <>
+              {" "}
+              The owner sent {sent.toLocaleString("en-US")} of its {txCount.toLocaleString("en-US")} transactions.
+            </>
+          )
+        ) : null}
+      </span>,
+    ];
+  }
   // The transaction read that names each owner's holder.
   const allCtx = [...history.txContext.values()];
   const partyCtx = (ref: MakerOwnerRef) => allCtx.find((c) => (ref.holder ? c.parties[ref.holder] : undefined));
@@ -222,6 +365,10 @@ function ownershipBullets(history: MakerVaultHistory, txCount: number, external:
       Owned by {describeOwner(current.ref, partyCtx(current.ref), false)} since <H>{formatDate(since)}</H>
       {creatorKnown && earlier.length === 1 ? (
         <>, when {creatorKnown.name} created the vault and handed it over</>
+      ) : earlier.length === 1 &&
+        earlier[0].until === since &&
+        partyCtx(creator.ref)?.parties[creator.ref.holder ?? ""]?.kind === "contract" ? (
+        <>, when the contract {shortAddr(creator.ref.holder)} opened it and handed it over in the same transaction</>
       ) : earlier.length > 0 ? (
         <>
           ; before that by{" "}
@@ -312,7 +459,10 @@ import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 import { useMakerVaultHistory, type MakerOwnerRef, type MakerVaultHistory } from "@/lib/makerdao/vault-history";
 import { knownContract } from "@/lib/makerdao/known-contracts";
-import { describeOwner } from "@/lib/makerdao/ownership-prose";
+import { describeOwner, shortAddr } from "@/lib/makerdao/ownership-prose";
+import { useMakerMatChanges } from "@/lib/makerdao/use-chain-history";
+import { useMemo } from "react";
+import { dropText } from "@/lib/makerdao/explainer-clauses";
 import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 import type { MakerAuctionOutcome } from "@/lib/makerdao/chain-history-types";
 

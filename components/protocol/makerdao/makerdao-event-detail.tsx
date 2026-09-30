@@ -12,6 +12,7 @@
 // and, from the auction's own logs, what it had to raise, what it sold and what
 // it handed back (MakerdaoAuctionOutcome). Each figure traces via <Prov>.
 
+import { collAmount, debtDigits, usdPrice } from "@/lib/makerdao/price-format";
 import type { MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { Prov } from "@/components/shared/provenance";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
@@ -66,6 +67,22 @@ export const fmtRatio = (r: number): string =>
 /** A minimum ratio at its own grain: 145%, 170%, 175%. */
 export const fmtMat = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
 
+/** The collateral transition at the Maker grain (collAmount), where the
+ *  shared form would state 0.254 beside a row header of 0.2538. */
+function collTransition<T extends { before: string; beforeExact?: string; change: string; changeExact?: string }>(
+  t: T | undefined,
+): T | undefined {
+  if (!t) return t;
+  const num = (x: string | undefined) => (x == null ? NaN : Number(x.replace(/[^0-9.eE-]/g, "")));
+  const b = num(t.beforeExact);
+  const c = num(t.changeExact);
+  return {
+    ...t,
+    ...(Number.isFinite(b) && Math.abs(b) < 1 ? { before: collAmount(b) } : {}),
+    ...(Number.isFinite(c) && Math.abs(c) < 1 ? { change: `${t.change.slice(0, 1)}${collAmount(c)}` } : {}),
+  };
+}
+
 /** The ilk at this row's block: the page's read when it holds one, else, with
  *  `readOwn`, this row's own. The opened card's grid and explanation pass it
  *  (they mount when the card opens); the closed card does not, so a long
@@ -111,20 +128,43 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
   const mat = ilkAt?.mat ?? null;
   const ratios = ctx.eventType === "frob" ? rowRatios(ctx, price) : null;
   const inkAfter = ctx.inkAfter != null ? Number(ctx.inkAfter) : null;
+  const dink = Number(ctx.dink) || 0;
+  const debtMove = Number(ctx.debtChange) || 0;
+  const isFrob = ctx.eventType === "frob";
+  // The row's own amount under the box it moved, and "unchanged" under the
+  // one it did not, so the grid states what this event did without the toggle.
+  const collSub = isFrob
+    ? dink > 0
+      ? `deposited ${collAmount(dink)} ${collSym}`
+      : dink < 0
+        ? `withdrew ${collAmount(-dink)} ${collSym}`
+        : "unchanged"
+    : undefined;
+  const debtSub = isFrob
+    ? debtMove > 0
+      ? `drew ${fmtDai(debtMove)} ${debtSym}`
+      : debtMove < 0
+        ? `repaid ${debtDigits(-debtMove)} ${debtSym}`
+        : "unchanged by this event"
+    : undefined;
 
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
       value: fmtAfter(ctx.inkAfter),
+      ...(ctx.inkAfter != null ? { display: collAmount(Number(ctx.inkAfter)) } : {}),
       symbol: collSym,
       prov: inkAfterProv(collSym, coords),
-      transition: reconstructTransition({
-        after: ctx.inkAfter,
-        change: ctx.dink,
-        changeProv: dinkProv(collSym, coords),
-        beforeProv: inkBeforeProv(collSym, coords),
-      }),
+      transition: collTransition(
+        reconstructTransition({
+          after: ctx.inkAfter,
+          change: ctx.dink,
+          changeProv: dinkProv(collSym, coords),
+          beforeProv: inkBeforeProv(collSym, coords),
+        }),
+      ),
       changed: Number(ctx.dink) !== 0,
+      ...(collSub ? { sub: <>{collSub}</> } : {}),
       // The collateral's value at this block's OSM price.
       ...(ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
         ? {
@@ -151,12 +191,15 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
         beforeProv: debtBeforeProv(debtSym, coords),
       }),
       changed: Number(ctx.dart) !== 0,
+      ...(debtSub ? { sub: <>{debtSub}</> } : {}),
       ...(ctx.interestSincePrevious
         ? {
             interestSincePrevious: {
               value: ctx.interestSincePrevious,
               prov: interestSincePreviousProv(debtSym, coords),
               label: "Stability fee since previous event",
+              labelTip:
+                "Fee added to the debt since the previous event. Maker adds it only when someone updates the collateral type's rate (a call to Jug.drip), so it lands in lumps: a row can carry fee that built up before the previous event, and the second row of one transaction can carry a little.",
             },
           }
         : {}),
@@ -220,14 +263,26 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
   }
 
   if (ctx.eventType === "frob" && price != null) {
+    // LockStake's feed is capped: the price is the lower of the cap and the OSM.
+    const cap = ilkAt?.priceCap;
+    const atCap = cap != null && cap.oracleUsd != null && cap.oracleUsd > cap.capUsd;
     stats.push({
-      label: `${collSym} price (OSM)`,
+      label: atCap ? `${collSym} price (capped)` : `${collSym} price (OSM)`,
       value: String(price),
-      display: `$${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      display: usdPrice(price),
       symbol: "",
       prov: eventPriceProv(collSym, coords, price),
       changed: false,
-      sub: blockNumber != null ? <>at block {blockNumber.toLocaleString("en-US")}</> : undefined,
+      sub: (
+        <>
+          {atCap ? (
+            <>the cap governance set on Maker&rsquo;s price; the oracle read {usdPrice(cap.oracleUsd as number)}</>
+          ) : (
+            <>Maker&rsquo;s oracle price, one hour behind the market</>
+          )}
+          {blockNumber != null ? <> · block {blockNumber.toLocaleString("en-US")}</> : null}
+        </>
+      ),
     });
   }
 

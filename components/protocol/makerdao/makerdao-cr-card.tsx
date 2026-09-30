@@ -12,13 +12,7 @@
 // own figures.
 
 import { Prov } from "@/components/shared/provenance";
-import {
-  collateralRatioProv,
-  matProv,
-  borrowHeadroomProv,
-  ilkCeilingProv,
-  dustProv,
-} from "@/lib/makerdao/event-provenance";
+import { matProv, borrowHeadroomProv, ilkCeilingProv, dustProv } from "@/lib/makerdao/event-provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { formatNumber } from "@/lib/utils/format";
@@ -26,6 +20,9 @@ import { formatUsd } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import type { MakerVaultView } from "./makerdao-vault-card";
 import { AmountText } from "@/components/shared/amount-text";
+
+/** A minimum ratio at its own grain: 175%, 145%, 172.5%. */
+const pctWhole = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
 
 export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
   // Meaningful only for an open vault with debt and the live overlay landed
@@ -41,7 +38,6 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
   )
     return null;
 
-  const ratio = v.collateralUsd / v.debtDai;
   // DAI on CdpManager vaults, USDS on LockStake urns (asset-catalog).
   const dsym = ilkDebtSymbol(v.ilk);
 
@@ -55,11 +51,12 @@ export function MakerdaoCrCard({ v }: { v: MakerVaultView }) {
   // same value text. A long composition wraps BETWEEN clusters.
   return (
     <>
-      <RiskFigure label="Collateral ratio">
-        <Prov info={collateralRatioProv(formatUsd(v.collateralUsd), `${formatNumber(v.debtDai)} ${dsym}`)}>
-          <RiskStrong>{pct(ratio)}</RiskStrong>
-        </Prov>{" "}
-        · minimum <Prov info={matProv(v.ilk)}>{pct(v.matRatio)}</Prov>
+      {/* The ratio itself is the card's headline figure; the strip states the
+          minimum it is held against. */}
+      <RiskFigure label="Minimum ratio">
+        <Prov info={matProv(v.ilk)}>
+          <RiskStrong>{pctWhole(v.matRatio)}</RiskStrong>
+        </Prov>
       </RiskFigure>
       {/* One label-led figure per line, so the stacked strip at phone width
           reads as a column of label: figure pairs. */}

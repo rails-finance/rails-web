@@ -11,6 +11,9 @@ export interface MakerIlkAt {
   mat: number | null;
   /** The ilk's minimum debt per vault, DAI. */
   dustDai: number | null;
+  /** LockStake's capped feed at the block: the cap and the OSM price behind
+   *  it; `priceUsd` is the lower. Absent for a plain OSM. */
+  priceCap?: { capUsd: number; oracleUsd: number | null };
 }
 
 export interface MakerIlkAtResponse {
@@ -123,6 +126,9 @@ export interface MakerTxContext {
   migratedCup: string | null;
   /** ERC-20 received by an Instadapp account listed in `parties`. */
   tokensIn: MakerTokenIn[];
+  /** DSProxies Maker's ProxyFactory built in the transaction, with the
+   *  account each was built for (its Created log). */
+  proxiesBuilt?: { owner: string; proxy: string }[];
 }
 
 /** A change to an ilk's minimum collateral ratio (Spotter file "mat"). */

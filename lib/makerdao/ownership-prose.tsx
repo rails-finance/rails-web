@@ -42,6 +42,7 @@ export function describeOwner(ref: MakerOwnerRef, ctx?: MakerTxContext, inTx = t
       </>
     );
   }
+  if (party?.kind === "contract" && (!ref.owner || ref.owner === holder)) return <>the contract {shortAddr(holder)}</>;
   if (holder && ref.owner && holder !== ref.owner) {
     return (
       <>
