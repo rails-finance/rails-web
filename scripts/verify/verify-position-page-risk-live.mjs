@@ -38,6 +38,7 @@
 //   seen again on two reloads).
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3762";
 const PAGE = 40;
@@ -132,6 +133,8 @@ for (const lane of LANES) {
   }
   // The strip arrives with the live read; give a slow read a moment past idle.
   await page.waitForTimeout(3000);
+  // A card with progressive disclosure draws its risk lines only once open.
+  await openPositionCards(page);
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
   const at = text.indexOf(RUNWAY);

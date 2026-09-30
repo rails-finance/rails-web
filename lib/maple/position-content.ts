@@ -7,7 +7,10 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
 const MAPLE_DOC_URL = "https://docs.maple.finance";
 
-const LINKS: LearnMoreContent["links"] = [{ label: "Maple docs", url: MAPLE_DOC_URL }];
+const LINKS: LearnMoreContent["links"] = [
+  { label: "Maple docs", url: MAPLE_DOC_URL },
+  { label: "Maple docs: withdrawals", url: `${MAPLE_DOC_URL}/syrupusdc-usdt-usdg-for-lenders/risk` },
+];
 
 export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?: boolean }): LearnMoreContent {
   if (opts.status === "closed") {
@@ -19,7 +22,7 @@ export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?
       details: [
         {
           bold: "Shares & the exit rate",
-          text: "the share is a claim on the pool: shares × the exit rate = what a withdrawal pays. The rate rises as loans accrue interest, and falls when the pool delegate marks an impairment.",
+          text: "a share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. The rate rises as borrowers pay interest, and falls when the pool delegate, the manager that runs the pool's lending, marks a loan as impaired.",
         },
         {
           bold: "On-chain bookkeeping, off-chain assets",
@@ -37,31 +40,35 @@ export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?
   const details: LearnMoreContent["details"] = [
     {
       bold: "Shares & the exit rate",
-      text: "the share is a claim on the pool: shares × convertToExitAssets = what a withdrawal pays. The rate rises as loans accrue interest at their posted rates, and falls only when the pool delegate marks an impairment.",
+      text: "a share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. The rate rises as the pool's borrowers pay interest on their loans, which is where a lender's yield comes from.",
     },
     {
-      bold: "Where the money actually is",
-      text: "only a small liquid buffer sits in the pool contract itself. The rest is deployed to loans whose collateral is held by custodians under off-chain tri-party agreements — the chain records the bookkeeping, not the collateral.",
+      bold: "Impairment",
+      text: "the pool delegate, the manager that runs the pool's lending, can mark a loan as impaired when it looks likely to lose money. The exit rate then drops by the marked amount, and a lender who exits while the mark stands takes that loss for good.",
+    },
+    {
+      bold: "Where the money is",
+      text: "only a small share of the pool sits in the pool contract as cash. The rest is lent out, against collateral that custodians hold off-chain.",
     },
     opts.inQueue
       ? {
           bold: "The withdrawal queue",
-          text: "requesting a withdrawal escrows the shares with the WithdrawalManager and takes a place in a first-in-first-out line; a processed request redeems at the exit rate at the moment of processing, not the moment of request.",
+          text: "a withdrawal request moves the shares into the queue and takes a place in line. Requests are paid first in, first out (FIFO), at the exit rate when each is processed, not when it was made.",
         }
       : {
           bold: "Exiting via the queue",
-          text: "withdrawing normally travels through a first-in-first-out queue; requests fill as pool liquidity allows, typically within minutes when the liquid buffer covers them.",
+          text: "a withdrawal joins a first-in, first-out (FIFO) queue and is paid from the pool's cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
         },
     {
       bold: "What the chain proves",
-      text: "every deposit and withdrawal is self-priced by its own log, and share balances replay exactly from transfers. What it cannot prove is the loan book's off-chain backing.",
+      text: "every deposit, withdrawal, share transfer, share balance and queue fill, and the pool rate each used. It cannot prove the loan book's collateral, which custodians hold off-chain.",
     },
   ];
 
   return {
     title: "About This Position",
     intro:
-      "This panel explains the position's live state in plain language — the pool shares this wallet holds, what they claim at the pool's own exit rate, and anything sitting in the withdrawal queue.",
+      "The pool shares this wallet holds, what they pay out at the pool's exit rate, and anything waiting in the withdrawal queue.",
     detailsHeading: "Key concepts:",
     details,
     links: LINKS,

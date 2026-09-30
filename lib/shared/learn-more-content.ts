@@ -9,6 +9,12 @@ import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/expla
 import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { indefiniteArticle } from "@/lib/utils/format";
+import {
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  isCompoundV2Deprecated,
+} from "@/lib/compound-v2/deprecated-markets";
+import { COMPOUND_V2_NO_SEIZE_SHARE } from "@/lib/compound-v2/asset-catalog";
 
 // ── CoW Protocol ─────────────────────────────────────────────────────────────
 
@@ -1686,16 +1692,16 @@ export function moonwellBorrowRepayContent(
         bold: "Borrowing power",
         text:
           deployment === "base"
-            ? "how much can be borrowed depends on the supplied value weighted by each market's collateral factor — set by governance per market, and shown on the position card as the Comptroller states it."
+            ? "how much can be borrowed depends on the supplied value in entered markets, weighted by each market's collateral factor. Governance sets the factors; the position card shows the entered markets' factors."
             : "how much can be borrowed depends on the supplied value weighted by each market's collateral factor (0.80 for WETH and cbBTC, 0.85 for USDC and USDT, as set by governance).",
       },
       {
         bold: "Account liquidity",
-        text: "the Comptroller tracks one liquidity figure across the whole account; when it turns to shortfall, the account can be liquidated.",
+        text: "the Comptroller (Moonwell's risk contract) keeps one figure for the whole account: the borrow limit (each entered market's value × its collateral factor) minus the debt. Below zero it is a shortfall, and the account can be liquidated.",
       },
       {
         bold: "The emitted debt figure",
-        text: "every borrow and repay event carries the borrower's total debt after it (accountBorrows) — the contract's own reckoning, interest included to that moment. The timeline shows that figure verbatim.",
+        text: "every borrow and repay event carries the borrower's total debt after it, as the market reckons it, interest included to that moment. The timeline shows that figure as emitted.",
       },
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -1735,7 +1741,7 @@ export function moonwellLiquidationContent(): LearnMoreContent {
     intro:
       "A Moonwell account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt (up to the close factor, 50% per liquidation) and, in return, seizes the borrower's mTokens in a collateral market of the liquidator's choosing — worth the repaid debt plus a 10% liquidation incentive. The seize is an mToken transfer from borrower to liquidator, so it shows on the collateral market's balance lane too.",
+      "A liquidator repays part of one debt (up to the close factor, 50% per liquidation) and in return seizes the borrower's mTokens in a market of its choosing, worth the repaid debt plus a 10% liquidation incentive. The market keeps 3% of the seized mTokens as reserves; the liquidator gets the rest. Any supplied market can be seized, including one the account never entered as collateral.",
       "Liquidation is partial and repeatable: each one clears at most half the debt, nudging the account back toward solvency rather than closing it outright.",
     ],
     links: [{ label: "Moonwell docs", url: MOONWELL_DOC_URL }],
@@ -1797,7 +1803,7 @@ export function compoundV2SupplyWithdrawContent(eventType: "mint" | "redeem"): L
       },
       {
         bold: "Cross-collateralisation",
-        text: "the Comptroller pools every entered market into one account per wallet — supplied value across markets backs borrowing across markets, weighted by each market's collateral factor. Eight of the twenty markets have collateral disabled entirely (a zero factor): supply there earns but backs nothing.",
+        text: "the Comptroller (Compound's risk contract, which decides what an account may borrow) pools every entered market into one account per wallet: supplied value across markets backs borrowing across markets, weighted by each market's collateral factor. Eight of the twenty markets have collateral disabled (a factor of 0): supply there backs nothing.",
       },
       {
         bold: supplying ? "Transferable positions" : "Effect on liquidity",
@@ -1810,26 +1816,31 @@ export function compoundV2SupplyWithdrawContent(eventType: "mint" | "redeem"): L
   };
 }
 
-export function compoundV2BorrowRepayContent(eventType: "borrow" | "repay"): LearnMoreContent {
+export function compoundV2BorrowRepayContent(eventType: "borrow" | "repay", market?: string): LearnMoreContent {
   const borrowing = eventType === "borrow";
+  // Maximillion is the helper contract that repays a cETH borrow in native
+  // ETH; it only ever appears on ETH repays.
+  const ethRepay = !borrowing && market === "eth";
   return {
     title: borrowing ? "How Borrowing Works" : "How Repaying Works",
     intro: borrowing
       ? "Borrowing draws an asset against the account's supplied collateral, accruing interest every block — Compound V2 accrues per block, and each market's own interest rate model sets the rate from utilisation."
-      : "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party — on the cETH market, the Maximillion helper fronts native-ETH repays.",
+      : ethRepay
+        ? "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party. ETH repays often go through Maximillion, a Compound helper contract that takes native ETH and repays the cETH borrow with it."
+        : "Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing headroom. A repay can be made by a third party.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "Borrowing power",
-        text: "how much can be borrowed depends on the supplied value in ENTERED markets, weighted by each market's governance-set collateral factor. Supplying alone does not enter a market.",
+        text: "how much can be borrowed depends on the supplied value in entered markets, weighted by each market's governance-set collateral factor. Supplying alone does not enter a market: the wallet enters it in a separate call.",
       },
       {
         bold: "Account liquidity",
-        text: "the Comptroller tracks one liquidity figure across the whole account (getAccountLiquidity); when it turns to shortfall, the account can be liquidated.",
+        text: "the Comptroller keeps one figure for the whole account: the borrow limit (each entered market's value × its collateral factor) minus the debt. Above zero it is room to borrow more; below zero it is a shortfall, and the account can be liquidated.",
       },
       {
         bold: "The emitted debt figure",
-        text: "every borrow and repay event carries the borrower's total debt after it (accountBorrows) — the contract's own reckoning, interest included to that moment. The gap between one event's debt-after and the next event's debt-before is the interest that accrued between them.",
+        text: "every borrow and repay event carries the borrower's total debt after it, as the market reckons it, interest included to that moment. The gap between one event's debt after and the next event's debt before is the interest that accrued between them.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
@@ -1863,20 +1874,28 @@ export function compoundV2TransferContent(direction: "transfer_in" | "transfer_o
   };
 }
 
-export function compoundV2LiquidationContent(): LearnMoreContent {
+export function compoundV2LiquidationContent(market?: string): LearnMoreContent {
+  const deprecated = isCompoundV2Deprecated(market);
   return {
     title: "How Liquidations Work",
     intro:
-      "A Compound V2 account becomes eligible for liquidation when the Comptroller's account liquidity turns to shortfall — its borrowed value is no longer covered by the collateral-factor-weighted supplied value. Once eligible, anyone (in practice, automated liquidator bots) can step in.",
+      "A Compound V2 account can be liquidated when its account liquidity turns to a shortfall: the Comptroller (Compound's risk contract) values each entered market's collateral × its collateral factor, and the debt is worth more than that. Once it is, anyone (in practice an automated bot) can step in. A deprecated market is the exception: there, any borrow can be liquidated with no shortfall.",
     extraParagraphs: [
-      "A liquidator repays part of the account's debt — at most the close factor, 50% of one borrowed market per liquidation — and in return seizes the borrower's cTokens in a collateral market of the liquidator's choosing, worth the repaid debt plus the liquidation incentive. The seizure splits in two: most goes to the liquidator, and the protocol keeps its own share (protocolSeizeShare, 2.8%), burned out of the borrower's balance.",
-      "Liquidation is partial and repeatable, and borrowers commonly survive it: Compound V2's 26,639 liquidations land on 5,864 distinct borrowers — about 4.5 each. An account liquidated years ago can still be open today; the timeline shows each liquidation as one event in the account's life.",
+      "A liquidator repays part of one debt, at most the close factor: 50% of that borrowed market per call, or the whole borrow in a deprecated market. In return it seizes the borrower's cTokens in a collateral market of its choosing, worth the repaid debt plus the 8% liquidation incentive. In thirteen markets the protocol keeps 2.8% of the seized cTokens as its share; cETH, cUSDC, cBAT, cREP, cZRX, cSAI and the first cWBTC take none, so the liquidator gets the whole seizure.",
+      deprecated
+        ? `A deprecated market has ${DEPRECATED_CONDITIONS}. The Comptroller skips the shortfall check and the close factor for a borrow in one, so ${DEPRECATED_CONSEQUENCE}.`
+        : `A deprecated market has ${DEPRECATED_CONDITIONS}. The Comptroller skips the shortfall check and the close factor for a borrow in one, so ${DEPRECATED_CONSEQUENCE}. Eight markets are deprecated: USDT, ZRX, COMP, TUSD, USDP, FEI, SAI and REP.`,
+      "Otherwise liquidation is partial and repeatable, and borrowers often survive it: Compound V2's 26,639 liquidations fall on 5,864 borrowers, about 4.5 each.",
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
   };
 }
 
-export function compoundV2SeizeContent(kind: "seize_out" | "seize_in" | "seize_burn"): LearnMoreContent {
+export function compoundV2SeizeContent(
+  kind: "seize_out" | "seize_in" | "seize_burn",
+  collateralMarket?: string,
+): LearnMoreContent {
+  const noShare = collateralMarket != null && COMPOUND_V2_NO_SEIZE_SHARE.has(collateralMarket);
   return {
     title:
       kind === "seize_in"
@@ -1886,23 +1905,25 @@ export function compoundV2SeizeContent(kind: "seize_out" | "seize_in" | "seize_b
           : "How Collateral Seizure Works",
     intro:
       kind === "seize_out"
-        ? "When a liquidator repays part of an account's debt, the protocol moves collateral-market cTokens out of the borrower's balance. This is a seizure — collateral being taken under the protocol's liquidation rules — not a transfer the borrower made."
+        ? "When a liquidator repays part of an account's debt, the protocol moves cTokens in a collateral market out of the borrower's balance. This is a seizure under the protocol's liquidation rules; the borrower did not send them."
         : kind === "seize_in"
-          ? "The cTokens a liquidator receives for repaying part of an underwater account's debt — the liquidator's side of a seizure, worth the repaid debt plus the liquidation incentive."
-          : "Every seizure splits in two: the liquidator's share, and the protocol's own cut (protocolSeizeShare, 2.8%) — transferred from the borrower to the cToken contract and burned out of total supply. The tokens cease to exist; no wallet receives them.",
+          ? "The cTokens a liquidator receives for repaying part of a liquidatable account's debt: its side of a seizure, worth the repaid debt plus the liquidation incentive."
+          : "The protocol's share of a seizure: 2.8% of the seized cTokens are taken from the borrower and burned, and their underlying is added to the market's reserves. No wallet receives them.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "One seizure, two legs",
-        text: "the LiquidateBorrow event's seizeTokens is the SUM of the liquidator's leg and the protocol's burned cut — reading only the liquidator's leg understates what the borrower lost.",
+        bold: "One seizure, two parts",
+        text: noShare
+          ? "this market takes no protocol share, so the liquidator receives every seized cToken."
+          : "the seized total is the liquidator's part plus the protocol's 2.8% share: reading only the liquidator's part understates what the borrower lost.",
       },
       {
         bold: "cTokens, not underlying",
         text: "a seizure moves the receipt tokens; the seized value follows the collateral market's exchange rate like any other cToken holding.",
       },
       {
-        bold: "Partial by design",
-        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives — seizures appear alongside continued activity.",
+        bold: "Partial, outside deprecated markets",
+        text: "the close factor caps each liquidation at half of one borrowed market, so an account often survives. In a deprecated market the whole borrow can go in one call.",
       },
     ],
     links: [{ label: "Compound V2 docs", url: COMPOUND_V2_DOC_URL }],
@@ -3354,11 +3375,11 @@ export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): 
     details: [
       {
         bold: "Shares & the exit rate",
-        text: "the share is a claim on the pool: shares × convertToExitAssets = what a withdrawal pays. The rate rises as loans accrue interest at their posted rates, and falls only when the pool delegate marks an impairment (unrealizedLosses) — which exiting lenders realize first.",
+        text: "the share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. It rises as borrowers pay interest, and falls only when the pool delegate, the manager that runs the pool's lending, marks a loan as impaired; a lender who exits while that mark stands takes the loss for good.",
       },
       {
         bold: "Where the money actually is",
-        text: "only a small liquid buffer sits in the pool contract itself (about 1% in mid-2026). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians (BitGo, Copper, Anchorage, Hex Trust) under off-chain tri-party agreements. The chain records the bookkeeping; the collateral itself is not on-chain.",
+        text: "only a small liquid buffer sits in the pool contract (a few percent of the pool; the pool band shows it live). The rest is deployed to loans whose collateral — BTC, ETH, stables — is held by custodians, firms that keep the borrowers' collateral in safekeeping and release it only on the agreed terms (BitGo, Copper, Anchorage, Hex Trust). The chain records the bookkeeping; the collateral itself is not on-chain.",
       },
       {
         bold: "What the chain proves",
@@ -3375,12 +3396,12 @@ export function mapleQueueContent(
   return {
     title: "How the Withdrawal Queue Works",
     intro:
-      "Syrup-pool withdrawals are queued: requesting a withdrawal escrows the shares with the WithdrawalManager and takes a place in a first-in-first-out line. Requests fill as pool liquidity allows — typically within minutes when the liquid buffer covers them; the contract permits up to 30 days.",
+      "Syrup-pool withdrawals are queued: a request moves the shares into the queue and takes a place in a first-in, first-out (FIFO) line, paid from the pool's liquid cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Escrow, not exit",
-        text: "requested shares leave the wallet's balance but remain the position's — they sit at the WithdrawalManager until processed or cancelled. Cancelling (fully or partly) returns them.",
+        bold: "Held in the queue, not paid out",
+        text: "requested shares leave the wallet's balance but remain the position's: the queue's contract holds them for the wallet until they are paid out or the request is cancelled. Cancelling (fully or partly) returns them.",
       },
       {
         bold: "Priced at fill time",
@@ -3390,10 +3411,16 @@ export function mapleQueueContent(
       },
       {
         bold: "Who processes",
-        text: "the pool delegate's operational machinery calls processRedemptions as cash allows; it can also cancel requests (Maple documents this for abuse and congestion cases). The queue's depth against the pool's liquid cash — shown on the pool band — is the live health of this pipeline.",
+        text: "the pool delegate or Maple's admins process requests as cash allows, earliest first; if the cash does not cover every request, only the earliest are paid and the rest wait. The pool band shows the queue against the pool's liquid cash.",
       },
     ],
-    links: [{ label: "Maple docs — withdrawals", url: MAPLE_DOC_URL }],
+    links: [
+      { label: "Maple docs: withdrawals", url: `${MAPLE_DOC_URL}/syrupusdc-usdt-usdg-for-lenders/risk` },
+      {
+        label: "Maple docs: the queue",
+        url: `${MAPLE_DOC_URL}/technical-resources/withdrawal-managers/withdrawal-manager-queue`,
+      },
+    ],
   };
 }
 
@@ -3402,17 +3429,17 @@ export function mapleTransferContent(eventType: "transfer_in" | "transfer_out"):
     title: "Transferable Pool Shares",
     intro:
       eventType === "transfer_in"
-        ? "Syrup-pool shares are ordinary ERC-20 tokens: receiving them moves the pool claim into this wallet with no pool event."
-        : "Syrup-pool shares are ordinary ERC-20 tokens: sending them moves the pool claim to another wallet with no pool event.",
+        ? "Syrup-pool shares move between wallets like any token: receiving them moves the pool claim into this wallet with no pool event."
+        : "Syrup-pool shares move between wallets like any token: sending them moves the pool claim to another wallet with no pool event.",
     detailsHeading: "Key concepts:",
     details: [
       {
         bold: "The claim moves with the token",
-        text: "whoever holds the shares holds the deposit and its accrued interest — positions routinely arrive via DEX buys, Pendle, or exchange distributions.",
+        text: "whoever holds the shares holds the claim on the pool, interest included. A wallet can receive them from another lender, or buy them from one.",
       },
       {
-        bold: "Deposit principal stays behind",
-        text: "a transferred-in position has no deposit history in this wallet, so its replayed principal reads zero — the share lane (exact, equal to balanceOf) is the truthful basis, and the current value comes from shares × the exit rate.",
+        bold: "Interest counts from arrival",
+        text: "the wallet paid nothing into the pool for shares it received, so the page starts from what they were worth when they arrived. Their claim now is the shares times the exit rate, and the interest is the rise since arrival.",
       },
     ],
     links: [{ label: "Maple docs", url: MAPLE_DOC_URL }],
@@ -4550,7 +4577,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
           },
           {
             bold: "The interest figure",
-            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary, utilisation-driven rate is added on top by the protocol and is not on this log.",
+            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary rate, which rises with the market's debt-to-reserve ratio, is added on top by the protocol and is not on this log.",
           },
           {
             bold: "A live note",
@@ -4566,39 +4593,47 @@ export function polarisCdpContent(): LearnMoreContent {
   return {
     title: "How Polaris CDPs Work",
     intro:
-      "Polaris is a Liquity-lineage CDP protocol on the Sepolia testnet. A borrower posts pETH — the protocol's bonding-curve wrapper of ETH — into a CDP in one of two markets and mints that market's stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. The CDP is an NFT, so the position can change hands without being closed.",
+      "Polaris is a Liquity-lineage CDP protocol on the Sepolia testnet. A borrower posts pETH into a CDP in one of two markets and mints that market's stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. pETH is the protocol's own collateral token: ETH paid into its bonding curve mints pETH, and pETH returned to the curve is burned for ETH. The curve's price per pETH rises as ETH enters it, which is why one pETH costs more than one ETH. The CDP is an NFT, so the position can change hands without being closed.",
     detailsHeading: "Key concepts:",
     details: [
       {
-        bold: "Algorithmic rates",
-        text: "the market sets a primary rate on nearly every touch and adds a utilisation-driven secondary rate. Nobody chooses a rate; the rate in force is a fact of the market at that moment.",
+        bold: "Touch",
+        text: "any transaction on the CDP: an open, a deposit, a borrow, a repayment, a close or a liquidation. Every touch writes the pending legs below into the CDP's stated collateral and debt.",
       },
       {
-        bold: "Interest charged at each touch",
-        text: "interest accrues continuously and is written into the debt whenever the CDP is touched — the touch's own figure states how much.",
+        bold: "Two rates, set by the market",
+        text: "the primary rate (the docs' Peg Stability Rate) rises as traders redeem through the PSM and falls as they mint. The secondary rate (the Protocol Safety Rate) rises with the market's debt-to-reserve ratio. A CDP pays both on its debt; nobody chooses a rate.",
       },
       {
-        bold: "Shared PSM adjustments",
-        text: "when the market's PSM mints or redeems, every CDP takes a pro-rata share of the collateral and debt that moved, credited or debited at its next touch.",
+        bold: "The PSM",
+        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint share raises a CDP's debt and collateral; a redemption share lowers both. The trade's fees go to the CDPs, so the net share can move the two sides by different amounts. It is not a Liquity redemption, and no one chose this CDP.",
       },
       {
-        bold: "Stability-pool rewards",
-        text: "a share of the market's revenue is credited against each CDP's debt, and reward pETH is added to its collateral, both applied at the next touch.",
+        bold: "Stability gain",
+        text: "the CDP's share of the secondary-rate interest the market's CDPs pay, credited against its debt in proportion to the collateral it holds. A CDP with little debt for its collateral receives more than it pays.",
+      },
+      {
+        bold: "Reward pETH",
+        text: "a share of the pETH yield Polaris pays to minters, added to the collateral in proportion to the debt the CDP holds.",
       },
       {
         bold: "Minimum collateral ratio",
-        text: "a CDP must hold collateral worth at least 115% of its debt at the protocol's own price; in defensive mode the floor rises to 150%.",
+        text: "a CDP must hold collateral worth at least 115% of its debt at the protocol's price. When the market's reserve-to-debt ratio falls below 1.10 it enters defensive mode and the minimum rises to 150%; above that it is in normal mode.",
+      },
+      {
+        bold: "The feed",
+        text: "the protocol's price for pETH: the bonding curve's price in ETH times an ETH/USD price. That price comes from the protocol's medianiser, which reads up to three oracles and takes their median. GOLDp divides by a gold price read the same way.",
       },
       {
         bold: "Equity at the feed",
-        text: "an open CDP's collateral valued at the protocol's own price for pETH, minus its debt — a valuation at the block the three figures were read at, not a profit. Turning it into a realised profit or loss needs a price for each of the holder's own deposits, which is a decision about basis rather than a fact the chain states.",
+        text: "an open CDP's collateral at the feed's price, minus its debt: a valuation at the block the figures were read at. A profit or loss would need a price for each of the holder's deposits (a basis), which the chain does not state.",
       },
     ],
     links: [
-      POLARIS_DOC_LINKS.passetMarkets,
+      POLARIS_DOC_LINKS.pegDefence,
       POLARIS_DOC_LINKS.interestRates,
+      POLARIS_DOC_LINKS.bondingCurve,
       POLARIS_DOC_LINKS.defensiveMode,
-      POLARIS_DOC_LINKS.peth,
       POLARIS_APP_LINK,
     ],
   };
@@ -4620,12 +4655,20 @@ export function polarisLiquidationContent(): LearnMoreContent {
         text: "debt and collateral the pool cannot absorb are spread pro rata across every other CDP in the market, arriving at each one's next touch.",
       },
       {
+        bold: "What the pool takes",
+        text: "collateral worth the debt plus the protocol's 5% liquidation penalty, at the feed's price at that block.",
+      },
+      {
         bold: "Gas compensation",
-        text: "the liquidator receives the fixed gas compensation the CDP escrowed at open plus a share of its collateral.",
+        text: "the fixed 0.0375 pETH the CDP set aside at opening, paid to the liquidator. It sits outside the seized collateral.",
+      },
+      {
+        bold: "Collateral compensation",
+        text: "0.5% of the seized collateral, also paid to the liquidator.",
       },
       {
         bold: "Collateral surplus",
-        text: "collateral left over after the debt is covered is set aside for the CDP's owner to claim.",
+        text: "the seized collateral left after the pool's take and the liquidator's share, set aside for the CDP's owner to claim from the protocol's surplus pool. This page does not show claims.",
       },
     ],
     links: [

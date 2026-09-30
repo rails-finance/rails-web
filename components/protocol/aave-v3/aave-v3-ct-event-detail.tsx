@@ -78,10 +78,20 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
-import { findReserve, groupExact, humanOf, legChange, legHeld, sincePrevious } from "@/lib/aave-v3/position-state";
+import {
+  findReserve,
+  groupExact,
+  humanOf,
+  legChange,
+  legHeld,
+  sincePrevious,
+  type AaveV3PositionState,
+} from "@/lib/aave-v3/position-state";
 import { AmountText } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
+import { v3Protocol } from "@/lib/aave-v3/protocol-name";
+import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE } from "@/lib/seamless/asset-catalog";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -195,6 +205,9 @@ export function AaveV3CtEventDetail({
   // The interest line of a stat that gave way to the block's row: drawn under
   // the grid, so the row still states it.
   const interestLines: (NonNullable<ChainTruthStat["interestSincePrevious"]> & { symbol: string })[] = [];
+  // The balances whose interest line runs from the previous event: the note
+  // under them states the reserve's rate at both ends.
+  const rated: { reserve: string; symbol: string; side: "supply" | "debt" }[] = [];
 
   /** Interest since the previous event, from the two position reads; where
    *  they are not in hand, the row's own figure, which runs from the last
@@ -205,6 +218,8 @@ export function AaveV3CtEventDetail({
     const since = ready ? sincePrevious(ready, prevReady, reserve, a.side) : undefined;
     // Interest under a millionth of a token is below what the line can show.
     if (since && Number(since.interest) < 1e-6) return undefined;
+    if (since && reserve && !rated.some((x) => x.reserve === reserve && x.side === a.side))
+      rated.push({ reserve, symbol: a.symbol, side: a.side });
     if (since) return { value: since.interest, prov: prevEventInterestProv(a.symbol, a.side, stateCoords) };
     if (since || (ready && previous && prevState?.status === "loading")) return undefined;
     return a.chain?.interest
@@ -638,6 +653,9 @@ export function AaveV3CtEventDetail({
           </StatSubline>
         </div>
       ))}
+      {ready && prevReady && rated.length > 0 && (
+        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
+      )}
       {state?.status === "loading" && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
           Reading the position at this block…
@@ -649,7 +667,9 @@ export function AaveV3CtEventDetail({
           data-position-state="unavailable"
           data-position-code={state.code}
         >
-          Position state isn&rsquo;t available for this event.
+          {state.lasting
+            ? "Position state isn’t available for this event."
+            : "The position at this block was not read. Reload to try again."}
         </div>
       )}
       {ready && (
@@ -688,5 +708,65 @@ export function AaveV3CtEventDetail({
         </div>
       )}
     </>
+  );
+}
+
+/** A reserve's yearly rate (ray) as a percentage. */
+const rayPct = (ray: string): number => (Number(BigInt(ray) / BigInt(10) ** BigInt(21)) / 1e6) * 100;
+/** Two decimals, or two significant figures under 0.1% so a small rate does not read 0.00%. */
+const pctText = (p: number): string =>
+  p > 0 && p < 0.1
+    ? `${p.toLocaleString("en-US", { maximumSignificantDigits: 2 })}%`
+    : `${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+/** The rate behind each interest line at both ends: the reserve's
+ *  getReserveData rate once the previous event's block had run, and once this
+ *  one's had. Interest accrues at each moment's rate, which moves with the
+ *  share of the reserve on loan. On Seamless, a stretch that spans the freeze
+ *  and whose rate rose says what the freeze did. */
+function RateNote({
+  here,
+  prev,
+  rated,
+  seamless,
+}: {
+  here: AaveV3PositionState;
+  prev: AaveV3PositionState;
+  rated: { reserve: string; symbol: string; side: "supply" | "debt" }[];
+  seamless: boolean;
+}) {
+  const rows = rated.flatMap((x) => {
+    const h = here.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
+    const p = prev.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
+    const hr = h ? (x.side === "debt" ? h.debt.rate : h.supply.rate) : null;
+    const pr = p ? (x.side === "debt" ? p.debt.rate : p.supply.rate) : null;
+    if (!hr || !pr) return [];
+    return [{ ...x, then: rayPct(pr), now: rayPct(hr) }];
+  });
+  // The at-block reads carry each reserve's getReserveData rate at the block;
+  // the index's rows carry the rate of the last reserve update, not the block's.
+  const atBlock = (s: AaveV3PositionState) => s.sources.balances === "chain-read-at-block";
+  if (rows.length === 0 || !atBlock(here) || !atBlock(prev)) return null;
+  const spansFreeze = seamless && prev.block < SEAMLESS_FREEZE_BLOCK && here.block >= SEAMLESS_FREEZE_BLOCK;
+  const rose = rows.filter((r) => r.side === "debt" && r.now > r.then * 2);
+  return (
+    <div className="px-5 pb-2 text-xs leading-relaxed text-rb-500" data-rate-note="">
+      <p>
+        {rows.map((r) => (
+          <span key={`${r.reserve}:${r.side}`}>
+            {r.symbol} {r.side === "debt" ? "borrow" : "supply"} rate: {pctText(r.then)} a year after the previous event
+            (block {prev.block.toLocaleString("en-US")}), {pctText(r.now)} at this block.{" "}
+          </span>
+        ))}
+        Interest accrues at each moment&rsquo;s rate, which rises and falls with the share of the reserve on loan.
+      </p>
+      {spansFreeze && rose.length > 0 && (
+        <p>
+          Every Seamless reserve was frozen on {SEAMLESS_FREEZE_DATE} (block{" "}
+          {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}): lenders could still withdraw and nobody could supply, so the
+          share of {rose.map((r) => r.symbol).join(" and ")} on loan rose and the borrow rate with it.
+        </p>
+      )}
+    </div>
   );
 }

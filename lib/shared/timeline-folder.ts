@@ -342,6 +342,9 @@ export interface FolderRegisterEntry {
   /** A shape run's summary, drawn before its sums: "12 × deposit + share
    *  transfer". */
   shapeLabel?: string;
+  /** While an opened folder's members are read, say so in words ("Reading 12
+   *  deposits…") above the skeleton. Unset draws the skeleton alone. */
+  readingLine?: boolean;
 }
 
 /** One family's whole folder register: served kind → how it draws. */

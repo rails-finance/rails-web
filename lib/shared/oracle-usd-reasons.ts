@@ -24,7 +24,7 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   frankencoin:
     "oracle-free by design — the liquidation price is owner-declared and enforced by challenge auctions; no USD feed exists anywhere in the protocol",
   maple:
-    "Maple runs an oracle, and for USDC that oracle IS a $1 pin: getLatestPrice returns a governance-set manualOverridePrice of exactly 1e8, overriding the registered feed (for USDT it reverts — no price at all). Rendering it would launder a pin as a market reading, which is what a $1 pin is charter-forbidden for; the pool assets ARE the unit, so values render in the asset itself",
+    "USDC and USDT amounts are shown in the token, with no dollar price: Maple's own USDC price is a fixed $1 set by its governance, and it states none for USDT",
   morpho:
     "prices are in the market's loan token — each market's oracle quotes the collateral in it — so the loan token has no price of its own; Morpho Blue has no USD oracle",
   "morpho-base":

@@ -2,11 +2,19 @@
 
 // <LifetimeFlowsScrubber> — Lifetime flows as two horizontal bars on one USD
 // axis, with a date scrubber under them (rails-ops
-// reference/lifetime-flows-scrubber.md). Solid is what is still there, each
-// kind of exit its own hatch, named in the key under the bars. Every figure is
-// `stateAt(model, stop)` and `assetsAt(model, stop)` (lib/shared/flows-timeline.ts);
-// this file only draws them. Under each bar one line says where its length
-// came from; hovering or tapping a segment lists its assets.
+// reference/lifetime-flows-scrubber.md). The two headline figures share one
+// row over the bars; the axis's labels sit once, under the last bar, and its
+// gridlines run behind both. Solid is what is still there, each kind of exit
+// its own hatch, named in the Key inside the panel's Explanation
+// (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
+// `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
+// them. Under each bar one line says where its length came from; hovering or
+// tapping a segment lists its assets.
+//
+// Accuracy: each segment is its own rounded block, 1px apart, laid out in
+// pixels from the measured track; a non-zero segment is at least 2px, the
+// width that takes comes off the largest segments, and the bar's total length
+// stays exact on the axis (`layoutStrip`).
 
 import {
   createContext,
@@ -18,11 +26,22 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
+  type RefObject,
 } from "react";
-import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import {
+  ChartBarStacked,
+  ChartLine,
+  ChartNoAxesCombined,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov } from "@/components/shared/provenance";
-import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
@@ -30,7 +49,9 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   assetsAt,
   buildFlowModel,
+  DAY_MS,
   dayStart,
+  longDay,
   formatFlowUsd,
   nextEventDay,
   prevEventDay,
@@ -43,7 +64,22 @@ import {
   type FlowSide,
   type FlowSideState,
   type FlowTimeline,
+  windowModel,
 } from "@/lib/shared/flows-timeline";
+import { isBusy } from "@/lib/shared/flows-busy";
+import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import { LifetimeOverTime, OVER_TIME_HUE } from "@/components/shared/lifetime-flows-over-time";
+import { CombinedFlows, FLOW_TICK } from "@/components/shared/lifetime-flows-combined";
+import {
+  binInputFromTimeline,
+  binSeries,
+  lifetimeBinFor,
+  windowFromDay,
+  WINDOW_ACTIVE_DAYS,
+  type FlowBinSeries,
+  type SeriesBin,
+} from "@/lib/shared/flows-series";
+import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 
 /** Days the slider advances per tick while playing, and the tick. */
 const PLAY_DAYS = 7;
@@ -93,28 +129,117 @@ function fillStyle(side: FlowSide, s: FlowSegment): CSSProperties {
 }
 
 /** Tick colours: the side an event moved; a liquidation in the critical red. */
-const TICK: Record<FlowModel["ticks"][number]["tick"], string> = {
-  collateral: "var(--color-blue-500)",
-  debt: "var(--color-green-400)",
-  both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--color-green-400) 50%)",
-  liquidation: "var(--color-red-500)",
-};
+const TICK = FLOW_TICK;
 
 const pct = (v: number, max: number) => `${Math.max(0, (v / max) * 100)}%`;
 
 /** "7 Feb '26": the timeline's day stamp (chain-truth-timeline). */
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 
-/** A held line that names a token (the ledger's summed interest line names none). */
+/** A held line that names a token (the summed interest line names none). */
 const isToken = (h: FlowAssetHeld) => h.amount != null;
 
 /** The highlight key a segment answers to: its link group, else its own key. */
 const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
 
-/** Set by the panel around the scrubber: told what the ledger under it shows
- *  while the slider is off its last stop ("Shows the position today"), and
- *  null at the last stop, where the two agree. */
+/** Set around the scrubber by a panel that draws a ledger under it (Aave V4):
+ *  told what the ledger shows while the slider is off its last stop ("Shows
+ *  the position today"), and null at the last stop, where the two agree. */
 export const FlowsLedgerNoteContext = createContext<((note: string | null) => void) | null>(null);
+
+/** The Key: each kind of exit the position has had over its life, and the
+ *  dashed outline where it has other stops. The scrubber reports it; the panel
+ *  draws it inside its Explanation, so the bars stand alone. */
+export type FlowsKeyItems = {
+  items: { side: FlowSide; s: FlowSegment }[];
+  outline: string | null;
+  /** The Over time view's lines, and the Flows window where it is shaded. */
+  lines?: { label: string; color: string }[];
+  shade?: string | null;
+  /** The Key's line on which view is which. */
+  views?: string;
+  /** The Explanation's line on the same. */
+  explain?: string;
+};
+export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
+
+/** Gap between neighbouring segments, the least width a non-zero segment
+ *  draws at, and the largest corner radius, all in px. */
+const SEG_GAP = 1;
+const SEG_MIN = 2;
+const SEG_RADIUS = 3;
+
+type SegBox = { left: number; width: number };
+
+/** Lays a strip's segments out in pixels on a track `trackPx` wide whose axis
+ *  runs to `max`. The bar ends where its total sits on the axis; the gaps come
+ *  out of that length; a segment the split leaves under SEG_MIN is raised to
+ *  it, and what that adds is shaved off the largest segments (down to a common
+ *  ceiling). A bar too short to hold every segment at SEG_MIN runs that much
+ *  longer. Edges snap to device pixels. */
+export function layoutStrip(widths: number[], max: number, trackPx: number, dpr = 1): SegBox[] {
+  const n = widths.length;
+  const total = widths.reduce((a, w) => a + w, 0);
+  if (n === 0 || !(total > 0) || !(max > 0) || !(trackPx > 0)) return widths.map(() => ({ left: 0, width: 0 }));
+  const length = Math.min(trackPx, (total / max) * trackPx);
+  const room = length - SEG_GAP * (n - 1);
+  let w: number[];
+  if (room <= SEG_MIN * n) {
+    w = widths.map(() => SEG_MIN);
+  } else {
+    w = widths.map((v) => (v / total) * room);
+    const small = w.map((x) => x < SEG_MIN);
+    const owed = w.reduce((a, x, i) => a + (small[i] ? SEG_MIN - x : 0), 0);
+    if (owed > 0) {
+      // The ceiling c over the rest where what lies above it equals `owed`.
+      const big = w.filter((_, i) => !small[i]).sort((a, b) => b - a);
+      let c = 0;
+      let sum = 0;
+      for (let k = 0; k < big.length; k++) {
+        sum += big[k];
+        c = (sum - owed) / (k + 1);
+        if (k === big.length - 1 || c >= big[k + 1]) break;
+      }
+      w = w.map((x, i) => (small[i] ? SEG_MIN : Math.min(x, c)));
+    }
+  }
+  const snap = (x: number) => Math.round(x * dpr) / dpr;
+  const out: SegBox[] = [];
+  let edge = 0;
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    edge += w[i];
+    const end = Math.max(start + SEG_MIN, snap(edge));
+    out.push({ left: start, width: end - start });
+    edge += SEG_GAP;
+    start = end + SEG_GAP;
+  }
+  return out;
+}
+
+/** The track's width once measured, and whether it has been measured long
+ *  enough for moves to animate (the first measured frame lands without one). */
+function useTrackWidth(): [RefObject<HTMLDivElement | null>, number | null, boolean] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number | null>(null);
+  const [settled, setSettled] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setWidth(r.width);
+    });
+    ro.observe(el);
+    const raf = requestAnimationFrame(() => setSettled(true));
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+  return [ref, width, settled];
+}
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -166,8 +291,36 @@ function Strip({
   split: AssetSplit;
 }) {
   const shown = segments.filter((s) => s.width > 0);
+  const [trackRef, trackPx, settled] = useTrackWidth();
+  const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+  // Until the track is measured (the server's render, the first paint) the
+  // segments sit on percentages with no gaps; after it, on `layoutStrip`.
+  const boxes = useMemo(() => {
+    if (trackPx == null) {
+      let at = 0;
+      return shown.map((s) => {
+        const box = { left: pct(at, max), width: pct(s.width, max), radius: SEG_RADIUS };
+        at += s.width;
+        return box;
+      });
+    }
+    return layoutStrip(
+      shown.map((s) => s.width),
+      max,
+      trackPx,
+      dpr,
+    ).map((b) => ({ left: `${b.left}px`, width: `${b.width}px`, radius: Math.min(SEG_RADIUS, b.width / 2) }));
+    // `shown` is new each render; its widths are what the layout reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown.map((s) => `${s.key}:${s.width}`).join("|"), max, trackPx, dpr]);
+  const anim = trackPx != null && settled ? motion : "";
+  const place = (i: number): CSSProperties => ({
+    left: boxes[i].left,
+    width: boxes[i].width,
+    borderRadius: boxes[i].radius,
+  });
   return (
-    <div className={`relative ${height}`}>
+    <div ref={trackRef} className={`relative ${height}`}>
       <div role="img" aria-label={label} className="absolute inset-0 overflow-hidden rounded-md bg-sunken">
         {ticks.slice(1).map((t) => (
           <i
@@ -177,22 +330,20 @@ function Strip({
             style={{ left: pct(t, max) }}
           />
         ))}
-        <div className="absolute inset-0 flex">
-          {shown.map((s) => (
-            <span
-              key={s.key}
-              className={`block h-full shrink-0 ${motion}`}
-              style={{ width: pct(s.width, max), ...fillStyle(side, s) }}
-            />
-          ))}
-        </div>
+        {shown.map((s, i) => (
+          <span
+            key={s.key}
+            className={`absolute inset-y-0 block ${anim}`}
+            style={{ ...place(i), ...fillStyle(side, s) }}
+          />
+        ))}
       </div>
-      <div className="absolute inset-0 flex" aria-hidden>
-        {shown.map((s) => {
+      <div className="absolute inset-0" aria-hidden>
+        {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
           const parts = split.get(s.key) ?? [];
           return (
-            <span key={s.key} className={`block h-full shrink-0 ${motion}`} style={{ width: pct(s.width, max) }}>
+            <span key={s.key} className={`absolute inset-y-0 block ${anim}`} style={place(i)}>
               <RevealTip
                 className="h-full w-full"
                 tip={
@@ -215,7 +366,8 @@ function Strip({
                 }
               >
                 <span
-                  className={`block h-full w-full rounded-[3px] ${on ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                  className={`block h-full w-full ${on ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
+                  style={{ borderRadius: boxes[i].radius }}
                   onMouseEnter={() => onHover(hlKey(s))}
                   onMouseLeave={() => onHover(null)}
                   onClick={() => s.link && onPin(hlKey(s))}
@@ -228,7 +380,7 @@ function Strip({
       {today != null && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 left-0 rounded-md border border-dashed border-rb-500 ${motion}`}
+          className={`pointer-events-none absolute inset-y-0 left-0 rounded-md border border-dashed border-rb-500 ${anim}`}
           style={{ width: pct(today, max) }}
         />
       )}
@@ -247,6 +399,7 @@ function SideBlock({
   motion,
   when,
   assets,
+  last,
   atLive,
 }: {
   side: FlowSide;
@@ -259,8 +412,8 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
-  /** The first bar drawn. Each bar carries the axis labels over it. */
-  first: boolean;
+  /** The last bar drawn, which carries the axis labels under it. */
+  last: boolean;
   /** The last stop, where no "today" outline is drawn (`isLive` there is
    *  false on a closed position: its receipts read as the close's). */
   atLive: boolean;
@@ -270,15 +423,17 @@ function SideBlock({
   const outs = st.bar.filter((s) => s.fill === "out");
   const liquidated = outs.filter((s) => s.tone === "liquidation").reduce((a, s) => a + s.value, 0);
   const repaid = st.out - liquidated;
-  const held = st.bar[0];
   const spoken = coll
     ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
       (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
+  // The strip's label names every segment it draws, so the bar reads without
+  // the Key.
+  const named = st.bar.filter((s) => s.width > 0).map((s) => `${s.label} ${spokenUsd(s.value)}`);
+  const label = named.length > 0 ? `${spoken} Segments: ${named.join(", ")}.` : spoken;
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
   const sideHeld = assets.held.filter((h) => h.side === side);
-  const heldTokens = sideHeld.filter((h) => isToken(h) && (h.amount ?? 0) > 0).map((h) => h.symbol);
   const split: AssetSplit = new Map();
   split.set(
     `${side}-held`,
@@ -287,15 +442,7 @@ function SideBlock({
   for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
 
   return (
-    <div className="mt-4 first:mt-1">
-      <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <Prov info={flowSegmentProv(held, side, when, isLive, model.daily)}>
-          <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
-        </Prov>
-        {heldTokens.length > 0 && <InlineAssetCluster symbols={heldTokens} size={16} overlap={5} max={3} />}
-        <span className="text-xs text-rb-500">{word}</span>
-      </div>
-      <AxisLabels model={model} />
+    <div className="mt-3 first:mt-0" data-flow-side={side}>
       <Strip
         side={side}
         segments={st.bar}
@@ -306,10 +453,11 @@ function SideBlock({
         active={active}
         onHover={onHover}
         onPin={onPin}
-        label={spoken}
+        label={label}
         motion={motion}
         split={split}
       />
+      {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
       <SourceLine side={side} segments={st.sources} when={when} isLive={isLive} daily={model.daily} />
     </div>
   );
@@ -355,26 +503,47 @@ function SourceLine({
   );
 }
 
-/** The hatches the bars draw, by name: each kind of exit the position has
- *  had over its life. The segments' tips carry the figures. Off the last
- *  stop, the dashed outline too: where each bar ends at that stop. */
-function HatchKey({ items, outline }: { items: { side: FlowSide; s: FlowSegment }[]; outline: string | null }) {
-  if (items.length === 0 && !outline) return null;
+/** The Key, drawn inside the panel's Explanation: the hatches the bars
+ *  draw, by name, for each kind of exit the position has had over its life.
+ *  The segments' tips carry the figures. Where the position has other stops,
+ *  the dashed outline too: where each bar ends at the last stop. */
+export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems) {
+  if (items.length === 0 && !outline && !lines?.length && !shade && !views) return null;
   return (
-    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key" data-flow-key="">
-      {items.map(({ side, s }) => (
-        <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
-          <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
-          {s.label}
-        </li>
-      ))}
-      {outline && (
-        <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
-          <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
-          {outline}
-        </li>
+    <div className="mt-3 first:mt-0" data-flow-key="">
+      <p className="text-xs font-semibold text-foreground">Key</p>
+      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key">
+        {items.map(({ side, s }) => (
+          <li key={`${side}:${s.key}`} className="inline-flex items-center gap-1.5">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, s)} />
+            {s.label}
+          </li>
+        ))}
+        {outline && (
+          <li className="inline-flex items-center gap-1.5" data-flow-key-outline="">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] border border-dashed border-rb-500" />
+            {outline}
+          </li>
+        )}
+        {lines?.map(({ label, color }) => (
+          <li key={label} className="inline-flex items-center gap-1.5" data-flow-key-line="">
+            <i aria-hidden className="inline-block h-0.5 w-4 shrink-0" style={{ background: color }} />
+            {label}
+          </li>
+        ))}
+        {shade && (
+          <li className="inline-flex items-center gap-1.5" data-flow-key-shade="">
+            <i aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px] bg-rb-400/25 dark:bg-rb-500/25" />
+            {shade}
+          </li>
+        )}
+      </ul>
+      {views && (
+        <p className="mt-1.5 text-xs leading-relaxed text-rb-500" data-flow-key-views="">
+          {views}
+        </p>
       )}
-    </ul>
+    </div>
   );
 }
 
@@ -415,41 +584,312 @@ function PipTip({ at }: { at: PipOpen }) {
   );
 }
 
-/** The shared axis's labels, over the first bar. Below the sm breakpoint an
- *  axis of more than five labels keeps the first, the last and every other
- *  one between that sits two steps clear of the last ("$12.5M$15.0M" ran
- *  together at 390px). */
-function AxisLabels({ model }: { model: FlowModel }) {
-  const last = model.axis.ticks.length - 1;
-  const phoneHidden = (i: number) => last > 4 && i !== 0 && i !== last && (i % 2 === 1 || last - i < 2);
+/** Where the Over time view reads its series: the family's route
+ *  (`/api/spark/flows/series`) and the position's parameters. */
+export type FlowSeriesSource = { path: string; params: Record<string, string> };
+
+/** The two views (rails-ops reference/lifetime-flows-scrubber.md): the bars,
+ *  cut to the last WINDOW_ACTIVE_DAYS active days, and Over time, collateral
+ *  and debt per week or month from the open. The bars take the busy
+ *  treatment (lib/shared/flows-busy.ts) where their window is busy. Where
+ *  `combined` is set, a third view between them draws both under one cursor
+ *  (a trial on Aave V3, components/shared/lifetime-flows-combined.tsx). */
+export function LifetimeFlowsScrubber({
+  timeline,
+  series,
+  combined = false,
+}: {
+  timeline: FlowTimeline;
+  /** The family's series route; absent, Over time bins the timeline's own day
+   *  rows (a page that holds them all, Sky Savings). */
+  series?: FlowSeriesSource;
+  /** Offer the Combined view. */
+  combined?: boolean;
+}) {
+  const model = useMemo(() => buildFlowModel(timeline), [timeline]);
+  const from = model ? windowFromDay(model.eventDays) : 0;
+  const bars = useMemo(() => (model ? windowModel(model, from) : null), [model, from]);
+  const busy = bars ? isBusy(bars) : false;
+  const [view, setView] = useState<FlowsView>("bars");
+  const ledgerNote = useContext(FlowsLedgerNoteContext);
+  const reportKey = useContext(FlowsKeyContext);
+  const [hatches, setHatches] = useState<Pick<FlowsKeyItems, "items" | "outline"> | null>(null);
+
+  // Over time's series: read on first opening, from the family's route, or
+  // binned here from the page's rows.
+  const startDay = model ? model.start / DAY_MS : 0;
+  const bin: SeriesBin = model ? lifetimeBinFor((timeline.today ?? startDay + model.liveStop) - startDay) : "week";
+  const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);
+  const seriesKey = series ? `${series.path}?${new URLSearchParams(series.params).toString()}&bin=${bin}` : null;
+  useEffect(() => setLifetime(null), [seriesKey, timeline]);
+  useEffect(() => {
+    if (view === "bars" || lifetime) return;
+    if (!series) {
+      const input = binInputFromTimeline(timeline);
+      setLifetime({ series: input ? binSeries(input, bin) : null, failed: !input });
+      return;
+    }
+    const ctl = new AbortController();
+    fetchFlowBinSeries(series.path, series.params, bin, ctl.signal)
+      .then((s) => setLifetime({ series: s, failed: false }))
+      .catch((err) => {
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setLifetime({ series: null, failed: true });
+      });
+    return () => ctl.abort();
+    // `seriesKey` stands for `series`, which a caller may build afresh each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, lifetime, seriesKey, timeline, bin]);
+
+  const words = useMemo(
+    () => (bars && model ? viewWords(model, bars, from, bin, combined) : null),
+    [model, bars, from, bin, combined],
+  );
+  useEffect(() => {
+    if (!words) return;
+    const drawn = view !== "lifetime" && !busy ? hatches : null;
+    const over = view !== "bars";
+    reportKey?.({
+      items: drawn?.items ?? [],
+      outline: view === "bars" ? (drawn?.outline ?? null) : null,
+      lines: over ? words.lines : undefined,
+      shade: over && from > 0 ? `The ${VIEWS.bars.label} window` : null,
+      views: words.key,
+      explain: words.explain,
+    });
+  }, [reportKey, view, busy, hatches, words, from]);
+  useEffect(() => () => reportKey?.(null), [reportKey]);
+  useEffect(() => {
+    if (view !== "bars") ledgerNote?.(null);
+  }, [view, ledgerNote]);
+
+  if (!model || !bars || !words) return null;
+  const switcher = (
+    <ViewSwitch
+      view={view}
+      onChange={setView}
+      what={words.what}
+      views={combined ? ["bars", "combined", "lifetime"] : ["bars", "lifetime"]}
+    />
+  );
   return (
-    <div className="relative mb-1 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
-      {model.axis.ticks.map((t, i) => {
-        const at = t / model.axis.max;
+    <div>
+      {view === "combined" ? (
+        <CombinedFlows
+          model={model}
+          bars={bars}
+          from={from}
+          busy={busy}
+          series={lifetime?.series ?? null}
+          failed={lifetime?.failed ?? false}
+          switcher={switcher}
+          renderBars={(stop, when, isLive) => (
+            <PlainBars model={bars} stop={stop} when={when} isLive={isLive} onKey={setHatches} />
+          )}
+        />
+      ) : view === "lifetime" ? (
+        <LifetimeOverTime
+          model={model}
+          series={lifetime?.series ?? null}
+          failed={lifetime?.failed ?? false}
+          windowFrom={from > 0 ? startDay + from : null}
+          switcher={switcher}
+        />
+      ) : busy ? (
+        <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} switcher={switcher} />
+      ) : (
+        <ScrubberBody model={bars} onKey={setHatches} switcher={switcher} />
+      )}
+    </div>
+  );
+}
+
+type FlowsView = "bars" | "combined" | "lifetime";
+
+/** The switch's options: an icon and a label at desktop width, the icon
+ *  alone on a phone, where `title` and `aria-label` carry the words. */
+const VIEWS: Record<FlowsView, { label: string; says: (what: string) => string; Icon: typeof ChartLine }> = {
+  bars: { label: "Flows", says: (what) => `Flows: where the ${what} came from and went`, Icon: ChartBarStacked },
+  combined: {
+    label: "Combined",
+    says: (what) => `Combined: the flows and the ${what} since the open, on one date`,
+    Icon: ChartNoAxesCombined,
+  },
+  lifetime: { label: "Over time", says: (what) => `Over time: the ${what} since the open`, Icon: ChartLine },
+};
+
+/** The segmented control between the views, on the date line's row. */
+function ViewSwitch({
+  view,
+  onChange,
+  what,
+  views,
+}: {
+  view: FlowsView;
+  onChange: (v: FlowsView) => void;
+  /** "collateral and debt", in the card's words. */
+  what: string;
+  views: FlowsView[];
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Chart view"
+      className="inline-flex shrink-0 rounded-lg border border-rb-200 bg-sunken p-0.5 dark:border-rb-700"
+      data-flow-view-switch=""
+    >
+      {views.map((v) => {
+        const { label, Icon } = VIEWS[v];
+        const says = VIEWS[v].says(what);
+        const on = view === v;
         return (
-          <span
-            key={t}
-            className={`absolute top-0${phoneHidden(i) ? " max-sm:hidden" : ""}`}
-            style={{
-              left: `${at * 100}%`,
-              transform: at === 0 ? "none" : at > 0.9 ? "translateX(-100%)" : "translateX(-50%)",
-            }}
+          <button
+            key={v}
+            type="button"
+            aria-pressed={on}
+            aria-label={says}
+            title={says}
+            onClick={() => onChange(v)}
+            className={`${CTRL_GHOST} ${
+              on ? "bg-foreground text-background shadow-sm" : CTRL_OFF
+            } h-9 min-w-11 gap-1.5 rounded-md px-2.5 text-xs font-semibold sm:h-8 sm:min-w-0`}
+            data-flow-view={v}
           >
-            {formatFlowUsd(t)}
-          </span>
+            <Icon size={15} aria-hidden />
+            <span className="max-sm:hidden">{label}</span>
+          </button>
         );
       })}
     </div>
   );
 }
 
-export function LifetimeFlowsScrubber({ timeline }: { timeline: FlowTimeline }) {
-  const model = useMemo(() => buildFlowModel(timeline), [timeline]);
-  if (!model) return null;
-  return <ScrubberBody model={model} />;
+/** The Key's and the Explanation's line on which view is which, and the Over
+ *  time view's lines for the Key. */
+function viewWords(
+  model: FlowModel,
+  bars: FlowModel,
+  from: number,
+  bin: SeriesBin,
+  combined: boolean,
+): { key: string; explain: string; what: string; lines: { label: string; color: string }[] } {
+  const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
+  const opens = longDay(dayStart(bars, 0));
+  const ends = closed ? `the close on ${longDay(dayStart(model, model.lastDay))}` : "today";
+  const days = (n: number) => `${n.toLocaleString("en-US")} day${n === 1 ? "" : "s"} with events`;
+  const hasDebt = model.buckets.some((b) => b.side === "debt");
+  const what = hasDebt
+    ? `${model.labels.collateral.toLowerCase()} and ${model.labels.debt.toLowerCase()}`
+    : model.labels.collateral.toLowerCase();
+  const barsCover =
+    from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} active days, from ${opens}` : `every active day since ${opens}`;
+  const f = VIEWS.bars.label;
+  const o = VIEWS.lifetime.label;
+  const c = VIEWS.combined.label;
+  return {
+    key:
+      `${f}: ${barsCover} · ${o}: ${what} by ${bin} since the open` +
+      (combined ? ` · ${c}: both, on the ${o} line's dates` : ""),
+    explain:
+      (from > 0
+        ? `${f} covers the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and starts with what was held as that window opens. `
+        : `${f} covers all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `) +
+      `${o} draws ${what} at the end of each ${bin} since the open, at the daily prices the index records` +
+      `${from > 0 ? `, with the ${f} window shaded` : ""}, and leaves a gap where a held asset has no price that ${bin}.` +
+      (combined
+        ? ` ${c} draws the ${f} bars over the ${o} line, and one cursor on the line's dates (the end of each ${bin}, and today) moves both: the headlines and the bars are the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure between events too.` +
+          (from > 0
+            ? ` Before the ${f} window opens the bars grey out at its first day; the headlines still follow the line.`
+            : "")
+        : ""),
+    what,
+    lines: [
+      { label: model.labels.collateral, color: OVER_TIME_HUE.collateral },
+      ...(hasDebt ? [{ label: model.labels.debt, color: OVER_TIME_HUE.debt }] : []),
+    ],
+  };
 }
 
-function ScrubberBody({ model }: { model: FlowModel }) {
+/** Each kind of exit the position has had, from the whole history: the Key's hatches. */
+function keyHatches(model: FlowModel): { side: FlowSide; s: FlowSegment }[] {
+  const end = stateAt(model, model.liveStop);
+  const seen = new Set<string>();
+  const out: { side: FlowSide; s: FlowSegment }[] = [];
+  for (const side of ["collateral", "debt"] as const)
+    for (const seg of end[side].bar) {
+      const id = `${seg.label}|${seg.tone === "exit" ? side : seg.tone}`;
+      if (seg.fill !== "out" || !(seg.value >= 0.5) || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ side, s: seg });
+    }
+  return out;
+}
+
+/** The two bars at a stop, with their lines, for the Combined view: the
+ *  scrubber's bars with the cursor held elsewhere. */
+function PlainBars({
+  model,
+  stop,
+  when,
+  isLive,
+  onKey,
+}: {
+  model: FlowModel;
+  stop: number;
+  when: string;
+  isLive: boolean;
+  onKey: (key: Pick<FlowsKeyItems, "items" | "outline"> | null) => void;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
+  const reduced = useReducedMotion();
+  const motion = reduced ? "" : "transition-all duration-200 ease-out";
+  const s = stateAt(model, stop);
+  const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
+  const hasDebt = model.buckets.some((b) => b.side === "debt");
+  const keyItems = useMemo(() => keyHatches(model), [model]);
+  useEffect(() => {
+    onKey({ items: keyItems, outline: null });
+  }, [onKey, keyItems]);
+  useEffect(() => () => onKey(null), [onKey]);
+  const active = pinned ?? hover;
+  const pin = (k: string) => setPinned((p) => (p === k ? null : k));
+  const side = (sd: FlowSide, last: boolean) => (
+    <SideBlock
+      side={sd}
+      st={s[sd]}
+      model={model}
+      isLive={isLive}
+      atLive
+      active={active}
+      onHover={setHover}
+      onPin={pin}
+      motion={motion}
+      when={when}
+      assets={assets}
+      last={last}
+    />
+  );
+  return (
+    <div>
+      {side("collateral", !hasDebt)}
+      {hasDebt && side("debt", true)}
+    </div>
+  );
+}
+
+function ScrubberBody({
+  model,
+  onKey,
+  switcher,
+}: {
+  model: FlowModel;
+  /** The Key's hatches and outline, for the panel's Explanation. */
+  onKey: (key: Pick<FlowsKeyItems, "items" | "outline"> | null) => void;
+  /** The view switch, on the date line's row. */
+  switcher?: ReactNode;
+}) {
   const [stop, setStop] = useState(model.liveStop);
   const [playing, setPlaying] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
@@ -498,19 +938,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   const s = stateAt(model, stop);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
   // The key: each kind of exit the position has had, from the whole history.
-  const keyItems = useMemo(() => {
-    const end = stateAt(model, model.liveStop);
-    const seen = new Set<string>();
-    const out: { side: FlowSide; s: FlowSegment }[] = [];
-    for (const side of ["collateral", "debt"] as const)
-      for (const seg of end[side].bar) {
-        const id = `${seg.label}|${seg.tone === "exit" ? side : seg.tone}`;
-        if (seg.fill !== "out" || !(seg.value >= 0.5) || seen.has(id)) continue;
-        seen.add(id);
-        out.push({ side, s: seg });
-      }
-    return out;
-  }, [model]);
+  const keyItems = useMemo(() => keyHatches(model), [model]);
   // Every stop: the headline icons and each segment's tip list the assets.
   const assets = useMemo(() => assetsAt(model, stop), [model, stop]);
   const active = pinned ?? hover;
@@ -533,13 +961,14 @@ function ScrubberBody({ model }: { model: FlowModel }) {
       : `Position on ${dateText}`;
   // Receipts read the live stop as the close's where the position closed.
   const liveReceipts = s.isLive && !closed;
-  const counter =
-    model.totalTxs != null && s.txs != null
-      ? `${s.txs.toLocaleString("en-US")} of ${model.totalTxs.toLocaleString("en-US")} transaction${model.totalTxs === 1 ? "" : "s"}`
-      : `${s.count.toLocaleString("en-US")} of ${model.totalEvents.toLocaleString("en-US")} event${model.totalEvents === 1 ? "" : "s"}`;
   const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
-  // Off the last stop, the dashed outline marks where each bar ends there.
-  const outline = s.isLive ? null : closed ? "Length at close" : "Today's length";
+  // The Key goes to the panel's Explanation. Its dashed outline, which marks
+  // where each bar ends at the last stop, is named wherever there is another stop.
+  const keyOutline = model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null;
+  useEffect(() => {
+    onKey({ items: keyItems, outline: keyOutline });
+  }, [onKey, keyItems, keyOutline]);
+  useEffect(() => () => onKey(null), [onKey]);
   // The ledger under the panel shows the last stop; say so while the slider is elsewhere.
   const ledgerNote = useContext(FlowsLedgerNoteContext);
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
@@ -582,9 +1011,13 @@ function ScrubberBody({ model }: { model: FlowModel }) {
   };
   return (
     <div className="text-sm">
-      <p className="mb-3 font-semibold tabular-nums text-foreground" aria-live="polite">
-        {dateLine}
-      </p>
+      <DateRow switcher={switcher}>{dateLine}</DateRow>
+      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={liveReceipts} assets={assets} />
+        {hasDebt && (
+          <Headline side="debt" st={s.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
+        )}
+      </div>
       <SideBlock
         side="collateral"
         st={s.collateral}
@@ -597,7 +1030,7 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         motion={motion}
         when={when}
         assets={assets}
-        first
+        last={!hasDebt}
       />
       {/* A one-sided position (savings, a lender) names no debt bucket and
           draws a single bar. */}
@@ -614,11 +1047,9 @@ function ScrubberBody({ model }: { model: FlowModel }) {
           motion={motion}
           when={when}
           assets={assets}
-          first={false}
+          last
         />
       )}
-
-      <HatchKey items={keyItems} outline={outline} />
 
       <div className="relative mt-3">
         {/* Event pips over the line, coloured by the side each event moved.
@@ -689,9 +1120,10 @@ function ScrubberBody({ model }: { model: FlowModel }) {
             ))}
           </div>
         )}
+        <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+      <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="">
         <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
           <SkipBack size={16} aria-hidden />
         </button>
@@ -712,9 +1144,6 @@ function ScrubberBody({ model }: { model: FlowModel }) {
         >
           <SkipForward size={16} aria-hidden />
         </button>
-        <span className="ml-auto text-xs tabular-nums text-rb-500" data-prov-exempt="">
-          {counter}
-        </span>
       </div>
 
       {(s.stale.length > 0 || repricedHere.length > 0) && (

@@ -52,7 +52,7 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
 import { fetchAaveV3GroupedTimeline, type AaveV3GroupedTimelineResponse } from "@/lib/api/fetch-aave-v3-timeline";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { aaveV3FlowSeriesTimeline, lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -68,7 +68,8 @@ import {
   AaveV3PositionExplanation,
   AaveV3ClosedPositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import {
   computeAaveV3Economics,
   isWethGateway,
@@ -357,18 +358,21 @@ export default function AaveV3PositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? aaveEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<AaveV3FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchAaveV3FlowSeries({ wallet, market, signal: ctl.signal })
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet, market]);
@@ -597,7 +601,9 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents) : null;
+  const captions = view
+    ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
+    : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
@@ -606,6 +612,10 @@ export default function AaveV3PositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  const flowSeriesSource = useMemo(
+    () => ({ path: "/api/aave-v3/flows/series", params: { wallet, market } }),
+    [wallet, market],
+  );
   const flowTimeline = useMemo(
     () => (flowSeries ? aaveV3FlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -685,17 +695,13 @@ export default function AaveV3PositionDetail({
                 receipts
                 viewHref={tl.viewHref}
                 captions={captions ?? undefined}
-                // The risk slot rides the card's heading-button row (the V2 trove
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway or the loan-to-value bar (LTV/CR framing +
-                // "available to borrow"). Whatever it draws is on the card face and
-                // in the card's receipts scope, so the Provenance list stays 1:1
-                // with the face figures. Shown only with debt (both views need it).
-                rowExtra={
-                  chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                    <AaveV3RiskSlot chain={chain} />
-                  ) : undefined
-                }
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The room left to borrow and the distance bar from the
+                // Pool read sit in the opened layer under Debt and Health
+                // factor, inside the card's receipts scope.
+                disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
+                debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
+                riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
                 // The Explanation is now pure layman prose about those same face
                 // figures — no secondary figure-strips. The LTV strip is absorbed
                 // into the risk slot above; the reserve rates live on the market
@@ -725,11 +731,15 @@ export default function AaveV3PositionDetail({
               />
             )}
             {towerData && (
-              <ChainTruthTower
-                data={towerData}
+              <LifetimeFlowsPanel
+                read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
                 explanation={aaveV3EconomicsExplanation(towerData)}
                 learnMore={aaveV3EconomicsContent({}, towerData)}
-                timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+                scrubber={
+                  flowTimeline ? (
+                    <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} combined />
+                  ) : null
+                }
               />
             )}
             <ChainTruthTimeline

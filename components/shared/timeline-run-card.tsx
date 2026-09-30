@@ -167,6 +167,9 @@ export interface TimelineRunCardProps {
    *  note changes: the figure is the same chain-derived Σ either way, and the
    *  leaves arrive when the folder opens. */
   summedByIndex?: boolean;
+  /** While a served folder's members are read, a line above the skeleton
+   *  saying so ("Reading 12 deposits…"). Unset draws the skeleton alone. */
+  readingLine?: boolean;
 }
 
 /** Roughly three member rows — what the skeleton reserves while a served
@@ -213,6 +216,7 @@ export function TimelineRunCard({
   stale,
   forceOpen,
   summedByIndex,
+  readingLine,
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
@@ -442,7 +446,16 @@ export function TimelineRunCard({
       // Undefined members and no error means the read is still out. There is
       // no spinner: a spinner implies a fast answer is coming, and a first
       // open on a cold position pays for the whole grouping pass.
-      body = <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />;
+      body = readingLine ? (
+        <div className="relative" aria-busy="true">
+          <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
+          <p className="absolute inset-x-0 top-5 px-5 text-center text-xs text-rb-500" role="status">
+            Reading {count.toLocaleString("en-US")} {count === 1 ? memberNoun : memberPlural}&hellip;
+          </p>
+        </div>
+      ) : (
+        <SkeletonBlock height={MEMBERS_SKELETON_HEIGHT} />
+      );
     }
   }
 

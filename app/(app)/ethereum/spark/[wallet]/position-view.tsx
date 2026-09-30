@@ -73,8 +73,9 @@ import {
   SparkClosedPositionExplanation,
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
-import { SparkRiskSlot } from "@/components/protocol/spark/spark-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { SparkRiskDetail } from "@/components/protocol/spark/spark-risk-slot";
+import { SparkBorrowRoom } from "@/components/protocol/spark/spark-ltv-card";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline } from "@/lib/spark/flows-timeline";
 import { lifetimeFromSeries } from "@/lib/aave-v3/flows-timeline";
@@ -131,6 +132,9 @@ interface SparkPositionDetailProps {
    *  0033), from the server read; null on an SSR miss or an older api. */
   initialLaneInterest?: AaveLaneInterest[] | null;
 }
+
+/** How long the card waits on the live Pool read before saying it was not read. */
+const HF_READ_WAIT_MS = 30_000;
 
 export default function SparkPositionDetail({
   wallet,
@@ -404,18 +408,21 @@ export default function SparkPositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? sparkEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet]);
@@ -648,9 +655,22 @@ export default function SparkPositionDetail({
   // risk slot's live one — two "drop to liquidation" percentages from two
   // blocks on one card. The listing keeps the snapshot; this page re-reads
   // live (which the snapshot receipt itself states).
+  // Until the read lands the card says the health factor is reading; a read
+  // that failed, or has not answered in HF_READ_WAIT_MS, says it was not read.
+  const [chainSlow, setChainSlow] = useState(false);
+  useEffect(() => {
+    setChainSlow(false);
+    const t = setTimeout(() => setChainSlow(true), HF_READ_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [wallet]);
   const liveView = useMemo<SparkPositionView | null>(
-    () => (view && chain ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false } : view),
-    [view, chain],
+    () =>
+      view && chain
+        ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false }
+        : view && view.status === "open"
+          ? { ...view, hfRead: chainSettled || chainSlow ? "unread" : "reading" }
+          : view,
+    [view, chain, chainSettled, chainSlow],
   );
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
@@ -668,6 +688,7 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
+  const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
     [flowSeries, towerData, view],
@@ -758,17 +779,13 @@ export default function SparkPositionDetail({
               notCollateral={notCollateral}
               lives={lives}
               captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the V2 trove
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway or the loan-to-value bar (LTV/CR framing +
-              // "available to borrow"). Whatever it draws is on the card face and
-              // in the card's receipts scope, so the Provenance list stays 1:1
-              // with the face figures. Shown only with debt (both views need it).
-              rowExtra={
-                chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                  <SparkRiskSlot chain={chain} />
-                ) : undefined
-              }
+              // Closed by default, remembered per viewer and position (ui-jobs
+              // 209). The room left to borrow and the distance bar from the
+              // Pool read sit in the opened layer under Debt and Health
+              // factor, inside the card's receipts scope.
+              disclosureKey={`spark:${wallet.toLowerCase()}`}
+              debtDetail={chain ? <SparkBorrowRoom chain={chain} /> : undefined}
+              riskDetail={chain ? <SparkRiskDetail chain={chain} /> : undefined}
               // The Explanation is now pure layman prose about those same face
               // figures — no secondary figure-strips. The LTV strip is absorbed
               // into the risk slot above; the reserve rates live on the market
@@ -794,8 +811,8 @@ export default function SparkPositionDetail({
             />
           )}
           {towerData && (
-            <ChainTruthTower
-              data={towerData}
+            <LifetimeFlowsPanel
+              read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
               explanation={sparkEconomicsExplanation(
                 towerData,
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
@@ -803,7 +820,9 @@ export default function SparkPositionDetail({
                 (view?.borrows ?? []).filter((r) => r.amount > 0).map((r) => r.symbol),
               )}
               learnMore={sparkEconomicsContent(towerData)}
-              timeline={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : undefined}
+              scrubber={
+                flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
+              }
             />
           )}
           <ChainTruthTimeline

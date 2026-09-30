@@ -93,21 +93,24 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         <>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
             <Stat
-              label="Collateral in CDPs"
+              label="Collateral in CDPs, now"
               note={
-                <Prov
-                  info={liveUsdValueProv("The market's collateral", true)}
-                  value={formatUsdValue(chain.totalColl * chain.price.pethUsd)}
-                >
-                  <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
-                </Prov>
+                <>
+                  <Prov
+                    info={liveUsdValueProv("The market's collateral", true)}
+                    value={formatUsdValue(chain.totalColl * chain.price.pethUsd)}
+                  >
+                    <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
+                  </Prov>{" "}
+                  · the market&rsquo;s own total, PSM shares included
+                </>
               }
             >
               <Prov info={liveTotalProv("coll", market)} value={formatExact(chain.totalColl)}>
                 <AmountText value={chain.totalColl} format="compact" /> pETH
               </Prov>
             </Stat>
-            <Stat label="Debt across CDPs">
+            <Stat label="Debt across CDPs, now" note="the market's own total, PSM shares included">
               <Prov info={liveTotalProv("debt", market)} value={formatExact(chain.totalDebt)}>
                 <AmountText value={chain.totalDebt} format="compact" /> {stable}
               </Prov>
@@ -136,7 +139,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 {chain.defensiveMode ? "defensive" : "normal"}
               </Prov>
               <span className="ml-1 text-rb-500">
-                · reserve/debt{" "}
+                · reserve-to-debt{" "}
                 <Prov info={liveReserveRatioProv(market, true)} value={chain.reserveToDebtRatio.toFixed(4)}>
                   {chain.reserveToDebtRatio.toFixed(2)}
                 </Prov>
@@ -158,6 +161,8 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                   <Prov info={liveSpPProv(market)} value={chain.spP}>
                     {formatSpP(chain.spP)}
                   </Prov>
+                  : a {stable} deposit made at launch is now worth this fraction of itself, the rest spent on liquidated
+                  debt and paid back in pETH
                 </>
               }
             >
@@ -220,7 +225,10 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 · {book.openCount} open, {book.closedCount} closed, {book.liquidatedCount} liquidated
               </span>
             </Stat>
-            <Stat label="Open book">
+            <Stat
+              label="Open CDPs, at their last touch"
+              note="each CDP as its last touch wrote it; the market's totals above add what is pending since"
+            >
               <Prov info={openBookProv("coll", market)} value={formatExact(book.openColl)}>
                 <AmountText value={book.openColl} format="compact" /> pETH
               </Prov>
@@ -230,7 +238,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
               </Prov>
             </Stat>
             {book.psmMintCount != null && (
-              <Stat label="PSM">
+              <Stat label="PSM" note={`direct ${stable} mints and redemptions against pETH, shared by every open CDP`}>
                 <Prov
                   info={bookCountProv(
                     "PSM mints and redemptions",
@@ -247,9 +255,19 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 <Prov info={bookCountProv("Liquidations", market, "Liquidation logs on the market's cdpManager.")}>
                   {book.liquidationCount}
                 </Prov>
-                {book.spDepositOps != null && (
-                  <span className="ml-1 text-rb-500">· {book.spDepositOps} pool deposit operations</span>
-                )}
+              </Stat>
+            )}
+            {book.spDepositOps != null && (
+              <Stat label="Stability pool operations" note="deposits, withdrawals and gain claims">
+                <Prov
+                  info={bookCountProv(
+                    "Stability pool operations",
+                    market,
+                    "DepositOperation logs on the market's stability pool: deposits, withdrawals and gain claims.",
+                  )}
+                >
+                  {book.spDepositOps}
+                </Prov>
               </Stat>
             )}
           </div>
@@ -296,10 +314,14 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
           ))}
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-rb-500">
-          Both markets mint against the same collateral, pETH — the protocol&rsquo;s bonding-curve wrapper of ETH — and
-          differ in the unit they price it in: USDp values it through the ETH/USD medianiser, GOLDp through ETH/USD and
-          XAU/USD, so a GOLDp debt is a claim on ounces of gold. The stability pool is what absorbs a
-          liquidation&rsquo;s debt; the reserve loans against POLAR are captured by the index but not shown here.
+          Both markets mint against the same collateral, pETH, which ETH buys from the protocol&rsquo;s bonding curve at
+          a price that rises as ETH enters it. They differ in the unit they price it in: USDp values it through the
+          ETH/USD medianiser, GOLDp through ETH/USD and XAU/USD, so a GOLDp debt is a claim on ounces of gold. A
+          medianiser takes the median of the oracles it reads. The rate is a primary rate, which moves with the
+          PSM&rsquo;s mints and redemptions, plus a secondary rate that rises with the market&rsquo;s debt-to-reserve
+          ratio. A market whose reserve-to-debt ratio falls below 1.10 enters defensive mode and its minimum rises to
+          150%. The stability pool is what absorbs a liquidation&rsquo;s debt. Reserve loans, which lend ETH against
+          fpETH (the floor part of pETH), are captured by the index but not shown here.
         </p>
       </section>
       <ProvenanceInfoTabs className="mt-6" />

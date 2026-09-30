@@ -134,6 +134,10 @@ export interface ChainTruthDelta {
    *  (formatNumber) rather than the exact decimal: for dust, where the exact
    *  decimal is eighteen digits no one reads aloud. */
   readableLabel?: boolean;
+  /** The magnitude as shown, where the family states amounts at its own
+   *  precision (Polaris: every figure in full, to three decimals). Unsigned:
+   *  the sign rule above still applies. Default: the compact header form. */
+  display?: string;
 }
 
 /** "−0.00534 wstETH": a figure's accessible name in the site's number format. */
@@ -171,7 +175,7 @@ export interface ChainTruthRowSpec {
    *  tracing both facts (tx sender + Pool caller vs owner). Like `critical`,
    *  it keeps the moved amounts in the header — the glyph spine carries no
    *  flanking numbers. */
-  externalActor?: { address: string; prov: Provenance; tip?: ReactNode };
+  externalActor?: { address: string; prov: Provenance; tip?: ReactNode; prefix?: string };
   /** Neutral party chip — "<prefix> 0x12…34" beside the deltas (e.g. Maker's
    *  give: "to <new owner>"). Unlike `externalActor` it carries no
    *  external-party signal: neutral tint, no spine hand-off — a named
@@ -524,7 +528,7 @@ export function ChainTruthRow({
         // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
         // keeps the sign from running into the "<" ("− <0.01").
         const bare = Boolean(d.label) || Boolean(spec.custody);
-        const magnitude = fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
+        const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
         const text =
           bare || spec.unsignedDeltas
             ? magnitude
@@ -646,6 +650,7 @@ export function ChainTruthRow({
             address={spec.externalActor.address}
             prov={spec.externalActor.prov}
             tip={spec.externalActor.tip}
+            prefix={spec.externalActor.prefix}
           />
         </span>
       )}

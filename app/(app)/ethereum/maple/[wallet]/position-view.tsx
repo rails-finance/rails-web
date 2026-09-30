@@ -43,12 +43,21 @@ import {
 } from "@/components/protocol/maple/maple-position-card";
 import { MaplePositionExplanation } from "@/components/protocol/maple/maple-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeMapleEconomics, computeMapleCardCaptions, mapleLifetimeWithOpening } from "@/lib/maple/economics";
+import {
+  computeMapleEconomics,
+  computeMapleCardCaptions,
+  mapleFlowSummaries,
+  mapleLifetimeWithOpening,
+} from "@/lib/maple/economics";
+import { mapleBoundaryFolders, mapleRateWindows, mapleRowTimes, mapleSinceLastEvent } from "@/lib/maple/row-times";
+import { MapleSinceLastEventRow } from "@/components/protocol/maple/maple-since-last-event";
+import type { FolderMembersReader } from "@/lib/shared/folder-members";
 import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { maplePoolOf } from "@/lib/maple/asset-catalog";
+import { poolExitRateProv } from "@/lib/maple/event-provenance";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
@@ -309,9 +318,76 @@ export default function MaplePositionView({
     return servedFolders && servedFolders.length > 0 ? withFolderActors(withOpening, servedFolders) : withOpening;
   }, [mapleEvents, opening, servedFolders]);
 
+  // Folder members the page has read, by folder: the reader opens a folder, or
+  // the page reads the one holding a pool's first or last row. Their rows date
+  // the interest of the rows around them and bound the yield window.
+  const [memberEvents, setMemberEvents] = useState<Record<string, BaseActivityEvent[]>>({});
+  const readMembers = useCallback<FolderMembersReader>(
+    async (ask) => {
+      const res = await readFolderMembers(ask);
+      setMemberEvents((m) => ({ ...m, [res.folder.responseId]: res.events }));
+      return res;
+    },
+    [readFolderMembers],
+  );
+  const readFolders = useMemo(() => new Set(Object.keys(memberEvents)), [memberEvents]);
+  const rowEvents = useMemo(() => {
+    const seen = new Set(mapleEvents.map((e) => e.id));
+    const extra = Object.values(memberEvents)
+      .flat()
+      .filter((e) => isMapleEvent(e) && !seen.has(e.id) && (seen.add(e.id), true));
+    return extra.length > 0 ? [...mapleEvents, ...extra] : mapleEvents;
+  }, [mapleEvents, memberEvents]);
+  const boundaryFolders = useMemo(
+    () => mapleBoundaryFolders(rowEvents, servedFolders, readFolders),
+    [rowEvents, servedFolders, readFolders],
+  );
+  useEffect(() => {
+    for (const f of boundaryFolders) void readMembers({ folder: f.responseId }).catch(() => {});
+    // One read per folder: a failed one is not retried, and its figures stay unstated.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boundaryFolders.map((f) => f.responseId).join(",")]);
+
+  // Each row's previous row in its pool and, for a queue fill, its request:
+  // the period a row's interest covers and how long a fill waited.
+  const rowTimes = useMemo(
+    () => mapleRowTimes(rowEvents, servedFolders, readFolders),
+    [rowEvents, servedFolders, readFolders],
+  );
+  // The yield window runs from the wallet's first row in a pool to its last,
+  // so it is stated only on a page that holds the whole history.
+  const rateWindows = useMemo(
+    () => (cutoffBlock == null ? mapleRateWindows(rowEvents, servedFolders, readFolders) : undefined),
+    [rowEvents, servedFolders, readFolders, cutoffBlock],
+  );
+  // The stretch from the newest row to now, per live pool: the interest no row
+  // states, drawn at the head of the timeline.
+  const sinceLast = useMemo(
+    () =>
+      view && view.status === "open"
+        ? mapleSinceLastEvent(rowEvents, servedFolders, readFolders, view.pools, (pool) => poolState[pool]?.blockNumber)
+        : [],
+    [view, rowEvents, servedFolders, readFolders, poolState],
+  );
+  // Requests the wallet cancelled, counted over the rows and the folders'
+  // own counts; unstated on a windowed page, whose older rows are not here.
+  const cancelledRequests = useMemo(() => {
+    if (cutoffBlock != null) return undefined;
+    let n = mapleEvents.filter((e) => e.context.data.eventType === "request_cancel").length;
+    for (const f of servedFolders ?? []) n += f.counts.find((c) => c.key === "request_cancel")?.count ?? 0;
+    return n;
+  }, [mapleEvents, servedFolders, cutoffBlock]);
+
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
   const captions = view ? computeMapleCardCaptions(view, lifetimeEvents, precomputedLifetime) : null;
+  // The pools the wallet received shares in by transfer: their interest counts
+  // from each batch's worth when it arrived, which the card's Explanation says.
+  const receivedPools = view
+    ? mapleFlowSummaries(view, lifetimeEvents, precomputedLifetime)
+        .filter((p) => p.received > 0)
+        .map((p) => p.assetSymbol)
+    : [];
 
   // The access band on the pools this wallet touches — the liquid/deployed
   // split IS the position's risk surface, so it belongs on the page.
@@ -321,16 +397,13 @@ export default function MaplePositionView({
     return Object.fromEntries(Object.entries(poolState).filter(([k]) => touched.size === 0 || touched.has(k)));
   }, [view, poolState]);
 
-  // The top row's price dropdown. A Maple lender holds POOL SHARES, and the
-  // one price the protocol states about a share is the pool's own exit rate:
-  // what one share converts to in the pool's funds asset, quantized by the pool
-  // rather than re-multiplied here. The funds asset is that unit — and it is
-  // where the USD stops, since Maple's oracle answers a governance-set $1 pin
-  // for USDC and reverts for USDT, so its row names the asset and no figure.
+  // The top row's price dropdown: one row per pool, its exit rate, the amount
+  // one share pays out on withdrawal, in the pool's token. USDC and USDT get
+  // no row of their own: amounts stay in the token, and the reason under the
+  // list says so once.
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
     const out: LatestPriceAsset[] = [];
-    const assets = new Map<string, string>();
     for (const p of view.pools) {
       const state = walletPoolState[p.pool];
       const rate = state && !Number.isNaN(state.exitRate) && state.exitRate > 0 ? state.exitRate : undefined;
@@ -339,12 +412,10 @@ export default function MaplePositionView({
         address: maplePoolOf(p.pool).pool,
         price: rate,
         unit: rate ? p.assetSymbol : undefined,
-        label: `One ${p.symbol} at the pool's exit rate, in ${p.assetSymbol}`,
+        label: `Exit rate: what one ${p.symbol} pays out on withdrawal, in ${p.assetSymbol}`,
+        tip: `Exit rate: what one ${p.symbol} pays out on withdrawal now, in ${p.assetSymbol}.`,
+        info: rate && state ? poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber) : undefined,
       });
-      assets.set(p.assetAddress, p.assetSymbol);
-    }
-    for (const [address, symbol] of assets) {
-      out.push({ symbol, address, label: `${symbol}, the pool's funds asset` });
     }
     return out;
   }, [view, walletPoolState]);
@@ -435,10 +506,18 @@ export default function MaplePositionView({
               receipts
               viewHref={tl.viewHref}
               captions={captions ?? undefined}
+              cancelledRequests={cancelledRequests}
               // The Explanation pane: layman narration of the card's own face
               // figures (claim, exit rate, escrow, the pool's queue and split).
               explanation={
-                <MaplePositionExplanation v={view} captions={captions} externalActivity={externalActivity} />
+                <MaplePositionExplanation
+                  v={view}
+                  captions={captions}
+                  externalActivity={externalActivity}
+                  rateWindows={rateWindows}
+                  cancelledRequests={cancelledRequests}
+                  receivedPools={receivedPools}
+                />
               }
             />
           )}
@@ -449,7 +528,10 @@ export default function MaplePositionView({
               return (
                 <ChainTruthTower
                   data={towerData}
-                  explanation={mapleEconomicsExplanation(towerData)}
+                  explanation={mapleEconomicsExplanation(
+                    towerData,
+                    mapleFlowSummaries(view, lifetimeEvents, precomputedLifetime),
+                  )}
                   learnMore={mapleEconomicsContent()}
                 />
               );
@@ -477,13 +559,24 @@ export default function MaplePositionView({
                   // old because its oldest loaded card is.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  // "in the pool 315 days" runs to today; the Explanation's
+                  // yield window runs first event to last, and says so.
+                  labelTenure={view.status === "open" ? "in the pool" : true}
+                  labelLastActivity
                 />
               ) : undefined
             }
             runs={MAPLE_QUEUE_FILL_RUNS}
             folderRegister={MAPLE_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
+            readFolderMembers={readMembers}
             segments={segments}
+            liveWindow={
+              sinceLast.length > 0
+                ? ({ isFirst }) => (
+                    <MapleSinceLastEventRow lines={sinceLast} isFirst={isFirst} now={Math.floor(Date.now() / 1000)} />
+                  )
+                : undefined
+            }
             renderCard={(event, meta) =>
               isMapleEvent(event) ? (
                 <MapleEventCard
@@ -491,6 +584,7 @@ export default function MaplePositionView({
                   eventNumber={meta.eventNumber}
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
+                  times={rowTimes.get(event.id)}
                 />
               ) : null
             }

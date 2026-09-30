@@ -292,3 +292,16 @@ export const COMPOUND_V2_KEYS_BY_SYMBOL: Record<string, string[]> = COMPOUND_V2_
 /** The distinct underlying symbols, in roster order (filter chips — 19 of 20
  *  markets survive the dedupe; the two WBTC markets share one chip). */
 export const COMPOUND_V2_FILTER_SYMBOLS: string[] = [...new Set(COMPOUND_V2_MARKETS.map((m) => m.symbol))];
+
+/** Markets whose cToken has no protocol seize share: `protocolSeizeShareMantissa`
+ *  reverts on each (read at head 2026-09-30), so a seizure there goes wholly
+ *  to the liquidator. The other thirteen keep 2.8%. */
+export const COMPOUND_V2_NO_SEIZE_SHARE: ReadonlySet<string> = new Set([
+  "eth",
+  "usdc",
+  "bat",
+  "rep",
+  "zrx",
+  "sai",
+  "wbtc",
+]);

@@ -36,7 +36,13 @@
 
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
-import { shortAddress } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKETS, shortAddress } from "@/lib/compound-v2/asset-catalog";
+import {
+  COMPOUND_V2_DEPRECATED,
+  DEPRECATED_CONDITIONS,
+  DEPRECATED_CONSEQUENCE,
+  deprecationDate,
+} from "@/lib/compound-v2/deprecated-markets";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
@@ -85,7 +91,17 @@ const coordsFor = (m: CompoundV2MarketRow, block: number, oracle: string | null)
   interestRateModel: m.interestRateModel,
 });
 
+/** The catalog key for a cToken address. */
+const keyOf = (cToken: string) => COMPOUND_V2_MARKETS.find((c) => c.ctoken === cToken.toLowerCase())?.key;
+
+/** The cToken's name on screen. The SAI market's cToken calls itself "cDAI"
+ *  on chain, the same as the DAI market's. */
+const cTokenLabel = (m: CompoundV2MarketRow) =>
+  keyOf(m.cToken) === "sai" ? "cSAI (the original cDAI)" : m.cTokenSymbol;
+
 function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: number; oracle: string | null }) {
+  const key = keyOf(m.cToken);
+  const deprecatedOn = key && COMPOUND_V2_DEPRECATED[key] ? deprecationDate(key) : null;
   const coords = coordsFor(m, block, oracle);
   const ticks: RatioBarTick[] = [];
   if (m.kink != null)
@@ -107,7 +123,7 @@ function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: numbe
             className="link-external text-[11px] text-rb-500"
             title={m.identityNote ?? undefined}
           >
-            {m.cTokenSymbol} · {shortAddress(m.cToken)}
+            {cTokenLabel(m)} · {shortAddress(m.cToken)}
           </a>
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
@@ -155,6 +171,15 @@ function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: numbe
           </span>
         )}
       </div>
+
+      {deprecatedOn && (
+        <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400" data-compound-v2-deprecated="">
+          <span title={`A deprecated market has ${DEPRECATED_CONDITIONS}: ${DEPRECATED_CONSEQUENCE}.`}>
+            deprecated since {deprecatedOn}
+          </span>
+          : a borrow here can be liquidated in full at any time
+        </p>
+      )}
 
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         {m.collateralDisabled ? (
@@ -297,6 +322,21 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
         </p>
       )}
 
+      <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-deprecated-note="">
+        Borrowing is paused in all twenty markets: fifteen were paused in the same governance transaction on 8 Dec 2025
+        (block 23,969,453), the other five earlier. Eight markets are also{" "}
+        <span className="text-foreground">deprecated</span> ({DEPRECATED_CONDITIONS}):{" "}
+        {data.markets
+          .filter((m) => {
+            const k = keyOf(m.cToken);
+            return k != null && COMPOUND_V2_DEPRECATED[k] != null;
+          })
+          .map((m) => m.underlyingSymbol)
+          .join(", ")}
+        . For a borrower that means the Comptroller skips the shortfall check and the close factor on that borrow:{" "}
+        {DEPRECATED_CONSEQUENCE}. The Comptroller has no pause on repaying or withdrawing.
+      </p>
+
       <div className="grid gap-2.5 sm:grid-cols-2">
         {data.markets.map((m) => (
           <MarketCard key={m.cToken} m={m} block={data.blockNumber} oracle={data.oracle} />
@@ -348,7 +388,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
                 rel="noopener noreferrer"
                 className="link-external"
               >
-                {m.cTokenSymbol} · {m.underlyingSymbol} at{" "}
+                {cTokenLabel(m)} · {m.underlyingSymbol} at{" "}
                 <Prov info={cvPriceProv(false, coordsFor(m, data.blockNumber, data.oracle))}>{usd(m.priceUsd)}</Prov>
               </a>
             ))}

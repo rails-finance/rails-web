@@ -49,12 +49,21 @@ import {
   poolUnrealizedLossesProv,
 } from "@/lib/maple/event-provenance";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { MapleResidualNote } from "./maple-pools-copy";
+import { MapleResidualNote, mapleNavTip, mapleExitTip, MAPLE_NO_IMPAIRMENT_TIP } from "./maple-pools-copy";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const amount = (v: number, symbol: string): React.ReactNode => {
   const f = formatCompact(v);
   return <span title={`${f.title} ${symbol}`}>{`${f.display} ${symbol}`}</span>;
+};
+
+/** The pool's total at the precision its parts are shown at: past a billion
+ *  the compact form reads "1B", beside parts in millions to one decimal. */
+const poolTotal = (v: number, symbol: string): React.ReactNode => {
+  if (Math.abs(v) < 1e9) return amount(v, symbol);
+  const f = formatCompact(v);
+  const millions = (v / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return <span title={`${f.title} ${symbol}`}>{`${millions}M ${symbol}`}</span>;
 };
 
 /** A split row: label, amount, share of pool value. */
@@ -120,7 +129,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
           <Prov info={poolTotalAssetsProv(cat.assetSymbol, s.blockNumber)}>
-            {amount(s.totalAssets, cat.assetSymbol)}
+            {poolTotal(s.totalAssets, cat.assetSymbol)}
           </Prov>
         </span>
       </div>
@@ -132,12 +141,12 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           </span>
         </Prov>
         <Prov info={poolNavRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
-          <span title={`convertToAssets on one share, read at block ${s.blockNumber} — shown as read`}>
-            NAV {s.navRate.toFixed(4)} {cat.assetSymbol}
+          <span title={mapleNavTip(s.blockNumber)}>
+            NAV, the pool&rsquo;s value per share: {s.navRate.toFixed(4)} {cat.assetSymbol}
           </span>
         </Prov>
         <Prov info={poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
-          <span title={`convertToExitAssets on one share, read at block ${s.blockNumber} — shown as read`}>
+          <span title={mapleExitTip(s.blockNumber)}>
             exit {s.exitRate.toFixed(4)} {cat.assetSymbol}
           </span>
         </Prov>
@@ -167,7 +176,9 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           share={share(s.openTermAum)}
           prov={poolLoanManagerAumProv(cat.assetSymbol, "open-term", s.blockNumber)}
         />
-        {s.strategiesAum > 0 && (
+        {/* Dust (under 0.05% of the pool) rounds to 0.0% and says nothing;
+            the residual check below still counts it. */}
+        {s.strategiesAum > 0 && (share(s.strategiesAum) ?? 0) >= 0.0005 && (
           <SplitRow
             label="Other strategies"
             note="Non-LoanManager strategies' assetsUnderManagement — on-chain yield strategies"
@@ -214,9 +225,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
             </span>
           </Prov>
         ) : (
-          <span title="unrealizedLosses is zero, so convertToAssets and convertToExitAssets return the same figure">
-            no impairment marked — NAV and exit rates are equal
-          </span>
+          <span title={MAPLE_NO_IMPAIRMENT_TIP}>no impairment marked — NAV and exit rates are equal</span>
         )}
       </div>
     </div>

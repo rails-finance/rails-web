@@ -125,6 +125,7 @@ export function moonwellViewFromChain(
     lastActivityAt: whole ? (timeline?.lastActivityAt ?? 0) : 0,
     priceByAddress,
     ratesByMarket,
+    ...(chain.entered ? { entered: chain.entered } : {}),
     ...(timeline?.liquidations ? { liquidations: timeline.liquidations } : {}),
     ...(whole && timeline ? { eventTotal: timeline.totalEvents } : {}),
   };

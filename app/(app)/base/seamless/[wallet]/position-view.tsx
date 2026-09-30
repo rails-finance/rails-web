@@ -39,9 +39,11 @@ import {
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
 import { AaveV3PoolNotes, type AaveV3FrozenMarket } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
-import { AaveV3RiskSlot } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
+import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import {
   emodeSwitchEvents,
   fetchAccountSwitches,
@@ -613,13 +615,13 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                   viewHref={tl.viewHref}
                   deployment={SEAMLESS_LIVE_CARD_DEPLOYMENT}
                   captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the L1
-                  // treatment). Shown only with debt — both views need it.
-                  rowExtra={
-                    view.status === "open" && view.borrows.length > 0 && view.healthFactor != null ? (
-                      <AaveV3RiskSlot chain={data} />
-                    ) : undefined
-                  }
+                  // Closed by default, remembered per viewer and position (ui-jobs
+                  // 209), as on Ethereum. The room left to borrow and the
+                  // distance bar from the Pool read sit in the opened layer
+                  // under Debt and Health factor, inside the card's receipts scope.
+                  disclosureKey={`seamless:${wallet.toLowerCase()}`}
+                  debtDetail={<AaveV3BorrowRoom chain={data} />}
+                  riskDetail={<AaveV3RiskDetail chain={data} />}
                   // The Explanation: the L1 prose about the face figures, then
                   // what is particular to THIS Pool — eMode, a supply that
                   // backs nothing (pre-3.2 accounting here), and the freeze.
@@ -705,6 +707,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           sw={event.context.data.emodeSwitch}
                           pool={POOL_IDENTITY}
                           persistPrefix="aave-v3"
+                          hfFormat={hfLabelV3}
                           eventNumber={meta.eventNumber}
                           isFirst={meta.isFirst}
                           isLast={meta.isLast}

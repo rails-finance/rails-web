@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-export function TxHashBadge({ txHash }: { txHash: string }) {
+export function TxHashBadge({
+  txHash,
+  label,
+}: {
+  txHash: string;
+  /** A word before the hash ("Transaction"), for a page that names it.
+   *  Unset changes nothing. */
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const short = `${txHash.slice(0, 8)}\u2026`;
 
@@ -26,7 +34,7 @@ export function TxHashBadge({ txHash }: { txHash: string }) {
           <line x1="10" x2="8" y1="3" y2="21" />
           <line x1="16" x2="14" y1="3" y2="21" />
         </svg>
-        {short}
+        {label ? `${label} ${short}` : short}
         <button
           className="btn-ghost focus:outline-none cursor-pointer"
           aria-label="Copy tx hash"

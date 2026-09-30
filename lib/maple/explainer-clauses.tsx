@@ -50,6 +50,7 @@ import {
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { getCcipEscrow } from "@/lib/shared/known-infrastructure";
+import { shortAddress } from "@/lib/maple/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 
 /** Dust epsilon — a balance below this reads as zero (a fully-exited leg). */
@@ -137,18 +138,17 @@ function permissionedActorMechanic(ctx: MapleContext, coords: MapleCoords): Clau
   if (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out")
     return clause(
       <>
-        {opened}
-        nor was it the wallet on the other side of the transfer. Pool shares move wallet-to-wallet as freely as any
-        token: arriving shares ask nothing of the receiver, and shares leaving this way ride an ordinary ERC-20
-        allowance the holder granted beforehand — revocable the same way.
+        The &ldquo;by&rdquo; address sent the transaction; the &ldquo;{ctx.eventType === "transfer_in" ? "from" : "to"}
+        &rdquo; address is the wallet on the other side of the transfer. Pool shares move wallet-to-wallet like any
+        token: arriving shares ask nothing of the receiver, and shares leaving this way need an allowance the holder
+        granted beforehand.
       </>,
     );
   return clause(
     <>
       {opened}
       nor was the caller the pool recorded. Shares only leave a position through the withdrawal queue, and another
-      address moves them by spending a share allowance the holder granted beforehand — the ordinary ERC-20 kind,
-      revocable the same way.
+      address moves them by spending a share allowance the holder granted beforehand, which the holder can revoke.
     </>,
   );
 }
@@ -332,7 +332,13 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
         changed: [changed],
         meansNow: [
           rate ? clause(<>The pool paid out at its exit rate of {rate}.</>) : null,
-          clause(<>When the pool marks an impairment, the lenders exiting first take it.</>),
+          clause(
+            <>
+              If the pool delegate, the manager that runs the pool&rsquo;s lending, marks a loan as impaired (likely to
+              lose money), the exit rate drops by the marked amount, and a lender who exits while the mark stands takes
+              that loss for good.
+            </>,
+          ),
         ],
       };
     }
@@ -341,21 +347,24 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
       return {
         happened: [
           clause(
-            <>Requested to withdraw {requestSharesFig("request")}, moving the shares into the queue&rsquo;s escrow.</>,
+            <>
+              Requested to withdraw {requestSharesFig("request")}, moving the shares into the queue, which holds them
+              for the wallet until they are paid out.
+            </>,
           ),
         ],
         changed: [hasEscrow ? clause(<>The queue now holds {escrowAfterFig()} for this position.</>) : null],
         meansNow: [
           clause(
             <>
-              The request takes its place in line and fills first-in, first-out as the pool has cash — typically within
-              minutes, though the queue allows up to 30 days.
+              The request takes its place in line and fills first in, first out, from the pool&rsquo;s liquid cash.
+              Maple&rsquo;s docs say most withdrawals are processed in under 24 hours and some can take up to 30 days.
             </>,
           ),
           clause(
             <>
-              Escrowed shares are still the position&rsquo;s, and they price at the exit rate when the request fills,
-              not now.
+              Shares in the queue are still the position&rsquo;s, and they price at the exit rate when the request
+              fills, not now.
             </>,
           ),
           clause(<>The request can be reduced or cancelled before it fills, returning the shares to the wallet.</>),
@@ -368,8 +377,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
         happened: [
           clause(
             <>
-              Reduced the pending withdrawal request, returning {requestSharesFig("request_decrease")} from the
-              queue&rsquo;s escrow to the wallet.
+              Reduced the pending withdrawal request, returning {requestSharesFig("request_decrease")} from the queue to
+              the wallet.
             </>,
           ),
         ],
@@ -377,7 +386,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
           hasEscrow
             ? clause(<>The queue still holds {escrowAfterFig()} for this position.</>)
             : escrowKnown
-              ? clause(<>The queue&rsquo;s escrow for this position is now empty.</>)
+              ? clause(<>The queue holds nothing for this position now.</>)
               : null,
         ],
       };
@@ -386,12 +395,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
     case "request_cancel": {
       return {
         happened: [
-          clause(
-            <>
-              Cancelled the withdrawal request, returning {requestCancelFig()} from the queue&rsquo;s escrow to the
-              wallet.
-            </>,
-          ),
+          clause(<>Cancelled the withdrawal request, returning {requestCancelFig()} from the queue to the wallet.</>),
         ],
         meansNow: [
           clause(<>The queue position is gone.</>),
@@ -418,7 +422,15 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
               ? clause(<>That cleared the request from the queue.</>)
               : null,
         ],
-        meansNow: [rate ? clause(<>It redeemed at the exit rate the moment it filled, {rate}.</>) : null],
+        meansNow: [
+          rate ? clause(<>It redeemed at the exit rate the moment it filled, {rate}.</>) : null,
+          clause(
+            <>
+              How long a request waits depends on the pool&rsquo;s liquid cash when its turn comes. The page has no
+              record of the pool&rsquo;s cash at past requests, so it cannot say why one fill took longer than another.
+            </>,
+          ),
+        ],
       };
     }
 
@@ -445,13 +457,27 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             ],
           }
         : {
-            happened: [clause(<>Received {transferShareFig("in")} from another wallet.</>)],
+            happened: [
+              clause(
+                <>
+                  Received {transferShareFig("in")} from{" "}
+                  {ctx.counterparty ? (
+                    <>
+                      <span className="font-mono">{shortAddress(ctx.counterparty)}</span>, an address with no label here
+                    </>
+                  ) : (
+                    <>another wallet</>
+                  )}
+                  . The wallet paid nothing into the pool for them.
+                </>,
+              ),
+            ],
             changed: [transferValueClause()],
             meansNow: [
               clause(
                 <>
-                  Pool shares are ordinary ERC-20s, so the transfer moved the claim on the pool&rsquo;s {asset} into
-                  this position with no pool event.
+                  Pool shares move between wallets like any token, so the transfer moved the claim on the pool&rsquo;s{" "}
+                  {asset} into this position with no pool event.
                 </>,
               ),
             ],
@@ -486,8 +512,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             meansNow: [
               clause(
                 <>
-                  Pool shares are ordinary ERC-20s, so the claim on the pool&rsquo;s {asset} moved with them and no pool
-                  event records it.
+                  Pool shares move between wallets like any token, so the claim on the pool&rsquo;s {asset} moved with
+                  them and no pool event records it.
                 </>,
               ),
             ],

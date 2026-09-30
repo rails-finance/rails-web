@@ -854,6 +854,46 @@ export function computeAaveV3Economics(
     return typeof p === "number" && p > 0 ? amount * p : null;
   };
 
+  // Interest rows beside the flows, at the prices it accrued at: each row's
+  // interest since the balance last moved, valued at that row's oracle price
+  // (the stretch it closes); what accrued since the last row at today's. The
+  // interest segment of a debt still owed is part of what is owed now and
+  // stays at today's price.
+  const interestAtEvent = new Map<string, { amount: number; usd: number }>();
+  for (const e of events ?? []) {
+    if (!isAaveV3Event(e)) continue;
+    const c = e.context.data;
+    const liq = c.eventType === "liquidation";
+    const legs: [string | undefined, "supply" | "debt", string | undefined, number | undefined][] = [
+      [
+        liq ? c.collateralSymbol : c.reserveSymbol,
+        "supply",
+        c.supplyInterestSincePrevious,
+        (liq ? c.collateralPrice : c.price)?.usd,
+      ],
+      [c.reserveSymbol, "debt", c.debtInterestSincePrevious, (liq ? c.debtPrice : c.price)?.usd],
+    ];
+    for (const [sym, side, amt, px] of legs) {
+      const n = Number(amt ?? "0");
+      if (!sym || !(n > 0) || px == null || !(px > 0)) continue;
+      const key = `${side}:${sym}`;
+      const cur = interestAtEvent.get(key) ?? { amount: 0, usd: 0 };
+      interestAtEvent.set(key, { amount: cur.amount + n, usd: cur.usd + n * px });
+    }
+  }
+  const interestUsd = (
+    side: "supply" | "debt",
+    symbol: string,
+    address: string | undefined,
+    amount: number,
+  ): number | null => {
+    const at = interestAtEvent.get(`${side}:${symbol}`);
+    if (!at || at.amount <= DUST) return usdOf(address, amount);
+    if (at.amount >= amount) return at.usd * (amount / at.amount);
+    const rest = usdOf(address, amount - at.amount);
+    return rest == null ? null : at.usd + rest;
+  };
+
   // Tokens whose decimals did not load are left out of every line and total,
   // and the tower names them.
   const notLoaded = aaveV3NotLoaded(view, events ?? [], precomputedLifetime);
@@ -1057,7 +1097,7 @@ export function computeAaveV3Economics(
             symbol: f.symbol,
             address: lane.reserve,
             amount,
-            usd: usdOf(lane.reserve, amount),
+            usd: interestUsd(side, f.symbol, lane.reserve, amount),
             prov: laneInterestProv(f.symbol, side),
             flowLabel: side === "supply" ? "Interest earned" : "Interest accrued",
           },
@@ -1088,7 +1128,7 @@ export function computeAaveV3Economics(
         symbol: cur.symbol,
         address: cur.key.toLowerCase(),
         amount: amt,
-        usd: usdOf(cur.key, amt),
+        usd: interestUsd("supply", cur.symbol, cur.key, amt),
         prov: laneInterestProv(cur.symbol, "supply"),
         flowLabel: "Interest earned",
       });
@@ -1120,7 +1160,7 @@ export function computeAaveV3Economics(
           symbol: cur.symbol,
           address: cur.key.toLowerCase(),
           amount: amt,
-          usd: usdOf(cur.key, amt),
+          usd: interestUsd("debt", cur.symbol, cur.key, amt),
           prov: vocab.debtInterest(cur.symbol),
           flowLabel: "Interest accrued",
         });

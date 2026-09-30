@@ -23,12 +23,22 @@ import { PriceRunway } from "@/components/shared/price-runway";
  * caption — for riding the position card's heading-button row. The full
  * section form remains for hosts that give the runway its own row.
  */
-export function AaveV3Runway({ healthFactor, compact }: { healthFactor: number | null; compact?: boolean }) {
+export function AaveV3Runway({
+  healthFactor,
+  compact,
+  barOnly,
+}: {
+  healthFactor: number | null;
+  compact?: boolean;
+  /** Compact only: the bar without its visible figure (PriceRunway `barOnly`). */
+  barOnly?: boolean;
+}) {
   if (healthFactor == null || healthFactor <= 0) return null;
 
   const bar = (
     <PriceRunway
       compact={compact}
+      barOnly={barOnly}
       currentPrice={healthFactor}
       liqPrice={1}
       liqCaption="liquidation · HF 1.0"

@@ -9,6 +9,7 @@
 // reference/lifetime-flows-scrubber.md states it.
 
 import type { FlowEvent } from "@/lib/shared/flows-timeline";
+import type { FlowBinSeries, SeriesBin } from "@/lib/shared/flows-series";
 
 export interface FlowSeries {
   wallet: string;
@@ -67,4 +68,18 @@ export function fetchAaveV3FlowSeries(p: {
   signal?: AbortSignal;
 }): Promise<FlowSeries> {
   return fetchFlowSeries("/api/aave-v3/flows", { wallet: p.wallet, market: p.market }, p.signal);
+}
+
+/** GET one family's Lifetime series: `path` is the series hop
+ *  ("/api/spark/flows/series"; lib/api/flow-bin-series-route.ts). */
+export async function fetchFlowBinSeries(
+  path: string,
+  params: Record<string, string>,
+  bin: SeriesBin,
+  signal?: AbortSignal,
+): Promise<FlowBinSeries> {
+  const qs = new URLSearchParams({ ...params, bin });
+  const res = await fetch(`${path}?${qs.toString()}`, { signal });
+  if (!res.ok) throw new Error(`fetchFlowBinSeries ${path} failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as FlowBinSeries;
 }

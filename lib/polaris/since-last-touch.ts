@@ -226,7 +226,9 @@ export function polarisProtocolLegNames(w: PolarisSinceLastTouch): string[] {
   const named: Array<[number, string]> = [
     [
       w.legs.psm,
-      w.raw.psmColl < 0 || (w.raw.psmColl === 0 && w.raw.psmDebt < 0) ? "a PSM redemption share" : "a PSM mint share",
+      // Named by the debt leg, as the rows name it; by the collateral leg
+      // only where the debt did not move.
+      w.raw.psmDebt < 0 || (w.raw.psmDebt === 0 && w.raw.psmColl < 0) ? "a PSM redemption share" : "a PSM mint share",
     ],
     [w.legs.reward, "the pETH reward"],
     [w.legs.interest, "interest charged"],

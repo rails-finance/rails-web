@@ -109,7 +109,7 @@ export const rateStepProv = (
       ? `The ${pair} at each end of the stretch — its last PrimaryRateSet at or before this CDP's own two touches, ` +
         `the same as-of figure already on each touch's own row. Algorithmic: the market sets it on the PSM's mints ` +
         `and redemptions, never chosen by the holder — the wallet that fired either log did nothing to this CDP. ` +
-        `The secondary, utilisation-driven rate is added on top and is not on this log. Nothing between the two ` +
+        `The secondary rate, a kinked function of the market's debt-to-reserve ratio, is added on top and is not on this log. Nothing between the two ` +
         `touches is drawn, because this CDP transacted nothing between them.`
       : part === "delta"
         ? `How far the ${pair} moved across the stretch — the later reading against the earlier one, both the ` +

@@ -27,6 +27,8 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { formatDate } from "@/lib/date";
+import type { MapleRateWindow } from "@/lib/maple/row-times";
 
 /** The figure the card's claim line asserts — the current redeemable value
  *  when the chain read landed, the recorded net deposits otherwise (the same
@@ -37,6 +39,9 @@ export function MaplePositionExplanation({
   v,
   captions,
   externalActivity,
+  rateWindows,
+  cancelledRequests,
+  receivedPools,
 }: {
   v: MaplePositionView;
   /** The card's stat captions (earned interest) — the same computed value the
@@ -46,6 +51,13 @@ export function MaplePositionExplanation({
    *  same verdict the event cards render. The page derives it from the events
    *  already on the page; omit to skip the operator bullet. */
   externalActivity?: ExternalActorSummary;
+  /** Per pool, the rate at the wallet's first and last loaded rows: the
+   *  window a yield figure covers. Omit to state none. */
+  rateWindows?: Map<string, MapleRateWindow>;
+  /** Requests the wallet cancelled, where the page holds its whole history. */
+  cancelledRequests?: number;
+  /** The assets of the pools the wallet received shares in by transfer. */
+  receivedPools?: string[];
 }) {
   // Hooks first — the pane declines below.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
@@ -93,10 +105,9 @@ export function MaplePositionExplanation({
       <span key="operators">
         {operatorLead(ext, null, "recorded on this account")}
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        this one. Another address may lend on the account&rsquo;s behalf without asking it first — a deposit needs the
-        pool&rsquo;s entry permission, and Maple&rsquo;s own deposit route grants it inside the deposit transaction —
-        but nothing can leave the position that way unless the account granted a share allowance for it. The shares
-        themselves move wallet-to-wallet as freely as any token.
+        this one: shares another wallet transferred in, or a deposit made on the account&rsquo;s behalf. Neither needs
+        the account to act, and nothing can leave the position that way unless the account granted a share allowance for
+        it.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`
@@ -229,6 +240,23 @@ export function MaplePositionExplanation({
       );
     }
 
+    // A yield figure only over a window the page can name: the pool's rate at
+    // this wallet's first and last rows in it, a week apart or more.
+    const w = rateWindows?.get(p.pool);
+    const days = w ? (w.toAt - w.fromAt) / 86400 : 0;
+    if (w && days >= 7 && w.toRate > w.fromRate) {
+      const rise = w.toRate / w.fromRate - 1;
+      const yearly = Math.pow(w.toRate / w.fromRate, 365 / days) - 1;
+      bullets.push(
+        <span key={`yield-${p.pool}`}>
+          From this wallet&rsquo;s first event in the pool to its last, {formatDate(w.fromAt)} to {formatDate(w.toAt)} (
+          {Math.round(days)} days), the pool&rsquo;s rate rose from {w.fromRate.toFixed(4)} to {w.toRate.toFixed(4)}{" "}
+          {p.assetSymbol} per share: {(rise * 100).toFixed(2)}%, or about {(yearly * 100).toFixed(1)}% a year at that
+          pace. Past rates do not set future ones.
+        </span>,
+      );
+    }
+
     if (p.escrowedShares > 0) {
       const escrowValue = st != null ? mapleExitAssets(p.escrowedSharesRaw, st) : null;
       bullets.push(
@@ -264,6 +292,24 @@ export function MaplePositionExplanation({
             <AmountText value={it.amount} format="compact" /> {it.symbol}
           </H>{" "}
           of that claim is interest earned to date, already included in the figure above.
+          {receivedPools && receivedPools.includes(it.symbol) && (
+            <>
+              {" "}
+              For shares the wallet received from another wallet, the interest counts from what each batch was worth
+              when it arrived.
+            </>
+          )}
+        </span>,
+      );
+    }
+    for (const e of captions?.earnedElsewhere ?? []) {
+      bullets.push(
+        <span key={`earned-${e.symbol}`}>
+          It also earned{" "}
+          <H>
+            <AmountText value={e.amount} format="compact" /> {e.symbol}
+          </H>{" "}
+          in the {e.symbol} pool, which it has left: withdrawals took all of that out.
         </span>,
       );
     }
@@ -334,7 +380,15 @@ export function MaplePositionExplanation({
     bullets.push(
       <span key="requests">
         The wallet has made <H>{v.requestCount}</H> withdrawal request{v.requestCount === 1 ? "" : "s"} over its
-        lifetime.
+        lifetime
+        {cancelledRequests != null && cancelledRequests > 0 && cancelledRequests <= v.requestCount
+          ? cancelledRequests === v.requestCount
+            ? v.requestCount === 1
+              ? " and cancelled it, so the shares came back to the wallet"
+              : " and cancelled all of them, so the shares came back to the wallet"
+            : `; it cancelled ${cancelledRequests}, and those shares came back to the wallet`
+          : ""}
+        .
       </span>,
     );
   }

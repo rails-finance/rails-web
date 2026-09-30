@@ -411,35 +411,6 @@ export const escrowBeforeProv = (poolSym: string, coords: MapleCoords): Provenan
   ]),
 });
 
-/** Net deposited after this event = Σ(deposit − withdraw − fill), a flow. */
-export const principalAfterProv = (sym: string, coords: MapleCoords, raw?: string | null): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} net deposited after this event, a running sum of flows: the asset amounts of the wallet's own deposits, less its withdrawals and queue fills, in log order up to this block${atBlock(coords)}. No on-chain slot holds this figure (the chain stores shares): it is the index's replay, clamped at zero, and a full exit nets negative by the interest earned. The pool claim beside it is the chain's value of the position at this block.`,
-  contract: poolContract(coords),
-  via: `${MAPLE_VIA} · Σ ±assets across Deposit/Withdraw/RequestProcessed logs${raw ? ` = ${raw}` : ""}`,
-  inputs: eventInputs(coords),
-});
-
-/** Deposited principal BEFORE this event = after − this event's own assets. */
-export const principalBeforeProv = (sym: string, coords: MapleCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} net deposited before this event — the after-value minus this event's own asset amount (after − change), reconstructed in the browser. The same running sum of flows as the after.`,
-  contract: poolContract(coords),
-  via: "net deposited after − assets",
-  formula: "after − change",
-  inputs: eventInputs(coords, [
-    {
-      label: "after",
-      kind: "chain-derived",
-      pclass: "indexed",
-      note: `replayed ${sym} net deposited after this event`,
-    },
-    { label: "change", kind: "chain", pclass: "emitted", note: "this event's own `assets` (signed)" },
-  ]),
-});
-
 /** Where a row's block rate came from, in words, and its receipt parts. */
 function rateBasis(source: string | undefined, coords: MapleCoords) {
   const fromChain = source === "chain";

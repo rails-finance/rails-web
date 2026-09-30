@@ -70,6 +70,7 @@ const QUEUE_FILL_FOLDER: FolderRegisterEntry = {
   memberNoun: "queue fill",
   spineIcon: "external",
   folderBadge: PAID_OUT_FOLDER_BADGE,
+  readingLine: true,
 };
 
 /** One member of an owner run, by its action; the transfers name a shape
@@ -82,4 +83,6 @@ const OWNER_RUN_NOUN: Record<string, string> = {
 };
 
 export const MAPLE_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>
-  folder.kind === OWNER_RUN_KIND ? ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event") : QUEUE_FILL_FOLDER;
+  folder.kind === OWNER_RUN_KIND
+    ? { ...ownerRunEntry(folder, (a) => OWNER_RUN_NOUN[a] ?? "event"), readingLine: true }
+    : QUEUE_FILL_FOLDER;

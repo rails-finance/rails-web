@@ -177,6 +177,9 @@ export function buildPolarisLiquidationForensics(
       constant: constant.label,
       fn: constant.fn,
     }),
+    // The valued leg is the pool's share of the seizure, not all of it.
+    seizedLabel: f.path === "sp" ? "Pool's take, valued at liquidation" : "Redistributed, valued at liquidation",
+    clearedLabel: "Debt cleared",
     premiumLabel: f.path === "sp" ? "Stability pool's premium" : "Redistribution premium",
     premiumReference: {
       label: "protocol's liquidation penalty",

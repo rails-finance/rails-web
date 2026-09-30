@@ -35,6 +35,7 @@
 // cross-references on the seize legs (§5.5); the highlight rule via Fig (§5.6).
 
 import type { ReactNode } from "react";
+import { DEPRECATED_CONDITIONS, isCompoundV2Deprecated } from "@/lib/compound-v2/deprecated-markets";
 import type { BaseActivityEvent, CompoundV2Context } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
@@ -58,7 +59,7 @@ import {
   cTokensAfterProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { COMPOUND_V2_MARKET_BY_KEY, COMPOUND_V2_NO_SEIZE_SHARE } from "@/lib/compound-v2/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -352,7 +353,7 @@ export function compoundV2EventSlots(
           clause(
             <>
               A liquidation seized {cTokenDelta(seizeLegProv(cSym, "seize_out", coords, ctx.raw?.cTokens), cSym)} of
-              this account&rsquo;s collateral{takenBy}, not sent by the account.
+              this account&rsquo;s collateral{takenBy}.
             </>,
           ),
         ],
@@ -390,8 +391,9 @@ export function compoundV2EventSlots(
         meansNow: [
           clause(
             <>
-              It is worth the repaid debt plus Compound&rsquo;s liquidation incentive, less the protocol&rsquo;s own
-              burned cut. The debt repaid is the {sibSym ? `${sibSym} ` : ""}liquidation in the same transaction.
+              It is worth the repaid debt plus Compound&rsquo;s liquidation incentive
+              {COMPOUND_V2_NO_SEIZE_SHARE.has(ctx.market) ? "" : ", less the protocol's 2.8% share"}. The debt repaid is
+              the {sibSym ? `${sibSym} ` : ""}liquidation in the same transaction.
             </>,
           ),
         ],
@@ -450,7 +452,17 @@ function liquidationSlots(
       ? afterFig(seizeTokensProv(collCSym, coords, ctx.raw?.seizeTokens), ctx.seizeTokens, collCSym)
       : null;
 
-  const happened = (
+  // A deprecated borrowed market (collateral factor 0, borrowing paused,
+  // reserve factor 100%) lets anyone repay the whole borrow with no shortfall
+  // (Comptroller.liquidateBorrowAllowed): the account's health is not why.
+  const deprecated = isCompoundV2Deprecated(ctx.market, coords.blockNumber);
+  const happened = deprecated ? (
+    <>
+      The {sym} market was deprecated ({DEPRECATED_CONDITIONS}), so any {sym} borrow could be liquidated in full
+      whatever the account&rsquo;s health. A liquidator repaid {repaidFig} of its {sym} debt
+      {seizedFig ? <> and seized {seizedFig} of collateral</> : null}.
+    </>
+  ) : (
     <>
       The account&rsquo;s borrowed value outgrew what its collateral covers, so a liquidator repaid {repaidFig} of its{" "}
       {sym} debt{seizedFig ? <> and seized {seizedFig} of collateral</> : null}.

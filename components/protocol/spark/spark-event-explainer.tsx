@@ -87,6 +87,9 @@ export function SparkEventExplainer({
     sparkEventSlots(ctx, coords, { owner, siblings, state: read.state, previousEvent: previous?.event }),
   );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
+  // The health-factor bullet needs the account reads; say so when they failed.
+  if (read.status === "unavailable" && !read.lasting)
+    items.push(<>The health factor before and after this transaction was not read. Reload to try again.</>);
 
   return <ProseExplainer items={items} />;
 }

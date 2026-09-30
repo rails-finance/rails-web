@@ -65,10 +65,13 @@ export function SingleWalletProvider({ children, value }: { children: React.Reac
 // ── Spine value formatter ───────────────────────────────────────────────
 
 /** Compact number for flanking values beside the spine icons */
-export function fmtSpine(v: string | number | undefined): string {
+export function fmtSpine(v: string | number | undefined, full = false): string {
   const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
   if (!n || !isFinite(n)) return "";
   const a = Math.abs(n);
+  // Opt-in: whole units up to a million, so 8,750 and 8,745 do not read as
+  // 8.8K and 8.7K beside each other.
+  if (full && a >= 1_000 && a < 1_000_000) return Math.round(a).toLocaleString("en-US");
   if (a >= 1_000_000) return `${(a / 1_000_000).toFixed(1)}M`;
   if (a >= 1_000) {
     const k = a / 1_000;
@@ -93,16 +96,26 @@ export function SpineVal({
   decimals = 4,
   max,
   prov,
+  unit,
+  full,
+  text,
 }: {
   value?: string | number;
   side: "left" | "right";
+  /** A symbol printed after the figure, smaller and muted. */
+  unit?: string;
+  /** Whole units below a million instead of "8.8K" (fmtSpine's `full`). */
+  full?: boolean;
+  /** The figure as shown, in place of fmtSpine's (a family's own precision). */
+  text?: string;
   onChange?: (v: number) => void;
   decimals?: number;
   max?: number;
   /** Echo this figure into the receipt it re-renders (see SpineValProv). */
   prov?: SpineValProv;
 }) {
-  const txt = fmtSpine(value);
+  const compact = fmtSpine(value, full);
+  const txt = compact && text != null ? text : compact;
   if (!txt) return <span />;
   const sideClass = side === "left" ? "justify-self-end pr-5" : "justify-self-start pl-5";
   if (onChange && typeof value === "number") {
@@ -121,6 +134,7 @@ export function SpineVal({
       ) : (
         txt
       )}
+      {unit ? <span className="ml-1 text-xs font-normal text-rb-500">{unit}</span> : null}
     </span>
   );
 }

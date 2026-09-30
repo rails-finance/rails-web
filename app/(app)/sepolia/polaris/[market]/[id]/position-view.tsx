@@ -50,7 +50,6 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, POLARIS_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { RiskFooterStrip, RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { Prov } from "@/components/shared/provenance";
@@ -62,7 +61,13 @@ import {
   liveRateStepNote,
   type MarketNote,
 } from "@/lib/shared/market-note";
-import { livePendingProv, polarisAnnualCostProv } from "@/lib/polaris/live-provenance";
+import {
+  curvePriceAtBlockProv,
+  liveCurvePriceProv,
+  livePendingProv,
+  liveRecordedDebtProv,
+  polarisAnnualCostProv,
+} from "@/lib/polaris/live-provenance";
 import { usePolarisUiState } from "@/hooks/usePolarisUiState";
 import { AmountText } from "@/components/shared/amount-text";
 
@@ -70,10 +75,32 @@ import { AmountText } from "@/components/shared/amount-text";
 // hyphen (the receipt's own convention, e.g. netChangeProv's formulas).
 const signedPending = (n: number): string => `${n < 0 ? "−" : "+"}${formatNumber(Math.abs(n))}`;
 
+/** What the trigger's pETH-in-ETH figure is, and why it is above one. */
+const PETH_CURVE_TIP =
+  "pETH's price in ETH on the protocol's bonding curve. ETH paid into the curve mints pETH at a price that rises as ETH enters it, so one pETH costs more than one ETH.";
+
 const PolarisExportMenu = dynamic(
   () => import("@/components/protocol/polaris/polaris-export-menu").then((m) => m.PolarisExportMenu),
   { ssr: false },
 );
+
+/** The card's "Highest recorded" peaks, with the liquidation's own state
+ *  counted: the index takes its peaks over each touch's resulting figures, and
+ *  a liquidation's resulting figures are zero — the collateral and debt it
+ *  seized and cleared, after the pending legs settled, are the CDP's last and
+ *  often its largest state. */
+function withLiquidationPeaks(v: PolarisView, events: BaseActivityEvent[]): PolarisView {
+  let coll = v.peakColl;
+  let debt = v.peakDebt;
+  let found = false;
+  for (const e of events) {
+    if (!isPolarisEvent(e) || e.context.data.eventType !== "liquidate") continue;
+    found = true;
+    coll = Math.max(coll, Number(e.context.data.collLiquidated ?? 0) || 0);
+    debt = Math.max(debt, Number(e.context.data.debtLiquidated ?? 0) || 0);
+  }
+  return found ? { ...v, peakColl: coll, peakDebt: debt, peaksCountLiquidation: true } : v;
+}
 
 interface PolarisPositionViewProps {
   market: PolarisMarket;
@@ -158,7 +185,7 @@ export default function PolarisPositionView({
   const view = useMemo<PolarisView | null>(() => {
     if (chain) {
       const v = viewFromChain(chain);
-      return summary ? mergeChainAndSummary(v, summary) : v;
+      return summary ? withLiquidationPeaks(mergeChainAndSummary(v, summary), events) : v;
     }
     // `!chainSettled` is the index lane's `pending` flag — the same one the
     // listing passes while its market-board read is in flight. Without it the
@@ -167,8 +194,8 @@ export default function PolarisPositionView({
     // and then flipped to a figure, which states "there is none" and then
     // corrects itself. With it they hold a pulse, and settle to the dash if
     // the overlay never answers.
-    return summary ? viewFromSummary(summary, undefined, !chainSettled) : null;
-  }, [chain, summary, chainSettled]);
+    return summary ? withLiquidationPeaks(viewFromSummary(summary, undefined, !chainSettled), events) : null;
+  }, [chain, summary, chainSettled, events]);
 
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
 
@@ -261,16 +288,20 @@ export default function PolarisPositionView({
   // distinct key and a distinct tooltip. Empty while the overlay is in
   // flight, and empty if it never answers: the strip states a price or
   // nothing.
-  const stripAssets: PriceStripAsset[] = useMemo(() => {
+  const stripAssets: LatestPriceAsset[] = useMemo(() => {
     if (!chain || chain.chainStale || !chain.price) return [];
     const cfg = POLARIS_MARKET_CONFIG[market];
-    const out: PriceStripAsset[] = [
+    const out: LatestPriceAsset[] = [
       {
         symbol: PETH.symbol,
         address: PETH.address,
         price: chain.price.curve,
         unit: "ETH",
         label: `${PETH.symbol} — bonding curve, native`,
+        // "2.84 ETH" alone read as a gas price: the trigger names the token.
+        triggerLabel: PETH.symbol,
+        tip: PETH_CURVE_TIP,
+        info: liveCurvePriceProv(),
       },
       { symbol: PETH.symbol, address: PETH.address, price: chain.price.pethUsd },
     ];
@@ -295,6 +326,9 @@ export default function PolarisPositionView({
           price: p.curve,
           unit: "ETH",
           label: `${PETH.symbol} — bonding curve, native`,
+          triggerLabel: PETH.symbol,
+          tip: PETH_CURVE_TIP,
+          info: curvePriceAtBlockProv(row.blockNumber),
         },
       ];
       if (p.ethUsd != null && p.ethUsd > 0)
@@ -343,7 +377,13 @@ export default function PolarisPositionView({
                 ~<AmountText value={annualCost} />
               </RiskStrong>
             </Prov>{" "}
-            {stable} / year
+            {stable} / year on the{" "}
+            <Prov info={liveRecordedDebtProv(market)} value={String(chain?.recordedDebt ?? 0)}>
+              <span>
+                <AmountText value={chain?.recordedDebt ?? 0} />
+              </span>
+            </Prov>{" "}
+            {stable} recorded at the last touch
           </RiskFigure>
         )}
         {belowMinimum && chain?.icr != null ? (
@@ -368,7 +408,11 @@ export default function PolarisPositionView({
               " and "}
             {(chain.mintRedeemCollChange !== 0 || chain.mintRedeemDebtChange !== 0) && (
               <>
-                a PSM share of{" "}
+                {chain.mintRedeemDebtChange < 0
+                  ? "a PSM redemption share of"
+                  : chain.mintRedeemDebtChange > 0
+                    ? "a PSM mint share of"
+                    : "a PSM share of"}{" "}
                 <Prov info={livePendingProv("mintRedeemColl", market)} value={String(chain.mintRedeemCollChange)}>
                   <span>{signedPending(chain.mintRedeemCollChange)}</span>
                 </Prov>{" "}

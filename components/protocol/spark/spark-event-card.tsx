@@ -142,6 +142,8 @@ export function SparkEventCard({
               address: soleFlowAddress(event.flows, ctx.reserveSymbol),
               direction: outFlow ? ("left" as const) : DIRECTION[kind as keyof typeof DIRECTION],
               value: mag,
+              unit: ctx.reserveSymbol,
+              fullValue: true,
               prov: spineProv,
             },
           ];

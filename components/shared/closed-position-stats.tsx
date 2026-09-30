@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ComponentType, type ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -71,6 +71,10 @@ export interface ClosedPositionStatsProps {
    *  used by surfaces (e.g. Aave spokes) that prefer the spoke name as a
    *  status-line companion rather than a top-right tag. */
   leadingIdentity?: ReactNode;
+  /** A card with progressive disclosure (ui-jobs 209) passes its detail gate
+   *  (`PositionCardDetail`): every cell but Outcome then draws only while the
+   *  card is open, so the closed card is its header and the outcome. */
+  detailGate?: ComponentType<{ children: ReactNode }>;
 }
 
 function formatClosureDate(unix: number): string {
@@ -99,7 +103,9 @@ export function ClosedPositionStats({
   identity,
   leadingIdentity,
   badgeTip,
+  detailGate,
 }: ClosedPositionStatsProps) {
+  const Gate = detailGate ?? Fragment;
   const { label, color, badge } = OUTCOME[outcome];
   const closure = closedAt ? formatClosureDate(closedAt) : null;
   const showDebt = debt !== undefined;
@@ -131,40 +137,42 @@ export function ClosedPositionStats({
       </div>
       <div className={gridClass}>
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
-        <div>
-          <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-            <TipLabel text={collateralLabel} tip={labelTips?.collateral} />
-            {collateralIcon}
-          </div>
-          {collateralAssetIcons ? (
-            <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
-              {collateral}
-              {collateralAssetIcons}
-            </div>
-          ) : (
-            collateral
-          )}
-          {collateralFootnote}
-        </div>
-        {showDebt ? (
+        <Gate>
           <div>
             <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-              <TipLabel text={debtLabel} tip={labelTips?.debt} />
-              {debtIcon}
+              <TipLabel text={collateralLabel} tip={labelTips?.collateral} />
+              {collateralIcon}
             </div>
-            {debtAssetIcons ? (
+            {collateralAssetIcons ? (
               <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
-                {debt}
-                {debtAssetIcons}
+                {collateral}
+                {collateralAssetIcons}
               </div>
             ) : (
-              debt
+              collateral
             )}
-            {debtFootnote}
+            {collateralFootnote}
           </div>
-        ) : outcomeFollows ? null : (
-          <div className="hidden sm:block" />
-        )}
+          {showDebt ? (
+            <div>
+              <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
+                <TipLabel text={debtLabel} tip={labelTips?.debt} />
+                {debtIcon}
+              </div>
+              {debtAssetIcons ? (
+                <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
+                  {debt}
+                  {debtAssetIcons}
+                </div>
+              ) : (
+                debt
+              )}
+              {debtFootnote}
+            </div>
+          ) : outcomeFollows ? null : (
+            <div className="hidden sm:block" />
+          )}
+        </Gate>
         <div>
           <div className="text-rb-500 text-xs font-semibold">
             <TipLabel text="Outcome" tip={labelTips?.outcome} />
@@ -178,14 +186,16 @@ export function ClosedPositionStats({
               ))
             : closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
         </div>
-        {extra ? (
-          <div>
-            <div className="text-rb-500 text-xs font-semibold">{extra.label}</div>
-            {extra.value}
-          </div>
-        ) : (
-          <div className="hidden sm:block" />
-        )}
+        <Gate>
+          {extra ? (
+            <div>
+              <div className="text-rb-500 text-xs font-semibold">{extra.label}</div>
+              {extra.value}
+            </div>
+          ) : (
+            <div className="hidden sm:block" />
+          )}
+        </Gate>
       </div>
     </div>
   );

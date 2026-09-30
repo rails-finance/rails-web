@@ -145,6 +145,10 @@ export interface PriceRunwayProps {
   /** Replaces the safe-side figure's wording (e.g. a runway read against the
    *  debt asset, or "At the liquidation line"). */
   label?: string;
+  /** Compact only: draw the bar alone, the figure kept for screen readers —
+   *  for a host line that states the same figure beside it (the Aave V3
+   *  card's "Liquidates on a 77% drop"). */
+  barOnly?: boolean;
 }
 
 export function PriceRunway({
@@ -155,6 +159,7 @@ export function PriceRunway({
   compact,
   asset,
   label,
+  barOnly,
 }: PriceRunwayProps) {
   const hasLiq = liqPrice != null && liqPrice > 0;
   if (!hasLiq) return null; // no debt / fully covered — nothing to plot
@@ -248,7 +253,13 @@ export function PriceRunway({
         {/* The price-fall wording is twice the length of the bare figure, so
             it may wrap onto a second line on a phone rather than squeeze the
             bar below its minimum. */}
-        <span className={`text-[11px] tabular-nums text-rb-500 ${asset ? "min-w-0" : "shrink-0 whitespace-nowrap"}`}>
+        <span
+          className={
+            barOnly && !underwater
+              ? "sr-only"
+              : `text-[11px] tabular-nums text-rb-500 ${asset ? "min-w-0" : "shrink-0 whitespace-nowrap"}`
+          }
+        >
           {underwater ? (
             <span className="font-semibold text-red-600 dark:text-red-400">Liquidatable now</span>
           ) : (
