@@ -66,7 +66,13 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
     stats.push({
       // The wallet's own claim: a − on a fill is the claim shrinking as the
       // assets leave for the wallet.
-      label: "Wallet's pool claim",
+      // On a transfer the before is the claim just before the shares arrived
+      // or left — a figure that can round to the flows' "received" total
+      // without being it (Maple newcomer round 2, M5).
+      label:
+        ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out"
+          ? "Wallet's pool claim, just before and after this transfer"
+          : "Wallet's pool claim",
       value: fmt(ctx.valueAfter),
       symbol: ctx.assetSymbol,
       prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
@@ -113,7 +119,10 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
       stats.push({
         label: "Rate at this event",
         value: (assets / shares).toFixed(6),
-        symbol: `${ctx.assetSymbol}/${ctx.poolSymbol}`,
+        // The asset's own icon beside the figure, the unit spelled out under
+        // it: a compound "USDC/syrupUSDC" has no icon and drew a bare letter.
+        symbol: ctx.assetSymbol,
+        sub: `${ctx.assetSymbol} per ${ctx.poolSymbol}`,
         prov: eventRateProv(ctx.assetSymbol, ctx.poolSymbol, ctx.eventType, coords),
       });
     }

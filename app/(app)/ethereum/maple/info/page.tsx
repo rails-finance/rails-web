@@ -12,11 +12,12 @@ const intro = (
   <>
     <p>
       Maple runs an institutional lending desk. Depositors supply USDC or USDT, and Maple lends it to trading firms and
-      funds against collateral held by custodians like BitGo and Anchorage. A loan is either fixed-term, running to a
-      maturity date, or open-term, with no maturity date and a call Maple can make with notice; the pools page shows the
-      split, and both pools here lend on open terms today. The borrowers&apos; interest is where a lender&apos;s yield
-      comes from. A depositor holds syrupUSDC or syrupUSDT, a share token whose exit rate, the amount one share pays out
-      on withdrawal, rises as that interest accrues.
+      funds against collateral held by custodians, firms such as BitGo and Anchorage that keep the collateral in
+      safekeeping and release it only on the loan&apos;s terms. A loan is either fixed-term, running to a maturity date,
+      or open-term, with no maturity date and a call Maple can make with notice; the pools page shows the split, and
+      both pools here lend on open terms today. The borrowers&apos; interest is where a lender&apos;s yield comes from.
+      A depositor holds syrupUSDC or syrupUSDT, a share token whose exit rate, the amount one share pays out on
+      withdrawal, rises as that interest accrues.
     </p>
     <p>
       Each position listed is one wallet&apos;s stake in a pool: what its shares are worth to exit today, and where it

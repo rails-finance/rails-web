@@ -46,6 +46,8 @@ import {
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
+import { RevealTip } from "@/components/shared/reveal-tip";
+import { TipLabel } from "@/components/shared/tip-label";
 
 export interface MaplePositionView {
   wallet: string;
@@ -83,14 +85,12 @@ function ClaimStack({ v }: { v: MaplePositionView }) {
       {live.map((p) => (
         <StatValue key={p.pool}>
           <Prov info={claimProv(p)}>
+            {/* The tip states the claim in its own token; the shares behind
+                it are the line beneath. */}
             <AssetAmount
               value={claimAmount(p)}
               symbol={p.assetSymbol}
-              exact={
-                p.currentValue != null
-                  ? `${formatUnitsExact(p.sharesRaw, 6)} + ${formatUnitsExact(p.escrowedSharesRaw, 6)} queued ${p.symbol}`
-                  : String(p.depositedPrincipal)
-              }
+              exact={p.currentValue != null ? undefined : String(p.depositedPrincipal)}
             />
           </Prov>
         </StatValue>
@@ -106,7 +106,7 @@ function ClaimFootnoteLines({ v, asOf = false }: { v: MaplePositionView; asOf?: 
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
       {live.map((p) => {
-        const exact = `${formatUnitsExact(p.sharesRaw, 6)} ${p.symbol}`;
+        const exact = formatUnitsExact(p.sharesRaw, 6);
         return (
           <div key={p.pool}>
             <Prov info={positionSharesProv(p.symbol)}>
@@ -191,7 +191,7 @@ function QueueStack({ v }: { v: MaplePositionView }) {
               <AssetAmount
                 value={value ?? p.escrowedShares}
                 symbol={value != null ? p.assetSymbol : p.symbol}
-                exact={`${formatUnitsExact(p.escrowedSharesRaw, 6)} ${p.symbol} escrowed`}
+                exact={value != null ? undefined : formatUnitsExact(p.escrowedSharesRaw, 6)}
               />
             </Prov>
           </StatValue>
@@ -242,9 +242,13 @@ export function MaplePositionCard({
   explanation,
   viewHref,
   captions,
+  cancelledRequests,
 }: {
   v: MaplePositionView;
   receipts?: boolean;
+  /** Requests the wallet cancelled, where the page holds its whole history:
+   *  the queue footnote then says what became of them. */
+  cancelledRequests?: number;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
@@ -293,6 +297,18 @@ export function MaplePositionCard({
   }
 
   const modeWord = v.inQueue ? "In withdrawal queue" : "Lending";
+  const modeTip = v.inQueue
+    ? "Some of the wallet's shares wait in the withdrawal queue to be paid out; they earn interest until then."
+    : "The wallet's shares are in the pool earning interest, with none waiting in the withdrawal queue.";
+  const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
+  const requestLine = (() => {
+    const n = v.requestCount;
+    const c = cancelledRequests ?? 0;
+    const noun = `request${n === 1 ? "" : "s"}`;
+    if (c <= 0 || c > n) return `${n} ${noun} lifetime`;
+    if (c === n) return n === 1 ? "1 request, cancelled" : `${n} requests, all cancelled`;
+    return `${n} ${noun}, ${c} cancelled`;
+  })();
 
   return (
     <PositionCardShell
@@ -306,10 +322,17 @@ export function MaplePositionCard({
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
+              <TipLabel text={modeWord} tip={modeTip} />
             </span>
           ) : (
-            <LifecyclePill status={v.status} />
+            <RevealTip
+              tip="Open: the wallet holds pool shares now, or has shares waiting in the withdrawal queue."
+              label="Open: the wallet holds pool shares now, or has shares waiting in the withdrawal queue."
+              focusable
+              className="focus-ring rounded-sm"
+            >
+              <LifecyclePill status={v.status} />
+            </RevealTip>
           )
         }
         leadingIdentity={
@@ -321,6 +344,8 @@ export function MaplePositionCard({
         columns={[
           {
             label: "Pool claim",
+            labelTip:
+              "What the wallet's shares pay out now: the shares times the pool's exit rate, the amount one share pays on withdrawal.",
             // Beside a single claim the amount carries its own token badge, so
             // the cluster draws only for the collapsed list of several.
             assetIcons: claimDisclosure.collapsible ? (
@@ -328,7 +353,18 @@ export function MaplePositionCard({
                 <InlineAssetCluster
                   symbols={v.pools.filter((p) => p.shares + p.escrowedShares > 0).map((p) => p.assetSymbol)}
                 />
-                <ReserveDisclosureToggle disclosure={claimDisclosure} count={liveCount} />
+                <ReserveDisclosureToggle
+                  disclosure={claimDisclosure}
+                  count={liveCount}
+                  // Each pool's claim in its own token, so a closed list still
+                  // reads: "5K USDC · 5K USDT".
+                  closedLabel={live.map((p, i) => (
+                    <span key={p.pool}>
+                      {i > 0 ? " · " : ""}
+                      <AmountText value={claimAmount(p)} format="compact" /> {p.assetSymbol}
+                    </span>
+                  ))}
+                />
               </span>
             ) : undefined,
             value: claimDisclosure.collapsible ? null : <ClaimStack v={v} />,
@@ -351,12 +387,7 @@ export function MaplePositionCard({
             // everyone's.
             label: "Queued by this wallet",
             value: <QueueStack v={v} />,
-            footnote:
-              v.requestCount > 0 ? (
-                <div className="text-xs mt-0.5 text-rb-500">
-                  {v.requestCount} request{v.requestCount === 1 ? "" : "s"} lifetime
-                </div>
-              ) : undefined,
+            footnote: v.requestCount > 0 ? <div className="text-xs mt-0.5 text-rb-500">{requestLine}</div> : undefined,
           },
           // No health-factor column: a lender has no liquidation surface —
           // default risk socializes through the pool's exit rate

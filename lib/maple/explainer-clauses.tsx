@@ -148,8 +148,7 @@ function permissionedActorMechanic(ctx: MapleContext, coords: MapleCoords): Clau
     <>
       {opened}
       nor was the caller the pool recorded. Shares only leave a position through the withdrawal queue, and another
-      address moves them by spending a share allowance the holder granted beforehand — the ordinary ERC-20 kind,
-      revocable the same way.
+      address moves them by spending a share allowance the holder granted beforehand, which the holder can revoke.
     </>,
   );
 }
@@ -348,7 +347,10 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
       return {
         happened: [
           clause(
-            <>Requested to withdraw {requestSharesFig("request")}, moving the shares into the queue&rsquo;s escrow.</>,
+            <>
+              Requested to withdraw {requestSharesFig("request")}, moving the shares into the queue, which holds them
+              for the wallet until they are paid out.
+            </>,
           ),
         ],
         changed: [hasEscrow ? clause(<>The queue now holds {escrowAfterFig()} for this position.</>) : null],
@@ -361,8 +363,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
           ),
           clause(
             <>
-              Escrowed shares are still the position&rsquo;s, and they price at the exit rate when the request fills,
-              not now.
+              Shares in the queue are still the position&rsquo;s, and they price at the exit rate when the request
+              fills, not now.
             </>,
           ),
           clause(<>The request can be reduced or cancelled before it fills, returning the shares to the wallet.</>),
@@ -375,8 +377,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
         happened: [
           clause(
             <>
-              Reduced the pending withdrawal request, returning {requestSharesFig("request_decrease")} from the
-              queue&rsquo;s escrow to the wallet.
+              Reduced the pending withdrawal request, returning {requestSharesFig("request_decrease")} from the queue to
+              the wallet.
             </>,
           ),
         ],
@@ -384,7 +386,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
           hasEscrow
             ? clause(<>The queue still holds {escrowAfterFig()} for this position.</>)
             : escrowKnown
-              ? clause(<>The queue&rsquo;s escrow for this position is now empty.</>)
+              ? clause(<>The queue holds nothing for this position now.</>)
               : null,
         ],
       };
@@ -393,12 +395,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
     case "request_cancel": {
       return {
         happened: [
-          clause(
-            <>
-              Cancelled the withdrawal request, returning {requestCancelFig()} from the queue&rsquo;s escrow to the
-              wallet.
-            </>,
-          ),
+          clause(<>Cancelled the withdrawal request, returning {requestCancelFig()} from the queue to the wallet.</>),
         ],
         meansNow: [
           clause(<>The queue position is gone.</>),
@@ -479,8 +476,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             meansNow: [
               clause(
                 <>
-                  Pool shares are ordinary ERC-20s, so the transfer moved the claim on the pool&rsquo;s {asset} into
-                  this position with no pool event.
+                  Pool shares move between wallets like any token, so the transfer moved the claim on the pool&rsquo;s{" "}
+                  {asset} into this position with no pool event.
                 </>,
               ),
             ],
@@ -515,8 +512,8 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
             meansNow: [
               clause(
                 <>
-                  Pool shares are ordinary ERC-20s, so the claim on the pool&rsquo;s {asset} moved with them and no pool
-                  event records it.
+                  Pool shares move between wallets like any token, so the claim on the pool&rsquo;s {asset} moved with
+                  them and no pool event records it.
                 </>,
               ),
             ],

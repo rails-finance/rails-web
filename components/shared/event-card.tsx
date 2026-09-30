@@ -58,6 +58,8 @@ export interface EventCardProps {
   explainerTeaserVariant?: "bullet" | "prose";
   /** Transaction hash — enables shared footer with Etherscan + TxHashBadge */
   txHash?: string;
+  /** A word before the footer's hash ("Transaction"). Unset changes nothing. */
+  txHashLabel?: string;
   /** Extra content in the footer row (e.g., Liquity collateral price) */
   footerExtra?: React.ReactNode;
   /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), rendered at the
@@ -105,6 +107,7 @@ export function EventCard({
   explainerTeaser: explainerTeaserProp,
   explainerTeaserVariant = "bullet",
   txHash,
+  txHashLabel,
   footerExtra,
   learnMore,
   hideDetailChevron,
@@ -211,7 +214,13 @@ export function EventCard({
       : []),
   ];
   const footerNode = txHash ? (
-    <EventCardFooter txHash={txHash} extra={footerExtra} learnMore={learnMore} shareHref={shareHref ?? undefined} />
+    <EventCardFooter
+      txHash={txHash}
+      txHashLabel={txHashLabel}
+      extra={footerExtra}
+      learnMore={learnMore}
+      shareHref={shareHref ?? undefined}
+    />
   ) : undefined;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
