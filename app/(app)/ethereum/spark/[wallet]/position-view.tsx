@@ -407,18 +407,21 @@ export default function SparkPositionDetail({
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
   const lifetimeEvents = lifetimeKnown ? sparkEvents : undefined;
   // Lifetime flows over time (rails-ops reference/lifetime-flows-scrubber.md):
-  // the date scrubber leads the panel and the ledger sits one click under it.
-  // Its day rows and daily prices come from the index for the whole history,
-  // so a windowed or folder-served page draws it too. A failed read leaves the
-  // ledger on the page's own rows.
+  // the date scrubber. Its day rows and daily prices come from the index for
+  // the whole history, so a windowed or folder-served page draws it too. A
+  // failed read says so in the panel.
+  const [flowSeriesFailed, setFlowSeriesFailed] = useState(false);
   const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
   useEffect(() => {
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowSeriesFailed(false);
     fetchFlowSeries("/api/spark/flows", { wallet }, ctl.signal)
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowSeriesFailed(true);
       });
     return () => ctl.abort();
   }, [wallet]);
@@ -684,9 +687,6 @@ export default function SparkPositionDetail({
     [view, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
-  // Lifetime's health line (lib/shared/flows-series.ts): today's threshold.
-  const healthThreshold =
-    chain && !chain.chainStale && chain.avgLiquidationThreshold > 0 ? chain.avgLiquidationThreshold : null;
   const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
   const flowTimeline = useMemo(
     () => (flowSeries ? sparkFlowSeriesTimeline(flowSeries, towerData, view?.priceByAddress) : null),
@@ -815,7 +815,7 @@ export default function SparkPositionDetail({
           )}
           {towerData && (
             <LifetimeFlowsPanel
-              ledger={towerData}
+              read={flowSeries ? "done" : flowSeriesFailed ? "failed" : "reading"}
               explanation={sparkEconomicsExplanation(
                 towerData,
                 sparkEvents.some((e) => isGatewayWithdrawal(e.context.data)),
@@ -824,13 +824,7 @@ export default function SparkPositionDetail({
               )}
               learnMore={sparkEconomicsContent(towerData)}
               scrubber={
-                flowTimeline ? (
-                  <LifetimeFlowsScrubber
-                    timeline={flowTimeline}
-                    series={flowSeriesSource}
-                    healthThreshold={healthThreshold}
-                  />
-                ) : null
+                flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} series={flowSeriesSource} /> : null
               }
             />
           )}

@@ -2,13 +2,12 @@
 
 // <LifetimeFlowsPanel> — the Lifetime flows panel on a position page that has a
 // date scrubber (rails-ops reference/lifetime-flows-scrubber.md): the header
-// that collapses the panel, the scrubber, Full breakdown over the ledger
-// (flows-ledger.tsx) with the note naming the stop it shows, and the
-// Explanation with the scrubber's Key after its prose. The scrubber reports
-// the Key's hatches where it draws them, and a line each for the Key and the
-// Explanation on which of its two views (the bars, Lifetime) is which. Until
-// the scrubber's timeline lands, or where its read fails, the ledger shows
-// open with no Full breakdown control.
+// that collapses the panel, the scrubber, and the Explanation with the
+// scrubber's Key after its prose. The scrubber reports the Key's hatches where
+// it draws them, and a line each for the Key and the Explanation on which of
+// its two views (the bars, Lifetime) is which. Until the scrubber's timeline
+// lands the panel says it is reading; where that read fails, that it was not
+// read.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -17,13 +16,7 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ChartBarBig, ChevronDown } from "lucide-react";
-import {
-  FlowsKey,
-  FlowsKeyContext,
-  FlowsLedgerNoteContext,
-  type FlowsKeyItems,
-} from "@/components/shared/lifetime-flows-scrubber";
-import { FlowsLedger, ledgerDrawable } from "@/components/shared/flows-ledger";
+import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -36,13 +29,16 @@ import {
   isFlowsCollapsed,
   setFlowsCollapsed,
 } from "@/lib/shared/flows-collapse-store";
-import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
+
+/** Where the scrubber's timeline read stands. */
+export type FlowsRead = "reading" | "failed" | "done";
 
 export interface LifetimeFlowsPanelProps {
-  /** The ledger behind Full breakdown. */
-  ledger: ChainTruthTowerData;
   /** `<LifetimeFlowsScrubber>`, or null while its timeline is not in hand. */
   scrubber: ReactNode | null;
+  /** The timeline read. Done with no scrubber: nothing to draw, and the panel
+   *  renders nothing. */
+  read: FlowsRead;
   /** The Explanation's prose; the scrubber's Key follows it. */
   explanation?: ReactNode;
   /** The "?" FAQ at the foot of the Explanation. */
@@ -55,8 +51,8 @@ export interface LifetimeFlowsPanelProps {
 }
 
 export function LifetimeFlowsPanel({
-  ledger,
   scrubber,
+  read,
   explanation,
   learnMore,
   title = "Lifetime flows",
@@ -64,13 +60,8 @@ export function LifetimeFlowsPanel({
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
-  // The ledger behind the scrubber: closed by default.
-  const [ledgerOpen, setLedgerOpen] = useState(false);
-  // What the ledger shows while the scrubber's slider is off its last stop.
-  const [ledgerNote, setLedgerNote] = useState<string | null>(null);
   // The scrubber's Key, drawn inside the Explanation.
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
-  const ledgerShown = scrubber == null || ledgerOpen;
   // Collapsed, per protocol. No collapsed attribute is written until the
   // store has been read: the pre-paint script owns it for the first frames.
   const [collapsed, setCollapsed] = useState(false);
@@ -84,10 +75,10 @@ export function LifetimeFlowsPanel({
   const reactId = useId();
   const bodyId = collapseKey ? `flows-body-${collapseKey}` : reactId;
   const registry = useReceiptRegistry();
-  if (!ledgerDrawable(ledger).any) return null;
+  if (scrubber == null && read === "done") return null;
 
   return (
-    // Its own receipts scope: every traced line in the ledger registers here.
+    // Its own receipts scope: every traced figure in the panel registers here.
     <ProvReceiptsScope registry={registry}>
       <section
         data-skel-section="detail-economics"
@@ -125,35 +116,18 @@ export function LifetimeFlowsPanel({
           )}
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
-          {scrubber != null && (
-            <>
-              <FlowsLedgerNoteContext.Provider value={setLedgerNote}>
-                <FlowsKeyContext.Provider value={setFlowsKey}>
-                  <div className="mt-2">{scrubber}</div>
-                </FlowsKeyContext.Provider>
-              </FlowsLedgerNoteContext.Provider>
-              <div className="mt-3 flex flex-wrap items-center gap-x-2">
-                <button
-                  type="button"
-                  onClick={() => setLedgerOpen((v) => !v)}
-                  aria-expanded={ledgerOpen}
-                  aria-controls={`${bodyId}-ledger`}
-                  className={`${CTRL_GHOST} -mx-1 gap-1 rounded-md px-1 text-xs font-semibold text-foreground`}
-                >
-                  Full breakdown
-                  <ChevronDown size={14} aria-hidden className={ledgerOpen ? "rotate-180" : ""} />
-                </button>
-                {ledgerNote && (
-                  <span className="text-xs text-rb-500" data-flow-ledger-note="">
-                    {ledgerNote}
-                  </span>
-                )}
-              </div>
-            </>
+          {scrubber != null ? (
+            <FlowsKeyContext.Provider value={setFlowsKey}>
+              <div className="mt-2">{scrubber}</div>
+            </FlowsKeyContext.Provider>
+          ) : (
+            <p
+              className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
+              data-flows-read={read}
+            >
+              {read === "failed" ? "The flow history was not read. Reload to try again." : "Reading the flow history…"}
+            </p>
           )}
-          <div id={`${bodyId}-ledger`} hidden={!ledgerShown} className={scrubber != null ? "mt-2" : undefined}>
-            <FlowsLedger data={ledger} />
-          </div>
           <ProvenanceInfoTabs
             className="mt-3"
             explanation={

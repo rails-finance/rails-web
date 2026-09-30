@@ -203,7 +203,3 @@ export function groupOperations(events: OpEvent[]): FlowOperations | null {
     executor,
   };
 }
-
-/** Health factor from held and owed at one liquidation threshold. */
-export const healthAt = (collateral: number, debt: number, threshold: number): number | null =>
-  debt > 0.5 && threshold > 0 ? (collateral * threshold) / debt : null;

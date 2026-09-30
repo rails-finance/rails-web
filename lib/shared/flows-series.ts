@@ -23,10 +23,6 @@ export type SeriesBin = "week" | "month";
 /** The bars cover this many active days (days with events) back from today. */
 export const WINDOW_ACTIVE_DAYS = 300;
 
-/** The Lifetime view's health factor line: every past bin at today's
- *  liquidation threshold, labelled so. False drops it everywhere. */
-export const SHOW_HEALTH_OVER_TIME = true;
-
 /** A life of more than three years is drawn by month, else by week. */
 export function lifetimeBinFor(spanDays: number): SeriesBin {
   return spanDays > 3 * 365 ? "month" : "week";

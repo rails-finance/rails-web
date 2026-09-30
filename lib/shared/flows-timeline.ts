@@ -311,6 +311,15 @@ export function axisFor(peak: number): { max: number; ticks: number[] } {
   return { max, ticks };
 }
 
+/** Whether the axis label at `i` of `count` is drawn below the sm breakpoint.
+ *  An axis of more than five labels keeps the first, the last and every other
+ *  one between that sits two steps clear of the last ("$12.5M$15.0M" ran
+ *  together at 390px). */
+export function axisLabelOnPhone(i: number, count: number): boolean {
+  const last = count - 1;
+  return !(last > 4 && i !== 0 && i !== last && (i % 2 === 1 || last - i < 2));
+}
+
 /** A page's events as day rows: each day's running totals, the balances its
  *  events stated, and the prices they carried, as the day's last event left
  *  them. */

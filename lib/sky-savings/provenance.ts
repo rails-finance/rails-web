@@ -307,27 +307,6 @@ export const rateChangeProv = (block: number, txHash: string, ssr: string, annua
   source: { block, txHash },
 });
 
-// ── the ledger under Lifetime flows ─────────────────────────────────────────
-
-export const ledgerLineProv = (
-  line: "held" | "deposited" | "received" | "withdrawn" | "sent" | "earned",
-  block: number,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: {
-    held: `Worth now — the sUSDS held at block ${n(block)} times the share price there.`,
-    deposited: `Deposited — every Deposit log's assets word for this address, added up to block ${n(block)}.`,
-    received: `Received — every transfer in, each at the share price of its block, added up to block ${n(block)}.`,
-    withdrawn: `Withdrawn — every Withdraw log's assets word for this address, added up to block ${n(block)}.`,
-    sent: `Sent — every transfer out, each at the share price of its block, added up to block ${n(block)}.`,
-    earned: `Interest earned — worth now, plus withdrawn and sent, less deposited and received, at block ${n(block)}.`,
-  }[line],
-  contract: SUSDS_CONTRACT,
-  via: LEDGER,
-  source: { block },
-});
-
 export const eventInterestSinceProv = (
   c: SkyEventCoords,
   raw: string,

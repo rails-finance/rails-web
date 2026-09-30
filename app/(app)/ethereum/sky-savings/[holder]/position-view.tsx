@@ -1,7 +1,7 @@
 "use client";
 
 // Sky Savings position — the three sections (standards/detail-page-anatomy.md):
-// the card, Lifetime flows (the date scrubber over the ledger), the timeline.
+// the card, Lifetime flows (the date scrubber), the timeline.
 // Every figure is at the sealed block the api names; the server half has
 // already refused the page when the gate did not pass.
 
@@ -26,7 +26,7 @@ import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
 import { pctString, rayNumber, toutAt, usdcPerUsdsAt } from "@/lib/sky-savings/math";
-import { skyFlowTimeline, skyLifetimeTotals, skyTowerData } from "@/lib/sky-savings/flows";
+import { skyFlowTimeline, skyLifetimeTotals } from "@/lib/sky-savings/flows";
 import { skyFlowsExplanation } from "@/lib/sky-savings/flows-explanation";
 import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
 import { chiProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
@@ -138,7 +138,6 @@ export default function SkySavingsPositionView({
   }, [open, rates, newestBlock, asOf.block, rateNotes, toNotes]);
 
   const totals = useMemo(() => (days ? skyLifetimeTotals(days) : null), [days]);
-  const tower = useMemo(() => skyTowerData(position, totals, asOf.block), [position, totals, asOf.block]);
   const flowTimeline = useMemo(
     () => (days && rates ? skyFlowTimeline(days, rates, position, asOf, todayDay) : null),
     [days, rates, position, asOf, todayDay],
@@ -201,7 +200,7 @@ export default function SkySavingsPositionView({
       />
 
       <LifetimeFlowsPanel
-        ledger={tower}
+        read={flowTimeline || (days && rates) ? "done" : "failed"}
         explanation={skyFlowsExplanation(position, totals)}
         learnMore={skyFlowsContent()}
         scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}

@@ -2,8 +2,10 @@
 
 // <LifetimeFlowsScrubber> — Lifetime flows as two horizontal bars on one USD
 // axis, with a date scrubber under them (rails-ops
-// reference/lifetime-flows-scrubber.md). Solid is what is still there, each
-// kind of exit its own hatch, named in the Key inside the panel's Explanation
+// reference/lifetime-flows-scrubber.md). The two headline figures share one
+// row over the bars; the axis's labels sit once, under the last bar, and its
+// gridlines run behind both. Solid is what is still there, each kind of exit
+// its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
 // them. Under each bar one line says where its length came from; hovering or
@@ -29,7 +31,6 @@ import {
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Prov } from "@/components/shared/provenance";
-import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_HOVER } from "@/lib/shared/ui-grammar";
@@ -55,7 +56,7 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { BusyFlows } from "@/components/shared/lifetime-flows-busy";
+import { AxisLabels, BusyFlows, Headline } from "@/components/shared/lifetime-flows-busy";
 import { LifetimeOverTime } from "@/components/shared/lifetime-flows-over-time";
 import {
   binInputFromTimeline,
@@ -128,15 +129,15 @@ const pct = (v: number, max: number) => `${Math.max(0, (v / max) * 100)}%`;
 /** "7 Feb '26": the timeline's day stamp (chain-truth-timeline). */
 const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
 
-/** A held line that names a token (the ledger's summed interest line names none). */
+/** A held line that names a token (the summed interest line names none). */
 const isToken = (h: FlowAssetHeld) => h.amount != null;
 
 /** The highlight key a segment answers to: its link group, else its own key. */
 const hlKey = (s: FlowSegment) => (s.link ? `link:${s.link}` : s.key);
 
-/** Set by the panel around the scrubber: told what the ledger under it shows
- *  while the slider is off its last stop ("Shows the position today"), and
- *  null at the last stop, where the two agree. */
+/** Set around the scrubber by a panel that draws a ledger under it (Aave V4):
+ *  told what the ledger shows while the slider is off its last stop ("Shows
+ *  the position today"), and null at the last stop, where the two agree. */
 export const FlowsLedgerNoteContext = createContext<((note: string | null) => void) | null>(null);
 
 /** The Key: each kind of exit the position has had over its life, and the
@@ -388,6 +389,7 @@ function SideBlock({
   motion,
   when,
   assets,
+  last,
   atLive,
 }: {
   side: FlowSide;
@@ -400,8 +402,8 @@ function SideBlock({
   onPin: (k: string) => void;
   motion: string;
   assets: ReturnType<typeof assetsAt>;
-  /** The first bar drawn. Each bar carries the axis labels over it. */
-  first: boolean;
+  /** The last bar drawn, which carries the axis labels under it. */
+  last: boolean;
   /** The last stop, where no "today" outline is drawn (`isLive` there is
    *  false on a closed position: its receipts read as the close's). */
   atLive: boolean;
@@ -411,7 +413,6 @@ function SideBlock({
   const outs = st.bar.filter((s) => s.fill === "out");
   const liquidated = outs.filter((s) => s.tone === "liquidation").reduce((a, s) => a + s.value, 0);
   const repaid = st.out - liquidated;
-  const held = st.bar[0];
   const spoken = coll
     ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
     : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
@@ -423,7 +424,6 @@ function SideBlock({
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
   const sideHeld = assets.held.filter((h) => h.side === side);
-  const heldTokens = sideHeld.filter((h) => isToken(h) && (h.amount ?? 0) > 0).map((h) => h.symbol);
   const split: AssetSplit = new Map();
   split.set(
     `${side}-held`,
@@ -432,15 +432,7 @@ function SideBlock({
   for (const b of model.buckets) if (b.side === side) split.set(b.key, assets.flows.get(b.key) ?? []);
 
   return (
-    <div className="mt-4 first:mt-1">
-      <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <Prov info={flowSegmentProv(held, side, when, isLive, model.daily)}>
-          <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
-        </Prov>
-        {heldTokens.length > 0 && <InlineAssetCluster symbols={heldTokens} size={16} overlap={5} max={3} />}
-        <span className="text-xs text-rb-500">{word}</span>
-      </div>
-      <AxisLabels model={model} />
+    <div className="mt-3 first:mt-0" data-flow-side={side}>
       <Strip
         side={side}
         segments={st.bar}
@@ -455,6 +447,7 @@ function SideBlock({
         motion={motion}
         split={split}
       />
+      {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
       <SourceLine side={side} segments={st.sources} when={when} isLive={isLive} daily={model.daily} />
     </div>
   );
@@ -569,34 +562,6 @@ function PipTip({ at }: { at: PipOpen }) {
   );
 }
 
-/** The shared axis's labels, over the first bar. Below the sm breakpoint an
- *  axis of more than five labels keeps the first, the last and every other
- *  one between that sits two steps clear of the last ("$12.5M$15.0M" ran
- *  together at 390px). */
-function AxisLabels({ model }: { model: FlowModel }) {
-  const last = model.axis.ticks.length - 1;
-  const phoneHidden = (i: number) => last > 4 && i !== 0 && i !== last && (i % 2 === 1 || last - i < 2);
-  return (
-    <div className="relative mb-1 h-4 text-[11px] tabular-nums text-rb-500" aria-hidden data-prov-exempt="">
-      {model.axis.ticks.map((t, i) => {
-        const at = t / model.axis.max;
-        return (
-          <span
-            key={t}
-            className={`absolute top-0${phoneHidden(i) ? " max-sm:hidden" : ""}`}
-            style={{
-              left: `${at * 100}%`,
-              transform: at === 0 ? "none" : at > 0.9 ? "translateX(-100%)" : "translateX(-50%)",
-            }}
-          >
-            {formatFlowUsd(t)}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 /** Where the Lifetime view reads its series: the family's route
  *  (`/api/spark/flows/series`) and the position's parameters. */
 export type FlowSeriesSource = { path: string; params: Record<string, string> };
@@ -607,12 +572,9 @@ export type FlowSeriesSource = { path: string; params: Record<string, string> };
  *  treatment (lib/shared/flows-busy.ts) where their window is busy. */
 export function LifetimeFlowsScrubber({
   timeline,
-  healthThreshold,
   series,
 }: {
   timeline: FlowTimeline;
-  /** The account's liquidation threshold now, for Lifetime's health line. */
-  healthThreshold?: number | null;
   /** The family's series route; absent, Lifetime bins the timeline's own day
    *  rows (a page that holds them all, Sky Savings). */
   series?: FlowSeriesSource;
@@ -692,7 +654,6 @@ export function LifetimeFlowsScrubber({
           series={lifetime?.series ?? null}
           failed={lifetime?.failed ?? false}
           windowFrom={from > 0 ? startDay + from : null}
-          healthThreshold={healthThreshold ?? null}
         />
       ) : busy ? (
         <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
@@ -877,9 +838,15 @@ function ScrubberBody({
   };
   return (
     <div className="text-sm">
-      <p className="mb-3 font-semibold tabular-nums text-foreground" aria-live="polite">
+      <p className="mb-2 font-semibold tabular-nums text-foreground" aria-live="polite">
         {dateLine}
       </p>
+      <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        <Headline side="collateral" st={s.collateral} model={model} when={when} isLive={liveReceipts} assets={assets} />
+        {hasDebt && (
+          <Headline side="debt" st={s.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
+        )}
+      </div>
       <SideBlock
         side="collateral"
         st={s.collateral}
@@ -892,7 +859,7 @@ function ScrubberBody({
         motion={motion}
         when={when}
         assets={assets}
-        first
+        last={!hasDebt}
       />
       {/* A one-sided position (savings, a lender) names no debt bucket and
           draws a single bar. */}
@@ -909,7 +876,7 @@ function ScrubberBody({
           motion={motion}
           when={when}
           assets={assets}
-          first={false}
+          last
         />
       )}
 

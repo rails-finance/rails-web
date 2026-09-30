@@ -53,6 +53,7 @@ import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeli
 import {
   assetsAt,
   axisFor,
+  axisLabelOnPhone,
   buildFlowModel,
   daysFromEvents,
   dayStart,
@@ -206,6 +207,24 @@ test("the stale WBTC price is marked where it steps", () => {
 test("the axis rule", () => {
   assert.deepEqual(model.axis, { max: 320_000, ticks: [0, 100_000, 200_000, 300_000] });
   assert.deepEqual(axisFor(122_043), { max: 125_000, ticks: [0, 25_000, 50_000, 75_000, 100_000, 125_000] });
+});
+
+test("the axis's labels at phone width: the ends always, never two neighbours, the last two steps clear", () => {
+  for (let count = 1; count <= 14; count++) {
+    const shown = Array.from({ length: count }, (_, i) => i).filter((i) => axisLabelOnPhone(i, count));
+    assert.equal(shown[0], 0, `count ${count}: the first`);
+    assert.equal(shown[shown.length - 1], count - 1, `count ${count}: the last`);
+    if (count <= 5) assert.equal(shown.length, count, `count ${count}: five or fewer all shown`);
+    else
+      for (let k = 1; k < shown.length; k++)
+        assert.ok(shown[k] - shown[k - 1] >= 2, `count ${count}: ${shown.join(",")} has neighbours`);
+  }
+  // The screenshot wallet's scale: $50k steps, $0 / $100k / $200k / $300k on a phone.
+  const { ticks } = axisFor(290_000);
+  assert.deepEqual(
+    ticks.filter((_, i) => axisLabelOnPhone(i, ticks.length)),
+    [0, 100_000, 200_000, 300_000],
+  );
 });
 
 test("the number format", () => {
