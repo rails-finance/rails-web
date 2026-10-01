@@ -31,6 +31,11 @@ export interface FocusEvent {
   tx?: string;
   /** Each leg's bucket, its USD, and the token amount it moved. */
   legs: { bucket: string; usd: number | null; amount?: number; symbol?: string }[];
+  /** Where the family's replay states it (the Liquity family): each side's
+   *  USD just before and once the event's transaction had run, at the
+   *  transaction's price, and its token move. The Aave family reads these
+   *  from the Pool at the block instead. */
+  sides?: Record<FlowSide, { before: number; after: number; amount: number; symbol: string }>;
 }
 
 /** Where the panel's cursor stands: the last second its figures cover, the
@@ -142,11 +147,19 @@ export function sinceEvent(
 ): { held: number; lines: { key: string; label: string; at: number; now: number }[] } {
   const s = stateAt(model, stop)[side];
   const cumNow = model.rows[rowIndexAt(model, stop)]?.cum ?? {};
+  // At the live stop, what no event has recorded yet lands on its line (a
+  // Liquity Trove's pending redistribution and batch fee), as on the bars.
+  const pending: Record<string, number> = {};
+  if (stop >= model.liveStop)
+    for (const p of model.live.pending ?? []) pending[p.bucket] = (pending[p.bucket] ?? 0) + p.usd;
   const lines: { key: string; label: string; at: number; now: number }[] = [];
   for (const b of model.buckets as FlowBucket[]) {
     if (b.side !== side) continue;
     const at = cum.after[b.key] ?? 0;
-    const now = stop >= model.liveStop ? (model.rows[model.rows.length - 1].cum[b.key] ?? 0) : (cumNow[b.key] ?? 0);
+    const now =
+      stop >= model.liveStop
+        ? (model.rows[model.rows.length - 1].cum[b.key] ?? 0) + (pending[b.key] ?? 0)
+        : (cumNow[b.key] ?? 0);
     if (Math.round(now) !== Math.round(at)) lines.push({ key: b.key, label: b.label, at, now });
   }
   return { held: s.now, lines };

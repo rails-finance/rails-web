@@ -20,7 +20,13 @@ import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
-import { liquityFlowTimeline, liquityV2FlowEvents, unpricedEvents } from "@/lib/shared/liquity-flows";
+import {
+  liquityFlowTimeline,
+  liquityFocusEvents,
+  liquityV2FlowEvents,
+  unpricedEvents,
+} from "@/lib/shared/liquity-flows";
+import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { liquityEconomicsExplanation, liquityRedemptionOutcome } from "@/lib/liquity/economics-explanation";
@@ -425,6 +431,14 @@ export default function TroveView({
           }),
     [flowEvents, flowCollSymbol, flowDebtSymbol, flowSurplusClaimed, flowsNow, flowOpen, flowPrice, liveState],
   );
+  // The panel and the timeline are tied by the day (components/shared/flow-focus-context.tsx):
+  // Apply to timeline, each day's mark, and each card's sum as of its event,
+  // read from the same replay.
+  const focusEvents = useMemo(
+    () => liquityFocusEvents(flowEvents, flowCollSymbol, flowDebtSymbol),
+    [flowEvents, flowCollSymbol, flowDebtSymbol],
+  );
+  const flowFocus = useFlowFocusValue(useFlowFocusRoot(focusEvents), flowTimeline);
 
   const olderCount = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
   const tl = useTimelineEvents(timelineEvents, {
@@ -562,7 +576,7 @@ export default function TroveView({
       : undefined;
 
   return (
-    <>
+    <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="liquity-v2"
@@ -702,6 +716,6 @@ export default function TroveView({
         </LiquityTroveBarsProvider>
       </div>
       <ProvInspectorLayer />
-    </>
+    </FlowFocusContext.Provider>
   );
 }

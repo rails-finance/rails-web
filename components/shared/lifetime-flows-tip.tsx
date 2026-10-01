@@ -139,7 +139,7 @@ export interface FlowCursor {
 }
 export const FlowCursorContext = createContext<FlowCursor | null>(null);
 
-/** On a page that ties the panel to its timeline (the Aave family), a segment
+/** On a page that ties the panel to its timeline (the Aave and Liquity families), a segment
  *  opens a short tip instead of its panel: a click, a tap or Enter shows its
  *  line, its value and its share of the bar (`SegmentTipBody`), in the same
  *  popover or bottom sheet. Hovering shows nothing. The view that draws the
@@ -328,7 +328,7 @@ function PanelDate({ cursor }: { cursor: FlowCursor | null }) {
   );
 }
 
-/** A segment's tip on the Aave family: the date its figures are at, its
+/** A segment's tip on the Aave and Liquity families: the date its figures are at, its
  *  swatch and line, its value and its share of its bar's length (everything
  *  that came in on that side); on a busy bar, what is held. */
 export function SegmentTipBody({

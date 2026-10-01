@@ -28,6 +28,7 @@
 
 import type { FlowBucket, FlowDayRow, FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import { daysFromEvents } from "@/lib/shared/flows-timeline";
+import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 
@@ -290,6 +291,12 @@ const COLL_BUCKETS = new Set<string>([
   LQ.surplus,
 ]);
 
+const OUT_BUCKETS = new Set<string>(
+  liquityFlowBuckets(false)
+    .filter((b) => b.dir === "out")
+    .map((b) => b.key),
+);
+
 /** The debt's price on a day: $1 plus the interest its rate builds on the
  *  recorded debt from the Trove's last event to the day's end. */
 function accrualFactor(rate: number, fee: number, sinceTs: number, atTs: number): number {
@@ -405,6 +412,56 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     today,
     words: liquityFlowWords(o.collSymbol, o.debtSymbol),
   };
+}
+
+/** The Trove's events as the event cards' sums read them (lib/shared/flow-focus.ts):
+ *  each event's legs in USD at its price, ascending in the replay's order,
+ *  the same legs the day rows add up. Each side's USD just before and once
+ *  the event's transaction had run is the transaction's last recorded
+ *  balance at that event's price, less the transaction's legs (the interest
+ *  stays in the before: it had built up by the block). */
+export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: string, debtSymbol: string): FocusEvent[] {
+  const replayed = replayLiquity(events);
+  const byTx = new Map<string, LiquityReplayed[]>();
+  for (const r of replayed) {
+    const k = r.ev.tx ?? r.ev.id;
+    const list = byTx.get(k);
+    if (list) list.push(r);
+    else byTx.set(k, [r]);
+  }
+  return replayed.map((r) => {
+    const tx = byTx.get(r.ev.tx ?? r.ev.id) ?? [r];
+    const lastOf = tx[tx.length - 1];
+    let collMove = 0;
+    let debtMove = 0;
+    for (const t of tx)
+      for (const l of t.legs) {
+        const sign = OUT_BUCKETS.has(l.bucket) ? -1 : 1;
+        if (COLL_BUCKETS.has(l.bucket)) collMove += sign * l.amount;
+        else if (l.bucket !== LQ.interest && l.bucket !== LQ.batchFee) debtMove += sign * l.amount;
+      }
+    const collAfter = Math.max(0, lastOf.ev.collAfter);
+    const debtAfter = Math.max(0, lastOf.ev.debtAfter);
+    return {
+      id: r.ev.id,
+      ts: r.ev.ts,
+      ...(r.ev.tx ? { tx: r.ev.tx } : {}),
+      legs: r.legs.map((l) =>
+        COLL_BUCKETS.has(l.bucket)
+          ? { bucket: l.bucket, usd: l.amount * r.price, amount: l.amount, symbol: collSymbol }
+          : { bucket: l.bucket, usd: l.amount, amount: l.amount, symbol: debtSymbol },
+      ),
+      sides: {
+        collateral: {
+          before: Math.max(0, collAfter - collMove) * lastOf.price,
+          after: collAfter * lastOf.price,
+          amount: collMove,
+          symbol: collSymbol,
+        },
+        debt: { before: Math.max(0, debtAfter - debtMove), after: debtAfter, amount: debtMove, symbol: debtSymbol },
+      },
+    };
+  });
 }
 
 /** The panel's words for a Trove. */

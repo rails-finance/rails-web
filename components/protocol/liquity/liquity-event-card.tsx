@@ -16,6 +16,8 @@ import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
+import { ReceiptCalcButton, ReceiptCalcContext, useReceiptCalc } from "@/components/shared/flow-event-sum";
+import { LiquityEventSum } from "@/components/protocol/liquity-family/liquity-event-sum";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -56,6 +58,10 @@ export function LiquityEventCard({
   const ctx = event.context.data;
   const wallet = event.wallet;
   const { prefs } = usePreferences();
+  // The card's calculator (components/shared/flow-event-sum.tsx): on a page
+  // that ties the timeline to the Lifetime flows panel, it shows the Trove's
+  // lifetime sum as of this event in place of the grid.
+  const { calc, hasSum } = useReceiptCalc(event.id);
 
   // Column 1 — Avatar
   const avatarSlot =
@@ -256,50 +262,57 @@ export function LiquityEventCard({
   );
 
   return (
-    <EventCard
-      avatar={avatarOverride ?? avatarSlot}
-      iconColumn={iconSlot}
-      header={
-        <LiquityEventHeader
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-        />
-      }
-      headerBars={<TroveBarsSlot eventId={event.id} />}
-      detail={
-        <LiquityEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          previousEvent={previousEvent}
-          currentEvent={event}
-          currentPrice={currentPrice}
-        />
-      }
-      explainer={
-        <LiquityEventExplainer
-          ctx={ctx}
-          previousEvent={previousEvent}
-          currentEvent={event}
-          currentPrice={currentPrice}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          // Passive events (redemption/liquidation/pending-debt application) are sent by a
-          // third party — the redeemer or liquidator pays the gas, not the Trove owner — so
-          // attributing this tx's gas to the owner would be misleading; the gas clause is
-          // omitted for them.
-          gas={isPassive ? undefined : event.gas}
-          skipLead
-        />
-      }
-      explainerTeaser={liquityTeaser}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={liquityLearnMoreContent(ctx)} />}
-      persistKey={`liquity-v2:${event.id}`}
-      caption={liquityOperationLabel(ctx)}
-    />
+    <ReceiptCalcContext.Provider value={calc}>
+      <EventCard
+        avatar={avatarOverride ?? avatarSlot}
+        infoAction={hasSum ? <ReceiptCalcButton /> : undefined}
+        iconColumn={iconSlot}
+        header={
+          <LiquityEventHeader
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+          />
+        }
+        headerBars={<TroveBarsSlot eventId={event.id} />}
+        detail={
+          calc.on && hasSum ? (
+            <LiquityEventSum eventId={event.id} eventTs={event.timestamp} />
+          ) : (
+            <LiquityEventDetail
+              ctx={ctx}
+              txHash={event.txHash}
+              blockNumber={event.blockNumber}
+              previousEvent={previousEvent}
+              currentEvent={event}
+              currentPrice={currentPrice}
+            />
+          )
+        }
+        explainer={
+          <LiquityEventExplainer
+            ctx={ctx}
+            previousEvent={previousEvent}
+            currentEvent={event}
+            currentPrice={currentPrice}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            // Passive events (redemption/liquidation/pending-debt application) are sent by a
+            // third party — the redeemer or liquidator pays the gas, not the Trove owner — so
+            // attributing this tx's gas to the owner would be misleading; the gas clause is
+            // omitted for them.
+            gas={isPassive ? undefined : event.gas}
+            skipLead
+          />
+        }
+        explainerTeaser={liquityTeaser}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={liquityLearnMoreContent(ctx)} />}
+        persistKey={`liquity-v2:${event.id}`}
+        caption={liquityOperationLabel(ctx)}
+      />
+    </ReceiptCalcContext.Provider>
   );
 }

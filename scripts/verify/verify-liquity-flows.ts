@@ -12,7 +12,10 @@
 // Held: the replay's token totals meet the last recorded balances on both
 // sides; the interest is never negative; and at every event day, a few days
 // between, and the live stop, each side's printed lines add to its printed
-// total, the remainder named for what it holds.
+// total, the remainder named for what it holds. Each event card's sum
+// (liquityFocusEvents through lib/shared/flow-focus.ts) is exact at every
+// event, its printed lines add to the card's figure, "Since this event" meets
+// the bars at later cursor dates, and the daily line meets the bars.
 //
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
@@ -24,6 +27,7 @@ import { isEbisuEvent } from "@/lib/shared/types/event-shape";
 import {
   LQ,
   liquityFlowTimeline,
+  liquityFocusEvents,
   liquityForkFlowEvents,
   liquityV2FlowEvents,
   replayLiquity,
@@ -32,7 +36,8 @@ import {
 import { troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
 import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
-import { binInputFromTimeline, binSeries } from "@/lib/shared/flows-series";
+import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
+import { eventCum, eventSideSum, sinceEvent } from "@/lib/shared/flow-focus";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
 
 const FIX = join(__dirname, "fixtures");
@@ -210,4 +215,99 @@ test("the basis line names what each remainder holds", () => {
     sumBasis(st.debt, "Interest since the last event", "owed", "today"),
     /^Debt is counted at BOLD's \$1 face\. .* so it is the interest built up on the recorded debt since the Trove's last event\.$/,
   );
+});
+
+// ── The event card's sum (lib/shared/flow-focus.ts over liquityFocusEvents) ──
+
+for (const [name, events, symbols, open] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+] as const) {
+  test(`${name}: every event card's sum is exact, and its printed lines add to the printed total`, () => {
+    const ev = events as LiquityFlowEvent[];
+    const [coll, debt] = symbols as unknown as [string, string];
+    const m = model(ev, [coll, debt], open);
+    const focus = liquityFocusEvents(ev, coll, debt);
+    assert.equal(focus.length, ev.length, "one focus event per Trove event");
+    for (const f of focus) {
+      const cum = eventCum(m, focus, f.id);
+      assert.ok(cum, `${name} ${f.id}: the model holds its day`);
+      assert.ok(cum.exact, `${name} ${f.id}: the legs add to the day row's move`);
+      for (const side of ["collateral", "debt"] as const) {
+        const held = f.sides![side].after;
+        const rows = eventSideSum(m, side, cum, held);
+        const printed = rows.lines.reduce((a, l) => a + l.dollars, 0);
+        assert.equal(printed, rows.total.dollars, `${name} ${f.id} ${side}: lines add to the total`);
+        assert.equal(rows.total.dollars, Math.round(held), `${name} ${f.id} ${side}: the total is the card's figure`);
+        if (side === "debt") {
+          // Interest is exact event by event: nothing is left for the remainder.
+          const rest = rows.lines.find((l) => l.kind === "rest");
+          assert.ok(!rest || Math.abs(rest.dollars) <= 1, `${name} ${f.id}: no debt remainder (${rest?.dollars})`);
+        }
+      }
+    }
+  });
+  test(`${name}: "Since this event" at a few cursor dates states the bars' figures`, () => {
+    const ev = events as LiquityFlowEvent[];
+    const [coll, debt] = symbols as unknown as [string, string];
+    const m = model(ev, [coll, debt], open);
+    const focus = liquityFocusEvents(ev, coll, debt);
+    const first = focus[0];
+    const cum = eventCum(m, focus, first.id)!;
+    const stops = cursorStops(m).filter((s) => s > cum.stop);
+    for (const stop of [stops[0], stops[Math.floor(stops.length / 2)], m.liveStop].filter((s) => s != null)) {
+      const st = stateAt(m, stop);
+      for (const side of ["collateral", "debt"] as const) {
+        const s = sinceEvent(m, side, cum, stop);
+        assert.equal(Math.round(s.held), Math.round(st[side].now), `${name} ${side} at ${stop}: held is the bars'`);
+        // Each moved line ends where the bar's segment stands.
+        for (const l of s.lines) {
+          const seg = [...st[side].bar, ...st[side].sources].find((x) => x.key === l.key);
+          if (seg) assert.equal(Math.round(l.now), Math.round(seg.value), `${name} ${l.key} at ${stop}`);
+        }
+      }
+    }
+  });
+}
+
+test("a Trove's day: the card's collateral at the day's last event is the bars' figure that day", () => {
+  const m = model(REDEEMED, ["WETH", "BOLD"], true);
+  const focus = liquityFocusEvents(REDEEMED, "WETH", "BOLD");
+  const lastOfDay = new Map<number, (typeof focus)[number]>();
+  for (const f of focus) lastOfDay.set(Math.floor(f.ts / 86_400), f);
+  for (const [day, f] of lastOfDay) {
+    // Today is valued at the live read's price.
+    if (day >= Math.floor(NOW / 86_400)) continue;
+    const stop = day - m.start / 86_400_000;
+    const now = stateAt(m, stop).collateral.now;
+    assert.ok(Math.abs(f.sides!.collateral.after - now) < 1, `day ${day}: ${f.sides!.collateral.after} vs ${now}`);
+  }
+});
+
+test("the daily line: a life of up to a year is drawn by day on the carried prices, each point the bars' figure", () => {
+  for (const [events, sym] of [
+    [REDEEMED, "WETH"],
+    [EBISU, "weETH"],
+  ] as const) {
+    const t = liquityFlowTimeline(events as LiquityFlowEvent[], {
+      collSymbol: sym,
+      debtSymbol: "BOLD",
+      surplusClaimed: false,
+      now: NOW,
+      live: { price: 4000 },
+    })!;
+    const m = buildFlowModel(t)!;
+    const span = t.today! - m.start / 86_400_000;
+    const bin = seriesRouteBinFor(span);
+    const series = binSeries(binInputFromTimeline(t)!, bin)!;
+    assert.equal(series.gaps.length, 0, "no gaps on carried prices");
+    if (bin !== "day") continue;
+    for (const [, to, collateral, debt] of series.points.slice(0, -1)) {
+      const st = stateAt(m, to - m.start / 86_400_000);
+      assert.ok(Math.abs((collateral ?? 0) - st.collateral.now) <= Math.max(1, st.collateral.now * 1e-6), `coll ${to}`);
+      assert.ok(Math.abs((debt ?? 0) - st.debt.now) <= Math.max(1, st.debt.now * 1e-6), `debt ${to}`);
+    }
+  }
 });

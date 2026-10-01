@@ -15,11 +15,7 @@ import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
 import { SparkEventHeader } from "./spark-event-header";
 import { SparkEventDetail } from "./spark-event-detail";
 import { useMemo, useState } from "react";
-import {
-  ReceiptCalcButton,
-  ReceiptCalcContext,
-  useEventCum,
-} from "@/components/protocol/aave-v3/aave-family-event-receipt";
+import { ReceiptCalcButton, ReceiptCalcContext, useEventCum } from "@/components/shared/flow-event-sum";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
@@ -66,7 +62,7 @@ export function SparkEventCard({
   siblings,
   previous,
 }: SparkEventCardProps) {
-  // The receipt's calculator (aave-family-event-receipt.tsx), and the (i)'s
+  // The receipt's calculator (components/shared/flow-event-sum.tsx), and the (i)'s
   // slot for the interest line and the prices.
   const [calcOn, setCalcOn] = useState(false);
   const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);

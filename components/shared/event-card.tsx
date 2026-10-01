@@ -86,8 +86,8 @@ export interface EventCardProps {
   /** The phone spine view's caption kind, where the card's label differs from
    *  the event's `actionLabel` (which the timeline provides by default). */
   caption?: string;
-  /** A control at the right of the open card's (i) row (the Aave family's
-   *  calculator). */
+  /** A control at the right of the open card's (i) row (the Aave and
+   *  Liquity families' calculator). */
   infoAction?: React.ReactNode;
 }
 

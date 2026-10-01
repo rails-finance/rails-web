@@ -29,11 +29,13 @@ export function lifetimeBinFor(spanDays: number): SeriesBin {
   return spanDays > 3 * 365 ? "month" : "week";
 }
 
-/** The longest life the Aave family's line draws by day: today at most this
- *  many days after the first event's day, 366 points at most. */
+/** The longest life a tied page's line draws by day (the Aave and Liquity
+ *  families): today at most this many days after the first event's day, 366
+ *  points at most. A Liquity Trove's daily points carry its events' prices
+ *  between them (`carry`), as its weekly points did. */
 export const DAILY_LINE_MAX_DAYS = 365;
 
-/** The Aave family's line (the families with a series route): by day up to
+/** The line on a page that ties the panel to its timeline: by day up to
  *  DAILY_LINE_MAX_DAYS, then as lifetimeBinFor. */
 export function seriesRouteBinFor(spanDays: number): SeriesBin {
   return spanDays <= DAILY_LINE_MAX_DAYS ? "day" : lifetimeBinFor(spanDays);

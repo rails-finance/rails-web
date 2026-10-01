@@ -15,7 +15,7 @@ import { assetsDeltaProv, swapLegNet, swapLegProv, swapLegSign, type V3Coords } 
 import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
 import { AaveV3CtEventHeader, isAaveV3LossRow, signedAmount } from "./aave-v3-ct-event-header";
 import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
-import { ReceiptCalcButton, ReceiptCalcContext, useEventCum } from "./aave-family-event-receipt";
+import { ReceiptCalcButton, ReceiptCalcContext, useEventCum } from "@/components/shared/flow-event-sum";
 import { useMemo, useState } from "react";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -80,7 +80,7 @@ export function AaveV3CtEventCard({
 }: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
-  // The receipt's calculator (aave-family-event-receipt.tsx): shown where the
+  // The receipt's calculator (components/shared/flow-event-sum.tsx): shown where the
   // page's flow model holds this event's day.
   const [calcOn, setCalcOn] = useState(false);
   const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);
