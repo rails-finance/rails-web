@@ -104,7 +104,11 @@ const roundsTo = (text, expected) => {
 
 // ── Page helpers (verify-at-block-prices-moonwell-base.mjs's) ─────────────
 
-async function setDisplayFlag(page, label, wantOn) {
+/** `optional`: the item may not be on offer. "Collapse like events" is offered
+ *  only where a collapse spec forms a run on the list (web aa0c3c6), so a page
+ *  with no like events to collapse has no such item and nothing to turn off;
+ *  that returns false instead of throwing. */
+async function setDisplayFlag(page, label, wantOn, { optional = false } = {}) {
   const countSpan = page.getByText(COUNT_RE).first();
   await countSpan.waitFor({ state: "visible", timeout: 30000 });
   const row = countSpan.locator(
@@ -113,7 +117,7 @@ async function setDisplayFlag(page, label, wantOn) {
   const trigger = row.locator("div.relative.inline-flex.items-center > button").last();
   const item = page.getByRole("button", { name: new RegExp(`^${label}$`, "i") });
   let opened = false;
-  for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
+  for (let attempt = 0; attempt < (optional ? 3 : 6) && !opened; attempt += 1) {
     await trigger.click();
     opened = await item
       .waitFor({ state: "visible", timeout: 2500 })
@@ -121,7 +125,12 @@ async function setDisplayFlag(page, label, wantOn) {
       .catch(() => false);
     if (!opened) await page.waitForTimeout(700);
   }
-  if (!opened) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
+  if (!opened) {
+    if (!optional) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
+    await page.keyboard.press("Escape");
+    await countSpan.click().catch(() => {});
+    return false;
+  }
   const isOn = await item
     .locator("span")
     .first()
@@ -289,7 +298,7 @@ async function openPage(x, wallet, events) {
   await page.goto(`${BASE}${x.page(wallet)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
   await setDisplayFlag(page, "Event Numbers", true);
-  await setDisplayFlag(page, "Collapse like events", false);
+  await setDisplayFlag(page, "Collapse like events", false, { optional: true });
   await showAll(page, 25);
   const badgeNumbers = await page
     .locator('[aria-label^="Event "]')
