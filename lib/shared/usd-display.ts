@@ -1,5 +1,5 @@
 // Whether an amount's USD value shows beside it on the timeline (rails-ops
-// reference/lifetime-flows-scrubber.md, "The Display menu's USD values"). The
+// standards/detail-page-anatomy.md, "USD values on the timeline"). The
 // Display menu has two switches where a page offers them: "USD for
 // stablecoins", off by default, and "USD for other tokens", on. A stablecoin
 // is a symbol in the stable-denominated list (`isStableDenominated`,
