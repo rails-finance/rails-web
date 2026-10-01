@@ -104,7 +104,7 @@ export function LiquityForkEventHeader({
   const deltas: ChainTruthDelta[] = [];
 
   // A redemption borrows the V2 grammar: collateral "Cleared", debt "Reduced",
-  // both in the external-party pink, magnitudes only — the action name rides the spine.
+  // both in the caution orange, magnitudes only — the action name rides the spine.
   const isRedemption = ctx.eventType === "redeemCollateral";
 
   // Opens + owner adjusts get V2's per-axis grammar: each axis carries its own
@@ -157,7 +157,7 @@ export function LiquityForkEventHeader({
         ctx.origin?.coll,
       ),
       ...(isRedemption
-        ? { label: "Cleared", tone: "external" as const }
+        ? { label: "Cleared", tone: "caution" as const }
         : perAxis
           ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
           : {}),
@@ -174,7 +174,7 @@ export function LiquityForkEventHeader({
       address: soleFlowAddress(flows, builders.debtSymbol),
       prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
       ...(isRedemption
-        ? { label: "Reduced", tone: "external" as const }
+        ? { label: "Reduced", tone: "caution" as const }
         : perAxis
           ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
           : {}),
@@ -264,7 +264,6 @@ export function LiquityForkEventHeader({
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidate",
         labelOnSpine: isRedemption,
-        labelTone: "external",
         deltas,
         ratePill,
         party,

@@ -45,8 +45,9 @@ export function LiquityV1EventCard({
   const isRedemption = ctx.eventType === "redemption";
   // Both liquidation and redemption are adverse events the owner didn't initiate —
   // they take the dotted warning spine (a passive loss), not token flows.
-  // Liquidation is terminal (critical/red); a redemption is another party's act
-  // on the Trove (external/pink, color-grammar.md §4b), matching Liquity V2.
+  // Liquidation is terminal (critical/red); a redemption changes the Trove
+  // without the owner acting (caution/orange, color-grammar.md §5), matching
+  // Liquity V2.
   const isWarning = isLiq || isRedemption;
 
   const collDelta = Number(ctx.collDelta) || 0;
@@ -128,7 +129,7 @@ export function LiquityV1EventCard({
   const iconSlot = isWarning ? (
     <SpineColumn
       icon="warning"
-      warningTone={isLiq ? "critical" : "external"}
+      warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
       spine="dotted"
       isFirst={isFirst}

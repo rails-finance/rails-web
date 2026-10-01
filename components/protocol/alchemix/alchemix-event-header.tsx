@@ -17,8 +17,8 @@
 //    as two deltas with two receipts, never as one number in two places.
 //
 // 2. A LINE-SCOPE ROW GETS NO ACTOR. A redemption names no position and
-//    applies one ratio to every open position at once. It rides the pink
-//    external-party label with what it cleared and took HERE, each a difference of this
+//    applies one ratio to every open position at once. It rides the caution
+//    label with what it cleared and took HERE, each a difference of this
 //    position's two readings either side of it (rails-ops decisions/0032),
 //    and with the line's own amount where there is no such figure. It is also
 //    never a leg of anybody's transaction: it joins no combined row.
@@ -300,7 +300,7 @@ function legSpec(
           symbol: sym,
           label: "Cleared",
           noSpineCounterpart: true,
-          tone: "external",
+          tone: "caution",
           prov: debtClearedFromReadingsProv(
             sym,
             cleared.amountRaw,
@@ -315,7 +315,7 @@ function legSpec(
             symbol: mytSymbol,
             label: "Took",
             noSpineCounterpart: true,
-            tone: "external",
+            tone: "caution",
             prov: collateralTakenFromReadingsProv(
               mytSymbol,
               taken,
@@ -331,11 +331,11 @@ function legSpec(
           symbol: sym,
           label: "Across the whole line",
           noSpineCounterpart: true,
-          tone: "external",
+          tone: "caution",
           prov: emittedAmountProv("amount", sym, raw.amount, coords),
         });
       }
-      spec = { ...spec, labelOnSpine: true, labelTone: "external" };
+      spec = { ...spec, labelOnSpine: true };
       break;
     }
     case "batch_liquidated":

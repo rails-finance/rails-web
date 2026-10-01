@@ -36,7 +36,7 @@ export interface PositionCardMetaProps {
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
   liquidated?: boolean;
-  /** Liquity-only redemption count (triangle in the external-party pink). */
+  /** Liquity-only redemption count (caution-tier triangle). */
   redemptionCount?: number | null;
   /** What the liquidation count counts, added to its tip. */
   liquidationRule?: string;
@@ -131,12 +131,7 @@ export function PositionCardMeta({
         (() => {
           const label = `Redeemed against ${redemptionCount} time${redemptionCount === 1 ? "" : "s"}`;
           return (
-            <RevealTip
-              tip={label}
-              label={label}
-              focusable
-              className="text-pink-500 dark:text-pink-400 focus-ring rounded-sm"
-            >
+            <RevealTip tip={label} label={label} focusable className="text-caution-400 focus-ring rounded-sm">
               <Icon name="triangle" size={12} />
               <span className="ml-1 font-semibold">{redemptionCount}</span>
             </RevealTip>

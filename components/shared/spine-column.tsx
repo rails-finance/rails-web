@@ -13,12 +13,13 @@ import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/compo
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
 import { SPINE_LINE_OVERSHOOT, spineLineKey, spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
+import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
 /** Semantic icon that replaces token icons when the event isn't about token flow */
 export type SpineIcon =
-  | "warning" // Passive loss: liquidation, redemption (external/caution/critical tone via warningTone)
+  | "warning" // Passive loss: liquidation, redemption (caution/critical tone via warningTone)
   | "rate-change" // Interest rate / parameter change (% with up/down arrow)
   | "delegate" // Delegation change (users icon with +/- badge)
   | "external" // Third-party action with nothing to draw (pink users icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
@@ -41,23 +42,22 @@ export type SpineIcon =
 export type SpineVariant = "solid" | "dotted";
 
 /** Spine color tint. The spine line itself carries NO decorative/subsystem
- *  tint — it stays neutral. The only tints are the warningTone values: the two
- *  §5 adverse tones (caution = routine adverse, critical = liquidation) and
- *  the §4b external-party pink for a redemption, another
- *  party's act on the position. Delegation signals via the pink glyph badge
+ *  tint — it stays neutral. The only tints are the two §5 adverse tones, the
+ *  warningTone values: caution for a change to the owner's position the owner
+ *  did not make (a redemption, a force repay, a tick rebalance), critical for
+ *  a liquidation. Delegation signals via the pink glyph badge
  *  (color-grammar.md §4b), not the spine line. (The former blue/green/
  *  violet/purple subsystem tints were retired — color variation doesn't belong
  *  on the spine.) */
-export type SpineColor = "default" | "caution" | "critical" | "external";
+export type SpineColor = "default" | "caution" | "critical";
 
 /** The warning triangle's tones. */
-export type WarningTone = "caution" | "critical" | "external";
+export type WarningTone = "caution" | "critical";
 
 export const SPINE_COLORS: Record<SpineColor, string> = {
   default: "rgb(101 115 140)", // rb-500
-  caution: "var(--caution)", // routine adverse (color-grammar.md §5)
+  caution: "var(--caution)", // a change the owner did not make: redemption + routine adverse (color-grammar.md §5)
   critical: "rgb(239 68 68)", // red-500 — liquidation + critical
-  external: "var(--external-party)", // pink-500 / dark pink-400 — a redemption (color-grammar.md §4b)
 };
 
 /** Pulsing dot color matching spine tint */
@@ -65,14 +65,12 @@ const DOT_COLORS: Record<SpineColor, string> = {
   default: "bg-green-400",
   caution: "bg-caution-400",
   critical: "bg-red-400",
-  external: "bg-pink-400",
 };
 
 /** Pill classes for the warning label, keyed by warning tone */
 const WARNING_PILL_CLASSES: Record<WarningTone, string> = {
   caution: "bg-caution-500/15 text-caution-600 dark:text-caution-400",
   critical: "bg-red-500/15 text-red-600 dark:text-red-400",
-  external: "bg-pink-500/15 text-pink-600 dark:text-pink-400",
 };
 
 /** Label classes for a warning leg's word ("Cleared"), keyed by warning tone —
@@ -80,7 +78,6 @@ const WARNING_PILL_CLASSES: Record<WarningTone, string> = {
 const WARNING_LEG_LABEL_CLASSES: Record<WarningTone, string> = {
   caution: "text-caution-600 dark:text-caution-400",
   critical: "text-rb-500",
-  external: "text-pink-500 dark:text-pink-400",
 };
 
 // ── Token row descriptor ────────────────────────────────────────────────────
@@ -182,9 +179,9 @@ export interface SpineColumnProps {
    *  explicit check/cross IS that event's meaning, and the dotted spine still
    *  carries the external signal. */
   externalParty?: boolean;
-  /** Tone for the "warning" triangle — "external" (pink) for a redemption,
-   *  another party's act on the position (color-grammar.md §4b);
-   *  "caution" (orange) for every routine adverse event; "critical" (red) for
+  /** Tone for the "warning" triangle — "caution" (orange) for a change to
+   *  the owner's position the owner did not make (a redemption, every routine
+   *  adverse event); "critical" (red) for
    *  terminal events (liquidation). The dotted spine + lead-in dot inherit this
    *  tone too. Defaults to "caution". See color-grammar.md §5. */
   warningTone?: WarningTone;
@@ -278,7 +275,7 @@ function WarningIcon({ size, color = "var(--caution)" }: { size: number; color?:
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d={WARNING_TRIANGLE_PATH} />
       <path d="M12 9v4" />
       <path d="M12 17h.01" />
     </svg>

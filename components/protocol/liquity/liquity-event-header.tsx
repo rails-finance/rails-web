@@ -91,8 +91,8 @@ function getOperationStyle(operation: string, ctx?: LiquityContext): OperationSt
     case "applyPendingDebt":
       return { label: "Apply debt", color: "text-pink-700 dark:text-pink-400", bg: "bg-pink-500/20", badge: true };
     case "redeemCollateral":
-      // Another party's act on the Trove: the §4b external-party pink.
-      return { label: "Redemption", color: "text-white", bg: "bg-pink-500", badge: true };
+      // A change to the Trove the owner did not make: caution (color-grammar.md §5).
+      return { label: "Redemption", color: "text-white", bg: "bg-caution-500", badge: true };
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":
       return { label: "Redeemed", color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
@@ -369,7 +369,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               </span>
               {hasCollChange && (
                 <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-pink-500 dark:text-pink-400">Cleared</span>
+                  <span className="text-caution-600 dark:text-caution-400">Cleared</span>
                   {wrapColl(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -384,7 +384,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               )}
               {hasDebtChange && (
                 <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-pink-500 dark:text-pink-400">Reduced</span>
+                  <span className="text-caution-600 dark:text-caution-400">Reduced</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip

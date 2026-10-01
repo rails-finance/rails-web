@@ -7,7 +7,7 @@
 // pill background. When an exact count is known (Aave, Compound) it's shown next
 // to the triangle; when only a boolean is known (Morpho, MakerDAO) the triangle
 // stands alone. Color carries the tier — red (critical) for a liquidation, vs
-// Liquity's external-party pink for a redemption.
+// Liquity's caution orange for a redemption.
 
 import { Icon } from "@/components/icons/icon";
 import { RevealTip } from "@/components/shared/reveal-tip";

@@ -44,7 +44,7 @@ export function LiquityV1EventHeader({
   const deltas: ChainTruthDelta[] = [];
 
   // A redemption borrows the V2 grammar: collateral "Cleared", debt "Reduced",
-  // both in the external-party pink, magnitudes only (the labels carry direction) —
+  // both in the caution orange, magnitudes only (the labels carry direction) —
   // and the action name rides the spine's REDEMPTION pill, not the row label.
   const isRedemption = ctx.eventType === "redemption";
 
@@ -69,7 +69,7 @@ export function LiquityV1EventHeader({
       symbol: COLLATERAL_SYMBOL,
       prov: redemptionLegProv(coords, "redeemer", legVals),
       label: "Cleared",
-      tone: "external",
+      tone: "caution",
     });
     if (split.ethSurplus > 0)
       deltas.push({
@@ -89,7 +89,7 @@ export function LiquityV1EventHeader({
         before: ctx.collAfter != null ? Number(ctx.collAfter) - coll : null,
       }),
       ...(isRedemption
-        ? { label: "Cleared", tone: "external" as const }
+        ? { label: "Cleared", tone: "caution" as const }
         : isLiq
           ? { label: LIQUIDATION_COLL_VERB, tone: "caution" as const }
           : perAxis
@@ -119,7 +119,7 @@ export function LiquityV1EventHeader({
         before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debt : null,
       }),
       ...(isRedemption
-        ? { label: "Reduced", tone: "external" as const }
+        ? { label: "Reduced", tone: "caution" as const }
         : isLiq
           ? { label: LIQUIDATION_DEBT_VERB, tone: "caution" as const }
           : perAxis
@@ -134,7 +134,6 @@ export function LiquityV1EventHeader({
         status: isOpen ? "open" : undefined,
         critical: ctx.eventType === "liquidation",
         labelOnSpine: isRedemption,
-        labelTone: "external",
         deltas,
       }}
       timestamp={timestamp}

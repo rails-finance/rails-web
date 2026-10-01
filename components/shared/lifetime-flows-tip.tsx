@@ -62,8 +62,10 @@ export const HUE: Record<FlowSide, { solid: string; line: string; hatch: string 
     hatch: "rgba(74, 222, 128, 0.7)",
   },
 };
-const TONE_HATCH = { liquidation: "rgba(248, 113, 113, 0.75)", redemption: "rgba(244, 114, 182, 0.75)" };
-const TONE_LINE = { liquidation: "rgba(239, 68, 68, 0.9)", redemption: "rgba(236, 72, 153, 0.9)" };
+// A liquidation in the critical red; a redemption in the caution orange
+// (caution-400 / caution-500, color-grammar.md §5).
+const TONE_HATCH = { liquidation: "rgba(248, 113, 113, 0.75)", redemption: "rgba(251, 146, 60, 0.75)" };
+const TONE_LINE = { liquidation: "rgba(239, 68, 68, 0.9)", redemption: "rgba(249, 115, 22, 0.9)" };
 
 /** A 6px tile of the hatch, in `color`. */
 function hatchImage(hatch: FlowHatch, color: string): CSSProperties {

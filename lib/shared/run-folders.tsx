@@ -101,15 +101,10 @@ export function folderTerminus(i: number, length: number): { isFirst: boolean; i
 /** Terminal adverse runs — liquidations, absorptions, auction settlements. */
 export const DANGER_FOLDER_BADGE: ReactNode = <TriangleAlert size={10} strokeWidth={2.5} className="text-red-500" />;
 
-/** Routine adverse runs — f(x) tick rebalances. */
+/** Changes to the owner's position the owner did not make — redemption runs
+ *  (Liquity family, Alchemix), f(x) tick rebalances (color-grammar.md §5). */
 export const CAUTION_FOLDER_BADGE: ReactNode = (
   <TriangleAlert size={10} strokeWidth={2.5} className="text-caution-500" />
-);
-
-/** Redemption runs (Liquity family, Alchemix) — another party's act on the position, in
- *  the external-party pink (color-grammar.md §4b). */
-export const EXTERNAL_FOLDER_BADGE: ReactNode = (
-  <TriangleAlert size={10} strokeWidth={2.5} className="text-pink-500 dark:text-pink-400" />
 );
 
 /** Custody runs — the paper plane, the same mark the single transfer row wears on its token. */

@@ -4,7 +4,7 @@
 // EventCard shell (the shared Liquity-fork explainer rides the second-tier
 // slot). A Trove event moves two axes, so the spine can show two token flows
 // (branch collateral + ebUSD debt); a liquidation shows the critical warning
-// spine, a redemption the external-party (pink) one.
+// spine, a redemption the caution one.
 
 import {
   forkDebtMove,
@@ -106,8 +106,8 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
   // Both liquidation and redemption are adverse events the owner didn't initiate.
-  // Liquidation is terminal (critical/red); a redemption is another party's act
-  // on the Trove (external/pink, color-grammar.md §4b).
+  // Liquidation is terminal (critical/red); a redemption changes the Trove
+  // without the owner acting (caution/orange, color-grammar.md §5).
   const isWarning = isLiq || isRedemption;
   // Zero-delta adjust — classified by the timeline transform (the single
   // source of truth for the predicate); spine shows the neutral glyph and the
@@ -187,7 +187,7 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
   const iconSlot = isWarning ? (
     <SpineColumn
       icon="warning"
-      warningTone={isLiq ? "critical" : "external"}
+      warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
       spine="dotted"
       isFirst={isFirst}

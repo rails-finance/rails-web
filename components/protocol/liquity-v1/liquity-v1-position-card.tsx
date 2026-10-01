@@ -104,7 +104,7 @@ export function LiquityV1PositionCard({
   const walletId = (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol="liquity-v1" bookmarkProtocol="liquity-v1" />
   );
-  // Right-hand activity-meta cluster: time-ago, transaction count, the pink
+  // Right-hand activity-meta cluster: time-ago, transaction count, the caution
   // redemption triangle (Liquity-family), and liquidation.
   const meta = (
     <PositionCardMeta

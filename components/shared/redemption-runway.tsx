@@ -18,9 +18,9 @@
 //     edge, so a longer fill is a longer runway — the same fill-equals-buffer
 //     read as the full redemption card's bar.
 //   · The fill is neutral rb — queue depth is a fact, not a danger (numbers
-//     carry meaning; no opinionated colour). The one accent is the pink
-//     diamond marking this position's own place at the fill's edge: pink is
-//     the family's established redemption hue (the redemption triangle in
+//     carry meaning; no opinionated colour). The one accent is the caution
+//     diamond marking this position's own place at the fill's edge: caution is
+//     the family's redemption hue (the redemption triangle in
 //     PositionCardMeta), an identity cue, not an alarm.
 //
 // The share figure carries the SAME queue-share provenance the protocol's full
@@ -31,8 +31,8 @@ import { pct } from "@/components/shared/ratio-bar";
 
 const TRACK = "bg-rb-200/60 dark:bg-rb-500/15";
 const FILL = "bg-rb-300 dark:bg-rb-500/40";
-// The redemption hue — PositionCardMeta's pink redemption triangle.
-const MARKER = "bg-pink-500 dark:bg-pink-400";
+// The redemption hue — PositionCardMeta's caution-tier redemption triangle.
+const MARKER = "bg-caution-400";
 const H_BAR_COMPACT = 6; // matches PriceRunway's compact bar height
 
 export function RedemptionRunway({
@@ -51,7 +51,7 @@ export function RedemptionRunway({
   /** Receipt for the share figure — pass the SAME queue-share builder the
    *  protocol's full redemption card uses, so both trace identically. */
   shareProv: Provenance;
-  /** Hover caption on the pink position marker. */
+  /** Hover caption on the caution position marker. */
   markerTitle?: string;
   /** Words after the share figure. Opt-in per protocol; the default is the
    *  family's "of queue in front". A caller's longer label may wrap, putting

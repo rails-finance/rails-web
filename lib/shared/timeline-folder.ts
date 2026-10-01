@@ -332,7 +332,7 @@ export interface FolderRegisterEntry {
    *  row draws the Σ glyph and the verbs beside each pair, never a word for
    *  the action. */
   memberNoun: string;
-  tone?: "caution" | "danger" | "neutral" | "external";
+  tone?: "caution" | "danger" | "neutral";
   spineIcon?: SpineIcon;
   warningLabel?: string;
   muted?: boolean;

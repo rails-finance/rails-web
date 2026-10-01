@@ -145,11 +145,11 @@ export function LiquityEventCard({
   })();
 
   const iconSlot = isPassive ? (
-    // A redemption is another party's act on the Trove: the §4b external-party
-    // pink (color-grammar.md). Liquidation stays critical red.
+    // A redemption changes the Trove without the owner acting: caution
+    // (color-grammar.md §5). Liquidation stays critical red.
     <SpineColumn
       icon="warning"
-      warningTone={ctx.operation === "liquidate" ? "critical" : isRedemption ? "external" : "caution"}
+      warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
       warningLabel={ctx.operation === "liquidate" ? "Liquidation" : isRedemption ? "Redemption" : undefined}
       warningLegs={redemptionLegs}
       spine="dotted"
