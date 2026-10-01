@@ -155,7 +155,7 @@ const roundsTo = (text, expected) => {
 
 // ── Page helpers (verify-historic-usd-pills.mjs's, verbatim in spirit) ──
 
-async function setDisplayFlag(page, label, wantOn) {
+async function setDisplayFlag(page, label, wantOn, { optional = false } = {}) {
   const countSpan = page.getByText(COUNT_RE).first();
   await countSpan.waitFor({ state: "visible", timeout: 30000 });
   const row = countSpan.locator(
@@ -172,6 +172,13 @@ async function setDisplayFlag(page, label, wantOn) {
       .catch(() => false);
     if (!opened) await page.waitForTimeout(700);
   }
+  if (!opened && optional) {
+    // The item is offered only where a collapse spec forms a run on the list;
+    // a list with nothing to collapse has nothing to turn off.
+    await countSpan.click();
+    console.log(`      Display menu offers no "${label}" here (nothing collapses)`);
+    return false;
+  }
   if (!opened) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
   const isOn = await item
     .locator("span")
@@ -180,6 +187,7 @@ async function setDisplayFlag(page, label, wantOn) {
     .catch(() => false);
   if (isOn !== wantOn) await item.click();
   await countSpan.click();
+  return true;
 }
 
 /** Grow the render window until every event is painted. The cap counts PRESSES,
@@ -313,8 +321,10 @@ async function openWalletPage(w, evts) {
   await p.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
   await setDisplayFlag(p, "Event Numbers", true);
   // A collapsed ×N run renders no individual badge — the MAMO cascade is
-  // hundreds of like liquidations in a row, so runs stay expanded here.
-  await setDisplayFlag(p, "Collapse like events", false);
+  // hundreds of like liquidations in a row, so runs stay expanded here. The
+  // item is offered only where a run forms: required on the cascade wallet,
+  // optional on the small specimen wallets the unpriced arm discovers.
+  await setDisplayFlag(p, "Collapse like events", false, { optional: w !== X.wallet });
   await showAll(p, 25);
   // Chronological numbering runs over the WHOLE history (an elided older
   // window offsets it), so the DOM number of API index i is offset + i + 1,
@@ -344,7 +354,9 @@ if (pricedOrdinary) {
       text.includes(d.marketSymbol) && roundsTo(text.replace(d.marketSymbol, ""), d.priceAtBlock.usd),
       `"${text}" vs ${d.priceAtBlock.usd}`,
     );
-    const receipt = await openReceiptFor(page, card, d.marketSymbol);
+    // The pill's own box: the card also carries receipts that name the
+    // market symbol (the position's debt before the event), which come first.
+    const receipt = await openReceiptFor(page, card, "oracle at block");
     check(
       `ordinary #${n}: the pill's receipt names Comptroller.oracle() → getUnderlyingPrice at the block`,
       !!receipt &&

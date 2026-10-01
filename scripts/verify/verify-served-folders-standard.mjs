@@ -89,8 +89,11 @@ const SERVED = [
   { id: "spark", path: "/ethereum/spark/0x000000000004444c5dc75cb358380d2e3de08a90" },
   { id: "moonwell-base", path: "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d" },
 ];
-// Aave V3 on Base declares `runs` and is not served (verify-timeline-boundary-card.mjs).
-const CLIENT = { id: "client", path: "/base/aave-v3/0x7ac2887e026e4239416aac6483c15df05a04a92e" };
+// Aave V3 on Base declares `runs`; its default page is served, so `?folders=0`
+// makes it group in the browser. The wallet holds a stretch of four transfers
+// (MIN_TRANSFER_RUN), so a run forms and the toggle is offered: the menu offers
+// "Collapse like events" only where a collapse spec forms a run on the list.
+const CLIENT = { id: "client", path: "/base/aave-v3/0xbb8fb8fe5198f25d117c0e7b1b9c8260cb19c3c0?folders=0" };
 
 // §13: a list with folders and no loose event, bare and filtered.
 // 0xb137…ece5 is Spark's deployer, not a borrower: all 2,776 of its events are
