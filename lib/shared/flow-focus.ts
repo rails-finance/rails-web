@@ -10,7 +10,14 @@
 // store at the foot is the one piece of state the panel, the timeline and the
 // cards share (components/shared/flow-focus-context.tsx).
 
-import { wholeUsd, sideSumRows, type SideSumRows, type SumLine } from "@/lib/shared/flows-sum";
+import {
+  apportionSigned,
+  wholeUsd,
+  sideSumRows,
+  type SideSumRows,
+  type SumLine,
+  type SumSign,
+} from "@/lib/shared/flows-sum";
 import {
   DAY_MS,
   sideStateFor,
@@ -36,9 +43,10 @@ export interface FocusEvent {
   legs: { bucket: string; usd: number | null; amount?: number; symbol?: string; accrual?: boolean }[];
   /** Where the family's replay states it (the Liquity family): each side's
    *  USD just before and once the event's transaction had run, at the
-   *  transaction's price, and its token move. The Aave family reads these
+   *  transaction's price, its token move, and the tokens held or owed once
+   *  the transaction had run (`held`). The Aave family reads these
    *  from the Pool at the block instead. */
-  sides?: Record<FlowSide, { before: number; after: number; amount: number; symbol: string }>;
+  sides?: Record<FlowSide, { before: number; after: number; amount: number; symbol: string; held: number }>;
   /** The annual rate in percent the event left in force on the debt, the
    *  batch's management fee included, where the family records one (the
    *  Liquity family): the state card between events states it. */
@@ -170,6 +178,131 @@ export function sinceEvent(
     if (Math.round(now) !== Math.round(at)) lines.push({ key: b.key, label: b.label, at, now });
   }
   return { held: s.now, lines };
+}
+
+// ── The sum in the side's token ─────────────────────────────────────────────
+// Where the family's replay states each side's tokens (FocusEvent.sides, the
+// Liquity family), the card's sum is in the side's token: each line the
+// running total of its legs' token amounts, landing on the tokens held or
+// owed once the transaction had run. The replay's legs add to its recorded
+// balances, so the token lines need no balancing item; the price's effect
+// (Market move) exists only in USD.
+
+/** A line of the event card's sum in the side's token. */
+export interface TokenSumLine {
+  key: string;
+  label: string;
+  kind: "in" | "out";
+  /** Signed, in units of the printed last decimal. */
+  units: number;
+  sign: SumSign;
+  /** Unsigned, at the side's decimals: "1.2500". */
+  amount: string;
+  hl: boolean;
+  /** On this event's line, what it stood at just before the event. */
+  before: string | null;
+}
+
+export interface TokenSum {
+  symbol: string;
+  decimals: number;
+  lines: TokenSumLine[];
+  /** What is held or owed, printed; the lines add to `units`. */
+  total: { units: number; amount: string };
+  /** What was held or owed just before the event's transaction, printed,
+   *  where the transaction moved the side; and its signed move. */
+  before: string | null;
+  move: number;
+  /** Each bucket's running total in tokens, unrounded. */
+  after: Record<string, number>;
+  held: number;
+}
+
+/** The decimals a side's token sum prints at: a $1-face side at cents, else
+ *  about five significant digits of the largest figure. */
+export function tokenDecimals(max: number, face: boolean): number {
+  if (face) return 2;
+  if (!(max > 0)) return 4;
+  if (max >= 1000) return 2;
+  if (max >= 100) return 3;
+  if (max >= 1) return 4;
+  return Math.min(8, 3 + Math.ceil(-Math.log10(max)));
+}
+
+/** "1,234.5000": unsigned, at `decimals`. */
+export function fmtTokens(v: number, decimals: number): string {
+  return Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+const isFace = (model: FlowModel, side: FlowSide) => model.words.moment?.face?.includes(side) ?? false;
+
+/** The last event the card's account covers: the event's transaction where
+ *  the sum is exact, else the close of its day. */
+function lastCovered(model: FlowModel, events: FocusEvent[], at: number, cum: EventCum): number {
+  const ev = events[at];
+  const startDay = model.start / DAY_MS;
+  let last = at;
+  if (cum.exact) while (ev.tx && last + 1 < events.length && events[last + 1].tx === ev.tx) last++;
+  else while (last + 1 < events.length && Math.floor(events[last + 1].ts / 86_400) - startDay <= cum.stop) last++;
+  return last;
+}
+
+/** One side's sum as of the event in its token, where the events state the
+ *  side's tokens (FocusEvent.sides); null elsewhere. The lines are rounded
+ *  together to the side's decimals so they add to the printed total. */
+export function eventTokenSum(
+  model: FlowModel,
+  events: FocusEvent[],
+  side: FlowSide,
+  cum: EventCum,
+  id: string,
+): TokenSum | null {
+  const at = events.findIndex((e) => e.id === id);
+  const ev = events[at];
+  if (!ev?.sides) return null;
+  const last = lastCovered(model, events, at, cum);
+  const buckets = model.buckets.filter((b) => b.side === side);
+  const after: Record<string, number> = Object.fromEntries(buckets.map((b) => [b.key, 0]));
+  for (let i = 0; i <= last; i++)
+    for (const l of events[i].legs) if (l.bucket in after && l.amount != null) after[l.bucket] += l.amount;
+  const before = { ...after };
+  for (const l of ev.legs) if (l.bucket in before && l.amount != null) before[l.bucket] -= l.amount;
+  const s = events[last].sides?.[side] ?? ev.sides[side];
+  const held = Math.max(0, s.held);
+  const ordered = [...buckets.filter((b) => b.dir === "in"), ...buckets.filter((b) => b.dir === "out")];
+  const max = Math.max(held, ...ordered.map((b) => Math.abs(after[b.key])));
+  const decimals = tokenDecimals(max, isFace(model, side));
+  const scale = 10 ** decimals;
+  const signed = ordered.map((b) => (b.dir === "out" ? -1 : 1) * after[b.key] * scale);
+  const totalUnits = Math.round(held * scale);
+  const parts = apportionSigned(signed, totalUnits);
+  const lines: TokenSumLine[] = [];
+  ordered.forEach((b, i) => {
+    if (parts[i] === 0) return;
+    const hl = cum.buckets.has(b.key);
+    lines.push({
+      key: b.key,
+      label: b.label,
+      kind: b.dir,
+      units: parts[i],
+      sign: (lines.length === 0 && parts[i] > 0 ? "" : parts[i] < 0 ? "−" : "+") as SumSign,
+      amount: fmtTokens(parts[i] / scale, decimals),
+      hl,
+      before: hl ? fmtTokens(before[b.key], decimals) : null,
+    });
+  });
+  const move = cum.exact ? ev.sides[side].amount : 0;
+  const moved = Math.round(move * scale) !== 0;
+  return {
+    symbol: ev.sides[side].symbol,
+    decimals,
+    lines,
+    total: { units: totalUnits, amount: fmtTokens(totalUnits / scale, decimals) },
+    before: moved ? fmtTokens(Math.max(0, held - move), decimals) : null,
+    move: moved ? move : 0,
+    after,
+    held,
+  };
 }
 
 /** Index of the last row on or before day `stop`. */

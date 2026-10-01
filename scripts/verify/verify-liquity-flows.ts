@@ -38,7 +38,7 @@ import { buildFlowModel, sideStateFor, stateAt, type FlowModel } from "@/lib/sha
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
-import { eventCum, eventSideSum, sinceEvent } from "@/lib/shared/flow-focus";
+import { eventCum, eventSideSum, eventTokenSum, fmtTokens, sinceEvent } from "@/lib/shared/flow-focus";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
 
 const FIX = join(__dirname, "fixtures");
@@ -313,6 +313,53 @@ for (const [name, events, symbols, open] of [
         }
       }
     }
+  });
+}
+
+for (const [name, events, symbols, open] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+] as const) {
+  test(`${name}: every event card's sum in tokens adds to the recorded balance, at the printed decimals`, () => {
+    const ev = events as LiquityFlowEvent[];
+    const [coll, debt] = symbols as unknown as [string, string];
+    const m = model(ev, [coll, debt], open);
+    const focus = liquityFocusEvents(ev, coll, debt);
+    const replayed = replayLiquity(ev);
+    const lastOfTx = new Map<string, LiquityFlowEvent>();
+    for (const r of replayed) lastOfTx.set(r.ev.tx ?? r.ev.id, r.ev);
+    let redeemedLines = 0;
+    for (const f of focus) {
+      const cum = eventCum(m, focus, f.id)!;
+      const tx = lastOfTx.get(f.tx ?? f.id)!;
+      for (const side of ["collateral", "debt"] as const) {
+        const sum = eventTokenSum(m, focus, side, cum, f.id);
+        assert.ok(sum, `${name} ${f.id} ${side}: a token sum`);
+        assert.equal(sum.symbol, side === "collateral" ? coll : debt);
+        const scale = 10 ** sum.decimals;
+        const recorded = Math.max(0, side === "collateral" ? tx.collAfter : tx.debtAfter);
+        assert.equal(sum.total.units, Math.round(recorded * scale), `${name} ${f.id} ${side}: the recorded balance`);
+        const printed = sum.lines.reduce((a, l) => a + l.units, 0);
+        assert.equal(printed, sum.total.units, `${name} ${f.id} ${side}: token lines add to the total`);
+        // The unrounded lines meet the balance: the replay leaves nothing over.
+        const raw = m.buckets
+          .filter((b) => b.side === side)
+          .reduce((a, b) => a + (b.dir === "out" ? -1 : 1) * sum.after[b.key], 0);
+        assert.ok(
+          Math.abs(raw - recorded) < 1e-6 * Math.max(1, recorded),
+          `${name} ${f.id} ${side}: ${raw} vs ${recorded}`,
+        );
+        for (const l of sum.lines) {
+          assert.equal(l.sign === "−", l.units < 0, `${name} ${l.key}: the sign`);
+          assert.equal(l.amount, fmtTokens(l.units / scale, sum.decimals));
+          if (l.key === LQ.collRedeemed) redeemedLines++;
+        }
+        if (side === "debt") assert.equal(sum.decimals, 2, "the stablecoin at cents");
+      }
+    }
+    if (name.includes("redeemed")) assert.ok(redeemedLines > 0, "Taken by redemptions in tokens");
   });
 }
 

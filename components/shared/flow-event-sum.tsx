@@ -26,8 +26,8 @@ import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
-import { flowRemainderProv, flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { eventCum, eventSideSum, sinceEvent, type EventCum } from "@/lib/shared/flow-focus";
+import { flowRemainderProv, flowSegmentProv, flowTokenProv } from "@/lib/shared/flows-timeline-provenance";
+import { eventCum, eventSideSum, fmtTokens, sinceEvent, type EventCum, type TokenSum } from "@/lib/shared/flow-focus";
 
 /** The card's calculator: on, and its switch. */
 export interface ReceiptCalc {
@@ -193,14 +193,198 @@ export function EventSumLines({
   );
 }
 
+/** One side's sum as of the event in its token (lib/shared/flow-focus.ts
+ *  `eventTokenSum`): each line its running total in the token, landing on
+ *  the tokens held or owed. With `usd`, each line carries its USD beside it
+ *  (EventSumLines' figures), and the USD column's balancing item (Market
+ *  move) follows the token lines: it has no token amount. */
+export function EventTokenSumLines({
+  side,
+  model,
+  cum,
+  sum,
+  usd,
+  held,
+  heldBefore,
+  totalLabel,
+  totalProv,
+  eventTs,
+}: {
+  side: FlowSide;
+  model: FlowModel;
+  cum: EventCum;
+  sum: TokenSum;
+  /** Show each line's USD beside its tokens (the page's Display switch). */
+  usd: boolean;
+  /** The side's USD once the transaction had run, and just before it. */
+  held: number;
+  heldBefore: number | null;
+  totalLabel: string;
+  /** The USD total's receipt. */
+  totalProv: Provenance;
+  eventTs?: number;
+}) {
+  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  // The dollar lines: their segments draw the swatches; with `usd` they are the USD column.
+  const dollarRows = eventSideSum(model, side, cum, held);
+  const usdRows = usd ? dollarRows : null;
+  const usdLine = new Map(usdRows?.lines.map((l) => [l.key, l]) ?? []);
+  const usdProv = (l: (typeof usdRows & object)["lines"][number]) =>
+    l.kind === "rest"
+      ? flowRemainderProv(l.label, side, at, l.seg.note)
+      : flowSegmentProv(l.seg, side, at, false, model.daily);
+  const sym = <span className="font-normal text-rb-500"> {sum.symbol}</span>;
+  const grid = `grid ${usd ? "grid-cols-[12px_12px_minmax(4.5rem,1fr)_auto_auto] gap-x-1.5" : "grid-cols-[12px_12px_minmax(7.5rem,1fr)_auto] gap-x-2"} items-center rounded-lg px-1.5 -mx-1.5 py-1`;
+  const usdCell = (node: ReactNode) => (
+    <span className="whitespace-nowrap text-right font-normal text-rb-500" data-receipt-usd="">
+      {node}
+    </span>
+  );
+  const dirOf = (key: string) => model.buckets.find((b) => b.key === key)?.dir;
+  const segOf = (key: string): FlowSegment | null => dollarRows.lines.find((l) => l.key === key)?.seg ?? null;
+  // USD lines with no token amount: the balancing item, an opening line.
+  const usdOnly = usdRows?.lines.filter((l) => !sum.lines.some((t) => t.key === l.key)) ?? [];
+  const movedWord =
+    sum.move !== 0 ? (
+      <>
+        <Prov info={flowTokenProv(totalLabel, sum.symbol, at, "move")}>
+          {`${sum.move < 0 ? "−" : "+"}${fmtTokens(sum.move, sum.decimals)} ${sum.symbol}`}
+        </Prov>
+        {usd && heldBefore != null && Math.round(held) !== Math.round(heldBefore)
+          ? ` (${held - heldBefore < 0 ? "−" : "+"}${wholeUsd(held - heldBefore)})`
+          : ""}
+      </>
+    ) : null;
+  return (
+    <div
+      className="flex flex-col text-[13px] tabular-nums"
+      data-receipt-sum={side}
+      data-receipt-unit="token"
+      data-receipt-decimals={sum.decimals}
+      data-anatomy="T8.1"
+    >
+      {sum.lines.map((l) => {
+        const u = usdLine.get(l.key);
+        return (
+          <div
+            key={l.key}
+            className={`${grid}${l.hl ? " font-semibold" : ""}`}
+            style={
+              l.hl
+                ? {
+                    background: "var(--rb-hl, rgba(127,127,127,0.12))",
+                    boxShadow: `inset 0 0 0 1.5px ${SIDE_HUE[side]}`,
+                  }
+                : undefined
+            }
+            data-receipt-line={l.kind}
+            data-receipt-line-key={l.key}
+            data-receipt-units={l.units}
+            {...(u ? { "data-receipt-dollars": u.dollars } : usd ? { "data-receipt-dollars": 0 } : {})}
+            {...(l.hl ? { "data-receipt-hl": "" } : {})}
+          >
+            <span className="text-right text-rb-500">{l.sign}</span>
+            {swatchFor(side, segOf(l.key), l.kind)}
+            <span className="min-w-0">
+              {l.label}
+              {l.hl && (
+                <small className="block text-xs font-normal text-rb-500">
+                  {hlNote(cum, l.key, dirOf(l.key) === "in" ? "+" : "−", usd, sum.decimals)}
+                </small>
+              )}
+            </span>
+            {pairCell(
+              l.hl ? `${l.before}` : null,
+              <Prov info={flowTokenProv(l.label, sum.symbol, at, "line")}>{l.amount}</Prov>,
+            )}
+            {usd && usdCell(u ? <Prov info={usdProv(u)}>{u.amount}</Prov> : "$0")}
+          </div>
+        );
+      })}
+      {usdOnly.map((l) => (
+        <div
+          key={l.key}
+          className={grid}
+          data-receipt-line={l.kind}
+          data-receipt-line-key={l.key}
+          data-receipt-dollars={l.dollars}
+        >
+          <span className="text-right text-rb-500">{l.sign}</span>
+          {swatchFor(side, l.seg, l.kind)}
+          <span className="min-w-0">
+            {l.label}
+            {l.kind === "rest" && (
+              <small className="block text-xs font-normal text-rb-500">
+                The price&rsquo;s effect: no {sum.symbol} moved.
+              </small>
+            )}
+          </span>
+          <span />
+          {usdCell(<Prov info={usdProv(l)}>{l.amount}</Prov>)}
+        </div>
+      ))}
+      <div
+        className={`${grid} mt-1 rounded-none border-t border-rb-300 pt-1.5 font-semibold dark:border-rb-600`}
+        data-receipt-line="total"
+        data-receipt-units={sum.total.units}
+        {...(usdRows ? { "data-receipt-dollars": usdRows.total.dollars } : {})}
+      >
+        <span className="text-right text-foreground">=</span>
+        <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
+        <span className="min-w-0">
+          {totalLabel}
+          {movedWord && <small className="block text-xs font-normal text-rb-500">{movedWord}</small>}
+        </span>
+        {pairCell(
+          sum.before,
+          <>
+            <Prov info={flowTokenProv(totalLabel, sum.symbol, at, "held")}>{sum.total.amount}</Prov>
+            {sym}
+          </>,
+        )}
+        {usdRows && usdCell(<Prov info={totalProv}>{usdRows.total.amount}</Prov>)}
+      </div>
+    </div>
+  );
+}
+
+/** A line's swatch: the bar's fill, or the balancing item's dashed box. */
+function swatchFor(side: FlowSide, seg: FlowSegment | null, kind: string) {
+  return kind === "rest" ? (
+    <i aria-hidden className="inline-block size-2.5 rounded-[2px] border border-dashed border-rb-500" />
+  ) : (
+    <i
+      aria-hidden
+      className="inline-block size-2.5 rounded-[2px]"
+      style={seg ? fillStyle(side, seg) : { background: SIDE_HUE[side] }}
+    />
+  );
+}
+
+/** A figure, after its before → where the event moved it. */
+function pairCell(before: string | null, after: ReactNode) {
+  return (
+    <span className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
+      {before != null && <span className="whitespace-nowrap font-normal text-rb-500">{before} →</span>}
+      <span className="whitespace-nowrap">{after}</span>
+    </span>
+  );
+}
+
 /** The highlighted line's note: what this event put on it. */
-function hlNote(cum: EventCum, key: string, sign: string): string {
+function hlNote(cum: EventCum, key: string, sign: string, usdShown = true, decimals?: number): string {
   const legs = cum.legs.filter((l) => l.bucket === key);
   const usd = `${sign}${wholeUsd(legs.reduce((a, l) => a + (l.usd ?? 0), 0))}`;
   const tokens = legs
     .filter((l) => l.amount != null && l.symbol)
-    .map((l) => `${sign}${fmtPositionAmount(l.amount)} ${l.symbol}`);
-  return tokens.length > 0 ? `${tokens.join(", ")} (${usd.slice(sign.length)}) at this event` : `${usd} at this event`;
+    .map(
+      (l) =>
+        `${sign}${decimals != null ? fmtTokens(l.amount as number, decimals) : fmtPositionAmount(l.amount)} ${l.symbol}`,
+    );
+  if (tokens.length === 0) return `${usd} at this event`;
+  return usdShown
+    ? `${tokens.join(", ")} (${usd.slice(sign.length)}) at this event`
+    : `${tokens.join(", ")} at this event`;
 }
 
 /** "Since this event": where the position has later events, what the side

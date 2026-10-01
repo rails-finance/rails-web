@@ -481,8 +481,15 @@ export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: strin
           after: collAfter * lastOf.price,
           amount: collMove,
           symbol: collSymbol,
+          held: collAfter,
         },
-        debt: { before: Math.max(0, debtAfter - debtMove), after: debtAfter, amount: debtMove, symbol: debtSymbol },
+        debt: {
+          before: Math.max(0, debtAfter - debtMove),
+          after: debtAfter,
+          amount: debtMove,
+          symbol: debtSymbol,
+          held: debtAfter,
+        },
       },
       rate: r.ev.rate + r.ev.fee,
     };

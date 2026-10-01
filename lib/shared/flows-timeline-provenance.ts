@@ -101,3 +101,32 @@ export function flowAssetProv(
     formula: "Σ amount × price at block",
   };
 }
+
+/** A figure of an event card's sum in the side's token (lib/shared/flow-focus.ts
+ *  `eventTokenSum`): a line's running total, what is held or owed, or the
+ *  transaction's move. `when`
+ *  is "this event (5 Jul '25)". */
+export function flowTokenProv(
+  label: string,
+  symbol: string,
+  when: string,
+  figure: "line" | "held" | "move",
+): Provenance {
+  if (figure === "move")
+    return {
+      kind: "chain-derived",
+      summary: `${label}'s move at ${when} — the ${symbol} the event's transaction added or took, its legs added up; the interest built since the last event is not the transaction's.`,
+      formula: "Σ legs of the transaction",
+    };
+  if (figure === "held")
+    return {
+      kind: "chain-derived",
+      summary: `${label} at ${when} — the ${symbol} balance once the event's transaction had run, as the position's events record it.`,
+      formula: "recorded balance",
+    };
+  return {
+    kind: "chain-derived",
+    summary: `${label} in ${symbol} up to ${when} — every ${symbol} amount of this kind the position's events record by then, added up. The lines are rounded together to the printed decimals, so they add to the total.`,
+    formula: "Σ amount",
+  };
+}
