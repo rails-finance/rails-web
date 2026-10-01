@@ -53,10 +53,13 @@ import {
 } from "@/lib/fx/event-provenance";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
-import { fxBeforeAfter, useFxEventState, type FxEventState, type FxSide } from "@/lib/fx/use-event-state";
+import { fxBeforeAfter, useFxEventStateRead, type FxEventState, type FxSide } from "@/lib/fx/use-event-state";
 import { fxRowFees, fxFeePct } from "@/lib/fx/row-figures";
 import { fxCollMoved, fxFundingText, fxRowFunding } from "@/lib/fx/in-tx-funding";
 import { formatDate } from "@/lib/date";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { T2Skeleton } from "@/components/shared/event-ledger";
+import { useFxLedgerCells } from "./fx-ledger";
 
 export interface FxEventDetailProps {
   ctx: FxContext;
@@ -157,7 +160,7 @@ function readStat(
 }
 
 export function FxEventDetail({ ctx, txHash, blockNumber, normalizedSymbol, blockPeers }: FxEventDetailProps) {
-  const state = useFxEventState(ctx, blockNumber, txHash);
+  const { value: state, settled } = useFxEventStateRead(ctx, blockNumber, txHash);
   return (
     <FxEventDetailBody
       ctx={ctx}
@@ -166,6 +169,7 @@ export function FxEventDetail({ ctx, txHash, blockNumber, normalizedSymbol, bloc
       normalizedSymbol={normalizedSymbol}
       blockPeers={blockPeers}
       state={state}
+      stateSettled={settled}
     />
   );
 }
@@ -177,7 +181,8 @@ function FxEventDetailBody({
   normalizedSymbol,
   blockPeers,
   state,
-}: FxEventDetailProps & { state: FxEventState | null }) {
+  stateSettled = true,
+}: FxEventDetailProps & { state: FxEventState | null; stateSettled?: boolean }) {
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
   const coords: FxCoords = {
@@ -189,6 +194,15 @@ function FxEventDetailBody({
   };
   const { before, after } = fxBeforeAfter(state, blockNumber);
   const rate = after?.rate ?? before?.rate ?? null;
+  // The cells that open into the Lifetime flows ledgers, where the page has
+  // them; while the model is on its way, the cells that will open stand as
+  // placeholder rows.
+  const cells = useFxLedgerCells();
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const ledgers = cells != null || flowsPending;
+  const collLedger = ledgers ? { ledger: "collateral" as const } : {};
+  const debtLedger = ledgers ? { ledger: "debt" as const } : {};
   const stats: ChainTruthStat[] = [];
   const feeStats: ChainTruthStat[] = [];
 
@@ -278,13 +292,22 @@ function FxEventDetailBody({
     }
     const tag = blockPeers && blockPeers > 1 ? ` · this block (${blockPeers} rebalances)` : "";
     const px = poolLiq ? (before?.minPrice ?? null) : null;
+    const coll = readStat(`This position · collateral${tag}`, "coll", normalizedSymbol, before, after, coords);
+    const debt = readStat(`This position · debt${tag}`, "debt", "fxUSD", before, after, coords);
     for (const s of [
-      readStat(`This position · collateral${tag}`, "coll", normalizedSymbol, before, after, coords),
-      readStat(`This position · debt${tag}`, "debt", "fxUSD", before, after, coords),
+      coll ? { ...coll, ...collLedger } : null,
+      debt ? { ...debt, ...debtLedger } : null,
       readStat(`This position · debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords, px),
     ])
       if (s) tickStats.push(s);
-    return <ChainTruthDetail stats={poolLiq ? tickStats.map(readable) : tickStats} />;
+    return (
+      <>
+        <ChainTruthDetail stats={poolLiq ? tickStats.map(readable) : tickStats} />
+        {/* The position's read at the block is out: its Collateral and Debt
+            stand as placeholder rows until it lands. */}
+        {ledgers && !stateSettled && (!coll || !debt) && <T2Skeleton data={{ "data-position-state": "loading" }} />}
+      </>
+    );
   }
 
   if (ctx.eventType === "liquidation") {
@@ -417,6 +440,7 @@ function FxEventDetailBody({
             })
           : undefined,
       sub: collSub,
+      ...collLedger,
     });
     const debtBefore = before?.debts ?? (ctx.debtBefore != null ? Number(ctx.debtBefore) : null);
     stats.push({
@@ -450,6 +474,7 @@ function FxEventDetailBody({
             },
           }
         : {}),
+      ...debtLedger,
     });
     const ratio = readStat(
       "Debt ratio",

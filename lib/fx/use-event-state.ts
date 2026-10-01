@@ -49,6 +49,11 @@ function load(url: string): Promise<FxEventState | null> {
 }
 
 function useStateAt(url: string | null): FxEventState | null {
+  return useStateAtRead(url).value;
+}
+
+/** The read and whether it has answered (a miss answers null). */
+function useStateAtRead(url: string | null): { value: FxEventState | null; settled: boolean } {
   const [state, setState] = useState<{ url: string; value: FxEventState | null } | null>(null);
   useEffect(() => {
     if (!url) return;
@@ -60,8 +65,9 @@ function useStateAt(url: string | null): FxEventState | null {
       live = false;
     };
   }, [url]);
-  if (!url || state?.url !== url) return null;
-  return state.value;
+  if (!url) return { value: null, settled: true };
+  if (state?.url !== url) return { value: null, settled: false };
+  return { value: state.value, settled: true };
 }
 
 /** The read's URL for one row, or null where the row states nothing about the
@@ -80,6 +86,15 @@ export function fxEventStateUrl(ctx: FxContext, blockNumber?: number, txHash?: s
  *  card then draws what the event states. */
 export function useFxEventState(ctx: FxContext, blockNumber?: number, txHash?: string): FxEventState | null {
   return useStateAt(fxEventStateUrl(ctx, blockNumber, txHash));
+}
+
+/** The same read, with whether it has answered. */
+export function useFxEventStateRead(
+  ctx: FxContext,
+  blockNumber?: number,
+  txHash?: string,
+): { value: FxEventState | null; settled: boolean } {
+  return useStateAtRead(fxEventStateUrl(ctx, blockNumber, txHash));
 }
 
 /** The position at every block of its socialized rows (rebalances, pool-wide
@@ -136,12 +151,23 @@ export function useFxPricesAt(
   /** Also the tick the position sits in at the block. */
   tick = false,
 ): FxStateAt | null {
+  return useFxPricesAtRead(pool, id, block, tick).value;
+}
+
+/** The same read, with whether it has answered: a miss or no block answers
+ *  null, settled. */
+export function useFxPricesAtRead(
+  pool: string,
+  id: string,
+  block: number | null | undefined,
+  tick = false,
+): { value: FxStateAt | null; settled: boolean } {
   const url =
     block != null && block > 0
       ? `/api/chain/fx/event-state?${new URLSearchParams({ pool, id, blocks: String(block), prices: "1", ...(tick ? { tick: "1" } : {}) })}`
       : null;
-  const s = useStateAt(url);
-  return block != null ? (s?.reads[String(block)] ?? null) : null;
+  const s = useStateAtRead(url);
+  return { value: block != null ? (s.value?.reads[String(block)] ?? null) : null, settled: s.settled };
 }
 
 const WAD = 1e18;

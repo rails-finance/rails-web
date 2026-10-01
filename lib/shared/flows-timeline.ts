@@ -52,6 +52,9 @@ export interface FlowBucket {
    *  (default "reverse"); an inflow's a texture over the side's faded hue
    *  (none: the faded hue alone). No two lines of a side share a fill. */
   hatch?: FlowHatch;
+  /** The ledger row's name, where it is not the label (a redemption-toned
+   *  line reads "Redeemed" there by default): an f(x) rebalance's. */
+  ledgerLabel?: string;
 }
 
 /** The outflow hatches: reverse diagonal (a withdrawal or repayment), cross
