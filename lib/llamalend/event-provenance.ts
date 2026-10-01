@@ -225,20 +225,6 @@ export const llamalendUsdProv = (what: string, borrowedSymbol: string, amm?: str
   ],
 });
 
-/** A lifetime gross flow (Σ borrowed / repaid / added / withdrawn /
- *  liquidated on this position) — sums of the events' own emitted deltas. */
-export const llamalendLifetimeFlowProv = (
-  flow: "collateral added" | "collateral withdrawn" | "borrowed" | "repaid" | "liquidated debt" | "collateral taken",
-  sym: string,
-  controller?: string,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "emitted",
-  summary: `Lifetime ${flow} (${sym}) — the sum of the emitted amounts of this position's own captured Controller events, complete from the market's deploy block. ⚠️ The Liquidate-paired Repay is deduped in the index (the Controller emits both with identical amounts inside _liquidate), so nothing here double-counts. Soft-liquidation conversion is NOT a flow — the AMM converts in place, emitting no per-user event; the converted amount is the state read on the card above.`,
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Σ emitted amounts across the position's own events · deploy → head`,
-});
-
 // ── liquidation forensics — the valued two-leg seizure ───────────────────────
 //
 // A hard liquidation takes BOTH legs of the position's AMM holding: the
@@ -412,38 +398,6 @@ export const llamalendLostProv = (sym: string, controller?: string): Provenance 
   ],
 });
 
-/** On a position with hard liquidations: collateral the AMM sold net of
- *  buy-backs, deposited − withdrawn − taken in liquidation − held now. */
-export const llamalendSoldBeforeLiqProv = (sym: string, controller?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${sym} the AMM sold from this position and did not buy back: everything deposited, less everything withdrawn, less what hard liquidations took, less what the position holds now. The converted balance it sold for is the line above the flows.`,
-  formula: "deposited − withdrawn − taken in liquidation − held now",
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · Liquidate collateral_received · user_state @ head`,
-  inputs: [
-    { label: "deposited", kind: "chain", pclass: "emitted", note: "Σ collateral added in the position's events" },
-    { label: "withdrawn", kind: "chain", pclass: "emitted", note: "Σ collateral removed in the position's events" },
-    { label: "taken", kind: "chain", pclass: "emitted", note: "Σ Liquidate collateral_received" },
-    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head; 0 on a closed loan" },
-  ],
-});
-
-/** On a position with hard liquidations: the borrowed token the AMM's sales
- *  put into the position, net of buy-backs — taken in liquidation + held now. */
-export const llamalendConvertedInProv = (sym: string, controller?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${sym} the AMM's sales of this position's collateral left in it, net of buy-backs: what hard liquidations took of it plus what the position holds now. It enters the position only by those sales, and leaves by a buy-back or a liquidation.`,
-  formula: "converted taken in liquidation + converted held now",
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Σ Liquidate stablecoin_received · user_state @ head`,
-  inputs: [
-    { label: "taken", kind: "chain", pclass: "emitted", note: "Σ Liquidate stablecoin_received" },
-    { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[1] @ head; 0 on a closed loan" },
-  ],
-});
-
 /** Collateral the AMM has sold net of buy-backs on a position in its bands
  *  now: deposited − withdrawn − held, the converted balance being what it
  *  holds for it. */
@@ -458,50 +412,5 @@ export const llamalendSoldProv = (sym: string, controller?: string): Provenance 
     { label: "deposited", kind: "chain", pclass: "emitted", note: "Σ collateral added in the position's events" },
     { label: "withdrawn", kind: "chain", pclass: "emitted", note: "Σ collateral removed in the position's events" },
     { label: "held now", kind: "chain", pclass: "state", note: "user_state(user)[0] @ head" },
-  ],
-});
-
-/** The debt still owed on what was drawn: borrowed less repaid less cleared in
- *  liquidation. The interest that built up on it is a separate line. */
-export const llamalendNetBorrowedProv = (sym: string, controller?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${sym} drawn and not yet repaid: everything the position's events borrowed, less everything they repaid or cleared. Interest that built up on it is the line below.`,
-  formula: "borrowed − repaid − cleared in liquidation",
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Σ emitted debt amounts`,
-  inputs: [
-    { label: "borrowed", kind: "chain", pclass: "emitted", note: "Σ debt added in the position's events" },
-    { label: "repaid", kind: "chain", pclass: "emitted", note: "Σ debt removed in the position's events" },
-  ],
-});
-
-/** Interest accrued on an open loan: the debt now less what was borrowed and
- *  not repaid. */
-export const llamalendAccruedInterestProv = (sym: string, controller?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${sym} of interest the debt has built up: what the position owes now, less what its events borrowed and did not repay. The market's rate policy sets the per-second rate.`,
-  formula: "debt now − (borrowed − repaid)",
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Controller.debt(user) @ head · Σ emitted debt amounts`,
-  inputs: [
-    { label: "debt now", kind: "chain", pclass: "state", note: "Controller.debt(user) @ head" },
-    { label: "borrowed − repaid", kind: "chain", pclass: "emitted", note: "Σ debt amounts in the position's events" },
-  ],
-});
-
-/** Interest paid on a closed loan: what its repayments returned, less what it
- *  drew. */
-export const llamalendInterestPaidProv = (sym: string, controller?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "emitted",
-  summary: `${sym} the borrower paid beyond what was drawn: everything repaid, less everything borrowed. The loan closed with no debt left and no liquidation, so the difference is interest.`,
-  formula: "repaid − borrowed",
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: `${LLAMALEND_VIA} · Σ emitted debt amounts`,
-  inputs: [
-    { label: "repaid", kind: "chain", pclass: "emitted", note: "Σ debt removed in the position's events" },
-    { label: "borrowed", kind: "chain", pclass: "emitted", note: "Σ debt added in the position's events" },
   ],
 });

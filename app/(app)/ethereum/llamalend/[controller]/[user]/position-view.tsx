@@ -14,7 +14,7 @@
 // multicall of user_state (the converted amount lives in NO event) +
 // read_user_tick_numbers + get_sum_xy (the two-contract cross-check) + A +
 // get_base_price + price_oracle, with the band edges from the exact integer
-// p_oracle_up port. The first paint (card + tower + timeline from the index)
+// p_oracle_up port. The first paint (card + flows + timeline from the index)
 // never waits on RPC round-trips; the risk surfaces stream in when the read
 // lands, and a chainStale response simply leaves them unrendered. The card's
 // state legs upgrade from the listing snapshot to the live head read when it
@@ -51,16 +51,17 @@ import {
 } from "@/components/protocol/llamalend/llamalend-position-card";
 import { LlamalendPositionExplanation } from "@/components/protocol/llamalend/llamalend-position-explanation";
 import { LlamalendRiskSlot } from "@/components/protocol/llamalend/llamalend-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import {
-  computeLlamalendEconomics,
   llamalendLifetimeWithOpening,
   llamalendLostToSoftLiq,
   llamalendSoldInBands,
   replayLlamalendLifetime,
 } from "@/lib/llamalend/economics";
-import { llamalendEconomicsExplanation, llamalendEconomicsContent } from "@/lib/llamalend/economics-explanation";
-import { normalizeAddressParam } from "@/lib/llamalend/asset-catalog";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { LlamalendFlowsNote, llamalendFlowsContent } from "@/components/protocol/llamalend/llamalend-flows-note";
+import { useLlamalendFlows } from "@/hooks/useLlamalendFlows";
 import {
   llamalendLoanMarks,
   llamalendLoans,
@@ -69,7 +70,6 @@ import {
 } from "@/lib/llamalend/event-figures";
 import { LlamalendLoansLine, LlamalendOwnerOutcomeLine } from "@/components/protocol/llamalend/llamalend-loans-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { soleFlowAddress } from "@/lib/shared/format-event";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -139,6 +139,9 @@ export default function LlamalendPositionView({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<LlamalendChainResponse | null>(null);
+  // Whether the live read has answered (or failed): the Lifetime flows panel
+  // waits for it, since today's figures and price are its.
+  const [chainSettled, setChainSettled] = useState(false);
 
   // Mount. A seeded view already holds the tail and leaves this alone; an
   // unseeded one reads it exactly as this page always did.
@@ -212,6 +215,7 @@ export default function LlamalendPositionView({
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
       }
+      if (!cancelled) setChainSettled(true);
     })();
     return () => {
       cancelled = true;
@@ -257,19 +261,6 @@ export default function LlamalendPositionView({
   }, [liveView, llamalendEvents, cutoffBlock]);
   const previousStated = useMemo(() => llamalendPreviousStatedMap(llamalendEvents), [llamalendEvents]);
   const nextRows = useMemo(() => llamalendNextRowMap(llamalendEvents), [llamalendEvents]);
-  // The two tokens' contracts, from the events' flows, for the flows panel's
-  // token chips.
-  const tokenAddresses = useMemo(() => {
-    if (!liveView) return undefined;
-    const find = (sym: string) => {
-      for (const e of llamalendEvents) {
-        const a = soleFlowAddress(e.flows, sym);
-        if (a) return a;
-      }
-      return undefined;
-    };
-    return { collateral: find(liveView.collateralSymbol), borrowed: find(liveView.borrowedSymbol) };
-  }, [llamalendEvents, liveView]);
   // The loans this page holds (a closed loan and a later one share the key);
   // read only over the whole history.
   const loans = useMemo(
@@ -286,15 +277,14 @@ export default function LlamalendPositionView({
     storageKey: `llamalend-${controller}-${user}`,
     protocolKey: "llamalend",
     window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
+  // not the window's: the card's soft-liquidation figures state nothing until
+  // the opening balance is known.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? llamalendEvents : undefined;
   const lost = useMemo(() => {
     if (!liveView) return null;
     const lifetime = precomputedLifetimeFor(liveView, llamalendEvents, opening, lifetimeKnown);
@@ -315,17 +305,6 @@ export default function LlamalendPositionView({
     if (kept <= 0 || lost <= 0) return null;
     return { kept, lost, repaidAny: lifetime.repaid > 0, withdrewAny: lifetime.collateralWithdrawn > 0 };
   }, [liveView, llamalendEvents, opening, lifetimeKnown, loans]);
-  const precomputedLifetime = useMemo(
-    () =>
-      liveView
-        ? llamalendLifetimeWithOpening(llamalendEvents, opening, {
-            collateral: liveView.collateralDecimals,
-            borrowed: liveView.borrowedDecimals,
-          })
-        : undefined,
-    [llamalendEvents, opening, liveView],
-  );
-
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
   // window under a whole-history filename.
@@ -339,6 +318,34 @@ export default function LlamalendPositionView({
       missing: Math.max((res.totalEvents ?? served.length) - served.length, 0),
     };
   }, [controller, user]);
+
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/llamalend/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read); a read short of the whole
+  // history is a failed read.
+  const flowLive = useMemo(
+    () =>
+      chain && !chain.chainStale
+        ? {
+            price: chain.priceOracle,
+            coll: chain.hasLoan ? chain.collateral : 0,
+            debt: chain.hasLoan ? chain.debt : 0,
+          }
+        : null,
+    [chain],
+  );
+  const flows = useLlamalendFlows({
+    controller,
+    user,
+    wholeEvents: historyWindow.state === "whole" ? llamalendEvents : null,
+    fetchAll: fetchAllHistory,
+    collSymbol: liveView?.collateralSymbol ?? null,
+    debtSymbol: liveView?.borrowedSymbol ?? null,
+    open: liveView?.status === "open",
+    live: flowLive,
+    liveSettled: chainSettled,
+  });
+  const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
   // The top row's price dropdown: the AMM's own oracle price of the
   // collateral — only where the borrowed token is crvUSD (~$1); a WETH-
@@ -361,158 +368,151 @@ export default function LlamalendPositionView({
   }
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="llamalend"
-        wallet={user}
-        assets={stripAssets}
-        closed={liveView != null && liveView.status !== "open"}
-      >
-        {liveView && (
-          <LlamalendExportMenu
-            controller={controller}
-            user={user}
-            view={liveView}
-            chain={chain}
-            events={llamalendEvents}
-            csvFilename={`llamalend-${controller.slice(0, 10)}-${user.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, llamalendEvents)}
-            scopeNote={exportScopeNote(historyWindow, llamalendEvents, "this position's whole history")}
-          />
-        )}
-      </DetailTopRow>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="llamalend"
+          wallet={user}
+          assets={stripAssets}
+          closed={liveView != null && liveView.status !== "open"}
+        >
+          {liveView && (
+            <LlamalendExportMenu
+              controller={controller}
+              user={user}
+              view={liveView}
+              chain={chain}
+              events={llamalendEvents}
+              csvFilename={`llamalend-${controller.slice(0, 10)}-${user.slice(0, 10)}-activity.csv`}
+              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, llamalendEvents)}
+              scopeNote={exportScopeNote(historyWindow, llamalendEvents, "this position's whole history")}
+            />
+          )}
+        </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {cardView && liveView && (
-            <LlamalendPositionCard
-              v={cardView}
-              bands={chain?.hasLoan ? chain.bands : null}
-              receipts
-              viewHref={tl.viewHref}
-              // ⇒ THE DISTINCTIVE SURFACE rides the heading-button row, the
-              // same slot a Trove's risk strip uses: health, the converted
-              // amount and the band meter — visible without a click, and inside
-              // the card's receipts scope, which is what makes those figures
-              // inspectable at all. It was a full-width body block while the
-              // band axis was section-sized; at the shared runway's compact
-              // size it belongs on the row with every sibling's. Mounted only
-              // while the loan is live and the chain read landed. The
-              // Explanation heading-button narrates the same figures.
-              rowExtra={
-                chain && chain.hasLoan && liveView.status === "open" ? (
-                  <LlamalendRiskSlot chain={chain} lost={lost} sold={soldInBands} />
-                ) : undefined
-              }
-              // Passed whatever the status and before the chain read lands:
-              // the pane, and the copy-view link at its foot, mount with the
-              // card. A closed account, a read still pending or a read with no
-              // loan narrates nothing.
-              bodyExtra={
-                loans.length > 1 ? (
-                  <LlamalendLoansLine loans={loans} />
-                ) : ownerOutcome ? (
-                  <LlamalendOwnerOutcomeLine
-                    {...ownerOutcome}
-                    borrowedSymbol={liveView.borrowedSymbol}
-                    collateralSymbol={liveView.collateralSymbol}
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {cardView && liveView && (
+              <LlamalendPositionCard
+                v={cardView}
+                bands={chain?.hasLoan ? chain.bands : null}
+                receipts
+                viewHref={tl.viewHref}
+                // ⇒ THE DISTINCTIVE SURFACE rides the heading-button row, the
+                // same slot a Trove's risk strip uses: health, the converted
+                // amount and the band meter — visible without a click, and inside
+                // the card's receipts scope, which is what makes those figures
+                // inspectable at all. It was a full-width body block while the
+                // band axis was section-sized; at the shared runway's compact
+                // size it belongs on the row with every sibling's. Mounted only
+                // while the loan is live and the chain read landed. The
+                // Explanation heading-button narrates the same figures.
+                rowExtra={
+                  chain && chain.hasLoan && liveView.status === "open" ? (
+                    <LlamalendRiskSlot chain={chain} lost={lost} sold={soldInBands} />
+                  ) : undefined
+                }
+                // Passed whatever the status and before the chain read lands:
+                // the pane, and the copy-view link at its foot, mount with the
+                // card. A closed account, a read still pending or a read with no
+                // loan narrates nothing.
+                bodyExtra={
+                  loans.length > 1 ? (
+                    <LlamalendLoansLine loans={loans} />
+                  ) : ownerOutcome ? (
+                    <LlamalendOwnerOutcomeLine
+                      {...ownerOutcome}
+                      borrowedSymbol={liveView.borrowedSymbol}
+                      collateralSymbol={liveView.collateralSymbol}
+                    />
+                  ) : undefined
+                }
+                explanation={
+                  <LlamalendPositionExplanation
+                    chain={liveView.status === "open" ? chain : null}
+                    closed={
+                      liveView.status !== "open" && historyWindow.state === "whole"
+                        ? { view: liveView, events: llamalendEvents }
+                        : null
+                    }
+                    lost={lost}
+                    sold={soldInBands}
+                    factory={liveView.factory ?? null}
+                    liquidationCount={liveView.liquidationCount}
+                    eventCount={liveView.eventCount}
+                  />
+                }
+              />
+            )}
+            {/* Lifetime flows: the bars and the line over the position's replay
+          (lib/llamalend/flows.ts), in the market's borrowed token, in place of
+          the tower (TO-DO-ui-jobs 206). */}
+            {liveView && (
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <LlamalendFlowsNote
+                      facts={flows.facts}
+                      collSymbol={liveView.collateralSymbol}
+                      debtSymbol={liveView.borrowedSymbol}
+                    />
+                  </div>
+                }
+                learnMore={llamalendFlowsContent()}
+              />
+            )}
+            <ChainTruthTimeline
+              csvExportCeiling={DRAINED_ROW_CEILING}
+              // Matches `LlamalendEventCard`'s own `persistKey={`llamalend:${event.id}`}`
+              // — lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="llamalend"
+              closed={liveView ? liveView.status !== "open" : undefined}
+              tl={tl}
+              runs={LLAMALEND_LIQUIDATION_RUNS}
+              toolbarLeading={
+                liveView ? (
+                  <TimelineActivityHeader
+                    events={llamalendEvents}
+                    closed={liveView.status !== "open"}
+                    // When the position actually opened, not when the window
+                    // does.
+                    firstAt={opening?.firstTimestamp}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    labelLastActivity
+                    reopenedAt={
+                      loans.length > 1 && loans[loans.length - 1].closedAt == null
+                        ? loans[loans.length - 1].openedAt
+                        : null
+                    }
                   />
                 ) : undefined
               }
-              explanation={
-                <LlamalendPositionExplanation
-                  chain={liveView.status === "open" ? chain : null}
-                  closed={
-                    liveView.status !== "open" && historyWindow.state === "whole"
-                      ? { view: liveView, events: llamalendEvents }
-                      : null
-                  }
-                  lost={lost}
-                  sold={soldInBands}
-                  factory={liveView.factory ?? null}
-                  liquidationCount={liveView.liquidationCount}
-                  eventCount={liveView.eventCount}
-                />
+              renderCard={(event, meta) =>
+                isLlamalendEvent(event) ? (
+                  <LlamalendEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    previousStated={previousStated.get(event.id) ?? null}
+                    loanMark={loanMarks?.get(event.id) ?? null}
+                    marketDiscount={chain?.marketLiquidationDiscount ?? null}
+                    next={nextRows.get(event.id) ?? null}
+                  />
+                ) : null
               }
             />
-          )}
-          {liveView &&
-            (() => {
-              const towerData = computeLlamalendEconomics(
-                liveView,
-                lifetimeEvents,
-                precomputedLifetime,
-                tokenAddresses,
-              );
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={llamalendEconomicsExplanation(
-                    towerData,
-                    liveView.borrowedIsCrvusd && liveView.priceOracle != null
-                      ? {
-                          price: liveView.priceOracle,
-                          collateralSymbol: liveView.collateralSymbol,
-                          borrowedSymbol: liveView.borrowedSymbol,
-                        }
-                      : null,
-                    soldInBands != null && liveView.converted != null
-                      ? { sold: soldInBands, converted: liveView.converted }
-                      : null,
-                  )}
-                  learnMore={llamalendEconomicsContent()}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={DRAINED_ROW_CEILING}
-            // Matches `LlamalendEventCard`'s own `persistKey={`llamalend:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="llamalend"
-            closed={liveView ? liveView.status !== "open" : undefined}
-            tl={tl}
-            runs={LLAMALEND_LIQUIDATION_RUNS}
-            toolbarLeading={
-              liveView ? (
-                <TimelineActivityHeader
-                  events={llamalendEvents}
-                  closed={liveView.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  labelLastActivity
-                  reopenedAt={
-                    loans.length > 1 && loans[loans.length - 1].closedAt == null
-                      ? loans[loans.length - 1].openedAt
-                      : null
-                  }
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isLlamalendEvent(event) ? (
-                <LlamalendEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  previousStated={previousStated.get(event.id) ?? null}
-                  loanMark={loanMarks?.get(event.id) ?? null}
-                  marketDiscount={chain?.marketLiquidationDiscount ?? null}
-                  next={nextRows.get(event.id) ?? null}
-                />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+            {/* Ambient oracle-price pill, fixed bottom-right. */}
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
