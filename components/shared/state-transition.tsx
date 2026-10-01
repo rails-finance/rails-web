@@ -100,7 +100,16 @@ export function ClosedLabel() {
  *  Debt, LTV, Interest/Borrow Rate) renders as one of these, all sharing a
  *  single CSS grid so they balance in width and — via `sm:auto-rows-fr` on the
  *  grid plus `h-full` here — match the tallest card's height per row. */
-export function StatCard({ label, children }: { label: ReactNode; children: ReactNode }) {
+export function StatCard({
+  label,
+  children,
+  data,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  /** Data attributes for the cell. */
+  data?: Record<string, string>;
+}) {
   // On a card whose account cells open into ledgers, every cell is one row
   // as the ledger cells are (components/shared/event-ledger.tsx): its label
   // at the left, its figures at the right with any sub-line under them.
@@ -110,13 +119,14 @@ export function StatCard({ label, children }: { label: ReactNode; children: Reac
       <div
         className="flex h-full flex-wrap items-start gap-x-3 gap-y-1 rounded-xl bg-background px-4 py-3"
         data-stat-row=""
+        {...data}
       >
         <div className="flex min-h-5 items-center text-sm font-semibold text-foreground">{label}</div>
         <div className="flex flex-1 basis-36 flex-col items-end text-right">{children}</div>
       </div>
     );
   return (
-    <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3">
+    <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3" {...data}>
       <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>
       {children}
     </div>
