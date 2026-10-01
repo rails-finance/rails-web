@@ -8,7 +8,7 @@
 // shortfall line — one burst, because a Compound v2 fork cross-collateralises
 // everything through one contract. Then the sweep: every event the wallet's
 // markets have emitted for it since the Comptroller's first block, which feeds
-// the timeline, the tower's lifetime layer and — when it read every block —
+// the timeline, the Lifetime flows panel and — when it read every block —
 // the card's own history: the principal beside each supply, the peaks a
 // closed account shows, its activity meta.
 //
@@ -52,7 +52,6 @@ import {
 import { MoonwellRiskSlot } from "@/components/protocol/moonwell/moonwell-risk-slot";
 import { MoonwellEventCard } from "@/components/protocol/moonwell/moonwell-event-card";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -66,11 +65,15 @@ import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { eventsBelowLife, replaySegmentReads, type ReplayGroupedFields } from "@/lib/api/fetch-replay-segment";
 import { WHOLE_HISTORY } from "@/lib/shared/timeline-opening-balance";
-import { computeMoonwellCardCaptions, computeMoonwellEconomics } from "@/lib/moonwell/economics";
-import { moonwellEconomicsExplanation, moonwellEconomicsContent } from "@/lib/moonwell/economics-explanation";
+import { computeMoonwellCardCaptions } from "@/lib/moonwell/economics";
 import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
 import { makeSweptMoonwellIdentity } from "@/lib/moonwell/swept-card-provenance";
-import { makeSweptMoonwellVocabulary } from "@/lib/moonwell/swept-tower-provenance";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CTokenLedgerContext } from "@/components/shared/ctoken-event-ledger";
+import { MoonwellFlowsNote, moonwellFlowsContent } from "@/components/protocol/moonwell/moonwell-flows-note";
+import { useMoonwellFlows } from "@/hooks/useMoonwellFlows";
 import { MOONWELL_ACTIVITY_RUNS, MOONWELL_FOLDER_REGISTER } from "@/lib/moonwell/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled, type GroupedTimelineFields } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -181,12 +184,8 @@ function sweepWaitCopy(c: ReturnType<typeof useBaseLendingCoverage>) {
   );
 }
 
-/** The tower's receipts for this lane — a live sweep from the Comptroller's
- *  first block and a position read pinned to a block, never an index. */
-const VOCAB = makeSweptMoonwellVocabulary({
-  deployBlock: MOONWELL_BASE_DEPLOY_BLOCK,
-  positionRoute: `GET ${POSITION_ROUTE}`,
-});
+/** A Base market's key is its mToken address. */
+const mtokenOf = (market: string) => market.toLowerCase();
 
 /** This deployment, as every card on the page resolves it: the market key IS
  *  the mToken address, the Comptroller and route are Base's, and the position
@@ -317,9 +316,10 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   );
   /** The folders, whole and unfiltered — the part of the history the page
    *  holds as aggregates. Every whole-history claim below that is reduced over
-   *  `moonwellEvents` adds them, or states nothing it cannot. The tower, the
-   *  card's counts and the positions need nothing: the route replayed every row
-   *  before it grouped, and those figures ride the replay itself. */
+   *  `moonwellEvents` adds them, or states nothing it cannot. The card's counts
+   *  and the positions need nothing: the route replayed every row before it
+   *  grouped, and those figures ride the replay itself. The Lifetime flows
+   *  panel reads the flat history where folders stand in it. */
   const servedFolders = useMemo(
     () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
     [servedRows],
@@ -439,6 +439,8 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
     folderParams: { wallet },
     storageKey: `moonwell-base-${wallet}`,
     protocolKey: "moonwell",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // The CSV on a grouped page: the rows in the order the route served them,
@@ -520,27 +522,33 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   const historyPending = nothingOnChain && timelineState === "loading";
   const historyUnread = nothingOnChain && (timelineState === "failed" || timelineState === "unavailable");
 
-  // The tower's lifetime layer reads the sums the route reduced over EVERY
-  // row, not the capped list of events on this page — and only when the sweep
-  // read the whole life. A holed or horizoned sweep keeps the bars (the
-  // current state comes from the Comptroller, not the logs) and drops the flows.
-  const towerData = useMemo(() => {
-    if (!view) return null;
-    const built = computeMoonwellEconomics(
-      view,
-      undefined,
-      VOCAB,
-      sweptClean ? timeline?.lifetime : undefined,
-      sweptClean ? timeline?.ledger : undefined,
-    );
-    return sweptClean
-      ? built
-      : {
-          ...built,
-          flowsNote:
-            "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Comptroller and the markets.",
-        };
-  }, [view, timeline, sweptClean]);
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/shared/ctoken-flows.ts through lib/moonwell/flows.ts): the page's
+  // rows where they are all of it, else the flat history read once; a read
+  // that is not the whole life (a heavy wallet's elided rows, a holed or
+  // horizoned sweep) is a failed read.
+  const wholeRows = sweptClean && (servedFolders?.length ?? 0) === 0 && (timeline?.coverage.omitted?.count ?? 0) === 0;
+  const fetchFlatHistory = useCallback(async () => {
+    const flat = await fetchChainTimeline<MoonwellBaseTimeline>({
+      wallet,
+      route: TIMELINE_ROUTE,
+      mark: "moonwell-base-flows",
+    });
+    const whole = flat.coverage.fromDeployment === true && flat.coverage.gaps.length === 0;
+    return {
+      events: flat.events.filter(isMoonwellEvent),
+      missing: whole ? (flat.coverage.omitted?.count ?? 0) : Math.max(1, flat.coverage.omitted?.count ?? 0),
+    };
+  }, [wallet]);
+  const flows = useMoonwellFlows({
+    chainId: 8453,
+    pending: timelineState === "loading",
+    wholeEvents: wholeRows ? moonwellEvents : null,
+    fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
+    chain: data,
+    mtokenOf,
+  });
+  const ledgerData = useMemo(() => ({ states: flows.states, brand: "Moonwell", receipt: "mToken" }), [flows.states]);
 
   // The top row's price dropdown: the Comptroller's own oracle price of each market the
   // account currently touches.
@@ -561,174 +569,186 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   return (
     <CaptureSourceProvider value={captureSource}>
       <MoonwellDeploymentProvider value={DEPLOYMENT}>
-        <div className="py-8 space-y-6">
-          <DetailTopRow
-            session="moonwell-base"
-            wallet={wallet}
-            assets={stripAssets}
-            closed={view != null && view.status !== "open"}
-          >
-            {view && (
-              <MoonwellExportMenu
+        <FlowFocusContext.Provider value={flows.focus}>
+          <CTokenLedgerContext.Provider value={ledgerData}>
+            <div className="py-8 space-y-6">
+              <DetailTopRow
+                session="moonwell-base"
                 wallet={wallet}
-                deploymentName="Moonwell (Base)"
-                source={captureSource}
-                view={view}
-                chain={data}
-                events={moonwellEvents}
-                notes={notes}
-                liveNotes={liveNotes}
-                csvFilename={`moonwell-base-${wallet.slice(0, 10)}-activity.csv`}
-                history={markdownHistoryScope(undefined, moonwellEvents, servedFolders)}
-                scopeNote={exportScopeNote(undefined, moonwellEvents, "this wallet's whole history", servedFolders)}
-                fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
-              />
-            )}
-          </DetailTopRow>
-
-          {loading ? (
-            <DetailBodySkeleton />
-          ) : error ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">Couldn&apos;t read this position.</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          ) : historyPending ? (
-            <SweepInFlight>{sweepWaitCopy(coverage)}</SweepInFlight>
-          ) : historyUnread ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">Nothing is supplied or borrowed on any of the Comptroller&rsquo;s markets.</p>
-              <p className="text-sm">
-                Whether this account ever held a position is a question only its history answers, and that read failed.
-                Reload to try again.
-              </p>
-            </div>
-          ) : untouched ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">This wallet has never touched Moonwell on Base.</p>
-              <p className="text-sm">
-                No supplied assets, no debt, and no events on any of the Comptroller&rsquo;s markets between its first
-                block and now.
-              </p>
-            </div>
-          ) : (
-            <>
-              {view && data && (
-                <MoonwellPositionCard
-                  v={view}
-                  receipts
-                  viewHref={tl.viewHref}
-                  captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the L1
-                  // treatment): the HF runway (1.0 exactly the Comptroller's
-                  // shortfall line) and the borrow-capacity lines, every
-                  // figure the Comptroller's own. Shown only with debt.
-                  rowExtra={
-                    view.status === "open" && data.healthFactor != null && data.healthFactor > 0 ? (
-                      <MoonwellRiskSlot chain={data} />
-                    ) : undefined
-                  }
-                  // The Explanation is layman prose about those same face
-                  // figures. A terminal account narrates from the sweep alone
-                  // (peaks, closure); an open one from the Comptroller read.
-                  explanation={
-                    view.status !== "open" ? (
-                      <MoonwellClosedPositionExplanation v={view} />
-                    ) : (
-                      <MoonwellPositionExplanation
-                        chain={data}
-                        captions={captions}
-                        txCount={view.txCount}
-                        liquidationCount={view.liquidationCount}
-                        externalActivity={externalActivity}
-                      />
-                    )
-                  }
-                />
-              )}
-
-              {towerData && timelineState === "ready" && (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={moonwellEconomicsExplanation(towerData, { deployment: "base" })}
-                  learnMore={moonwellEconomicsContent({ deployment: "base" })}
-                />
-              )}
-
-              {timelineState === "ready" && timeline ? (
-                <>
-                  <TimelineFillWell fill={timeline.coverage.fill} />
-                  <ChainTruthTimeline
-                    tl={tl}
-                    runs={MOONWELL_ACTIVITY_RUNS}
-                    // Both grouping paths: the spec groups a flat answer in the
-                    // browser, the register draws the folders the route served.
-                    // Only one is in force on a load.
-                    folderRegister={MOONWELL_FOLDER_REGISTER}
-                    readFolderMembers={readFolderMembers}
-                    segments={segments}
-                    persistKeyPrefix="moonwell"
-                    closed={view?.status !== "open"}
-                    // Receipted facts about the MARKETS this account supplied
-                    // into, placed between the two of its own events that
-                    // bracket each one. Never counted anywhere — see the prop's
-                    // own doc comment and lib/shared/market-note.ts.
+                assets={stripAssets}
+                closed={view != null && view.status !== "open"}
+              >
+                {view && (
+                  <MoonwellExportMenu
+                    wallet={wallet}
+                    deploymentName="Moonwell (Base)"
+                    source={captureSource}
+                    view={view}
+                    chain={data}
+                    events={moonwellEvents}
                     notes={notes}
-                    // This account's own live share-rate note per entered
-                    // market it still holds — no pending state here (see
-                    // `liveNotes`'s own comment): both it and `moonwellEvents`
-                    // are already settled by the time this branch mounts.
                     liveNotes={liveNotes}
-                    toolbarLeading={
-                      <TimelineActivityHeader
-                        events={headerStamps}
-                        closed={view?.status !== "open"}
-                        firstAt={timeline.coverage.firstEventAt}
-                      />
-                    }
-                    emptyLabel={
-                      sweptClean
-                        ? "This wallet has no Moonwell activity on Base."
-                        : "No events to show — the sweep could not read this wallet's history."
-                    }
-                    footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
-                    // On a grouped answer the list covers `eventsServed` — the
-                    // folder members are one tap away, not below the cut.
-                    // A month read holds no card: the grid holds the other months.
-                    boundary={
-                      tl.historyWindow.state === "span"
-                        ? null
-                        : boundaryFromChainCoverage(
-                            timeline.coverage,
-                            servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
-                          )
-                    }
-                    renderCard={(event, meta) =>
-                      isMoonwellEvent(event) ? (
-                        <MoonwellEventCard
-                          event={event}
-                          eventNumber={meta.eventNumber}
-                          isFirst={meta.isFirst}
-                          isLast={meta.isLast}
-                        />
-                      ) : null
-                    }
+                    csvFilename={`moonwell-base-${wallet.slice(0, 10)}-activity.csv`}
+                    history={markdownHistoryScope(undefined, moonwellEvents, servedFolders)}
+                    scopeNote={exportScopeNote(undefined, moonwellEvents, "this wallet's whole history", servedFolders)}
+                    fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
                   />
-                </>
-              ) : timelineState === "loading" ? (
-                <SweepInFlight>{sweepWaitCopy(coverage)}</SweepInFlight>
-              ) : (
-                <p className="py-6 text-center text-sm text-rb-500">
-                  {timelineState === "unavailable"
-                    ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comptroller and is unaffected."
-                    : "The history sweep failed. Reload to try again — the position above is read live from the Comptroller and is unaffected."}
-                </p>
-              )}
-            </>
-          )}
+                )}
+              </DetailTopRow>
 
-          <ProvInspectorLayer />
-        </div>
+              {loading ? (
+                <DetailBodySkeleton />
+              ) : error ? (
+                <div className="py-12 text-center text-rb-500">
+                  <p className="mb-1">Couldn&apos;t read this position.</p>
+                  <p className="text-sm">{error}</p>
+                </div>
+              ) : historyPending ? (
+                <SweepInFlight>{sweepWaitCopy(coverage)}</SweepInFlight>
+              ) : historyUnread ? (
+                <div className="py-12 text-center text-rb-500">
+                  <p className="mb-1">Nothing is supplied or borrowed on any of the Comptroller&rsquo;s markets.</p>
+                  <p className="text-sm">
+                    Whether this account ever held a position is a question only its history answers, and that read
+                    failed. Reload to try again.
+                  </p>
+                </div>
+              ) : untouched ? (
+                <div className="py-12 text-center text-rb-500">
+                  <p className="mb-1">This wallet has never touched Moonwell on Base.</p>
+                  <p className="text-sm">
+                    No supplied assets, no debt, and no events on any of the Comptroller&rsquo;s markets between its
+                    first block and now.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {view && data && (
+                    <MoonwellPositionCard
+                      v={view}
+                      receipts
+                      viewHref={tl.viewHref}
+                      captions={captions ?? undefined}
+                      // The risk slot rides the card's heading-button row (the L1
+                      // treatment): the HF runway (1.0 exactly the Comptroller's
+                      // shortfall line) and the borrow-capacity lines, every
+                      // figure the Comptroller's own. Shown only with debt.
+                      rowExtra={
+                        view.status === "open" && data.healthFactor != null && data.healthFactor > 0 ? (
+                          <MoonwellRiskSlot chain={data} />
+                        ) : undefined
+                      }
+                      // The Explanation is layman prose about those same face
+                      // figures. A terminal account narrates from the sweep alone
+                      // (peaks, closure); an open one from the Comptroller read.
+                      explanation={
+                        view.status !== "open" ? (
+                          <MoonwellClosedPositionExplanation v={view} />
+                        ) : (
+                          <MoonwellPositionExplanation
+                            chain={data}
+                            captions={captions}
+                            txCount={view.txCount}
+                            liquidationCount={view.liquidationCount}
+                            externalActivity={externalActivity}
+                          />
+                        )
+                      }
+                    />
+                  )}
+
+                  {/* Lifetime flows: the bars and the line over the account's
+                  replay (lib/shared/ctoken-flows.ts), in place of the tower
+                  (TO-DO-ui-jobs 206). */}
+                  {view && (
+                    <LifetimeFlowsPanel
+                      scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                      read={flows.read}
+                      explanation={
+                        <div className="space-y-2 text-sm text-rb-500">
+                          <MoonwellFlowsNote facts={flows.facts} />
+                        </div>
+                      }
+                      learnMore={moonwellFlowsContent()}
+                    />
+                  )}
+
+                  {timelineState === "ready" && timeline ? (
+                    <>
+                      <TimelineFillWell fill={timeline.coverage.fill} />
+                      <ChainTruthTimeline
+                        tl={tl}
+                        runs={MOONWELL_ACTIVITY_RUNS}
+                        // Both grouping paths: the spec groups a flat answer in the
+                        // browser, the register draws the folders the route served.
+                        // Only one is in force on a load.
+                        folderRegister={MOONWELL_FOLDER_REGISTER}
+                        readFolderMembers={readFolderMembers}
+                        segments={segments}
+                        persistKeyPrefix="moonwell"
+                        closed={view?.status !== "open"}
+                        // Receipted facts about the MARKETS this account supplied
+                        // into, placed between the two of its own events that
+                        // bracket each one. Never counted anywhere — see the prop's
+                        // own doc comment and lib/shared/market-note.ts.
+                        notes={notes}
+                        // This account's own live share-rate note per entered
+                        // market it still holds — no pending state here (see
+                        // `liveNotes`'s own comment): both it and `moonwellEvents`
+                        // are already settled by the time this branch mounts.
+                        liveNotes={liveNotes}
+                        toolbarLeading={
+                          <TimelineActivityHeader
+                            events={headerStamps}
+                            closed={view?.status !== "open"}
+                            firstAt={timeline.coverage.firstEventAt}
+                          />
+                        }
+                        emptyLabel={
+                          sweptClean
+                            ? "This wallet has no Moonwell activity on Base."
+                            : "No events to show — the sweep could not read this wallet's history."
+                        }
+                        footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
+                        // On a grouped answer the list covers `eventsServed` — the
+                        // folder members are one tap away, not below the cut.
+                        // A month read holds no card: the grid holds the other months.
+                        boundary={
+                          tl.historyWindow.state === "span"
+                            ? null
+                            : boundaryFromChainCoverage(
+                                timeline.coverage,
+                                servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
+                              )
+                        }
+                        renderCard={(event, meta) =>
+                          isMoonwellEvent(event) ? (
+                            <MoonwellEventCard
+                              event={event}
+                              eventNumber={meta.eventNumber}
+                              isFirst={meta.isFirst}
+                              isLast={meta.isLast}
+                            />
+                          ) : null
+                        }
+                      />
+                    </>
+                  ) : timelineState === "loading" ? (
+                    <SweepInFlight>{sweepWaitCopy(coverage)}</SweepInFlight>
+                  ) : (
+                    <p className="py-6 text-center text-sm text-rb-500">
+                      {timelineState === "unavailable"
+                        ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comptroller and is unaffected."
+                        : "The history sweep failed. Reload to try again — the position above is read live from the Comptroller and is unaffected."}
+                    </p>
+                  )}
+                </>
+              )}
+
+              <ProvInspectorLayer />
+            </div>
+          </CTokenLedgerContext.Provider>
+        </FlowFocusContext.Provider>
       </MoonwellDeploymentProvider>
     </CaptureSourceProvider>
   );

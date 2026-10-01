@@ -1,5 +1,5 @@
 // The POSITION CARD's receipts for an INDEX-FREE Moonwell deployment, as a
-// factory — the card-side sibling of swept-tower-provenance.ts.
+// factory.
 // ----------------------------------------------------------------------------
 // The shared Moonwell position card renders Ethereum's and Base's accounts
 // through one grammar, and its figures come from two different custodies:

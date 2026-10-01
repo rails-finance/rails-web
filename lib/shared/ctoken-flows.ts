@@ -32,8 +32,9 @@
 // before over the last row's debt after; after the last row, to the live read
 // (the market's exchange rate and borrow balance now), else at its rate now.
 // Prices: each row's at its block where the page read it, else the nearest
-// priced row's on the market; between events the last price is carried
-// (`seriesCarry`), and today's is the live read's.
+// priced row's on the market; between events the daily store's price for the
+// day where the family passes one (Moonwell), else the last price is carried
+// (`seriesCarry`); today's is the live read's.
 //
 // Pure: tested offline in scripts/verify/verify-compound-v2-flows.ts.
 
@@ -191,6 +192,10 @@ export interface CTokenFlowOptions {
   live: Record<string, CTokenLiveMarket> | null;
   /** Today's oracle price by market, for a market no row priced. */
   todayPrices?: Record<string, number>;
+  /** A daily price per market, [UTC day, USD] ascending (the shared daily
+   *  price store's, rails-ops reference/daily-prices.md): each day no row
+   *  priced takes it, so a quiet market is valued at its day's price. */
+  dailyPrices?: Record<string, [number, number][]>;
 }
 
 /** A replayed row: its legs in tokens and the market's balances after it. */
@@ -524,6 +529,12 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     const p0 = firstPriceOf.get(m);
     if (p0 != null && ![...obs.keys()].some((d) => d <= d0)) obs.set(d0, p0);
   }
+  // The daily store's prices, where the family has them: a day a row priced
+  // keeps the row's (the cards and the bars agree on an event's day).
+  for (const [m, obs] of byMarket) {
+    const rowDays = new Set(obs.keys());
+    for (const [d, p] of o.dailyPrices?.[m] ?? []) if (p > 0 && !rowDays.has(d) && d < today) obs.set(d, p);
+  }
   for (const [m, obs] of byMarket) {
     const p = todayPrice(m);
     if (open && p != null && p > 0) obs.set(today, p);
@@ -645,18 +656,36 @@ export interface CTokenEventState {
 
 export function ctokenEventStates(
   rp: CTokenFlowReplay,
-  o: Pick<CTokenFlowOptions, "todayPrices" | "live">,
+  o: Pick<CTokenFlowOptions, "todayPrices" | "live" | "dailyPrices">,
 ): Map<string, CTokenEventState> {
   const out = new Map<string, CTokenEventState>();
   const { replayed, indexes } = rp;
   // Per market: the balance each side recorded last, its index then, and the
-  // latest price read.
+  // latest price read (and its day).
   const rec = new Map<string, { symbol: string; s: number; sIdx: number | null; d: number; dIdx: number }>();
-  const lastPrice = new Map<string, number>();
+  const lastPrice = new Map<string, { usd: number; day: number }>();
   const firstPrice = new Map<string, number>();
   for (const r of replayed) if (r.price > 0 && !firstPrice.has(r.ev.market)) firstPrice.set(r.ev.market, r.price);
-  const priceOf = (m: string) =>
-    lastPrice.get(m) ?? firstPrice.get(m) ?? o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
+  // A market the transaction left alone takes the newer of its latest row's
+  // price and the daily store's for the event's day, as the bars do that day.
+  const storeAt = (m: string, day: number): { usd: number; day: number } | null => {
+    const obs = o.dailyPrices?.[m];
+    if (!obs || obs.length === 0 || obs[0][0] > day) return null;
+    let lo = 0;
+    let hi = obs.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (obs[mid][0] <= day) lo = mid;
+      else hi = mid - 1;
+    }
+    return obs[lo][1] > 0 ? { usd: obs[lo][1], day: obs[lo][0] } : null;
+  };
+  const priceOf = (m: string, day: number) => {
+    const row = lastPrice.get(m);
+    const store = storeAt(m, day);
+    if (store && (!row || store.day > row.day)) return store.usd;
+    return row?.usd ?? firstPrice.get(m) ?? o.live?.[m]?.price ?? o.todayPrices?.[m] ?? null;
+  };
   let i = 0;
   while (i < replayed.length) {
     const tx = replayed[i].ev.tx ?? replayed[i].ev.id;
@@ -687,14 +716,15 @@ export function ctokenEventStates(
         cur.dIdx = r.debtIndex;
       }
       rec.set(r.ev.market, cur);
-      if (r.ownPrice && r.price > 0) lastPrice.set(r.ev.market, r.price);
+      if (r.ownPrice && r.price > 0) lastPrice.set(r.ev.market, { usd: r.price, day: Math.floor(r.ev.ts / DAY_S) });
     }
     const ts = replayed[j].ev.ts;
+    const day = Math.floor(ts / DAY_S);
     const bySym: Record<FlowSide, Map<string, AssetBalance>> = { collateral: new Map(), debt: new Map() };
     const usd: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     const usdBefore: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     for (const [m, c] of rec) {
-      const p = priceOf(m);
+      const p = priceOf(m, day);
       const touched = before.get(m);
       // A side the transaction moved stands as its rows recorded it; one it
       // left alone, grown by its index to the block, the same before and after.

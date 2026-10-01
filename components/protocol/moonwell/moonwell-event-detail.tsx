@@ -55,12 +55,16 @@ import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
+import { CTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
 
 export interface MoonwellEventDetailProps {
   ctx: MoonwellContext;
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
+  /** The timeline event, for the account cells' ledgers. */
+  eventId?: string;
+  eventTs?: number;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -190,13 +194,19 @@ function supplyStat(ctx: MoonwellContext, mSym: string, coords: MoonwellCoords):
   };
 }
 
-export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: MoonwellEventDetailProps) {
+export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet, eventId, eventTs }: MoonwellEventDetailProps) {
   const dep = useMoonwellDeployment();
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
   const mSym = coords.marketLabel ?? `m${ctx.marketSymbol}`;
   const stats: ChainTruthStat[] = [];
+  // Where the page ties its timeline to the Lifetime flows panel, the card
+  // opens with the account's Collateral and Debt cells; a market's own
+  // balance cell goes where its side holds that market alone, since the
+  // account cell states the same tokens.
+  const soleSupply = useCTokenSoleAsset(eventId ?? "", "collateral");
+  const soleDebt = useCTokenSoleAsset(eventId ?? "", "debt");
 
-  const supply = ctx.side === "supply" ? supplyStat(ctx, mSym, coords) : undefined;
+  const supply = ctx.side === "supply" && soleSupply !== ctx.marketSymbol ? supplyStat(ctx, mSym, coords) : undefined;
   if (supply) stats.push(supply);
 
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
@@ -212,7 +222,7 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: Moonwe
         beforeProv: mTokensBeforeProv(mSym, coords),
       }),
     });
-  } else if (ctx.eventType === "borrow" || ctx.eventType === "repay") {
+  } else if ((ctx.eventType === "borrow" || ctx.eventType === "repay") && soleDebt !== ctx.marketSymbol) {
     stats.push({
       label: "Borrowed",
       value: fmt(ctx.debtAfter),
@@ -284,7 +294,10 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet }: Moonwe
 
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail
+        stats={stats}
+        lead={eventId != null && eventTs != null ? <CTokenLedgerCells eventId={eventId} eventTs={eventTs} /> : null}
+      />
       {forensics && <LiquidationForensics {...forensics} />}
       {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
         <CTokenLiquidationBreakdown

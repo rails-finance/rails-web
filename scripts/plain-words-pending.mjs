@@ -43,7 +43,6 @@ export const PLAIN_WORDS_PENDING = [
   "lib/moonwell/markets-provenance.ts",
   "lib/moonwell/position-provenance.ts",
   "lib/moonwell/swept-card-provenance.ts",
-  "lib/moonwell/swept-tower-provenance.ts",
   "lib/morpho-base/vault-provenance.ts",
   "lib/morpho-base/vault-timeline-provenance.ts",
   "lib/morpho/event-provenance.ts",
