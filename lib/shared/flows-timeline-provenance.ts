@@ -110,8 +110,14 @@ export function flowTokenProv(
   label: string,
   symbol: string,
   when: string,
-  figure: "line" | "held" | "move",
+  figure: "line" | "held" | "move" | "interest",
 ): Provenance {
+  if (figure === "interest")
+    return {
+      kind: "chain-derived",
+      summary: `${label} in ${symbol} at ${when} — the ${symbol} balance at the block less every ${symbol} flow before it: what the reserve's index added.`,
+      formula: "balance − Σ flows",
+    };
   if (figure === "move")
     return {
       kind: "chain-derived",
@@ -128,5 +134,15 @@ export function flowTokenProv(
     kind: "chain-derived",
     summary: `${label} in ${symbol} up to ${when} — every ${symbol} amount of this kind the position's events record by then, added up. The lines are rounded together to the printed decimals, so they add to the total.`,
     formula: "Σ amount",
+  };
+}
+
+/** The interest line of a side's sum by asset in dollars (lib/shared/flow-focus.ts
+ *  `eventSideSumByAsset`). */
+export function flowInterestUsdProv(label: string, when: string): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `${label} at ${when} — each asset's interest in its token (its balance at the block less every flow in it) at the oracle price at the block, an asset no longer held at the price of its latest flow, added up.`,
+    formula: "Σ (balance − Σ flows) × price",
   };
 }

@@ -14,8 +14,8 @@
 // between, and the live stop, each side's printed lines add to its printed
 // total, the remainder named for what it holds. Each event card's sum
 // (liquityFocusEvents through lib/shared/flow-focus.ts) is exact at every
-// event, its printed lines add to the card's figure, "Since this event" meets
-// the bars at later cursor dates, and the daily line meets the bars.
+// event, its printed lines add to the card's figure, its token lines add to
+// the recorded balance at the printed decimals, and the daily line meets the bars.
 //
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
@@ -38,7 +38,7 @@ import { buildFlowModel, sideStateFor, stateAt, type FlowModel } from "@/lib/sha
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
-import { eventCum, eventSideSum, eventTokenSum, fmtTokens, sinceEvent } from "@/lib/shared/flow-focus";
+import { eventCum, eventSideSum, eventTokenSum, fmtTokens } from "@/lib/shared/flow-focus";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
 
 const FIX = join(__dirname, "fixtures");
@@ -289,27 +289,6 @@ for (const [name, events, symbols, open] of [
           // Interest is exact event by event: nothing is left for the remainder.
           const rest = rows.lines.find((l) => l.kind === "rest");
           assert.ok(!rest || Math.abs(rest.dollars) <= 1, `${name} ${f.id}: no debt remainder (${rest?.dollars})`);
-        }
-      }
-    }
-  });
-  test(`${name}: "Since this event" at a few cursor dates states the bars' figures`, () => {
-    const ev = events as LiquityFlowEvent[];
-    const [coll, debt] = symbols as unknown as [string, string];
-    const m = model(ev, [coll, debt], open);
-    const focus = liquityFocusEvents(ev, coll, debt);
-    const first = focus[0];
-    const cum = eventCum(m, focus, first.id)!;
-    const stops = cursorStops(m).filter((s) => s > cum.stop);
-    for (const stop of [stops[0], stops[Math.floor(stops.length / 2)], m.liveStop].filter((s) => s != null)) {
-      const st = stateAt(m, stop);
-      for (const side of ["collateral", "debt"] as const) {
-        const s = sinceEvent(m, side, cum, stop);
-        assert.equal(Math.round(s.held), Math.round(st[side].now), `${name} ${side} at ${stop}: held is the bars'`);
-        // Each moved line ends where the bar's segment stands.
-        for (const l of s.lines) {
-          const seg = [...st[side].bar, ...st[side].sources].find((x) => x.key === l.key);
-          if (seg) assert.equal(Math.round(l.now), Math.round(seg.value), `${name} ${l.key} at ${stop}`);
         }
       }
     }
