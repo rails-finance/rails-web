@@ -24,6 +24,7 @@ import {
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
 import { clause, composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import type { GasCost } from "@/lib/shared/types/event-shape";
+import { useCollFigures } from "@/components/shared/event-ledger-context";
 import { formatGasCost } from "@/lib/shared/format-event";
 import {
   liquityForkEventSlots,
@@ -99,7 +100,8 @@ export function LiquityForkEventExplainer({
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
   };
-  const clauses = eventClauses(liquityForkEventSlots(ctx, coords, fork, builders));
+  const figures = useCollFigures();
+  const clauses = figures(() => eventClauses(liquityForkEventSlots(ctx, coords, fork, builders)));
   // Gas rides last, after the arc — never the lead, so skipLead removes the
   // teaser sentence alone and the gas clause always survives into the pane.
   const withGas =

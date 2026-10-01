@@ -37,6 +37,7 @@
 // totals and the server-collapsed no-change run. Items a branch cannot fill are
 // simply absent (the never-empty floor) — noted per branch in the report.
 
+import { collFigure } from "@/lib/shared/coll-figure";
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -60,13 +61,24 @@ import {
 } from "@/lib/liquity/event-provenance";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhole } from "@/lib/liquity/figure-format";
+import {
+  fmtAccrued,
+  fmtColl as fmtCollAt4,
+  fmtCr,
+  fmtDebt,
+  fmtRate,
+  fmtRateChange,
+  fmtUsdWhole,
+} from "@/lib/liquity/figure-format";
 import { formatRatio } from "@/lib/shared/ratio-format";
 import type { RatioMode } from "@/lib/shared/preferences";
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 // fmtColl / fmtDebt / fmtUsdWhole / fmtAccrued / fmtRate / fmtCr are the T2
 // grid's formats; `fmt` and `fmtUsd` are for figures stated only here.
+
+/** Collateral at the card ledger's decimals where the build set them. */
+const fmtColl = (n: number): string => collFigure(n, fmtCollAt4(n));
 
 function fmt(n: number): string {
   if (!isFinite(n)) return "0";

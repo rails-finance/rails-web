@@ -92,6 +92,7 @@
 //     capturing the receipt's l1Fee. The mainnet forks state gas as the pane's
 //     last clause (liquity-fork-event-explainer.tsx), as Liquity V2 does.
 
+import { collFigure } from "@/lib/shared/coll-figure";
 import type { ReactNode } from "react";
 import type { EbisuContext, AsymmetryContext, BasedollarContext, OriginEnvelope } from "@/lib/shared/types/event-shape";
 import type { LiquityForkCoords, DeltaOps, LiquityForkLiquidationLeg } from "@/lib/shared/liquity-fork-provenance";
@@ -107,7 +108,7 @@ import {
   forkCollMoveOps,
   forkRedistArrival,
   forkAmount,
-  forkCollAmount,
+  forkCollAmount as forkCollAmountAt4,
   forkFeeAmount,
   forkLiquidationReserve,
 } from "@/lib/shared/liquity-fork-ops";
@@ -225,6 +226,8 @@ function Fig({
 // with the header and the opened grid.
 const fmtAbs = (h?: string): string => forkAmount(Math.abs(Number(h)));
 const fmtNum = (h?: string): string => forkAmount(Number(h));
+/** Collateral at the card ledger's decimals where the build set them. */
+const forkCollAmount = (n: number): string => collFigure(n, forkCollAmountAt4(n));
 const fmtColl = (h?: string): string => forkCollAmount(Number(h));
 
 // ── the variant table ────────────────────────────────────────────────────────

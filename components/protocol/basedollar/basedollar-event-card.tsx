@@ -15,6 +15,7 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
@@ -232,7 +233,13 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
           />
         }
         explainerLabel="Plain English"
-        explainerTeaser={liquityForkExplainerTeaser(ctx, coords, BASEDOLLAR_FORK, BASEDOLLAR_EXPLAINER_PROVS)}
+        explainerTeaser={
+          liquityForkExplainerTeaser(ctx, coords, BASEDOLLAR_FORK, BASEDOLLAR_EXPLAINER_PROVS) ? (
+            <InLedgerFigures
+              build={() => liquityForkExplainerTeaser(ctx, coords, BASEDOLLAR_FORK, BASEDOLLAR_EXPLAINER_PROVS)}
+            />
+          ) : null
+        }
         txHash={event.txHash}
         learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, BASEDOLLAR_FORK)} />}
         persistKey={`basedollar:${event.id}`}

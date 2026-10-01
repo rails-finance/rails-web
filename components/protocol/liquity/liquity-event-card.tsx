@@ -15,6 +15,7 @@ import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
+import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 
 function shortenAddress(addr: string): string {
@@ -251,14 +252,16 @@ export function LiquityEventCard({
     })()
   );
 
-  const liquityTeaser = getLiquityExplainerTeaser(
-    ctx,
-    { txHash: event.txHash, blockNumber: event.blockNumber },
-    prefs.ratioMode,
-    previousEvent,
-    event,
-    currentPrice,
-  );
+  const teaserBuild = () =>
+    getLiquityExplainerTeaser(
+      ctx,
+      { txHash: event.txHash, blockNumber: event.blockNumber },
+      prefs.ratioMode,
+      previousEvent,
+      event,
+      currentPrice,
+    );
+  const liquityTeaser = teaserBuild() ? <InLedgerFigures build={teaserBuild} /> : null;
 
   return (
     <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>

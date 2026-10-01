@@ -20,6 +20,7 @@ import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liqu
 import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
 import { collDeltaProv, debtDeltaProv, closeRepaidProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
+import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 
 export interface LiquityV1EventCardProps {
@@ -179,7 +180,11 @@ export function LiquityV1EventCard({
           />
         }
         explainerLabel="Plain English"
-        explainerTeaser={liquityV1ExplainerTeaser(ctx, coords)}
+        explainerTeaser={
+          liquityV1ExplainerTeaser(ctx, coords) ? (
+            <InLedgerFigures build={() => liquityV1ExplainerTeaser(ctx, coords)} />
+          ) : null
+        }
         txHash={event.txHash}
         learnMore={<LearnMore inline content={liquityV1LearnMoreContent(ctx)} />}
         persistKey={`liquity-v1:${event.id}`}

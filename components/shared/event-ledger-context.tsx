@@ -4,7 +4,7 @@
 // module so the cell atoms (state-transition.tsx) can read them.
 
 import { createContext, useContext, type ReactNode } from "react";
-import { fmtTokens } from "@/lib/shared/flow-focus";
+import { withCollDecimals } from "@/lib/shared/coll-figure";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** A card's ledgers by side, for its T2 cells. */
@@ -27,12 +27,17 @@ export function useLedgerDecimals(side: FlowSide): number | null {
   return useContext(EventLedgerContext)?.decimals?.(side) ?? null;
 }
 
-/** A closed cell's token figure at its ledger's decimals ("1,037.52", as the
- *  ledger prints it). Where the ledger has none, or the figure would round to
- *  zero at them, `fallback` stands. */
-export function ledgerFigure(n: number, decimals: number | null, fallback: string): string {
-  if (decimals == null || !Number.isFinite(n)) return fallback;
-  if (n === 0) return "0";
-  const text = fmtTokens(n, decimals);
-  return Number(text.replace(/,/g, "")) === 0 ? fallback : text;
+export { ledgerFigure } from "@/lib/shared/coll-figure";
+
+/** Build prose (a thunk) with this card's collateral decimals in force, so its
+ *  collateral figures read as the T2 cells and the ledger do. */
+export function InLedgerFigures({ build }: { build: () => ReactNode }) {
+  const dec = useLedgerDecimals("collateral");
+  return <>{withCollDecimals(dec, build)}</>;
+}
+
+/** The same, for a component that composes the prose itself. */
+export function useCollFigures(): <T>(build: () => T) => T {
+  const dec = useLedgerDecimals("collateral");
+  return (build) => withCollDecimals(dec, build);
 }

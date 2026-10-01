@@ -35,6 +35,7 @@ import {
   liquityGasClause,
   liquityExplainerTeaser,
 } from "@/lib/liquity/explainer-clauses";
+import { useCollFigures } from "@/components/shared/event-ledger-context";
 import { usePreferences } from "@/lib/shared/preferences-context";
 
 // ── LearnMore selection (byte-unchanged from the bullet-era explainer) ──────
@@ -129,15 +130,18 @@ export function LiquityEventExplainer({
   const { prefs } = usePreferences();
   const coords = { txHash, blockNumber };
   const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
-  const clauses = eventClauses(
-    liquityEventSlots(
-      ctx,
-      coords,
-      prefs.ratioMode,
-      previousEvent,
-      currentEvent,
-      currentPrice,
-      claim ? claim.timestamp : undefined,
+  const figures = useCollFigures();
+  const clauses = figures(() =>
+    eventClauses(
+      liquityEventSlots(
+        ctx,
+        coords,
+        prefs.ratioMode,
+        previousEvent,
+        currentEvent,
+        currentPrice,
+        claim ? claim.timestamp : undefined,
+      ),
     ),
   );
   // Gas rides last, after the arc — never the lead, so skipLead removes exactly
@@ -145,7 +149,7 @@ export function LiquityEventExplainer({
   const gasClause = gas ? liquityGasClause(ctx, gas) : null;
   const withGas = gasClause ? [...clauses, gasClause] : clauses;
   const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
-  const list = liquityLiquidationLegs(ctx);
+  const list = figures(() => liquityLiquidationLegs(ctx));
 
   return <ProseExplainer items={items} list={list} />;
 }

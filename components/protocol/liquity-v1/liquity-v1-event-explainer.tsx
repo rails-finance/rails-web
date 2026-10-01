@@ -20,6 +20,7 @@ import {
   liquityV1EventFallbackContent,
 } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { useCollFigures } from "@/components/shared/event-ledger-context";
 import { liquityV1EventSlots } from "@/lib/liquity-v1/explainer-clauses";
 import { useLiquityV1EventReadState, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
@@ -80,8 +81,9 @@ export function LiquityV1EventExplainer({
   const wantsSurplus = ctx.eventType === "liquidation" || redemptionSplit(ctx)?.full === true;
   const surplus = useLiquityV1Surplus(wantsSurplus ? txHash : null, wantsSurplus ? wallet : null);
   const price = liquityV1EventPrice(ctx, read);
-  const clauses = eventClauses(
-    liquityV1EventSlots(ctx, coords, { read, surplus, price, currentPrice, readPending, ownerOutcome }),
+  const figures = useCollFigures();
+  const clauses = figures(() =>
+    eventClauses(liquityV1EventSlots(ctx, coords, { read, surplus, price, currentPrice, readPending, ownerOutcome })),
   );
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 

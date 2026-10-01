@@ -22,6 +22,7 @@
 // the card's teaser renders it before either read lands, and the pane renders
 // the rest.
 
+import { collFigure } from "@/lib/shared/coll-figure";
 import type { ReactNode } from "react";
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
@@ -53,7 +54,7 @@ import { formatUsdValue, formatPrice } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 import {
   LIQUITY_V1_RESERVE,
-  fmtEth,
+  fmtEth as fmtEthAt4,
   fmtLusd,
   fmtPct,
   fmtUsd,
@@ -62,6 +63,8 @@ import {
   redemptionSplit,
   sidesOf,
 } from "@/lib/liquity-v1/event-figures";
+/** Collateral at the card ledger's decimals where the build set them. */
+const fmtEth = (n: number): string => collFigure(n, fmtEthAt4(n));
 import type { LiquityV1EventRead, LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1LiquidationRead } from "@/lib/sources/chain/liquity-v1-event";
 import type { LiquityV1NearLine, LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";

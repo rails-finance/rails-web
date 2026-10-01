@@ -15,6 +15,7 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, EbisuContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
@@ -238,7 +239,11 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
           />
         }
         explainerLabel="Plain English"
-        explainerTeaser={liquityForkExplainerTeaser(ctx, coords, EBISU_FORK, EBISU_EXPLAINER_PROVS)}
+        explainerTeaser={
+          liquityForkExplainerTeaser(ctx, coords, EBISU_FORK, EBISU_EXPLAINER_PROVS) ? (
+            <InLedgerFigures build={() => liquityForkExplainerTeaser(ctx, coords, EBISU_FORK, EBISU_EXPLAINER_PROVS)} />
+          ) : null
+        }
         txHash={event.txHash}
         learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, EBISU_FORK)} />}
         persistKey={`ebisu:${event.id}`}
