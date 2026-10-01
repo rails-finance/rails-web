@@ -71,8 +71,9 @@ const cssEscape = (s: string) => (typeof CSS !== "undefined" && CSS.escape ? CSS
 
 /** Holds the one open card. When a tap closes a card above the tapped one, the
  *  tapped segment would jump up by that card's height; the layout effect
- *  scrolls it back to where it was, then reveals the opened card as far as it
- *  can while the segment stays on screen. */
+ *  scrolls it back to where it was. An opened card that runs past the bottom
+ *  of the screen stays where it opened: the visitor scrolls to read it
+ *  (Miles, 1 Oct 2026). */
 export function SpineViewProvider({ active, children }: { active: boolean; children: ReactNode }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const pending = useRef<{ el: HTMLElement; top: number; id: string } | null>(null);
@@ -89,15 +90,6 @@ export function SpineViewProvider({ active, children }: { active: boolean; child
     if (!p.el.isConnected) return;
     const drift = p.el.getBoundingClientRect().top - p.top;
     if (Math.abs(drift) >= 1) window.scrollBy(0, drift);
-    if (openId !== p.id) return;
-    const region = document.querySelector<HTMLElement>(`[data-spine-card="${cssEscape(p.id)}"]`);
-    if (!region) return;
-    const overflow = region.getBoundingClientRect().bottom - window.innerHeight + 12;
-    const room = p.el.getBoundingClientRect().top - 8;
-    const by = Math.min(overflow, room);
-    if (by <= 0) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollBy({ top: by, behavior: reduced ? "auto" : "smooth" });
   }, [openId]);
 
   // Leaving the view (the viewport widened) drops the open card, so a return
@@ -236,7 +228,7 @@ export function SpineSegment({
   iconColumn: ReactNode;
   /** The card drawn under the segment while it is open. */
   card?: ReactNode;
-  /** `data-spine-card` on the open region, which the reveal scroll finds. */
+  /** `data-spine-card` on the open region. */
   cardKey?: string;
   /** Colour the caption as the open card's. */
   captionFor?: "open";

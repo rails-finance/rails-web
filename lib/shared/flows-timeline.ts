@@ -110,6 +110,10 @@ export interface FlowAssetHeld {
   /** Token units, where known. */
   amount: number | null;
   usd: number;
+  /** Where the model values it on a past day: the UTC day (days since the
+   *  epoch) its price was recorded, and whether a daily series recorded it
+   *  (else an event's block). */
+  priced?: { day: number; series: boolean };
 }
 
 /** One active UTC day: the position after the day's last event. */
@@ -189,6 +193,21 @@ export interface FlowWords {
   /** The Explanation's clause on the prices the line is drawn at, where it is
    *  not the index's daily prices. */
   linePrices?: string;
+  /** The timeline's card for a moment between events (lib/shared/flow-moment.ts). */
+  moment?: FlowMomentWords;
+}
+
+/** A family's words for the card that states the position at a moment
+ *  between its events. */
+export interface FlowMomentWords {
+  /** Sides counted at a $1 face, whose daily price in the model is the
+   *  interest built on the recorded balance since the last event: their
+   *  token figure is their USD figure (a Liquity Trove's debt). */
+  face?: FlowSide[];
+  /** Why a side states no USD where no price was recorded that day. */
+  noPrice?: Partial<Record<FlowSide, string>>;
+  /** Lines under the figures, on what the moment leaves out. */
+  notes?: string[];
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
@@ -513,7 +532,12 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     let coll = 0;
     let debt = 0;
     const staleHere: StalePrice[] = [];
-    const lines: { asset: string; h: { symbol: string; side: FlowSide; amount: number }; usd: number }[] = [];
+    const lines: {
+      asset: string;
+      h: { symbol: string; side: FlowSide; amount: number };
+      usd: number;
+      p: PriceAt | undefined;
+    }[] = [];
     for (const [key, h] of held) {
       if (!(h.amount > 0)) continue;
       const asset = key.slice(key.indexOf(":") + 1);
@@ -534,7 +558,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       const usd = h.amount * usdPer;
       if (h.side === "collateral") coll += usd;
       else debt += usd;
-      lines.push({ asset, h, usd });
+      lines.push({ asset, h, usd, p });
       if (p && usd >= STALE_FLOOR_USD) {
         const old = daily ? stop - p.day > gapDays : (startDay + stop + 1) * DAY_S - p.ts > gapDays * DAY_S;
         if (old) staleHere.push({ symbol: h.symbol, side: h.side, pricedAt: p.ts, usd });
@@ -565,7 +589,15 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     // Only what was held at this stop can be repriced at the next.
     prevPrice = priceNow;
     valued.push({ collateral: coll, debt });
-    heldAt.push(lines.map(({ h, usd }) => ({ side: h.side, symbol: h.symbol, amount: h.amount, usd })));
+    heldAt.push(
+      lines.map(({ h, usd, p }) => ({
+        side: h.side,
+        symbol: h.symbol,
+        amount: h.amount,
+        usd,
+        ...(p ? { priced: { day: utcDay(p.ts), series: p.series } } : {}),
+      })),
+    );
     if (staleHere.length) stale.set(stop, staleHere);
   }
 

@@ -72,6 +72,8 @@ import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context"
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
+import { flowMoment } from "@/lib/shared/flow-moment";
+import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
 import { List, X } from "lucide-react";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -231,6 +233,8 @@ function EventNotFoundNotice({ id, chainId }: { id: string; chainId: ChainId }) 
 const PINNED_SKELETON_HEIGHT = 96;
 
 /** Cards painted before the first sentinel hit, and added per subsequent hit. */
+/** The flash id of the cut's moment card (flow-moment-card.tsx). */
+const MOMENT_FLASH = "flow-moment";
 const WINDOW_CHUNK = TIMELINE_PAGE_ROWS;
 
 /** A live note's header-panel height, closed — the note row's `SkeletonBlock`
@@ -729,6 +733,15 @@ function ChainTruthTimelineBody({
   // and move up by what was cut.
   const rewind = useFlowFocusState((st) => st.rewind);
   const cut = rewind?.endTs ?? null;
+  // Where the cut falls on a day with no events of its own, the cut list
+  // opens with a card for that moment (components/shared/flow-moment-card.tsx).
+  const flowFocusValue = useFlowFocus();
+  const focusModel = flowFocusValue?.model ?? null;
+  const focusEvents = flowFocusValue?.events;
+  const moment = useMemo(
+    () => (focusModel && focusEvents && cut != null ? flowMoment(focusModel, focusEvents, cut) : null),
+    [focusModel, focusEvents, cut],
+  );
   const allEvents = tl.displayedEvents;
   const events = useMemo(() => rewindEvents(allEvents, cut), [allEvents, cut]);
   const cutOff = allEvents.length - events.length;
@@ -1170,6 +1183,11 @@ function ChainTruthTimelineBody({
   /** The last "go" not yet answered by a card brought into view: a cut whose
    *  month is still loading scrolls once its rows land. */
   const pendingGo = useRef(0);
+  /** The cut last seen, and whether its top card flashes once it first comes
+   *  into view: Apply cuts and leaves the page where it is (Miles, 1 Oct
+   *  2026), so the flash waits for the visitor to scroll to the card. */
+  const lastRewindKey = useRef<string | null>(null);
+  const watchTop = useRef(false);
   /** The top row, looked for in the page: its day's mark, a folder holding it
    *  opened first, a run opened by its header. */
   const [seek, setSeek] = useState<{
@@ -1177,14 +1195,16 @@ function ChainTruthTimelineBody({
     n: number;
     folderId: string | null;
     runId: string | null;
-    scroll: boolean;
+    /** "scroll": into view, flashing (the chip's text); "watch": flash once
+     *  it comes into view (Apply); "none": open it only. */
+    mode: "scroll" | "watch" | "none";
   } | null>(null);
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
   const flashId = flash?.id ?? null;
   /** The folder the rewind's top lies in; it stays open. */
   const [revealFolderId, setRevealFolderId] = useState<string | null>(null);
   const seekTop = useCallback(
-    (scroll: boolean, n: number) => {
+    (mode: "scroll" | "watch" | "none", n: number) => {
       const row = rows[0];
       if (!row) return;
       const top =
@@ -1199,7 +1219,7 @@ function ChainTruthTimelineBody({
         n,
         folderId: row.kind === "folder" ? row.folder.responseId : null,
         runId: row.kind === "run" && !row.spec.asOneEvent ? row.events[0].id : null,
-        scroll,
+        mode,
       });
     },
     [rows, cut],
@@ -1247,16 +1267,33 @@ function ChainTruthTimelineBody({
     if (own || !rewind) return;
     releasing.current = true;
     releaseRewind();
-    // `rewind` is read at the moment Dates changes.
+    // Dates wins: the last choice sets the timeline, and the chart's cursor
+    // goes to the close of the span's last day (lib/shared/flow-focus.ts
+    // `park`). Clearing Dates leaves the cursor where it is.
+    const r = tl.dateRange;
+    const end =
+      r != null
+        ? r[1]
+        : monthNow != null
+          ? Date.UTC(Math.floor(monthNow / 12), (monthNow % 12) + 1, 1) / 1000 - 1
+          : null;
+    if (end != null && focusStore) focusStore.set({ park: { endTs: end, n: (focusStore.get().park?.n ?? 0) + 1 } });
+    // `rewind` and `tl.dateRange` are read at the moment Dates changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rangeKey, monthNow, releaseRewind]);
   useEffect(() => {
+    // A new cut states its own line: one the last cut left would name the
+    // wrong day.
+    if (rewindKey !== lastRewindKey.current) {
+      lastRewindKey.current = rewindKey;
+      setRewindNote(null);
+      watchTop.current = rewindKey != null;
+    }
     if (rewindKey == null) {
       // Cleared: a month the cut read goes back to the rows the page
       // opened with, unless a month picked in Dates cleared it.
       if (!releasing.current && askedMonth.current != null && segments?.month === askedMonth.current)
         segments.onReset?.();
-      setRewindNote(null);
       releasing.current = false;
       askedMonth.current = null;
       pendingGo.current = 0;
@@ -1292,12 +1329,14 @@ function ChainTruthTimelineBody({
     }
     // Draw from the top, where the cut list starts.
     setWindowSize(WINDOW_CHUNK);
-    seekTop(pendingGo.current > 0, pendingGo.current);
+    const mode = pendingGo.current > 0 ? "scroll" : watchTop.current ? "watch" : "none";
+    watchTop.current = false;
+    seekTop(mode, pendingGo.current);
     // `tl`, `segments` and `seekTop` are read at the moment the rewind or the
     // top row changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewindKey, topKey, segments?.loading]);
-  // "Apply to timeline", or the chip's text.
+  // The chip's text brings the cut's top into view.
   const wentTo = useRef(go);
   useEffect(() => {
     if (wentTo.current === go) return;
@@ -1306,15 +1345,26 @@ function ChainTruthTimelineBody({
     // A cut whose month is still being read scrolls once it lands (the
     // effect above).
     if (segments?.loading != null || (askedMonth.current != null && segments?.month !== askedMonth.current)) return;
-    seekTop(true, go);
+    seekTop("scroll", go);
     // `segments` is read at the moment of the press.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [go, seekTop]);
   // The mark is in the page once its row is drawn, a folder's once its
-  // members are read, a run's once it is open: look for it until it is.
+  // members are read, a run's once it is open: look for it until it is. The
+  // moment's card, where the cut has one, is the top.
+  const hasMoment = moment != null;
+  /** Apply's watch for its top card; a new seek or cut replaces it. */
+  const watcher = useRef<IntersectionObserver | null>(null);
+  useEffect(() => {
+    watcher.current?.disconnect();
+    watcher.current = null;
+  }, [rewindKey]);
+  useEffect(() => () => watcher.current?.disconnect(), []);
   useEffect(() => {
     if (!seek) return;
-    const { day, n, runId, scroll } = seek;
+    const { day, n, runId, mode } = seek;
+    watcher.current?.disconnect();
+    watcher.current = null;
     let tries = 0;
     let runOpened = false;
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -1328,18 +1378,36 @@ function ChainTruthTimelineBody({
           }),
         60,
       );
+    /** Apply: the header flashes once the card is half in view. */
+    const watch = (el: HTMLElement, id: string) => {
+      const seen = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting)) return;
+          seen.disconnect();
+          setFlash({ id, n });
+        },
+        { threshold: 0.5 },
+      );
+      seen.observe(el);
+      watcher.current = seen;
+    };
+    const answer = (el: HTMLElement, id: string) => {
+      if (mode === "scroll") {
+        pendingGo.current = 0;
+        setFlash({ id, n });
+        bring(el);
+      } else if (mode === "watch") watch(el, id);
+    };
     const find = () => {
       tries++;
-      const mark = document.querySelector<HTMLElement>(`[data-flow-day-mark="${day}"]`);
-      const card = mark?.closest<HTMLElement>("[data-event-id]");
-      if (card?.dataset.eventId) {
+      const top = hasMoment ? document.querySelector<HTMLElement>("[data-flow-moment]") : null;
+      const mark = top ? null : document.querySelector<HTMLElement>(`[data-flow-day-mark="${day}"]`);
+      const card = top ?? mark?.closest<HTMLElement>("[data-event-id]");
+      const id = top ? MOMENT_FLASH : card?.dataset.eventId;
+      if (card && id) {
         window.clearInterval(timer);
         setSeek(null);
-        if (scroll) {
-          pendingGo.current = 0;
-          setFlash({ id: card.dataset.eventId, n });
-          bring(card);
-        }
+        answer(card, id);
         return;
       }
       if (runId && !runOpened) {
@@ -1352,19 +1420,20 @@ function ChainTruthTimelineBody({
         window.clearInterval(timer);
         setSeek(null);
         const last = events.find((e) => utcDay(e.timestamp) === day);
-        if (scroll) pendingGo.current = 0;
+        if (mode === "scroll") pendingGo.current = 0;
         const el = last
           ? document.getElementById(`event-${last.id}`)
           : seek.folderId
             ? document.querySelector<HTMLElement>(`[data-flow-folder="${seek.folderId}"]`)
             : null;
-        if (el && scroll) bring(el);
+        if (el && mode === "scroll") bring(el);
       }
     };
     const timer = window.setInterval(find, 100);
     find();
+    // A watch outlives its seek, until the card is seen or the cut moves.
     return () => window.clearInterval(timer);
-    // `events` is read when the mark is not found.
+    // `events` and `hasMoment` are read when the mark is looked for.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seek]);
   useEffect(() => {
@@ -1480,7 +1549,24 @@ function ChainTruthTimelineBody({
   // A row draws a spine TERMINUS only where nothing else stands at that end.
   // The top's occupants are the live window, the live-note slot and the tip's
   // withheld-dot glyph; the bottom's are the cut's and the view's.
-  const topTerminusTaken = liveWindowAtTop || liveSlotAtTop || tipBoundaryAtTop;
+  const topTerminusTaken = liveWindowAtTop || liveSlotAtTop || tipBoundaryAtTop || moment != null;
+  /** The events either side of the cut's moment, where the page holds them:
+   *  the card names them. */
+  const momentNeighbours = useMemo((): { prev: MomentNeighbour | null; next: MomentNeighbour | null } => {
+    if (!moment) return { prev: null, next: null };
+    const all = tl.sortedEvents;
+    let prev: MomentNeighbour | null = null;
+    let next: MomentNeighbour | null = null;
+    for (const e of all) {
+      if (e.timestamp <= moment.endTs) {
+        if (utcDay(e.timestamp) === moment.lastDay) prev = { label: e.actionLabel, ts: e.timestamp };
+      } else if (utcDay(e.timestamp) === moment.nextDay) {
+        next = { label: e.actionLabel, ts: e.timestamp };
+        break;
+      }
+    }
+    return { prev, next };
+  }, [moment, tl.sortedEvents]);
   const bottomTerminusTaken = boundaryAtBottom || viewBoundaryAtBottom;
   const liveSkeletonAtTop = showMarketNotes && !!liveNotesPending && cut == null;
 
@@ -1897,6 +1983,19 @@ function ChainTruthTimelineBody({
                     />
                   </SpineTipContext.Provider>
                 ))}
+              {/* The cut's moment, where it falls on a day with no events:
+                above the rows, under the withheld tip's glyph. */}
+              {moment && focusModel && (
+                <FlowMomentCard
+                  moment={moment}
+                  model={focusModel}
+                  prev={momentNeighbours.prev}
+                  next={momentNeighbours.next}
+                  today={utcDay(Date.now() / 1000)}
+                  isFirst={!tipBoundaryAtTop && !liveWindowAtTop && !liveSlotAtTop}
+                  flash={flashId === MOMENT_FLASH}
+                />
+              )}
               {windowed.map((row, rowIdx) => {
                 const marked = opensDay(rowIdx);
                 const rowNode =

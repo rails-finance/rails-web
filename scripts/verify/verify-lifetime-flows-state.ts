@@ -64,6 +64,7 @@ import {
   longDay,
   nextEventDay,
   prevEventDay,
+  sideStateFor,
   stateAt,
   type FlowModel,
   type FlowSideState,
@@ -93,6 +94,7 @@ import {
 } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
 import { eventCum, eventSideSum } from "@/lib/shared/flow-focus";
+import { flowMoment, type FlowMoment, type MomentSide } from "@/lib/shared/flow-moment";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -1383,4 +1385,69 @@ test("the fill rule: no two lines of a side share a fill", () => {
   const used = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "usedToRepay");
   const sold = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "soldToRepay");
   assert.notEqual(used?.hatch, sold?.hatch, "Used to repay has its own hatch");
+});
+
+test("the state card: a day between events states the chart's figures, each asset as its last event left it", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  const startDay = route.start / DAY_MS;
+  let checked = 0;
+  for (let stop = 1; stop < route.liveStop; stop++) {
+    const endTs = (startDay + stop + 1) * 86_400 - 1;
+    const m: FlowMoment | null = flowMoment(route, focus, endTs);
+    if (route.eventDays.includes(stop)) {
+      assert.equal(m, null, `a day with events keeps its last event as the anchor (stop ${stop})`);
+      continue;
+    }
+    assert.ok(m, `a moment at stop ${stop}`);
+    checked++;
+    const chart = stateAt(route, stop);
+    const lastStop = m.lastDay - startDay;
+    for (const side of ["collateral", "debt"] as const) {
+      const s: MomentSide = m.sides[side];
+      // Every held reserve recorded a price that day: USD, and a clean sum.
+      assert.ok(s.priced, `${side} priced at stop ${stop}`);
+      const usd = s.assets.reduce((t, a) => t + (a.usd ?? 0), 0);
+      assert.ok(near(usd, chart[side].now, 1e-6), `${side} at stop ${stop}: ${usd} vs the chart's ${chart[side].now}`);
+      assert.ok(near(s.held, chart[side].now, 1e-6));
+      // The tokens are the last event's balances.
+      const last = new Map(
+        route.heldAt[lastStop].filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => [h.symbol, h.amount]),
+      );
+      assert.equal(s.assets.length, last.size);
+      for (const a of s.assets) assert.equal(a.tokens, last.get(a.symbol), `${side} ${a.symbol} at stop ${stop}`);
+      // The sum to that day adds up to the held figure.
+      let ri = -1;
+      for (let i = 0; i < route.rows.length && route.rows[i].day <= stop; i++) ri = i;
+      const rows = sideSumRows(sideStateFor(route, side, route.rows[ri].cum, s.held));
+      assert.equal(
+        rows.lines.reduce((a, l) => a + l.dollars, 0),
+        rows.total.dollars,
+      );
+    }
+  }
+  assert.ok(checked > 100, `days between events checked: ${checked}`);
+  // Today, and a cut on an event day, have no card.
+  assert.equal(flowMoment(route, focus, (startDay + route.liveStop) * 86_400 + 10), null);
+});
+
+test("Combined: a Dates span's last day parks the cursor on a stop of its own, which the steps pass over", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const line = binSeries(binInputFromWire(series), "month")!;
+  const plain = combinedStops(full, line, 0);
+  // A day that is neither a month's end nor a day with events.
+  let day = 1;
+  while (plain.some((s) => s.stop === day)) day++;
+  const parked = combinedStops(full, line, 0, day);
+  assert.equal(parked.length, plain.length + 1);
+  const i = stopForDay(parked, day);
+  assert.ok(i != null);
+  assert.equal(parked[i].point, null);
+  assert.equal(parked[i].event, false);
+  // The back and forward steps go by days with events, so they pass over it.
+  assert.notEqual(eventStep(parked, i - 1, 1), i);
+  // A day that already has a stop adds none.
+  assert.equal(combinedStops(full, line, 0, full.eventDays[3]).length, plain.length);
 });

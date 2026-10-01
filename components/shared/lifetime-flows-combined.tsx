@@ -99,13 +99,18 @@ export function CombinedFlows({
   onLedgerNote,
   renderBars,
 }: CombinedFlowsProps) {
-  const stops = useMemo(() => combinedStops(model, series, from), [model, series, from]);
+  // A Dates pick after Apply parks the cursor at its span's last day, which
+  // is a stop of its own where the line has no point there.
+  const [parkStop, setParkStop] = useState<number | null>(null);
+  const stops = useMemo(() => combinedStops(model, series, from, parkStop), [model, series, from, parkStop]);
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
   const [playing, setPlaying] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   // A new series (the first read landing) puts the cursor at today.
-  useEffect(() => setAt(last), [last]);
+  const lastRef = useRef(last);
+  lastRef.current = last;
+  useEffect(() => setAt(lastRef.current), [model, series, from]);
   const halt = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
     timer.current = null;
@@ -182,9 +187,11 @@ export function CombinedFlows({
   // today, nor where that cut already stands.
   const applied = useFlowFocusState((s) => s.rewind?.endTs ?? null);
   const canApply = byDays && !!committed && !committed.live && applied !== committedEnd;
+  // The page stays where it is (Miles, 1 Oct 2026): the cut's top card
+  // flashes once the visitor scrolls it into view.
   const apply = () => {
     if (!focus || !canApply) return;
-    focus.store.set({ rewind: { endTs: committedEnd, word: committedWord }, go: focus.store.get().go + 1 });
+    focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
   };
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
@@ -198,6 +205,35 @@ export function CombinedFlows({
       setFrozen(true);
     }
   }, [move, stops, model.start, halt]);
+  // A month or range picked in Dates while a cut stood: the cursor goes to
+  // the close of the span's last day, frozen there, or to today, unfrozen,
+  // where the span reaches today.
+  const park = useFlowFocusState((s) => s.park);
+  const parked = useRef<number | null>(null);
+  const parkTo = useRef<number | "live" | null>(null);
+  useEffect(() => {
+    if (!park || parked.current === park.n) return;
+    parked.current = park.n;
+    halt();
+    const stop = Math.max(0, Math.floor(park.endTs / 86_400) - model.start / DAY_MS);
+    if (stop >= model.liveStop) {
+      parkTo.current = "live";
+      setParkStop(null);
+      setFrozen(false);
+    } else {
+      parkTo.current = stop;
+      setParkStop(stop);
+      setFrozen(true);
+    }
+  }, [park, model.start, model.liveStop, halt]);
+  useEffect(() => {
+    const to = parkTo.current;
+    if (to == null) return;
+    const i = to === "live" ? stops.length - 1 : stops.findIndex((x) => !x.live && x.stop === to);
+    if (i < 0) return;
+    parkTo.current = null;
+    setAt(i);
+  }, [stops, park]);
   // The Dates filter's span on the timeline, bracketed on the line.
   const dates = useFlowFocusState((s) => s.dates);
 

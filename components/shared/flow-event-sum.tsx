@@ -96,6 +96,7 @@ export function EventSumLines({
   totalLabel,
   totalProv,
   eventTs,
+  at: atWords,
 }: {
   side: FlowSide;
   model: FlowModel;
@@ -107,9 +108,12 @@ export function EventSumLines({
   totalLabel: string;
   totalProv: Provenance;
   eventTs?: number;
+  /** The receipts' words for the sum's date, where it is not an event's
+   *  ("the close of 15 Jun '25"). */
+  at?: string;
 }) {
   const rows = eventSideSum(model, side, cum, held);
-  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  const at = atWords ?? (eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event");
   const lineProv = (l: (typeof rows.lines)[number]) =>
     l.kind === "rest"
       ? flowRemainderProv(l.label, side, at, l.seg.note)
