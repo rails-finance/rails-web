@@ -3,16 +3,16 @@
 // One CDP's remembered UI state — today exactly one field: whether the
 // position card's Explanation pane was left open.
 //
-// It is deliberately NOT a copy of useTroveUiState. V2's hook carries the
-// timeline's hidden actions and sort direction as well, because V2's page
-// predates the shared timeline; Polaris's timeline already persists both for
-// itself under `polaris-<market>-<cdpId>` (useTimelineEvents, wired in
-// position-view.tsx), and a second writer for the same facts is how the two
-// drift apart. So this hook owns the one thing nothing else stores.
+// Polaris's timeline persists its filters for itself under
+// `polaris-<market>-<cdpId>` (useTimelineEvents, wired in position-view.tsx),
+// and a second writer for the same facts is how the two drift apart. So this
+// hook owns the one thing nothing else stores. A card that adopts the
+// closed/opened disclosure (ui-jobs 209) remembers its Explanation in the
+// disclosure's store instead (components/shared/position-card-disclosure.tsx),
+// and this hook goes with it.
 //
 // The key joins the `rails-ui-` family every explorer's UI state lives in
-// (`rails-ui-<trove key>` on V2, `rails-ui-aave-v4-<wallet>` on V4) and is per
-// CDP, because the pane's usefulness is per position: a reader who opened the
+// (`rails-ui-aave-v4-<wallet>` on V4) and is per CDP, because the pane's usefulness is per position: a reader who opened the
 // explanation on a CDP they are studying should not have it forced open on
 // every other CDP they glance at.
 //

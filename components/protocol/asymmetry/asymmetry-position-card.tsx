@@ -26,6 +26,9 @@ export function AsymmetryPositionCard({
   live,
   compact,
   surplus,
+  disclosureKey,
+  debtDetail,
+  riskDetail,
 }: {
   v: AsymmetryTroveView;
   receipts?: boolean;
@@ -43,6 +46,11 @@ export function AsymmetryPositionCard({
   compact?: boolean;
   /** A liquidated Trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
+  /** The closed/opened card (ui-jobs 209) and its opened-layer lines — see
+   *  LiquityPositionCard. */
+  disclosureKey?: string;
+  debtDetail?: React.ReactNode;
+  riskDetail?: React.ReactNode;
 }) {
   return (
     <LiquityPositionCard
@@ -55,6 +63,9 @@ export function AsymmetryPositionCard({
       live={live ? liveFromForkChain(live) : live}
       compact={compact}
       surplus={surplus}
+      disclosureKey={disclosureKey}
+      debtDetail={debtDetail}
+      riskDetail={riskDetail}
     />
   );
 }

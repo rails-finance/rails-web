@@ -24,12 +24,13 @@
 // of that table on purpose: the `protocol` prop selects both the config row
 // and the OPS lookup below.
 
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { AlertTriangle, Users } from "lucide-react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -432,6 +433,9 @@ export function LiquityPositionCard({
   explanationDefaultOpen,
   onExplanationToggle,
   surplus,
+  disclosureKey,
+  debtDetail,
+  riskDetail,
 }: {
   protocol: LiquityFamilyId;
   v: LiquityTroveView;
@@ -458,8 +462,23 @@ export function LiquityPositionCard({
    *  While some is claimable the terminal card leads with it in place of the
    *  two lifetime maxima. */
   surplus?: LiquityTroveSurplus | null;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per Trove —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's lines and the Explanation. */
+  disclosureKey?: string;
+  /** Opened-layer lines under Debt from the page's live read (the yearly
+   *  cost). Only drawn on a disclosing card. */
+  debtDetail?: ReactNode;
+  /** Opened-layer lines under Collateral ratio from the page's live read
+   *  (the price bar, the redemption queue). Only drawn on a disclosing card. */
+  riskDetail?: ReactNode;
 }) {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>), and the page hands its
+  // heading-row strip over as `debtDetail` / `riskDetail`.
+  const disclosing = !!receipts && !!disclosureKey;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
   const ops = OPS[protocol];
   const ct = v.collateralType;
 
@@ -594,9 +613,13 @@ export function LiquityPositionCard({
         learnMore={learnMore}
         explanationDefaultOpen={explanationDefaultOpen}
         onExplanationToggle={onExplanationToggle}
+        disclosureKey={disclosureKey}
       >
         {deprecationBanner}
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the life's highest balances (and any claimable surplus) open.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           closedAt={v.lastActivityAt}
           leadingIdentity={
@@ -637,9 +660,11 @@ export function LiquityPositionCard({
       learnMore={learnMore}
       explanationDefaultOpen={explanationDefaultOpen}
       onExplanationToggle={onExplanationToggle}
+      disclosureKey={disclosureKey}
     >
       {deprecationBanner}
       <OpenPositionStats
+        stackOnPhone={disclosing}
         // Detail render (receipts): the house grammar's neutral mode-word
         // pill — "Borrowing", or "Zombie" once redeemed below the floor. The
         // LISTING render keeps the lifecycle pill, with ZOMBIE standing in
@@ -709,19 +734,26 @@ export function LiquityPositionCard({
               </StatValue>
             ),
             footnote: (
-              <div className="text-xs mt-0.5 min-h-[1rem]">
-                {collUsd !== null && collUsd > 0 ? (
-                  <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
-                    <Prov info={fp.collUsd}>
-                      <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
-                        <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
-                      </HighlightableValue>
-                    </Prov>
-                  </span>
-                ) : pending && coll > 0 ? (
-                  <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                ) : null}
-              </div>
+              <Detail>
+                <div className="text-xs mt-0.5 min-h-[1rem]">
+                  {collUsd !== null && collUsd > 0 ? (
+                    <span className="inline-flex items-center font-bold text-green-400 border-l-2 border-r-2 border-green-400 rounded-sm px-1 py-0">
+                      <Prov info={fp.collUsd}>
+                        <HighlightableValue
+                          type="collateralUsd"
+                          state="after"
+                          value={collUsd}
+                          className="text-green-400"
+                        >
+                          <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
+                        </HighlightableValue>
+                      </Prov>
+                    </span>
+                  ) : pending && coll > 0 ? (
+                    <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+                  ) : null}
+                </div>
+              </Detail>
             ),
           },
           {
@@ -743,17 +775,20 @@ export function LiquityPositionCard({
               </StatValue>
             ),
             footnote: (
-              <div className="text-xs mt-0.5 text-rb-500">
-                <Prov info={fp.rate}>
-                  <HighlightableValue type="interestRate" state="after" value={rate} className="text-rb-500">
-                    <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
-                  </HighlightableValue>
-                </Prov>{" "}
-                interest rate
-                {/* The live read's debt includes interest to the head block,
+              <Detail>
+                <div className="text-xs mt-0.5 text-rb-500">
+                  <Prov info={fp.rate}>
+                    <HighlightableValue type="interestRate" state="after" value={rate} className="text-rb-500">
+                      <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
+                    </HighlightableValue>
+                  </Prov>{" "}
+                  interest rate
+                  {/* The live read's debt includes interest to the head block,
                     so the figure grows while the page is open. */}
-                {lv && debt > 0 && <div>Live, accrues every second</div>}
-              </div>
+                  {lv && debt > 0 && <div>Live, accrues every second</div>}
+                </div>
+                {disclosing && debtDetail}
+              </Detail>
             ),
           },
           {
@@ -781,17 +816,20 @@ export function LiquityPositionCard({
             // restatement (Liquity is always single-collateral, so a
             // concrete price is the clearest read — no headroom % needed).
             footnote: (
-              <div className="text-xs mt-0.5 text-rb-500 min-h-[1rem]">
-                {liqPrice !== null ? (
-                  <span className="inline-flex items-center gap-1">
-                    Liquidates at
-                    <TokenChipIcon symbol={ct} size={14} filterable={false} />
-                    <Prov info={fp.liq}>{formatLiquidationPrice(liqPrice)}</Prov>
-                  </span>
-                ) : pending && debt > 0 && coll > 0 ? (
-                  <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                ) : null}
-              </div>
+              <Detail>
+                <div className="text-xs mt-0.5 text-rb-500 min-h-[1rem]">
+                  {liqPrice !== null ? (
+                    <span className="inline-flex items-center gap-1">
+                      Liquidates at
+                      <TokenChipIcon symbol={ct} size={14} filterable={false} />
+                      <Prov info={fp.liq}>{formatLiquidationPrice(liqPrice)}</Prov>
+                    </span>
+                  ) : pending && debt > 0 && coll > 0 ? (
+                    <span className="inline-block h-3 w-20 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+                  ) : null}
+                </div>
+                {disclosing && riskDetail}
+              </Detail>
             ),
           },
         ]}

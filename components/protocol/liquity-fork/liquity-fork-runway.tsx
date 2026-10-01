@@ -20,7 +20,15 @@ import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork
  * Zombie troves (status 4) still carry debt and can be liquidated, so they
  * keep the runway. Hidden when there's no live debt or the read hasn't landed.
  */
-export function LiquityForkRunway({ chain }: { chain: LiquityForkTroveChainResponse }) {
+export function LiquityForkRunway({
+  chain,
+  barOnly = false,
+}: {
+  chain: LiquityForkTroveChainResponse;
+  /** The bar without its visible figure (PriceRunway `barOnly`): the card's
+   *  opened layer, where "Liquidates at" above it states the price. */
+  barOnly?: boolean;
+}) {
   if (
     chain.chainStale ||
     (chain.status !== "active" && chain.status !== "zombie") ||
@@ -30,5 +38,13 @@ export function LiquityForkRunway({ chain }: { chain: LiquityForkTroveChainRespo
     chain.liqPriceUsd == null
   )
     return null;
-  return <PriceRunway compact currentPrice={chain.priceUsd} liqPrice={chain.liqPriceUsd} asset={chain.symbol} />;
+  return (
+    <PriceRunway
+      compact
+      barOnly={barOnly}
+      currentPrice={chain.priceUsd}
+      liqPrice={chain.liqPriceUsd}
+      asset={chain.symbol}
+    />
+  );
 }

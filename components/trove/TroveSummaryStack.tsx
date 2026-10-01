@@ -34,8 +34,7 @@ export function TroveSummaryStack({
   trovesAhead,
   queueDebtTotal = null,
   debtInFrontLoading,
-  summaryExplanationOpen,
-  onToggleSummaryExplanation,
+  disclosureKey,
   loadingStatus,
   viewHref,
   surplus,
@@ -50,8 +49,10 @@ export function TroveSummaryStack({
    *  its queue bullets without the branch-debt and queue-share figures. */
   queueDebtTotal?: number | null;
   debtInFrontLoading: boolean;
-  summaryExplanationOpen: boolean;
-  onToggleSummaryExplanation: (isOpen: boolean) => void;
+  /** The trove page's per-Trove key: the card draws closed/opened (ui-jobs
+   *  209) and the strip below moves into its opened layer. The home hero
+   *  omits it and keeps the strip on the heading row. */
+  disclosureKey?: string;
   loadingStatus: { message: string | null; snapshotDate?: number };
   /** Copy-this-view control, forwarded straight through to `LiquityPositionCard`
    *  — the trove page's `useTimelineEvents().viewHref`. Absent on the home
@@ -96,32 +97,41 @@ export function TroveSummaryStack({
   // front ÷ entire branch debt), traced by the same shared receipt.
   const showRedemptionRunway = showBand && debtInFront != null && queueDebtTotal != null && queueDebtTotal > 0;
 
+  const queueRunway = showRedemptionRunway ? (
+    <RedemptionRunway
+      debtInFront={debtInFront as number}
+      queueDebtTotal={queueDebtTotal as number}
+      shareProv={troveQueueShareProv(trove.collateralType)}
+      markerTitle="This trove's place in the branch's redemption queue — everything left of the marker is redeemed first"
+    />
+  ) : null;
+  const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
+
+  // The opened layer (trove page): the yearly cost under Debt; the price bar
+  // and the redemption queue under Collateral ratio, whose "Liquidates at"
+  // line states the price the bar measures to.
+  const debtDetail =
+    disclosureKey && showBand ? <TroveDetailsBand {...bandProps} part="costs" alignStart /> : undefined;
+  const riskDetail =
+    disclosureKey && (showBand || showRunway) ? (
+      <div className="mt-1.5 max-w-72 space-y-1">
+        {showRunway && liqPrice && collPrice && (
+          <PriceRunway compact barOnly currentPrice={collPrice} liqPrice={liqPrice} asset={trove.collateralType} />
+        )}
+        {queueRunway}
+        {showBand && <TroveDetailsBand {...bandProps} part="queue" alignStart />}
+      </div>
+    ) : undefined;
+
   const rowExtra =
-    showBand || (showRunway && liqPrice && collPrice) ? (
+    !disclosureKey && (showBand || (showRunway && liqPrice && collPrice)) ? (
       // The shared risk-footer strip: the heading-buttons anchor the left
       // edge, the figures the right, one row when the card is wide enough
       // and a right-aligned stacked column the moment it isn't (the strip's
       // own container-query rule — see risk-footer-strip.tsx).
       <RiskFooterStrip>
-        {showBand && (
-          <TroveDetailsBand
-            trove={trove}
-            liveState={liveState}
-            debtInFront={debtInFront}
-            trovesAhead={trovesAhead}
-            debtInFrontLoading={debtInFrontLoading}
-          />
-        )}
-        {showRedemptionRunway && (
-          <RiskMeter>
-            <RedemptionRunway
-              debtInFront={debtInFront as number}
-              queueDebtTotal={queueDebtTotal as number}
-              shareProv={troveQueueShareProv(trove.collateralType)}
-              markerTitle="This trove's place in the branch's redemption queue — everything left of the marker is redeemed first"
-            />
-          </RiskMeter>
-        )}
+        {showBand && <TroveDetailsBand {...bandProps} />}
+        {queueRunway && <RiskMeter>{queueRunway}</RiskMeter>}
         {showRunway && liqPrice && collPrice && (
           <RiskMeter>
             <PriceRunway compact currentPrice={collPrice} liqPrice={liqPrice} asset={trove.collateralType} />
@@ -141,8 +151,9 @@ export function TroveSummaryStack({
       rowExtra={rowExtra}
       viewHref={viewHref}
       surplus={surplus}
-      explanationDefaultOpen={summaryExplanationOpen}
-      onExplanationToggle={onToggleSummaryExplanation}
+      disclosureKey={disclosureKey}
+      debtDetail={debtDetail}
+      riskDetail={riskDetail}
       footer={
         loadingStatus?.message ? (
           <div className="flex justify-end mt-3">

@@ -79,15 +79,19 @@ export function RiskFooterStrip({ children }: { children: ReactNode }) {
 export function RiskFigure({
   label,
   caution,
+  alignStart = false,
   children,
 }: {
   label?: ReactNode;
   caution?: boolean;
+  /** Left-aligned, under a headline in a position card's opened layer
+   *  (ui-jobs 209). Right-aligned on the strip by default. */
+  alignStart?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`text-right text-xs tabular-nums leading-relaxed ${
+      className={`${alignStart ? "text-left" : "text-right"} text-xs tabular-nums leading-relaxed ${
         caution ? "font-semibold text-caution-600 dark:text-caution-400" : "text-rb-500"
       }`}
     >

@@ -64,8 +64,10 @@ export function PositionCardShell({
   /** Opt in to progressive disclosure (ui-jobs 209): one stable key per
    *  position. The card then draws closed by default, a chevron in the
    *  header's activity meta opens it, and the Explanation row shows only
-   *  while it is open (components/shared/position-card-disclosure.tsx). Only
-   *  meaningful with `receipts`: a listing row never discloses. */
+   *  while it is open (components/shared/position-card-disclosure.tsx). Both
+   *  the card's state and its Explanation's are remembered under the key, so
+   *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
+   *  Only meaningful with `receipts`: a listing row never discloses. */
   disclosureKey?: string;
   children: ReactNode;
 }) {
@@ -88,8 +90,9 @@ export function PositionCardShell({
           explanation={explanation}
           learnMore={learnMore}
           viewHref={viewHref}
-          explanationDefaultOpen={explanationDefaultOpen}
-          onExplanationToggle={onExplanationToggle}
+          // A disclosing card remembers its Explanation with its open state.
+          explanationDefaultOpen={disclosure ? disclosure.explanationOpen : explanationDefaultOpen}
+          onExplanationToggle={disclosure ? disclosure.setExplanationOpen : onExplanationToggle}
         />
       )}
     </div>
