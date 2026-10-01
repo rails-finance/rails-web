@@ -57,6 +57,7 @@ const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "ctoken-rows": { collateral: "exchange rate", debt: "debt growth" },
   "fluid-rows": { collateral: "supply exchange price", debt: "borrow exchange price" },
   "dolomite-rows": { collateral: "supply index", debt: "borrow index" },
+  "llamalend-rows": { collateral: "collateral", debt: "debt growth" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
@@ -69,6 +70,8 @@ const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
     "the position's rows (each row's balance before it over the balance after the row before), grown at the rate between them to the moment, and after the last row at the vault's rate now",
   "dolomite-rows":
     "the market's index at each of the account's rows, in a straight line between two rows and to today's live read after the last",
+  "llamalend-rows":
+    "the position's rows (the debt before each row over the debt after the row before), grown at the rate between them to the moment, and after the last row at the rate that meets today's live debt",
 };
 /** Whose index it is, and what the grown balance is to the chain's. */
 const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
@@ -78,6 +81,7 @@ const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
   "ctoken-rows": "the market's",
   "fluid-rows": "the vault's",
   "dolomite-rows": "the market's",
+  "llamalend-rows": "the market's",
 };
 const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
@@ -89,6 +93,8 @@ const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
     "The index runs in a straight line between the two rows around the day, so this is the vault's balance to within how its rate moved between them.",
   "dolomite-rows":
     "The index runs in a straight line between the two rows around the day, so this is the chain's balance to within how the market's rate moved between them.",
+  "llamalend-rows":
+    "The index runs in a straight line between the two rows around the day, so this is the Controller's debt to within how the market's rate moved between them.",
 };
 const fmtIndex = (v: number) =>
   v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
@@ -555,7 +561,9 @@ export function FlowMomentCard({
             ? " Each balance is grown by the interest since its last event: the balance that event recorded × the market's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the chain's balance to within how the rate moved between them."
             : g.basis === "fluid-rows"
               ? " Each balance is grown by the interest since its last event: the balance that event recorded × the vault's exchange price at the close of the day ÷ its exchange price at that event. The exchange price runs in a straight line between the position's rows, so this is the vault's balance to within how its rate moved between them."
-              : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
+              : g.basis === "llamalend-rows"
+                ? " The debt is grown by the interest since its last event, at the rate the market charged between that event and the next (after the last, the rate that meets today's live debt), so this is the Controller's debt to within how the rate moved between them."
+                : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
         })()}{" "}
         Each side&rsquo;s toggle opens its ledger: each asset as its last event left it, the interest since, and what it
         comes to at the close.

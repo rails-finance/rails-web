@@ -10,6 +10,7 @@
 
 import type { BaseActivityEvent, LlamalendContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { LlamalendLedgerProvider } from "./llamalend-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
@@ -134,50 +135,54 @@ export function LlamalendEventCard({
     <SpineColumn tokens={tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
   );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <LlamalendEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          wallet={event.wallet}
-          flows={event.flows}
-          loanMark={loanMark}
-        />
-      }
-      detail={
-        <LlamalendEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          previousStated={previousStated}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <LlamalendEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          skipLead
-          loanMark={loanMark}
-          marketDiscount={marketDiscount}
-          next={next}
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx)} />}
-      persistKey={`llamalend:${event.id}`}
-    />
+    <LlamalendLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <LlamalendEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            wallet={event.wallet}
+            flows={event.flows}
+            loanMark={loanMark}
+          />
+        }
+        detail={
+          <LlamalendEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            previousStated={previousStated}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <LlamalendEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            skipLead
+            loanMark={loanMark}
+            marketDiscount={marketDiscount}
+            next={next}
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx)} />}
+        persistKey={`llamalend:${event.id}`}
+      />
+    </LlamalendLedgerProvider>
   );
 }

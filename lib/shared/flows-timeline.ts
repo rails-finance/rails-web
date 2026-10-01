@@ -155,9 +155,10 @@ export interface FlowGrowth {
  *  exchange rate, and the debt's growth between rows: lib/shared/ctoken-flows.ts);
  *  a Fluid position's exchange prices as its rows imply them (lib/fluid/flows.ts);
  *  a Dolomite market's supply and borrow index as the account's rows state
- *  them (lib/dolomite/flows.ts). */
+ *  them (lib/dolomite/flows.ts); a LlamaLend position's debt growth as its
+ *  rows imply it (lib/llamalend/flows.ts). */
 export interface FlowIndexes {
-  basis: "reserve-data" | "hub-state" | "comet" | "ctoken-rows" | "fluid-rows" | "dolomite-rows";
+  basis: "reserve-data" | "hub-state" | "comet" | "ctoken-rows" | "fluid-rows" | "dolomite-rows" | "llamalend-rows";
   assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
 }
 

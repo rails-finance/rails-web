@@ -50,6 +50,8 @@ import {
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { useLlamalendLedgerCells } from "./llamalend-ledger";
 
 export interface LlamalendEventDetailProps {
   ctx: LlamalendContext;
@@ -206,6 +208,16 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
   };
 
   const stats: ChainTruthStat[] = [];
+  // The cells that open into the Lifetime flows ledgers, where the page has
+  // them; while the model is on its way, they stand as placeholder rows. A row
+  // where the page's wallet liquidated someone else's position is no event of
+  // this position's and opens nothing.
+  const cells = useLlamalendLedgerCells();
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const own = ctx.role !== "liquidator";
+  const collLedger = own && (cells != null || flowsPending) ? { ledger: "collateral" as const } : {};
+  const debtLedger = own && (cells?.debt || flowsPending) ? { ledger: "debt" as const } : {};
 
   // Collateral: the event's after-image, or the read at this block where the
   // Controller logged its sentinel (a repay while converted).
@@ -241,6 +253,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
             ),
       changed: t != null || (Boolean(ctx.collateralDelta) && Number(ctx.collateralDelta) !== 0),
       transition: t,
+      ...collLedger,
       sub:
         sold != null && previousStated ? (
           <>
@@ -304,6 +317,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
           : stateAtBlockProv(`${bSym} debt`, "Controller.user_state(user)[2]", block, coords, state?.after.debtRaw),
       changed: t != null || (Boolean(ctx.debtDelta) && Number(ctx.debtDelta) !== 0),
       transition: t,
+      ...debtLedger,
     });
   }
 
