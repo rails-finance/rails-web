@@ -190,7 +190,7 @@ export function binInputFromWire(s: FlowSeries): BinInput {
   };
 }
 
-/** A timeline's day rows and daily prices as binning input (Sky Savings,
+/** A timeline's day rows and daily prices as binning input (the families
  *  whose rows are on the page). Null without a daily price series. */
 export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
   if (!t.dailyPrices || t.today == null) return null;
@@ -202,5 +202,7 @@ export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
     symbols,
     today: t.today,
     ...(t.seriesCarry ? { carry: true } : {}),
+    // A family that grows its balances by an index on the page (Compound V3).
+    ...(t.indexes ? { indexes: t.indexes } : {}),
   };
 }

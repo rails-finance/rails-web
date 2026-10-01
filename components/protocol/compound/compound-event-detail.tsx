@@ -40,6 +40,7 @@ import { CompoundRateNote } from "@/components/protocol/compound/compound-rate-n
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
+import { useCompoundLedgerState } from "./compound-ledger";
 
 export interface CompoundEventDetailProps {
   ctx: CompoundContext;
@@ -52,6 +53,8 @@ export interface CompoundEventDetailProps {
   previous?: CompoundPreviousRow;
   /** The last row of the previous transaction: the absorb's "what moved". */
   previousTx?: CompoundPreviousRow;
+  /** The timeline event, for the cells' ledgers. */
+  eventId?: string;
 }
 
 /** A before within one unit of zero is Comet's rounding: it reads as zero,
@@ -84,8 +87,23 @@ export function CompoundEventDetail({
   timestamp,
   previous,
   previousTx,
+  eventId,
 }: CompoundEventDetailProps) {
   const m = useCometMarket(ctx.market);
+  // Where the page ties its timeline to the Lifetime flows panel, the cells
+  // open into their side's ledger: a collateral cell into the collateral, a
+  // base cell into the debt where the account owes, else into the collateral
+  // side that holds the lent base. While the model is on its way they stand
+  // as placeholder rows.
+  const ledgerState = useCompoundLedgerState(eventId ?? "");
+  const ledgerOn = ledgerState != null;
+  const baseSide = (after: string | undefined, before: string | null): "collateral" | "debt" | undefined => {
+    if (!ledgerOn || after == null) return undefined;
+    const a = Number(after);
+    if (a < 0) return "debt";
+    if (a > 0) return "collateral";
+    return before != null && Number(before) < 0 ? "debt" : "collateral";
+  };
   const coords: CompoundCoords = {
     comet: m.comet,
     marketLabel: m.label,
@@ -148,6 +166,7 @@ export function CompoundEventDetail({
       stats.push({
         label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
         value: fmt(ctx.baseAfter),
+        ...(baseSide(ctx.baseAfter, before) ? { ledger: baseSide(ctx.baseAfter, before) } : {}),
         symbol: ctx.assetSymbol,
         prov: baseAfterProv(ctx.assetSymbol, coords),
         interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
@@ -182,6 +201,7 @@ export function CompoundEventDetail({
     stats.push({
       label: `${ctx.assetSymbol} collateral`,
       value: fmt(ctx.collateralAfter),
+      ...(ledgerOn ? { ledger: "collateral" as const } : {}),
       symbol: ctx.assetSymbol,
       prov: collateralAfterProv(ctx.assetSymbol, collCoords),
       transition: reconstructTransition({
@@ -201,6 +221,8 @@ export function CompoundEventDetail({
       stats.push({
         label: b < 0 ? "Borrowed (base)" : b > 0 ? "Lent (base)" : "Base balance",
         value: fmt(ctx.baseAfter),
+        // The lent base sits in the collateral cell's ledger.
+        ...(ledgerOn && b < 0 ? { ledger: "debt" as const } : {}),
         symbol: m.baseSymbol,
         prov: baseAfterProv(m.baseSymbol, coords),
         interestSincePrevious: interestSincePrevious(m.baseSymbol),

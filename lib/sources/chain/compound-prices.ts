@@ -22,7 +22,7 @@
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
-import { COMPOUND_DEPLOYMENT, type CometDeployment } from "@/lib/compound/asset-catalog";
+import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 
 const COMET_ABI = parseAbi([
   "function baseTokenPriceFeed() view returns (address)",
@@ -315,5 +315,69 @@ export async function cometEthUsdAtBlocks(deployment: CometDeployment, blocks: n
       }
     }),
   );
+  return out;
+}
+
+// ── Every asset's price at a past block, for the Lifetime flows ──────────────
+// The flows panel values each event at its block (lib/compound/flows.ts): the
+// base's feed (baseTokenPriceFeed) and each asset's (getAssetInfoByAddress) as
+// the Comet named them at that block, then getPrice on each, all at the block.
+// An ETH-quoted Comet's prices are converted with WETH/USD at the same block,
+// and dropped where that read fails.
+
+/** USD per whole token at `block`, keyed by lowercased token address (the
+ *  base under its own). An asset the Comet did not list then is absent. */
+export async function cometPricesAtBlock(
+  deployment: CometDeployment,
+  market: CometMarket,
+  assets: string[],
+  block: number,
+): Promise<Record<string, number>> {
+  const client = chainClient(deployment.chainId);
+  const comet = market.comet as `0x${string}`;
+  const base = market.baseToken.toLowerCase();
+  const coll = [...new Set(assets.map((a) => a.toLowerCase()))].filter((a) => a !== base);
+  const at = BigInt(block);
+  const feeds = (await client.multicall({
+    allowFailure: true,
+    blockNumber: at,
+    contracts: [base, ...coll].map((t, i) =>
+      i === 0
+        ? ({ address: comet, abi: COMET_ABI, functionName: "baseTokenPriceFeed" } as const)
+        : ({
+            address: comet,
+            abi: COMET_ABI,
+            functionName: "getAssetInfoByAddress",
+            args: [t as `0x${string}`],
+          } as const),
+    ),
+  })) as { status: string; result?: unknown }[];
+  const named: { token: string; feed: `0x${string}` }[] = [];
+  feeds.forEach((r, i) => {
+    if (r.status !== "success" || r.result == null) return;
+    const feed = i === 0 ? (r.result as string) : (r.result as { priceFeed?: string }).priceFeed;
+    if (typeof feed === "string" && feed.toLowerCase() !== ZERO_ADDR)
+      named.push({ token: i === 0 ? base : coll[i - 1], feed: feed as `0x${string}` });
+  });
+  if (named.length === 0) return {};
+  const res = (await client.multicall({
+    allowFailure: true,
+    blockNumber: at,
+    contracts: named.map(
+      (n) => ({ address: comet, abi: COMET_ABI, functionName: "getPrice", args: [n.feed] }) as const,
+    ),
+  })) as { status: string; result?: unknown }[];
+  let quote = 1;
+  if (market.quoteUnit === "ETH") {
+    const eth = (await cometEthUsdAtBlocks(deployment, [block])).get(block);
+    if (eth == null || eth <= BigInt(0)) return {};
+    quote = Number(eth) / PRICE_SCALE;
+  }
+  const out: Record<string, number> = {};
+  res.forEach((r, i) => {
+    if (r.status !== "success" || r.result == null) return;
+    const usd = (Number(r.result as bigint) / PRICE_SCALE) * quote;
+    if (usd > 0) out[named[i].token] = usd;
+  });
   return out;
 }

@@ -16,6 +16,7 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 import { compoundExplainerTeaser, type CompoundEvent } from "@/lib/compound/explainer-clauses";
 import { CompoundEventHeader } from "./compound-event-header";
 import { CompoundEventDetail } from "./compound-event-detail";
+import { CompoundLedgerProvider } from "./compound-ledger";
 import type { CompoundPreviousRow } from "./compound-absorb-breakdown";
 import { CompoundEventExplainer, compoundLearnMoreContent } from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -163,50 +164,55 @@ export function CompoundEventCard({
     />
   );
 
+  // The collateral and debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      txHashLabel="Transaction"
-      iconColumn={iconSlot}
-      header={
-        <CompoundEventHeader
-          actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals)}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <CompoundEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          timestamp={event.timestamp}
-          previous={prevRow(previous)}
-          previousTx={prevRow(previousTx)}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <CompoundEventExplainer
-          ctx={ctx}
-          event={event}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          siblings={sibs}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={compoundExplainerTeaser(ctx, coords, sibs, event, m)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={compoundLearnMoreContent(ctx)} />}
-      persistKey={`compound:${event.id}`}
-    />
+    <CompoundLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        txHashLabel="Transaction"
+        iconColumn={iconSlot}
+        header={
+          <CompoundEventHeader
+            actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals)}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+          />
+        }
+        detail={
+          <CompoundEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            timestamp={event.timestamp}
+            eventId={event.id}
+            previous={prevRow(previous)}
+            previousTx={prevRow(previousTx)}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <CompoundEventExplainer
+            ctx={ctx}
+            event={event}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            siblings={sibs}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={compoundExplainerTeaser(ctx, coords, sibs, event, m)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={compoundLearnMoreContent(ctx)} />}
+        persistKey={`compound:${event.id}`}
+      />
+    </CompoundLedgerProvider>
   );
 }

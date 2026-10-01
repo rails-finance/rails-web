@@ -146,9 +146,11 @@ export interface FlowGrowth {
 /** The reserves' indexes at each held day's close, per asset: [UTC day,
  *  supply index, borrow index] (the Aave family's route). The Aave V3 Pool
  *  family's from its ReserveDataUpdated logs (liquidityIndex,
- *  variableBorrowIndex); Aave V4's from the hub (share price, drawn index). */
+ *  variableBorrowIndex); Aave V4's from the hub (share price, drawn index);
+ *  a Comet's base supply and borrow index as the account's rows imply them
+ *  (lib/compound/flows.ts). */
 export interface FlowIndexes {
-  basis: "reserve-data" | "hub-state";
+  basis: "reserve-data" | "hub-state" | "comet";
   assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
 }
 

@@ -42,10 +42,13 @@ export interface MomentNeighbour {
 const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "reserve-data": { collateral: "liquidity index", debt: "variable borrow index" },
   "hub-state": { collateral: "supply share price", debt: "drawn index" },
+  comet: { collateral: "base supply index", debt: "base borrow index" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
   "hub-state": "the hub's state at its last event block (the drawn index grown at its logged rate to the moment)",
+  comet:
+    "the account's rows (each row's balance over the last at an unchanged principal), grown at the rate between them to the moment, and after the last row at the market's rate now",
 };
 const fmtIndex = (v: number) =>
   v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
