@@ -89,6 +89,7 @@ export function RevealTip({
   return (
     <span
       ref={ref}
+      data-reveal-tip=""
       className={`relative inline-flex items-center ${className ?? ""}`}
       onMouseEnter={hasHover ? () => setOpen(true) : undefined}
       onMouseLeave={hasHover ? () => setOpen(false) : undefined}

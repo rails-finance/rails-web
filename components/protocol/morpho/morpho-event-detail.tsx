@@ -43,6 +43,8 @@ import {
 } from "@/lib/morpho/event-provenance";
 import { Prov } from "@/components/shared/provenance";
 import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { PendingBar } from "@/components/shared/event-ledger";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   useMorphoAtBlock,
   morphoHealthMove,
@@ -224,10 +226,12 @@ function MorphoRiskCards({
   if (!anyDebt || ctx.debtAfter == null) return null;
   if (read.status === "loading")
     return (
-      <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2">
-        <StatCard label="Health factor">
-          <span className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse" aria-hidden="true" />
-        </StatCard>
+      <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2" data-t2-skeleton="">
+        {["Health factor", "LTV", ...(debtSide ? ["Market borrow rate"] : [])].map((label) => (
+          <StatCard key={label} label={label}>
+            <PendingBar />
+          </StatCard>
+        ))}
       </div>
     );
   if (read.status !== "ok" || !move) return null;
@@ -300,6 +304,11 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   const read = useMorphoAtBlock(ctx.marketId, blockNumber, chainId);
   // Which cells open into the Lifetime flows ledgers, where the page has them.
   const cells = useMorphoLedgerCells();
+  // The page ties its timeline to the flows panel and the model has not landed:
+  // the cells that will open into ledgers stand as placeholder rows meanwhile.
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const lenderEv = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   // The address for each axis, read off the event's own flows under the
   // single-match rule (soleFlowAddress): a symbol two flows share resolves to
   // nothing rather than to whichever contract happened to come first. Only the
@@ -322,7 +331,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       prov: collateralAfterProv(ctx.collateralSymbol, coords),
       changed: collActive,
       display: ctx.collateralAfter != null ? fmtMorphoAmount(ctx.collateralAfter) : undefined,
-      ...(cells?.collateral === "collateral" ? { ledger: "collateral" as const } : {}),
+      ...(cells?.collateral === "collateral" || (flowsPending && !lenderEv) ? { ledger: "collateral" as const } : {}),
       transition:
         ctx.side === "collateral"
           ? atPrecision(
@@ -345,7 +354,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           label: "Debt",
           value: fmt(ctx.debtAfter),
           display: fmtMorphoAmount(ctx.debtAfter),
-          ...(cells?.debt ? { ledger: "debt" as const } : {}),
+          ...(cells?.debt || (flowsPending && !lenderEv) ? { ledger: "debt" as const } : {}),
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: debtAfterProv(ctx.loanSymbol, coords),
@@ -408,7 +417,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: supplyAfterProv(ctx.loanSymbol, coords),
-      ...(cells?.collateral === "supply" ? { ledger: "collateral" as const } : {}),
+      ...(cells?.collateral === "supply" || (flowsPending && lenderEv) ? { ledger: "collateral" as const } : {}),
       changed: lenderActive || Boolean(gap),
       transition: lenderActive
         ? reconstructTransition({

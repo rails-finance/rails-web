@@ -39,6 +39,7 @@ import {
   reconstructTransition,
   type ChainTruthStat,
 } from "@/components/shared/chain-truth-event";
+import { T2Skeleton } from "@/components/shared/event-ledger";
 import {
   supplyAfterProv,
   debtAfterProv,
@@ -725,11 +726,12 @@ export function AaveV3CtEventDetail({
 
   return (
     <>
-      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {state?.status === "loading" && (
-        <div className="px-5 pb-2 text-xs text-rb-500" data-position-state="loading">
-          Reading the position at this block…
-        </div>
+      {/* Until the position read lands the area stands as the loaded grid's
+          placeholders (T2Skeleton); a failed read keeps the row's own figures. */}
+      {state?.status === "loading" ? (
+        <T2Skeleton stats={["Health factor", "LTV", "Still borrowable"]} data={{ "data-position-state": "loading" }} />
+      ) : (
+        stats.length > 0 && <ChainTruthDetail stats={stats} />
       )}
       {state?.status === "unavailable" && (
         <div

@@ -25,6 +25,7 @@
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import type { SparkContext, SparkSnapshotItem } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import { T2Skeleton } from "@/components/shared/event-ledger";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   supplyAfterProv,
@@ -393,7 +394,7 @@ export function SparkEventDetail({
 
   return (
     <div>
-      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
+      {read.status !== "loading" && stats.length > 0 && <ChainTruthDetail stats={stats} />}
       {read.status === "ready" && read.state && read.raw ? (
         <SparkAccountState
           state={read.state}
@@ -405,9 +406,10 @@ export function SparkEventDetail({
           eventTs={eventTs}
         />
       ) : read.status === "loading" ? (
-        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
-          Reading the account before and after this transaction…
-        </div>
+        <T2Skeleton
+          stats={["Health factor", "LTV", "Still borrowable"]}
+          data={{ "data-spark-account-state": "loading" }}
+        />
       ) : read.status === "unavailable" && !read.lasting ? (
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
           The account before and after this transaction was not read. Reload to try again.

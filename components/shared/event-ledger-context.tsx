@@ -14,6 +14,9 @@ export interface EventLedgerSource {
   /** The decimals the side's ledger prints its tokens at, where it has a
    *  token sum; the closed cell states its figures at the same. */
   decimals?: (side: FlowSide) => number | null;
+  /** The ledgers are still on their way: a ledger cell stands as a placeholder
+   *  row (event-ledger.tsx `T2Skeleton`) until they land. */
+  pending?: boolean;
 }
 export const EventLedgerContext = createContext<EventLedgerSource | null>(null);
 
@@ -21,6 +24,10 @@ export const EventLedgerContext = createContext<EventLedgerSource | null>(null);
  *  (label at the left, figures at the right, any sub-line under them): the
  *  Aave family's risk and liquidation cells. Provide it around them. */
 export const ROW_CELLS: EventLedgerSource = { has: () => false, render: () => null };
+
+/** A card whose ledgers have not landed: its cells stand as full-width
+ *  placeholder rows, and its stat cells as rows beside them. */
+export const LEDGER_PENDING: EventLedgerSource = { has: () => false, render: () => null, pending: true };
 
 /** The decimals the side's opened ledger prints at, for its closed cell. */
 export function useLedgerDecimals(side: FlowSide): number | null {

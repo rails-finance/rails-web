@@ -12,6 +12,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import {
   DayCloseNote,
   EventLedgerContext,
@@ -84,19 +85,24 @@ export function LiquityLedgerProvider({
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
   const has = !!focus?.model && cum != null && !!focus.events.find((e) => e.id === eventId)?.sides;
+  // The page ties its timeline to the flows panel but the day rows have not
+  // landed: the cells stand as placeholder rows until the ledgers can open.
+  const pending = !!focus && !focus.model;
   const src: EventLedgerSource | null = useMemo(
     () =>
-      has
-        ? {
-            has: () => true,
-            render: (side) => <LiquityLedger side={side} eventId={eventId} eventTs={eventTs} />,
-            decimals: (side) =>
-              focus?.model && cum
-                ? (eventTokenSum(focus.model, focus.events, side, cum, eventId)?.decimals ?? null)
-                : null,
-          }
-        : null,
-    [has, eventId, eventTs, focus?.model, focus?.events, cum],
+      pending
+        ? LEDGER_PENDING
+        : has
+          ? {
+              has: () => true,
+              render: (side) => <LiquityLedger side={side} eventId={eventId} eventTs={eventTs} />,
+              decimals: (side) =>
+                focus?.model && cum
+                  ? (eventTokenSum(focus.model, focus.events, side, cum, eventId)?.decimals ?? null)
+                  : null,
+            }
+          : null,
+    [pending, has, eventId, eventTs, focus?.model, focus?.events, cum],
   );
   return <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>;
 }

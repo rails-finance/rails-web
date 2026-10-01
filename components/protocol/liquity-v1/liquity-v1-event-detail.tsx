@@ -28,7 +28,7 @@ import {
   changeTone,
 } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { LedgerCell } from "@/components/shared/event-ledger";
+import { LedgerCell, PendingBar } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { LinkedAddress } from "@/components/shared/linked-address";
@@ -369,7 +369,9 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                   <ClosedLabel />
                 </StateTransition>
               ) : (
-                <span className="text-sm font-semibold text-rb-500">{price == null ? "…" : "N/A"}</span>
+                <span className="text-sm font-semibold text-rb-500">
+                  {price == null ? readPending ? <PendingBar /> : "…" : "N/A"}
+                </span>
               )
             ) : (
               <Transition
@@ -411,7 +413,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                 <TokenChipIcon symbol={COLLATERAL_SYMBOL} size={16} />
               </StateTransition>
             ) : (
-              <span className="text-sm font-semibold text-rb-500">…</span>
+              <span className="text-sm font-semibold text-rb-500">{readPending ? <PendingBar /> : "…"}</span>
             )}
             <StatSubline>Liquity&apos;s price feed, at this block</StatSubline>
           </StatCard>

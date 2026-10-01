@@ -11,6 +11,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import {
   DayCloseNote,
   EventLedgerContext,
@@ -87,15 +88,19 @@ export function MorphoLedgerProvider({
   const cum = useEventCum(eventId);
   const cells = useMorphoLedgerCells();
   const has = !!focus?.model && cum != null && !!focus.events.find((e) => e.id === eventId)?.sides;
+  // The flows model has not landed: the cells stand as placeholder rows.
+  const pending = !!focus && !focus.model;
   const src: EventLedgerSource | null = useMemo(
     () =>
-      has && cells
-        ? {
-            has: (side) => (side === "debt" ? cells.debt : cells.collateral != null),
-            render: (side) => <MorphoLedger side={side} eventId={eventId} eventTs={eventTs} />,
-          }
-        : null,
-    [has, cells, eventId, eventTs],
+      pending
+        ? LEDGER_PENDING
+        : has && cells
+          ? {
+              has: (side) => (side === "debt" ? cells.debt : cells.collateral != null),
+              render: (side) => <MorphoLedger side={side} eventId={eventId} eventTs={eventTs} />,
+            }
+          : null,
+    [pending, has, cells, eventId, eventTs],
   );
   return <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>;
 }
