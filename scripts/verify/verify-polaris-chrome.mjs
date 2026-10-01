@@ -23,7 +23,7 @@
 //      feeds polarisLiquidationDeltas a row with collSurplus "0" and gets two
 //      legs, and one with "0.5" gets the third, neutral, off the spine.
 //   5. Every Polaris learn-more modal — the markets page's two inline "?",
-//      the CDP card's, the tower's, a liquidation row's — lists ≥ 2 links on
+//      the CDP card's, the Lifetime flows panel's, a liquidation row's — lists ≥ 2 links on
 //      docs.polaris.finance, each answering 200 to a fetch from this script,
 //      and the last link is the testnet app.
 //   6. /sepolia/polaris/info carries the ENS sentence.
@@ -325,7 +325,7 @@ async function readModalLinks(page) {
     .catch(() => {});
   return { title: (title ?? "").trim(), links };
 }
-/** Click the "?" inside `scope`. The CDP card's and the tower's ride at the
+/** Click the "?" inside `scope`. The CDP card's and the flows panel's ride at the
  *  foot of an Explanation pane and are hidden until it opens; a timeline row's
  *  rides its footer, drawn once the card is open. */
 async function openModalIn(scope, page) {
@@ -378,7 +378,7 @@ async function checkModal(name, { title, links }) {
   await openModalIn(page.locator('[data-skel-section="detail-card"]').first(), page);
   await checkModal("the CDP card", await readModalLinks(page));
   await openModalIn(page.locator('[data-skel-section="detail-economics"]').first(), page);
-  await checkModal("the tower", await readModalLinks(page));
+  await checkModal("the Lifetime flows panel", await readModalLinks(page));
   const card = await liquidationCard(page);
   // The card's header is the toggle (role="button"); its footer, with the "?",
   // draws once the detail is open.

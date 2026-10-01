@@ -12,8 +12,8 @@
 //   3. the page-wide label count equals the timeline route's own independent
 //      count of touches with a non-zero share (one label per touch: the share
 //      is the net of every mint and redemption since the previous touch);
-//   4. the economics tower names the net shares "Net PSM shares" on both
-//      signs, never "PSM redemptions";
+//   4. the Lifetime flows panel names the net shares "Net PSM shares" on
+//      both signs, never "PSM redemptions";
 //   5. the debt-sum strip states the live overlay's own pending net PSM
 //      share on the debt (fetched independently, compared with tolerance);
 //   6. a control CDP (usdp/296) — face count agrees with the route's count,
@@ -202,8 +202,20 @@ check(
   `DOM ${domLabelCount8}, route ${wantLegs8}`,
 );
 
-// ── 4. the tower's renamed flow labels; "PSM redemptions" nowhere on page ─
+// ── 4. the panel's flow labels; "PSM redemptions" nowhere on page ────────
 
+// The panel's lines are named in its Key, inside the Explanation: open it.
+{
+  const panel = page8.locator('[data-skel-section="detail-economics"]').first();
+  await panel
+    .locator("[data-flow-strip]")
+    .first()
+    .waitFor({ timeout: 60000 })
+    .catch(() => {});
+  const toggle = panel.locator('button[aria-label*="explanation" i]').first();
+  if ((await toggle.count()) > 0 && (await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await page8.waitForTimeout(500);
+}
 const bodyText8 = (await page8.locator("body").innerText()).replace(/\s+/g, " ");
 check(
   '4. "Net PSM shares" appears on the page (the flows panel\'s one name for both signs)',

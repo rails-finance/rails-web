@@ -22,6 +22,7 @@ import {
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
 import { LinkedAddress } from "@/components/shared/linked-address";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { Prov } from "@/components/shared/provenance";
 import {
   AtBlockPriceFootnote,
@@ -129,6 +130,7 @@ function crTransitionOf(
 }
 
 export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDetailProps) {
+  const focus = useFlowFocus();
   const coords: PolarisCoords = { txHash, blockNumber, market: ctx.market, cdpId: ctx.cdpId };
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
@@ -157,6 +159,11 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
       </div>
     );
   }
+
+  // The Collateral and Debt cells open into the Lifetime flows ledgers where
+  // the page has the panel; while its model is on its way they stand as
+  // placeholder rows (components/protocol/polaris/polaris-ledger.tsx).
+  const ledgers = focus != null;
 
   const stats: ChainTruthStat[] = [];
   /** A protocol leg, signed by what it does to the CDP: "+" adds to the
@@ -194,6 +201,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
       prov: ledgerFieldProv("newColl", coords, ctx.raw?.newColl),
       transition: transitionOf(ctx.newColl, ctx.collBefore, "coll", coords, ctx.raw?.collBefore),
       changed: ctx.newColl !== ctx.collBefore,
+      ...(ledgers ? { ledger: "collateral" as const } : {}),
     });
   if (ctx.newDebt != null)
     stats.push({
@@ -207,6 +215,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
       prov: ledgerFieldProv("newDebt", coords, ctx.raw?.newDebt),
       transition: transitionOf(ctx.newDebt, ctx.debtBefore, "debt", coords, ctx.raw?.debtBefore),
       changed: ctx.newDebt !== ctx.debtBefore,
+      ...(ledgers ? { ledger: "debt" as const } : {}),
     });
 
   // The collateral ratio at this event, always on (as Liquity V2's metric is):

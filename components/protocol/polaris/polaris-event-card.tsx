@@ -21,6 +21,7 @@ import { PolarisEventHeader } from "./polaris-event-header";
 import { PolarisEventDetail } from "./polaris-event-detail";
 import { PolarisEventExplainer, polarisLearnMoreContent } from "./polaris-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { PolarisLedgerProvider } from "./polaris-ledger";
 
 export interface PolarisEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
@@ -105,40 +106,44 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
       <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
     );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <PolarisEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-        />
-      }
-      detail={<PolarisEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-      detailLabel="CDP state"
-      explainer={
-        <PolarisEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          // A liquidation is sent by the liquidator and a transfer is paid for
-          // by whoever moved the NFT — neither transaction's gas is the CDP
-          // holder's, so the clause is withheld on those two rows and stated
-          // on the holder's own open / adjust / close.
-          gas={ctx.eventType === "liquidate" || ctx.eventType === "transfer" ? undefined : event.gas}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={polarisExplainerTeaser(ctx, coords)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={polarisLearnMoreContent(ctx)} />}
-      persistKey={`polaris:${event.id}`}
-    />
+    <PolarisLedgerProvider eventId={event.id} eventTs={event.timestamp} flowRow={ctx.eventType !== "transfer"}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <PolarisEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+          />
+        }
+        detail={<PolarisEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
+        detailLabel="CDP state"
+        explainer={
+          <PolarisEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            // A liquidation is sent by the liquidator and a transfer is paid for
+            // by whoever moved the NFT — neither transaction's gas is the CDP
+            // holder's, so the clause is withheld on those two rows and stated
+            // on the holder's own open / adjust / close.
+            gas={ctx.eventType === "liquidate" || ctx.eventType === "transfer" ? undefined : event.gas}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={polarisExplainerTeaser(ctx, coords)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={polarisLearnMoreContent(ctx)} />}
+        persistKey={`polaris:${event.id}`}
+      />
+    </PolarisLedgerProvider>
   );
 }

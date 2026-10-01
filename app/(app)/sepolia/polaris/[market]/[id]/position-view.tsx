@@ -36,15 +36,15 @@ import {
   type PolarisPositionView as PolarisView,
 } from "@/components/protocol/polaris/polaris-position-card";
 import { PolarisPositionExplanation } from "@/components/protocol/polaris/polaris-position-explanation";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computePolarisEconomics, polarisLifetime } from "@/lib/polaris/economics";
+import { polarisLifetime } from "@/lib/polaris/economics";
 import { polarisSinceLastTouch } from "@/lib/polaris/since-last-touch";
 import { PolarisSinceLastTouchRow } from "@/components/protocol/polaris/polaris-since-last-touch";
-import {
-  polarisEconomicsExplanation,
-  polarisEconomicsContent,
-  polarisPsmOutcome,
-} from "@/lib/polaris/economics-explanation";
+import { polarisPsmOutcome } from "@/lib/polaris/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { PolarisFlowsNote, polarisFlowsContent } from "@/components/protocol/polaris/polaris-flows-note";
+import { usePolarisFlows } from "@/hooks/usePolarisFlows";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -212,8 +212,8 @@ export default function PolarisPositionView({
   const polarisEvents = useMemo(() => events.filter(isPolarisEvent), [events]);
 
   // The CDP's summed ledger over its whole life — the closed/liquidated
-  // explanation's lifetime bullet and the tower's lifetime layer both read
-  // it, computed once here from the same event list.
+  // explanation's lifetime bullet and the PSM outcome strip both read it,
+  // computed once here from the same event list.
   const lifetime = useMemo(() => (polarisEvents.length > 0 ? polarisLifetime(polarisEvents) : null), [polarisEvents]);
 
   // The live window between the CDP's last touch and the head block, split
@@ -227,6 +227,8 @@ export default function PolarisPositionView({
   const tl = useTimelineEvents(polarisEvents, {
     storageKey: `polaris-${market}-${cdpId}`,
     protocolKey: "polaris",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // Market notes: the stretches between two of this CDP's own touches where
@@ -363,6 +365,19 @@ export default function PolarisPositionView({
 
   const loading = !chainSettled && view == null;
 
+  // The Lifetime flows panel replays the CDP's whole history
+  // (lib/polaris/flows.ts), the index's one read; today's figures are the live
+  // read's entire collateral and debt, with the legs pending since the last
+  // touch.
+  const flows = usePolarisFlows({
+    events: indexPending ? null : polarisEvents,
+    chain,
+    chainSettled,
+    stable,
+    open: view?.status === "open",
+  });
+  const flowFocus = flows.read !== "failed" ? flows.focus : null;
+
   // ── The card's risk footer strip ────────────────────────────────────────
   // ONE strip, whose items are, in reading order: what a year of interest
   // costs, then the CDP's live warning — below the minimum ratio if it is, the
@@ -480,117 +495,126 @@ export default function PolarisPositionView({
     ) : undefined;
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="polaris"
-        wallet={view?.owner ?? null}
-        assets={stripAssets}
-        closed={view != null && view.status !== "open"}
-        closing={closing}
-      >
-        {view && (
-          <PolarisExportMenu
-            view={view}
-            chain={chain}
-            events={polarisEvents}
-            notes={notes}
-            liveNotes={liveNotes}
-            csvFilename={`polaris-${market}-${cdpId}-activity.csv`}
-          />
-        )}
-      </DetailTopRow>
-
-      <p className="text-xs text-rb-500">
-        Sepolia testnet · {stable} market · CDP #{cdpId} — every figure on this page is a test figure.
-      </p>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : view == null ? (
-        <div className="text-sm text-rb-500">
-          Nothing readable for this CDP — the market has no CDP with this number, or the chain read is unavailable.
-        </div>
-      ) : (
-        <>
-          <PolarisPositionCard
-            v={view}
-            receipts
-            viewHref={tl.viewHref}
-            rowExtra={riskStrip}
-            explanationDefaultOpen={explanationOpen}
-            onExplanationToggle={setExplanationOpen}
-            explanation={
-              chain ? (
-                <PolarisPositionExplanation
-                  chain={chain}
-                  stableSymbol={stable}
-                  terminal={summary && summary.status !== "open" ? summary.status : null}
-                  lifetime={lifetime}
-                  eventCount={summary?.eventCount}
-                  transferCount={summary?.transferCount}
-                />
-              ) : undefined
-            }
-          />
-
-          {(() => {
-            const towerData = computePolarisEconomics(view, polarisEvents.length > 0 ? polarisEvents : undefined);
-            const pethInDebt = chain?.price?.pethInDebt;
-            return (
-              <ChainTruthTower
-                data={towerData}
-                explanation={polarisEconomicsExplanation(towerData, lifetime, pethInDebt)}
-                learnMore={polarisEconomicsContent()}
-                rowExtra={lifetime ? polarisPsmOutcome(lifetime, stable, pethInDebt) : undefined}
-              />
-            );
-          })()}
-
-          {indexPending && polarisEvents.length === 0 ? (
-            <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-              Event history pending — the indexed backend for this explorer has not answered for this CDP. Everything
-              above is read from the market&rsquo;s contracts at the latest Sepolia block.
-            </div>
-          ) : (
-            // No `runs`: measured 2026-09-10, no CDP on the index holds a run of
-            // no-change touches (rails-ops TO-DO-polaris-v2-parity §1.4), so
-            // the menu offers no collapse.
-            <ChainTruthTimeline
-              persistKeyPrefix="polaris"
-              closed={view.status !== "open"}
-              tl={tl}
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="polaris"
+          wallet={view?.owner ?? null}
+          assets={stripAssets}
+          closed={view != null && view.status !== "open"}
+          closing={closing}
+        >
+          {view && (
+            <PolarisExportMenu
+              view={view}
+              chain={chain}
+              events={polarisEvents}
               notes={notes}
               liveNotes={liveNotes}
-              liveNotesPending={positionOpen && !chainSettled}
-              // The window between this CDP's last touch and now, as the
-              // timeline's head row — where every other window between two
-              // touches is already told. Undefined wherever the split is not
-              // a fact (a closed CDP, an overlay that has not answered), and
-              // the slot draws nothing.
-              liveWindow={
-                sinceTouch
-                  ? ({ isFirst }) => (
-                      <PolarisSinceLastTouchRow window={sinceTouch} market={market} stable={stable} isFirst={isFirst} />
-                    )
-                  : undefined
-              }
-              displayItems={POLARIS_DISPLAY_ITEMS}
-              toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
-              renderCard={(event, meta) =>
-                isPolarisEvent(event) ? (
-                  <PolarisEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
-                ) : null
-              }
+              csvFilename={`polaris-${market}-${cdpId}-activity.csv`}
             />
           )}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+        </DetailTopRow>
+
+        <p className="text-xs text-rb-500">
+          Sepolia testnet · {stable} market · CDP #{cdpId} — every figure on this page is a test figure.
+        </p>
+
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : view == null ? (
+          <div className="text-sm text-rb-500">
+            Nothing readable for this CDP — the market has no CDP with this number, or the chain read is unavailable.
+          </div>
+        ) : (
+          <>
+            <PolarisPositionCard
+              v={view}
+              receipts
+              viewHref={tl.viewHref}
+              rowExtra={riskStrip}
+              explanationDefaultOpen={explanationOpen}
+              onExplanationToggle={setExplanationOpen}
+              explanation={
+                chain ? (
+                  <PolarisPositionExplanation
+                    chain={chain}
+                    stableSymbol={stable}
+                    terminal={summary && summary.status !== "open" ? summary.status : null}
+                    lifetime={lifetime}
+                    eventCount={summary?.eventCount}
+                    transferCount={summary?.transferCount}
+                  />
+                ) : undefined
+              }
+            />
+
+            {/* Lifetime flows: the bars and the line over the CDP's replay
+              (lib/polaris/flows.ts), in the market's stablecoin, in place of
+              the tower (TO-DO-ui-jobs 206). */}
+            <LifetimeFlowsPanel
+              scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+              read={flows.read}
+              explanation={
+                <div className="space-y-2 text-sm text-rb-500">
+                  <PolarisFlowsNote facts={flows.facts} stable={stable} />
+                </div>
+              }
+              learnMore={polarisFlowsContent(stable)}
+              rowExtra={lifetime ? polarisPsmOutcome(lifetime, stable, chain?.price?.pethInDebt) : undefined}
+            />
+
+            {indexPending && polarisEvents.length === 0 ? (
+              <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
+                Event history pending — the indexed backend for this explorer has not answered for this CDP. Everything
+                above is read from the market&rsquo;s contracts at the latest Sepolia block.
+              </div>
+            ) : (
+              // No `runs`: measured 2026-09-10, no CDP on the index holds a run of
+              // no-change touches (rails-ops TO-DO-polaris-v2-parity §1.4), so
+              // the menu offers no collapse.
+              <ChainTruthTimeline
+                persistKeyPrefix="polaris"
+                closed={view.status !== "open"}
+                tl={tl}
+                notes={notes}
+                liveNotes={liveNotes}
+                liveNotesPending={positionOpen && !chainSettled}
+                // The window between this CDP's last touch and now, as the
+                // timeline's head row — where every other window between two
+                // touches is already told. Undefined wherever the split is not
+                // a fact (a closed CDP, an overlay that has not answered), and
+                // the slot draws nothing.
+                liveWindow={
+                  sinceTouch
+                    ? ({ isFirst }) => (
+                        <PolarisSinceLastTouchRow
+                          window={sinceTouch}
+                          market={market}
+                          stable={stable}
+                          isFirst={isFirst}
+                        />
+                      )
+                    : undefined
+                }
+                displayItems={POLARIS_DISPLAY_ITEMS}
+                toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
+                renderCard={(event, meta) =>
+                  isPolarisEvent(event) ? (
+                    <PolarisEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                    />
+                  ) : null
+                }
+              />
+            )}
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
