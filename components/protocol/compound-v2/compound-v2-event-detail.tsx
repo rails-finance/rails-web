@@ -49,6 +49,7 @@ import {
 } from "@/lib/compound-v2/event-provenance";
 import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
+import { CTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
@@ -58,6 +59,9 @@ export interface CompoundV2EventDetailProps {
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
+  /** The timeline event, for the account cells' ledgers. */
+  eventId?: string;
+  eventTs?: number;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -177,7 +181,14 @@ function supplyStat(ctx: CompoundV2Context, cSym: string, coords: CompoundV2Coor
   };
 }
 
-export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: CompoundV2EventDetailProps) {
+export function CompoundV2EventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  eventId,
+  eventTs,
+}: CompoundV2EventDetailProps) {
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const cSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
   const coords: CompoundV2Coords = {
@@ -188,8 +199,14 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
     account: wallet,
   };
   const stats: ChainTruthStat[] = [];
+  // Where the page ties its timeline to the Lifetime flows panel, the card
+  // opens with the account's Collateral and Debt cells; a market's own
+  // balance cell goes where its side holds that market alone, since the
+  // account cell states the same tokens.
+  const soleSupply = useCTokenSoleAsset(eventId ?? "", "collateral");
+  const soleDebt = useCTokenSoleAsset(eventId ?? "", "debt");
 
-  const supply = ctx.side === "supply" ? supplyStat(ctx, cSym, coords) : undefined;
+  const supply = ctx.side === "supply" && soleSupply !== ctx.marketSymbol ? supplyStat(ctx, cSym, coords) : undefined;
   if (supply) stats.push(supply);
 
   if (ctx.eventType === "mint" || ctx.eventType === "redeem") {
@@ -205,7 +222,7 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
         beforeProv: cTokensBeforeProv(cSym, coords),
       }),
     });
-  } else if (ctx.eventType === "borrow" || ctx.eventType === "repay") {
+  } else if ((ctx.eventType === "borrow" || ctx.eventType === "repay") && soleDebt !== ctx.marketSymbol) {
     stats.push({
       label: "Borrowed",
       value: fmt(ctx.debtAfter),
@@ -252,18 +269,19 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
     // emitted accountBorrows (from the liquidation's own repay leg) reads
     // before→after like a repay. The collateral movement lands on the sibling
     // seize_* rows.
-    stats.push({
-      label: "Borrowed",
-      value: fmt(ctx.debtAfter),
-      symbol: ctx.marketSymbol,
-      prov: accountBorrowsProv(ctx.marketSymbol, coords, ctx.raw?.accountBorrows, true),
-      transition: reconstructTransition({
-        after: ctx.debtAfter,
-        change: ctx.assetsDelta,
-        changeProv: liqDebtRepaidProv(ctx.marketSymbol, coords, ctx.raw?.amount),
-        beforeProv: debtBeforeProv(ctx.marketSymbol, "liquidation", coords),
-      }),
-    });
+    if (soleDebt !== ctx.marketSymbol)
+      stats.push({
+        label: "Borrowed",
+        value: fmt(ctx.debtAfter),
+        symbol: ctx.marketSymbol,
+        prov: accountBorrowsProv(ctx.marketSymbol, coords, ctx.raw?.accountBorrows, true),
+        transition: reconstructTransition({
+          after: ctx.debtAfter,
+          change: ctx.assetsDelta,
+          changeProv: liqDebtRepaidProv(ctx.marketSymbol, coords, ctx.raw?.amount),
+          beforeProv: debtBeforeProv(ctx.marketSymbol, "liquidation", coords),
+        }),
+      });
     if (ctx.seizeTokens != null) {
       stats.push({
         label: "Collateral seized",
@@ -282,7 +300,10 @@ export function CompoundV2EventDetail({ ctx, txHash, blockNumber, wallet }: Comp
 
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail
+        stats={stats}
+        lead={eventId != null && eventTs != null ? <CTokenLedgerCells eventId={eventId} eventTs={eventTs} /> : null}
+      />
       {forensics && <LiquidationForensics {...forensics} />}
       {ctx.eventType === "mint" && wallet && blockNumber != null && (
         <CTokenMembershipLine

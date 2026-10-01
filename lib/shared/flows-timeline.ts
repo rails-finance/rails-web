@@ -148,9 +148,10 @@ export interface FlowGrowth {
  *  family's from its ReserveDataUpdated logs (liquidityIndex,
  *  variableBorrowIndex); Aave V4's from the hub (share price, drawn index);
  *  a Comet's base supply and borrow index as the account's rows imply them
- *  (lib/compound/flows.ts). */
+ *  (lib/compound/flows.ts); a Compound V2-family account's from its rows (the
+ *  exchange rate, and the debt's growth between rows: lib/shared/ctoken-flows.ts). */
 export interface FlowIndexes {
-  basis: "reserve-data" | "hub-state" | "comet";
+  basis: "reserve-data" | "hub-state" | "comet" | "ctoken-rows";
   assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
 }
 

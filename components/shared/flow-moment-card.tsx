@@ -43,12 +43,29 @@ const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "reserve-data": { collateral: "liquidity index", debt: "variable borrow index" },
   "hub-state": { collateral: "supply share price", debt: "drawn index" },
   comet: { collateral: "base supply index", debt: "base borrow index" },
+  "ctoken-rows": { collateral: "exchange rate", debt: "debt growth" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
   "hub-state": "the hub's state at its last event block (the drawn index grown at its logged rate to the moment)",
   comet:
     "the account's rows (each row's balance over the last at an unchanged principal), grown at the rate between them to the moment, and after the last row at the market's rate now",
+  "ctoken-rows":
+    "the account's rows (the market's exchange rate, and the debt before each row over the debt after the one before), in a straight line between two rows and to today's live read after the last",
+};
+/** Whose index it is, and what the grown balance is to the chain's. */
+const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
+  "reserve-data": "the reserve's",
+  "hub-state": "the reserve's",
+  comet: "the reserve's",
+  "ctoken-rows": "the market's",
+};
+const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
+  "reserve-data": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
+  "hub-state": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
+  comet: "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
+  "ctoken-rows":
+    "The index runs in a straight line between the two rows around the day, so this is the chain's balance to within how the market's rate moved between them.",
 };
 const fmtIndex = (v: number) =>
   v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
@@ -130,7 +147,7 @@ export function FlowMomentCard({
     a.grown
       ? {
           kind: "chain-derived",
-          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by the interest since: the reserve's ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. The chain's balance is the scaled balance × the index, so this is what the chain held that day.`,
+          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by the interest since: ${INDEX_OWNER[a.grown.basis]} ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. ${INDEX_CLAIM[a.grown.basis]}`,
           formula: "recorded balance × index at the close ÷ index at the event",
           inputs: indexInputs(side, a, a.grown),
         }
@@ -166,7 +183,7 @@ export function FlowMomentCard({
     const g = a.grown as FlowGrowth;
     return {
       kind: "chain-derived",
-      summary: `${a.symbol} interest ${side === "collateral" ? "earned" : "owed"} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by the reserve's ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
+      summary: `${a.symbol} interest ${side === "collateral" ? "earned" : "owed"} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
       formula:
         a.interestUsd != null
           ? "recorded × (index at the close ÷ index at the event − 1) × price"
@@ -390,8 +407,13 @@ export function FlowMomentCard({
     <p className="text-sm leading-relaxed text-rb-500">
       The position at the close of {date}, where the timeline is cut. No event happened that day, so this card is not an
       event: it has no number, the filters and the count leave it out, and it goes when the cut is cleared.
-      {sides.some((s) => moment.sides[s].assets.some((a) => a.grown)) &&
-        " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held."}{" "}
+      {(() => {
+        const g = sides.flatMap((s) => moment.sides[s].assets).find((a) => a.grown)?.grown;
+        if (!g) return null;
+        return g.basis === "ctoken-rows"
+          ? " Each balance is grown by the interest since its last event: the balance that event recorded × the market's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the chain's balance to within how the rate moved between them."
+          : " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held.";
+      })()}{" "}
       Each side&rsquo;s toggle opens its ledger: its flows up to that day, where every figure on it has a price for the
       day.
     </p>

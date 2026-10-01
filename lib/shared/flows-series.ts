@@ -202,7 +202,7 @@ export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
     symbols,
     today: t.today,
     ...(t.seriesCarry ? { carry: true } : {}),
-    // A family that grows its balances by an index on the page (Compound V3).
+    // A family that grows its balances by an index on the page (Compound V3, the Compound V2 family).
     ...(t.indexes ? { indexes: t.indexes } : {}),
   };
 }

@@ -158,7 +158,14 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
         />
       }
       detail={
-        <MoonwellEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
+        <MoonwellEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          eventId={event.id}
+          eventTs={event.timestamp}
+        />
       }
       detailLabel="Position state"
       explainer={
