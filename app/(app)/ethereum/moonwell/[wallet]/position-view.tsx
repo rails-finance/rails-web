@@ -12,7 +12,7 @@
 //
 // Moonwell cross-collateralises its four markets through one Comptroller, so
 // ONE chain fetch covers the whole account. It rides its own effect + state so
-// the first paint (card + tower + timeline from the index) never waits on RPC
+// the first paint (card + timeline from the index) never waits on RPC
 // round-trips; the risk surfaces stream in when the read lands, a chainStale
 // response simply leaves them unrendered, and the debt rows upgrade from the
 // last event's emitted accountBorrows to the live borrowBalanceStored (each
@@ -53,14 +53,13 @@ import {
   MoonwellClosedPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
 import { MoonwellRiskSlot } from "@/components/protocol/moonwell/moonwell-risk-slot";
-import { moonwellLedger } from "@/lib/moonwell/ledger";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import {
-  computeMoonwellEconomics,
-  computeMoonwellCardCaptions,
-  moonwellLifetimeWithOpening,
-} from "@/lib/moonwell/economics";
-import { moonwellEconomicsExplanation, moonwellEconomicsContent } from "@/lib/moonwell/economics-explanation";
+import { computeMoonwellCardCaptions, moonwellLifetimeWithOpening } from "@/lib/moonwell/economics";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CTokenLedgerContext } from "@/components/shared/ctoken-event-ledger";
+import { MoonwellFlowsNote, moonwellFlowsContent } from "@/components/protocol/moonwell/moonwell-flows-note";
+import { useMoonwellFlows } from "@/hooks/useMoonwellFlows";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -108,6 +107,9 @@ function suppliedMarkets(events: readonly BaseActivityEvent[]): ShareRateMarket[
 /** The share-rate route's `market` field IS the catalog key on this
  *  deployment (unlike Base, which returns the mToken address) — matched by
  *  key, never by address. */
+/** An Ethereum market key's mToken address. */
+const mtokenOf = (market: string) => MOONWELL_MARKET_BY_KEY[market]?.mtoken ?? market;
+
 function marketByKey(key: string): ShareRateMarket | undefined {
   const meta = MOONWELL_MARKET_BY_KEY[key];
   return meta ? { address: meta.mtoken, key, symbol: meta.symbol } : undefined;
@@ -351,6 +353,8 @@ export default function MoonwellPositionView({
     storageKey: `moonwell-${wallet}`,
     protocolKey: "moonwell",
     window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // Who executed this account's events — the SAME externalActor() verdict each
@@ -393,18 +397,18 @@ export default function MoonwellPositionView({
     [moonwellEvents, opening],
   );
 
-  // Each flow at its own block's price, the transfers, seizures and interest
-  // on both sides — only when the page holds every row.
-  const ledger = useMemo(
-    () =>
-      historyWindow.state === "whole" && moonwellEvents.length > 0
-        ? moonwellLedger(moonwellEvents, {
-            mtokenOf: (m) => MOONWELL_MARKET_BY_KEY[m]?.mtoken,
-            addressOf: (m) => MOONWELL_MARKET_BY_KEY[m]?.underlying,
-          })
-        : null,
-    [historyWindow.state, moonwellEvents],
-  );
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/shared/ctoken-flows.ts through lib/moonwell/flows.ts): the page's
+  // rows where they are all of it, else the flat history read once (the
+  // CSV's read); a read the row ceiling cut short is a failed read.
+  const flows = useMoonwellFlows({
+    chainId: 1,
+    wholeEvents: historyWindow.state === "whole" ? moonwellEvents : null,
+    fetchAll: fetchAllHistory,
+    chain,
+    mtokenOf,
+  });
+  const ledgerData = useMemo(() => ({ states: flows.states, brand: "Moonwell", receipt: "mToken" }), [flows.states]);
 
   // What each liquidation did, and a closed card's peaks as each row's balance
   // before and after it (interest included), where the page holds every row.
@@ -476,141 +480,143 @@ export default function MoonwellPositionView({
   }, [view]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="moonwell"
-        wallet={wallet}
-        assets={stripAssets}
-        closed={liveView != null && liveView.status !== "open"}
-      >
-        {liveView && (
-          <MoonwellExportMenu
+    <FlowFocusContext.Provider value={flows.focus}>
+      <CTokenLedgerContext.Provider value={ledgerData}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="moonwell"
             wallet={wallet}
-            view={liveView}
-            chain={chain}
-            events={moonwellEvents}
-            notes={notes}
-            liveNotes={liveNotes}
-            csvFilename={`moonwell-${wallet.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, moonwellEvents)}
-            scopeNote={exportScopeNote(historyWindow, moonwellEvents, "this wallet's whole history")}
-          />
-        )}
-      </DetailTopRow>
+            assets={stripAssets}
+            closed={liveView != null && liveView.status !== "open"}
+          >
+            {liveView && (
+              <MoonwellExportMenu
+                wallet={wallet}
+                view={liveView}
+                chain={chain}
+                events={moonwellEvents}
+                notes={notes}
+                liveNotes={liveNotes}
+                csvFilename={`moonwell-${wallet.slice(0, 10)}-activity.csv`}
+                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+                history={markdownHistoryScope(historyWindow, moonwellEvents)}
+                scopeNote={exportScopeNote(historyWindow, moonwellEvents, "this wallet's whole history")}
+              />
+            )}
+          </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {liveView && cardView && (
-            <MoonwellPositionCard
-              v={cardView}
-              receipts
-              viewHref={tl.viewHref}
-              captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the Aave V3
-              // treatment): the Display menu plus the chosen risk picture — HF
-              // runway (1.0 exactly the Comptroller's shortfall line) or the
-              // borrow-capacity bar. Whatever it draws is on the card face and
-              // in the card's receipts scope, so the Provenance list stays 1:1
-              // with the face figures.
-              rowExtra={
-                chain && liveView.status === "open" && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                  <MoonwellRiskSlot chain={chain} />
-                ) : undefined
-              }
-              // The Explanation is now pure layman prose about those same face
-              // figures — no secondary figure-strips. The borrow-capacity strip
-              // is absorbed into the risk slot above; the market rates live on
-              // the market view (where pool-wide rate context belongs). A
-              // terminal account narrates from the index alone (peaks, closure)
-              // — it has no live state to read, so the closed mood never waits
-              // on the chain lane.
-              explanation={
-                liveView.status !== "open" ? (
-                  <MoonwellClosedPositionExplanation v={cardView} />
-                ) : (
-                  // Passed before the chain read lands (the Fluid treatment):
-                  // the pane, and the copy-view link at its foot, mount with
-                  // the card rather than with the read.
-                  <MoonwellPositionExplanation
-                    chain={chain}
-                    captions={captions}
-                    txCount={liveView.txCount}
-                    liquidationCount={liveView.liquidationCount}
-                    externalActivity={externalActivity}
-                  />
-                )
-              }
-            />
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : (
+            <>
+              {liveView && cardView && (
+                <MoonwellPositionCard
+                  v={cardView}
+                  receipts
+                  viewHref={tl.viewHref}
+                  captions={captions ?? undefined}
+                  // The risk slot rides the card's heading-button row (the Aave V3
+                  // treatment): the Display menu plus the chosen risk picture — HF
+                  // runway (1.0 exactly the Comptroller's shortfall line) or the
+                  // borrow-capacity bar. Whatever it draws is on the card face and
+                  // in the card's receipts scope, so the Provenance list stays 1:1
+                  // with the face figures.
+                  rowExtra={
+                    chain && liveView.status === "open" && chain.healthFactor != null && chain.healthFactor > 0 ? (
+                      <MoonwellRiskSlot chain={chain} />
+                    ) : undefined
+                  }
+                  // The Explanation is now pure layman prose about those same face
+                  // figures — no secondary figure-strips. The borrow-capacity strip
+                  // is absorbed into the risk slot above; the market rates live on
+                  // the market view (where pool-wide rate context belongs). A
+                  // terminal account narrates from the index alone (peaks, closure)
+                  // — it has no live state to read, so the closed mood never waits
+                  // on the chain lane.
+                  explanation={
+                    liveView.status !== "open" ? (
+                      <MoonwellClosedPositionExplanation v={cardView} />
+                    ) : (
+                      // Passed before the chain read lands (the Fluid treatment):
+                      // the pane, and the copy-view link at its foot, mount with
+                      // the card rather than with the read.
+                      <MoonwellPositionExplanation
+                        chain={chain}
+                        captions={captions}
+                        txCount={liveView.txCount}
+                        liquidationCount={liveView.liquidationCount}
+                        externalActivity={externalActivity}
+                      />
+                    )
+                  }
+                />
+              )}
+              {/* Lifetime flows: the bars and the line over the account's replay
+              (lib/shared/ctoken-flows.ts), in place of the tower
+              (TO-DO-ui-jobs 206). */}
+              {liveView && (
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <MoonwellFlowsNote facts={flows.facts} />
+                    </div>
+                  }
+                  learnMore={moonwellFlowsContent()}
+                />
+              )}
+              <ChainTruthTimeline
+                csvExportCeiling={INDEX_ROW_CEILING}
+                // Matches `MoonwellEventCard`'s own `persistKey={`moonwell:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="moonwell"
+                closed={liveView ? liveView.status !== "open" : undefined}
+                tl={tl}
+                runs={MOONWELL_ACTIVITY_RUNS}
+                // Receipted facts about the MARKETS this account supplied into
+                // (historical steps — measured empty for all four markets as of
+                // 2026-09-06) and this account's own live share-rate note per
+                // entered market it still holds. `liveNotesPending` reserves the
+                // head slot while the chain overlay is still in flight on an
+                // open position, so it never appears after hydration with no
+                // reservation (the Polaris view's rule).
+                notes={notes}
+                liveNotes={liveNotes}
+                liveNotesPending={liveNotesPending}
+                // Tenure-first header: when the account started, how long it has
+                // run, how fresh the latest activity is.
+                toolbarLeading={
+                  liveView ? (
+                    <TimelineActivityHeader
+                      events={moonwellEvents}
+                      closed={liveView.status !== "open"}
+                      // When the position actually opened, not when the window
+                      // does — otherwise a deep wallet reads as days old because
+                      // its oldest loaded card is.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isMoonwellEvent(event) ? (
+                    <MoonwellEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                    />
+                  ) : null
+                }
+              />
+              {/* Ambient oracle-price pill, fixed bottom-right. */}
+              <ProvInspectorLayer />
+            </>
           )}
-          {liveView &&
-            (() => {
-              const towerData = computeMoonwellEconomics(
-                liveView,
-                lifetimeEvents,
-                undefined,
-                precomputedLifetime,
-                ledger,
-              );
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={moonwellEconomicsExplanation(towerData)}
-                  learnMore={moonwellEconomicsContent()}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={INDEX_ROW_CEILING}
-            // Matches `MoonwellEventCard`'s own `persistKey={`moonwell:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="moonwell"
-            closed={liveView ? liveView.status !== "open" : undefined}
-            tl={tl}
-            runs={MOONWELL_ACTIVITY_RUNS}
-            // Receipted facts about the MARKETS this account supplied into
-            // (historical steps — measured empty for all four markets as of
-            // 2026-09-06) and this account's own live share-rate note per
-            // entered market it still holds. `liveNotesPending` reserves the
-            // head slot while the chain overlay is still in flight on an
-            // open position, so it never appears after hydration with no
-            // reservation (the Polaris view's rule).
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={liveNotesPending}
-            // Tenure-first header: when the account started, how long it has
-            // run, how fresh the latest activity is.
-            toolbarLeading={
-              liveView ? (
-                <TimelineActivityHeader
-                  events={moonwellEvents}
-                  closed={liveView.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does — otherwise a deep wallet reads as days old because
-                  // its oldest loaded card is.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isMoonwellEvent(event) ? (
-                <MoonwellEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+        </div>
+      </CTokenLedgerContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }
