@@ -90,6 +90,24 @@ const gridFigure = (raw: string): string => {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 };
 
+/** Before and after in the grid's format, widened where the two would round
+ *  alike although they differ (a 0.2-share repay fee on 55,258 shares): both
+ *  take the fewest fixed decimals, two at least, that tell them apart. A pair
+ *  that still matches at ten keeps the grid's figures. Alchemix-local; the
+ *  shared grid formats each figure alone. */
+function gridPair(beforeRaw: string, raw: string): { before: string; after: string } {
+  const before = gridFigure(beforeRaw);
+  const after = gridFigure(raw);
+  if (before !== after || beforeRaw === raw) return { before, after };
+  const b = Number(beforeRaw) / 10 ** DECIMALS;
+  const a = Number(raw) / 10 ** DECIMALS;
+  for (let d = 2; d <= 10; d++) {
+    const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+    if (fmt(b) !== fmt(a)) return { before: fmt(b), after: fmt(a) };
+  }
+  return { before, after };
+}
+
 export interface AlchemixStateAtBlockProps {
   state: AlchemixStateAtBlockFromReading | undefined;
   /** The synthetic's ticker — debt and earmarked are denominated in it. */
@@ -206,7 +224,7 @@ export function AlchemixStateAtBlock({
     const sign = delta > BigInt(0) ? "+" : "−";
     const abs = (delta < BigInt(0) ? -delta : delta).toString();
     const t: ChainTruthTransition = {
-      before: gridFigure(beforeRaw),
+      before: gridPair(beforeRaw, raw).before,
       beforeExact: formatUnitsExact(beforeRaw, DECIMALS),
       beforeProv: stateAtBlockFromReadingProv(label, symbol, beforeRaw, before.blockNumber, 0, coords, DECIMALS),
       change: `${sign}${gridFigure(abs)}`,
@@ -228,7 +246,7 @@ export function AlchemixStateAtBlock({
       label,
       value: formatUnitsExact(raw, DECIMALS),
       symbol,
-      display: gridFigure(raw),
+      display: t && beforeRaw != null ? gridPair(beforeRaw, raw).after : gridFigure(raw),
       prov: stateAtBlockFromReadingProv(label, symbol, raw, atBlock, state.positionEventsInBlock, coords, DECIMALS),
       transition: t,
       // Colour shows change: an axis this block left where the reading before

@@ -20,6 +20,7 @@ import {
 } from "@/lib/alchemix/list-filter-dimensions";
 import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { AlchemixPositionSummary } from "@/types/api/alchemix";
+import { searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export interface AlchemixListingPageData {
   initialItems?: AlchemixPositionSummary[];
@@ -43,12 +44,18 @@ export async function alchemixListingPageData(
     page,
     label: `Alchemix (chain ${deployment.chainId})`,
     fetchPage: (baseUrl, signal, headers) =>
-      fetchAlchemixPositions({
-        ...alchemixFiltersToFetchParams(deployment, filters, page),
+      searchedAlchemixPage(
+        filters.q,
+        true,
+        alchemixFiltersToFetchParams(deployment, filters, page),
+        (p) =>
+          fetchAlchemixPositions({ ...p, baseUrl, signal, headers }).then((r) => ({
+            data: r.data,
+            total: r.pagination.total,
+          })),
         baseUrl,
         signal,
-        headers,
-      }).then((r) => ({ data: r.data, total: r.pagination.total })),
+      ),
   });
 
   return { ...initial, initialSearch: sp.toString() };

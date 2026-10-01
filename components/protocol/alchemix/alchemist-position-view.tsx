@@ -85,11 +85,13 @@ import { alchemixFlowsExplanation } from "@/lib/alchemix/economics-explanation";
 import { splitRidingTransfers, withRiders } from "@/lib/alchemix/riding-transfers";
 import { isZeroEffectRedemption, useAlchemixTimelineRuns } from "@/lib/alchemix/timeline-runs";
 import {
+  AlchemixLineEventBlocksContext,
   AlchemixLineRatiosContext,
   AlchemixReadingsBeforeContext,
   AlchemixReadingsInOrderContext,
   AlchemixUnderlyingContext,
   collateralTakenRaw,
+  lineEventBlocks,
   readingsBefore,
   readingsInOrder,
   type AlchemixLineRatios,
@@ -142,8 +144,15 @@ const block = (n: number) => n.toLocaleString("en-US");
 
 /** The health column: collateralisation at the reading's block, with the
  *  line's two ratios under it. Liquity V2's ratio column is the model: the
- *  figure, and under it the line it is measured against. */
-function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: AlchemixCoords): OpenPositionStatsColumn {
+ *  figure, and under it the line it is measured against. A closed position has
+ *  no band to sit in, so it keeps "No debt" and drops the footnote; an open one
+ *  with no debt keeps the minimum, which bounds what it can mint. */
+function healthColumn(
+  health: AlchemixHealth,
+  debtRaw: string | null,
+  coords: AlchemixCoords,
+  closed = false,
+): OpenPositionStatsColumn {
   const b = health.asOfBlock;
   const fall = shareFallToLiquidation(health.collateralizationRaw, health.collateralizationLowerBoundRaw);
   const ratio =
@@ -159,6 +168,7 @@ function healthColumn(health: AlchemixHealth, debtRaw: string | null, coords: Al
     ) : (
       <StatValue color="text-rb-500">No debt</StatValue>
     );
+  if (closed) return { label: "Collateralisation", value: ratio };
   return {
     label: "Collateralisation",
     value: ratio,
@@ -328,6 +338,8 @@ export function AlchemistPositionView({
   const beforeByBlock = useMemo(() => readingsBefore(alchemistEvents), [alchemistEvents]);
   // Every reading in block order, for a custody card's figures in force.
   const readingList = useMemo(() => readingsInOrder(alchemistEvents), [alchemistEvents]);
+  // The blocks holding a line-scope row, where set-aside's move is not one card's.
+  const lineBlocks = useMemo(() => lineEventBlocks(alchemistEvents), [alchemistEvents]);
   // A transfer sharing its transaction with another leg is drawn inside that
   // card, so the timeline counts the card and not the transfer.
   const { drawn: drawnEvents, ridersByTx } = useMemo(
@@ -856,7 +868,9 @@ export function AlchemistPositionView({
                         hideBlock: true,
                       },
                     ),
-                    live.health ? healthColumn(live.health, live.debt?.raw ?? null, coords) : null,
+                    live.health
+                      ? healthColumn(live.health, live.debt?.raw ?? null, coords, position.status === "closed")
+                      : null,
                   ]
                 : []
             }
@@ -900,84 +914,86 @@ export function AlchemistPositionView({
         {/* ── The timeline ───────────────────────────────────────────────── */}
         <AlchemixReadingsBeforeContext.Provider value={beforeByBlock}>
           <AlchemixReadingsInOrderContext.Provider value={readingList}>
-            <AlchemixLineRatiosContext.Provider value={lineRatios}>
-              <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
-                <ChainTruthTimeline
-                  persistKeyPrefix="alchemix-v3"
-                  closed={position.status === "closed"}
-                  tl={tl}
-                  runs={timelineRuns}
-                  boundary={boundary}
-                  notes={marketNotes}
-                  liveNotes={liveMarketNotes}
-                  liveNotesPending={livePending}
-                  displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-                  emptyLabel="No events recorded for this position"
-                  toolbarLeading={
-                    <TimelineActivityHeader
-                      events={drawnEvents}
-                      closed={position.status === "closed"}
-                      tenurePending={olderCount > 0}
-                    />
-                  }
-                  // The count is this position's own logs plus every line
-                  // redemption's: a transaction that moved more than one thing
-                  // (an opening, a deposit with a mint, a close) is two logs
-                  // or more but one card, so the line names the transactions
-                  // too ("21 events in 11 transactions").
-                  countTooltip="Counts logs: a transaction that moved more than one thing (an opening, a deposit with a mint, a close) is one card holding each of its logs."
-                  countDetail={countDetail}
-                  notice={
-                    (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
-                      <div className="space-y-1">
-                        {lineScopedNote && redemptionRowDrawn ? (
-                          // The route's own sentence about line rows, rendered as given.
-                          <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
-                        ) : null}
-                        {/* Why a closed position's timeline stops carrying the line's
+            <AlchemixLineEventBlocksContext.Provider value={lineBlocks}>
+              <AlchemixLineRatiosContext.Provider value={lineRatios}>
+                <AlchemixUnderlyingContext.Provider value={underlyingUnit}>
+                  <ChainTruthTimeline
+                    persistKeyPrefix="alchemix-v3"
+                    closed={position.status === "closed"}
+                    tl={tl}
+                    runs={timelineRuns}
+                    boundary={boundary}
+                    notes={marketNotes}
+                    liveNotes={liveMarketNotes}
+                    liveNotesPending={livePending}
+                    displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
+                    emptyLabel="No events recorded for this position"
+                    toolbarLeading={
+                      <TimelineActivityHeader
+                        events={drawnEvents}
+                        closed={position.status === "closed"}
+                        tenurePending={olderCount > 0}
+                      />
+                    }
+                    // The count is this position's own logs plus every line
+                    // redemption's: a transaction that moved more than one thing
+                    // (an opening, a deposit with a mint, a close) is two logs
+                    // or more but one card, so the line names the transactions
+                    // too ("21 events in 11 transactions").
+                    countTooltip="Counts logs: a transaction that moved more than one thing (an opening, a deposit with a mint, a close) is one card holding each of its logs."
+                    countDetail={countDetail}
+                    notice={
+                      (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
+                        <div className="space-y-1">
+                          {lineScopedNote && redemptionRowDrawn ? (
+                            // The route's own sentence about line rows, rendered as given.
+                            <p className="px-1 text-[11px] leading-relaxed text-rb-500">{lineScopedNote}</p>
+                          ) : null}
+                          {/* Why a closed position's timeline stops carrying the line's
                     events while the line goes on having them. Open positions
                     get nothing: their window ends at the frontier, so the
                     sentence would restate the timeline. */}
-                        {endedWindow ? (
-                          <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                            This position closed
-                            {endedWindow.endedAt != null ? (
-                              <> on {formatDate(endedWindow.endedAt)}</>
-                            ) : null} (block {block(endedWindow.endedAtBlock)}). Nothing on the line can change it after
-                            that, so the timeline ends there.
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : undefined
-                  }
-                  renderCard={(event, meta) => {
-                    if (isAlchemixV2Event(event)) {
+                          {endedWindow ? (
+                            <p className="px-1 text-[11px] leading-relaxed text-rb-500">
+                              This position closed
+                              {endedWindow.endedAt != null ? (
+                                <> on {formatDate(endedWindow.endedAt)}</>
+                              ) : null} (block {block(endedWindow.endedAtBlock)}). Nothing on the line can change it
+                              after that, so the timeline ends there.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : undefined
+                    }
+                    renderCard={(event, meta) => {
+                      if (isAlchemixV2Event(event)) {
+                        return (
+                          <AlchemixV2EventCard
+                            event={event as AlchemixV2Event}
+                            showVersion
+                            isFirst={meta.isFirst}
+                            isLast={meta.isLast}
+                            eventNumber={meta.eventNumber}
+                          />
+                        );
+                      }
+                      if (!isAlchemistEvent(event)) return null;
                       return (
-                        <AlchemixV2EventCard
-                          event={event as AlchemixV2Event}
-                          showVersion
+                        <AlchemixEventCard
+                          legs={withRiders([event], ridersByTx)}
+                          mytSymbol={mytSymbol}
+                          underlyingDecimals={underlyingDecimals}
+                          siblings={siblingsByTx.get(event.txHash) ?? [event]}
                           isFirst={meta.isFirst}
                           isLast={meta.isLast}
                           eventNumber={meta.eventNumber}
                         />
                       );
-                    }
-                    if (!isAlchemistEvent(event)) return null;
-                    return (
-                      <AlchemixEventCard
-                        legs={withRiders([event], ridersByTx)}
-                        mytSymbol={mytSymbol}
-                        underlyingDecimals={underlyingDecimals}
-                        siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                        isFirst={meta.isFirst}
-                        isLast={meta.isLast}
-                        eventNumber={meta.eventNumber}
-                      />
-                    );
-                  }}
-                />
-              </AlchemixUnderlyingContext.Provider>
-            </AlchemixLineRatiosContext.Provider>
+                    }}
+                  />
+                </AlchemixUnderlyingContext.Provider>
+              </AlchemixLineRatiosContext.Provider>
+            </AlchemixLineEventBlocksContext.Provider>
           </AlchemixReadingsInOrderContext.Provider>
         </AlchemixReadingsBeforeContext.Provider>
       </div>

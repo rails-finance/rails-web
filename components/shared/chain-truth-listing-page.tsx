@@ -173,6 +173,8 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** Server tier: the count line's noun and note for the live selection, where
    *  a default filter narrows the set without drawing a chip. */
   countLine?: (filters: F) => { noun?: string; note?: string } | null;
+  /** Opt-in line under the empty state for the live selection; null for none. */
+  emptyNote?: (filters: F) => ReactNode | null;
 }
 
 export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefined>({
@@ -199,6 +201,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   titleHidden,
   titleAs,
   countLine,
+  emptyNote,
 }: ChainTruthListingPageProps<T, F, Ext>) {
   const searchParams = useUrlSearchParams(initialSearch ?? "");
 
@@ -477,6 +480,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       protocol={directoryEntry}
       headerExtra={headerExtra}
       above={above}
+      emptyNote={emptyNote?.(filters) ?? undefined}
       identity={identity}
       titleHidden={titleHidden}
       titleAs={titleAs}

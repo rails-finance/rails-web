@@ -15,6 +15,7 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { ChainId } from "@/lib/shared/chains";
 import { isV2LineOnChain, v2LinesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixV2Sort, FetchAlchemixV2PositionsParams } from "@/lib/sources/api/alchemix-v2-backend";
+import { parseAlchemixSearch } from "@/lib/alchemix/search";
 
 export const V2_ITEMS_PER_PAGE = 20;
 
@@ -90,10 +91,10 @@ export function v2FiltersToFetchParams(
       : sorts.includes(filters.sortBy as AlchemixV2Sort)
         ? (filters.sortBy as AlchemixV2Sort)
         : "lastActivity";
-  const q = filters.q.trim();
+  const q = parseAlchemixSearch(filters.q, false);
   return {
     lines,
-    owner: /^0x[a-fA-F0-9]{40}$/.test(q) ? q.toLowerCase() : undefined,
+    owner: q.kind === "address" ? q.address : undefined,
     status: filters.status,
     sortBy,
     sortOrder: filters.sortOrder,

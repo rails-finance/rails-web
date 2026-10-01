@@ -19,6 +19,7 @@ import {
   type V2ListFilters,
 } from "@/lib/alchemix/v2-list-filter-dimensions";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
+import { alchemixSearchNote, searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export interface AlchemixV2ListingProps {
   deployment: AlchemixDeployment;
@@ -46,17 +47,18 @@ export function AlchemixV2Listing({
       bookmarksProtocol={deployment.session}
       defaults={V2_LIST_DEFAULTS}
       sortOptions={v2SortOptions}
-      searchPlaceholder="Address"
+      searchPlaceholder="Address or ENS name"
+      emptyNote={(f) => alchemixSearchNote(f.q, false)}
       renderCard={(p) => <AlchemixV2PositionCard p={p} session={deployment.session} />}
       hrefFor={(p) => v2PositionPath(deployment, p.lineKey, p.account)}
       keyFor={(p) => `${p.lineKey}:${p.account}`}
       strategy={serverStrategy<AlchemixV2PositionSummary, V2ListFilters>({
         dimensions: v2ListDimensions(deployment.chainId),
         itemsPerPage: V2_ITEMS_PER_PAGE,
-        fetchPage: async (filters, page) => {
-          const res = await fetchAlchemixV2Positions(v2FiltersToFetchParams(deployment, filters, page));
-          return { data: res.data, total: res.pagination.total };
-        },
+        fetchPage: (filters, page) =>
+          searchedAlchemixPage(filters.q, false, v2FiltersToFetchParams(deployment, filters, page), (p) =>
+            fetchAlchemixV2Positions(p).then((res) => ({ data: res.data, total: res.pagination.total })),
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

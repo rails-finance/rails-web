@@ -96,6 +96,22 @@ export function useReadingInForce(block: number | null | undefined): AlchemixRea
   return found;
 }
 
+/** The blocks on the timeline that hold a line-scope row (a redemption, a
+ *  batch liquidation). The reading at such a block is past that row too, so a
+ *  card in the same block cannot put set-aside's move down to its transaction. */
+export function lineEventBlocks(events: AlchemistEvent[]): Set<number> {
+  const out = new Set<number>();
+  for (const e of events) if (e.context.data.scope === "line") out.add(e.blockNumber);
+  return out;
+}
+
+export const AlchemixLineEventBlocksContext = createContext<Set<number> | null>(null);
+
+export function useLineEventInBlock(block: number | null | undefined): boolean {
+  const set = useContext(AlchemixLineEventBlocksContext);
+  return set != null && block != null && set.has(block);
+}
+
 /** The line's two ratios as the position card states them, read at its
  *  block. Null where the page has no current reading. */
 export interface AlchemixLineRatios {

@@ -313,7 +313,8 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {who(raw.sender)} burned {shown(raw.amount, sym)} against this position, taking its debt down by that much.
+            {whoOn(ctx, raw.sender)} burned {shown(raw.amount, sym)} against this position, taking its debt down by that
+            much.
           </>,
         ),
       );
@@ -324,7 +325,7 @@ export function alchemixEventClauses(
       out.push(
         clause(
           <>
-            {who(raw.sender)} repaid this position&rsquo;s debt with {shown(raw.amount, myt)}.
+            {whoOn(ctx, raw.sender)} repaid this position&rsquo;s debt with {shown(raw.amount, myt)}.
           </>,
         ),
       );
@@ -802,8 +803,41 @@ export function alchemixReadingClauses(
 }
 
 /** The kinds that leave set-aside where `_earmark` put it: what a card made of
- *  these alone shows moving there built up between the two readings. */
-const LEAVES_SET_ASIDE = new Set(["deposit", "mint", "withdraw", "transfer"]);
+ *  these alone shows moving there built up between the two readings. A burn is
+ *  one of them (chain `getCDP` either side of a burn moves set-aside by one
+ *  block of accrual); a repay is not, since it pays set-aside first. */
+const LEAVES_SET_ASIDE = new Set(["deposit", "mint", "withdraw", "transfer", "burn"]);
+
+/** A set-aside figure in the bullets: at most two decimals from 1 up, so the
+ *  three figures of a repay's sentence add up as printed. */
+const setAsideFigure = (wei: bigint): string => {
+  const n = Number(wei) / WAD;
+  return n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : formatCompact(n).display;
+};
+
+/** The set-aside part of the debt a repay cleared, in the synthetic's wei. A
+ *  repay pays set-aside first, so where set-aside is still above zero after it
+ *  the whole credit was set-aside debt; where it reached zero, the part is what
+ *  the protocol fee was charged on (fee ÷ rate, in shares, at this block's
+ *  share price). Null where the figures for either are not in hand. */
+function repaySetAsidePartRaw(
+  repay: AlchemistEvent,
+  at: AlchemixStateAtBlockFromReading,
+  feeBps: number | null,
+  decimals: number | null,
+): bigint | null {
+  const captured = repay.context.data.resolvedAtCapture;
+  if (captured?.debtCredit == null || at.earmarkedRaw == null) return null;
+  const credit = BigInt(captured.debtCredit);
+  if (BigInt(at.earmarkedRaw) > BigInt(0)) return credit;
+  if (captured.collateralFee == null) return null;
+  const fee = BigInt(captured.collateralFee);
+  if (fee === BigInt(0)) return BigInt(0);
+  if (!feeBps || at.sharePriceRaw == null || decimals == null) return null;
+  const shares = (fee * BigInt(10000)) / BigInt(feeBps);
+  const value = (shares * BigInt(at.sharePriceRaw)) / BigInt(10) ** BigInt(decimals);
+  return value < credit ? value : credit;
+}
 
 /** "4 days and 21 hours", "3 hours", "2 seconds": the span between two block
  *  times, in its largest whole unit, with the hours beside a day count under
@@ -818,24 +852,38 @@ function spanWords(seconds: number): string {
   return days < 10 && hours > 0 ? `${unit(days, "day")} and ${unit(hours, "hour")}` : unit(days, "day");
 }
 
+/** What the between-readings bullets need beyond the legs and the reading. */
+export interface AlchemixBetweenReadingsOptions {
+  /** The line's protocol fee in basis points, which a repay's fee is read
+   *  back through. */
+  protocolFeeBps?: number | null;
+  /** A line-scope row (a redemption) shares this card's block, so the reading
+   *  at it is past that too and set-aside's move is not this card's alone. */
+  lineEventInBlock?: boolean;
+}
+
 /** What moved between the reading before this card and the reading at its
  *  block that the transaction did not move: set-aside, as Transmuter stakes
- *  matured, and the vault's share price, where it moved collateralisation. Only
- *  on a card whose legs leave set-aside alone; a redemption states its own. */
+ *  matured, and the vault's share price, where it moved collateralisation. On a
+ *  card whose legs leave set-aside alone, and on a repay, which states what
+ *  set-aside stood at in its block and how much of it the repay cleared. A
+ *  redemption states its own. */
 export function alchemixBetweenReadingsClauses(
   legs: AlchemistEvent[],
   before: AlchemixReading | null | undefined,
   unit: { symbol: string | null; decimals: number | null },
+  opts: AlchemixBetweenReadingsOptions = {},
 ): ClauseInput[] {
   if (!before || legs.length === 0) return [];
-  if (!legs.every((l) => LEAVES_SET_ASIDE.has(l.context.data.eventType))) return [];
+  const kinds = new Set(legs.map((l) => l.context.data.eventType).filter((k) => k !== "transfer"));
+  const repay = kinds.size === 1 && kinds.has("repay") ? legs.find((l) => l.context.data.eventType === "repay") : null;
+  if (!repay && !legs.every((l) => LEAVES_SET_ASIDE.has(l.context.data.eventType))) return [];
   const at = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated")?.context.data
     .stateAtBlockFromReading;
   if (!at || at.status !== "stated" || at.blockNumber == null || at.blockNumber <= before.blockNumber) return [];
   const lead = legs[0];
   const sym = lead.context.data.syntheticSymbol;
   const span = before.timestamp != null ? spanWords(lead.timestamp - before.timestamp) : null;
-  const kinds = new Set(legs.map((l) => l.context.data.eventType).filter((k) => k !== "transfer"));
   const act =
     kinds.size === 1 && kinds.has("deposit")
       ? "this deposit"
@@ -843,16 +891,52 @@ export function alchemixBetweenReadingsClauses(
         ? "this mint"
         : kinds.size === 1 && kinds.has("withdraw")
           ? "this withdrawal"
-          : "this transaction";
+          : kinds.size === 1 && kinds.has("burn")
+            ? "this burn"
+            : kinds.size === 1 && kinds.has("repay")
+              ? "this repay"
+              : "this transaction";
   const out: ClauseInput[] = [];
-  if (at.earmarkedRaw != null && before.earmarkedRaw != null) {
+  // The reading at this block is past every event in it. A line redemption in
+  // the same block moves set-aside too, so then its move is not this card's to
+  // explain; a repay, whose figure is derived from that reading, also needs the
+  // block to hold none of the position's events beyond this card.
+  const blockIsCards = !opts.lineEventInBlock && (!repay || at.positionEventsInBlock <= legs.length);
+  const sincePrevious = span ? <>in the {span} since the previous card</> : <>since the previous card</>;
+  const part =
+    repay && blockIsCards ? repaySetAsidePartRaw(repay, at, opts.protocolFeeBps ?? null, unit.decimals) : null;
+  if (blockIsCards && at.earmarkedRaw != null && before.earmarkedRaw != null && part != null && part > BigInt(0)) {
+    // Set-aside just before the repay: what it left plus what it cleared.
+    const after = BigInt(at.earmarkedRaw);
+    const stood = after + part;
+    // Rose only by more than the printed figure shows: where set-aside is
+    // derived from the fee, its last digits are the fee's rounding.
+    const rose =
+      stood > BigInt(before.earmarkedRaw) && setAsideFigure(stood) !== setAsideFigure(BigInt(before.earmarkedRaw));
+    out.push(
+      clause(
+        <>
+          {rose ? (
+            <>
+              Set aside had risen to {setAsideFigure(stood)} {sym} {sincePrevious}
+            </>
+          ) : (
+            <>
+              Set aside stood at {setAsideFigure(stood)} {sym} at this block
+            </>
+          )}
+          ; this repay cleared {setAsideFigure(part)} of it, leaving{" "}
+          {after > BigInt(0) ? setAsideFigure(after) : "none"}.
+        </>,
+      ),
+    );
+  } else if (blockIsCards && (!repay || part === BigInt(0)) && at.earmarkedRaw != null && before.earmarkedRaw != null) {
     const grew = BigInt(at.earmarkedRaw) - BigInt(before.earmarkedRaw);
     if (grew > BigInt(1)) {
       out.push(
         clause(
           <>
-            Set aside rose {formatCompact(Number(grew) / WAD).display} {sym}{" "}
-            {span ? <>in the {span} since the previous card</> : <>since the previous card</>}, as Transmuter stakes
+            Set aside rose {formatCompact(Number(grew) / WAD).display} {sym} {sincePrevious}, as Transmuter stakes
             matured; {act} did not move it.
           </>,
         ),

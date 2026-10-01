@@ -127,6 +127,8 @@ export interface AlchemixCardProse {
   /** The reading before this card's block, which a close's returned
    *  collateral is measured from. */
   readingBefore?: AlchemixReading | null;
+  /** A line-scope row shares this card's block (`lineEventBlocks`). */
+  lineEventInBlock?: boolean;
 }
 
 /** The trailing gas bullet, Liquity's: the holder's own transactions only. A
@@ -171,10 +173,12 @@ function alchemixCardClauses(
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
     ...readingClauses,
-    ...alchemixBetweenReadingsClauses(legs, prose.readingBefore, {
-      symbol: prose.underlyingSymbol,
-      decimals: prose.underlyingDecimals,
-    }),
+    ...alchemixBetweenReadingsClauses(
+      legs,
+      prose.readingBefore,
+      { symbol: prose.underlyingSymbol, decimals: prose.underlyingDecimals },
+      { protocolFeeBps: prose.protocolFeeBps, lineEventInBlock: prose.lineEventInBlock ?? false },
+    ),
     gasClause(legs),
   ];
 }

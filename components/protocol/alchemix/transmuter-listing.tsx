@@ -23,6 +23,7 @@ import {
   type TransmuterListFilters,
 } from "@/lib/alchemix/transmuter-list-filter-dimensions";
 import type { AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
+import { alchemixSearchNote, searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export interface TransmuterListingProps {
   deployment: AlchemixDeployment;
@@ -50,17 +51,18 @@ export function TransmuterListing({
       bookmarksProtocol={deployment.session}
       defaults={TRANSMUTER_LIST_DEFAULTS}
       sortOptions={transmuterSortOptions}
-      searchPlaceholder="Address or position id"
+      searchPlaceholder="Address, ENS name or position id"
+      emptyNote={(f) => alchemixSearchNote(f.q, true)}
       renderCard={(p) => <TransmuterPositionCard p={p} session={deployment.session} />}
       hrefFor={(p) => transmuterPositionPath(deployment, p.lineKey, p.nftId)}
       keyFor={(p) => `${p.lineKey}:${p.nftId}`}
       strategy={serverStrategy<AlchemixTransmuterPositionSummary, TransmuterListFilters>({
         dimensions: transmuterListDimensions(deployment.chainId),
         itemsPerPage: TRANSMUTER_ITEMS_PER_PAGE,
-        fetchPage: async (filters, page) => {
-          const res = await fetchAlchemixTransmuterPositions(transmuterFiltersToFetchParams(deployment, filters, page));
-          return { data: res.data, total: res.pagination.total };
-        },
+        fetchPage: (filters, page) =>
+          searchedAlchemixPage(filters.q, true, transmuterFiltersToFetchParams(deployment, filters, page), (p) =>
+            fetchAlchemixTransmuterPositions(p).then((res) => ({ data: res.data, total: res.pagination.total })),
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

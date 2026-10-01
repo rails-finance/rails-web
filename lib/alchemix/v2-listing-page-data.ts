@@ -12,6 +12,7 @@ import {
 } from "@/lib/alchemix/v2-list-filter-dimensions";
 import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { AlchemixV2PositionSummary } from "@/types/api/alchemix";
+import { searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export async function v2ListingPageData(deployment: AlchemixDeployment, rawSearchParams: RawSearchParams) {
   const dims = v2ListDimensions(deployment.chainId);
@@ -25,8 +26,17 @@ export async function v2ListingPageData(deployment: AlchemixDeployment, rawSearc
     page,
     label: `Alchemix V2 (chain ${deployment.chainId})`,
     fetchPage: (baseUrl, signal, headers) =>
-      fetchAlchemixV2Positions({ ...v2FiltersToFetchParams(deployment, filters, page), baseUrl, signal, headers }).then(
-        (r) => ({ data: r.data, total: r.pagination.total }),
+      searchedAlchemixPage(
+        filters.q,
+        false,
+        v2FiltersToFetchParams(deployment, filters, page),
+        (p) =>
+          fetchAlchemixV2Positions({ ...p, baseUrl, signal, headers }).then((r) => ({
+            data: r.data,
+            total: r.pagination.total,
+          })),
+        baseUrl,
+        signal,
       ),
   });
 

@@ -28,6 +28,7 @@ import {
   type AlchemixListFilters,
 } from "@/lib/alchemix/list-filter-dimensions";
 import type { AlchemixPositionSummary } from "@/types/api/alchemix";
+import { alchemixSearchNote, searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export interface AlchemixListingProps {
   deployment: AlchemixDeployment;
@@ -55,7 +56,8 @@ export function AlchemixListing({
       bookmarksProtocol={deployment.session}
       defaults={ALCHEMIX_LIST_DEFAULTS}
       sortOptions={alchemixSortOptions(deployment.chainId)}
-      searchPlaceholder="Address or position id"
+      searchPlaceholder="Address, ENS name or position id"
+      emptyNote={(f) => alchemixSearchNote(f.q, true)}
       renderCard={(p) => <AlchemixPositionCard p={p} session={deployment.session} />}
       // Both halves of the key, always: a token id is unique only inside its
       // line, and the line is unique only on its chain. The position route
@@ -66,10 +68,10 @@ export function AlchemixListing({
       strategy={serverStrategy<AlchemixPositionSummary, AlchemixListFilters>({
         dimensions: alchemixListDimensions(deployment.chainId),
         itemsPerPage: ALCHEMIX_ITEMS_PER_PAGE,
-        fetchPage: async (filters, page) => {
-          const res = await fetchAlchemixPositions(alchemixFiltersToFetchParams(deployment, filters, page));
-          return { data: res.data, total: res.pagination.total };
-        },
+        fetchPage: (filters, page) =>
+          searchedAlchemixPage(filters.q, true, alchemixFiltersToFetchParams(deployment, filters, page), (p) =>
+            fetchAlchemixPositions(p).then((res) => ({ data: res.data, total: res.pagination.total })),
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

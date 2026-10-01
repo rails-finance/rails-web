@@ -39,13 +39,17 @@ export interface AlchemixLine {
    *  of the shares the Transmuter gets. Stated on the repay and redemption
    *  cards. */
   protocolFeeBps: number;
+  /** The line's vault share (MYT) and the asset it holds, by symbol, for the
+   *  prose that names a line's pair. The addresses come from the API. */
+  myt: string;
+  underlying: string;
 }
 
 /** Every line, chain first. The order is the display order. */
 const LINES: AlchemixLine[] = [
-  { key: "eth-alusd", chainId: 1, displayName: "alUSD", protocolFeeBps: 25 },
-  { key: "eth-aleth", chainId: 1, displayName: "alETH", protocolFeeBps: 25 },
-  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb", protocolFeeBps: 10 },
+  { key: "eth-alusd", chainId: 1, displayName: "alUSD", protocolFeeBps: 25, myt: "mixUSDC", underlying: "USDC" },
+  { key: "eth-aleth", chainId: 1, displayName: "alETH", protocolFeeBps: 25, myt: "mixWETH", underlying: "WETH" },
+  { key: "base-alusdb", chainId: 8453, displayName: "alUSDb", protocolFeeBps: 10, myt: "mixUSDC", underlying: "USDC" },
 ];
 
 /** One explorer — a chain, its route, its session key, and the lines it lists.
@@ -93,13 +97,13 @@ export function transmuterPositionPath(deployment: AlchemixDeployment, lineKey: 
 // `<explorer>/v2/<line>/<account>`: the position is a wallet account, so the
 // account is the second half of the key where a V3 position has a token id.
 
-const V2_LINES: Omit<AlchemixLine, "protocolFeeBps">[] = [
+const V2_LINES: Omit<AlchemixLine, "protocolFeeBps" | "myt" | "underlying">[] = [
   { key: "eth-alusd-v2", chainId: 1, displayName: "alUSD" },
   { key: "eth-aleth-v2", chainId: 1, displayName: "alETH" },
 ];
 
 /** The V2 lines on one chain: both on Ethereum, none anywhere else. */
-export function v2LinesForChain(chainId: ChainId): Omit<AlchemixLine, "protocolFeeBps">[] {
+export function v2LinesForChain(chainId: ChainId): Omit<AlchemixLine, "protocolFeeBps" | "myt" | "underlying">[] {
   return V2_LINES.filter((l) => l.chainId === chainId);
 }
 

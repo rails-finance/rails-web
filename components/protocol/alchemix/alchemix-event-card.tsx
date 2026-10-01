@@ -46,7 +46,12 @@ import {
   alchemixLearnMoreFor,
   type AlchemixCardProse,
 } from "./alchemix-event-explainer";
-import { collateralTakenRaw, useAlchemixUnderlying, useReadingBefore } from "@/lib/alchemix/readings-before";
+import {
+  collateralTakenRaw,
+  useAlchemixUnderlying,
+  useLineEventInBlock,
+  useReadingBefore,
+} from "@/lib/alchemix/readings-before";
 import { redemptionNet } from "@/lib/alchemix/redemption-net";
 import { lineProtocolFeeBps } from "@/lib/alchemix/lines";
 
@@ -141,6 +146,7 @@ export function AlchemixEventCard({
   const sibs = siblings ?? legs;
   const before = useReadingBefore(lead.context.data.stateAtBlockFromReading?.blockNumber);
   const unit = useAlchemixUnderlying();
+  const lineEventInBlock = useLineEventInBlock(lead.blockNumber);
   const isRedemption = lead.context.data.eventType === "redemption";
   const feeBps = lineProtocolFeeBps(lead.context.data.chainId, lead.context.data.lineKey);
   const prose: AlchemixCardProse = {
@@ -149,6 +155,7 @@ export function AlchemixEventCard({
     protocolFeeBps: feeBps,
     collateralTakenRaw: isRedemption ? collateralTakenRaw(lead, before) : null,
     readingBefore: before,
+    lineEventInBlock,
     redemptionNet: isRedemption ? redemptionNet(lead, before, unit?.decimals ?? null, feeBps) : null,
     underlyingSymbol: unit?.symbol ?? null,
   };

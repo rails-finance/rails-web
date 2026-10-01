@@ -36,6 +36,7 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { ChainId } from "@/lib/shared/chains";
 import { isLineOnChain, linesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { FetchAlchemixPositionsParams } from "@/lib/api/fetch-alchemix-positions";
+import { parseAlchemixSearch } from "@/lib/alchemix/search";
 
 export const ALCHEMIX_ITEMS_PER_PAGE = 20;
 
@@ -121,7 +122,8 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
 
 /** Map the decoded selection + page onto the fetch params.
  *
- *  The search box names a position id or a holder. A debt or collateral sort
+ *  The search box names a position id or a holder (lib/alchemix/search; an
+ *  ENS name is resolved where the page is fetched). A debt or collateral sort
  *  without exactly one line falls back to activity — the wire never ranks two
  *  tokens as one number, whatever a stale URL says.
  *
@@ -144,12 +146,12 @@ export function alchemixFiltersToFetchParams(
       : filters.sortBy === "tokenId"
         ? "tokenId"
         : "lastActivity";
-  const q = filters.q.trim();
+  const q = parseAlchemixSearch(filters.q, true);
   return {
     chainId: deployment.chainId,
     lines,
-    owner: /^0x[a-fA-F0-9]{40}$/.test(q) ? q.toLowerCase() : undefined,
-    tokenId: /^\d+$/.test(q) ? q : undefined,
+    owner: q.kind === "address" ? q.address : undefined,
+    tokenId: q.kind === "id" ? q.id : undefined,
     status: filters.status,
     sortBy,
     sortOrder: filters.sortOrder,

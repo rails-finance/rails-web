@@ -22,6 +22,7 @@ import type {
   AlchemixTransmuterSort,
   FetchAlchemixTransmuterPositionsParams,
 } from "@/lib/sources/api/alchemix-transmuter-backend";
+import { parseAlchemixSearch } from "@/lib/alchemix/search";
 
 export const TRANSMUTER_ITEMS_PER_PAGE = 20;
 
@@ -97,12 +98,12 @@ export function transmuterFiltersToFetchParams(
       : sorts.includes(filters.sortBy as AlchemixTransmuterSort)
         ? (filters.sortBy as AlchemixTransmuterSort)
         : "maturity";
-  const q = filters.q.trim();
+  const q = parseAlchemixSearch(filters.q, true);
   return {
     chainId: deployment.chainId,
     lines,
-    owner: /^0x[a-fA-F0-9]{40}$/.test(q) ? q.toLowerCase() : undefined,
-    nftId: /^\d+$/.test(q) ? q : undefined,
+    owner: q.kind === "address" ? q.address : undefined,
+    nftId: q.kind === "id" ? q.id : undefined,
     status: filters.status,
     sortBy,
     sortOrder: filters.sortOrder,

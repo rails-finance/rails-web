@@ -12,6 +12,7 @@ import {
 } from "@/lib/alchemix/transmuter-list-filter-dimensions";
 import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
+import { searchedAlchemixPage } from "@/lib/alchemix/search";
 
 export async function transmuterListingPageData(deployment: AlchemixDeployment, rawSearchParams: RawSearchParams) {
   const dims = transmuterListDimensions(deployment.chainId);
@@ -25,12 +26,18 @@ export async function transmuterListingPageData(deployment: AlchemixDeployment, 
     page,
     label: `Alchemix Transmuter (chain ${deployment.chainId})`,
     fetchPage: (baseUrl, signal, headers) =>
-      fetchAlchemixTransmuterPositions({
-        ...transmuterFiltersToFetchParams(deployment, filters, page),
+      searchedAlchemixPage(
+        filters.q,
+        true,
+        transmuterFiltersToFetchParams(deployment, filters, page),
+        (p) =>
+          fetchAlchemixTransmuterPositions({ ...p, baseUrl, signal, headers }).then((r) => ({
+            data: r.data,
+            total: r.pagination.total,
+          })),
         baseUrl,
         signal,
-        headers,
-      }).then((r) => ({ data: r.data, total: r.pagination.total })),
+      ),
   });
 
   return { ...initial, initialSearch: sp.toString() };

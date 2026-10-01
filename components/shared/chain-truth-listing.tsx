@@ -145,6 +145,9 @@ export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListF
    *  re-staggers the cards without re-staggering a band that did not change.
    *  Drawn only when there are rows — a summary of nothing is nothing. */
   above?: ReactNode;
+  /** Opt-in line under the empty state, for a listing whose search can name
+   *  nothing it reads (Alchemix: "Search takes a full address…"). */
+  emptyNote?: ReactNode;
   /** Roster entry for the listing's protocol — renders the shared
    *  `RailHeader` (identity + sub-nav tabs, this listing's tab active) in
    *  place of a visible heading; `title` then lives in an sr-only h1. Omit
@@ -183,6 +186,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
   error,
   headerExtra,
   above,
+  emptyNote,
   protocol,
   identity,
   titleHidden = false,
@@ -307,6 +311,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
             ) : (
               <div className="text-sm text-rb-500">
                 {pagination ? `No ${noun} match these filters.` : `No ${noun} captured yet.`}
+                {emptyNote ? <p className="mt-1">{emptyNote}</p> : null}
               </div>
             )}
           </div>
