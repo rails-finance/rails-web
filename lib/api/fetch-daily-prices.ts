@@ -19,17 +19,30 @@ export async function fetchDailyPrices(
   keys: readonly string[],
   opts: { from?: number; signal?: AbortSignal } = {},
 ): Promise<Record<string, [number, number][]> | null> {
+  const body = await fetchDailyAnswer(chain, keys, opts);
+  if (!body) return null;
+  const out = dailyPricesFromAnswer(body);
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** The store's answer as it came, every unit kept, the reads of more than
+ *  40 series merged; null where a read failed. */
+export async function fetchDailyAnswer(
+  chain: number,
+  keys: readonly string[],
+  opts: { from?: number; signal?: AbortSignal } = {},
+): Promise<DailyAnswer | null> {
   const unique = [...new Set(keys)];
   if (unique.length === 0) return null;
-  const out: Record<string, [number, number][]> = {};
+  const out: DailyAnswer = { series: {} };
   for (let i = 0; i < unique.length; i += MAX_SERIES) {
     const qs = new URLSearchParams({ chain: String(chain), series: unique.slice(i, i + MAX_SERIES).join(",") });
     if (opts.from != null) qs.set("from", String(opts.from));
     const res = await fetch(`/api/prices/daily?${qs.toString()}`, { signal: opts.signal });
     if (!res.ok) return null;
-    Object.assign(out, dailyPricesFromAnswer(await res.json()));
+    Object.assign(out.series!, ((await res.json()) as DailyAnswer).series ?? {});
   }
-  return Object.keys(out).length > 0 ? out : null;
+  return out;
 }
 
 /** One answer's series as `[day, usd]` ascending, the USD rows only. */

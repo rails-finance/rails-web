@@ -23,6 +23,7 @@
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
+import { cometUsdOf } from "@/lib/compound/at-block-prices";
 
 const COMET_ABI = parseAbi([
   "function baseTokenPriceFeed() view returns (address)",
@@ -367,16 +368,17 @@ export async function cometPricesAtBlock(
       (n) => ({ address: comet, abi: COMET_ABI, functionName: "getPrice", args: [n.feed] }) as const,
     ),
   })) as { status: string; result?: unknown }[];
-  let quote = 1;
+  let quote: bigint | null = null;
   if (market.quoteUnit === "ETH") {
     const eth = (await cometEthUsdAtBlocks(deployment, [block])).get(block);
     if (eth == null || eth <= BigInt(0)) return {};
-    quote = Number(eth) / PRICE_SCALE;
+    quote = eth;
   }
+  // The conversion the stored prices take too (lib/compound/at-block-prices.ts).
   const out: Record<string, number> = {};
   res.forEach((r, i) => {
     if (r.status !== "success" || r.result == null) return;
-    const usd = (Number(r.result as bigint) / PRICE_SCALE) * quote;
+    const usd = cometUsdOf(r.result as bigint, quote);
     if (usd > 0) out[named[i].token] = usd;
   });
   return out;

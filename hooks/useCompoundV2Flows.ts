@@ -7,10 +7,14 @@
 // once (the read its CSV export makes), and a read short of the whole history
 // is a failed read, since a replay of part of a history would state the wrong
 // lifetime. The oracle price at each row's block comes from the row (a
-// liquidation's legs) or from /api/chain/compound-v2/prices-at, one read of
-// at most 400 pairs. It also gives the page the value that ties the panel to
-// the timeline (components/shared/flow-focus-context.tsx) and each event's
-// account for its card's ledgers.
+// liquidation's legs), else from the prices the server stores for every event
+// row (/api/compound-v2/prices-at), else from the archive
+// (/api/chain/compound-v2/prices-at) for the pairs not stored yet: at most 400
+// pairs a page. Between events each market is valued at the daily price
+// store's price for the day (`cv2:<cToken>`), one read per page. It also
+// gives the page the value that ties the panel to the timeline
+// (components/shared/flow-focus-context.tsx) and each event's account for its
+// card's ledgers.
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
@@ -19,6 +23,10 @@ import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import { fetchCompoundV2PricesAt } from "@/lib/api/fetch-compound-v2-prices-at";
+import { fetchStoredV2Prices } from "@/lib/api/fetch-compound-stored-prices";
+import { fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
+import { compoundV2DailyPrices, compoundV2SeriesKey, storedV2Prices } from "@/lib/compound-v2/at-block-prices";
+import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import {
   ctokenEventStates,
   ctokenFlowReplay,
@@ -66,6 +74,32 @@ export interface CompoundV2FlowsFacts {
   live: boolean;
   /** Symbols of markets on a fixed oracle price. */
   fixed: string[];
+  /** "store": days between events at the daily store's price; "carried":
+   *  each market keeps its latest priced row's. */
+  between: "store" | "carried";
+}
+
+const DAY_S = 86_400;
+
+/** The pairs' prices: the stored ones first, the archive for the pairs the
+ *  server has not stored (or all of them, where the stored read failed). */
+async function pricesAt(pairs: string[], signal: AbortSignal): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const stored = await fetchStoredV2Prices(pairs, signal).catch((err) => {
+    if ((err as { name?: string })?.name === "AbortError") throw err;
+    return null;
+  });
+  let rest = pairs;
+  if (stored) {
+    for (const [k, v] of storedV2Prices(stored)) out.set(k, v);
+    const missing = new Set(stored.missing);
+    rest = pairs.filter((p) => missing.has(p));
+  }
+  if (rest.length > 0) {
+    const read = await fetchCompoundV2PricesAt(rest, signal);
+    for (const [k, v] of read ?? []) out.set(k, v);
+  }
+  return out;
 }
 
 export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
@@ -113,8 +147,8 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
       return;
     }
     const ac = new AbortController();
-    fetchCompoundV2PricesAt(pairs, ac.signal)
-      .then((m) => setRead({ key: pairsKey, map: m ?? new Map() }))
+    pricesAt(pairs, ac.signal)
+      .then((m) => setRead({ key: pairsKey, map: m }))
       .catch((err) => {
         // A failed read leaves every row on the rows' own prices and the
         // nearest priced row's; the Explanation counts them.
@@ -129,6 +163,36 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
     return new Map([...rowPrices, ...read.map]);
   }, [rowPrices, read, pairsKey]);
   const rows = useMemo(() => (source && prices ? compoundV2FlowRows(source, prices) : null), [source, prices]);
+
+  // The daily store, one read per page: each market's series from its first
+  // row's day, and USDC's for the oracle's ETH years. A failed or empty read
+  // carries each market's latest priced row.
+  const want = useMemo(() => {
+    if (!rows || rows.length === 0) return null;
+    const markets = [...new Set(rows.map((r) => r.market))].filter((m) => COMPOUND_V2_MARKET_BY_KEY[m]);
+    return { markets, from: Math.floor(rows[0].ts / DAY_S), key: markets.join(",") };
+  }, [rows]);
+  const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
+  useEffect(() => {
+    if (!want) return;
+    const ac = new AbortController();
+    const keys = [...new Set([...want.markets, "usdc"])].map((m) =>
+      compoundV2SeriesKey(COMPOUND_V2_MARKET_BY_KEY[m].ctoken),
+    );
+    fetchDailyAnswer(1, keys, { from: want.from, signal: ac.signal })
+      .then((body) => {
+        const prices = body ? compoundV2DailyPrices(body, want.markets) : {};
+        setDaily({ key: want.key, prices: Object.keys(prices).length > 0 ? prices : null });
+      })
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: want.key, prices: null });
+      });
+    return () => ac.abort();
+    // `want.key` stands for the markets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [want?.key, want?.from]);
+  const dailySettled = want != null && daily?.key === want.key;
+  const dailyPrices = dailySettled ? (daily?.prices ?? undefined) : undefined;
 
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
@@ -149,11 +213,22 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
   }, [p.chain]);
   const opts = useMemo<CTokenFlowOptions | null>(
     () =>
-      now != null ? { vocab: { brand: "Compound", receipt: "cToken" }, now, live, todayPrices: p.todayPrices } : null,
-    [now, live, p.todayPrices],
+      now != null
+        ? {
+            vocab: { brand: "Compound", receipt: "cToken" },
+            now,
+            live,
+            todayPrices: p.todayPrices,
+            ...(dailyPrices ? { dailyPrices } : {}),
+          }
+        : null,
+    [now, live, p.todayPrices, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? ctokenFlowReplay(rows, opts) : null), [rows, opts]);
-  const timeline = useMemo(() => (rows && opts ? ctokenFlowTimeline(rows, opts) : null), [rows, opts]);
+  const timeline = useMemo(
+    () => (rows && opts && (dailySettled || rows.length === 0) ? ctokenFlowTimeline(rows, opts) : null),
+    [rows, opts, dailySettled],
+  );
   const focusEvents = useMemo(() => (replay ? ctokenFocusEvents(replay) : []), [replay]);
   const states = useMemo(() => (replay && opts ? ctokenEventStates(replay, opts) : null), [replay, opts]);
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
@@ -174,12 +249,13 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
       seizedAsLiquidator: has(CT.seizedIn),
       live: live != null,
       fixed: [...fixed],
+      between: dailyPrices ? "store" : "carried",
     };
-  }, [replay, rows, live, p.fixedPrices]);
+  }, [replay, rows, live, p.fixedPrices, dailyPrices]);
   const state: FlowsRead =
     p.wholeEvents == null && fetched.read !== "done"
       ? fetched.read
-      : now == null || (source != null && prices == null)
+      : now == null || (source != null && prices == null) || (rows != null && rows.length > 0 && !dailySettled)
         ? "reading"
         : "done";
   return { timeline, read: state, focus, facts, states };

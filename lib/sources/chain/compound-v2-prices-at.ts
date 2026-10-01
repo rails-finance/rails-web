@@ -19,10 +19,9 @@
 import { parseAbi, type PublicClient } from "viem";
 import { chainBatchClient } from "./rpc";
 import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
-import { rawToNum } from "@/lib/compound-v2/liquidation-values";
+import { COMPOUND_V2_USD_ORACLE_BLOCK, compoundV2UsdAtBlock } from "@/lib/compound-v2/at-block-prices";
 
-/** First block at which Compound's oracle answered in USD. */
-export const COMPOUND_V2_USD_ORACLE_BLOCK = 10_678_764;
+export { COMPOUND_V2_USD_ORACLE_BLOCK };
 
 const COMPTROLLER_ABI = parseAbi(["function oracle() view returns (address)"]);
 const ORACLE_ABI = parseAbi(["function getUnderlyingPrice(address cToken) view returns (uint256)"]);
@@ -82,21 +81,14 @@ export async function compoundV2PricesAt(pairs: string[]): Promise<Record<string
             .catch(() => null),
         ),
       );
-      const native = new Map<string, number>();
-      wanted.forEach((m, i) => {
-        const raw = raws[i];
-        if (raw == null || raw === BigInt(0)) return;
-        native.set(m, rawToNum(raw, 36 - COMPOUND_V2_MARKET_BY_KEY[m].decimals));
-      });
-      // Dollars per ETH at this block: 1 ÷ (ETH per USDC).
-      const usdPerNative = inEth ? (native.get("usdc") ? 1 / native.get("usdc")! : null) : 1;
+      // The conversion the stored prices take too (lib/compound-v2/at-block-prices.ts).
+      const usdByMarket = compoundV2UsdAtBlock(block, markets, new Map(wanted.map((m, i) => [m, raws[i]])));
       for (const m of markets) {
         const key = `${block}:${m}`;
-        const n = native.get(m);
-        const usd = n != null && usdPerNative != null ? n * usdPerNative : null;
+        const usd = usdByMarket.get(m) ?? null;
         if (cache.size > MAX_CACHE) cache.clear();
         cache.set(key, usd);
-        if (usd != null && Number.isFinite(usd) && usd > 0) out[key] = usd;
+        if (usd != null) out[key] = usd;
       }
     }),
   );

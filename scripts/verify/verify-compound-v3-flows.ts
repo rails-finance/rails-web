@@ -36,6 +36,13 @@
 // to its recorded balance and every ledger adds in tokens and dollars; the
 // daily line's points are the bars' figures.
 //
+// Stored prices (scripts/verify/fixtures/compound-stored-prices.json): what
+// rails-server stores for each fixture's blocks (mig 372,
+// /api/compound/prices-at) turns into the archive read's dollars to the bit,
+// and a panel read from them, with the blocks not stored from the archive,
+// is the archive panel. The daily store's price takes the days between
+// events, a row's day keeping the row's.
+//
 //   npx tsx --test scripts/verify/verify-compound-v3-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -63,6 +70,8 @@ import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared
 import { assetTokenSum, eventAssetSum, eventCum, eventSideSum, eventSideSumByAsset } from "@/lib/shared/flow-focus";
 import { assetLedgers, ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
 import { flowMoment } from "@/lib/shared/flow-moment";
+import { storedCometPrices, type StoredCometBlock } from "@/lib/compound/at-block-prices";
+import { compoundAssets } from "@/lib/compound/flows";
 
 interface Fixture {
   name: string;
@@ -407,4 +416,75 @@ test("the state card between events states the base grown by its index, at the c
     assert.ok(Math.abs((held.amount ?? 0) - lent.tokens) < 1e-9, `stop ${stop}: the chart's tokens`);
   }
   assert.ok(checked > 0);
+});
+
+// ── Stored prices (rails-server mig 372) and the daily store ──────────────────
+
+const STORED = JSON.parse(readFileSync(join(__dirname, "fixtures", "compound-stored-prices.json"), "utf8")) as {
+  v3: Record<string, { blocks: Record<string, StoredCometBlock>; missing: number[] }>;
+};
+function assetsOf(f: Fixture): string[] {
+  const m = marketFor(f);
+  return compoundAssets(compoundFlowEvents(served(f), m.baseToken, m.baseDecimals), m.baseToken);
+}
+
+for (const name of NAMES) {
+  test(`${name}: the stored prices are the archive read's, to the bit`, () => {
+    const f = fx(name);
+    const stored = STORED.v3[name];
+    assert.ok(stored, `${name}: stored answer`);
+    assert.deepEqual(stored.missing, [], `${name}: every block stored`);
+    for (const [b, archive] of Object.entries(f.prices)) {
+      const s = stored.blocks[b];
+      assert.ok(s, `${name} ${b}: stored`);
+      assert.deepEqual(storedCometPrices(s, assetsOf(f)), archive, `${name} ${b}`);
+    }
+  });
+
+  test(`${name}: a panel read from the stored prices, the rest from the archive, is the archive panel`, () => {
+    const f = fx(name);
+    const m = marketFor(f);
+    const assets = assetsOf(f);
+    // Every other block as if not stored yet: those come from the archive.
+    const blocks = Object.keys(f.prices)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const missing = new Set(blocks.filter((_, i) => i % 2 === 1));
+    const mixed = new Map<number, Record<string, number>>();
+    for (const b of blocks) {
+      const r = missing.has(b) ? f.prices[String(b)] : storedCometPrices(STORED.v3[name].blocks[String(b)], assets);
+      if (r) mixed.set(b, r);
+    }
+    const fromStore = compoundFlowTimeline(compoundFlowEvents(served(f), m.baseToken, m.baseDecimals, mixed), opts(f));
+    const fromArchive = compoundFlowTimeline(rows(f), opts(f));
+    assert.deepEqual(fromStore, fromArchive, `${name}: the same timeline`);
+  });
+}
+
+test("the daily store prices a quiet day; an event's day keeps the row's price", () => {
+  const f = fx("usdc-open-received");
+  const m = marketFor(f);
+  const base = m.baseToken.toLowerCase();
+  const evs = rows(f);
+  const days = [...new Set(evs.map((e) => Math.floor(e.ts / DAY)))].sort((a, b) => a - b);
+  // A quiet day: the first day after the first event day that no row is on.
+  let quiet = days[0] + 1;
+  while (days.includes(quiet)) quiet++;
+  const eventDay = days[1] ?? days[0];
+  const wbtc = assetsOf(f).find((t) => t !== base)!;
+  const daily = {
+    [wbtc]: [[eventDay, 1] as [number, number], [quiet, 12_345] as [number, number]].sort((a, b) => a[0] - b[0]),
+    [base]: [[quiet, 0.5] as [number, number]],
+  };
+  const carried = compoundFlowTimeline(evs, opts(f))!;
+  const stored = compoundFlowTimeline(evs, { ...opts(f), dailyPrices: daily })!;
+  const at = (t: typeof stored, asset: string, d: number) => t.dailyPrices![asset].find(([x]) => x === d)?.[1];
+  const coll = `coll:${wbtc}`;
+  assert.ok(stored.dailyPrices![coll], "the collateral's series");
+  assert.equal(at(stored, coll, quiet), 12_345, "a quiet day takes the store's price");
+  assert.equal(at(carried, coll, quiet), undefined, "without the store the day carries");
+  assert.equal(at(stored, coll, eventDay), at(carried, coll, eventDay), "an event's day keeps the row's price");
+  assert.equal(at(stored, "base-supply", quiet), 0.5, "the base too");
+  assert.ok(stored.words?.linePrices?.includes("end of the day"), "the words name the day's price");
+  assert.ok(!carried.words?.linePrices?.includes("end of the day"), "and only with the store");
 });
