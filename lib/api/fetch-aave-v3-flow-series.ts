@@ -8,7 +8,7 @@
 // (the server's `FlowSeriesWire`, services/aave-v3-flow-series.ts); rails-ops
 // reference/lifetime-flows-scrubber.md states it.
 
-import type { FlowEvent } from "@/lib/shared/flows-timeline";
+import type { FlowEvent, FlowIndexes } from "@/lib/shared/flows-timeline";
 import type { FlowBinSeries, SeriesBin } from "@/lib/shared/flows-series";
 
 export interface FlowSeries {
@@ -22,7 +22,8 @@ export interface FlowSeries {
   totalEvents: number;
   /** Transactions with an event other than a liquidation: the position card's count. */
   totalTxs?: number;
-  /** [UTC day, events through it, tick, cum per bucket, balances stated,
+  /** [UTC day, events through it, tick, cum per bucket, balances stated
+   *  [side, asset, amount, the side's index at the event that recorded it?],
    *  prices carried, transactions through it, the running USD of each
    *  [bucket index, symbol] the day moved] */
   days: [
@@ -30,7 +31,7 @@ export interface FlowSeries {
     number,
     FlowEvent["tick"],
     number[],
-    ["collateral" | "debt", string, number][],
+    ["collateral" | "debt", string, number, number?][],
     [string, number, number][],
     number?,
     [number, string, number][]?,
@@ -46,6 +47,9 @@ export interface FlowSeries {
   lifetime?: [string, string, number, number][];
   /** Of the liquidated collateral, what the treasury took: [asset, token units]. */
   treasuryFees?: [string, number][];
+  /** Per held asset, the reserve's indexes at each completed held day's close
+   *  (served from 1 Oct 2026; an older server leaves it out). */
+  indexes?: FlowIndexes;
 }
 
 export type AaveV3FlowSeries = FlowSeries;

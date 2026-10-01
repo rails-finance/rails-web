@@ -568,7 +568,13 @@ export function flowSeriesTimeline(
     events,
     tick,
     cum: Object.fromEntries(series.buckets.map((k, i) => [k, cum[i] ?? 0])),
-    balances: balances.map(([side, asset, amount]) => ({ side, asset, symbol: symbolOf(asset), amount })),
+    balances: balances.map(([side, asset, amount, index]) => ({
+      side,
+      asset,
+      symbol: symbolOf(asset),
+      amount,
+      ...(index != null ? { index } : {}),
+    })),
     prices: prices.map(([asset, usd, ts]) => ({ asset, usd, ts })),
     ...(txs != null ? { txs } : {}),
     ...(cells ? { cumAsset: cells.map(([i, symbol, usd]) => ({ bucket: series.buckets[i], symbol, usd })) } : {}),
@@ -583,14 +589,19 @@ export function flowSeriesTimeline(
     today: series.today,
     totalEvents: series.totalEvents,
     ...(series.totalTxs != null ? { totalTxs: series.totalTxs } : {}),
-    // The day rows hold the balances each day's last event recorded, so a
-    // day between events keeps them (rails-ops reference/lifetime-flows-scrubber.md).
-    words: {
-      moment: {
-        notes: [
-          "Interest since the last event is not included: each balance is the one the last event recorded, valued at the day's price.",
-        ],
-      },
-    },
+    // With the reserves' indexes a day between events grows each balance by
+    // its interest; without them (an older server) it keeps the balance its
+    // last event recorded (rails-ops reference/lifetime-flows-scrubber.md).
+    ...(series.indexes && Object.keys(series.indexes.assets).length > 0
+      ? { indexes: series.indexes }
+      : {
+          words: {
+            moment: {
+              notes: [
+                "Interest since the last event is not included: each balance is the one the last event recorded, valued at the day's price.",
+              ],
+            },
+          },
+        }),
   };
 }

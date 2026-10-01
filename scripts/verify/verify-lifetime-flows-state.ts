@@ -66,6 +66,7 @@ import {
   prevEventDay,
   sideStateFor,
   stateAt,
+  type FlowAssetHeld,
   type FlowModel,
   type FlowSideState,
   type FlowTimeline,
@@ -1450,4 +1451,111 @@ test("Combined: a Dates span's last day parks the cursor on a stop of its own, w
   assert.notEqual(eventStep(parked, i - 1, 1), i);
   // A day that already has a stop adds none.
   assert.equal(combinedStops(full, line, 0, full.eventDays[3]).length, plain.length);
+});
+
+// The reserves' indexes (lifetime-flows-series-*-indexed.json: the route's
+// answers with `indexes`, read through victoria's read-only session on
+// 1 Oct 2026). A balance on a day after the event that recorded it is
+// recorded × the index at the day's close ÷ the index at that event.
+const INDEXED: [string, string, "v3" | "v4"][] = [
+  ["Aave V3 0xfb93…2a71", "lifetime-flows-series-fb93-indexed.json", "v3"],
+  ["Aave V4 Main 0x0fc9…afd3", "lifetime-flows-series-v4-0fc9-indexed.json", "v4"],
+  ["Aave V4 Bluechip 0xb0dd…ff76", "lifetime-flows-series-v4-b0dd-indexed.json", "v4"],
+];
+const indexedModel = (file: string, family: "v3" | "v4") => {
+  const series = readJson<FlowSeries>(file);
+  const t =
+    family === "v3"
+      ? aaveV3FlowSeriesTimeline(series, null, undefined)
+      : aaveV4FlowSeriesTimeline(series, null, undefined);
+  return { series, t: t!, m: buildFlowModel(t!) as FlowModel };
+};
+
+test("indexes: on an event day each balance the day recorded is stated as recorded (Aave V3, Aave V4)", () => {
+  for (const [name, file, family] of INDEXED) {
+    const { series, t, m } = indexedModel(file, family);
+    assert.ok(t.indexes, `${name}: the fixture carries indexes`);
+    const startDay = m.start / DAY_MS;
+    let checked = 0;
+    for (const d of t.days) {
+      const stop = d.day - startDay;
+      for (const b of d.balances) {
+        if (!(b.amount > 0)) continue;
+        assert.ok(b.index != null && b.index > 0, `${name}: ${b.symbol} on day ${d.day} carries its event's index`);
+        const h = m.heldAt[stop].find((x) => x.side === b.side && x.symbol === b.symbol);
+        assert.ok(h, `${name}: ${b.symbol} held on day ${d.day}`);
+        assert.equal(h.amount, b.amount, `${name}: ${b.side} ${b.symbol} on its event day ${d.day}`);
+        assert.equal(h.grown, undefined, `${name}: nothing grown on its own event day`);
+        checked++;
+      }
+    }
+    assert.ok(checked >= 10, `${name}: event-day balances checked: ${checked}`);
+    assert.ok(series.days.length > 0);
+  }
+});
+
+test("indexes: between events the card, the bars and the line state recorded × index ÷ index at the event", () => {
+  for (const [name, file, family] of INDEXED) {
+    const { series, t, m } = indexedModel(file, family);
+    const startDay = m.start / DAY_MS;
+    const line = binSeries(binInputFromWire(series), "day")!;
+    let grownSeen = 0;
+    for (let stop = 1; stop < m.liveStop; stop++) {
+      const day = startDay + stop;
+      for (const h of m.heldAt[stop]) {
+        if (!h.grown) continue;
+        grownSeen++;
+        const g = h.grown;
+        assert.ok(g.recordedDay < day && g.indexDay === day, `${name}: ${h.symbol} grown to its own day ${day}`);
+        const row =
+          t.indexes!.assets[Object.keys(t.indexes!.assets).find((a) => (series.assets[a]?.symbol ?? a) === h.symbol)!];
+        const at = row.find((r) => r[0] === day)!;
+        assert.equal(g.index, h.side === "collateral" ? at[1] : at[2], `${name}: the day's ${h.side} index`);
+        assert.ok(near(h.amount ?? 0, (g.recorded * g.index) / g.anchor, 1e-12 * (h.amount ?? 1)));
+        assert.ok((h.amount ?? 0) >= g.recorded, `${name}: interest only adds (${h.symbol} on ${day})`);
+      }
+      // The line's day point is the bars' figure that day.
+      const p = line.points.find((x) => x[0] === day);
+      const v = m.valued[stop];
+      if (p && p[2] != null)
+        assert.ok(near(p[2], v.collateral, 1e-6 * Math.max(1, v.collateral)), `${name}: collateral line at ${day}`);
+      if (p && p[3] != null) assert.ok(near(p[3], v.debt, 1e-6 * Math.max(1, v.debt)), `${name}: debt line at ${day}`);
+      // The state card states the model's tokens and their interest.
+      if (m.eventDays.includes(stop)) continue;
+      const mo: FlowMoment | null = flowMoment(m, [], (day + 1) * 86_400 - 1);
+      assert.ok(mo, `${name}: a moment at ${day}`);
+      for (const side of ["collateral", "debt"] as const)
+        for (const a of mo.sides[side].assets) {
+          const h: FlowAssetHeld = m.heldAt[stop].find((x) => x.side === side && x.symbol === a.symbol)!;
+          assert.equal(a.tokens, h.amount);
+          if (h.grown) {
+            assert.equal(a.recorded, h.grown.recorded);
+            assert.ok(near(a.interest ?? -1, (h.amount ?? 0) - h.grown.recorded, 1e-15 * (h.amount ?? 1)));
+            if (a.price != null) assert.ok(near(a.interestUsd ?? -1, (a.interest ?? 0) * a.price, 1e-9));
+          } else assert.equal(a.interest, null);
+        }
+    }
+    assert.ok(grownSeen > 20, `${name}: balances grown between events: ${grownSeen}`);
+  }
+});
+
+test("indexes: Aave V3 0xfb93…2a71 grown to the close of 10 Dec '23 is the chain's balance", () => {
+  // aWBTC and variableDebtUSDT balanceOf(0xfb93…2a71) at block 18,752,088, the
+  // last Aave V3 event block of 10 Dec 2023 (109 s before midnight), read by
+  // eth_call on 1 Oct 2026. The recorded balances are 1.91023454 WBTC
+  // (31 Aug '23) and 25,132.096979 USDT (27 Sep '23).
+  const { m } = indexedModel("lifetime-flows-series-fb93-indexed.json", "v3");
+  const stop = 19_700 - m.start / DAY_MS;
+  const at = (symbol: string) => m.heldAt[stop].find((h) => h.symbol === symbol)!.amount ?? 0;
+  assert.ok(Math.abs(at("WBTC") / 1.91116516 - 1) < 1e-6, `WBTC ${at("WBTC")}`);
+  assert.ok(Math.abs(at("USDT") / 25471.68126 - 1) < 1e-6, `USDT ${at("USDT")}`);
+});
+
+test("indexes: a route without them grows nothing and says so on the card", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const t = aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!;
+  assert.equal(t.indexes, undefined);
+  assert.equal(t.words?.moment?.notes?.length, 1);
+  const m = buildFlowModel(t) as FlowModel;
+  assert.ok(m.heldAt.every((hs) => hs.every((h) => h.grown == null)));
 });

@@ -9,14 +9,15 @@
 // the page and bins them here.
 //
 // Each bin states what was held and owed at its last day: the balances the
-// replay left by then, each asset at the index's daily price on the bin's
-// last day that recorded one. Where a held asset records no price inside the
+// replay left by then (grown by interest to that day where the route serves
+// the reserves' indexes, as the scrubber grows them), each asset at the
+// index's daily price on the bin's last day that recorded one. Where a held asset records no price inside the
 // bin, that side is null and the chart draws a gap.
 //
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts.
 
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
-import type { FlowSide, FlowTimeline } from "@/lib/shared/flows-timeline";
+import { grownBalance, type FlowIndexes, type FlowSide, type FlowTimeline } from "@/lib/shared/flows-timeline";
 
 export type SeriesBin = "day" | "week" | "month";
 
@@ -52,13 +53,15 @@ export function windowFromDay(activeDays: readonly number[]): number {
  *  day), each asset's daily prices ([day, usd] on each day one was recorded),
  *  and the symbols. Days are UTC day numbers. */
 export interface BinInput {
-  days: { day: number; balances: { side: FlowSide; asset: string; amount: number }[] }[];
+  days: { day: number; balances: { side: FlowSide; asset: string; amount: number; index?: number }[] }[];
   prices: Record<string, [number, number][]>;
   symbols: Record<string, string>;
   today: number;
   /** Prices are recorded only on some days (a family's events): a bin keeps
    *  the last one recorded by its end, however old. */
   carry?: boolean;
+  /** The reserves' indexes at each held day's close (the Aave family's route). */
+  indexes?: FlowIndexes;
 }
 
 /** [first day, last day, held, owed]; null where a held asset has no price in the bin. */
@@ -130,23 +133,24 @@ export function binSeries(input: BinInput, bin: SeriesBin): FlowBinSeries | null
     return i >= 0 && (input.carry || list[i][0] >= from) ? list[i][1] : null;
   };
 
-  const held = new Map<string, { side: FlowSide; asset: string; amount: number }>();
+  const held = new Map<string, { side: FlowSide; asset: string; amount: number; index?: number; day: number }>();
   const points: SeriesPoint[] = [];
   const gaps: FlowBinSeries["gaps"] = [];
   let di = 0;
   for (const [from, to] of binRanges(first, today, bin)) {
     while (di < days.length && days[di].day <= to) {
-      for (const b of days[di].balances) held.set(`${b.side}:${b.asset}`, b);
+      for (const b of days[di].balances) held.set(`${b.side}:${b.asset}`, { ...b, day: days[di].day });
       di++;
     }
     const sum: Record<FlowSide, number | null> = { collateral: 0, debt: 0 };
     for (const h of held.values()) {
       if (!(h.amount > 0)) continue;
+      const amount = grownBalance(input.indexes, h.asset, h.side, h.amount, h.day, h.index, to).amount;
       const p = priceIn(h.asset, from, to);
       if (p == null) {
         sum[h.side] = null;
         gaps.push([points.length, h.side, input.symbols[h.asset] ?? h.asset]);
-      } else if (sum[h.side] != null) sum[h.side] = (sum[h.side] as number) + h.amount * p;
+      } else if (sum[h.side] != null) sum[h.side] = (sum[h.side] as number) + amount * p;
     }
     points.push([
       from,
@@ -172,11 +176,17 @@ export function binInputFromWire(s: FlowSeries): BinInput {
   return {
     days: s.days.map(([day, , , , balances]) => ({
       day,
-      balances: balances.map(([side, asset, amount]) => ({ side, asset, amount })),
+      balances: balances.map(([side, asset, amount, index]) => ({
+        side,
+        asset,
+        amount,
+        ...(index != null ? { index } : {}),
+      })),
     })),
     prices: Object.fromEntries(Object.entries(s.prices).map(([a, p]) => [a, p.obs])),
     symbols: Object.fromEntries(Object.entries(s.assets).map(([a, x]) => [a, x.symbol])),
     today: s.today,
+    ...(s.indexes ? { indexes: s.indexes } : {}),
   };
 }
 

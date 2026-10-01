@@ -5,8 +5,10 @@
 // moment. It states only what the flow model holds exactly for that day, the
 // figures the chart states there:
 //
-//   - each asset as held after the last event (its balance does not move
-//     between events);
+//   - each asset as held after the last event, grown by its interest to the
+//     day's close where the timeline carries the reserves' indexes (the Aave
+//     family: recorded × the index at the close ÷ the index at that event,
+//     the chart's figure), as recorded otherwise;
 //   - its USD where the model has a price recorded that day (the Aave
 //     family's daily series); none where it carries an older one (a Liquity
 //     branch, whose collateral is priced only at its events);
@@ -17,7 +19,7 @@
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts and
 // scripts/verify/verify-liquity-flows.ts.
 
-import { DAY_MS, type FlowModel, type FlowSide } from "@/lib/shared/flows-timeline";
+import { DAY_MS, type FlowGrowth, type FlowModel, type FlowSide } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 
 const DAY_S = 86_400;
@@ -36,6 +38,12 @@ export interface MomentAsset {
   usd: number | null;
   /** The day's recorded price (USD per token), where it states USD. */
   price: number | null;
+  /** Where the balance was grown by its reserve's index since the event that
+   *  recorded it: how, and the interest that adds in tokens and (at the day's
+   *  price, where it states USD) in USD. */
+  grown: FlowGrowth | null;
+  interest: number | null;
+  interestUsd: number | null;
 }
 
 export interface MomentSide {
@@ -94,14 +102,21 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
     const assets: MomentAsset[] = held
       .filter((h) => h.side === side && (h.amount ?? 0) > 0)
       .map((h) => {
-        const recorded = h.amount as number;
+        const amount = h.amount as number;
+        const grown = !isFace && h.grown ? h.grown : null;
+        const recorded = grown ? grown.recorded : amount;
         const today = h.priced != null && h.priced.series && h.priced.day === day;
+        const price = !isFace && today ? h.usd / amount : null;
+        const interest = grown ? amount - grown.recorded : null;
         return {
           symbol: h.symbol,
           recorded,
-          tokens: isFace ? h.usd : recorded,
+          tokens: isFace ? h.usd : amount,
           usd: !isFace && today ? h.usd : null,
-          price: !isFace && today ? h.usd / recorded : null,
+          price,
+          grown,
+          interest,
+          interestUsd: interest != null && price != null ? interest * price : null,
         };
       });
     return {

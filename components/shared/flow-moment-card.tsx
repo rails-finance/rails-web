@@ -6,9 +6,11 @@
 // own, the cut timeline opens with this card for that moment. It wears an
 // event card's shell with a clock on the spine, and states only what the
 // flow model holds exactly for that day (lib/shared/flow-moment.ts): each
-// asset as its last event left it, its USD where a price was recorded that
-// day, a side counted at its $1 face with the interest built to the moment,
-// and each side's sum where it reads cleanly. It is not an event: no number,
+// asset as its last event left it, grown by its interest since where the
+// route serves the reserves' indexes (the Aave family), with that interest on
+// a line of its own; its USD where a price was recorded that day; a side
+// counted at its $1 face with the interest built to the moment; and each
+// side's sum where it reads cleanly. It is not an event: no number,
 // no filter, not counted, and it goes when the cut is cleared.
 
 import { useMemo, useState, type ReactNode } from "react";
@@ -28,7 +30,7 @@ import {
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { EventCum } from "@/lib/shared/flow-focus";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
-import type { FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
+import type { FlowGrowth, FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 
 const DAY_S = 86_400;
@@ -41,6 +43,18 @@ export interface MomentNeighbour {
 }
 
 const SIDE_WORD: Record<FlowSide, string> = { collateral: "Collateral", debt: "Debt" };
+
+/** What the index is called on each side, by where it comes from. */
+const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
+  "reserve-data": { collateral: "liquidity index", debt: "variable borrow index" },
+  "hub-state": { collateral: "supply share price", debt: "drawn index" },
+};
+const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
+  "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
+  "hub-state": "the hub's state at its last event block (the drawn index grown at its logged rate to the moment)",
+};
+const fmtIndex = (v: number) =>
+  v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
 const plural = (n: number, w: string) => `${n.toLocaleString("en-US")} ${w}${n === 1 ? "" : "s"}`;
 
 export function FlowMomentCard({
@@ -92,33 +106,93 @@ export function FlowMomentCard({
   const words = model.words.moment;
 
   // ── Receipts ──────────────────────────────────────────────────────────
+  const indexInputs = (side: FlowSide, a: MomentAsset, g: FlowGrowth) => {
+    const name = INDEX_NAME[g.basis][side];
+    return [
+      {
+        label: "recorded balance",
+        value: `${fmtPositionAmount(g.recorded)} ${a.symbol}`,
+        kind: "chain" as const,
+        note: `after the event on ${dayStamp(g.recordedDay * DAY_S)}`,
+      },
+      {
+        label: `${name} at the close`,
+        value: fmtIndex(g.index),
+        kind: "chain-derived" as const,
+        pclass: "state" as const,
+        note: `${a.symbol}'s ${name} at the close of ${dayStamp(g.indexDay * DAY_S)}, from ${INDEX_SOURCE[g.basis]}`,
+      },
+      {
+        label: `${name} at the event`,
+        value: fmtIndex(g.anchor),
+        kind: "chain-derived" as const,
+        pclass: "state" as const,
+        note: `at the event on ${dayStamp(g.recordedDay * DAY_S)}`,
+      },
+    ];
+  };
   const tokensProv = (side: FlowSide, a: MomentAsset): Provenance =>
-    moment.sides[side].face && moment.accrual
+    a.grown
       ? {
           kind: "chain-derived",
-          summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
-          formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
-          inputs: [
-            { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
-            {
-              label: "annual rate",
-              value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
-              kind: "chain",
-              note: "in force after the last event, fees included",
-            },
-            {
-              label: "time",
-              value: `${(moment.accrual.seconds / DAY_S).toLocaleString("en-US", { maximumFractionDigits: 2 })} days`,
-              kind: "chain-derived",
-              note: `from the last event to the end of ${date}`,
-            },
-          ],
+          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by the interest since: the reserve's ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. The chain's balance is the scaled balance × the index, so this is what the chain held that day.`,
+          formula: "recorded balance × index at the close ÷ index at the event",
+          inputs: indexInputs(side, a, a.grown),
         }
-      : {
-          kind: "chain",
-          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
-          inputs: [{ label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" }],
-        };
+      : moment.sides[side].face && moment.accrual
+        ? {
+            kind: "chain-derived",
+            summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
+            formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
+            inputs: [
+              { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
+              {
+                label: "annual rate",
+                value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+                kind: "chain",
+                note: "in force after the last event, fees included",
+              },
+              {
+                label: "time",
+                value: `${(moment.accrual.seconds / DAY_S).toLocaleString("en-US", { maximumFractionDigits: 2 })} days`,
+                kind: "chain-derived",
+                note: `from the last event to the end of ${date}`,
+              },
+            ],
+          }
+        : {
+            kind: "chain",
+            summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
+            inputs: [
+              { label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
+            ],
+          };
+  const interestProv = (side: FlowSide, a: MomentAsset): Provenance => {
+    const g = a.grown as FlowGrowth;
+    return {
+      kind: "chain-derived",
+      summary: `${a.symbol} interest ${side === "collateral" ? "earned" : "owed"} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by the reserve's ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
+      formula:
+        a.interestUsd != null
+          ? "recorded × (index at the close ÷ index at the event − 1) × price"
+          : "recorded × (index at the close ÷ index at the event − 1)",
+      ...(a.interestUsd != null ? { pclass: "oracle" as const } : {}),
+      inputs: [
+        ...indexInputs(side, a, g),
+        ...(a.price != null
+          ? [
+              {
+                label: "price",
+                value: `$${a.price.toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
+                kind: "chain-derived" as const,
+                pclass: "oracle" as const,
+                note: `last oracle price recorded by the end of ${date}`,
+              },
+            ]
+          : []),
+      ],
+    };
+  };
   const usdProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
     summary: `${a.symbol} in USD at ${when} — the balance at the oracle price the index recorded for that day.`,
@@ -208,6 +282,16 @@ export function FlowMomentCard({
       ? `The ${what}'s sum is left out: it needs a price for ${unpriced.join(", ")} on ${date}, which is not recorded yet.`
       : `The ${what}'s sum is left out: no price was recorded for ${unpriced.join(", ")} on ${date}.`;
   };
+  /** The cell's line on balances grown by interest: since the one event day
+   *  that recorded them all, or since each one's own. */
+  const grownWords = (side: FlowSide): string => {
+    const days = new Set(moment.sides[side].assets.map((a) => a.grown?.recordedDay ?? null));
+    const verb = side === "collateral" ? "earned" : "owed";
+    const one = days.size === 1 ? [...days][0] : null;
+    return one != null
+      ? `As the last event left it on ${dayStamp(one * DAY_S)}, grown by the interest ${verb} since, to the close of ${date}.`
+      : `Each balance as its last event left it, grown by the interest ${verb} since, to the close of ${date}.`;
+  };
   const cell = (side: FlowSide) => {
     const s = moment.sides[side];
     return (
@@ -240,19 +324,39 @@ export function FlowMomentCard({
             ) : (
               <ul className="flex flex-col gap-1 text-[13px] tabular-nums">
                 {s.assets.map((a) => (
-                  <li key={a.symbol} className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5">
-                      <TokenChipIcon symbol={a.symbol} size={14} filterable={false} />
-                      {a.symbol}
+                  <li key={a.symbol} className="flex flex-col gap-0.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5">
+                        <TokenChipIcon symbol={a.symbol} size={14} filterable={false} />
+                        {a.symbol}
+                      </span>
+                      <span className="inline-flex items-baseline gap-2">
+                        <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
+                        {a.usd != null && (
+                          <Prov info={usdProv(a)}>
+                            <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                          </Prov>
+                        )}
+                      </span>
                     </span>
-                    <span className="inline-flex items-baseline gap-2">
-                      <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
-                      {a.usd != null && (
-                        <Prov info={usdProv(a)}>
-                          <span className="text-rb-500">{wholeUsd(a.usd)}</span>
-                        </Prov>
-                      )}
-                    </span>
+                    {a.grown && a.interest != null && (
+                      <span
+                        className="flex items-baseline justify-between gap-2 pl-5 text-xs text-rb-500"
+                        data-flow-moment-interest={`${side}:${a.symbol}`}
+                      >
+                        <span>Interest since {dayStamp(a.grown.recordedDay * DAY_S)}</span>
+                        <span className="inline-flex items-baseline gap-2">
+                          <Prov info={interestProv(side, a)}>
+                            <span className="text-foreground">+{fmtPositionAmount(a.interest)}</span>
+                          </Prov>
+                          {a.interestUsd != null && (
+                            <Prov info={interestProv(side, a)}>
+                              <span>{wholeUsd(a.interestUsd)}</span>
+                            </Prov>
+                          )}
+                        </span>
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -260,7 +364,9 @@ export function FlowMomentCard({
             <p className="mt-2 text-xs leading-snug text-rb-500">
               {s.face && moment.accrual
                 ? `The debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
-                : `As the last event left it on ${lastStamp}; no event changed it by then.${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`}
+                : s.assets.some((a) => a.grown)
+                  ? `${grownWords(side)}${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`
+                  : `As the last event left it on ${lastStamp}; no event changed it by then.${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`}
             </p>
           </>
         )}
@@ -292,8 +398,10 @@ export function FlowMomentCard({
   const explainer = (
     <p className="text-sm leading-relaxed text-rb-500">
       The position at the close of {date}, where the timeline is cut. No event happened that day, so this card is not an
-      event: it has no number, the filters and the count leave it out, and it goes when the cut is cleared. The
-      calculator adds each side up to that day where every figure on it has a price for the day.
+      event: it has no number, the filters and the count leave it out, and it goes when the cut is cleared.
+      {sides.some((s) => moment.sides[s].assets.some((a) => a.grown)) &&
+        " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held."}{" "}
+      The calculator adds each side up to that day where every figure on it has a price for the day.
     </p>
   );
 
