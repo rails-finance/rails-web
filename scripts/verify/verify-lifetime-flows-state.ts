@@ -23,7 +23,9 @@
 // and every line still adds up to its bar. The Lifetime series
 // (lib/shared/flows-series.ts): calendar bins from the open to today, each the
 // scrubber's state where the bin's last day recorded every held asset's price,
-// and a bin with no price recorded for a held asset a gap.
+// and a bin with no price recorded for a held asset a gap. A balance step
+// (Core's GHO discount settlement, lifetime-flows-series-gho-2079.json, read
+// 2026-10-01) is read from its day and is no event day.
 //
 //   npx tsx --test scripts/verify/verify-lifetime-flows-state.ts
 import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
@@ -1555,6 +1557,24 @@ test("indexes: Aave V3 0xfb93…2a71 grown to the close of 10 Dec '23 is the cha
   const at = (symbol: string) => m.heldAt[stop].find((h) => h.symbol === symbol)!.amount ?? 0;
   assert.ok(Math.abs(at("WBTC") / 1.91116516 - 1) < 1e-6, `WBTC ${at("WBTC")}`);
   assert.ok(Math.abs(at("USDT") / 25471.68126 - 1) < 1e-6, `USDT ${at("USDT")}`);
+});
+
+test("a balance step (Core's GHO discount settlement) is read from its day, and is no event day", () => {
+  // 0x2079…d6ce, read on victoria 2026-10-01: borrows on 16 Jun and 16 Jul '25,
+  // the settlement on 3 Jul between them. The chain's figures are the stored
+  // scaledBalanceOf × the borrow index at each close.
+  const { series, m } = indexedModel("lifetime-flows-series-gho-2079.json", "v3");
+  const startDay = m.start / DAY_MS;
+  const row = series.days.find((d) => d[0] === 20_272)!;
+  const before = series.days[series.days.indexOf(row) - 1];
+  assert.equal(row[1], before[1], "the step's row adds no event");
+  assert.ok(!m.eventDays.includes(20_272 - startDay), "the step is not an event day");
+  assert.ok(!m.ticks.some((t) => t.day === 20_272 - startDay), "the step draws no tick");
+  assert.equal(m.ticks.length, series.days.length - 1);
+  const gho = (day: number) =>
+    m.heldAt[day - startDay].find((h) => h.symbol === "GHO" && h.side === "debt")!.amount ?? 0;
+  assert.ok(Math.abs(gho(20_279) / 2_311_682.895 - 1) < 1e-9, `10 Jul '25: ${gho(20_279)}`);
+  assert.ok(Math.abs(gho(20_301) / 3_321_406.778 - 1) < 1e-9, `1 Aug '25: ${gho(20_301)}`);
 });
 
 test("indexes: a route without them grows nothing and says so on the card", () => {

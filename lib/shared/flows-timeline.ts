@@ -621,7 +621,11 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     cells: d.cumAsset ?? [],
   }));
   const lastDay = rows[rows.length - 1].day;
-  const eventDays = rows.map((r) => r.day);
+  // A row whose events equal the row before's holds a balance the protocol set
+  // with no event (Aave V3 Core's GHO discount settlement, 3 Jul 2025): the
+  // balances read it, but it is not an event day and draws no tick.
+  const stepOnly = (i: number) => i > 0 && days[i].events === days[i - 1].events;
+  const eventDays = rows.filter((_, i) => !stepOnly(i)).map((r) => r.day);
 
   // Held balances after the last active day, to see whether the slider runs on.
   const heldEnd = new Map<string, number>();
@@ -778,7 +782,8 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     lastDay,
     liveStop,
     eventDays,
-    ticks: days.map((d, i) => {
+    ticks: days.flatMap((d, i) => {
+      if (stepOnly(i)) return [];
       const prev = days[i - 1];
       const kinds: string[] = [];
       for (const b of t.buckets) {
@@ -790,7 +795,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
       }
       for (const r of d.rates ?? []) kinds.push(RATE_WORD[r]);
-      return { day: d.day - startDay, tick: d.tick, kinds };
+      return [{ day: d.day - startDay, tick: d.tick, kinds }];
     }),
     repricings,
     live: t.live,

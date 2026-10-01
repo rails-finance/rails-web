@@ -85,11 +85,12 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   const day = Math.floor(endTs / DAY_S);
   const stop = day - startDay;
   if (stop <= 0 || stop >= model.liveStop || model.eventDays.includes(stop)) return null;
-  let ri = -1;
-  for (let i = 0; i < model.rows.length && model.rows[i].day <= stop; i++) ri = i;
-  if (ri < 0) return null;
-  const lastDay = startDay + model.rows[ri].day;
-  const nextRow = model.rows[ri + 1];
+  // The event days around it (a balance step's row is not one).
+  let ei = -1;
+  for (let i = 0; i < model.eventDays.length && model.eventDays[i] <= stop; i++) ei = i;
+  if (ei < 0) return null;
+  const lastDay = startDay + model.eventDays[ei];
+  const nextEvent = model.eventDays[ei + 1];
   const close = (day + 1) * DAY_S;
   let last: FocusEvent | null = null;
   for (const e of events) if (e.ts < close) last = e;
@@ -137,7 +138,7 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
     day,
     stop,
     lastDay,
-    nextDay: nextRow ? startDay + nextRow.day : null,
+    nextDay: nextEvent != null ? startDay + nextEvent : null,
     last,
     accrual,
     sides,
