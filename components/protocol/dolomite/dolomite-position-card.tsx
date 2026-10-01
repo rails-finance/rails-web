@@ -186,7 +186,7 @@ function LegStack({ v, side }: { v: DolomitePositionView; side: "supply" | "debt
             {r.decimalsUnread ? (
               <TokenAmountNotLoaded label={r.symbol} />
             ) : (
-              <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} />
+              <AssetAmount value={legAmount(r)} symbol={r.symbol} exact={legExact(r)} address={r.token} />
             )}
           </Prov>
         </StatValue>
@@ -212,6 +212,7 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
               <AssetAmount
                 value={r.amount}
                 symbol={r.symbol}
+                address={r.token}
                 exact={
                   r.tokens
                     ? formatUnitsExact(r.amountRaw, r.decimals)

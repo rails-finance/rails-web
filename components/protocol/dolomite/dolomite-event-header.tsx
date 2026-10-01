@@ -65,7 +65,7 @@ export function DolomiteEventHeader({
     deltas.push({
       value: d,
       symbol: sym,
-      address: soleFlowAddress(flows, sym),
+      address: ctx.marketToken ?? soleFlowAddress(flows, sym),
       prov: movedDeltaProv(ctx.eventType, sym, coords, raw),
     });
 

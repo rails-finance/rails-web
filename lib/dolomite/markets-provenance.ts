@@ -131,6 +131,18 @@ export const dolMarginPremiumProv = (c: DolomiteMarketCoords): Provenance => ({
   via: `${LANE} · getMarketMarginPremium @ head`,
 });
 
+/** A market's own spread premium — getMarketSpreadPremium, multiplying the
+ *  global liquidation spread when this market is seized or repaid. */
+export const dolSpreadPremiumProv = (c: DolomiteMarketCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: recompute("DolomiteMargin.getMarketSpreadPremium", c),
+  summary: `${sym(c)} spread premium — ${mkt(c)}'s own \`getMarketSpreadPremium\`${atBlock(c)} (1e18 → fraction). It MULTIPLIES the global liquidation spread: spread = \`getLiquidationSpread\` × (1 + premium).`,
+  contract: marginContract(),
+  via: `${LANE} · getMarketSpreadPremium @ head`,
+});
+
 /** A market's effective minimum collateralisation as collateral — the ladder's
  *  rung: (1 + global marginRatio) × (1 + its margin premium). */
 export const dolMinCollatProv = (c: DolomiteMarketCoords): Provenance => ({

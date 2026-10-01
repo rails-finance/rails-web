@@ -262,13 +262,29 @@ export default function DolomitePositionView({
   const eventTotal = lifetimeFiguresKnown(historyWindow) ? tl.totalCount : undefined;
   const cardView = useMemo<DolomitePositionView | null>(() => {
     if (!liveView) return liveView;
-    const counted = { ...liveView, eventTotal };
+    // Each market's token address from the rows (the core's roster), so the
+    // card draws the same logo as the rows.
+    const tokenByMarket = new Map<number, string>();
+    for (const e of dolomiteEvents) {
+      const d = e.context.data;
+      if (d.marketToken && !tokenByMarket.has(d.marketId)) tokenByMarket.set(d.marketId, d.marketToken);
+    }
+    const withToken = <T extends { marketId: number; token?: string }>(lines: T[]): T[] =>
+      lines.map((l) => (l.token == null && tokenByMarket.has(l.marketId) ? { ...l, token: tokenByMarket.get(l.marketId) } : l));
+    const counted = {
+      ...liveView,
+      eventTotal,
+      supplies: withToken(liveView.supplies),
+      borrows: withToken(liveView.borrows),
+      peakSupplies: withToken(liveView.peakSupplies),
+      peakBorrows: withToken(liveView.peakBorrows),
+    };
     if (liveView.status === "open" || cutoffBlock != null || dolomiteEvents.length === 0) return counted;
     return {
       ...counted,
       liquidations: dolomiteLiquidationStories(dolomiteEvents),
-      peakSupplies: withTokenPeaks(liveView.peakSupplies, dolomiteEvents, "supply"),
-      peakBorrows: withTokenPeaks(liveView.peakBorrows, dolomiteEvents, "debt"),
+      peakSupplies: withTokenPeaks(counted.peakSupplies, dolomiteEvents, "supply"),
+      peakBorrows: withTokenPeaks(counted.peakBorrows, dolomiteEvents, "debt"),
     };
   }, [liveView, eventTotal, cutoffBlock, dolomiteEvents]);
 

@@ -248,6 +248,9 @@ export function getEventCounterpartyKeys(e: BaseActivityEvent): string[] {
 //                      wins over an older per-protocol spelling (e.g. Liquity
 //                      V2's redemption used to read "Redemption").
 //   Position moves  — stay "Transfer in" / "Transfer out" everywhere.
+//                      Dolomite's balance moves between a wallet's accounts
+//                      are not ownership moves: its filter uses the row words
+//                      ("Received" / "Sent").
 const LIQUITY_OP_LABELS: Record<string, string> = {
   openTrove: "Open",
   openTroveAndJoinBatch: "Open",
@@ -363,8 +366,8 @@ const COMPOUND_V2_OP_LABELS: Record<string, string> = {
 // did).
 const DOLOMITE_OP_LABELS: Record<string, string> = {
   ...DOLOMITE_BALANCE_ACTION_LABELS,
-  transfer_in: "Transfer in",
-  transfer_out: "Transfer out",
+  transfer_in: "Received",
+  transfer_out: "Sent",
   trade_taker: "Trade (spent)",
   trade_maker: "Trade (received)",
   liquidation: "Liquidated",

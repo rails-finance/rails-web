@@ -3,7 +3,7 @@
 // borrow, and a deposit into a negative balance is a repayment. The row label
 // and the timeline filter both name the act by the balance's par before and
 // after, so a repayment never reads "Deposit". A transfer between accounts
-// that moves a debt is named the same way ("Sent (borrow)", "Received (repay)").
+// that moves a debt is named for the act first ("Borrow (sent)", "Repay (received)").
 
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
 
@@ -24,8 +24,8 @@ export const DOLOMITE_BALANCE_ACTION_LABELS: Record<DolomiteBalanceAction, strin
   withdraw: "Withdraw",
   borrow: "Borrow",
   withdraw_borrow: "Withdraw and borrow",
-  sent_borrow: "Sent (borrow)",
-  received_repay: "Received (repay)",
+  sent_borrow: "Borrow (sent)",
+  received_repay: "Repay (received)",
 };
 
 const sign = (v: string | undefined): number => {

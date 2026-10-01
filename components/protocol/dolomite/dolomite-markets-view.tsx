@@ -58,6 +58,7 @@ import {
   dolMarginPremiumProv,
   dolMinCollatProv,
   dolMarketSpreadProv,
+  dolSpreadPremiumProv,
   dolRateProv,
   dolSummaryValueProv,
   dolGlobalMinProv,
@@ -68,6 +69,8 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
+/** A premium as a percentage without trailing zeros ("200%", "27.5%"). */
+const premiumText = (f: number) => `${Number((f * 100).toFixed(1))}%`;
 
 const usd = (v: number | null): string =>
   v == null ? "—" : `$${v.toLocaleString("en-US", { maximumFractionDigits: v < 100 ? 2 : 0 })}`;
@@ -223,6 +226,13 @@ function MarketRow({ m, axisMax, block }: { m: DolomiteMarketRow; axisMax: numbe
           title="The liquidation spread when this market is seized: the collateral a liquidator takes is worth the debt it repays plus this bonus"
         >
           <Prov info={dolMarketSpreadProv(coords)}>{pctText(m.liquidationSpread, 1)}</Prov>
+          <div className="mt-1 whitespace-nowrap text-[10px] font-normal text-rb-500">
+            {m.spreadPremium > 0 ? (
+              <Prov info={dolSpreadPremiumProv(coords)}>{premiumText(m.spreadPremium)} spread premium</Prov>
+            ) : (
+              "no spread premium"
+            )}
+          </div>
         </td>
         <td className="px-3 py-2.5">
           <UtilMini m={m} />
@@ -404,6 +414,16 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
           </>
         }
       />
+
+      {/* The two per-market premiums, named together: the reader otherwise
+          meets one under Min collateralisation and the other under Spread. */}
+      <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-dolomite-premiums="">
+        Each market can carry two premiums. Its margin premium raises the collateralisation required on it, the
+        global <Prov info={dolGlobalMinProv(summaryCoords)}>{pctText(baseline, 2)}</Prov> × (1 + margin premium); its
+        spread premium raises the bonus a liquidator takes on it, the global{" "}
+        <Prov info={dolGlobalSpreadProv(summaryCoords)}>{pctText(data.risk.liquidationSpread, 0)}</Prov> spread × (1 +
+        spread premium).
+      </p>
 
       <div className="overflow-x-auto rounded-lg border border-rb-200 dark:border-rb-800">
         <table className="w-full min-w-[980px] border-collapse">

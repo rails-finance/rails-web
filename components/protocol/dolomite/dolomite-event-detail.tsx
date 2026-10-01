@@ -43,7 +43,16 @@ import {
   type DolomiteCoords,
 } from "@/lib/dolomite/event-provenance";
 import type { DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
-import { formatNumber, formatCompact, formatExact, formatUsdValue } from "@/lib/utils/format";
+import { dolomiteBalanceAction } from "@/lib/dolomite/balance-action";
+import {
+  decimalSub,
+  formatNumber,
+  formatCompact,
+  formatExact,
+  formatExactDecimal,
+  formatUnitsExact,
+  formatUsdValue,
+} from "@/lib/utils/format";
 
 export interface DolomiteEventDetailProps {
   ctx: DolomiteContext;
@@ -146,6 +155,12 @@ function legResolved(ctx: DolomiteContext): boolean {
   return ctx.raw?.weiDelta != null && !/^market #/.test(ctx.marketSymbol);
 }
 
+/** An oracle price (Monetary.Price, scaled 1e(36 − decimals)) at its full
+ *  precision, trailing zeros trimmed: no float in the path. */
+function fullPrice(raw: string, decimals: number): string {
+  return formatExactDecimal(formatUnitsExact(raw, 36 - decimals));
+}
+
 /** The valued two-leg breakdown — both legs of one LogLiquidate at the
  *  block's own prices. Undefined until the archive read lands. */
 function buildDolomiteLiqForensics(
@@ -164,6 +179,10 @@ function buildDolomiteLiqForensics(
 
   const heldPrice = Number(atBlock.heldPriceRaw) / 10 ** (36 - held.decimals);
   const owedPrice = Number(atBlock.owedPriceRaw) / 10 ** (36 - owed.decimals);
+  // The pills print the oracle's whole figure (trailing zeros trimmed), so
+  // amount × the printed price gives the printed dollars to the cent.
+  const heldPriceText = fullPrice(atBlock.heldPriceRaw, held.decimals);
+  const owedPriceText = fullPrice(atBlock.owedPriceRaw, owed.decimals);
   const spread = atBlock.spreadRaw != null ? Number(atBlock.spreadRaw) / 1e18 : null;
 
   return {
@@ -172,7 +191,7 @@ function buildDolomiteLiqForensics(
       usd: seizedUsd,
       usdProv: dolomiteLiqLegValueProv("seized collateral", held.marketSymbol, coords, {
         amount: `${fmt(held.weiDelta)} ${held.marketSymbol}`,
-        price: formatDolomitePrice(heldPrice),
+        price: heldPriceText,
       }),
     },
     cleared: {
@@ -180,7 +199,7 @@ function buildDolomiteLiqForensics(
       usd: clearedUsd,
       usdProv: dolomiteLiqLegValueProv("cleared debt", owed.marketSymbol, coords, {
         amount: `${fmt(owed.weiDelta)} ${owed.marketSymbol}`,
-        price: formatDolomitePrice(owedPrice),
+        price: owedPriceText,
       }),
     },
     premium: seizedUsd / clearedUsd - 1,
@@ -205,18 +224,31 @@ function buildDolomiteLiqForensics(
       {
         symbol: held.marketSymbol,
         priceUsd: heldPrice,
+        display: heldPriceText,
+        address: held.marketToken,
         priceProv: dolomiteLiqAtBlockPriceProv(held.marketSymbol, coords, atBlock.heldPriceRaw),
         note: "oracle at block",
       },
       {
         symbol: owed.marketSymbol,
         priceUsd: owedPrice,
+        display: owedPriceText,
+        address: owed.marketToken,
         priceProv: dolomiteLiqAtBlockPriceProv(owed.marketSymbol, coords, atBlock.owedPriceRaw),
         note: "oracle at block",
       },
     ],
     format: { value: formatUsdValue, price: formatDolomitePrice },
   };
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "7 Aug" (UTC), with the year when it differs from the row's. */
+function sinceDate(ts: number, rowTs: number | undefined): string {
+  const d = new Date(ts * 1000);
+  const sameYear = rowTs != null && new Date(rowTs * 1000).getUTCFullYear() === d.getUTCFullYear();
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${sameYear ? "" : ` ${d.getUTCFullYear()}`}`;
 }
 
 const pctOf = (raw: string | null): number | null => (raw == null ? null : Number(raw) / 1e18);
@@ -355,12 +387,23 @@ export function DolomiteEventDetail({
     const changeN = owed ? Math.abs(afterN) - b : afterN - beforeN;
     if (changeN !== 0) {
       const sign = changeN >= 0 ? "+" : "−";
+      // The exact figures come from the decimal strings, so the tip carries
+      // the same digits as the card's; the float path is the fallback.
+      const mag = (v: string): string => v.replace(/^-/, "");
+      const afterRaw = onChain ? ctx.balanceAfter : ctx.parAfter;
+      const beforeStr = beforeRaw != null ? (owed ? mag(beforeRaw) : beforeRaw) : null;
+      const changeStr =
+        beforeRaw != null && afterRaw != null
+          ? owed
+            ? decimalSub(mag(afterRaw), mag(beforeRaw))
+            : decimalSub(afterRaw, beforeRaw)
+          : null;
       transition = {
         before: formatCompact(b),
-        beforeExact: formatExact(b),
+        beforeExact: beforeStr != null && /^-?\d/.test(beforeStr) ? formatExactDecimal(beforeStr) : formatExact(b),
         beforeProv: onChain ? balanceBeforeProv(sym, coords) : parBeforeProv(sym, coords, ctx.raw?.parBefore),
         change: `${sign}${formatCompact(Math.abs(changeN))}`,
-        changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
+        changeExact: `${sign}${changeStr != null ? formatExactDecimal(mag(changeStr)) : formatExact(Math.abs(changeN))}`,
         changeProv: onChain ? balanceChangeProv(sym, coords) : parDeltaProv(sym, coords),
       };
     }
@@ -371,6 +414,7 @@ export function DolomiteEventDetail({
       label,
       value: fmt(onChain ? ctx.balanceAfter : ctx.parAfter),
       symbol: sym,
+      address: ctx.marketToken,
       prov: onChain ? balanceAfterProv(sym, coords) : parAfterProv(sym, coords, ctx.raw?.parAfter),
       transition,
       ...(ctx.interestSincePrevious
@@ -378,6 +422,11 @@ export function DolomiteEventDetail({
             interestSincePrevious: {
               value: ctx.interestSincePrevious,
               prov: dolomiteInterestSincePreviousProv(sym, coords),
+              ...(ctx.interestRate != null
+                ? {
+                    after: `, about ${(ctx.interestRate.apr * 100).toFixed(2)}% a year since ${sinceDate(ctx.interestRate.sinceTimestamp, event?.timestamp)}`,
+                  }
+                : {}),
             },
           }
         : {}),
@@ -392,13 +441,25 @@ export function DolomiteEventDetail({
       ? { owner: ctx.counterparty, number: ctx.counterpartyAccountNumber }
       : null;
   const sameWallet = other != null && wallet != null && other.owner === wallet.toLowerCase();
+  // A transfer that moved a debt names the act first, as the Borrow and Repay
+  // rows do.
+  const debtAct = isTransfer ? dolomiteBalanceAction(ctx) : null;
+  const movedAmount = ctx.weiDelta != null ? `${fmt(ctx.weiDelta)} ${sym}` : sym;
+  const lead =
+    debtAct === "sent_borrow"
+      ? `Borrowed ${movedAmount} into`
+      : debtAct === "received_repay"
+        ? `Repaid with ${movedAmount} from`
+        : ctx.eventType === "transfer_in"
+          ? "Came from"
+          : "Went to";
 
   return (
     <>
       <ChainTruthDetail stats={stats} />
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
-          {ctx.eventType === "transfer_in" ? "Came from" : "Went to"}{" "}
+          {lead}{" "}
           <Link href={`/ethereum/dolomite/${other.owner}/${other.number}`} className="font-medium text-foreground">
             <DolomiteAccountLabel text={otherAccountName(other.number)} accountNumber={other.number} />
           </Link>

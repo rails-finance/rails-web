@@ -2121,6 +2121,9 @@ export interface DolomiteContext {
   marketId: number;
   /** The market token's display symbol (resolved from its own contract). */
   marketSymbol: string;
+  /** The market token's contract address, from the core's roster (the
+   *  logo's key on rows whose flows are empty). */
+  marketToken?: string;
   /** The market token's decimals. */
   decimals: number;
   /** Which side of zero this leg's balance sits on after the event. */
@@ -2143,6 +2146,11 @@ export interface DolomiteContext {
    *  market (human, a magnitude: earned on a supply, owed on a debt). Absent
    *  when zero or unknown. */
   interestSincePrevious?: string;
+  /** The average yearly rate behind `interestSincePrevious`, from the market's
+   *  index at both rows, and the previous row's time (unix seconds). Absent on
+   *  gaps under an hour, interest under 0.01 of a token, or a previous row
+   *  outside the page. */
+  interestRate?: { apr: number; sinceTimestamp: number };
   /** transfer legs — the other Account.Info. liquidation legs — the other
    *  side's account (borrower ↔ liquidator). */
   counterparty?: string;

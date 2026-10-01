@@ -222,6 +222,34 @@ export function buildDolomiteTimeline(
     else byTxLog.set(key, [r]);
   }
 
+  // Each row's previous row on the same market (the row the server's
+  // prev_*_index was read at), for the average rate between the two. A row
+  // whose predecessor is outside this page gets no rate.
+  const posKey = (r: DolomiteMvRow): [number, number, number, string] => [
+    Number(r.block_number),
+    r.tx_index ?? -1,
+    r.log_index,
+    r.event_key,
+  ];
+  const rowOrder = (a: DolomiteMvRow, b: DolomiteMvRow): number => {
+    const ka = posKey(a);
+    const kb = posKey(b);
+    for (let i = 0; i < 3; i++) if (ka[i] !== kb[i]) return (ka[i] as number) - (kb[i] as number);
+    return ka[3] < kb[3] ? -1 : ka[3] > kb[3] ? 1 : 0;
+  };
+  const prevRowOf = new Map<DolomiteMvRow, DolomiteMvRow>();
+  const byMarket = new Map<string, DolomiteMvRow[]>();
+  for (const r of rows) {
+    if (r.market_id == null) continue;
+    const list = byMarket.get(r.market_id);
+    if (list) list.push(r);
+    else byMarket.set(r.market_id, [r]);
+  }
+  for (const list of byMarket.values()) {
+    list.sort(rowOrder);
+    for (let i = 1; i < list.length; i++) prevRowOf.set(list[i], list[i - 1]);
+  }
+
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
     const marketId = r.market_id != null ? Number(r.market_id) : null;
@@ -277,10 +305,35 @@ export function buildDolomiteTimeline(
         ? absBig(parToWei(parBefore, atRow.s, atRow.b)) - absBig(parToWei(parBefore, prevIdx.s, prevIdx.b))
         : null;
 
+    // The average rate since the previous row on this market, from the index
+    // at both ends: (index now ÷ index then − 1) ÷ years between. Only where
+    // the gap is an hour or more and the interest at least 0.01 of a token;
+    // shorter gaps give noisy rates.
+    const prevRow = prevRowOf.get(r);
+    const gapSec = prevRow != null ? Number(r.block_timestamp) - Number(prevRow.block_timestamp) : 0;
+    let interestRate: DolomiteContext["interestRate"];
+    if (
+      interestRaw != null &&
+      atRow &&
+      prevIdx &&
+      prevRow != null &&
+      parBefore != null &&
+      gapSec >= 3600 &&
+      absBig(interestRaw) * BigInt(100) >= BigInt(10) ** BigInt(Math.max(decimals, 0))
+    ) {
+      const [now, then] = parBefore < ZERO ? [atRow.b, prevIdx.b] : [atRow.s, prevIdx.s];
+      if (then > ZERO) {
+        const growth = Number(((now - then) * INDEX_BASE) / then) / Number(INDEX_BASE);
+        const apr = growth / (gapSec / (365 * 24 * 3600));
+        if (Number.isFinite(apr) && apr > 0) interestRate = { apr, sinceTimestamp: Number(prevRow.block_timestamp) };
+      }
+    }
+
     const ctx: DolomiteContext = {
       eventType: kind,
       marketId: marketId ?? -1,
       marketSymbol: symbol,
+      ...(st?.token ? { marketToken: st.token.toLowerCase() } : {}),
       decimals,
       side,
       weiDelta: r.delta_wei != null ? fmtUnits(deltaWei, decimals) : undefined,
@@ -291,6 +344,7 @@ export function buildDolomiteTimeline(
       ...(interestRaw != null && interestRaw !== ZERO
         ? { interestSincePrevious: fmtUnits(interestRaw, decimals) }
         : {}),
+      ...(interestRate != null ? { interestRate } : {}),
       ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       ...(r.counterparty_number != null ? { counterpartyAccountNumber: r.counterparty_number } : {}),
       ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),
