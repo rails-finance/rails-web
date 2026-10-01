@@ -17,6 +17,9 @@ import { formatCompact } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import type { AlchemixLiveState } from "@/types/api/alchemix";
 import { AmountText } from "@/components/shared/amount-text";
+import type { SelfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { formatDate } from "@/lib/date";
+import { formatSharePrice } from "@/components/protocol/alchemix/alchemix-position-card";
 
 const compact = (n: number) => formatCompact(n).display;
 /** A signed figure that keeps its sign and size however small: a lifetime net
@@ -56,20 +59,15 @@ export interface AlchemixRedemptionNetView {
   prov: Provenance | null;
 }
 
-export function AlchemixPositionExplanation({
-  live,
-  syntheticSymbol,
-  mytSymbol,
-  redemptions,
-  net = null,
-  vaultHref = null,
-  fall = null,
-  clearedOnCard = false,
-  usdOnCard = false,
-  feeBps = null,
-  lineLiquidations = null,
-  v2 = null,
-}: {
+/** How a closed position closed: its last transaction, and the split where
+ *  that was a self-liquidation. */
+export interface AlchemixCloseFacts {
+  blockNumber: number;
+  timestamp: number;
+  split: SelfLiquidationSplit | null;
+}
+
+export interface AlchemixPositionExplanationProps {
   live: AlchemixLiveState | null;
   syntheticSymbol: string;
   mytSymbol: string;
@@ -90,17 +88,87 @@ export function AlchemixPositionExplanation({
   lineLiquidations?: { count: number; throughBlock: number | null; prov: Provenance } | null;
   /** The holder's V2 account(s), linked, and whether their rows are on the timeline. */
   v2?: { names: ReactNode; joined: boolean } | null;
-}) {
+  /** A closed position's close; null on an open one. */
+  close?: AlchemixCloseFacts | null;
+}
+
+const shares = (raw: bigint) => compact(Number(raw) / 1e18);
+
+/** The close, for a closed position's pane: when, how, and that nothing has
+ *  moved since. */
+function closeItems(close: AlchemixCloseFacts, sym: string, mytSymbol: string): ReactNode[] {
+  const s = close.split;
+  const when = (
+    <>
+      This position closed on {formatDate(close.timestamp)} at block {close.blockNumber.toLocaleString("en-US")}.
+    </>
+  );
+  const how = s ? (
+    <>
+      The holder closed it with its collateral, which Alchemix calls a self-liquidation:{" "}
+      <span className="tabular-nums">
+        {shares(s.totalRaw)} {mytSymbol}
+      </span>{" "}
+      paid{" "}
+      {s.debtBeforeRaw != null ? (
+        <span className="tabular-nums">
+          the {shares(s.debtBeforeRaw)} {sym} of debt
+        </span>
+      ) : (
+        <>its debt</>
+      )}
+      {s.feeRaw > BigInt(0) ? (
+        <>
+          , with a protocol fee of{" "}
+          <span className="tabular-nums">
+            {shares(s.feeRaw)} {mytSymbol}
+          </span>{" "}
+          on the part set aside for repayment
+        </>
+      ) : null}
+      {s.returnedRaw != null && s.returnedRaw > BigInt(0) ? (
+        <>
+          , and the remaining{" "}
+          <span className="tabular-nums">
+            {shares(s.returnedRaw)} {mytSymbol}
+          </span>{" "}
+          went back to an address the holder chose
+        </>
+      ) : null}
+      .
+    </>
+  ) : null;
+  return [
+    <>
+      {when}
+      {how ? <> {how}</> : null}
+    </>,
+    <>Its debt and collateral have been zero since.</>,
+  ];
+}
+
+function explanationParts({
+  live,
+  syntheticSymbol,
+  mytSymbol,
+  redemptions,
+  net = null,
+  vaultHref = null,
+  fall = null,
+  clearedOnCard = false,
+  usdOnCard = false,
+  feeBps = null,
+  lineLiquidations = null,
+  v2 = null,
+  close = null,
+}: AlchemixPositionExplanationProps): { lead: ReactNode; items: ReactNode[] } | null {
   if (!live) return null;
   const sym = syntheticSymbol;
   const under = live.collateral.underlying;
   const underSym = under?.symbol ?? "the asset underneath";
   const netN = net?.total.netRaw != null ? Number(net.total.netRaw) / 1e18 : null;
   const sharePrice = under?.sharePriceRaw ? Number(under.sharePriceRaw) / 10 ** under.decimals : null;
-  const priceText =
-    sharePrice != null
-      ? `${sharePrice.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${underSym}`
-      : null;
+  const priceText = sharePrice != null && under ? `${formatSharePrice(sharePrice, under.decimals)} ${underSym}` : null;
   const health = live.health;
   const hasCollateral = live.collateral.raw !== "0";
 
@@ -133,7 +201,7 @@ export function AlchemixPositionExplanation({
   const takeShares = earmarked && sharePrice ? earmarked.formatted / sharePrice : null;
   const takeFee = takeShares != null && feeBps != null ? (takeShares * feeBps) / 10000 : null;
 
-  const items = [
+  const items: ReactNode[] = [
     // The collateral: share count, vault, share price, value.
     hasCollateral ? (
       <>
@@ -193,8 +261,8 @@ export function AlchemixPositionExplanation({
         {takeShares != null ? (
           <>
             {" "}
-            Line redemptions clear it, and at this share price clearing all of it takes {compact(takeShares)}{" "}
-            {mytSymbol} from the collateral
+            A line redemption clears it, and so does the holder repaying with vault shares or closing the position. At
+            this share price clearing all of it takes {compact(takeShares)} {mytSymbol} from the collateral
             {takeFee != null && feeBps != null ? (
               <>
                 , plus {takeFee.toLocaleString("en-US", { maximumFractionDigits: takeFee < 0.01 ? 6 : 2 })} {mytSymbol}{" "}
@@ -267,13 +335,6 @@ export function AlchemixPositionExplanation({
         ) : null}
       </>
     ) : null,
-    // Why an event card's set-aside move includes growth between readings.
-    redemptions.count > 0 || earmarked ? (
-      <>
-        Set-aside grows block by block between readings, and an event card&rsquo;s before figure is the reading at the
-        previous card&rsquo;s block, so a card&rsquo;s set-aside move includes what built up in between.
-      </>
-    ) : null,
     v2 ? (
       <>
         {v2.names} is this holder&rsquo;s account from before Alchemix V3, closed on 2 April 2026.
@@ -284,5 +345,18 @@ export function AlchemixPositionExplanation({
     ) : null,
   ].filter(Boolean);
 
-  return <ProseExplainer paragraph={lead} items={items} />;
+  if (close) items.unshift(...closeItems(close, sym, mytSymbol));
+  return lead || items.length > 0 ? { lead, items } : null;
+}
+
+/** Whether the pane has anything to say: a closed position with no close in
+ *  hand, and no V2 history, has none, and then the card draws no (i). */
+export function hasAlchemixPositionExplanation(props: AlchemixPositionExplanationProps): boolean {
+  return explanationParts(props) != null;
+}
+
+export function AlchemixPositionExplanation(props: AlchemixPositionExplanationProps) {
+  const parts = explanationParts(props);
+  if (!parts) return null;
+  return <ProseExplainer paragraph={parts.lead} items={parts.items} />;
 }

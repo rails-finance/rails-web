@@ -34,12 +34,13 @@
 // a change of owner and keeps its own card, unchanged.
 //
 // THE CAVEATS THAT HOLD FOR EVERY CARD ARE SAID ONCE, on the position card's
-// Explanation pane and in its "About this position" modal: that the
-// figures are readings, that collateral is a vault share count, and that
-// set-aside grows between readings. Each is also on the receipt of the figure
-// it governs. The bullets here are specific to the event. The one reading
-// caveat left in `alchemixReadingClauses` is event-specific: a block holding
-// more of this position's events than the card draws.
+// Explanation pane and in its "About this position" modal: that the figures
+// are readings and that collateral is a vault share count. Each is also on the
+// receipt of the figure it governs. The bullets here are specific to the
+// event. Two reading caveats are said on the card they concern:
+// `alchemixReadingClauses` (a block holding more of this position's events
+// than the card draws) and `alchemixBetweenReadingsClauses` (what set-aside
+// and the share price did between the reading before and this block).
 
 import type {
   AlchemixStateAtBlockFromReading,
@@ -48,7 +49,7 @@ import type {
 } from "@/lib/shared/types/event-shape";
 import type { ReactNode } from "react";
 import { clause, cont, H, type ClauseInput } from "@/lib/shared/explainer-prose";
-import { shortAddr } from "@/lib/shared/format-event";
+import { formatCompact, shortAddr } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import { isLineRouter } from "@/lib/alchemix/lines";
@@ -798,4 +799,96 @@ export function alchemixReadingClauses(
       </>,
     ),
   ];
+}
+
+/** The kinds that leave set-aside where `_earmark` put it: what a card made of
+ *  these alone shows moving there built up between the two readings. */
+const LEAVES_SET_ASIDE = new Set(["deposit", "mint", "withdraw", "transfer"]);
+
+/** "4 days and 21 hours", "3 hours", "2 seconds": the span between two block
+ *  times, in its largest whole unit, with the hours beside a day count under
+ *  ten so a span just short of a day boundary is not rounded away. */
+function spanWords(seconds: number): string {
+  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  if (seconds < 60) return unit(Math.max(0, Math.round(seconds)), "second");
+  if (seconds < 3600) return unit(Math.floor(seconds / 60), "minute");
+  if (seconds < 86400) return unit(Math.floor(seconds / 3600), "hour");
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  return days < 10 && hours > 0 ? `${unit(days, "day")} and ${unit(hours, "hour")}` : unit(days, "day");
+}
+
+/** What moved between the reading before this card and the reading at its
+ *  block that the transaction did not move: set-aside, as Transmuter stakes
+ *  matured, and the vault's share price, where it moved collateralisation. Only
+ *  on a card whose legs leave set-aside alone; a redemption states its own. */
+export function alchemixBetweenReadingsClauses(
+  legs: AlchemistEvent[],
+  before: AlchemixReading | null | undefined,
+  unit: { symbol: string | null; decimals: number | null },
+): ClauseInput[] {
+  if (!before || legs.length === 0) return [];
+  if (!legs.every((l) => LEAVES_SET_ASIDE.has(l.context.data.eventType))) return [];
+  const at = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated")?.context.data
+    .stateAtBlockFromReading;
+  if (!at || at.status !== "stated" || at.blockNumber == null || at.blockNumber <= before.blockNumber) return [];
+  const lead = legs[0];
+  const sym = lead.context.data.syntheticSymbol;
+  const span = before.timestamp != null ? spanWords(lead.timestamp - before.timestamp) : null;
+  const kinds = new Set(legs.map((l) => l.context.data.eventType).filter((k) => k !== "transfer"));
+  const act =
+    kinds.size === 1 && kinds.has("deposit")
+      ? "this deposit"
+      : kinds.size === 1 && kinds.has("mint")
+        ? "this mint"
+        : kinds.size === 1 && kinds.has("withdraw")
+          ? "this withdrawal"
+          : "this transaction";
+  const out: ClauseInput[] = [];
+  if (at.earmarkedRaw != null && before.earmarkedRaw != null) {
+    const grew = BigInt(at.earmarkedRaw) - BigInt(before.earmarkedRaw);
+    if (grew > BigInt(1)) {
+      out.push(
+        clause(
+          <>
+            Set aside rose {formatCompact(Number(grew) / WAD).display} {sym}{" "}
+            {span ? <>in the {span} since the previous card</> : <>since the previous card</>}, as Transmuter stakes
+            matured; {act} did not move it.
+          </>,
+        ),
+      );
+    }
+  }
+  // The share price's part of the collateralisation move: the collateral
+  // before, revalued at this block's price, over the debt before.
+  const dec = unit.decimals;
+  if (
+    dec != null &&
+    before.sharePriceRaw != null &&
+    at.sharePriceRaw != null &&
+    before.collateralRaw != null &&
+    before.debtRaw != null &&
+    BigInt(before.debtRaw) > BigInt(0) &&
+    before.sharePriceRaw !== at.sharePriceRaw
+  ) {
+    const p0 = Number(before.sharePriceRaw) / 10 ** dec;
+    const p1 = Number(at.sharePriceRaw) / 10 ** dec;
+    const points = ((Number(before.collateralRaw) / WAD) * (p1 - p0) * 100) / (Number(before.debtRaw) / WAD);
+    if (Math.abs(points) >= 0.005) {
+      const digits = Math.min(dec, 6);
+      const price = (p: number) =>
+        p.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+      out.push(
+        clause(
+          <>
+            {span ? <>Over the same {span}</> : <>Since the previous card</>} the vault&rsquo;s share price{" "}
+            {p1 > p0 ? "rose" : "fell"} from {price(p0)} to {price(p1)} {unit.symbol ?? "in the asset underneath"},
+            which moved collateralisation {points > 0 ? "up" : "down"} by about{" "}
+            {Math.abs(points).toLocaleString("en-US", { maximumFractionDigits: 2 })} points.
+          </>,
+        ),
+      );
+    }
+  }
+  return out;
 }

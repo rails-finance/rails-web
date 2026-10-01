@@ -53,6 +53,8 @@ import type {
 import { formatCompact } from "@/lib/shared/format-event";
 import { alchemixPositionName } from "@/lib/alchemix/naming";
 import { BlockRef } from "@/components/shared/block-ref";
+import { isStableDenominated } from "@/lib/aave-v4/asset-class";
+import { DEPEG_BAND } from "@/lib/shared/usd-display";
 
 /** The collateral, as either surface holds it. The listing serves it with the
  *  block it was settled at; the live read pins one block to the whole reading,
@@ -67,6 +69,14 @@ export interface AlchemixCollateralView {
 }
 
 const block = (n: number) => n.toLocaleString("en-US");
+
+/** A vault share price at the asset underneath's own precision, up to six
+ *  places (1.000934 USDC), so the share count times it gives the value the
+ *  card states. */
+export function formatSharePrice(price: number, decimals: number): string {
+  const digits = Math.min(decimals, 6);
+  return price.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
 
 /** The LISTING axis: Open and Closed are the roster's own lifecycle pill. The
  *  two states only Alchemix has wear the muted pill CLOSED wears, with the
@@ -156,6 +166,22 @@ export function amountColumn(
   };
 }
 
+/** The collateral's dollar figure, where the card states one. The house rule
+ *  for a stablecoin (lib/shared/usd-display.ts): a USDC line priced within
+ *  1% of $1 says its figure once, in USDC; anything else carries the dollar
+ *  figure on every card. A holding worth less than a cent reads "< $0.01",
+ *  never "$0". */
+export function collateralUsdText(
+  underlying: AlchemixUnderlyingValue | null,
+  usd: AlchemixUsdValue | null,
+): string | null {
+  if (!underlying || !usd) return null;
+  if (underlying.symbol && isStableDenominated(underlying.symbol) && Math.abs(usd.pricePerUnit - 1) <= DEPEG_BAND)
+    return null;
+  if (usd.usd > 0 && usd.usd < 0.01) return "< $0.01";
+  return `$${formatCompact(usd.usd).display}`;
+}
+
 /** The collateral as a stat, on either surface. What a holder recognises is the
  *  asset underneath, not the vault share, so THE UNDERLYING LEADS and the share
  *  count stays beside it — the count is what the position holds and the two
@@ -182,6 +208,13 @@ export function collateralColumn(
     });
   }
 
+  // The value in the asset underneath is the share count at one block times
+  // the share price read at another. The listing stamps each with its own:
+  // the headline with the share price's block, as Set aside is stamped, and
+  // the share count with the block it was settled at. The position page reads
+  // both at one block and names it once in its header.
+  const priceBlock = underlying.sharePriceAsOfBlock ?? c.asOfBlock;
+  const twoBlocks = !opts?.hideBlock && c.asOfBlock != null && priceBlock != null && priceBlock !== c.asOfBlock;
   const shares = (
     <span className="inline-flex items-center gap-1 tabular-nums">
       {formatCompact(c.formatted).display}
@@ -189,13 +222,17 @@ export function collateralColumn(
       {myt}
     </span>
   );
-  // The dollar figure is dropped where it reads the same as the figure above
-  // it (USDC at $1): say it once.
-  const usdDisplay = c.usd ? formatCompact(c.usd.usd).display : null;
-  const usd =
-    usdDisplay != null && usdDisplay !== formatCompact(underlying.formatted).display ? (
-      <span className="tabular-nums">${usdDisplay}</span>
-    ) : null;
+  // Its own inline run, so on a narrow card it wraps under the share count.
+  const sharesBlock = twoBlocks ? (
+    <>
+      {" "}
+      <span className="whitespace-nowrap">
+        at <BlockRef block={c.asOfBlock!} size={12} />
+      </span>
+    </>
+  ) : null;
+  const usdText = collateralUsdText(underlying, c.usd);
+  const usd = usdText != null ? <span className="tabular-nums">{usdText}</span> : null;
   // The share price beside the two figures it relates, so the gap between the
   // share count and the underlying reads as a price and not a mismatch. Drawn
   // where the caller asks for it or hands its receipt, and never on a position
@@ -206,13 +243,12 @@ export function collateralColumn(
   const priceText =
     priceValue != null ? (
       <span className="tabular-nums">
-        1 {myt} = {priceValue.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}{" "}
-        {underlying.symbol ?? "underlying"}
+        1 {myt} = {formatSharePrice(priceValue, underlying.decimals)} {underlying.symbol ?? "underlying"}
       </span>
     ) : null;
   return amountColumn(
     "Collateral",
-    { raw: underlying.raw, formatted: underlying.formatted, asOfBlock: c.asOfBlock },
+    { raw: underlying.raw, formatted: underlying.formatted, asOfBlock: twoBlocks ? priceBlock : c.asOfBlock },
     underlying.symbol ?? "underlying",
     {
       prov: prov?.underlying,
@@ -226,6 +262,7 @@ export function collateralColumn(
           ) : (
             shares
           )}
+          {sharesBlock}
           {usd ? (
             <>
               {" · "}

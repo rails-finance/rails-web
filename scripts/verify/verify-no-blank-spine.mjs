@@ -7,6 +7,7 @@
 //
 // Run with the dev server up:
 //   BASE=http://localhost:3000 node scripts/verify/verify-no-blank-spine.mjs
+//   ROUTE_FILTER=alchemix BASE=… node scripts/verify/verify-no-blank-spine.mjs
 //
 // Proved able to fail: reverting SpineColumn's fallback resolver to its previous
 // form (`icon ?? (externalParty && !tokens?.length ? "external" : undefined)`)
@@ -55,7 +56,13 @@ const ROUTES = [
     "/ethereum/asymmetry/sUSDS/8309122898133156698498852897464396224593631760337811282458430493454418132410",
   ],
   ["pwn", "/ethereum/pwn/0x0598b250a99bd45155a6b9b04af2ee19a2e5fed0?loan=20"],
+  // Deposit · Mint rows, one transaction each; a closed position's close row.
+  ["alchemix base", "/base/alchemix/base-alusdb/14"],
+  ["alchemix base (closed)", "/base/alchemix/base-alusdb/5"],
+  ["alchemix ethereum", "/ethereum/alchemix/eth-alusd/1221"],
 ];
+// ROUTE_FILTER=alchemix runs the routes whose label holds that text.
+const ROUTE_FILTER = process.env.ROUTE_FILTER ?? "";
 
 let pass = 0,
   fail = 0;
@@ -66,7 +73,7 @@ let totalCards = 0,
   totalGlyph = 0,
   totalTokens = 0;
 
-for (const [label, path] of ROUTES) {
+for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILTER))) {
   await page.goto(`${BASE}${path}`, { waitUntil: "load", timeout: 90000 });
   await page.waitForSelector(CARD, { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(1500);

@@ -13,7 +13,9 @@
 //
 // SET-ASIDE IS THE EXCEPTION, and the card says so on the figure: it grows
 // block by block between readings, so its "before" is the figure at the
-// earlier block, named on its receipt, and the move includes that growth.
+// earlier block, named on its receipt, and the move includes that growth. The
+// card's bullets say how much of it built up in between, and over how long
+// (`alchemixBetweenReadingsClauses`).
 //
 // A windowed timeline has no before for its oldest loaded block. A custody
 // transfer with no reading is skipped: it moved neither axis.
@@ -28,6 +30,8 @@ export interface AlchemixReading {
   earmarkedRaw: string | null;
   /** The vault's share price read with it, in the underlying's decimals. */
   sharePriceRaw: string | null;
+  /** The block's time, in unix seconds. */
+  timestamp?: number;
 }
 
 /** Block number → the stated reading at the previous reading block on the
@@ -46,6 +50,7 @@ export function readingsBefore(events: AlchemistEvent[]): AlchemixReadingsBefore
         collateralRaw: s.collateralRaw,
         earmarkedRaw: s.earmarkedRaw,
         sharePriceRaw: s.sharePriceRaw ?? null,
+        timestamp: e.timestamp,
       });
     }
   }
@@ -67,6 +72,7 @@ export function readingsInOrder(events: AlchemistEvent[]): AlchemixReading[] {
       collateralRaw: s.collateralRaw,
       earmarkedRaw: s.earmarkedRaw,
       sharePriceRaw: s.sharePriceRaw ?? null,
+      timestamp: e.timestamp,
     });
   }
   return [...byBlock.values()].sort((a, b) => a.blockNumber - b.blockNumber);

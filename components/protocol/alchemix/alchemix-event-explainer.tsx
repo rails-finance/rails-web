@@ -24,6 +24,7 @@ import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 import { clause, composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
 import { formatGasCost } from "@/lib/shared/format-event";
 import {
+  alchemixBetweenReadingsClauses,
   alchemixCustodyRoundTripClause,
   alchemixEventClauses,
   alchemixReadingClauses,
@@ -33,11 +34,14 @@ import {
 import {
   ALCHEMIX_BURN_REPAY,
   ALCHEMIX_CUSTODY,
+  ALCHEMIX_DEPOSIT,
+  ALCHEMIX_DEPOSIT_MINT,
   ALCHEMIX_HOW_IT_WORKS,
   ALCHEMIX_LINE_WIDE,
   ALCHEMIX_LIQUIDATION,
   ALCHEMIX_MINT,
   ALCHEMIX_OPEN_DEPOSIT,
+  ALCHEMIX_OPEN_MINT,
   ALCHEMIX_SELF_LIQUIDATE,
   ALCHEMIX_WITHDRAW,
 } from "@/lib/alchemix/learn-more";
@@ -57,7 +61,7 @@ export interface AlchemixEventExplainerProps {
 export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreContent {
   switch (ctx.eventType) {
     case "deposit":
-      return ALCHEMIX_OPEN_DEPOSIT;
+      return ALCHEMIX_DEPOSIT;
     case "mint":
       return ALCHEMIX_MINT;
     case "burn":
@@ -79,15 +83,22 @@ export function alchemixLearnMoreContent(ctx: AlchemixV3Context): LearnMoreConte
     case "transfer":
       return ALCHEMIX_CUSTODY;
     default:
-      return ALCHEMIX_OPEN_DEPOSIT;
+      return ALCHEMIX_DEPOSIT;
   }
 }
 
 /** The mechanic a whole transaction is about. A custody leg rides along with
  *  an opening and with a hand-over that moved an axis in the same transaction;
  *  what the reader needs explained there is the axis, so the leg that moved one
- *  chooses the modal and a transaction of transfers alone keeps custody. */
+ *  chooses the modal and a transaction of transfers alone keeps custody. An
+ *  opening (the NFT's mint among the legs) and a deposit beside a mint each
+ *  have their own modal, so a row that minted never opens one saying the debt
+ *  stayed where it was. */
 export function alchemixLearnMoreFor(legs: AlchemistEvent[]): LearnMoreContent {
+  const kinds = new Set(legs.map((l) => l.context.data.eventType));
+  const opening = legs.some((l) => l.context.data.transfer?.transferType === "mint");
+  if (opening && !kinds.has("self_liquidated")) return kinds.has("mint") ? ALCHEMIX_OPEN_MINT : ALCHEMIX_OPEN_DEPOSIT;
+  if (kinds.has("deposit") && kinds.has("mint") && !kinds.has("self_liquidated")) return ALCHEMIX_DEPOSIT_MINT;
   const lead =
     legs.find((l) => l.context.data.eventType === "self_liquidated") ??
     legs.find((l) => l.context.data.eventType !== "transfer") ??
@@ -160,6 +171,10 @@ function alchemixCardClauses(
     ),
     ...(roundTrip ? [alchemixCustodyRoundTripClause(roundTrip)] : []),
     ...readingClauses,
+    ...alchemixBetweenReadingsClauses(legs, prose.readingBefore, {
+      symbol: prose.underlyingSymbol,
+      decimals: prose.underlyingDecimals,
+    }),
     gasClause(legs),
   ];
 }

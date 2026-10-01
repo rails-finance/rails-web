@@ -106,6 +106,8 @@ export interface AlchemixEventHeaderProps {
   mytSymbol: string;
   timestamp: number;
   eventNumber?: number;
+  /** The last of the card's event numbers, where it draws several logs. */
+  eventNumberLast?: number;
   /** Each leg's own coordinates; the emitter differs between the Alchemist and
    *  the position NFT, so a receipt cannot borrow another leg's. */
   coordsFor: (leg: AlchemistEvent) => AlchemixCoords;
@@ -397,7 +399,10 @@ export function combineLegSpecs(
   const custodyParty =
     opening && mintLeg
       ? {
-          prefix: "to" as const,
+          // The NFT's destination, named as the position's: after "Mint" a
+          // bare "to" reads as the synthetic's recipient, which the mint's own
+          // log names separately.
+          prefix: "position to",
           address: opening.forwardedTo ?? opening.mintedTo,
           prov: emittedAmountProv("to_addr", mintLeg.context.data.syntheticSymbol, null, coordsFor(mintLeg)),
           ens: true,
@@ -432,11 +437,14 @@ export function AlchemixEventHeader({
   mytSymbol,
   timestamp,
   eventNumber,
+  eventNumberLast,
   coordsFor,
 }: AlchemixEventHeaderProps) {
   const before = useReadingBefore(legs[0].context.data.stateAtBlockFromReading?.blockNumber);
   const spec = alchemixHeaderSpec(legs, siblings, mytSymbol, coordsFor, before);
-  return <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} />;
+  return (
+    <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} eventNumberLast={eventNumberLast} />
+  );
 }
 
 /** The row the header draws, for a card that echoes a header figure onto its

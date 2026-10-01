@@ -77,6 +77,8 @@ export interface AlchemixEventCardProps {
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
+  /** The last of the card's event numbers, where it draws several logs. */
+  eventNumberLast?: number;
 }
 
 /** The shares or synthetic one leg moved for THIS position, and which way.
@@ -133,6 +135,7 @@ export function AlchemixEventCard({
   isFirst,
   isLast,
   eventNumber,
+  eventNumberLast,
 }: AlchemixEventCardProps) {
   const lead = legs[0];
   const sibs = siblings ?? legs;
@@ -223,6 +226,7 @@ export function AlchemixEventCard({
           mytSymbol={mytSymbol}
           timestamp={lead.timestamp}
           eventNumber={eventNumber}
+          eventNumberLast={eventNumberLast}
           coordsFor={coordsFor}
         />
       }
