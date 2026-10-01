@@ -17,6 +17,7 @@ import { MapleEventDetail } from "./maple-event-detail";
 import { MapleEventExplainer, mapleLearnMoreContent } from "./maple-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { MapleRowTimes } from "@/lib/maple/row-times";
+import { MapleLedgerProvider } from "./maple-ledger";
 
 export interface MapleEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "maple"; data: MapleContext } };
@@ -134,50 +135,55 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
     />
   );
 
+  // The pool claim opens into its ledger where the page ties its timeline to
+  // the Lifetime flows panel and the panel shows this pool.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <MapleEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-          requestAt={times?.requestAt}
-        />
-      }
-      detail={
-        <MapleEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          timestamp={event.timestamp}
-          prevAt={times?.prevAt}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <MapleEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={mapleExplainerTeaser(ctx, coords)}
-      txHash={event.txHash}
-      txHashLabel="Transaction"
-      learnMore={<LearnMore inline content={mapleLearnMoreContent(ctx)} />}
-      persistKey={`maple:${event.id}`}
-    />
+    <MapleLedgerProvider eventId={event.id} eventTs={event.timestamp} pool={ctx.pool}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <MapleEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+            requestAt={times?.requestAt}
+          />
+        }
+        detail={
+          <MapleEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            timestamp={event.timestamp}
+            prevAt={times?.prevAt}
+            eventId={event.id}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <MapleEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={mapleExplainerTeaser(ctx, coords)}
+        txHash={event.txHash}
+        txHashLabel="Transaction"
+        learnMore={<LearnMore inline content={mapleLearnMoreContent(ctx)} />}
+        persistKey={`maple:${event.id}`}
+      />
+    </MapleLedgerProvider>
   );
 }

@@ -38,6 +38,7 @@ import {
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
 import { formatDayMonth, formatDuration } from "@/lib/date";
+import { useMapleLedgerCell } from "./maple-ledger";
 
 export interface MapleEventDetailProps {
   ctx: MapleContext;
@@ -47,6 +48,8 @@ export interface MapleEventDetailProps {
   /** Unix seconds of this row and of the previous row in its pool. */
   timestamp?: number;
   prevAt?: number;
+  /** The row's id, for its Lifetime flows ledger. */
+  eventId?: string;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -71,7 +74,17 @@ const ACT: Partial<Record<MapleContext["eventType"], string>> = {
   request_fill: "fill",
 };
 
-export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, prevAt }: MapleEventDetailProps) {
+export function MapleEventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  timestamp,
+  prevAt,
+  eventId,
+}: MapleEventDetailProps) {
+  // The claim opens into the pool's Lifetime flows ledger, where the page has it.
+  const ledger = useMapleLedgerCell(eventId ?? "", ctx.pool);
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
 
@@ -109,6 +122,7 @@ export function MapleEventDetail({ ctx, txHash, blockNumber, wallet, timestamp, 
       prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
       transition,
       changed: transition != null,
+      ...(ledger ? { ledger: "collateral" as const } : {}),
       interestSincePrevious:
         ctx.interestSincePrev != null && interest !== 0
           ? {
