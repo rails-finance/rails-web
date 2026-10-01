@@ -82,8 +82,6 @@ export interface TroveViewProps {
    *  (`pagination.hasMore`); null when the rows are the whole history. */
   initialTotalEvents: number | null;
   initialPrices: OraclePricesData | null;
-  /** `?hide=op1,op2` decoded on the server — see the page for what it is for. */
-  urlHidden: string[] | null;
   /** The server's clock (unix seconds) at render: the Explanation's debt owed
    *  today accrues to it until the flows clock below is set, so the server's
    *  render and the first client render state the same figure. */
@@ -97,7 +95,6 @@ export default function TroveView({
   initialEvents,
   initialTotalEvents,
   initialPrices,
-  urlHidden,
   renderedAt,
 }: TroveViewProps) {
   const troveKey = `${collateralType}:${troveId}`;
@@ -446,7 +443,6 @@ export default function TroveView({
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `liquity-v2-${troveKey}`,
     protocolKey: "liquity-v2-troves",
-    initialHidden: urlHidden,
     olderCount,
     // Navigated by the Lifetime flows chart's Apply: no Dates.
     dates: false,

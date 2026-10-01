@@ -588,6 +588,18 @@ export interface TimelineFilterPillSpec {
   clear: () => void;
 }
 
+/** A type's pill word with the menu's label beside it where they differ: the
+ *  menu says "Received", the pill says "transfers in". A label that is the
+ *  noun's own verb in as many words ("Supply", "supplies") adds nothing and is
+ *  left out. */
+function actionTip(o: FilterOption, protocolKey: string): string {
+  const noun = actionNoun(o.key, protocolKey, o.label);
+  const label = o.label.toLowerCase();
+  const n = Math.min(4, label.length);
+  const sameWords = label.split(/\s+/).length === noun.split(/\s+/).length;
+  return sameWords && label.slice(0, n) === noun.slice(0, n) ? noun : `${noun} (${o.label})`;
+}
+
 /** Name the shorter side of one axis: "Only a, b" when fewer are kept than
  *  hidden, "Hiding a, b" otherwise. Hidden keys the menu does not offer (a
  *  saved filter from another history) are not named. Null when the axis
@@ -599,6 +611,8 @@ function narrowing(
   /** The axis's plural, for a pill that hides every option ("Hiding all
    *  assets"). */
   noun: string,
+  /** One name as the tooltip states it, where that adds to the pill's word. */
+  tip: (o: FilterOption) => string = name,
 ): (Pick<TimelineFilterPillSpec, "verb" | "names" | "more" | "title"> & { every: boolean }) | null {
   const hidden = options.filter((o) => !visible.has(o.key));
   if (hidden.length === 0) return null;
@@ -606,24 +620,29 @@ function narrowing(
   if (kept.length === 0)
     return { verb: "Hiding", names: [`all ${noun}`], more: 0, title: `Hiding all ${noun}`, every: true };
   const only = kept.length < hidden.length;
-  const side = (only ? kept : hidden).map(name);
+  const shown = only ? kept : hidden;
+  const side = shown.map(name);
   const verb = only ? "Only" : "Hiding";
   const names = side.length > 3 ? side.slice(0, 2) : side;
-  return { verb, names, more: side.length - names.length, title: `${verb} ${side.join(", ")}`, every: false };
+  return {
+    verb,
+    names,
+    more: side.length - names.length,
+    title: `${verb} ${shown.map(tip).join(", ")}`,
+    every: false,
+  };
 }
 
 /** Every filter pill the toolbar's state calls for, in the toolbar's order. */
 export function timelineFilterPills(tl: TimelineEventsState): TimelineFilterPillSpec[] {
   const pills: TimelineFilterPillSpec[] = [];
-  // A fixed hidden list (the embed's `?hide=`) is not the visitor's to undo: no pill.
-  const action = tl.actionsFixed
-    ? null
-    : narrowing(
-        tl.eventOptions,
-        tl.visibleActionKeys,
-        (o) => actionNoun(o.key, tl.protocolKey, o.label),
-        "types of event",
-      );
+  const action = narrowing(
+    tl.eventOptions,
+    tl.visibleActionKeys,
+    (o) => actionNoun(o.key, tl.protocolKey, o.label),
+    "types of event",
+    (o) => actionTip(o, tl.protocolKey),
+  );
   if (action)
     pills.push({
       axis: "action",

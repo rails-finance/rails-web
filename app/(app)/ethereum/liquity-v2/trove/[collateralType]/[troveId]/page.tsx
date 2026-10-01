@@ -6,14 +6,13 @@ import TroveView from "./trove-view";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-// A trove's settled facts change only when the trove transacts, but the page
-// reads searchParams (below) and its numbers are stated as current, so the route
-// renders per request and every backend read is `no-store`. Serving a position
-// page from a previous request's read is a separate decision — a charter one,
-// about which values may render as current — not a side effect of this change.
+// A trove's settled facts change only when the trove transacts, but its
+// numbers are stated as current, so the route renders per request and every
+// backend read is `no-store`. Serving a position page from a previous
+// request's read is a separate decision — a charter one, about which values
+// may render as current — not a side effect of this change.
 export const dynamic = "force-dynamic";
 
 // The troveId is a full uint256 — pre-truncate to its first 8 characters (the
@@ -39,20 +38,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function TrovePage({ params, searchParams }: Props) {
+export default async function TrovePage({ params }: Props) {
   const { collateralType, troveId } = await params;
-  const sp = await searchParams;
-
-  // `?hide=op1,op2` overrides the stored type filter for this view — a
-  // shareable / embeddable pre-filtered timeline (the home hero iframes this
-  // page with redemptions + delegate rate updates set aside). Display-level
-  // only: it never writes into the visitor's saved filter state. Decoded here
-  // rather than from `window.location.search` on the client, so the filtered
-  // timeline is the one that renders on the server too.
-  const raw = sp.hide;
-  const hide = Array.isArray(raw) ? raw[0] : raw;
-  const urlHidden = hide ? hide.split(",").filter(Boolean) : null;
-
+  
   const tail = await loadTroveTail(collateralType, troveId);
   // Only an answered-and-empty backend roster reaches this — a failed read
   // leaves `missing` false and hands the client an unseeded view to retry.
@@ -75,7 +63,6 @@ export default async function TrovePage({ params, searchParams }: Props) {
       initialEvents={tail.events}
       initialTotalEvents={tail.hasMore ? tail.totalEvents : null}
       initialPrices={tail.prices}
-      urlHidden={urlHidden}
       renderedAt={Date.now() / 1000}
     />
   );

@@ -6,13 +6,11 @@ import TrovePage from "../../page";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string; eventId: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Restated (not re-exported — see twitter-image.tsx's own header on why Next
 // needs the literal declaration in every file that carries it): the parent
-// route renders per request (it also reads `?hide=`, passed through below),
-// so this segment does too.
+// route renders per request, so this segment does too.
 export const dynamic = "force-dynamic";
 
 // NOT reused from the parent (`../../page`'s own `generateMetadata`) — this
@@ -40,11 +38,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // provider still wraps it, and `TroveView` (this page's client half) never
 // learns a new prop. It finds out it is on an event route from
 // `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `searchParams` (`?hide=`) is passed through
-// unchanged — the parent still reads it and filters the same way it does on
-// its own path. `params` here carries an extra `eventId` key the parent's own
-// `Props` type doesn't declare; passing the same promise through is still
+// component's pinned-mode branch. `params` here carries an extra
+// `eventId` key the parent's own `Props` type doesn't declare; passing the same promise through is still
 // structurally valid (the parent only reads `collateralType`/`troveId` off it).
-export default async function LiquityV2EventPage({ params, searchParams }: Props) {
-  return TrovePage({ params, searchParams });
+export default async function LiquityV2EventPage({ params }: Props) {
+  return TrovePage({ params });
 }

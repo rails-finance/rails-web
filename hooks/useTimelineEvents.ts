@@ -81,9 +81,7 @@
 // preference silently pasted into the address bar. That silence is about the
 // ADDRESS BAR — `viewHref()` composes the full current view into a link on
 // demand for the toolbar's copy-link control, which is an explicit share act
-// and works on a load where nothing was toggled. The `initialHidden` prop
-// (below) is a separate, stronger override — a pinned embed view — and opts
-// out of both the URL read of `hide` and the write-back.
+// and works on a load where nothing was toggled.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -194,9 +192,6 @@ export interface TimelineEventsState {
   /** Keys currently shown (FilterDropdown `selected` for multi mode). */
   visibleActionKeys: Set<string>;
   toggleHiddenAction: (key: string) => void;
-  /** The hidden types are a fixed list the page passed (`initialHidden`), not
-   *  the visitor's to change: the narrowing row draws no pill for them. */
-  actionsFixed: boolean;
   resetHiddenActions: () => void;
 
   /** Asset buckets for the FilterDropdown — the symbols this position's events
@@ -364,7 +359,6 @@ export function useTimelineEvents(
   {
     storageKey,
     protocolKey,
-    initialHidden,
     window: win = WHOLE_HISTORY,
     olderCount = 0,
     olderCountIsFloor = false,
@@ -408,13 +402,6 @@ export function useTimelineEvents(
      *  838k positions in the index and for every protocol that has not been
      *  moved onto the checkpoint model yet. */
     window?: TimelineWindow;
-    /** Overrides the persisted hidden-action set with a fixed list — a
-     *  shareable / embeddable pre-filtered timeline (e.g. `?hide=op1,op2`
-     *  on the Liquity V2 trove page, whose home-hero iframe sets aside
-     *  redemptions + delegate rate updates). Display-level only: present,
-     *  it never gets written back to `storageKey`, and the visitor's own
-     *  saved filter stays untouched underneath it. */
-    initialHidden?: string[] | null;
   },
 ): TimelineEventsState {
   const defaultHidden = useMemo(() => DEFAULT_HIDDEN_ACTIONS[protocolKey] ?? [], [protocolKey]);
@@ -496,12 +483,11 @@ export function useTimelineEvents(
     }
   }, [storageKey, hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions]);
 
-  // Mirror the view into the URL after the visitor's first live toggle (never
-  // for a pinned `initialHidden` embed — see file header). Only ever a
+  // Mirror the view into the URL after the visitor's first live toggle. Only ever a
   // non-default value is written, matching the listing driver's
   // sortBy/sortOrder convention, so an untouched timeline keeps a clean URL.
   useEffect(() => {
-    if (!hydrated || !interactedRef.current || initialHidden) return;
+    if (!hydrated || !interactedRef.current) return;
     try {
       const url = new URL(window.location.href);
       writeViewParams(
@@ -521,17 +507,15 @@ export function useTimelineEvents(
     } catch {
       /* non-fatal — the view still works, it just won't be shareable */
     }
-  }, [hydrated, initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
+  }, [hydrated, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
 
-  // The same grammar, composed on demand for the copy-link control. Reads the
-  // pinned set where an embed pins one, so the link carries what the page
-  // actually shows.
+  // The same grammar, composed on demand for the copy-link control.
   const viewHref = useCallback(() => {
     const url = new URL(window.location.href);
     writeViewParams(
       url.searchParams,
       {
-        hiddenActions: initialHidden ?? hiddenActions,
+        hiddenActions,
         hiddenAssets,
         hiddenCounterparties,
         hiddenVersions,
@@ -540,9 +524,9 @@ export function useTimelineEvents(
       dates,
     );
     return url.toString();
-  }, [initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
+  }, [hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
 
-  const hiddenSet = useMemo(() => new Set(initialHidden ?? hiddenActions), [initialHidden, hiddenActions]);
+  const hiddenSet = useMemo(() => new Set(hiddenActions), [hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
   const hiddenCounterpartySet = useMemo(() => new Set(hiddenCounterparties), [hiddenCounterparties]);
   const hiddenVersionSet = useMemo(() => new Set(hiddenVersions), [hiddenVersions]);
@@ -934,7 +918,6 @@ export function useTimelineEvents(
     eventOptions,
     visibleActionKeys,
     toggleHiddenAction,
-    actionsFixed: initialHidden != null,
     resetHiddenActions,
     assetOptions,
     visibleAssetKeys,
