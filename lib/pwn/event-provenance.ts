@@ -175,7 +175,7 @@ export const positionAccruedProv = (
   basis: "paid" | "at-deadline",
 ) => accrualProv(sym, version, a, basis);
 
-// ── Position-card / tower provenances (no per-event coords) ──────────────────
+// ── Position-card provenances (no per-event coords) ──────────────────────────
 
 /** Position-card collateral line. */
 export const positionCollateralProv = (sym: string, version?: string | null): Provenance => ({
@@ -193,7 +193,7 @@ export const positionCreditProv = (sym: string, version?: string | null): Proven
   via: `${PWN_VIA} · LOANCreated log · ${creditField(version)}`,
 });
 
-/** Position-card / tower repay line (principal + fixed interest). */
+/** Position-card repay line (principal + fixed interest). */
 export const positionRepayProv = (sym: string, version?: string | null): Provenance => ({
   kind: "chain",
   summary: `Total repayment owed (${sym}) — the single fixed total (principal + fixed interest) owed at maturity, set in the loan's on-chain terms at creation. A v1.1 loan's economics are fully fixed — nothing accrues.`,
@@ -380,7 +380,7 @@ export const bookInterestShareProv = (): Provenance => ({
   ],
 });
 
-/** Tower fixed-interest line (repay − principal). */
+/** The fixed-interest line (repay − principal). */
 export const positionInterestProv = (sym: string, version?: string | null): Provenance => ({
   kind: "chain-derived",
   summary: `Fixed interest (${sym}) — what the borrower owes above principal: the fixed repay total minus the credit advanced, along PWN's own repayAmount = principal + fixed interest definition (both operands on-chain terms fields). Agreed upfront and never accruing — exact for a v1.1 fixed loan.`,
@@ -431,3 +431,29 @@ export function rowRepay(
     };
   return null;
 }
+
+/** A flow row's ledger cell (the card's Collateral and Debt): what the loan
+ *  held in escrow, or what the borrower owed, once the row had run, from the
+ *  loan's replay over its terms (lib/pwn/flows.ts). */
+export const flowCellProv = (side: "collateral" | "debt", sym: string, coords: PwnCoords): Provenance => ({
+  kind: "chain-derived",
+  summary:
+    side === "collateral"
+      ? `Collateral in escrow (${sym}) once this event had run: the terms' collateral, locked at the loan's creation and released by its repayment or the lender's default claim.`
+      : `Debt (${sym}) once this event had run: the terms' principal plus the interest they fix (v1.1: the repay total less the principal) or accrue by the minute (v1.2 and v1.3: the contract's sum), less what the repayment paid or the default claim cleared.`,
+  contract: contractFor(coords),
+  via:
+    side === "collateral"
+      ? `${PWN_VIA} · LOANCreated terms.collateral · LOANPaidBack / LOANClaimed`
+      : `${PWN_VIA} · LOANCreated terms · LOANPaidBack / LOANClaimed`,
+  inputs: eventInputs(coords),
+});
+
+/** The same cell's figure before the row. */
+export const flowCellBeforeProv = (side: "collateral" | "debt", sym: string, coords: PwnCoords): Provenance => ({
+  ...flowCellProv(side, sym, coords),
+  summary:
+    side === "collateral"
+      ? `Collateral in escrow (${sym}) just before this event: nothing before the creation, the terms' collateral after it.`
+      : `Debt (${sym}) just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
+});

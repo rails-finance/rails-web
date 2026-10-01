@@ -10,7 +10,11 @@
 
 import type { PwnContext } from "@/lib/shared/types/event-shape";
 import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { usePwnLedgerPending, usePwnLedgerSides } from "./pwn-ledger";
 import {
+  flowCellBeforeProv,
+  flowCellProv,
   collateralLockedProv,
   collateralReturnedProv,
   collateralSeizedProv,
@@ -37,6 +41,8 @@ export interface PwnEventDetailProps {
   /** Same-transaction events: a burn reads where the collateral went from the
    *  claim or repayment beside it. */
   siblings?: PwnEvent[];
+  /** The event's id, for its ledgers (components/protocol/pwn/pwn-ledger.tsx). */
+  eventId?: string;
 }
 
 /** Matches the explainer's echo keys (lib/pwn/explainer-clauses.tsx `fmt`). */
@@ -77,14 +83,70 @@ const STATE_LABEL: Record<CollateralState, string> = {
   closed: "Collateral · none (loan closed)",
 };
 
-export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings = [] }: PwnEventDetailProps) {
+export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId }: PwnEventDetailProps) {
   const coords: PwnCoords = { txHash, blockNumber, loanId: ctx.loanId, version: ctx.version };
   const isNft = ctx.collateralCategory === "ERC721" || ctx.collateralCategory === "ERC1155";
   const seized = ctx.eventType === "claimed" && ctx.defaulted === true;
   const state = collateralState(ctx, siblings);
   const stats: ChainTruthStat[] = [];
+  // A flow row (the creation, the repayment, a default claim) leads with the
+  // loan's Collateral and Debt as the Lifetime flows replay states them, each
+  // opening into its ledger; while the replay is on its way they stand as
+  // placeholder rows.
+  const sides = usePwnLedgerSides(eventId ?? "");
+  const ledgerPending = usePwnLedgerPending();
+  const flowRow = ctx.eventType === "created" || ctx.eventType === "paid_back" || seized;
+  const ledgerCells = flowRow && eventId != null && (sides != null || ledgerPending);
+  const ledgerCell = (side: FlowSide, label: string, symbol: string, sub?: string): ChainTruthStat => {
+    const s = sides?.[side];
+    const after = s?.after ?? 0;
+    const before = s?.before ?? 0;
+    const change = after - before;
+    return {
+      label,
+      value: String(after),
+      display: formatNumber(after),
+      symbol,
+      prov: flowCellProv(side, symbol, coords),
+      ledger: side,
+      ...(s && change !== 0
+        ? {
+            transition: {
+              before: formatNumber(before),
+              beforeExact: String(before),
+              beforeProv: flowCellBeforeProv(side, symbol, coords),
+              change: `${change > 0 ? "+" : "\u2212"}${formatNumber(Math.abs(change))}`,
+              changeExact: `${change > 0 ? "+" : "\u2212"}${Math.abs(change)}`,
+              changeProv: flowCellProv(side, symbol, coords),
+              shownAsIs: true,
+            },
+          }
+        : {}),
+      ...(sub ? { sub } : {}),
+    };
+  };
+  if (ledgerCells && ctx.collateralSymbol) {
+    const what =
+      isNft && ctx.collateralId != null ? `${ctx.collateralSymbol} #${shortTokenId(ctx.collateralId)}` : null;
+    const where =
+      state === "claimed"
+        ? "claimed by the lender"
+        : state === "returned"
+          ? "returned to the borrower"
+          : "locked in escrow";
+    stats.push(ledgerCell("collateral", "Collateral", ctx.collateralSymbol, what ? `${what} ${where}` : where));
+  }
+  if (ledgerCells && ctx.creditSymbol)
+    stats.push(
+      ledgerCell(
+        "debt",
+        "Debt",
+        ctx.creditSymbol,
+        seized ? "cleared by the default claim" : ctx.eventType === "paid_back" ? "repaid in full" : undefined,
+      ),
+    );
 
-  if (ctx.collateralSymbol) {
+  if (ctx.collateralSymbol && !ledgerCells) {
     const nftValue = isNft && ctx.collateralId != null ? `#${shortTokenId(ctx.collateralId)}` : null;
     const collValue = nftValue ?? fmt(ctx.collateralAmount);
     stats.push({

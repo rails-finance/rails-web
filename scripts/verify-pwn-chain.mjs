@@ -31,7 +31,7 @@
 //      block, and the bundler's uri(id) is PWN's own metadata route (the
 //      catalog identity in lib/pwn/asset-catalog.ts).
 //   6. Fixed-interest identity — loanRepayAmount − credit principal equals
-//      the index's fixed interest (the split the card and tower render), ≥ 0.
+//      the index's fixed interest (the split the card renders), ≥ 0.
 //   7. Default timing — a defaulted claim fires only after the deadline
 //      (v1.1 expiration; v1.2/v1.3 creation + duration, both moved by any
 //      extension).
@@ -375,7 +375,7 @@ for (const row of rows) {
     mismatches.map(([f, c, i]) => `${f}: chain ${c} vs index ${i}`).join("; "),
   );
 
-  // 6. The fixed-interest split the card and tower render.
+  // 6. The fixed-interest split the card renders.
   const interest = BigInt(t.loanRepayAmount) - BigInt(t.asset.amount);
   check(
     `${key}: repay − principal == index fixed interest, ≥ 0`,

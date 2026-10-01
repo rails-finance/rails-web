@@ -1,0 +1,1664 @@
+{
+ "read": "2026-10-02",
+ "fixtures": [
+  {
+   "name": "repaid-fixed-extended",
+   "loanId": "31",
+   "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+   "summary": {
+    "loanId": "31",
+    "version": "v11",
+    "status": "repaid",
+    "defaulted": false,
+    "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+    "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+    "collateral": {
+     "category": "ERC721",
+     "symbol": "PIRATE",
+     "named": true,
+     "address": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+     "tokenId": "5302",
+     "amount": 0,
+     "amountRaw": "0",
+     "decimals": 0
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDT",
+     "named": true,
+     "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+     "tokenId": null,
+     "amount": 1380,
+     "amountRaw": "1380000000",
+     "decimals": 6
+    },
+    "repayAmount": 1490.4,
+    "repayAmountRaw": "1490400000",
+    "accruingInterestApr": null,
+    "fixedInterestRaw": null,
+    "dueKind": "expiration",
+    "dueValue": "1708597319",
+    "createdBlock": 19068742,
+    "createdAt": 1706005319,
+    "closedBlock": 20057536,
+    "closedAt": 1717975535,
+    "eventCount": 9,
+    "txCount": 7,
+    "latestDefaultAt": 1718446919,
+    "extensionCount": 4
+   },
+   "events": [
+    {
+     "id": "minted:3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f:2",
+     "blockNumber": 19068742,
+     "timestamp": 1706005319,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "31",
+       "version": null,
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f#eventlog"
+    },
+    {
+     "id": "created:3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f:3",
+     "blockNumber": 19068742,
+     "timestamp": 1706005319,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "tokenSymbol": "USDT",
+       "tokenDecimals": 6,
+       "amount": "1380000000",
+       "amountFormatted": 1380,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "isOpen": true
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x3b9e47d3bbfabff9ced60762417421f74de9cc11c4f7193685e547b88f177c6f#eventlog"
+    },
+    {
+     "id": "extended:edb7e3b29d64b041634cb8d946e4589bccaae6bab583ef190e9067be044b9a62:0",
+     "blockNumber": 19269906,
+     "timestamp": 1708444163,
+     "actionType": "extended",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "extended",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "originalDefaultTimestamp": "1708597319",
+       "extendedDefaultTimestamp": "1710930119",
+       "extendedBy": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0xedb7e3b29d64b041634cb8d946e4589bccaae6bab583ef190e9067be044b9a62",
+     "actionLabel": "Extended",
+     "etherscanUrl": "https://etherscan.io/tx/0xedb7e3b29d64b041634cb8d946e4589bccaae6bab583ef190e9067be044b9a62#eventlog"
+    },
+    {
+     "id": "extended:22374166c1bf92d09fe53ad3fd4496c309b38666a4291de05ef6140f9792dc76:0",
+     "blockNumber": 19472334,
+     "timestamp": 1710894287,
+     "actionType": "extended",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "extended",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "originalDefaultTimestamp": "1710930119",
+       "extendedDefaultTimestamp": "1713435719",
+       "extendedBy": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x22374166c1bf92d09fe53ad3fd4496c309b38666a4291de05ef6140f9792dc76",
+     "actionLabel": "Extended",
+     "etherscanUrl": "https://etherscan.io/tx/0x22374166c1bf92d09fe53ad3fd4496c309b38666a4291de05ef6140f9792dc76#eventlog"
+    },
+    {
+     "id": "extended:2d887e68f94242c3e7deb87d04f2673fe99dd52b2b6dfc15a2933eb51d259dc6:0",
+     "blockNumber": 19691897,
+     "timestamp": 1713558923,
+     "actionType": "extended",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "extended",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "originalDefaultTimestamp": "1713435719",
+       "extendedDefaultTimestamp": "1715941319",
+       "extendedBy": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x2d887e68f94242c3e7deb87d04f2673fe99dd52b2b6dfc15a2933eb51d259dc6",
+     "actionLabel": "Extended",
+     "etherscanUrl": "https://etherscan.io/tx/0x2d887e68f94242c3e7deb87d04f2673fe99dd52b2b6dfc15a2933eb51d259dc6#eventlog"
+    },
+    {
+     "id": "extended:6a647bccd8a7ea9960cbed0d4883e7a27323489c785e53ec2524e63ccf7d791c:0",
+     "blockNumber": 20039769,
+     "timestamp": 1717761059,
+     "actionType": "extended",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "extended",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "originalDefaultTimestamp": "1715941319",
+       "extendedDefaultTimestamp": "1718446919",
+       "extendedBy": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x6a647bccd8a7ea9960cbed0d4883e7a27323489c785e53ec2524e63ccf7d791c",
+     "actionLabel": "Extended",
+     "etherscanUrl": "https://etherscan.io/tx/0x6a647bccd8a7ea9960cbed0d4883e7a27323489c785e53ec2524e63ccf7d791c#eventlog"
+    },
+    {
+     "id": "paid_back:b339ef7b23664a4b816f9bcca1d282c80e188ad8a86508607454561a96af66b8:4",
+     "blockNumber": 20057379,
+     "timestamp": 1717973651,
+     "actionType": "paid_back",
+     "flows": [
+      {
+       "token": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "tokenSymbol": "USDT",
+       "tokenDecimals": 6,
+       "amount": "1490400000",
+       "amountFormatted": 1490.4,
+       "direction": "out"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "paid_back",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0xb339ef7b23664a4b816f9bcca1d282c80e188ad8a86508607454561a96af66b8",
+     "actionLabel": "Repaid",
+     "etherscanUrl": "https://etherscan.io/tx/0xb339ef7b23664a4b816f9bcca1d282c80e188ad8a86508607454561a96af66b8#eventlog"
+    },
+    {
+     "id": "burned:e6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e:1",
+     "blockNumber": 20057536,
+     "timestamp": 1717975535,
+     "actionType": "burned",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "burned",
+       "loanId": "31",
+       "version": null,
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0xe6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e",
+     "actionLabel": "Burned",
+     "etherscanUrl": "https://etherscan.io/tx/0xe6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e#eventlog"
+    },
+    {
+     "id": "claimed:e6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e:4",
+     "blockNumber": 20057536,
+     "timestamp": 1717975535,
+     "actionType": "claimed",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "claimed",
+       "loanId": "31",
+       "version": "v11",
+       "lender": "0x192512b381127ac8e4235c178bc2088aff4e575c",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC721",
+       "collateralSymbol": "PIRATE",
+       "collateralAsset": "0x1b41d54b3f8de13d58102c50d7431fd6aa1a2c48",
+       "collateralId": "5302",
+       "collateralAmount": "0",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "1380",
+       "loanRepayAmount": "1490.4",
+       "dueKind": "expiration",
+       "dueValue": "1708597319",
+       "defaulted": false,
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0xe6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e",
+     "actionLabel": "Claimed",
+     "etherscanUrl": "https://etherscan.io/tx/0xe6a06ebf5264820c3f75a1ea1eee7a77981d8e456e4dd1ec31113d4da658846e#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "repaid-fixed-erc20",
+   "loanId": "39",
+   "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+   "summary": {
+    "loanId": "39",
+    "version": "v11",
+    "status": "repaid",
+    "defaulted": false,
+    "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+    "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+    "collateral": {
+     "category": "ERC20",
+     "symbol": "PT-Re7LRT-26SEP2024",
+     "named": true,
+     "address": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+     "tokenId": null,
+     "amount": 2.5,
+     "amountRaw": "2500000000000000000",
+     "decimals": 18
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDC",
+     "named": true,
+     "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+     "tokenId": null,
+     "amount": 4700,
+     "amountRaw": "4700000000",
+     "decimals": 6
+    },
+    "repayAmount": 4800.438356,
+    "repayAmountRaw": "4800438356",
+    "accruingInterestApr": null,
+    "fixedInterestRaw": null,
+    "dueKind": "expiration",
+    "dueValue": "1727675255",
+    "createdBlock": 20431703,
+    "createdAt": 1722491255,
+    "closedBlock": 20841799,
+    "closedAt": 1727438147,
+    "eventCount": 5,
+    "txCount": 3,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4:2",
+     "blockNumber": 20431703,
+     "timestamp": 1722491255,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "39",
+       "version": null,
+       "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+       "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "PT-Re7LRT-26SEP2024",
+       "collateralAsset": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+       "collateralId": "0",
+       "collateralAmount": "2.5",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "4700",
+       "loanRepayAmount": "4800.438356",
+       "dueKind": "expiration",
+       "dueValue": "1727675255",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+     "txHash": "0x15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4#eventlog"
+    },
+    {
+     "id": "created:15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4:3",
+     "blockNumber": 20431703,
+     "timestamp": 1722491255,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "tokenSymbol": "USDC",
+       "tokenDecimals": 6,
+       "amount": "4700000000",
+       "amountFormatted": 4700,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "39",
+       "version": "v11",
+       "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+       "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "PT-Re7LRT-26SEP2024",
+       "collateralAsset": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+       "collateralId": "0",
+       "collateralAmount": "2.5",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "4700",
+       "loanRepayAmount": "4800.438356",
+       "dueKind": "expiration",
+       "dueValue": "1727675255",
+       "isOpen": true
+      }
+     },
+     "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+     "txHash": "0x15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x15f5e1c793b1c76b13391b2410be7b44d531e1ede2f86987a213addf2b90b3a4#eventlog"
+    },
+    {
+     "id": "paid_back:8ef1f58322906b4f57800b7f8f40f0fe9b4b2887f38d0ed6da40b253332a88e9:4",
+     "blockNumber": 20838812,
+     "timestamp": 1727402195,
+     "actionType": "paid_back",
+     "flows": [
+      {
+       "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "tokenSymbol": "USDC",
+       "tokenDecimals": 6,
+       "amount": "4800438356",
+       "amountFormatted": 4800.438356,
+       "direction": "out"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "paid_back",
+       "loanId": "39",
+       "version": "v11",
+       "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+       "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "PT-Re7LRT-26SEP2024",
+       "collateralAsset": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+       "collateralId": "0",
+       "collateralAmount": "2.5",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "4700",
+       "loanRepayAmount": "4800.438356",
+       "dueKind": "expiration",
+       "dueValue": "1727675255",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+     "txHash": "0x8ef1f58322906b4f57800b7f8f40f0fe9b4b2887f38d0ed6da40b253332a88e9",
+     "actionLabel": "Repaid",
+     "etherscanUrl": "https://etherscan.io/tx/0x8ef1f58322906b4f57800b7f8f40f0fe9b4b2887f38d0ed6da40b253332a88e9#eventlog"
+    },
+    {
+     "id": "burned:b7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32:1",
+     "blockNumber": 20841799,
+     "timestamp": 1727438147,
+     "actionType": "burned",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "burned",
+       "loanId": "39",
+       "version": null,
+       "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+       "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "PT-Re7LRT-26SEP2024",
+       "collateralAsset": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+       "collateralId": "0",
+       "collateralAmount": "2.5",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "4700",
+       "loanRepayAmount": "4800.438356",
+       "dueKind": "expiration",
+       "dueValue": "1727675255",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+     "txHash": "0xb7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32",
+     "actionLabel": "Burned",
+     "etherscanUrl": "https://etherscan.io/tx/0xb7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32#eventlog"
+    },
+    {
+     "id": "claimed:b7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32:4",
+     "blockNumber": 20841799,
+     "timestamp": 1727438147,
+     "actionType": "claimed",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "claimed",
+       "loanId": "39",
+       "version": "v11",
+       "lender": "0x2b79bc0ed6ba16078560e986a89d801c69757596",
+       "borrower": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "PT-Re7LRT-26SEP2024",
+       "collateralAsset": "0x5c8151643f7aac530e2c5d13f91ca2a2d645a9a7",
+       "collateralId": "0",
+       "collateralAmount": "2.5",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "4700",
+       "loanRepayAmount": "4800.438356",
+       "dueKind": "expiration",
+       "dueValue": "1727675255",
+       "defaulted": false,
+       "isOpen": false
+      }
+     },
+     "wallet": "0x5ee7253fbef24cf4718d60d7b9622ec70f343f8f",
+     "txHash": "0xb7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32",
+     "actionLabel": "Claimed",
+     "etherscanUrl": "https://etherscan.io/tx/0xb7f361eabd6889f5c450bee09a5dbef8ecb6293935aa8310ac544d7abbf76c32#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "repaid-accruing",
+   "loanId": "60",
+   "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+   "summary": {
+    "loanId": "60",
+    "version": "v13",
+    "status": "repaid",
+    "defaulted": false,
+    "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+    "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+    "collateral": {
+     "category": "ERC1155",
+     "symbol": "PWN Bundle",
+     "named": true,
+     "address": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+     "tokenId": "56",
+     "amount": 1,
+     "amountRaw": "1",
+     "decimals": 0
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDT",
+     "named": true,
+     "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+     "tokenId": null,
+     "amount": 3000,
+     "amountRaw": "3000000000",
+     "decimals": 6
+    },
+    "repayAmount": null,
+    "repayAmountRaw": null,
+    "accruingInterestApr": 6500,
+    "fixedInterestRaw": "0",
+    "dueKind": "duration",
+    "dueValue": "3888000",
+    "createdBlock": 23656172,
+    "createdAt": 1761415799,
+    "closedBlock": 23975517,
+    "closedAt": 1765286903,
+    "eventCount": 5,
+    "txCount": 2,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557:2",
+     "blockNumber": 23656172,
+     "timestamp": 1761415799,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "60",
+       "version": null,
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "56",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "3000",
+       "dueKind": "duration",
+       "dueValue": "3888000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557#eventlog"
+    },
+    {
+     "id": "created:937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557:3",
+     "blockNumber": 23656172,
+     "timestamp": 1761415799,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "tokenSymbol": "USDT",
+       "tokenDecimals": 6,
+       "amount": "3000000000",
+       "amountFormatted": 3000,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "60",
+       "version": "v13",
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "56",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "3000",
+       "dueKind": "duration",
+       "dueValue": "3888000",
+       "isOpen": true
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x937583342ab0a351db60833c098357f43280f3d742afa87e60c7d4b7db89e557#eventlog"
+    },
+    {
+     "id": "paid_back:7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7:0",
+     "blockNumber": 23975517,
+     "timestamp": 1765286903,
+     "actionType": "paid_back",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "paid_back",
+       "loanId": "60",
+       "version": "v13",
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "56",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "3000",
+       "dueKind": "duration",
+       "dueValue": "3888000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7",
+     "actionLabel": "Repaid",
+     "etherscanUrl": "https://etherscan.io/tx/0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7#eventlog"
+    },
+    {
+     "id": "burned:7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7:6",
+     "blockNumber": 23975517,
+     "timestamp": 1765286903,
+     "actionType": "burned",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "burned",
+       "loanId": "60",
+       "version": null,
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "56",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "3000",
+       "dueKind": "duration",
+       "dueValue": "3888000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7",
+     "actionLabel": "Burned",
+     "etherscanUrl": "https://etherscan.io/tx/0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7#eventlog"
+    },
+    {
+     "id": "claimed:7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7:7",
+     "blockNumber": 23975517,
+     "timestamp": 1765286903,
+     "actionType": "claimed",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "claimed",
+       "loanId": "60",
+       "version": "v13",
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "56",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "3000",
+       "dueKind": "duration",
+       "dueValue": "3888000",
+       "defaulted": false,
+       "isOpen": false
+      }
+     },
+     "wallet": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+     "txHash": "0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7",
+     "actionLabel": "Claimed",
+     "etherscanUrl": "https://etherscan.io/tx/0x7f9222d53405446dbc159d7b4fbb024edb9e583ad321f0d287aa26249dc45da7#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "repaid-unclaimed-accruing",
+   "loanId": "54",
+   "wallet": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+   "summary": {
+    "loanId": "54",
+    "version": "v12",
+    "status": "repaid",
+    "defaulted": false,
+    "lender": "0x04e2cf7cec6b754d2a3c1ecc8e15503f61d93db5",
+    "borrower": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+    "collateral": {
+     "category": "ERC20",
+     "symbol": "TKNZ",
+     "named": true,
+     "address": "0x4769734b013ce356515b3bf68335482c0ad33d75",
+     "tokenId": null,
+     "amount": 1,
+     "amountRaw": "1000000000000000000",
+     "decimals": 18
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDC",
+     "named": true,
+     "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+     "tokenId": null,
+     "amount": 400,
+     "amountRaw": "400000000",
+     "decimals": 6
+    },
+    "repayAmount": null,
+    "repayAmountRaw": null,
+    "accruingInterestApr": 1000,
+    "fixedInterestRaw": "0",
+    "dueKind": "duration",
+    "dueValue": "604800",
+    "createdBlock": 21587104,
+    "createdAt": 1736427911,
+    "closedBlock": null,
+    "closedAt": null,
+    "eventCount": 3,
+    "txCount": 2,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:d186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66:1",
+     "blockNumber": 21587104,
+     "timestamp": 1736427911,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "54",
+       "version": null,
+       "lender": "0x04e2cf7cec6b754d2a3c1ecc8e15503f61d93db5",
+       "borrower": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "TKNZ",
+       "collateralAsset": "0x4769734b013ce356515b3bf68335482c0ad33d75",
+       "collateralId": "0",
+       "collateralAmount": "1",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "400",
+       "dueKind": "duration",
+       "dueValue": "604800",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+     "txHash": "0xd186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0xd186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66#eventlog"
+    },
+    {
+     "id": "created:d186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66:2",
+     "blockNumber": 21587104,
+     "timestamp": 1736427911,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "tokenSymbol": "USDC",
+       "tokenDecimals": 6,
+       "amount": "400000000",
+       "amountFormatted": 400,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "54",
+       "version": "v12",
+       "lender": "0x04e2cf7cec6b754d2a3c1ecc8e15503f61d93db5",
+       "borrower": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "TKNZ",
+       "collateralAsset": "0x4769734b013ce356515b3bf68335482c0ad33d75",
+       "collateralId": "0",
+       "collateralAmount": "1",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "400",
+       "dueKind": "duration",
+       "dueValue": "604800",
+       "isOpen": true
+      }
+     },
+     "wallet": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+     "txHash": "0xd186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0xd186dab411af54c94883908631c341ff317887da209c4ae5d051032615805c66#eventlog"
+    },
+    {
+     "id": "paid_back:b310a71acbba8184292a7165edafdafb4456f83c39638bb14cf779106dcd4178:0",
+     "blockNumber": 21632515,
+     "timestamp": 1736975819,
+     "actionType": "paid_back",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "paid_back",
+       "loanId": "54",
+       "version": "v12",
+       "lender": "0x04e2cf7cec6b754d2a3c1ecc8e15503f61d93db5",
+       "borrower": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "TKNZ",
+       "collateralAsset": "0x4769734b013ce356515b3bf68335482c0ad33d75",
+       "collateralId": "0",
+       "collateralAmount": "1",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "400",
+       "dueKind": "duration",
+       "dueValue": "604800",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xd20510621d75d25f11ab92572e1cf39dc260431c",
+     "txHash": "0xb310a71acbba8184292a7165edafdafb4456f83c39638bb14cf779106dcd4178",
+     "actionLabel": "Repaid",
+     "etherscanUrl": "https://etherscan.io/tx/0xb310a71acbba8184292a7165edafdafb4456f83c39638bb14cf779106dcd4178#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "defaulted-accruing",
+   "loanId": "61",
+   "wallet": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+   "summary": {
+    "loanId": "61",
+    "version": "v13",
+    "status": "defaulted",
+    "defaulted": true,
+    "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+    "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+    "collateral": {
+     "category": "ERC1155",
+     "symbol": "PWN Bundle",
+     "named": true,
+     "address": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+     "tokenId": "58",
+     "amount": 1,
+     "amountRaw": "1",
+     "decimals": 0
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDT",
+     "named": true,
+     "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+     "tokenId": null,
+     "amount": 5000,
+     "amountRaw": "5000000000",
+     "decimals": 6
+    },
+    "repayAmount": null,
+    "repayAmountRaw": null,
+    "accruingInterestApr": 6000,
+    "fixedInterestRaw": "0",
+    "dueKind": "duration",
+    "dueValue": "2592000",
+    "createdBlock": 23928226,
+    "createdAt": 1764708119,
+    "closedBlock": 24274537,
+    "closedAt": 1768894583,
+    "eventCount": 4,
+    "txCount": 2,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf:2",
+     "blockNumber": 23928226,
+     "timestamp": 1764708119,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "61",
+       "version": null,
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "lender",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "58",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "5000",
+       "dueKind": "duration",
+       "dueValue": "2592000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+     "txHash": "0x0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf#eventlog"
+    },
+    {
+     "id": "created:0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf:3",
+     "blockNumber": 23928226,
+     "timestamp": 1764708119,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "tokenSymbol": "USDT",
+       "tokenDecimals": 6,
+       "amount": "5000000000",
+       "amountFormatted": 5000,
+       "direction": "out"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "61",
+       "version": "v13",
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "lender",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "58",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "5000",
+       "dueKind": "duration",
+       "dueValue": "2592000",
+       "isOpen": true
+      }
+     },
+     "wallet": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+     "txHash": "0x0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x0f3fd3651e407f4a1ef0ed7eba314b8f838903f2bac776570e52b772c665f2cf#eventlog"
+    },
+    {
+     "id": "burned:1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62:1",
+     "blockNumber": 24274537,
+     "timestamp": 1768894583,
+     "actionType": "burned",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "burned",
+       "loanId": "61",
+       "version": null,
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "lender",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "58",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "5000",
+       "dueKind": "duration",
+       "dueValue": "2592000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+     "txHash": "0x1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62",
+     "actionLabel": "Burned",
+     "etherscanUrl": "https://etherscan.io/tx/0x1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62#eventlog"
+    },
+    {
+     "id": "claimed:1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62:2",
+     "blockNumber": 24274537,
+     "timestamp": 1768894583,
+     "actionType": "claimed",
+     "flows": [
+      {
+       "token": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "tokenSymbol": "PWN Bundle",
+       "tokenDecimals": 0,
+       "amount": "1",
+       "amountFormatted": 1,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "claimed",
+       "loanId": "61",
+       "version": "v13",
+       "lender": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+       "borrower": "0x8f1fc3766884d4a890acb2cf4bd7a9af7b2a6932",
+       "viewerRole": "lender",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "58",
+       "collateralAmount": "1",
+       "creditSymbol": "USDT",
+       "creditAsset": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+       "creditAmount": "5000",
+       "dueKind": "duration",
+       "dueValue": "2592000",
+       "defaulted": true,
+       "isOpen": false
+      }
+     },
+     "wallet": "0x62ee13473eb1f771c3788f70ea988499a6008881",
+     "txHash": "0x1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62",
+     "actionLabel": "Claimed",
+     "etherscanUrl": "https://etherscan.io/tx/0x1a56600719232914c5915de3b81be71caa81f7a0528af77c47fca34782a89a62#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "defaulted-fixed-erc20",
+   "loanId": "37",
+   "wallet": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+   "summary": {
+    "loanId": "37",
+    "version": "v11",
+    "status": "defaulted",
+    "defaulted": true,
+    "lender": "0x978452c747ee0b617285caf3c50cae0103af5656",
+    "borrower": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+    "collateral": {
+     "category": "ERC20",
+     "symbol": "BZZ",
+     "named": true,
+     "address": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+     "tokenId": null,
+     "amount": 10000,
+     "amountRaw": "100000000000000000000",
+     "decimals": 16
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "DAI",
+     "named": true,
+     "address": "0x6b175474e89094c44da98b954eedeac495271d0f",
+     "tokenId": null,
+     "amount": 2875.053124,
+     "amountRaw": "2875053124000000000000",
+     "decimals": 18
+    },
+    "repayAmount": 3166.4968653369865,
+    "repayAmountRaw": "3166496865336986300976",
+    "accruingInterestApr": null,
+    "fixedInterestRaw": null,
+    "dueKind": "expiration",
+    "dueValue": "1735375127",
+    "createdBlock": 20174719,
+    "createdAt": 1719391127,
+    "closedBlock": 21544465,
+    "closedAt": 1735913447,
+    "eventCount": 4,
+    "txCount": 2,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df:2",
+     "blockNumber": 20174719,
+     "timestamp": 1719391127,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "37",
+       "version": null,
+       "lender": "0x978452c747ee0b617285caf3c50cae0103af5656",
+       "borrower": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "BZZ",
+       "collateralAsset": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+       "collateralId": "0",
+       "collateralAmount": "10000",
+       "creditSymbol": "DAI",
+       "creditAsset": "0x6b175474e89094c44da98b954eedeac495271d0f",
+       "creditAmount": "2875.053124",
+       "loanRepayAmount": "3166.496865336986300976",
+       "dueKind": "expiration",
+       "dueValue": "1735375127",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+     "txHash": "0x2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df#eventlog"
+    },
+    {
+     "id": "created:2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df:3",
+     "blockNumber": 20174719,
+     "timestamp": 1719391127,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0x6b175474e89094c44da98b954eedeac495271d0f",
+       "tokenSymbol": "DAI",
+       "tokenDecimals": 18,
+       "amount": "2875053124000000000000",
+       "amountFormatted": 2875.053124,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "37",
+       "version": "v11",
+       "lender": "0x978452c747ee0b617285caf3c50cae0103af5656",
+       "borrower": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "BZZ",
+       "collateralAsset": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+       "collateralId": "0",
+       "collateralAmount": "10000",
+       "creditSymbol": "DAI",
+       "creditAsset": "0x6b175474e89094c44da98b954eedeac495271d0f",
+       "creditAmount": "2875.053124",
+       "loanRepayAmount": "3166.496865336986300976",
+       "dueKind": "expiration",
+       "dueValue": "1735375127",
+       "isOpen": true
+      }
+     },
+     "wallet": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+     "txHash": "0x2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x2aebf1953765e1df1a78eaff75b37b83651326e0322bd6830ce1ea22a67eb2df#eventlog"
+    },
+    {
+     "id": "burned:8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da:1",
+     "blockNumber": 21544465,
+     "timestamp": 1735913447,
+     "actionType": "burned",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "burned",
+       "loanId": "37",
+       "version": null,
+       "lender": "0x978452c747ee0b617285caf3c50cae0103af5656",
+       "borrower": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "BZZ",
+       "collateralAsset": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+       "collateralId": "0",
+       "collateralAmount": "10000",
+       "creditSymbol": "DAI",
+       "creditAsset": "0x6b175474e89094c44da98b954eedeac495271d0f",
+       "creditAmount": "2875.053124",
+       "loanRepayAmount": "3166.496865336986300976",
+       "dueKind": "expiration",
+       "dueValue": "1735375127",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+     "txHash": "0x8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da",
+     "actionLabel": "Burned",
+     "etherscanUrl": "https://etherscan.io/tx/0x8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da#eventlog"
+    },
+    {
+     "id": "claimed:8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da:4",
+     "blockNumber": 21544465,
+     "timestamp": 1735913447,
+     "actionType": "claimed",
+     "flows": [
+      {
+       "token": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+       "tokenSymbol": "BZZ",
+       "tokenDecimals": 16,
+       "amount": "100000000000000000000",
+       "amountFormatted": 10000,
+       "direction": "out"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "claimed",
+       "loanId": "37",
+       "version": "v11",
+       "lender": "0x978452c747ee0b617285caf3c50cae0103af5656",
+       "borrower": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "BZZ",
+       "collateralAsset": "0x19062190b1925b5b6689d7073fdfc8c2976ef8cb",
+       "collateralId": "0",
+       "collateralAmount": "10000",
+       "creditSymbol": "DAI",
+       "creditAsset": "0x6b175474e89094c44da98b954eedeac495271d0f",
+       "creditAmount": "2875.053124",
+       "loanRepayAmount": "3166.496865336986300976",
+       "dueKind": "expiration",
+       "dueValue": "1735375127",
+       "defaulted": true,
+       "isOpen": false
+      }
+     },
+     "wallet": "0xb2d3fc2bbda9a71c65b69ccf39d7052c26a90d13",
+     "txHash": "0x8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da",
+     "actionLabel": "Claimed",
+     "etherscanUrl": "https://etherscan.io/tx/0x8d603450ee14943d1ad0bc1f7f5d862fce7ec1281a08043577ac1c4f3f37d7da#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "lapsed-accruing",
+   "loanId": "55",
+   "wallet": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+   "summary": {
+    "loanId": "55",
+    "version": "v13",
+    "status": "open",
+    "defaulted": false,
+    "lender": "0x8737a63134c1f0abdf06869a11cfe133f1cf06c4",
+    "borrower": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+    "collateral": {
+     "category": "ERC20",
+     "symbol": "ELIMU",
+     "named": true,
+     "address": "0xe29797910d413281d2821d5d9a989262c8121cc2",
+     "tokenId": null,
+     "amount": 100000,
+     "amountRaw": "100000000000000000000000",
+     "decimals": 18
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "WETH",
+     "named": true,
+     "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+     "tokenId": null,
+     "amount": 0.034727,
+     "amountRaw": "34727000000000000",
+     "decimals": 18
+    },
+    "repayAmount": null,
+    "repayAmountRaw": null,
+    "accruingInterestApr": 1200,
+    "fixedInterestRaw": "0",
+    "dueKind": "duration",
+    "dueValue": "7776000",
+    "createdBlock": 21808118,
+    "createdAt": 1739094023,
+    "closedBlock": null,
+    "closedAt": null,
+    "eventCount": 2,
+    "txCount": 1,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:d43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c:1",
+     "blockNumber": 21808118,
+     "timestamp": 1739094023,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "55",
+       "version": null,
+       "lender": "0x8737a63134c1f0abdf06869a11cfe133f1cf06c4",
+       "borrower": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "ELIMU",
+       "collateralAsset": "0xe29797910d413281d2821d5d9a989262c8121cc2",
+       "collateralId": "0",
+       "collateralAmount": "100000",
+       "creditSymbol": "WETH",
+       "creditAsset": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+       "creditAmount": "0.034727",
+       "dueKind": "duration",
+       "dueValue": "7776000",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+     "txHash": "0xd43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0xd43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c#eventlog"
+    },
+    {
+     "id": "created:d43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c:2",
+     "blockNumber": 21808118,
+     "timestamp": 1739094023,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+       "tokenSymbol": "WETH",
+       "tokenDecimals": 18,
+       "amount": "34727000000000000",
+       "amountFormatted": 0.034727,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "55",
+       "version": "v13",
+       "lender": "0x8737a63134c1f0abdf06869a11cfe133f1cf06c4",
+       "borrower": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC20",
+       "collateralSymbol": "ELIMU",
+       "collateralAsset": "0xe29797910d413281d2821d5d9a989262c8121cc2",
+       "collateralId": "0",
+       "collateralAmount": "100000",
+       "creditSymbol": "WETH",
+       "creditAsset": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+       "creditAmount": "0.034727",
+       "dueKind": "duration",
+       "dueValue": "7776000",
+       "isOpen": true
+      }
+     },
+     "wallet": "0xc4f9af390065fd1598970ae32ef27c024bba276b",
+     "txHash": "0xd43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0xd43d43781c65dca6ccbb3a5cb45052f2b0c80209a6bec924dea59469ed77fa8c#eventlog"
+    }
+   ]
+  },
+  {
+   "name": "lapsed-fixed",
+   "loanId": "26",
+   "wallet": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+   "summary": {
+    "loanId": "26",
+    "version": "v11",
+    "status": "open",
+    "defaulted": false,
+    "lender": "0xc8cf0b616843ef8412c824c22fcacae67222515f",
+    "borrower": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+    "collateral": {
+     "category": "ERC1155",
+     "symbol": "PWN Bundle",
+     "named": true,
+     "address": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+     "tokenId": "29",
+     "amount": 1,
+     "amountRaw": "1",
+     "decimals": 0
+    },
+    "credit": {
+     "category": "ERC20",
+     "symbol": "USDC",
+     "named": true,
+     "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+     "tokenId": null,
+     "amount": 50,
+     "amountRaw": "50000000",
+     "decimals": 6
+    },
+    "repayAmount": 50.205479,
+    "repayAmountRaw": "50205479",
+    "accruingInterestApr": null,
+    "fixedInterestRaw": null,
+    "dueKind": "expiration",
+    "dueValue": "1704128339",
+    "createdBlock": 18700065,
+    "createdAt": 1701536339,
+    "closedBlock": null,
+    "closedAt": null,
+    "eventCount": 2,
+    "txCount": 1,
+    "latestDefaultAt": null,
+    "extensionCount": 0
+   },
+   "events": [
+    {
+     "id": "minted:7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512:2",
+     "blockNumber": 18700065,
+     "timestamp": 1701536339,
+     "actionType": "minted",
+     "flows": [],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "minted",
+       "loanId": "26",
+       "version": null,
+       "lender": "0xc8cf0b616843ef8412c824c22fcacae67222515f",
+       "borrower": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "29",
+       "collateralAmount": "1",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "50",
+       "loanRepayAmount": "50.205479",
+       "dueKind": "expiration",
+       "dueValue": "1704128339",
+       "isOpen": false
+      }
+     },
+     "wallet": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+     "txHash": "0x7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512",
+     "actionLabel": "Minted",
+     "etherscanUrl": "https://etherscan.io/tx/0x7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512#eventlog"
+    },
+    {
+     "id": "created:7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512:3",
+     "blockNumber": 18700065,
+     "timestamp": 1701536339,
+     "actionType": "created",
+     "flows": [
+      {
+       "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "tokenSymbol": "USDC",
+       "tokenDecimals": 6,
+       "amount": "50000000",
+       "amountFormatted": 50,
+       "direction": "in"
+      }
+     ],
+     "context": {
+      "protocol": "pwn",
+      "data": {
+       "eventType": "created",
+       "loanId": "26",
+       "version": "v11",
+       "lender": "0xc8cf0b616843ef8412c824c22fcacae67222515f",
+       "borrower": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+       "viewerRole": "borrower",
+       "collateralCategory": "ERC1155",
+       "collateralSymbol": "PWN Bundle",
+       "collateralAsset": "0x19e3293196aee99bb3080f28b9d3b4ea7f232b8d",
+       "collateralId": "29",
+       "collateralAmount": "1",
+       "creditSymbol": "USDC",
+       "creditAsset": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+       "creditAmount": "50",
+       "loanRepayAmount": "50.205479",
+       "dueKind": "expiration",
+       "dueValue": "1704128339",
+       "isOpen": true
+      }
+     },
+     "wallet": "0xcf7247c7e70672d95c13c4c292f8205f46f09281",
+     "txHash": "0x7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512",
+     "actionLabel": "Created",
+     "etherscanUrl": "https://etherscan.io/tx/0x7be8e6115517a9b2d22fbdc11a2a13a9c19971396b8c97854e07c31b3f2fa512#eventlog"
+    }
+   ]
+  }
+ ]
+}
