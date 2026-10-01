@@ -28,6 +28,7 @@ import { FxEventDetail } from "./fx-event-detail";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
 import { useFxPoolTerms } from "@/lib/fx/use-event-state";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { FxLedgerProvider } from "./fx-ledger";
 
 export interface FxEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "fx"; data: FxContext } };
@@ -172,47 +173,51 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     />
   );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <FxEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          flows={event.flows}
-          eventId={event.id}
-        />
-      }
-      detail={
-        <FxEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          normalizedSymbol={meta?.normalizedSymbol ?? ctx.poolSymbol}
-          blockPeers={blockPeers}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <FxEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          blockPeers={blockPeers}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={fxExplainerTeaser(ctx, coords)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />}
-      persistKey={`fx:${event.id}`}
-    />
+    <FxLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <FxEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            flows={event.flows}
+            eventId={event.id}
+          />
+        }
+        detail={
+          <FxEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            normalizedSymbol={meta?.normalizedSymbol ?? ctx.poolSymbol}
+            blockPeers={blockPeers}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <FxEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            blockPeers={blockPeers}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={fxExplainerTeaser(ctx, coords)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />}
+        persistKey={`fx:${event.id}`}
+      />
+    </FxLedgerProvider>
   );
 }

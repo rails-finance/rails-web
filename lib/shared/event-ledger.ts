@@ -92,6 +92,8 @@ const THIS_ROW: Record<string, string> = {
   "Collateral swap": "This swap",
   "Debt swap": "This debt swap",
   "Debt written off": "This write-off",
+  Rebalance: "This rebalance",
+  "Pool liquidation": "This liquidation",
 };
 
 /** A row's words: the line's name, its earlier movements, the event's. */
@@ -99,7 +101,7 @@ export function ledgerWords(
   b: FlowBucket | undefined,
   label: string,
 ): { plain: string; before: string; event: string } {
-  const plain = b?.tone === "redemption" ? "Redeemed" : label;
+  const plain = b?.ledgerLabel ?? (b?.tone === "redemption" ? "Redeemed" : label);
   return { plain, before: `${plain} before`, event: THIS_ROW[b?.event ?? ""] ?? "This event" };
 }
 

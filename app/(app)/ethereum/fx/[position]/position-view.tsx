@@ -18,7 +18,7 @@ import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxPositionSummary } from "@/lib/sources/api/fx-positions";
-import { parseFxPositionSlug } from "@/lib/fx/asset-catalog";
+import { FX_POOLS, parseFxPositionSlug } from "@/lib/fx/asset-catalog";
 import { fetchFxTimeline } from "@/lib/api/fetch-fx-timeline";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
@@ -39,18 +39,20 @@ import { FxPositionExplanation } from "@/components/protocol/fx/fx-position-expl
 import { FxLoansLine } from "@/components/protocol/fx/fx-loans-line";
 import { fxLoans } from "@/lib/fx/loans";
 import { summariseFxExternalActors } from "@/lib/fx/external-actor";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { FxDriftPanel } from "@/components/protocol/fx/fx-drift-panel";
 import { FxSocializedReadsContext } from "@/lib/fx/socialized-reads";
-import { useFxPositionReads, useFxPricesAt } from "@/lib/fx/use-event-state";
+import { useFxPositionReads, useFxPricesAtRead } from "@/lib/fx/use-event-state";
 import { fxInTxFunding, fxOperateBlocks } from "@/lib/fx/in-tx-funding";
 import { currentHolder, withHolderSpans } from "@/lib/fx/holders";
 import { FxHolderLine } from "@/components/protocol/fx/fx-holder-line";
 import { fetchFxDrift, FxDriftError, type FxDriftResult } from "@/lib/sources/api/fx-drift";
-import { computeFxEconomics, fxDebtFlowsWithOpening } from "@/lib/fx/economics";
 import { fxNoTxParts } from "@/lib/fx/no-tx-parts";
 import { fxLiquidationMoved } from "@/lib/fx/row-figures";
-import { fxEconomicsExplanation, fxEconomicsContent } from "@/lib/fx/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { FxFlowsNote, fxFlowsContent } from "@/components/protocol/fx/fx-flows-note";
+import { useFxFlows } from "@/hooks/useFxFlows";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -337,16 +339,17 @@ export default function FxPositionView({
   }, [view, socializedRows, emptyLiquidations, historyWindow.state]);
   const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
-  const tl = useTimelineEvents(fxEvents, { storageKey: `fx-${slug}`, protocolKey: "fx", window: historyWindow });
+  const tl = useTimelineEvents(fxEvents, {
+    storageKey: `fx-${slug}`,
+    protocolKey: "fx",
+    window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
+  });
 
-  // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
+  // On a windowed page the row count reads the MERGED history: unknown until
+  // the opening balance is.
   const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? fxEvents : undefined;
-  const precomputedLifetime = useMemo(() => fxDebtFlowsWithOpening(fxEvents, opening), [fxEvents, opening]);
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -381,7 +384,7 @@ export default function FxPositionView({
   // The anchor price read at the settled block, the price the card's USD
   // figure and debt ratio use; the sweep's stored min-leg reading until it
   // lands.
-  const settledPx = useFxPricesAt(
+  const { value: settledPx, settled: settledPxIn } = useFxPricesAtRead(
     parsed?.pool ?? "",
     parsed?.positionId ?? "",
     view?.status === "open" ? view.settled.block : null,
@@ -401,6 +404,41 @@ export default function FxPositionView({
     return [{ symbol: view.normalizedSymbol, price: view.oracle.priceUsd }];
   }, [view, settledPx]);
 
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/fx/flows.ts): the page's rows where they are all of it, else the
+  // flat history read once (the CSV's read). Today's figures are the pool's
+  // settled read at the anchor price, the card's.
+  const poolMeta = parsed ? FX_POOLS[parsed.pool] : null;
+  const flowLive = useMemo(
+    () =>
+      view && view.status === "open"
+        ? {
+            price:
+              settledPx?.anchorPrice != null
+                ? Number(settledPx.anchorPrice) / 1e18
+                : view.oracle.priceUsd != null && view.oracle.priceUsd > 0
+                  ? view.oracle.priceUsd
+                  : null,
+            coll: view.settled.colls,
+            debt: view.settled.debts,
+          }
+        : null,
+    [view, settledPx],
+  );
+  const flows = useFxFlows({
+    pool: parsed?.pool ?? null,
+    positionId: parsed?.positionId ?? null,
+    normalizes: poolMeta != null && poolMeta.tokenSymbol !== poolMeta.normalizedSymbol,
+    wholeEvents: historyWindow.state === "whole" ? fxEvents : null,
+    fetchAll: fetchAllHistory,
+    collSymbol: view?.normalizedSymbol ?? null,
+    open: view?.status === "open",
+    live: flowLive,
+    liveSettled: settledPxIn,
+    enabled: view != null,
+  });
+  const flowFocus = flows.read !== "failed" ? flows.focus : null;
+
   // A closed position's price: the oracle read its closing row's snapshot
   // carries.
   const closing = useMemo(() => {
@@ -412,149 +450,164 @@ export default function FxPositionView({
   }, [view, fxEvents]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow session="fx" assets={stripAssets} closed={view != null && view.status !== "open"} closing={closing}>
-        {view && (
-          <FxExportMenu
-            view={view}
-            events={fxEvents}
-            drift={drift}
-            csvFilename={`fx-${slug}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, fxEvents)}
-            scopeNote={exportScopeNote(historyWindow, fxEvents, "this position's whole history")}
-          />
-        )}
-      </DetailTopRow>
-
-      {/* An unreadable slug never reaches here: the server route answers 404
-          with the not-found body beside it. */}
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="fx"
+          assets={stripAssets}
+          closed={view != null && view.status !== "open"}
+          closing={closing}
+        >
           {view && (
-            // The Explanation pane: layman narration of the card's own face
-            // figures, in two moods — the pool's own figures present, or still
-            // pending (the card shows dashes and the pane says so plainly).
-            <FxPositionCard
-              v={cardView ?? view}
-              receipts
-              viewHref={tl.viewHref}
+            <FxExportMenu
+              view={view}
+              events={fxEvents}
               drift={drift}
-              rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
-              inTxFunding={inTxFunding}
-              bodyExtra={
-                holder || loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? (
-                  <>
-                    {holder ? <FxHolderLine holder={holder} /> : null}
-                    {loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? <FxLoansLine loans={loans} /> : null}
-                  </>
-                ) : undefined
-              }
-              explanation={
-                <FxPositionExplanation
-                  v={cardView ?? view}
-                  parts={noTxParts}
-                  emptyLiquidations={historyWindow.state === "whole" ? emptyLiquidations : 0}
-                  externalActivity={externalActivity}
-                  // The full record's row count: the loaded rows plus the
-                  // MV-lane events the opening balance summarised (the raw
-                  // lanes always load whole, so they are already counted).
-                  // Unknown while the opening balance is in flight.
-                  timelineRows={lifetimeKnown ? fxEvents.length + (opening?.totalEvents ?? 0) : undefined}
-                  rowKinds={rowKinds}
-                />
-              }
+              csvFilename={`fx-${slug}-activity.csv`}
+              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, fxEvents)}
+              scopeNote={exportScopeNote(historyWindow, fxEvents, "this position's whole history")}
             />
           )}
-          {view &&
-            (() => {
-              const towerData = computeFxEconomics(view, lifetimeEvents ?? [], precomputedLifetime, noTxParts);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={fxEconomicsExplanation(towerData)}
-                  learnMore={fxEconomicsContent()}
-                />
-              );
-            })()}
-          {/* Per-interval decomposition of the socialized lane — the same
+        </DetailTopRow>
+
+        {/* An unreadable slug never reaches here: the server route answers 404
+          with the not-found body beside it. */}
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {view && (
+              // The Explanation pane: layman narration of the card's own face
+              // figures, in two moods — the pool's own figures present, or still
+              // pending (the card shows dashes and the pane says so plainly).
+              <FxPositionCard
+                v={cardView ?? view}
+                receipts
+                viewHref={tl.viewHref}
+                drift={drift}
+                rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
+                inTxFunding={inTxFunding}
+                bodyExtra={
+                  holder || loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? (
+                    <>
+                      {holder ? <FxHolderLine holder={holder} /> : null}
+                      {loans.length > 1 || loans.at(-1)?.ending === "liquidated" ? <FxLoansLine loans={loans} /> : null}
+                    </>
+                  ) : undefined
+                }
+                explanation={
+                  <FxPositionExplanation
+                    v={cardView ?? view}
+                    parts={noTxParts}
+                    emptyLiquidations={historyWindow.state === "whole" ? emptyLiquidations : 0}
+                    externalActivity={externalActivity}
+                    // The full record's row count: the loaded rows plus the
+                    // MV-lane events the opening balance summarised (the raw
+                    // lanes always load whole, so they are already counted).
+                    // Unknown while the opening balance is in flight.
+                    timelineRows={lifetimeKnown ? fxEvents.length + (opening?.totalEvents ?? 0) : undefined}
+                    rowKinds={rowKinds}
+                  />
+                }
+              />
+            )}
+            {/* Lifetime flows: the bars and the line over the position's replay
+              (lib/fx/flows.ts), in fxUSD, in place of the tower (TO-DO-ui-jobs
+              206). */}
+            {view && (
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <FxFlowsNote
+                      facts={flows.facts}
+                      collSymbol={view.normalizedSymbol}
+                      tokenSymbol={poolMeta?.tokenSymbol ?? view.poolSymbol}
+                    />
+                  </div>
+                }
+                learnMore={fxFlowsContent()}
+              />
+            )}
+            {/* Per-interval decomposition of the socialized lane — the same
               intervals the card's collateral line and the rebalance cards'
               own-position slices read from. Only meaningful once the position
               has events to bound the intervals. */}
-          {view && hasOwnEvents && (
-            <FxDriftPanel
-              drift={drift}
-              state={driftState}
-              reason={driftReason}
-              onLoad={() => void loadDrift()}
-              normalizedSymbol={view.normalizedSymbol}
-              blockDates={blockDates}
-              inTx={inTxFunding}
-            />
-          )}
-          {/* Chain-only positions: the contract minted them via a path that
+            {view && hasOwnEvents && (
+              <FxDriftPanel
+                drift={drift}
+                state={driftState}
+                reason={driftReason}
+                onLoad={() => void loadDrift()}
+                normalizedSymbol={view.normalizedSymbol}
+                blockDates={blockDates}
+                inTx={inTxFunding}
+              />
+            )}
+            {/* Chain-only positions: the contract minted them via a path that
               emits no Operate (roster verified against getNextPositionId), so
               an empty timeline is the truthful record, not missing data. */}
-          {view && fxEvents.length === 0 && (
-            <div className="text-sm text-rb-500">
-              This position has no recorded events — it was created by a path that logs nothing, so only the
-              pool&rsquo;s own current figures above describe it.
-            </div>
-          )}
-          <FxSocializedReadsContext.Provider value={socializedReads}>
-            <ChainTruthTimeline
-              csvExportCeiling={null}
-              // Matches `FxEventCard`'s own `persistKey={`fx:${event.id}`}` —
-              // lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="fx"
-              closed={view ? view.status !== "open" : undefined}
-              tl={tl}
-              runs={FX_TICK_REBALANCE_RUNS}
-              // Tenure-first header: when the position started, how long it has
-              // run, how fresh the latest activity is.
-              toolbarLeading={
-                view ? (
-                  <TimelineActivityHeader
-                    events={fxEvents}
-                    closed={view.status !== "open"}
-                    // When the position actually opened, not when the window
-                    // does.
-                    firstAt={opening?.firstTimestamp}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                    reopenedAt={
-                      loans.length > 1 && loans[loans.length - 1].closedAt == null
-                        ? loans[loans.length - 1].openedAt
-                        : null
-                    }
-                  />
-                ) : undefined
-              }
-              renderCard={(event, meta) =>
-                isFxEvent(event) ? (
-                  <FxEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                    blockPeers={
-                      event.context.data.eventType === "tickRebalance"
-                        ? blockPeers.get(event.blockNumber)
-                        : event.context.data.eventType === "operate"
-                          ? ownPeers.get(event.blockNumber)
-                          : undefined
-                    }
-                  />
-                ) : null
-              }
-            />
-          </FxSocializedReadsContext.Provider>
-          {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+            {view && fxEvents.length === 0 && (
+              <div className="text-sm text-rb-500">
+                This position has no recorded events — it was created by a path that logs nothing, so only the
+                pool&rsquo;s own current figures above describe it.
+              </div>
+            )}
+            <FxSocializedReadsContext.Provider value={socializedReads}>
+              <ChainTruthTimeline
+                csvExportCeiling={null}
+                // Matches `FxEventCard`'s own `persistKey={`fx:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="fx"
+                closed={view ? view.status !== "open" : undefined}
+                tl={tl}
+                runs={FX_TICK_REBALANCE_RUNS}
+                // Tenure-first header: when the position started, how long it has
+                // run, how fresh the latest activity is.
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
+                      events={fxEvents}
+                      closed={view.status !== "open"}
+                      // When the position actually opened, not when the window
+                      // does.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                      reopenedAt={
+                        loans.length > 1 && loans[loans.length - 1].closedAt == null
+                          ? loans[loans.length - 1].openedAt
+                          : null
+                      }
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isFxEvent(event) ? (
+                    <FxEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      blockPeers={
+                        event.context.data.eventType === "tickRebalance"
+                          ? blockPeers.get(event.blockNumber)
+                          : event.context.data.eventType === "operate"
+                            ? ownPeers.get(event.blockNumber)
+                            : undefined
+                      }
+                    />
+                  ) : null
+                }
+              />
+            </FxSocializedReadsContext.Provider>
+            {/* Ambient oracle-price pill, fixed bottom-right. */}
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }

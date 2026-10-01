@@ -410,17 +410,6 @@ export const socializedDebtProv = (
   ],
 });
 
-/** A lifetime gross fxUSD debt flow (Σ repaid / liquidation-cleared) — the sum
- *  of the position's own emitted debt deltas across its whole captured history
- *  (complete from the pool's deploy block). */
-export const fxLifetimeFlowProv = (flow: "repaid" | "liquidated debt"): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Lifetime ${flow} (fxUSD) — the sum of every fxUSD amount this position's own events ${flow === "repaid" ? "repaid through Operate" : "had cleared in LiquidatePosition events"} across its whole captured history (complete from the pool's deploy block). Emitted deltas only — the socialized lane (rebalances, write-offs, socialized bad debt) moved debt with no event and lives in the explicit reconciliation line, not in this sum.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: `${FX_VIA} · Σ debt deltas across the position's own logs · pool deploy → head`,
-});
-
 // ── the drift panel (archive boundary reads) ─────────────────────────────────
 
 /** One quiet stretch between the position's own events — the interval row's
