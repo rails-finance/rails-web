@@ -62,9 +62,16 @@ const EXPLORERS = [
     protocolFee: false,
   },
 ].filter((x) => !ONLY || x.key === ONLY);
+/** The captions the Aave V3 card passes LiquidationForensics (aave-v3-ct-event-detail.tsx,
+ *  web 9ac0b06; the shared defaults "Seized, at liquidation" / "Cleared, at
+ *  liquidation" / "Realized premium" are not drawn on this card). The seized
+ *  leg is "Collateral to the liquidator" beside a fee-transfer row,
+ *  "Collateral seized" otherwise. */
+const LIQ_CAPTIONS = /^(Collateral seized|Collateral to the liquidator|Debt cleared|Liquidator's premium)$/;
 const COUNT_RE = /^(?:Showing )?[\d,]+(?: of [\d,]+)? (?:events?|listed)/;
 
 let failures = 0;
+let tokenOnlyEvidence = 0;
 const check = (name, cond, detail = "") => {
   console.log(`${cond ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
   if (!cond) failures++;
@@ -156,8 +163,8 @@ async function expandCard(page, n) {
   await page.waitForTimeout(250);
 }
 
-/** The forensics grid's own StatCard for one leg ("Seized, at liquidation" /
- *  "Cleared, at liquidation") — scopes a "$" search to that leg alone. Needed
+/** The forensics grid's own StatCard for one leg (the seized-leg caption) —
+ *  scopes a "$" search to that leg alone. Needed
  *  because the snapshot grid above the forensics grid carries its own
  *  after-balance USD chip (lib/aave-v3/event-provenance.ts's
  *  snapshotUsdProv), so an unscoped "$" search on the whole card finds that
@@ -414,7 +421,10 @@ async function runExplorer(x) {
         text.includes(d.reserveSymbol) && roundsTo(text.replace(d.reserveSymbol, ""), d.price.usd),
         `"${text}" vs ${d.price.usd}`,
       );
-      const receipt = await openReceiptFor(own.page, card, d.reserveSymbol);
+      // Opened by the pill's own "oracle at block" text: the reserve symbol
+      // finds the header's amount first (aave-v3-base #5, seamless #65), and
+      // that receipt is the amount's, not the price's.
+      const receipt = await openReceiptFor(own.page, card, "oracle at block");
       check(
         `${x.key} ordinary #${n}: the pill's receipt names IAaveOracle getAssetPrice at the block`,
         !!receipt && /getAssetPrice/.test(receipt) && !/Untraced input/.test(receipt),
@@ -423,7 +433,7 @@ async function runExplorer(x) {
     }
     check(
       `${x.key} ordinary #${n}: no forensics grid on an ordinary row`,
-      (await card.getByText("Seized, at liquidation").count()) === 0,
+      (await card.getByText(LIQ_CAPTIONS).count()) === 0,
     );
     if (own.page !== page) await own.page.close();
   }
@@ -432,14 +442,35 @@ async function runExplorer(x) {
     const { n, d } = pricedLiq;
     await expandCard(page, domN(n));
     const card = cardFor(page, domN(n));
+    // The forensics grid, its price pills and the bonus reference are drawn
+    // once the position read has landed (rails-ops TO-DO-ui-jobs §213).
+    await card
+      .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
+      .first()
+      .waitFor({ timeout: 60000 })
+      .catch(() => {});
     const seized = Number(d.liquidatedCollateralAmount) * d.collateralPrice.usd;
     const cleared = Number(d.debtToCover) * d.debtPrice.usd;
     const premium = seized / cleared - 1;
+    // The seized leg's caption follows the timeline's own fee-transfer row
+    // (`fee` in aave-v3-ct-event-detail.tsx), not the reserve's fee setting:
+    // "Collateral to the liquidator" beside a fee row, "Collateral seized"
+    // otherwise. The grid draws a beat after the read lands, so wait on
+    // either caption, then take the one that is there.
+    await card
+      .getByText(/^(Collateral seized|Collateral to the liquidator)$/)
+      .first()
+      .waitFor({ timeout: 30000 })
+      .catch(() => {});
+    const seizedCaption =
+      (await card.getByText("Collateral to the liquidator", { exact: true }).count()) > 0
+        ? "Collateral to the liquidator"
+        : "Collateral seized";
     check(
-      `${x.key} liquidation #${n}: forensics grid renders (Seized / Cleared / Realized premium)`,
-      (await card.getByText("Seized, at liquidation").count()) > 0 &&
-        (await card.getByText("Cleared, at liquidation").count()) > 0 &&
-        (await card.getByText("Realized premium").count()) > 0,
+      `${x.key} liquidation #${n}: forensics grid renders (${seizedCaption} / Debt cleared / Liquidator's premium)`,
+      (await card.getByText(seizedCaption, { exact: true }).count()) > 0 &&
+        (await card.getByText("Debt cleared", { exact: true }).count()) > 0 &&
+        (await card.getByText("Liquidator's premium", { exact: true }).count()) > 0,
     );
     const premiumEl = card.getByText(/^[+−]\d+\.\d\d%$/).first();
     if ((await premiumEl.count()) > 0) {
@@ -473,7 +504,7 @@ async function runExplorer(x) {
       (await pills.count()) === 2,
       `${await pills.count()} pill(s)`,
     );
-    const receipt = await openReceiptFor(page, legStatFor(card, "Seized, at liquidation"), "$");
+    const receipt = await openReceiptFor(page, legStatFor(card, seizedCaption), "$");
     check(
       `${x.key} liquidation #${n}: the seized leg's receipt is amount × price at block, no untraced input`,
       !!receipt && /amount × price at block/.test(receipt) && !/Untraced input/.test(receipt),
@@ -517,11 +548,13 @@ async function runExplorer(x) {
         (await card.getByText(/oracle at block/).count()) === 0,
       );
     if (own.page !== page) await own.page.close();
+    tokenOnlyEvidence += 1;
   } else {
-    check(
-      `${x.key} token-only arm: NO EVIDENCE — no unpriced ordinary row on this wallet`,
-      false,
-      "set WALLET= to a wallet with older rows the walk has not reached",
+    // A lane whose every row is priced (Seamless, frozen, once the index
+    // walked it) has nothing to show here: that is no evidence, not a fault.
+    // The run still fails below if NO lane in it had a specimen.
+    console.log(
+      `SKIP  ${x.key} token-only arm: no unpriced ordinary row on this wallet or the first 500 listed (set WALLET= to one with rows the walk has not reached)`,
     );
   }
   await page.close();
@@ -534,6 +567,11 @@ for (const x of EXPLORERS) {
     check(`${x.key}: run completed`, false, String(e).slice(0, 200));
   }
 }
+check(
+  "token-only arm: at least one lane in this run had an unpriced ordinary row",
+  tokenOnlyEvidence > 0,
+  tokenOnlyEvidence > 0 ? `${tokenOnlyEvidence} lane(s)` : "NO EVIDENCE on any lane",
+);
 check("no page errors", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 await browser.close();
 console.log(`\n${failures === 0 ? "ALL PASS" : `${failures} FAILED`}`);
