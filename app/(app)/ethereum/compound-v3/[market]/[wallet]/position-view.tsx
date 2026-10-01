@@ -12,7 +12,7 @@
 // wallet's markets as equal-weight cards over one merged cross-market timeline.
 // The only structural change is that the market comes from the URL and both the
 // position fetch and the timeline are scoped to it, so this renders one position
-// card + risk surfaces + one economics tower + a market-scoped timeline.
+// card + risk surfaces + the Lifetime flows panel + a market-scoped timeline.
 //
 // Every value below is chain-direct or chain-derived: position state + timeline
 // replayed from the captured Comet events, and the risk surfaces (health factor,
@@ -20,12 +20,12 @@
 // the market's Comet contract via /api/chain/compound/position (balanceOf /
 // collateralBalanceOf / getAssetInfo / getPrice — plus the contract's OWN
 // isBorrowCollateralized / isLiquidatable verdicts, verified against the derived
-// arithmetic by scripts/verify-compound-v3-chain.mjs). The economics tower values
-// each asset at Comet's own on-chain oracle (getPrice, threaded on the summary's
-// priceByAddress) and — with the event stream — adds the lifetime flow layer and
-// the borrower's principal-vs-accrued split.
+// arithmetic by scripts/verify-compound-v3-chain.mjs). The Lifetime flows panel
+// replays the position's whole history (lib/compound/flows.ts), each flow at
+// Comet's own oracle price at its block, in place of the tower
+// (rails-ops TO-DO-ui-jobs 206).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -78,13 +78,13 @@ import {
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
 import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import {
-  computeCompoundEconomics,
-  compoundInterestInDebt,
-  compoundLifetimeWithOpening,
-} from "@/lib/compound/economics";
-import { compoundEconomicsExplanation, compoundEconomicsContent } from "@/lib/compound/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CompoundFlowsNote, compoundFlowsContent } from "@/components/protocol/compound/compound-flows-note";
+import { CompoundFlowReplayContext } from "@/components/protocol/compound/compound-ledger";
+import { useCompoundFlows } from "@/hooks/useCompoundFlows";
+import type { CompoundLive } from "@/lib/compound/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 
@@ -96,15 +96,16 @@ const CompoundExportMenu = dynamic(
 );
 
 /** Renders the single (market, wallet) position: the card, the live risk
- *  surfaces for that market (when its chain read landed), and the chain-state
- *  economics tower with the lifetime layer from the market's own events. */
+ *  surfaces for that market (when its chain read landed), and the Lifetime
+ *  flows panel (`flows`). */
 function Position({
   view: indexView,
   events,
   chain,
-  historyWindow,
   viewHref,
   folders,
+  opening,
+  flows,
 }: {
   view: CompoundPositionView;
   events: BaseActivityEvent[];
@@ -113,12 +114,12 @@ function Position({
    *  and `events`. Null on a flat page. */
   folders: readonly ServedFolder[] | null;
   chain: CompoundMarketChainResponse | null;
-  /** The window the page drew. `whole` on all but a handful of positions, and
-   *  there every figure below is the plain whole-history reduction it has
-   *  always been. */
-  historyWindow: TimelineWindow;
+  /** A windowed page's opening balance: its actors join the Explanation's. */
+  opening: TimelineOpeningBalance | null;
   /** Copy-this-view control — the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
+  /** The Lifetime flows panel. */
+  flows: ReactNode;
 }) {
   // One live read for the whole card: where the Comet read at head has landed,
   // its balance is the card's, the tower's and the pane's, so the three
@@ -141,22 +142,6 @@ function Position({
     };
   }, [indexView, chain]);
   const sideUsd = cardSideUsd(view);
-  const opening = historyWindow.opening;
-  // ⚠️ On a windowed page the tower must read the MERGED lifetime, not the
-  // window's. Between the two requests the reducer is handed NEITHER an event
-  // list nor a precomputed one, so it states no lifetime layer at all rather
-  // than presenting the window's arithmetic as a lifetime — the only correct
-  // answer while the opening balance is in flight or has failed. Comet's own
-  // carve-outs are untouched by the merge: they run on its result, per market.
-  const lifetimeEvents = lifetimeFiguresKnown(historyWindow) ? events : undefined;
-  const precomputedLifetime = useMemo(
-    () => compoundLifetimeWithOpening(events, view.market, opening, folders),
-    [events, view.market, opening, folders],
-  );
-  const towerData = useMemo(
-    () => computeCompoundEconomics(view, lifetimeEvents, undefined, precomputedLifetime),
-    [view, lifetimeEvents, precomputedLifetime],
-  );
   // Who executed this position's events — the SAME externalActor() verdict each
   // event card renders on its spine, reduced over the whole market-scoped
   // timeline so the Explanation can state it once. Derived from the events
@@ -220,17 +205,7 @@ function Position({
           ) : undefined
         }
       />
-      <ChainTruthTower
-        data={towerData}
-        explanation={compoundEconomicsExplanation(towerData, {
-          todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
-          interestInDebt:
-            lifetimeEvents && view.current?.side === "borrow"
-              ? compoundInterestInDebt(lifetimeEvents, view.market, Math.abs(view.current.amount), folders)
-              : null,
-        })}
-        learnMore={compoundEconomicsContent()}
-      />
+      {flows}
     </div>
   );
 }
@@ -459,6 +434,37 @@ export default function CompoundPositionView({
     folderParams: { wallet, market },
     storageKey: `compound-${market}-${wallet}`,
     protocolKey: "compound",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
+  });
+
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/compound/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read); a read the row ceiling cut
+  // short is a failed read.
+  const flowWhole = historyWindow.state === "whole" && !servedFolders?.length;
+  const flowLive = useMemo<CompoundLive | null>(() => {
+    if (!chain || chain.chainStale || !view || view.status !== "open") return null;
+    const supply = scaleCompoundChainBalance(chain.supplyBalanceRaw || "0", chain.baseDecimals);
+    const borrow = scaleCompoundChainBalance(chain.borrowBalanceRaw || "0", chain.baseDecimals);
+    return {
+      base: supply - borrow,
+      coll: Object.fromEntries(
+        chain.collateral.map((c) => [c.address.toLowerCase(), scaleCompoundChainBalance(c.balanceRaw, c.decimals)]),
+      ),
+      prices: Object.fromEntries(Object.entries(view.priceByAddress ?? {}).map(([a, p]) => [a.toLowerCase(), p])),
+      supplyApr: chain.supplyApr,
+      borrowApr: chain.borrowApr,
+    };
+  }, [chain, view]);
+  const cometMarket = useMemo(() => marketOf(market), [market]);
+  const flows = useCompoundFlows({
+    wholeEvents: flowWhole ? compoundEvents : null,
+    fetchAll: fetchAllHistory,
+    deployment: "ethereum",
+    market: cometMarket,
+    open: view?.status === "open",
+    live: flowLive,
   });
 
   // The top row's price dropdown: the open market's base +
@@ -483,112 +489,135 @@ export default function CompoundPositionView({
   }, [view]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="compound"
-        wallet={wallet}
-        assets={stripAssets}
-        closed={view != null && view.status !== "open"}
-      >
-        {view && (
-          <CompoundExportMenu
+    <FlowFocusContext.Provider value={flows.focus}>
+      <CompoundFlowReplayContext.Provider value={flows.replay}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="compound"
             wallet={wallet}
-            views={[view]}
-            chainByMarket={chain ? { [market]: chain } : {}}
-            events={compoundEvents}
-            csvFilename={`compound-${market}-${wallet.slice(0, 10)}-activity.csv`}
-            // A folder's members are not in the page's events, so a grouped page
-            // reads the whole history for the CSV as a windowed one does.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            queued={{
-              protocol: "compound-v3",
-              params: { wallet, market },
-              totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-            }}
-            history={markdownHistoryScope(historyWindow, compoundEvents, servedFolders)}
-            scopeNote={exportScopeNote(
-              historyWindow,
-              compoundEvents,
-              "this wallet's whole history in this market",
-              servedFolders,
-            )}
-          />
-        )}
-      </DetailTopRow>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : view ? (
-        <>
-          <Position
-            view={view}
-            events={compoundEvents}
-            chain={chain}
-            historyWindow={historyWindow}
-            viewHref={tl.viewHref}
-            folders={servedFolders}
-          />
-          <ChainTruthTimeline
-            // The queued export (rails-ops decision 0029) has no row cap: the
-            // card offers the CSV whenever the total is known.
-            csvExportCeiling={null}
-            // Matches `CompoundEventCard`'s own `persistKey={`compound:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="compound"
-            closed={view.status !== "open"}
-            tl={tl}
-            runs={COMPOUND_LIQUIDATION_RUNS}
-            folderRegister={COMPOUND_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            segments={segments}
-            // Tenure-first header (the V4 spoke treatment): when the wallet's
-            // activity in this market started, how long it has run, how fresh.
-            toolbarLeading={
-              <TimelineActivityHeader
+            assets={stripAssets}
+            closed={view != null && view.status !== "open"}
+          >
+            {view && (
+              <CompoundExportMenu
+                wallet={wallet}
+                views={[view]}
+                chainByMarket={chain ? { [market]: chain } : {}}
                 events={compoundEvents}
-                folders={servedFolders}
-                closed={view.status !== "open"}
-                // When the position actually opened, not when the window does —
-                // otherwise a wallet with ten thousand events reads as days old
-                // because its oldest loaded card is.
-                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                labelLastActivity
+                csvFilename={`compound-${market}-${wallet.slice(0, 10)}-activity.csv`}
+                // A folder's members are not in the page's events, so a grouped page
+                // reads the whole history for the CSV as a windowed one does.
+                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+                queued={{
+                  protocol: "compound-v3",
+                  params: { wallet, market },
+                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+                }}
+                history={markdownHistoryScope(historyWindow, compoundEvents, servedFolders)}
+                scopeNote={exportScopeNote(
+                  historyWindow,
+                  compoundEvents,
+                  "this wallet's whole history in this market",
+                  servedFolders,
+                )}
               />
-            }
-            renderCard={(event, meta) =>
-              isCompoundEvent(event) ? (
-                <CompoundEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                  previous={previousPastFolders(event, previousById.get(event.id), servedFolders)}
-                  previousTx={previousPastFolders(event, previousByTx.get(event.txHash), servedFolders)}
-                />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
-          <ProvInspectorLayer />
-        </>
-      ) : (
-        // The URL points at a market this wallet has no position in (typo, stale
-        // link, or a market it never entered) — bail with a path back to the
-        // wallet's other positions rather than dead-ending.
-        <div className="text-center py-12">
-          <p className="text-foreground text-lg mb-3">
-            <span className="font-mono">{shortAddr(wallet)}</span> has no {marketLabel} position
-          </p>
-          <p className="text-sm text-rb-500">
-            <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
-              See this wallet&rsquo;s other positions →
-            </Link>
-          </p>
+            )}
+          </DetailTopRow>
+
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : view ? (
+            <>
+              <Position
+                view={view}
+                events={compoundEvents}
+                chain={chain}
+                opening={opening}
+                viewHref={tl.viewHref}
+                folders={servedFolders}
+                flows={
+                  // Lifetime flows: the bars and the line over the position's
+                  // replay (lib/compound/flows.ts), in place of the tower
+                  // (TO-DO-ui-jobs 206).
+                  <LifetimeFlowsPanel
+                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                    read={flows.read}
+                    explanation={
+                      <div className="space-y-2 text-sm text-rb-500">
+                        <CompoundFlowsNote
+                          facts={flows.facts}
+                          baseSymbol={cometMarket.baseSymbol}
+                          ethQuoted={cometMarket.quoteUnit === "ETH"}
+                        />
+                      </div>
+                    }
+                    learnMore={compoundFlowsContent()}
+                  />
+                }
+              />
+              <ChainTruthTimeline
+                // The queued export (rails-ops decision 0029) has no row cap: the
+                // card offers the CSV whenever the total is known.
+                csvExportCeiling={null}
+                // Matches `CompoundEventCard`'s own `persistKey={`compound:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="compound"
+                closed={view.status !== "open"}
+                tl={tl}
+                runs={COMPOUND_LIQUIDATION_RUNS}
+                folderRegister={COMPOUND_FOLDER_REGISTER}
+                readFolderMembers={readFolderMembers}
+                segments={segments}
+                // Tenure-first header (the V4 spoke treatment): when the wallet's
+                // activity in this market started, how long it has run, how fresh.
+                toolbarLeading={
+                  <TimelineActivityHeader
+                    events={compoundEvents}
+                    folders={servedFolders}
+                    closed={view.status !== "open"}
+                    // When the position actually opened, not when the window does —
+                    // otherwise a wallet with ten thousand events reads as days old
+                    // because its oldest loaded card is.
+                    firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    labelLastActivity
+                  />
+                }
+                renderCard={(event, meta) =>
+                  isCompoundEvent(event) ? (
+                    <CompoundEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                      previous={previousPastFolders(event, previousById.get(event.id), servedFolders)}
+                      previousTx={previousPastFolders(event, previousByTx.get(event.txHash), servedFolders)}
+                    />
+                  ) : null
+                }
+              />
+              {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
+              <ProvInspectorLayer />
+            </>
+          ) : (
+            // The URL points at a market this wallet has no position in (typo, stale
+            // link, or a market it never entered) — bail with a path back to the
+            // wallet's other positions rather than dead-ending.
+            <div className="text-center py-12">
+              <p className="text-foreground text-lg mb-3">
+                <span className="font-mono">{shortAddr(wallet)}</span> has no {marketLabel} position
+              </p>
+              <p className="text-sm text-rb-500">
+                <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
+                  See this wallet&rsquo;s other positions →
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </CompoundFlowReplayContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }

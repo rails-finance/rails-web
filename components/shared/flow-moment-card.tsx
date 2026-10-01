@@ -42,23 +42,28 @@ export interface MomentNeighbour {
 const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "reserve-data": { collateral: "liquidity index", debt: "variable borrow index" },
   "hub-state": { collateral: "supply share price", debt: "drawn index" },
+  comet: { collateral: "base supply index", debt: "base borrow index" },
   "ctoken-rows": { collateral: "exchange rate", debt: "debt growth" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
   "hub-state": "the hub's state at its last event block (the drawn index grown at its logged rate to the moment)",
+  comet:
+    "the account's rows (each row's balance over the last at an unchanged principal), grown at the rate between them to the moment, and after the last row at the market's rate now",
   "ctoken-rows":
-    "the account's own rows (the market's exchange rate, and the debt before each row over the debt after the one before), in a straight line between two rows and to today's live read after the last",
+    "the account's rows (the market's exchange rate, and the debt before each row over the debt after the one before), in a straight line between two rows and to today's live read after the last",
 };
 /** Whose index it is, and what the grown balance is to the chain's. */
 const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the reserve's",
   "hub-state": "the reserve's",
+  comet: "the reserve's",
   "ctoken-rows": "the market's",
 };
 const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
   "hub-state": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
+  comet: "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
   "ctoken-rows":
     "The index runs in a straight line between the two rows around the day, so this is the chain's balance to within how the market's rate moved between them.",
 };
