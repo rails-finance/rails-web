@@ -5,6 +5,7 @@
 
 import type { FluidContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { FluidLedgerProvider } from "./fluid-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -140,59 +141,63 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
     />
   );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <FluidEventHeader
-          actionLabel={
-            openedBy
-              ? "Open"
-              : // A hop of an NFT round trip inside one transaction says so at T1;
-                // the explainer states the holder it left and came back to.
-                transferRoundTrip(sibs, event)
-                ? "Ownership transfer · round trip in this transaction"
-                : event.actionLabel
-          }
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={ctx.ownerAt ?? event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <FluidEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          mintedTo={openedBy?.context.data.transferTo}
-          opening={openedBy != null || fundedSameTx(sibs, event)}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <FluidEventExplainer
-          ctx={ctx}
-          event={event}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          siblings={sibs}
-          skipLead
-          openedBy={openedBy}
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy })}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />}
-      persistKey={`fluid:${event.id}`}
-    />
+    <FluidLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <FluidEventHeader
+            actionLabel={
+              openedBy
+                ? "Open"
+                : // A hop of an NFT round trip inside one transaction says so at T1;
+                  // the explainer states the holder it left and came back to.
+                  transferRoundTrip(sibs, event)
+                  ? "Ownership transfer · round trip in this transaction"
+                  : event.actionLabel
+            }
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={ctx.ownerAt ?? event.wallet}
+            flows={event.flows}
+          />
+        }
+        detail={
+          <FluidEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            mintedTo={openedBy?.context.data.transferTo}
+            opening={openedBy != null || fundedSameTx(sibs, event)}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <FluidEventExplainer
+            ctx={ctx}
+            event={event}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            siblings={sibs}
+            skipLead
+            openedBy={openedBy}
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy })}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />}
+        persistKey={`fluid:${event.id}`}
+      />
+    </FluidLedgerProvider>
   );
 }

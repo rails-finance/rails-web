@@ -47,6 +47,11 @@ import {
 import { FluidRiskSlot } from "@/components/protocol/fluid/fluid-risk-slot";
 import { FluidPositionExplanation } from "@/components/protocol/fluid/fluid-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { FluidFlowsNote, fluidFlowsContent } from "@/components/protocol/fluid/fluid-flows-note";
+import { useFluidFlows } from "@/hooks/useFluidFlows";
 import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/economics";
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -130,6 +135,9 @@ export default function FluidPositionView({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<FluidPositionChainResponse | null>(null);
+  // Whether the live read has answered (or failed): the Lifetime flows panel
+  // waits for it, since today's figures and price are its.
+  const [chainSettled, setChainSettled] = useState(false);
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
 
@@ -201,6 +209,7 @@ export default function FluidPositionView({
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
       }
+      if (!cancelled) setChainSettled(true);
     })();
     return () => {
       cancelled = true;
@@ -276,11 +285,51 @@ export default function FluidPositionView({
   const lifetimeEvents = lifetimeKnown ? fluidEvents : undefined;
   const precomputedLifetime = useMemo(() => fluidLifetimeWithOpening(fluidEvents, opening), [fluidEvents, opening]);
 
+  // A smart vault's legs are DEX shares with no token price the page states,
+  // so its positions keep the tower (lib/fluid/flows.ts); every other
+  // position draws the Lifetime flows panel in its place.
+  const vaultType = fluidEvents[0]?.context.data.vaultType ?? chain?.vaultType ?? null;
+  const flowsOn = vaultType === 10000;
+
   const tl = useTimelineEvents(fluidEvents, {
     storageKey: `fluid-${nftId}`,
     protocolKey: "fluid",
     window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: !flowsOn,
   });
+
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/fluid/flows.ts): the page's rows where they are all of it, else the
+  // flat history read once (the CSV's read); a read the row ceiling cut short
+  // is a failed read.
+  const flowLive = useMemo(
+    () =>
+      chain && !chain.chainStale
+        ? {
+            price: chain.oraclePriceDebtPerCol,
+            coll: Number(chain.supplyExact),
+            debt: Number(chain.borrowExact),
+            supplyApr: chain.supplyRatePct != null ? chain.supplyRatePct / 100 : null,
+            borrowApr: chain.borrowRatePct != null ? chain.borrowRatePct / 100 : null,
+          }
+        : null,
+    [chain],
+  );
+  const flowColl = view ? fluidLegName(view, "supply", chain) : null;
+  const flowDebt = view ? fluidLegName(view, "borrow", chain) : null;
+  const flows = useFluidFlows({
+    wholeEvents: historyWindow.state === "whole" ? fluidEvents : null,
+    fetchAll: fetchAllHistory,
+    collSymbol: flowColl,
+    debtSymbol: flowDebt,
+    open: view?.status === "open",
+    live: flowLive,
+    liveSettled: chainSettled,
+    enabled: flowsOn,
+  });
+  // The timeline ties to the panel only where the panel draws.
+  const flowFocus = flowsOn && flows.read !== "failed" ? flows.focus : null;
 
   const liveRisk = chain != null && view?.status === "open";
 
@@ -357,108 +406,126 @@ export default function FluidPositionView({
   }, [view, chain, fluidEvents]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="fluid"
-        assets={stripAssets}
-        priceReason={ORACLE_USD_REASON.fluid}
-        closed={view != null && view.status !== "open"}
-        closing={closing}
-      >
-        {view && (
-          <FluidExportMenu
-            view={view}
-            chain={chain}
-            events={fluidEvents}
-            csvFilename={`fluid-${nftId}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, fluidEvents)}
-            scopeNote={exportScopeNote(historyWindow, fluidEvents, "this position's whole history")}
-          />
-        )}
-      </DetailTopRow>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="fluid"
+          assets={stripAssets}
+          priceReason={ORACLE_USD_REASON.fluid}
+          closed={view != null && view.status !== "open"}
+          closing={closing}
+        >
           {view && (
-            <FluidPositionCard
-              v={view}
-              receipts
-              viewHref={tl.viewHref}
+            <FluidExportMenu
+              view={view}
               chain={chain}
-              // The risk slot rides the card's heading-button row (the Aave
-              // V3 treatment): the Display menu plus the chosen risk picture
-              // — liquidation runway (the vault oracle's debt-per-col price
-              // vs the borrow ÷ (supply × threshold) liquidation price) or
-              // the position-ratio view (the same engine-space read against
-              // the vault's three lines, framed as a capacity bar). Whatever
-              // it draws is on the card face and in the card's receipts
-              // scope, so the Provenance list stays 1:1 with the face
-              // figures.
-              rowExtra={liveRisk ? <FluidRiskSlot chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
-              // The Explanation is now pure layman prose about those same
-              // face figures — no secondary figure-strips. The
-              // position-ratio strip is absorbed into the risk slot above.
-              // Rendered whenever there's a view or a chain read — a closed
-              // position gets its prose too (the risk slot keeps its own gate).
-              explanation={
-                view || chain ? (
-                  <FluidPositionExplanation chain={chain} view={view} externalActivity={externalActivity} />
-                ) : undefined
-              }
+              events={fluidEvents}
+              csvFilename={`fluid-${nftId}-activity.csv`}
+              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, fluidEvents)}
+              scopeNote={exportScopeNote(historyWindow, fluidEvents, "this position's whole history")}
             />
           )}
-          {view &&
-            (() => {
-              const towerData = computeFluidEconomics(view, lifetimeEvents, chain, precomputedLifetime);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={fluidEconomicsExplanation(towerData)}
-                  learnMore={fluidEconomicsContent()}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={INDEX_ROW_CEILING}
-            // Matches `FluidEventCard`'s own `persistKey={`fluid:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="fluid"
-            closed={view ? view.status !== "open" : undefined}
-            tl={tl}
-            runs={timelineRuns}
-            countTooltip="Counts events, not rows: an Open row combines the mint and the first operation, and a round-trip row combines one transfer per hop."
-            toolbarLeading={
-              view ? (
-                <TimelineActivityHeader
-                  events={fluidEvents}
-                  closed={view.status !== "open"}
-                  // When the position was minted, not when the window opens —
-                  // otherwise a position with 1,400 events reads as days old
-                  // because its oldest loaded card is.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isFluidEvent(event) ? (
-                <FluidEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                />
-              ) : null
-            }
-          />
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+        </DetailTopRow>
+
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {view && (
+              <FluidPositionCard
+                v={view}
+                receipts
+                viewHref={tl.viewHref}
+                chain={chain}
+                // The risk slot rides the card's heading-button row (the Aave
+                // V3 treatment): the Display menu plus the chosen risk picture
+                // — liquidation runway (the vault oracle's debt-per-col price
+                // vs the borrow ÷ (supply × threshold) liquidation price) or
+                // the position-ratio view (the same engine-space read against
+                // the vault's three lines, framed as a capacity bar). Whatever
+                // it draws is on the card face and in the card's receipts
+                // scope, so the Provenance list stays 1:1 with the face
+                // figures.
+                rowExtra={liveRisk ? <FluidRiskSlot chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
+                // The Explanation is now pure layman prose about those same
+                // face figures — no secondary figure-strips. The
+                // position-ratio strip is absorbed into the risk slot above.
+                // Rendered whenever there's a view or a chain read — a closed
+                // position gets its prose too (the risk slot keeps its own gate).
+                explanation={
+                  view || chain ? (
+                    <FluidPositionExplanation chain={chain} view={view} externalActivity={externalActivity} />
+                  ) : undefined
+                }
+              />
+            )}
+            {/* Lifetime flows: the bars and the line over the position's replay
+            (lib/fluid/flows.ts), in the vault's debt token, in place of the
+            tower (TO-DO-ui-jobs 206). A smart vault keeps the tower. */}
+            {view && flowsOn && flowColl && flowDebt && (
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <FluidFlowsNote facts={flows.facts} collSymbol={flowColl} debtSymbol={flowDebt} />
+                  </div>
+                }
+                learnMore={fluidFlowsContent()}
+              />
+            )}
+            {view &&
+              !flowsOn &&
+              (() => {
+                const towerData = computeFluidEconomics(view, lifetimeEvents, chain, precomputedLifetime);
+                return (
+                  <ChainTruthTower
+                    data={towerData}
+                    explanation={fluidEconomicsExplanation(towerData)}
+                    learnMore={fluidEconomicsContent()}
+                  />
+                );
+              })()}
+            <ChainTruthTimeline
+              csvExportCeiling={INDEX_ROW_CEILING}
+              // Matches `FluidEventCard`'s own `persistKey={`fluid:${event.id}`}` —
+              // lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="fluid"
+              closed={view ? view.status !== "open" : undefined}
+              tl={tl}
+              runs={timelineRuns}
+              countTooltip="Counts events, not rows: an Open row combines the mint and the first operation, and a round-trip row combines one transfer per hop."
+              toolbarLeading={
+                view ? (
+                  <TimelineActivityHeader
+                    events={fluidEvents}
+                    closed={view.status !== "open"}
+                    // When the position was minted, not when the window opens —
+                    // otherwise a position with 1,400 events reads as days old
+                    // because its oldest loaded card is.
+                    firstAt={opening?.firstTimestamp}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  />
+                ) : undefined
+              }
+              renderCard={(event, meta) =>
+                isFluidEvent(event) ? (
+                  <FluidEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                  />
+                ) : null
+              }
+            />
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
