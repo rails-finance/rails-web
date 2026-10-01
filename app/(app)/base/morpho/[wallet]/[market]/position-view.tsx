@@ -1,7 +1,7 @@
 "use client";
 
 // One Morpho Blue position on Base — a (market, wallet) pair: its card, its
-// economics tower and its whole-life timeline. The Ethereum explorer's detail
+// Lifetime flows and its whole-life timeline. The Ethereum explorer's detail
 // page is exactly this pair, and this route restores that grain on Base; the
 // wallet page above it is the way in (one card per position, each a link).
 //
@@ -9,7 +9,7 @@
 // no per-market endpoint, and a position's history is a slice of the wallet's
 // sweep — so this page fetches what the wallet page fetches and renders the
 // one market the route names. The section it renders is the wallet page's
-// former per-market block, unchanged: the same cards, tower and footer, with
+// former per-market block, unchanged: the same cards, flows panel and footer, with
 // the same rules about what a partial sweep may and may not claim.
 
 import { useCallback, useMemo } from "react";
@@ -127,7 +127,7 @@ export default function MorphoBasePositionView({
     );
   }, [liveClean, wallet, vaultOwner]);
 
-  // The export rides the same rule as the card and the tower: only a sweep
+  // The export rides the same rule as the card and the flows panel: only a sweep
   // that read every block yields a view whose principal and lifetime figures
   // the document can stand behind. Same adapter as the position section, so
   // the exported card is the rendered one.

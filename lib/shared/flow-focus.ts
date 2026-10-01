@@ -142,12 +142,12 @@ export function eventSideSum(
   held: number,
 ): Omit<SideSumRows, "lines"> & { lines: EventSumLine[] } {
   const st = sideStateFor(model, side, cum.after, held);
-  const rows = sideSumRows(st);
+  const rows = sideSumRows(st, model.unit);
   return {
     ...rows,
     lines: rows.lines.map((l) => {
       const hl = cum.buckets.has(l.key);
-      return { ...l, hl, before: hl ? wholeUsd(cum.before[l.key] ?? 0) : null };
+      return { ...l, hl, before: hl ? wholeUsd(cum.before[l.key] ?? 0, model.unit) : null };
     }),
   };
 }
@@ -485,7 +485,7 @@ export function eventSideSumByAsset(
     seg: { key: il.key, label: il.label, fill: "estimate", width: 0, value: sum.interestUsd },
     dollars,
     sign: dollars < 0 ? "−" : "+",
-    amount: wholeUsd(dollars),
+    amount: wholeUsd(dollars, model.unit),
     hl: false,
     before: null,
   };
@@ -506,7 +506,7 @@ export function eventSideSumByAsset(
       seg: { ...restSeg, label: "Market move", note: "the change in each asset's price since its flows" },
       dollars: restDollars,
       sign: restDollars < 0 ? "−" : "+",
-      amount: wholeUsd(restDollars),
+      amount: wholeUsd(restDollars, model.unit),
       hl: false,
       before: null,
     });

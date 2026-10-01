@@ -24,7 +24,7 @@ import {
   type FocusEvent,
   type TokenSum,
 } from "@/lib/shared/flow-focus";
-import type { FlowBucket, FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
+import type { FlowBucket, FlowModel, FlowSegment, FlowSide, FlowUnit } from "@/lib/shared/flows-timeline";
 
 /** A row's part: a kind of flow the event left alone, the earlier movements
  *  of a kind it moved, its movement, an asset's interest, the price's
@@ -69,7 +69,8 @@ export interface UsdLine {
 
 export const signedTokens = (units: number, decimals: number): string =>
   `${units < 0 ? "−" : ""}${fmtTokens(units / 10 ** decimals, decimals)}`;
-export const signedUsd = (dollars: number): string => `${dollars < 0 ? "−" : ""}${wholeUsd(dollars)}`;
+export const signedUsd = (dollars: number, unit?: FlowUnit): string =>
+  `${dollars < 0 ? "−" : ""}${wholeUsd(dollars, unit)}`;
 
 /** The event's row, by the name the timeline gives the event that fills
  *  its bucket. */
@@ -125,9 +126,9 @@ function eventPart(ev: FocusEvent | null, key: string, symbol?: string): { amoun
   return act ? { amount, usd } : null;
 }
 
-const usdTotal = (dollars: number, before: number | null) => ({
-  before: before != null && Math.round(before) !== dollars ? wholeUsd(before) : null,
-  after: wholeUsd(dollars),
+const usdTotal = (dollars: number, before: number | null, unit?: FlowUnit) => ({
+  before: before != null && Math.round(before) !== dollars ? wholeUsd(before, unit) : null,
+  after: wholeUsd(dollars, unit),
   dollars,
 });
 
@@ -238,7 +239,7 @@ export function dollarLedger({
 }): Ledger {
   const rows: LedgerRow[] = [];
   const row = (key: string, line: string, label: string, role: LedgerRole, seg: FlowSegment | null, d: number) =>
-    rows.push({ key, line, label, role, seg, tokens: null, usd: { dollars: d, text: signedUsd(d) } });
+    rows.push({ key, line, label, role, seg, tokens: null, usd: { dollars: d, text: signedUsd(d, model.unit) } });
   for (const l of lines) {
     const b = model.buckets.find((x) => x.key === l.key);
     const words = ledgerWords(b, l.label);
@@ -255,7 +256,7 @@ export function dollarLedger({
       row(`${l.key}#event`, l.key, words.event, "event", seg, evDollars);
     } else row(l.key, l.key, interest ? l.label : words.plain, interest ? "interest" : "flow", seg, l.dollars);
   }
-  return { side, symbol: null, decimals: null, rows, tokens: null, usd: usdTotal(dollars, before) };
+  return { side, symbol: null, decimals: null, rows, tokens: null, usd: usdTotal(dollars, before, model.unit) };
 }
 
 /** A side holding several assets: one ledger per asset in its token, each

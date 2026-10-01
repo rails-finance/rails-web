@@ -112,7 +112,8 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
         return {
           symbol: h.symbol,
           recorded,
-          tokens: isFace ? h.usd : amount,
+          // A token axis states the face side's tokens in grains (FlowUnit).
+          tokens: isFace ? (model.unit ? h.usd / 10 ** model.unit.scale : h.usd) : amount,
           usd: !isFace && today ? h.usd : null,
           price,
           grown,

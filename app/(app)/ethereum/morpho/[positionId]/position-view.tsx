@@ -9,8 +9,8 @@
 // and upgrades the current-debt figure to head. Morpho exposes no public
 // health getter, so the health surfaces replicate the internal _isHealthy
 // arithmetic — verified against mainnet by scripts/verify-morpho-chain.mjs.
-// Provenance: the position card and the economics tower are each a receipts
-// scope, read by the page-level inspector.
+// Provenance: the position card and the Lifetime flows panel are each a
+// receipts scope, read by the page-level inspector.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
@@ -53,9 +53,12 @@ import {
   viewFromSummary,
   type MorphoPositionView,
 } from "@/components/protocol/morpho/morpho-position-card";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeMorphoEconomics, morphoLifetimeWithOpening } from "@/lib/morpho/economics";
-import { morphoEconomicsExplanation, morphoEconomicsContent } from "@/lib/morpho/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
+import { useMorphoFlows } from "@/hooks/useMorphoFlows";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import {
   MorphoPositionExplanation,
@@ -248,19 +251,9 @@ export default function MorphoPositionView({
     folderParams: {},
     storageKey: `morpho-${positionId}`,
     protocolKey: "morpho",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
-
-  // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
-  const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? morphoEvents : undefined;
-  const precomputedLifetime = useMemo(
-    () => morphoLifetimeWithOpening(morphoEvents, opening, servedFolders),
-    [morphoEvents, opening, servedFolders],
-  );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -361,6 +354,35 @@ export default function MorphoPositionView({
     };
   }, [view, chain, peakDebtOwed]);
 
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/morpho/flows.ts): the page's rows where they are all of it, else the
+  // flat history read once (the CSV's read); a read the row ceiling cut short
+  // is a failed read.
+  const flowWhole = historyWindow.state === "whole" && !servedFolders?.length;
+  const flowLive = useMemo(
+    () =>
+      chain && !chain.chainStale
+        ? {
+            price: chain.oraclePrice > 0 ? chain.oraclePrice : null,
+            coll: chain.collateral,
+            debt: chain.currentDebt,
+            borrowApr: chain.borrowApr,
+          }
+        : null,
+    [chain],
+  );
+  const flows = useMorphoFlows({
+    wholeEvents: flowWhole ? morphoEvents : null,
+    fetchAll: fetchAllHistory,
+    marketId: splitMorphoPositionId(positionId).market,
+    chainId: MAINNET_CHAIN_ID,
+    loanSymbol: view && !view.loanDecimalsUnread ? view.loanSymbol : null,
+    collSymbol: view && !view.collateralDecimalsUnread ? view.collateralSymbol : null,
+    lltv: view?.lltv ?? null,
+    open: view?.status === "open",
+    live: flowLive,
+  });
+
   // The top row's price dropdown. Morpho Blue runs no USD oracle: a market's
   // oracle prices the collateral in that market's own loan token, which is the
   // space the liquidation engine judges in, so that is what the collateral row
@@ -408,133 +430,143 @@ export default function MorphoPositionView({
   }, [liveView, morphoEvents]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="morpho"
-        assets={stripAssets}
-        priceReason={ORACLE_USD_REASON.morpho}
-        closed={liveView != null && liveView.status !== "open"}
-        closing={closing}
-      >
-        {liveView && (
-          <MorphoExportMenu
-            view={liveView}
-            chain={chain}
-            events={morphoEvents}
-            csvFilename={`morpho-${positionId.slice(0, 10)}-activity.csv`}
-            // A folder's members are not in `morphoEvents`, so a grouped page
-            // reads the whole history for the CSV as a windowed one does.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, morphoEvents, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, morphoEvents, "this position's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
+    <FlowFocusContext.Provider value={flows.focus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="morpho"
+          assets={stripAssets}
+          priceReason={ORACLE_USD_REASON.morpho}
+          closed={liveView != null && liveView.status !== "open"}
+          closing={closing}
+        >
           {liveView && (
-            <MorphoPositionCard
-              v={historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView}
-              receipts
-              viewHref={tl.viewHref}
-              // The risk slot rides the card's heading-button row (the Aave V3
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway or the borrow-capacity bar (the market's one
-              // LLTV line + "available to borrow"). Whatever it draws is on the
-              // card face and in the card's receipts scope, so the Provenance
-              // list stays 1:1 with the face figures.
-              rowExtra={
-                chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                  <MorphoRiskSlot chain={chain} />
-                ) : undefined
-              }
-              // The Explanation is now pure layman prose about those same face
-              // figures — no secondary figure-strips. The borrow-capacity strip
-              // is absorbed into the risk slot above; the market rates live on
-              // the market view (where pool-wide rate context belongs).
-              // A terminal position narrates from the replay + the timeline
-              // already on the page (no chain overlay needed); the open pane
-              // still needs the live overlay for the oracle and health facts
-              // and declines without it.
-              explanation={
-                liveView.status !== "open" ? (
-                  <MorphoClosedPositionExplanation
-                    v={liveView}
-                    events={morphoEvents}
-                    folders={servedFolders}
-                    {...(historyWindow.state === "whole"
-                      ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
-                      : {})}
-                  />
-                ) : chain ? (
-                  <MorphoPositionExplanation
-                    chain={chain}
-                    txCount={liveView.txCount}
-                    {...(historyWindow.state === "whole"
-                      ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
-                      : {})}
-                    everLiquidated={liveView.everLiquidated}
-                    externalActivity={externalActivityWithOpening}
-                  />
-                ) : undefined
-              }
+            <MorphoExportMenu
+              view={liveView}
+              chain={chain}
+              events={morphoEvents}
+              csvFilename={`morpho-${positionId.slice(0, 10)}-activity.csv`}
+              // A folder's members are not in `morphoEvents`, so a grouped page
+              // reads the whole history for the CSV as a windowed one does.
+              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, morphoEvents, servedFolders)}
+              scopeNote={exportScopeNote(historyWindow, morphoEvents, "this position's whole history", servedFolders)}
             />
           )}
-          {liveView &&
-            (() => {
-              const towerData = computeMorphoEconomics(liveView, lifetimeEvents ?? [], undefined, precomputedLifetime);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={morphoEconomicsExplanation(towerData, {
-                    lltv: liveView.lltv,
-                    badDebt: liveView.badDebt,
-                  })}
-                  learnMore={morphoEconomicsContent()}
-                />
-              );
-            })()}
-          <MorphoNeighboursProvider events={morphoEvents} folders={servedFolders}>
-            <ChainTruthTimeline
-              csvExportCeiling={INDEX_ROW_CEILING}
-              // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`
-              // — lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="morpho"
-              closed={liveView?.status !== "open"}
-              tl={tl}
-              runs={MORPHO_LIQUIDATION_RUNS}
-              folderRegister={MORPHO_FOLDER_REGISTER}
-              readFolderMembers={readFolderMembers}
-              segments={segments}
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={tl.sortedEvents}
-                  folders={servedFolders}
-                  closed={liveView?.status !== "open"}
-                  // When the position actually opened, not when the window does.
-                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              }
-              renderCard={(event, meta) =>
-                isMorphoEvent(event) ? (
-                  <MorphoEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
+        </DetailTopRow>
+
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {liveView && (
+              <MorphoPositionCard
+                v={
+                  historyWindow.state === "whole" && liquidationCount > 0 ? { ...liveView, liquidationCount } : liveView
+                }
+                receipts
+                viewHref={tl.viewHref}
+                // The risk slot rides the card's heading-button row (the Aave V3
+                // treatment): the Display menu plus the chosen risk picture —
+                // liquidation runway or the borrow-capacity bar (the market's one
+                // LLTV line + "available to borrow"). Whatever it draws is on the
+                // card face and in the card's receipts scope, so the Provenance
+                // list stays 1:1 with the face figures.
+                rowExtra={
+                  chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
+                    <MorphoRiskSlot chain={chain} />
+                  ) : undefined
+                }
+                // The Explanation is now pure layman prose about those same face
+                // figures — no secondary figure-strips. The borrow-capacity strip
+                // is absorbed into the risk slot above; the market rates live on
+                // the market view (where pool-wide rate context belongs).
+                // A terminal position narrates from the replay + the timeline
+                // already on the page (no chain overlay needed); the open pane
+                // still needs the live overlay for the oracle and health facts
+                // and declines without it.
+                explanation={
+                  liveView.status !== "open" ? (
+                    <MorphoClosedPositionExplanation
+                      v={liveView}
+                      events={morphoEvents}
+                      folders={servedFolders}
+                      {...(historyWindow.state === "whole"
+                        ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
+                        : {})}
+                    />
+                  ) : chain ? (
+                    <MorphoPositionExplanation
+                      chain={chain}
+                      txCount={liveView.txCount}
+                      {...(historyWindow.state === "whole"
+                        ? { eventCount: liveView.eventCount, liquidationCount: liquidationCount }
+                        : {})}
+                      everLiquidated={liveView.everLiquidated}
+                      externalActivity={externalActivityWithOpening}
+                    />
+                  ) : undefined
+                }
+              />
+            )}
+            {/* Lifetime flows: the bars and the line over the position's replay
+              (lib/morpho/flows.ts), in the loan token, in place of the tower
+              (TO-DO-ui-jobs 206). */}
+            {liveView && (
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <MorphoFlowsNote
+                      facts={flows.facts}
+                      loanSymbol={liveView.loanSymbol}
+                      collSymbol={liveView.collateralSymbol}
+                      name="Morpho Blue"
+                    />
+                  </div>
+                }
+                learnMore={morphoFlowsContent("Morpho Blue")}
+              />
+            )}
+            <MorphoNeighboursProvider events={morphoEvents} folders={servedFolders}>
+              <ChainTruthTimeline
+                csvExportCeiling={INDEX_ROW_CEILING}
+                // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`
+                // — lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="morpho"
+                closed={liveView?.status !== "open"}
+                tl={tl}
+                runs={MORPHO_LIQUIDATION_RUNS}
+                folderRegister={MORPHO_FOLDER_REGISTER}
+                readFolderMembers={readFolderMembers}
+                segments={segments}
+                toolbarLeading={
+                  <TimelineActivityHeader
+                    events={tl.sortedEvents}
+                    folders={servedFolders}
+                    closed={liveView?.status !== "open"}
+                    // When the position actually opened, not when the window does.
+                    firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
                   />
-                ) : null
-              }
-            />
-          </MorphoNeighboursProvider>
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+                }
+                renderCard={(event, meta) =>
+                  isMorphoEvent(event) ? (
+                    <MorphoEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                    />
+                  ) : null
+                }
+              />
+            </MorphoNeighboursProvider>
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }

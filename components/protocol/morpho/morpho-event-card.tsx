@@ -11,6 +11,7 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { MorphoEventHeader } from "./morpho-event-header";
 import { MorphoEventDetail } from "./morpho-event-detail";
+import { MorphoLedgerProvider } from "./morpho-ledger";
 import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { assetsDeltaProv, type MorphoCoords } from "@/lib/morpho/event-provenance";
@@ -111,39 +112,45 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
     />
   );
 
+  // The Collateral (or Supplied) and Debt cells open into their ledgers where
+  // the page ties its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <MorphoEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={<MorphoEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} flows={event.flows} />}
-      detailLabel="Position state"
-      explainer={
-        <MorphoEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventId={event.id}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={morphoExplainerTeaser(ctx, coords)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={morphoLearnMoreContent(ctx)} />}
-      persistKey={`morpho:${event.id}`}
-    />
+    <MorphoLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <MorphoEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+          />
+        }
+        detail={
+          <MorphoEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} flows={event.flows} />
+        }
+        detailLabel="Position state"
+        explainer={
+          <MorphoEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventId={event.id}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={morphoExplainerTeaser(ctx, coords)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={morphoLearnMoreContent(ctx)} />}
+        persistKey={`morpho:${event.id}`}
+      />
+    </MorphoLedgerProvider>
   );
 }

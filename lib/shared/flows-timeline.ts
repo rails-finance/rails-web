@@ -254,7 +254,17 @@ export interface FlowDayRow {
   cumAsset?: { bucket: string; symbol: string; usd: number }[];
 }
 
+/** The token a family states its flows in, where it is not USD: every
+ *  figure is the token in units of 10^-scale (rails-ops
+ *  reference/lifetime-flows-scrubber.md, "Morpho"). */
+export interface FlowUnit {
+  symbol: string;
+  scale: number;
+}
+
 export interface FlowTimeline {
+  /** Set where the figures are a token's (Morpho's loan token); absent, USD. */
+  unit?: FlowUnit;
   buckets: FlowBucket[];
   /** Ascending by day. */
   days: FlowDayRow[];
@@ -361,6 +371,8 @@ interface FlowRow {
 }
 
 export interface FlowModel {
+  /** The timeline's token axis, where it has one; absent, USD. */
+  unit?: FlowUnit;
   buckets: FlowBucket[];
   /** One per active day, ascending. */
   rows: FlowRow[];
@@ -776,6 +788,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   // An exact inflow can exceed its bar where a price fell; the drill-down
   // strip clamps to the bar, so the axis follows the bars alone.
   return {
+    ...(t.unit ? { unit: t.unit } : {}),
     buckets: t.buckets,
     rows,
     start,
@@ -1119,7 +1132,8 @@ export const dayStart = (m: FlowModel, stop: number): number => (m.start + stop 
  *  under $1k, one decimal under $10k, whole thousands under $1M, one decimal
  *  of millions under $1B, then billions to two decimals with a trailing zero
  *  dropped ("$1.0B", "$1.5B", "$1.89B"). */
-export function formatFlowUsd(v: number): string {
+export function formatFlowUsd(v: number, unit?: FlowUnit): string {
+  if (unit) return formatFlowToken(v, unit);
   const a = Math.abs(v);
   const sign = v < 0 && a >= 0.5 ? "−" : "";
   let body: string;
@@ -1132,11 +1146,59 @@ export function formatFlowUsd(v: number): string {
 }
 
 /** "211 thousand dollars" — a figure for a screen reader. */
-export function spokenUsd(v: number): string {
+export function spokenUsd(v: number, unit?: FlowUnit): string {
+  if (unit) return spokenToken(v, unit);
   const a = Math.abs(v);
   const sign = v < 0 ? "minus " : "";
   if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion dollars`;
   if (a >= 1_000_000) return `${sign}${(a / 1_000_000).toFixed(1)} million dollars`;
   if (a >= 1_000) return `${sign}${Math.round(a / 1_000)} thousand dollars`;
   return `${sign}${Math.round(a)} dollars`;
+}
+
+// ── A token axis ────────────────────────────────────────────────────────────
+// A family that states its flows in a token (Morpho, in each market's loan
+// token) sets `FlowTimeline.unit`: every figure in the model is that token in
+// units of 10^-scale (grains), so the whole-unit rounding the sums use
+// (lib/shared/flows-sum.ts) rounds to the token's printed decimals and the
+// printed lines still add to the printed total.
+
+/** Grains to the token. */
+export const unitAmount = (v: number, unit: FlowUnit): number => v / 10 ** unit.scale;
+
+/** "12.3k USDC" · "4.21 WETH" · "0.0315 WBTC": the token at about three
+ *  significant digits, thousands and millions shortened as the dollars are. */
+export function formatFlowToken(v: number, unit: FlowUnit, symbol = true): string {
+  const x = unitAmount(v, unit);
+  const a = Math.abs(x);
+  const sign = x < 0 && a >= 0.5 / 10 ** unit.scale ? "−" : "";
+  let body: string;
+  if (a >= 999_950_000) body = `${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")}B`;
+  else if (a >= 1_000_000) body = `${(a / 1_000_000).toFixed(1)}M`;
+  else if (a >= 9_999.5) body = `${Math.round(a / 1_000)}k`;
+  else if (a >= 999.5) body = `${(a / 1_000).toFixed(1)}k`;
+  else if (a >= 99.95) body = `${Math.round(a)}`;
+  else if (a >= 9.995) body = a.toFixed(1);
+  else if (a >= 0.9995) body = a.toFixed(2);
+  else if (a === 0) body = "0";
+  else body = a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
+  return `${sign}${body}${symbol ? ` ${unit.symbol}` : ""}`;
+}
+
+/** "12 thousand USDC" — a token figure for a screen reader. */
+export function spokenToken(v: number, unit: FlowUnit): string {
+  const x = unitAmount(v, unit);
+  const a = Math.abs(x);
+  const sign = x < 0 ? "minus " : "";
+  if (a >= 999_950_000) return `${sign}${(a / 1e9).toFixed(2).replace(/(\.\d)0$/, "$1")} billion ${unit.symbol}`;
+  if (a >= 1_000_000) return `${sign}${(a / 1_000_000).toFixed(1)} million ${unit.symbol}`;
+  if (a >= 1_000) return `${sign}${Math.round(a / 1_000)} thousand ${unit.symbol}`;
+  return `${sign}${formatFlowToken(Math.abs(v), unit, false)} ${unit.symbol}`;
+}
+
+/** The scale that prints a token axis at about five significant digits of
+ *  its largest figure, `peak` in tokens. */
+export function unitScaleFor(peak: number): number {
+  if (!(peak > 0)) return 2;
+  return Math.max(0, Math.min(8, 4 - Math.floor(Math.log10(peak))));
 }

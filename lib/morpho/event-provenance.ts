@@ -403,30 +403,6 @@ export const morphoPeakOwedProv = (sym: string, coords?: MorphoCoords): Provenan
   via: `${captureVia(coords)} · max(debt after each event) · open → close${coords?.marketId ? ` · market ${coords.marketId.slice(0, 10)}…` : ""}`,
 });
 
-/** Lifetime gross flow (deposited / withdrawn / borrowed / repaid / liquidated)
- *  — the sum of that event type's own `assets` amounts over the position's life.
- *  Exact token amounts (Morpho events carry real assets, not normalized units). */
-export const morphoFlowProv = (
-  flow: "deposited" | "withdrawn" | "borrowed" | "repaid" | "liquidated",
-  sym: string,
-  coords?: MorphoCoords,
-): Provenance => ({
-  kind: "chain",
-  pclass: "indexed",
-  summary: `Total ${sym} ${flow} over the position's life — the sum of the matching amounts across the position's own logs. Exact token amounts (a gross flow needs no index).`,
-  contract: MORPHO,
-  via: `${captureVia(coords)} · Σ ${flow} assets`,
-});
-
-/** Interest the debt accrued over the position's life. */
-export const morphoLifetimeInterestProv = (sym: string, coords?: MorphoCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${sym} of interest the position's debt accrued over its life: each event's debt just before it less the debt just after the previous event, summed over every event, plus the current debt less the debt after the newest event. Each debt figure is the borrow shares at the market's totals at that point.`,
-  contract: MORPHO,
-  via: `${captureVia(coords)} · Σ (debt before − previous debt after) + (current debt − last debt after)`,
-});
-
 /** Current debt WITH accrued interest = borrow shares converted to assets via
  *  the LIVE market index (toAssetsUp). Unlike the frozen dump (which couldn't
  *  reach the index at T), the `api` arm reads the live per-market index, so this

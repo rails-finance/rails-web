@@ -10,7 +10,7 @@
 // market the wallet holds something in now or ever acted in, as the shared
 // Morpho card in the listing's row grammar, and each row opens
 // /base/morpho/<wallet>/<market> — the position, at the Ethereum grain, with
-// its tower and whole-life timeline. It used to stack all of that here, one
+// its Lifetime flows and whole-life timeline. It used to stack all of that here, one
 // market after another; a wallet in three markets was three explorer pages on
 // one scroll.
 //

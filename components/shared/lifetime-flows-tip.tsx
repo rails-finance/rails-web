@@ -44,7 +44,14 @@ import {
   flowSegmentProv,
 } from "@/lib/shared/flows-timeline-provenance";
 import { apportionDollars, sideSumRows, sumBasis, wholeUsd } from "@/lib/shared/flows-sum";
-import type { FlowAssetHeld, FlowHatch, FlowSegment, FlowSide, FlowSideState } from "@/lib/shared/flows-timeline";
+import type {
+  FlowAssetHeld,
+  FlowHatch,
+  FlowSegment,
+  FlowSide,
+  FlowSideState,
+  FlowUnit,
+} from "@/lib/shared/flows-timeline";
 
 // ── The bars' fills, and the sum's swatches ─────────────────────────────────
 
@@ -139,6 +146,11 @@ export interface FlowCursor {
   /** False while the bars are greyed (before their window): no panel opens. */
   live?: boolean;
 }
+/** The model's token axis, where the figures are a token's (Morpho); null,
+ *  USD. The scrubber provides it from `FlowModel.unit`. */
+export const FlowUnitContext = createContext<FlowUnit | null>(null);
+export const useFlowUnit = (): FlowUnit | undefined => useContext(FlowUnitContext) ?? undefined;
+
 export const FlowCursorContext = createContext<FlowCursor | null>(null);
 
 /** On a page that ties the panel to its timeline (the Aave and Liquity families), a segment
@@ -352,6 +364,7 @@ export function SegmentTipBody({
   share?: boolean;
 }) {
   const cursor = useContext(FlowCursorContext);
+  const unit = useFlowUnit();
   const share = withShare && st.total > 0 ? (seg.value / st.total) * 100 : null;
   const pct =
     share == null ? null : share > 0 && share < 1 ? "under 1%" : `${Math.round(share).toLocaleString("en-US")}%`;
@@ -366,7 +379,7 @@ export function SegmentTipBody({
         <span aria-hidden className="inline-block h-3 w-4 shrink-0 rounded-[2px]" style={fillStyle(side, seg)} />
         <span>{seg.label}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value, unit)}</Prov>
         </span>
       </div>
       {pct && (
@@ -411,6 +424,7 @@ export function SegmentPanelBody({
   words: { rest: string };
 }) {
   const cursor = useContext(FlowCursorContext);
+  const unit = useFlowUnit();
   const partDollars = apportionDollars(
     parts.map((p) => p.usd),
     Math.round(seg.value),
@@ -422,7 +436,7 @@ export function SegmentPanelBody({
       <div className="flex items-baseline gap-2 pr-6 text-sm font-semibold">
         <span>{title}</span>
         <span className="ml-auto tabular-nums">
-          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value)}</Prov>
+          <Prov info={flowSegmentProv(seg, side, when, isLive, daily)}>{wholeUsd(seg.value, unit)}</Prov>
         </span>
       </div>
       {shownParts.length > 0 && (
@@ -432,7 +446,9 @@ export function SegmentPanelBody({
               {p.token !== false && <TokenChipIcon symbol={p.symbol} size={14} />}
               <span>{p.symbol}</span>
               <span className="ml-auto tabular-nums">
-                <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily)}>{wholeUsd(partDollars[i])}</Prov>
+                <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily)}>
+                  {wholeUsd(partDollars[i], unit)}
+                </Prov>
               </span>
             </li>
           ))}
@@ -475,7 +491,8 @@ function SideSumTable({
   words: { rest: string };
 }) {
   const cursor = useContext(FlowCursorContext);
-  const sum = sideSumRows(st);
+  const unit = useFlowUnit();
+  const sum = sideSumRows(st, unit);
   const coll = side === "collateral";
   const heldWord = coll ? "Held" : "Owed";
   const at = cursor?.at ?? (isLive ? "now" : `at ${when}`);
@@ -538,7 +555,7 @@ function SideSumTable({
               </td>
               <td className="whitespace-nowrap py-0.5 text-right">
                 <Prov info={flowAssetProv(h.symbol, sum.total.seg, side, when, isLive, daily)}>
-                  {wholeUsd(heldDollars[i])}
+                  {wholeUsd(heldDollars[i], unit)}
                 </Prov>
               </td>
             </tr>
