@@ -46,6 +46,8 @@ import {
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
 import { formatNumber, formatCompact, formatExact } from "@/lib/utils/format";
 import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { useFluidLedgerCells } from "./fluid-ledger";
 
 export interface FluidEventDetailProps {
   ctx: FluidContext;
@@ -181,6 +183,15 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
   };
   const stats: ChainTruthStat[] = [];
   const chain = ctx.balanceBasis === "chain";
+  // The cells that open into the Lifetime flows ledgers, where the page has
+  // them; while the model is on its way, the cells that will open stand as
+  // placeholder rows.
+  const cells = useFluidLedgerCells();
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const owes = (Number(ctx.debtAfter ?? "0") || 0) > 0 || (Number(ctx.debtBefore ?? "0") || 0) > 0;
+  const collLedger = cells != null || flowsPending ? { ledger: "collateral" as const } : {};
+  const debtLedger = cells?.debt || (flowsPending && owes) ? { ledger: "debt" as const } : {};
   const interest = (side: "collateral" | "debt", sym: string): Pick<ChainTruthStat, "interestSincePrevious"> => {
     const value = side === "collateral" ? ctx.colInterestSincePrevious : ctx.debtInterestSincePrevious;
     return value != null
@@ -198,6 +209,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
       prov: liqSettledProv("collateral", "after", supplySym, coords),
       transition: settledTransition("collateral", supplySym, ctx.liqSupplyBefore, ctx.liqSupplyAfter, coords),
       ...interest("collateral", supplySym),
+      ...collLedger,
     });
     stats.push({
       label: "Debt",
@@ -206,6 +218,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
       prov: liqSettledProv("debt", "after", borrowSym, coords),
       transition: settledTransition("debt", borrowSym, ctx.liqBorrowBefore, ctx.liqBorrowAfter, coords),
       ...interest("debt", borrowSym),
+      ...debtLedger,
     });
     stats.push({
       label: "Outcome",
@@ -251,6 +264,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
           opening,
         }),
         ...interest("collateral", supplySym),
+        ...collLedger,
       });
     }
     if (ctx.debtAfter != null) {
@@ -268,6 +282,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
           opening,
         }),
         ...interest("debt", borrowSym),
+        ...debtLedger,
       });
     }
   }
