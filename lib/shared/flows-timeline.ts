@@ -383,6 +383,8 @@ export interface FlowModel {
   stale: Map<number, StalePrice[]>;
   /** Whether held assets are valued at a daily price series. */
   daily: boolean;
+  /** Days a price may age before the asset is on an old price. */
+  gapDays: number;
   totalEvents: number;
   /** Transactions in the history, where the day rows count them. */
   totalTxs: number | null;
@@ -795,6 +797,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     valued,
     stale,
     daily,
+    gapDays,
     totalEvents: t.totalEvents ?? last.events,
     totalTxs: t.totalTxs ?? last.txs ?? null,
     labels: t.labels ?? { collateral: "Collateral", debt: "Debt" },
@@ -991,6 +994,32 @@ export function stateAt(m: FlowModel, stop: number): FlowState {
 }
 
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "5 Feb '26": the timeline's day stamp. */
+const dayStampOf = (tsSec: number): string => {
+  const d = new Date(tsSec * 1000);
+  return `${d.getUTCDate()} ${MONTH_SHORT[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
+};
+
+/** The readout's price label at a stop (rails-ops
+ *  reference/lifetime-flows-scrubber.md, "Prices"): "Old price" where a held
+ *  asset is on an old price, else "Repriced" on a day that gave one a newer
+ *  price; `lines` are its tip, naming each asset and its price's day. Null on
+ *  other stops and at the live one. */
+export function oldPriceAt(m: FlowModel, stop: number): { word: "Old price" | "Repriced"; lines: string[] } | null {
+  if (stop < 0 || stop >= m.liveStop) return null;
+  const stale = m.stale.get(stop) ?? [];
+  const repriced = m.repricings.filter((r) => r.day === stop);
+  if (stale.length === 0 && repriced.length === 0) return null;
+  const lines = repriced.map((r) => `${r.symbol} repriced on this day, last priced ${dayStampOf(r.from)}.`);
+  if (stale.length > 0)
+    lines.push(
+      `${m.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${stale
+        .map((x) => `${x.symbol} from ${dayStampOf(x.pricedAt)}`)
+        .join(", ")}.`,
+    );
+  return { word: stale.length > 0 ? "Old price" : "Repriced", lines };
+}
 
 /** "3 Mar 2025": the window's dates. */
 export function longDay(tsSec: number): string {

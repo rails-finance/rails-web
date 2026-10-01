@@ -31,12 +31,14 @@ import {
   axisLabelOnPhone,
   dayStart,
   formatFlowUsd,
+  oldPriceAt,
   spokenUsd,
   stateAt,
   type FlowModel,
   type FlowSide,
   type FlowSideState,
 } from "@/lib/shared/flows-timeline";
+import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 
 const PLAY_MS = 220;
@@ -64,12 +66,13 @@ export function useWidth(): [React.RefObject<HTMLDivElement | null>, number] {
 }
 
 /** The date line over the headlines. */
-export function DateRow({ children }: { children: ReactNode }) {
+export function DateRow({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="mb-2 flex min-h-9 items-center">
+    <div className="mb-2 flex min-h-9 items-center justify-between gap-3">
       <p className="min-w-0 font-semibold tabular-nums text-foreground" aria-live="polite">
         {children}
       </p>
+      {aside}
     </div>
   );
 }
@@ -180,7 +183,7 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   return (
     <FlowCursorContext.Provider value={cursor}>
       <div className="text-sm" data-flows-busy="">
-        <DateRow>{dateLine}</DateRow>
+        <DateRow aside={<OldPriceLabel note={oldPriceAt(model, stop)} />}>{dateLine}</DateRow>
         <Throughput t={through} hasDebt={hasDebt} />
 
         <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
@@ -228,14 +231,6 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
             <SkipForward size={16} aria-hidden />
           </button>
         </div>
-
-        {s.stale.length > 0 && (
-          <p className="mt-2 text-[11px] leading-snug text-rb-500">
-            {`${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
-              .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
-              .join(", ")}.`}
-          </p>
-        )}
       </div>
     </FlowCursorContext.Provider>
   );

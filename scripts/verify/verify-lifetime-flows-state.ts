@@ -53,6 +53,7 @@ import type { TowerLine } from "@/lib/shared/chain-truth-economics";
 import { aaveV4FlowSeriesTimeline, aaveV4FlowTimeline } from "@/lib/aave-v4/flows-timeline";
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
+  oldPriceAt,
   assetsAt,
   axisFor,
   axisLabelOnPhone,
@@ -924,6 +925,11 @@ test("a gap past SERIES_GAP_DAYS keeps the older price and marks the refresh", (
   assert.equal(stateAt(m, 20).collateral.now, 300);
   assert.equal(stateAt(m, 20).stale.length, 0);
   assert.deepEqual(m.repricings, [{ day: 20, symbol: "A", from: 1001 * 86_400 }]);
+  // The readout's label: "Old price" through the gap, "Repriced" on the step.
+  assert.equal(oldPriceAt(m, 8), null);
+  assert.deepEqual(oldPriceAt(m, 9), { word: "Old price", lines: ["No newer price recorded: A from 28 Sep '72."] });
+  assert.deepEqual(oldPriceAt(m, 20), { word: "Repriced", lines: ["A repriced on this day, last priced 28 Sep '72."] });
+  assert.equal(oldPriceAt(m, m.liveStop), null);
 });
 
 // ── SparkLend and Aave V4: the route against the event-level answer ─────────

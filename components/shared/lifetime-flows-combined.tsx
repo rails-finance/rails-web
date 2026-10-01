@@ -37,10 +37,12 @@ import {
   DAY_MS,
   dayStart,
   formatFlowUsd,
+  oldPriceAt,
   type FlowModel,
   type FlowTick,
   tickRank,
 } from "@/lib/shared/flows-timeline";
+import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { throughput } from "@/lib/shared/flows-busy";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
@@ -125,6 +127,8 @@ export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number;
 export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
 
 const STRIP_H = 80;
+/** A dotted piece's tip: OldPriceTip's 16rem and the bubble's padding. */
+const OLD_TIP_W = 282;
 /** The strip's inset each side. */
 const PAD = 8;
 /** The lead-in: the strip's time axis starts this share of its width before
@@ -397,14 +401,17 @@ export function CombinedFlows({
               {hasDebt && (
                 <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
               )}
-              <p
-                className="ml-auto min-w-0 text-xs font-semibold tabular-nums text-foreground sm:text-sm"
-                aria-live="polite"
-                data-flow-date=""
-                data-anatomy="F2.1"
-              >
-                {dateLine}
-              </p>
+              <div className="ml-auto flex min-w-0 items-center gap-2">
+                <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
+                <p
+                  className="min-w-0 text-xs font-semibold tabular-nums text-foreground sm:text-sm"
+                  aria-live="polite"
+                  data-flow-date=""
+                  data-anatomy="F2.1"
+                >
+                  {dateLine}
+                </p>
+              </div>
             </div>
             <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
               <div
@@ -515,14 +522,6 @@ export function CombinedFlows({
               </button>
             )}
           </div>
-
-          {head.stale.length > 0 && (
-            <p className="mt-2 text-[11px] leading-snug text-rb-500">
-              {`${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${head.stale
-                .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
-                .join(", ")}.`}
-            </p>
-          )}
         </div>
       </SegmentTipContext.Provider>
     </FlowCursorContext.Provider>
@@ -788,6 +787,46 @@ function LineStrip({
     const lead = seq[0] === 0 ? [`${PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k])}`] : [];
     return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
   };
+  // Where the side's value at a point rests on an old price (the model's
+  // `stale`, as the readout's label): the segment into that point is drawn
+  // dotted. Today's point is at live prices.
+  const oldAt = (k: "collateral" | "debt", i: number) =>
+    i < n - 1 && (model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k);
+  /** A run's line as its solid and dotted pieces, each a path of whole
+   *  segments; a dotted piece keeps the indexes of its points for its tip. */
+  const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
+    const solid: string[] = [];
+    const dotted: { d: string; idx: number[] }[] = [];
+    if (seq[0] === 0) {
+      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number)}`;
+      solid.push(`M${PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k])}L${p0}`);
+    }
+    for (let j = 1; j < seq.length; j++) {
+      const a = seq[j - 1];
+      const b = seq[j];
+      const seg = `M${x(a)},${y(points[a][k] as number)}L${x(b)},${y(points[b][k] as number)}`;
+      if (!oldAt(k, b)) {
+        solid.push(seg);
+        continue;
+      }
+      const prev = dotted[dotted.length - 1];
+      if (prev && prev.idx[prev.idx.length - 1] === a) {
+        prev.d += `L${x(b)},${y(points[b][k] as number)}`;
+        prev.idx.push(b);
+      } else dotted.push({ d: seg, idx: [a, b] });
+    }
+    return { solid: solid.join(""), dotted };
+  };
+  // A dotted piece under the mouse opens the label's tip for its nearest point.
+  const [oldTip, setOldTip] = useState<{ x: number; y: number; lines: string[] } | null>(null);
+  const hoverOld = (e: PointerEvent<SVGPathElement>, k: "collateral" | "debt", idx: number[]) => {
+    if (e.pointerType !== "mouse") return;
+    const px = e.clientX - (ref.current?.getBoundingClientRect().left ?? 0);
+    let best = idx[idx.length - 1];
+    for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
+    const note = oldPriceAt(model, points[best].to - startDay);
+    setOldTip(note ? { x: px, y: y(points[best][k] as number), lines: note.lines } : null);
+  };
   const area = (k: "collateral" | "debt", seq: number[]) =>
     `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;
   const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
@@ -850,18 +889,35 @@ function LineStrip({
                   />
                 ))}
               {sides.map((k) =>
-                runs(k).map((seq) => (
-                  <g key={`${k}${seq[0]}`}>
-                    <path d={area(k, seq)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
-                    <path
-                      d={lineOf(k, seq)}
-                      fill="none"
-                      stroke={LINE_HUE[k]}
-                      strokeWidth={1.5}
-                      strokeLinejoin="round"
-                    />
-                  </g>
-                )),
+                runs(k).map((seq) => {
+                  const pieces = piecesOf(k, seq);
+                  return (
+                    <g key={`${k}${seq[0]}`}>
+                      <path d={area(k, seq)} fill={LINE_HUE[k]} fillOpacity={k === "collateral" ? 0.14 : 0.12} />
+                      {pieces.solid && (
+                        <path
+                          d={pieces.solid}
+                          fill="none"
+                          stroke={LINE_HUE[k]}
+                          strokeWidth={1.5}
+                          strokeLinejoin="round"
+                        />
+                      )}
+                      {pieces.dotted.map((p) => (
+                        <path
+                          key={p.idx[0]}
+                          d={p.d}
+                          fill="none"
+                          stroke={LINE_HUE[k]}
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeDasharray="0 4"
+                          data-flow-old-line={k}
+                        />
+                      ))}
+                    </g>
+                  );
+                }),
               )}
               {dim && (
                 <rect
@@ -871,10 +927,37 @@ function LineStrip({
                   height={STRIP_H}
                   style={{ fill: "var(--surface-raised)" }}
                   fillOpacity={0.7}
+                  pointerEvents="none"
                   data-flow-after-cursor=""
                 />
               )}
-              <line x1={cx} x2={cx} y1={0} y2={STRIP_H} className="stroke-foreground" strokeWidth={1} />
+              {/* Each dotted piece's hit area, wider than its stroke. */}
+              {sides.map((k) =>
+                runs(k).flatMap((seq) =>
+                  piecesOf(k, seq).dotted.map((p) => (
+                    <path
+                      key={`${k}${p.idx[0]}`}
+                      d={p.d}
+                      fill="none"
+                      stroke="transparent"
+                      strokeWidth={12}
+                      pointerEvents="stroke"
+                      onPointerMove={(e) => hoverOld(e, k, p.idx)}
+                      onPointerLeave={() => setOldTip(null)}
+                      data-flow-old-hit={k}
+                    />
+                  )),
+                ),
+              )}
+              <line
+                x1={cx}
+                x2={cx}
+                y1={0}
+                y2={STRIP_H}
+                className="stroke-foreground"
+                strokeWidth={1}
+                pointerEvents="none"
+              />
               <circle
                 cx={cx}
                 cy={y(head.collateral)}
@@ -912,6 +995,22 @@ function LineStrip({
                 );
               })}
             </div>
+          )}
+          {oldTip && (
+            <span
+              role="tooltip"
+              data-prov-hidden=""
+              data-flow-old-tip=""
+              className="pointer-events-none absolute z-50 rounded-2xl border p-3 text-xs font-medium text-foreground shadow-lg"
+              style={{
+                left: Math.max(4, Math.min(w - OLD_TIP_W - 4, oldTip.x - OLD_TIP_W / 2)),
+                bottom: STRIP_H - oldTip.y + 10,
+                background: "var(--rb-tooltip-bg)",
+                borderColor: "var(--rb-tooltip-border)",
+              }}
+            >
+              <OldPriceTip lines={oldTip.lines} />
+            </span>
           )}
           {w > 0 && n > 0 ? null : (
             <p className="flex h-full items-center justify-center text-xs text-rb-500">

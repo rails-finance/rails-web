@@ -39,6 +39,7 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   fillStyle,
@@ -61,6 +62,7 @@ import {
   longDay,
   formatFlowUsd,
   nextEventDay,
+  oldPriceAt,
   prevEventDay,
   spokenUsd,
   stateAt,
@@ -729,6 +731,11 @@ function panelWords(
       : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";
   const today = closed ? "at the close" : "today";
   const marks = tickWords(model, hasDebt);
+  // Only where the position has an old-price period.
+  const old =
+    model.stale.size > 0
+      ? ` Where a held asset's latest price is more than ${model.gapDays} days old, ${lined ? "the line is dotted and " : ""}“Old price” shows by the date, its tip naming the asset and the day of that price${model.repricings.length > 0 ? "; “Repriced” marks a day whose newer price moves its side by 1% or more" : ""}.`
+      : "";
   return {
     key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
     explain: lined
@@ -739,8 +746,9 @@ function panelWords(
         `${read} The dashed outline is where ${each} ${today}.` +
         (from > 0
           ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`
-          : "")
-      : cover + read,
+          : "") +
+        old
+      : cover + read + old,
     outline: model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null,
     lines: [
       { label: model.labels.collateral, color: LINE_HUE.collateral },
@@ -912,7 +920,6 @@ function ScrubberBody({
       : `Position on ${dateText}`;
   // Receipts read the live stop as the close's where the position closed.
   const liveReceipts = s.isLive && !closed;
-  const repricedHere = s.isLive ? [] : model.repricings.filter((r) => r.day === stop);
   // The Key goes to the panel's Explanation. Its dashed outline, which marks
   // where each bar ends at the last stop, is named wherever there is another stop.
   const keyOutline = model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null;
@@ -970,7 +977,7 @@ function ScrubberBody({
   return (
     <FlowCursorContext.Provider value={cursor}>
       <div className="text-sm">
-        <DateRow>{dateLine}</DateRow>
+        <DateRow aside={<OldPriceLabel note={oldPriceAt(model, stop)} />}>{dateLine}</DateRow>
         <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
           <Headline
             side="collateral"
@@ -1124,16 +1131,6 @@ function ScrubberBody({
             <SkipForward size={16} aria-hidden />
           </button>
         </div>
-
-        {(s.stale.length > 0 || repricedHere.length > 0) && (
-          <p className="mt-2 text-[11px] leading-snug text-rb-500">
-            {repricedHere.map((r) => `${r.symbol} repriced on this day, last priced ${dayStamp(r.from)}. `).join("")}
-            {s.stale.length > 0 &&
-              `${model.daily ? "No newer price recorded" : "Valued at each asset's last event price"}: ${s.stale
-                .map((x) => `${x.symbol} from ${dayStamp(x.pricedAt)}`)
-                .join(", ")}.`}
-          </p>
-        )}
       </div>
     </FlowCursorContext.Provider>
   );
