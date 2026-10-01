@@ -82,9 +82,13 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
         />
 
         {(() => {
+          // The composition paints after mount (above), so the browser's
+          // clock is the only one this render meets.
+          const now = Date.now() / 1000;
           const result = computeLiquityEconomics(towerEvents, {
             currentPrice,
             collateralType: trove.collateralType,
+            now,
           });
           if (!result) return null;
           return (
@@ -92,7 +96,7 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
               <ChainTruthTower
                 data={result.data}
                 title="Lifetime flows"
-                explanation={liquityEconomicsExplanation(result.economics, result.economics._meta)}
+                explanation={liquityEconomicsExplanation(result.economics, result.economics._meta, now)}
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
                 // Stated, not left to default (ui-jobs 61): the hero belongs to
                 // no protocol, so it has no setting of its own to read and must

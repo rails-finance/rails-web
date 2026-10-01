@@ -85,6 +85,10 @@ export interface TroveViewProps {
   initialPrices: OraclePricesData | null;
   /** `?hide=op1,op2` decoded on the server — see the page for what it is for. */
   urlHidden: string[] | null;
+  /** The server's clock (unix seconds) at render: the Explanation's debt owed
+   *  today accrues to it until the flows clock below is set, so the server's
+   *  render and the first client render state the same figure. */
+  renderedAt: number;
 }
 
 export default function TroveView({
@@ -95,6 +99,7 @@ export default function TroveView({
   initialTotalEvents,
   initialPrices,
   urlHidden,
+  renderedAt,
 }: TroveViewProps) {
   const troveKey = `${collateralType}:${troveId}`;
   // The page keys this component on the trove, so a client-side navigation to a
@@ -622,10 +627,14 @@ export default function TroveView({
             others) gets the redeemer block underneath. */}
         {(() => {
           const currentPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
+          // One clock for the scrubber and the Explanation once mounted;
+          // the server's until then.
+          const now = flowsNow ?? renderedAt;
           const result = computeLiquityEconomics(tl.sortedEvents, {
             currentPrice,
             collateralType: troveData.collateralType,
             surplusClaimed: surplus?.claimed != null,
+            now,
           });
           if (!result) return null;
           return (
@@ -638,6 +647,7 @@ export default function TroveView({
                     {liquityEconomicsExplanation(
                       result.economics,
                       result.economics._meta,
+                      now,
                       currentPrice,
                       surplus?.claimed != null,
                     )}

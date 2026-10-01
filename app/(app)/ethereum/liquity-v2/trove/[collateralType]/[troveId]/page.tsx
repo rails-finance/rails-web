@@ -76,6 +76,7 @@ export default async function TrovePage({ params, searchParams }: Props) {
       initialTotalEvents={tail.hasMore ? tail.totalEvents : null}
       initialPrices={tail.prices}
       urlHidden={urlHidden}
+      renderedAt={Date.now() / 1000}
     />
   );
 }
