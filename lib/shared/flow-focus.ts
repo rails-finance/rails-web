@@ -314,10 +314,14 @@ export interface AssetSum {
    *  held at the price of its latest flow); null where an asset with interest
    *  has no price. */
   interestUsd: number | null;
+  /** Each asset's interest in its token, and the price it is valued at. */
+  interest: { symbol: string; amount: number; price: number | null }[];
   /** Running tokens per bucket and asset once the transaction had run, and
-   *  less this event's legs. */
+   *  less this event's legs; and the running USD per bucket and asset, each
+   *  leg at its block's price. */
   after: Record<string, Record<string, number>>;
   before: Record<string, Record<string, number>>;
+  usd: Record<string, Record<string, number>>;
 }
 
 /** The interest line's key and words. */
@@ -343,6 +347,7 @@ export function eventAssetSum(
   const buckets = model.buckets.filter((b) => b.side === side);
   const after: Record<string, Record<string, number>> = Object.fromEntries(buckets.map((b) => [b.key, {}]));
   const usd: Record<string, number> = Object.fromEntries(buckets.map((b) => [b.key, 0]));
+  const usdBy: Record<string, Record<string, number>> = Object.fromEntries(buckets.map((b) => [b.key, {}]));
   // Each asset's price at its latest flow, for the interest of an asset the
   // side no longer holds (no read at the block prices it).
   const flowPrice: Record<string, number> = {};
@@ -352,6 +357,7 @@ export function eventAssetSum(
       if (l.amount == null || !l.symbol || l.usd == null) return null;
       after[l.bucket][l.symbol] = (after[l.bucket][l.symbol] ?? 0) + l.amount;
       usd[l.bucket] += l.usd;
+      usdBy[l.bucket][l.symbol] = (usdBy[l.bucket][l.symbol] ?? 0) + l.usd;
       if (l.amount > 0) flowPrice[l.symbol] = l.usd / l.amount;
     }
   // The page holds every flow: it holds as many events as the history has,
@@ -399,7 +405,7 @@ export function eventAssetSum(
       parts: earned.map(({ symbol, amount }) => ({ symbol, amount })),
       hl: false,
     });
-  return { side, lines, symbols, balances, interestUsd, after, before };
+  return { side, lines, symbols, balances, interestUsd, interest, after, before, usd: usdBy };
 }
 
 /** A side by asset that holds one asset, as a sum in that token: the lines
@@ -407,20 +413,27 @@ export function eventAssetSum(
  *  the side names several assets. */
 export function assetTokenSum(sum: AssetSum): TokenSum | null {
   if (sum.symbols.length !== 1) return null;
-  const symbol = sum.symbols[0];
+  return assetTokenSumFor(sum, sum.symbols[0]);
+}
+
+/** One asset of a side by asset as a sum in its token, the lines rounded
+ *  together to its decimals so they add to its balance. */
+export function assetTokenSumFor(sum: AssetSum, symbol: string): TokenSum {
   const bal = sum.balances.find((b) => b.symbol === symbol);
   const held = Math.max(0, bal?.amount ?? 0);
-  const signedOf = (l: AssetSumLine) => (l.kind === "out" ? -1 : 1) * (l.parts[0]?.amount ?? 0);
-  const max = Math.max(held, ...sum.lines.map((l) => Math.abs(l.parts[0]?.amount ?? 0)));
+  const mine = sum.lines.filter((l) => l.parts.some((p) => p.symbol === symbol));
+  const amountOf = (l: AssetSumLine) => l.parts.find((p) => p.symbol === symbol)?.amount ?? 0;
+  const signedOf = (l: AssetSumLine) => (l.kind === "out" ? -1 : 1) * amountOf(l);
+  const max = Math.max(held, ...mine.map((l) => Math.abs(amountOf(l))));
   const decimals = tokenDecimals(max, false);
   const scale = 10 ** decimals;
   const totalUnits = Math.round(held * scale);
   const parts = apportionSigned(
-    sum.lines.map((l) => signedOf(l) * scale),
+    mine.map((l) => signedOf(l) * scale),
     totalUnits,
   );
   const lines: TokenSumLine[] = [];
-  sum.lines.forEach((l, i) => {
+  mine.forEach((l, i) => {
     if (parts[i] === 0) return;
     lines.push({
       key: l.key,
@@ -436,7 +449,7 @@ export function assetTokenSum(sum: AssetSum): TokenSum | null {
   const move = held - Math.max(0, bal?.before ?? 0);
   const moved = Math.round(move * scale) !== 0;
   const after: Record<string, number> = {};
-  for (const l of sum.lines) after[l.key] = l.parts[0]?.amount ?? 0;
+  for (const l of mine) after[l.key] = amountOf(l);
   return {
     symbol,
     decimals,

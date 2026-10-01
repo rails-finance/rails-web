@@ -15,8 +15,7 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, AsymmetryContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
-import { ReceiptCalcButton, ReceiptCalcContext, useReceiptCalc } from "@/components/shared/flow-event-sum";
-import { LiquityEventSum } from "@/components/protocol/liquity-family/liquity-event-sum";
+import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
@@ -99,9 +98,6 @@ export interface AsymmetryEventCardProps {
 }
 
 export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: AsymmetryEventCardProps) {
-  // The card's calculator (components/shared/flow-event-sum.tsx): the Trove's
-  // lifetime sum as of this event, in place of the grid.
-  const { calc, hasSum } = useReceiptCalc(event.id);
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
@@ -201,10 +197,9 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
   );
 
   return (
-    <ReceiptCalcContext.Provider value={calc}>
+    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
-        infoAction={hasSum ? <ReceiptCalcButton /> : undefined}
         iconColumn={iconSlot}
         header={
           <LiquityForkEventHeader
@@ -228,13 +223,7 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
             flows={event.flows}
           />
         }
-        detail={
-          calc.on && hasSum ? (
-            <LiquityEventSum eventId={event.id} eventTs={event.timestamp} />
-          ) : (
-            <AsymmetryEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />
-          )
-        }
+        detail={<AsymmetryEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
         detailLabel="Trove state"
         explainer={
           <LiquityForkEventExplainer
@@ -255,6 +244,6 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
         learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, ASYMMETRY_FORK)} />}
         persistKey={`asymmetry:${event.id}`}
       />
-    </ReceiptCalcContext.Provider>
+    </LiquityLedgerProvider>
   );
 }

@@ -57,6 +57,8 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
+import { LedgerCell } from "@/components/shared/event-ledger";
+import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
  *  snapshot grid; the full string rides the tooltip + provenance trace. Passes
@@ -348,6 +350,10 @@ export interface ChainTruthStat {
   /** The token amount the USD chip prices, where `value` is formatted (the
    *  stablecoin rule reads its price as usd ÷ amount). */
   usdAmount?: number;
+  /** The account side this cell states, where the card offers its ledger
+   *  (components/shared/event-ledger.tsx): the cell carries the toggle that
+   *  opens it. */
+  ledger?: FlowSide;
   /** One line under the value, in the value's tone — the Liquity V2 grid's
    *  sub-line ("incl. +0.36 interest", "12.40 USDaf / year"). Its figures carry
    *  a <Prov> each. */
@@ -786,7 +792,7 @@ export function ChainTruthDetail({
   return (
     // px-5 py-2 mirrors the Liquity / Aave detail bodies so the snapshot grid
     // sits inset from the shared bg-raised detail surface, not flush to its edge.
-    <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:auto-rows-fr sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-open]]:auto-rows-auto">
       {stats.map((s, i) => {
         const changed = s.changed ?? true;
         const unread = s.symbol ? unreadOf(s.address, s.symbol) : undefined;
@@ -800,102 +806,122 @@ export function ChainTruthDetail({
               </StatCard>
             </div>
           );
+        const wrap = (children: ReactNode) =>
+          s.ledger ? (
+            <LedgerCell label={s.label} side={s.ledger}>
+              {children}
+            </LedgerCell>
+          ) : (
+            <StatCard label={s.label}>{children}</StatCard>
+          );
+        const usdOn = s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.usdAmount ?? s.value));
         return (
-          <div key={i} className="h-full">
-            <StatCard label={s.label}>
-              <StateTransition>
-                {s.transition && (
-                  <DeltaToggle
-                    before={
-                      <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                        <ExactTip
-                          always
-                          text={
-                            s.transition.shownAsIs
-                              ? s.transition.before
-                              : transitionFigure(s.transition.before, s.transition.beforeExact, false)
-                          }
-                          exact={s.transition.beforeExact}
-                          symbol={s.symbol}
-                          label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
-                        />
-                      </Prov>
-                    }
-                    delta={
-                      <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                        <ExactTip
-                          always
-                          text={
-                            s.transition.shownAsIs
-                              ? s.transition.change
-                              : transitionFigure(s.transition.change, s.transition.changeExact)
-                          }
-                          exact={s.transition.changeExact}
-                          symbol={s.symbol}
-                          label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
-                        />
-                      </Prov>
-                    }
-                    size="sm"
-                  />
-                )}
-                <Prov
-                  info={s.prov}
-                  value={s.value}
-                  icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
-                >
-                  <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
-                    <ExactTip
-                      always
-                      text={s.display ?? compactAmount(s.value)}
-                      exact={s.value}
-                      symbol={s.symbol}
-                      label={
-                        s.readableLabel && Number.isFinite(Number(s.value))
-                          ? readableName(Number(s.value), s.symbol, false)
-                          : undefined
+          <div key={i} className={s.ledger ? "contents" : "h-full"}>
+            {wrap(
+              <>
+                <StateTransition>
+                  {s.transition && (
+                    <DeltaToggle
+                      before={
+                        <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
+                          <ExactTip
+                            always
+                            text={
+                              s.transition.shownAsIs
+                                ? s.transition.before
+                                : transitionFigure(s.transition.before, s.transition.beforeExact, false)
+                            }
+                            exact={s.transition.beforeExact}
+                            symbol={s.symbol}
+                            label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
+                          />
+                        </Prov>
                       }
+                      delta={
+                        <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
+                          <ExactTip
+                            always
+                            text={
+                              s.transition.shownAsIs
+                                ? s.transition.change
+                                : transitionFigure(s.transition.change, s.transition.changeExact)
+                            }
+                            exact={s.transition.changeExact}
+                            symbol={s.symbol}
+                            label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
+                          />
+                        </Prov>
+                      }
+                      size="sm"
                     />
-                    {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
-                  </span>
-                </Prov>
-                {s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.usdAmount ?? s.value)) && (
-                  // The after-balance valued at the event-block oracle price —
-                  // the bordered chip the Liquity V2 / Aave V4 details use
-                  // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
-                  // receipt; the chip shows whole dollars.
-                  <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
-                    <ValuePill changed={changed}>{fmtUsdChip(s.usd.value)}</ValuePill>
+                  )}
+                  <Prov
+                    info={s.prov}
+                    value={s.value}
+                    icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
+                  >
+                    <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
+                      <ExactTip
+                        always
+                        text={s.display ?? compactAmount(s.value)}
+                        exact={s.value}
+                        symbol={s.symbol}
+                        label={
+                          s.readableLabel && Number.isFinite(Number(s.value))
+                            ? readableName(Number(s.value), s.symbol, false)
+                            : undefined
+                        }
+                      />
+                      {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
+                    </span>
                   </Prov>
-                )}
-              </StateTransition>
-              {s.interestSincePrevious && (
-                <StatSubline>
-                  <TipLabel
-                    text={s.interestSincePrevious.label ?? "Interest since previous event"}
-                    tip={s.interestSincePrevious.labelTip}
-                  />
-                  :{" "}
-                  <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
-                    <ExactTip
-                      always
-                      text={
-                        s.interestSincePrevious.display ??
-                        transitionFigure(
-                          formatNumber(Number(s.interestSincePrevious.value)),
-                          s.interestSincePrevious.value,
-                        )
-                      }
-                      exact={s.interestSincePrevious.value}
-                      symbol={s.symbol}
+                  {s.usd &&
+                    usdOn &&
+                    (s.ledger ? (
+                      // A ledger cell states its USD after a thin divider.
+                      <span className="ml-1 border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600">
+                        <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
+                          {fmtUsdChip(s.usd.value)}
+                        </Prov>
+                      </span>
+                    ) : (
+                      // The after-balance valued at the event-block oracle price —
+                      // the bordered chip the Liquity V2 / Aave V4 details use
+                      // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
+                      // receipt; the chip shows whole dollars.
+                      <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
+                        <ValuePill changed={changed}>{fmtUsdChip(s.usd.value)}</ValuePill>
+                      </Prov>
+                    ))}
+                </StateTransition>
+                {s.interestSincePrevious && (
+                  <StatSubline>
+                    <TipLabel
+                      text={s.interestSincePrevious.label ?? "Interest since previous event"}
+                      tip={s.interestSincePrevious.labelTip}
                     />
-                  </Prov>{" "}
-                  {s.symbol}
-                  {s.interestSincePrevious.after}
-                </StatSubline>
-              )}
-              {s.sub && <StatSubline changed={changed}>{s.sub}</StatSubline>}
-            </StatCard>
+                    :{" "}
+                    <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
+                      <ExactTip
+                        always
+                        text={
+                          s.interestSincePrevious.display ??
+                          transitionFigure(
+                            formatNumber(Number(s.interestSincePrevious.value)),
+                            s.interestSincePrevious.value,
+                          )
+                        }
+                        exact={s.interestSincePrevious.value}
+                        symbol={s.symbol}
+                      />
+                    </Prov>{" "}
+                    {s.symbol}
+                    {s.interestSincePrevious.after}
+                  </StatSubline>
+                )}
+                {s.sub && <StatSubline changed={changed}>{s.sub}</StatSubline>}
+              </>,
+            )}
           </div>
         );
       })}

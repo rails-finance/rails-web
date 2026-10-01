@@ -7,22 +7,23 @@
 // row: health factor, LTV, still borrowable (and eMode where the account
 // used one).
 //
-// The card's calculator (components/shared/flow-event-sum.tsx) grows each
-// cell into its side's lifetime sum as of the event, its assets under it: in
-// the asset's token where the side holds one, by asset with the dollars
-// beside where it holds several (lib/shared/flow-focus.ts `eventAssetSum`),
-// in dollars where the page does not hold every flow before the event.
+// Each cell's toggle opens it into its side's ledger as of the event
+// (components/shared/event-ledger.tsx): in the asset's token where the side
+// holds one, one short ledger per asset with the side's total in dollars
+// where it holds several (lib/shared/flow-focus.ts `eventAssetSum`), in
+// dollars where the page does not hold every flow before the event.
 
-import { useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
+  AssetLedgers,
   DayCloseNote,
-  EventAssetSumLines,
-  EventSumLines,
-  EventTokenSumLines,
-  ReceiptCalcContext,
+  LedgerCell,
+  LedgerTable,
   SIDE_HUE,
+  SIDE_NAME,
+  dayStamp,
   useEventCum,
-} from "@/components/shared/flow-event-sum";
+} from "@/components/shared/event-ledger";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { Prov } from "@/components/shared/provenance";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -31,13 +32,17 @@ import type { FlowSide } from "@/lib/shared/flows-timeline";
 import {
   assetTokenSum,
   eventAssetSum,
+  eventSideSum,
   eventSideSumByAsset,
   type AssetBalance,
   type EventCum,
 } from "@/lib/shared/flow-focus";
+import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledger";
+import { ledgerPartProv } from "@/lib/shared/flows-timeline-provenance";
 import { accountTotalProv, heldAtEventProv, sideChangeProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { baseToUsd, big, humanOf, legChange, rawToUsd, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { ReserveList, TotalHeadline, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 /** One figure of the row under the cells. */
 export interface RiskItem {
@@ -128,47 +133,55 @@ export function AaveFamilyEventReceipt({
   state: AaveV3PositionState;
   coords: V3Coords;
   touched: TouchedLeg[];
-  /** The timeline event this card states, for its lifetime sum. */
+  /** The timeline event this card states, for its ledgers. */
   eventId?: string;
   eventTs?: number;
   risk: RiskItem[];
   /** Lines under the row (a liquidation's basis, a missing read). */
   notes?: ReactNode;
 }) {
-  const calc = useContext(ReceiptCalcContext);
+  const focus = useFlowFocus();
   const cum = useEventCum(eventId);
-  const sum = !!calc?.on && cum != null;
   const touchedOn = (side: "supply" | "debt") => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
   return (
     <div className="px-5 py-2" data-position-state="ready" data-position-complete={state.complete ? "true" : "false"}>
-      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2" data-receipt={sum ? "sum" : "open"}>
+      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2" data-receipt="open">
         {(["collateral", "debt"] as const).map((side) => {
           const f = sideFacts(state, side, touched);
+          const ledger =
+            cum && focus?.model ? (
+              <SideLedger
+                side={side}
+                state={state}
+                coords={coords}
+                cum={cum}
+                facts={f}
+                eventId={eventId}
+                eventTs={eventTs}
+              />
+            ) : null;
           return (
-            <div
+            <LedgerCell
               key={side}
-              className="flex min-w-0 flex-col rounded-xl bg-background px-4 py-3"
-              data-position-card={side}
-              data-receipt-cell={side}
-              data-receipt-changed={f.changed || f.touchedHere ? "true" : "false"}
+              side={side}
+              ledger={ledger}
+              label={
+                <span className="flex items-center gap-2 text-foreground">
+                  <i
+                    aria-hidden
+                    className="inline-block size-2.5 rounded-[2px]"
+                    style={{ background: SIDE_HUE[side] }}
+                  />
+                  {SIDE_NAME[side]}
+                </span>
+              }
+              data={{
+                "data-position-card": side,
+                "data-receipt-cell": side,
+                "data-receipt-changed": f.changed || f.touchedHere ? "true" : "false",
+              }}
             >
-              <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
-                <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
-                {side === "collateral" ? "Collateral" : "Debt"}
-              </div>
-              {sum && cum ? (
-                <SideSum
-                  side={side}
-                  state={state}
-                  coords={coords}
-                  cum={cum}
-                  facts={f}
-                  eventId={eventId}
-                  eventTs={eventTs}
-                />
-              ) : (
-                <SideCell side={side} state={state} coords={coords} facts={f} />
-              )}
+              <SideCell side={side} state={state} coords={coords} facts={f} />
               <ReserveList
                 state={state}
                 side={f.leg as "supply" | "debt"}
@@ -178,11 +191,10 @@ export function AaveFamilyEventReceipt({
               {side === "collateral" && state.sources.settings == null && (
                 <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
               )}
-            </div>
+            </LedgerCell>
           );
         })}
       </div>
-      {sum && cum && <DayCloseNote cum={cum} eventTs={eventTs} />}
       <div
         className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] sm:gap-4 sm:px-4"
         data-receipt-risk=""
@@ -199,7 +211,7 @@ export function AaveFamilyEventReceipt({
   );
 }
 
-/** The open cell: the side's total at the event, before → after where it
+/** The closed cell: the side's total at the event, before → after where it
  *  moved, and the change with the asset it moved. */
 function SideCell({
   side,
@@ -234,8 +246,8 @@ function SideCell({
   );
 }
 
-/** The cell as the side's sum at the event. */
-function SideSum({
+/** The opened cell: the side's ledger as of the event. */
+function SideLedger({
   side,
   state,
   coords,
@@ -255,16 +267,18 @@ function SideSum({
   const focus = useFlowFocus();
   const usdShown = useUsdShown();
   const model = focus?.model;
-  if (!model) return null;
+  if (!model || !focus) return null;
   if (facts.held == null)
     return (
-      <p className="text-xs text-rb-500" data-receipt-sum-missing={side}>
-        A supplied reserve has no price at this block, so the sum is left out.
+      <p className="text-sm text-rb-500" data-ledger-missing={side}>
+        A supplied reserve has no price at this block, so the ledger is left out.
       </p>
     );
   const what = side === "collateral" ? "collateral" : "debt";
+  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  const ev = focus.events.find((e) => e.id === eventId) ?? null;
   const balances = sideBalances(state, side);
-  const bySum = focus && eventId ? eventAssetSum(model, focus.events, side, cum, eventId, balances) : null;
+  const bySum = eventId ? eventAssetSum(model, focus.events, side, cum, eventId, balances) : null;
   const totalProv =
     side === "collateral" && facts.offSupply
       ? heldAtEventProv(coords, { parts: facts.parts, total: facts.held })
@@ -275,60 +289,97 @@ function SideSum({
               : (state.account?.after.totalDebtBase ?? "0"),
           poolRevision: state.sources.poolRevision,
         });
-  const totalLabel = side === "collateral" ? "Held at this event" : "Owed at this event";
+  const name = SIDE_NAME[side];
+  const totalBeforeProv =
+    facts.offSupply || !state.account
+      ? ledgerPartProv(name, "USD", at, "held-before")
+      : accountTotalProv(what, "before", coords, {
+          base: side === "collateral" ? state.account.before.totalCollateralBase : state.account.before.totalDebtBase,
+          poolRevision: state.sources.poolRevision,
+        });
+  const note = <DayCloseNote cum={cum} eventTs={eventTs} />;
   if (bySum) {
-    const dollars = eventSideSumByAsset(model, bySum, cum, facts.held);
-    // USD beside the tokens where the Display switches show it for any of the side's assets.
-    const usd = bySum.symbols.some((sym) => {
-      const b = bySum.balances.find((x) => x.symbol === sym);
+    const priceOf = (sym: string) => bySum.balances.find((x) => x.symbol === sym);
+    const shownFor = (sym: string) => {
+      const b = priceOf(sym);
       return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
-    });
+    };
     const single = assetTokenSum(bySum);
-    if (single)
+    if (single) {
+      const dollars = eventSideSumByAsset(model, bySum, cum, facts.held);
+      const ledger = tokenLedger({
+        model,
+        side,
+        ev,
+        sum: single,
+        usd: shownFor(single.symbol)
+          ? { lines: dollars.lines, dollars: dollars.total.dollars, before: facts.heldBefore }
+          : null,
+      });
       return (
-        <EventTokenSumLines
-          side={side}
-          model={model}
-          cum={cum}
-          sum={single}
-          usd={usd}
-          held={facts.held}
-          heldBefore={facts.heldBefore}
-          totalLabel={totalLabel}
-          totalProv={totalProv}
-          eventTs={eventTs}
-          dollars={dollars}
-          caption
-        />
+        <>
+          <LedgerTable
+            ledger={ledger}
+            name={name}
+            at={at}
+            totalUsdProv={totalProv}
+            totalUsdBeforeProv={totalBeforeProv}
+            daily={model.daily}
+            subhead={
+              <>
+                <TokenChipIcon symbol={single.symbol} size={16} filterable={false} />
+                {single.symbol}
+              </>
+            }
+          />
+          {note}
+        </>
       );
+    }
+    const { assets, usd } = assetLedgers({
+      model,
+      side,
+      ev,
+      sum: bySum,
+      held: facts.held,
+      heldBefore: facts.heldBefore,
+    });
     return (
-      <EventAssetSumLines
-        side={side}
-        model={model}
-        cum={cum}
-        sum={bySum}
-        dollars={dollars}
-        usd={usd}
-        held={facts.held}
-        heldBefore={facts.heldBefore}
-        moved={facts.moved}
-        totalLabel={totalLabel}
-        totalProv={totalProv}
-        eventTs={eventTs}
-      />
+      <>
+        <AssetLedgers
+          side={side}
+          assets={assets}
+          usd={usd}
+          at={at}
+          totalUsdProv={totalProv}
+          totalUsdBeforeProv={totalBeforeProv}
+          usdShownFor={(l) => l.usd != null && l.symbol != null && shownFor(l.symbol)}
+        />
+        {note}
+      </>
     );
   }
+  // The page does not hold every flow before the event: the ledger in dollars.
+  const rows = eventSideSum(model, side, cum, facts.held);
+  const ledger = dollarLedger({
+    model,
+    side,
+    ev,
+    lines: rows.lines,
+    dollars: rows.total.dollars,
+    before: facts.heldBefore,
+  });
   return (
-    <EventSumLines
-      side={side}
-      model={model}
-      cum={cum}
-      held={facts.held}
-      heldBefore={facts.heldBefore}
-      moved={facts.moved}
-      totalLabel={side === "collateral" ? "Held at this event" : "Owed at this event"}
-      totalProv={totalProv}
-      eventTs={eventTs}
-    />
+    <>
+      <LedgerTable
+        ledger={ledger}
+        name={name}
+        at={at}
+        totalUsdProv={totalProv}
+        totalUsdBeforeProv={totalBeforeProv}
+        daily={model.daily}
+      />
+      {note}
+    </>
   );
 }

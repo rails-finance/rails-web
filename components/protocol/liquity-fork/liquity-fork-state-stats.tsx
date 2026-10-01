@@ -314,6 +314,7 @@ export function liquityForkStateStats(
   const redist = forkRedistArrival(ctx);
   stats.push({
     label: "Collateral",
+    ledger: "collateral",
     value: fmtColl(ctx.collAfter),
     display: gridFigure(ctx.collAfter, forkCollAmount),
     symbol: ctx.collateralSymbol,
@@ -401,6 +402,7 @@ export function liquityForkStateStats(
     ) : undefined;
   stats.push({
     label: "Debt",
+    ledger: "debt",
     value: fmt(ctx.debtAfter),
     display: gridFigure(ctx.debtAfter),
     symbol: debtSymbol,

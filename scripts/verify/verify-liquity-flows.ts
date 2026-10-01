@@ -16,6 +16,8 @@
 // (liquityFocusEvents through lib/shared/flow-focus.ts) is exact at every
 // event, its printed lines add to the card's figure, its token lines add to
 // the recorded balance at the printed decimals, and the daily line meets the bars.
+// Each cell's ledger (lib/shared/event-ledger.ts) adds in tokens and in USD,
+// with the event's movement on a "This …" row of its legs.
 //
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
@@ -39,6 +41,7 @@ import { flowMoment } from "@/lib/shared/flow-moment";
 import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
 import { eventCum, eventSideSum, eventTokenSum, fmtTokens } from "@/lib/shared/flow-focus";
+import { dollarLedger, ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
 
 const FIX = join(__dirname, "fixtures");
@@ -339,6 +342,63 @@ for (const [name, events, symbols, open] of [
       }
     }
     if (name.includes("redeemed")) assert.ok(redeemedLines > 0, "Taken by redemptions in tokens");
+  });
+}
+
+for (const [name, events, symbols, open] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+] as const) {
+  test(`${name}: every cell's ledger adds in tokens and in USD, the event's movement on a separate row`, () => {
+    const ev = events as LiquityFlowEvent[];
+    const [coll, debt] = symbols as unknown as [string, string];
+    const m = model(ev, [coll, debt], open);
+    const focus = liquityFocusEvents(ev, coll, debt);
+    let split = 0;
+    for (const f of focus) {
+      const cum = eventCum(m, focus, f.id)!;
+      for (const side of ["collateral", "debt"] as const) {
+        const sum = eventTokenSum(m, focus, side, cum, f.id)!;
+        const s = f.sides![side];
+        const rows = eventSideSum(m, side, cum, s.after);
+        for (const usd of [null, { lines: rows.lines, dollars: rows.total.dollars, before: s.before }]) {
+          const l = tokenLedger({ model: m, side, ev: f, sum, usd });
+          const adds = ledgerAdds(l);
+          assert.ok(adds.tokens, `${name} ${f.id} ${side}: the token rows add to the total`);
+          assert.ok(adds.usd, `${name} ${f.id} ${side}: the USD rows add to the total`);
+          assert.equal(l.tokens?.after, sum.total.amount, `${name} ${f.id} ${side}: closes on the balance`);
+          // Market move shows only with the USD column, and has no token amount.
+          const market = l.rows.filter((r) => r.role === "market");
+          if (!usd) assert.equal(market.length, 0, `${name} ${f.id} ${side}: no Market move without USD`);
+          for (const r of market) assert.equal(r.tokens, null);
+          // The event's act on each line it moved: one "This …" row, its legs rounded.
+          const scale = 10 ** sum.decimals;
+          for (const r of l.rows.filter((x) => x.role === "event")) {
+            split++;
+            assert.ok(r.label.startsWith("This "), `${name} ${f.id}: "${r.label}"`);
+            const legs = f.legs.filter((x) => x.bucket === r.line && !x.accrual);
+            const amt = legs.reduce((a, x) => a + (x.amount ?? 0), 0);
+            const out = m.buckets.find((b) => b.key === r.line)?.dir === "out" ? -1 : 1;
+            assert.equal(r.tokens?.units, out * Math.round(amt * scale), `${name} ${f.id} ${r.line}: the event's legs`);
+            const before = l.rows.find((x) => x.role === "before" && x.line === r.line);
+            if (before) assert.ok(before.label.endsWith(" before"), `${name} ${f.id}: "${before.label}"`);
+          }
+          for (const r of l.rows) assert.ok(!/−−|^-/.test(r.tokens?.text ?? ""), `a true minus: ${r.tokens?.text}`);
+        }
+        const d = dollarLedger({
+          model: m,
+          side,
+          ev: f,
+          lines: rows.lines,
+          dollars: rows.total.dollars,
+          before: s.before,
+        });
+        assert.ok(ledgerAdds(d).usd, `${name} ${f.id} ${side}: the ledger in dollars adds`);
+      }
+    }
+    assert.ok(split > 0, `${name}: some event rows (${split})`);
   });
 }
 

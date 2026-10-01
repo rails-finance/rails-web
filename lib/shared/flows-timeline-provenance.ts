@@ -146,3 +146,54 @@ export function flowInterestUsdProv(label: string, when: string): Provenance {
     formula: "Σ (balance − Σ flows) × price",
   };
 }
+
+/** A figure of an event card's ledger (lib/shared/event-ledger.ts) that
+ *  splits a line around the event: the line's earlier movements, the event's
+ *  movement, or what was held or owed just before the transaction. `unit` is the
+ *  token, or "USD". `when` is "this event (5 Jul '25)". */
+export function ledgerPartProv(
+  label: string,
+  unit: string,
+  when: string,
+  part: "before" | "event" | "held-before",
+): Provenance {
+  const usd = unit === "USD";
+  if (part === "held-before")
+    return {
+      kind: "chain-derived",
+      summary: `${label} just before ${when} — the ${unit} balance before the event's transaction ran: the balance after it less the transaction's legs.`,
+      formula: "balance after − Σ legs of the transaction",
+    };
+  if (part === "event")
+    return {
+      kind: "chain-derived",
+      summary: `${label} at ${when} — the ${usd ? "USD of the" : unit} legs of this kind the event moved, added up${usd ? ", each at the oracle price at its block" : ""}.`,
+      formula: usd ? "Σ amount × price at block" : "Σ legs",
+    };
+  return {
+    kind: "chain-derived",
+    summary: `${label} up to ${when} — every amount of this kind the position's events record before this one, added up${usd ? ", each at the oracle price at its block" : ` in ${unit}`}. The rows are rounded together, so they add to the total.`,
+    formula: usd ? "Σ amount × price at block" : "Σ amount",
+  };
+}
+
+/** An asset's dollar rows in a side's ledger by asset: its interest at
+ *  the block's price, or the price's effect on it. */
+export function ledgerAssetUsdProv(
+  label: string,
+  symbol: string,
+  when: string,
+  part: "interest" | "market",
+): Provenance {
+  return part === "interest"
+    ? {
+        kind: "chain-derived",
+        summary: `${label} in ${symbol} at ${when}, in USD — the ${symbol} interest (its balance at the block less every flow in it) at the oracle price at the block, or at its latest flow's price where it is no longer held.`,
+        formula: "(balance − Σ flows) × price",
+      }
+    : {
+        kind: "chain-derived",
+        summary: `${label} on ${symbol} at ${when} — the remainder: the ${symbol} balance at the oracle price at the block less every ${symbol} row above it. It is the change in ${symbol}'s price since its flows; no funds moved.`,
+        formula: "balance × price − Σ rows",
+      };
+}

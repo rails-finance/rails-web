@@ -14,8 +14,7 @@ import { assetsDeltaProv, transferDeltaProv, type SparkCoords } from "@/lib/spar
 import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
 import { SparkEventHeader } from "./spark-event-header";
 import { SparkEventDetail } from "./spark-event-detail";
-import { useMemo, useState } from "react";
-import { ReceiptCalcButton, ReceiptCalcContext, useEventCum } from "@/components/shared/flow-event-sum";
+import { useState } from "react";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
@@ -62,11 +61,7 @@ export function SparkEventCard({
   siblings,
   previous,
 }: SparkEventCardProps) {
-  // The receipt's calculator (components/shared/flow-event-sum.tsx), and the (i)'s
-  // slot for the interest line and the prices.
-  const [calcOn, setCalcOn] = useState(false);
-  const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);
-  const hasSum = useEventCum(event.id) != null;
+  // The (i)'s slot for the interest line and the prices.
   const [notesSlot, setNotesSlot] = useState<HTMLElement | null>(null);
   const ctx = event.context.data;
   // A transfer to the Spark treasury in a liquidation's transaction is that
@@ -176,66 +171,63 @@ export function SparkEventCard({
   );
 
   return (
-    <ReceiptCalcContext.Provider value={calc}>
-      <EventCard
-        avatar={null}
-        infoAction={hasSum && stateMarket ? <ReceiptCalcButton /> : undefined}
-        iconColumn={iconSlot}
-        header={
-          // The pointer on the header starts the account reads the open card
-          // makes (this transaction's and the previous one's).
-          <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
-            <SparkEventHeader
-              actionLabel={event.actionLabel}
-              ctx={ctx}
-              timestamp={event.timestamp}
-              txHash={event.txHash}
-              blockNumber={event.blockNumber}
-              eventNumber={eventNumber}
-              externalBy={extBy ?? undefined}
-              wallet={event.wallet}
-              flows={event.flows}
-              feeOf={feeOf}
-            />
-          </div>
-        }
-        detail={
-          <SparkEventDetail
+    <EventCard
+      avatar={null}
+      iconColumn={iconSlot}
+      header={
+        // The pointer on the header starts the account reads the open card
+        // makes (this transaction's and the previous one's).
+        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
+          <SparkEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+            feeOf={feeOf}
+          />
+        </div>
+      }
+      detail={
+        <SparkEventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          market={stateMarket}
+          reserveAddress={reserveAddress}
+          previous={previous}
+          eventId={event.id}
+          eventTs={event.timestamp}
+          notesSlot={notesSlot}
+        />
+      }
+      detailLabel="Position state"
+      explainer={
+        <>
+          <div ref={setNotesSlot} className="mb-2 empty:hidden" />
+          <SparkEventExplainer
             ctx={ctx}
             txHash={event.txHash}
             blockNumber={event.blockNumber}
-            wallet={event.wallet}
+            owner={event.wallet}
             market={stateMarket}
             reserveAddress={reserveAddress}
+            siblings={siblings}
             previous={previous}
-            eventId={event.id}
-            eventTs={event.timestamp}
-            notesSlot={notesSlot}
+            skipLead
           />
-        }
-        detailLabel="Position state"
-        explainer={
-          <>
-            <div ref={setNotesSlot} className="mb-2 empty:hidden" />
-            <SparkEventExplainer
-              ctx={ctx}
-              txHash={event.txHash}
-              blockNumber={event.blockNumber}
-              owner={event.wallet}
-              market={stateMarket}
-              reserveAddress={reserveAddress}
-              siblings={siblings}
-              previous={previous}
-              skipLead
-            />
-          </>
-        }
-        explainerLabel="Plain English"
-        explainerTeaser={sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />}
-        persistKey={`spark:${event.id}`}
-      />
-    </ReceiptCalcContext.Provider>
+        </>
+      }
+      explainerLabel="Plain English"
+      explainerTeaser={sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
+      txHash={event.txHash}
+      learnMore={<LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />}
+      persistKey={`spark:${event.id}`}
+    />
   );
 }

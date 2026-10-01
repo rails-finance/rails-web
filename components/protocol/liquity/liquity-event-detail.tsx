@@ -14,13 +14,13 @@ import {
   StatCard,
   StateTransition,
   StatSubline,
-  ValuePill,
   PriceChipShell,
   changeTone,
 } from "@/components/shared/state-transition";
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
+import { LedgerCell } from "@/components/shared/event-ledger";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
 import {
   streamVia,
@@ -137,7 +137,7 @@ function DebtMetric({
   );
 
   return (
-    <StatCard label="Debt">
+    <LedgerCell label="Debt" side="debt">
       <div>
         <StateTransition>
           {showBefore && (
@@ -174,7 +174,7 @@ function DebtMetric({
           </StatSubline>
         )}
       </div>
-    </StatCard>
+    </LedgerCell>
   );
 }
 
@@ -241,21 +241,12 @@ function CollateralMetric({
     <P info={deltaProv}>{collDeltaStr}</P>
   );
 
+  const afterUsd = !isClose && after > 0 && afterInUsd > 0 && afterUsdShown;
   return (
-    <StatCard label="Collateral">
+    <LedgerCell label="Collateral" side="collateral">
       <StateTransition>
         {showBefore && (
-          <DeltaToggle
-            before={<P info={provBefore}>{formatColl(before)}</P>}
-            delta={isClose ? null : deltaNode}
-            beforeExtra={
-              beforeUsdKnown ? (
-                <P info={usdProvBefore}>
-                  <ValuePill changed={changed}>{formatUsd(beforeInUsd)}</ValuePill>
-                </P>
-              ) : undefined
-            }
-          />
+          <DeltaToggle before={<P info={provBefore}>{formatColl(before)}</P>} delta={isClose ? null : deltaNode} />
         )}
         {isClose ? (
           <>
@@ -269,13 +260,20 @@ function CollateralMetric({
             </span>
           </P>
         )}
-        {!isClose && after > 0 && afterInUsd > 0 && afterUsdShown && (
-          <P info={usdProvAfter}>
-            <ValuePill changed={changed}>{formatUsd(afterInUsd)}</ValuePill>
-          </P>
+        {(beforeUsdKnown || afterUsd) && (
+          // The USD at this event's price, after a thin divider.
+          <span className="ml-1 inline-flex items-center gap-1 border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600">
+            {beforeUsdKnown && (
+              <>
+                <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P>
+                {afterUsd && <span aria-hidden>→</span>}
+              </>
+            )}
+            {afterUsd && <P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>}
+          </span>
         )}
       </StateTransition>
-    </StatCard>
+    </LedgerCell>
   );
 }
 
@@ -858,7 +856,7 @@ export function LiquityEventDetail({
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-open]]:auto-rows-auto">
               <CollateralMetric
                 collateralType={ctx.collateralType}
                 before={beforeColl}

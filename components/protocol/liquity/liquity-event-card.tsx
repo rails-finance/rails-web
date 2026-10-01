@@ -16,8 +16,7 @@ import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
-import { ReceiptCalcButton, ReceiptCalcContext, useReceiptCalc } from "@/components/shared/flow-event-sum";
-import { LiquityEventSum } from "@/components/protocol/liquity-family/liquity-event-sum";
+import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -58,10 +57,6 @@ export function LiquityEventCard({
   const ctx = event.context.data;
   const wallet = event.wallet;
   const { prefs } = usePreferences();
-  // The card's calculator (components/shared/flow-event-sum.tsx): on a page
-  // that ties the timeline to the Lifetime flows panel, it shows the Trove's
-  // lifetime sum as of this event in place of the grid.
-  const { calc, hasSum } = useReceiptCalc(event.id);
 
   // Column 1 — Avatar
   const avatarSlot =
@@ -267,10 +262,9 @@ export function LiquityEventCard({
   );
 
   return (
-    <ReceiptCalcContext.Provider value={calc}>
+    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={avatarOverride ?? avatarSlot}
-        infoAction={hasSum ? <ReceiptCalcButton /> : undefined}
         iconColumn={iconSlot}
         header={
           <LiquityEventHeader
@@ -283,18 +277,14 @@ export function LiquityEventCard({
         }
         headerBars={<TroveBarsSlot eventId={event.id} />}
         detail={
-          calc.on && hasSum ? (
-            <LiquityEventSum eventId={event.id} eventTs={event.timestamp} />
-          ) : (
-            <LiquityEventDetail
-              ctx={ctx}
-              txHash={event.txHash}
-              blockNumber={event.blockNumber}
-              previousEvent={previousEvent}
-              currentEvent={event}
-              currentPrice={currentPrice}
-            />
-          )
+          <LiquityEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            previousEvent={previousEvent}
+            currentEvent={event}
+            currentPrice={currentPrice}
+          />
         }
         explainer={
           <LiquityEventExplainer
@@ -318,6 +308,6 @@ export function LiquityEventCard({
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
       />
-    </ReceiptCalcContext.Provider>
+    </LiquityLedgerProvider>
   );
 }

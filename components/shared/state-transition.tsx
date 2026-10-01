@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
+import { EventLedgerContext } from "@/components/shared/event-ledger-context";
 
 // Small layout atoms for before→after state displays on event detail cards.
 // Factored out so Liquity V2, LUSD, the simulator, and any future protocols
@@ -100,10 +101,13 @@ export function ClosedLabel() {
  *  single CSS grid so they balance in width and — via `sm:auto-rows-fr` on the
  *  grid plus `h-full` here — match the tallest card's height per row. */
 export function StatCard({ label, children }: { label: ReactNode; children: ReactNode }) {
+  // On a card whose account cells open into ledgers, every cell sets its
+  // figures right, as the ledger cells do (components/shared/event-ledger.tsx).
+  const right = useContext(EventLedgerContext) != null;
   return (
     <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3">
-      <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>
-      {children}
+      <div className={`mb-1.5 text-xs font-semibold text-rb-500${right ? " min-h-5" : ""}`}>{label}</div>
+      {right ? <div className="flex flex-col items-end text-right">{children}</div> : children}
     </div>
   );
 }
@@ -173,5 +177,6 @@ export function StateTransition({ children }: { children: ReactNode }) {
   // gap, not space-x: space-x stamps margins onto the children, which would
   // fight the locator pill's negative-margin box (.prov-locate-box) on any
   // <Prov>-wrapped value sitting directly in this row.
-  return <div className="flex flex-wrap items-center gap-1">{children}</div>;
+  const right = useContext(EventLedgerContext) != null;
+  return <div className={`flex flex-wrap items-center gap-1${right ? " justify-end" : ""}`}>{children}</div>;
 }

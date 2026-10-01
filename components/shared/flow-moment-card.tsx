@@ -10,23 +10,20 @@
 // route serves the reserves' indexes (the Aave family), with that interest on
 // a line of its own; its USD where a price was recorded that day; a side
 // counted at its $1 face with the interest built to the moment; and each
-// side's sum where it reads cleanly. It is not an event: no number,
+// side's ledger behind its toggle (components/shared/event-ledger.tsx) where
+// every figure has a price for the day. It is not an event: no number,
 // no filter, not counted, and it goes when the cut is cleared.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { EventCaptionContext } from "@/components/shared/mobile-spine";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtPositionAmount } from "@/components/shared/position-row";
-import {
-  EventSumLines,
-  ReceiptCalcButton,
-  ReceiptCalcContext,
-  SIDE_HUE,
-  dayStamp,
-} from "@/components/shared/flow-event-sum";
+import { LedgerCell, LedgerTable, SIDE_HUE, dayStamp } from "@/components/shared/event-ledger";
+import { dollarLedger } from "@/lib/shared/event-ledger";
+import { eventSideSum } from "@/lib/shared/flow-focus";
 import { wholeUsd, wholeUsdOrUnder } from "@/lib/shared/flows-sum";
 import type { EventCum } from "@/lib/shared/flow-focus";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
@@ -79,8 +76,6 @@ export function FlowMomentCard({
    *  or it first comes into view after Apply. */
   flash: boolean;
 }) {
-  const [calcOn, setCalcOn] = useState(false);
-  const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);
   const date = dayStamp(moment.day * DAY_S);
   const when = `the close of ${date}`;
   const lastStamp = dayStamp(moment.lastDay * DAY_S);
@@ -274,14 +269,7 @@ export function FlowMomentCard({
     const at = ri >= 0 ? model.rows[ri].cum : {};
     return { before: at, after: at, exact: true, stop: moment.stop, buckets: new Set(), legs: [], later: false };
   }, [model, moment.stop]);
-  const noSum = (side: FlowSide): string => {
-    const s = moment.sides[side];
-    const unpriced = s.assets.filter((a) => a.usd == null).map((a) => a.symbol);
-    const what = side === "collateral" ? "collateral" : "debt";
-    return words?.noPrice?.[side]
-      ? `The ${what}'s sum is left out: it needs a price for ${unpriced.join(", ")} on ${date}, which is not recorded yet.`
-      : `The ${what}'s sum is left out: no price was recorded for ${unpriced.join(", ")} on ${date}.`;
-  };
+
   /** The cell's line on balances grown by interest: since the one event day
    *  that recorded them all, or since each one's own. */
   const grownWords = (side: FlowSide): string => {
@@ -294,98 +282,106 @@ export function FlowMomentCard({
   };
   const cell = (side: FlowSide) => {
     const s = moment.sides[side];
+    // The cell's ledger: the side's flows to the moment in dollars, where
+    // every figure on it has a price for the day.
+    const ledger =
+      s.priced && s.assets.length > 0
+        ? (() => {
+            const rows = eventSideSum(model, side, cum, s.held);
+            return (
+              <LedgerTable
+                ledger={dollarLedger({
+                  model,
+                  side,
+                  ev: null,
+                  lines: rows.lines,
+                  dollars: rows.total.dollars,
+                  before: null,
+                })}
+                name={SIDE_WORD[side]}
+                at={when}
+                totalUsdProv={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}
+                daily={model.daily}
+              />
+            );
+          })()
+        : null;
     return (
-      <div
+      <LedgerCell
         key={side}
-        className="flex min-w-0 flex-col rounded-xl bg-background px-4 py-3"
-        data-receipt-cell={side}
-        data-flow-moment-cell={side}
+        side={side}
+        ledger={ledger}
+        alignRight={false}
+        data={{ "data-receipt-cell": side, "data-flow-moment-cell": side }}
+        label={
+          <span className="flex items-center gap-2 text-foreground">
+            <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
+            {SIDE_WORD[side]}
+          </span>
+        }
       >
-        <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
-          <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
-          {SIDE_WORD[side]}
-        </div>
-        {calcOn && s.priced && s.assets.length > 0 ? (
-          <EventSumLines
-            side={side}
-            model={model}
-            cum={cum}
-            held={s.held}
-            heldBefore={null}
-            moved={[]}
-            totalLabel={side === "collateral" ? `Held at ${date}` : `Owed at ${date}`}
-            totalProv={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}
-            at={when}
-          />
-        ) : (
-          <>
-            {s.assets.length === 0 ? (
-              <p className="text-[13px] text-rb-500">Nothing {side === "collateral" ? "held" : "owed"}.</p>
-            ) : (
-              <ul className="flex flex-col gap-1 text-[13px] tabular-nums">
-                {s.assets.map((a) => (
-                  <li key={a.symbol} className="flex flex-col gap-0.5">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        <TokenChipIcon symbol={a.symbol} size={14} filterable={false} />
-                        {a.symbol}
-                      </span>
+        <>
+          {s.assets.length === 0 ? (
+            <p className="text-[13px] text-rb-500">Nothing {side === "collateral" ? "held" : "owed"}.</p>
+          ) : (
+            <ul className="flex flex-col gap-1 text-[13px] tabular-nums">
+              {s.assets.map((a) => (
+                <li key={a.symbol} className="flex flex-col gap-0.5">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TokenChipIcon symbol={a.symbol} size={14} filterable={false} />
+                      {a.symbol}
+                    </span>
+                    <span className="inline-flex items-baseline gap-2">
+                      <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
+                      {a.usd != null && (
+                        <Prov info={usdProv(a)}>
+                          <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                        </Prov>
+                      )}
+                    </span>
+                  </span>
+                  {a.grown && a.interest != null && (
+                    <span
+                      className="flex items-baseline justify-between gap-2 pl-5 text-xs text-rb-500"
+                      data-flow-moment-interest={`${side}:${a.symbol}`}
+                    >
+                      <span>Interest since {dayStamp(a.grown.recordedDay * DAY_S)}</span>
                       <span className="inline-flex items-baseline gap-2">
-                        <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
-                        {a.usd != null && (
-                          <Prov info={usdProv(a)}>
-                            <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                        <Prov info={interestProv(side, a)}>
+                          <span className="text-foreground">+{fmtPositionAmount(a.interest)}</span>
+                        </Prov>
+                        {a.interestUsd != null && (
+                          <Prov info={interestProv(side, a)}>
+                            <span>{wholeUsdOrUnder(a.interestUsd)}</span>
                           </Prov>
                         )}
                       </span>
                     </span>
-                    {a.grown && a.interest != null && (
-                      <span
-                        className="flex items-baseline justify-between gap-2 pl-5 text-xs text-rb-500"
-                        data-flow-moment-interest={`${side}:${a.symbol}`}
-                      >
-                        <span>Interest since {dayStamp(a.grown.recordedDay * DAY_S)}</span>
-                        <span className="inline-flex items-baseline gap-2">
-                          <Prov info={interestProv(side, a)}>
-                            <span className="text-foreground">+{fmtPositionAmount(a.interest)}</span>
-                          </Prov>
-                          {a.interestUsd != null && (
-                            <Prov info={interestProv(side, a)}>
-                              <span>{wholeUsdOrUnder(a.interestUsd)}</span>
-                            </Prov>
-                          )}
-                        </span>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 text-xs leading-snug text-rb-500">
-              {s.face && moment.accrual
-                ? `The debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
-                : s.assets.some((a) => a.grown)
-                  ? `${grownWords(side)}${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`
-                  : `As the last event left it on ${lastStamp}; no event changed it by then.${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`}
-            </p>
-          </>
-        )}
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs leading-snug text-rb-500">
+            {s.face && moment.accrual
+              ? `The debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
+              : s.assets.some((a) => a.grown)
+                ? `${grownWords(side)}${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`
+                : `As the last event left it on ${lastStamp}; no event changed it by then.${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`}
+          </p>
+        </>
         {!s.priced && s.assets.length > 0 && (
           <p className="mt-1.5 text-xs leading-snug text-rb-500" data-flow-moment-no-price={side}>
             {words?.noPrice?.[side] ?? `No price was recorded for this side on ${date}, so it is stated in tokens.`}
           </p>
         )}
-        {calcOn && !s.priced && s.assets.length > 0 && (
-          <p className="mt-1.5 text-xs leading-snug text-rb-500" data-flow-moment-no-sum={side}>
-            {noSum(side)}
-          </p>
-        )}
-      </div>
+      </LedgerCell>
     );
   };
   const detail = (
     <div className="px-5 py-2" data-flow-moment-detail="">
-      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2" data-receipt="sum">
+      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2" data-receipt="open">
         {sides.map((s) => cell(s))}
       </div>
       {(words?.notes ?? []).map((n) => (
@@ -401,26 +397,24 @@ export function FlowMomentCard({
       event: it has no number, the filters and the count leave it out, and it goes when the cut is cleared.
       {sides.some((s) => moment.sides[s].assets.some((a) => a.grown)) &&
         " Each balance is grown by the interest since its last event: the balance that event recorded × the reserve's index at the close of the day ÷ its index at that event, which is what the chain held."}{" "}
-      The calculator adds each side up to that day where every figure on it has a price for the day.
+      Each side&rsquo;s toggle opens its ledger: its flows up to that day, where every figure on it has a price for the
+      day.
     </p>
   );
 
   return (
     <EventCaptionContext.Provider value={{ kind: "Position at close", ts: moment.endTs }}>
-      <ReceiptCalcContext.Provider value={calc}>
-        <div id="flow-moment" data-flow-moment={moment.day} data-anatomy="L4" className="rounded-xl">
-          <EventCard
-            avatar={null}
-            iconColumn={<SpineColumn icon="moment" isFirst={isFirst} isLast={false} tip={null} />}
-            header={header}
-            detail={detail}
-            detailLabel={`The position at the close of ${date}`}
-            explainer={explainer}
-            infoAction={<ReceiptCalcButton />}
-            caption="Position at close"
-          />
-        </div>
-      </ReceiptCalcContext.Provider>
+      <div id="flow-moment" data-flow-moment={moment.day} data-anatomy="L4" className="rounded-xl">
+        <EventCard
+          avatar={null}
+          iconColumn={<SpineColumn icon="moment" isFirst={isFirst} isLast={false} tip={null} />}
+          header={header}
+          detail={detail}
+          detailLabel={`The position at the close of ${date}`}
+          explainer={explainer}
+          caption="Position at close"
+        />
+      </div>
     </EventCaptionContext.Provider>
   );
 }

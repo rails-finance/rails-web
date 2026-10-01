@@ -106,6 +106,7 @@ import {
   type AssetBalance,
 } from "@/lib/shared/flow-focus";
 import { flowMoment, type FlowMoment, type MomentSide } from "@/lib/shared/flow-moment";
+import { assetLedgers, dollarLedger, ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
 
 const fixture = JSON.parse(
   readFileSync(join(process.cwd(), "scripts/verify/fixtures/lifetime-flows-aave-v3-fb93.json"), "utf8"),
@@ -1409,6 +1410,26 @@ test("the event card's sum by asset: each asset's lines and its interest add to 
         `${ev.id} ${side}: the dollar lines add`,
       );
       const t = assetTokenSum(sum);
+      // The cell's ledgers: each asset's rows add in its token and, priced, in
+      // USD; the assets' dollars add to the side's.
+      const { assets, usd } = assetLedgers({ model: route, side, ev, sum, held, heldBefore: null });
+      for (const l of assets) {
+        const adds = ledgerAdds(l);
+        assert.ok(adds.tokens && adds.usd, `${ev.id} ${side} ${l.symbol}: the asset's ledger adds`);
+        for (const r of l.rows.filter((x) => x.role === "event"))
+          assert.ok(r.label.startsWith("This "), `${ev.id}: "${r.label}"`);
+      }
+      assert.equal(
+        assets.reduce((a, l) => a + (l.usd?.dollars ?? 0), 0),
+        usd.dollars,
+        `${ev.id} ${side}: the assets' dollars add to the side's`,
+      );
+      assert.ok(
+        ledgerAdds(
+          dollarLedger({ model: route, side, ev, lines: dollars.lines, dollars: dollars.total.dollars, before: null }),
+        ).usd,
+        `${ev.id} ${side}: the ledger in dollars adds`,
+      );
       if (sum.symbols.length === 1) {
         single++;
         assert.ok(t);
@@ -1417,6 +1438,15 @@ test("the event card's sum by asset: each asset's lines and its interest add to 
           t.total.units,
           `${ev.id} ${side}: token lines add`,
         );
+        const l = tokenLedger({
+          model: route,
+          side,
+          ev,
+          sum: t,
+          usd: { lines: dollars.lines, dollars: dollars.total.dollars, before: null },
+        });
+        const adds = ledgerAdds(l);
+        assert.ok(adds.tokens && adds.usd, `${ev.id} ${side}: the single asset's ledger adds`);
       } else {
         assert.equal(t, null);
         if (sum.symbols.length > 1) multi++;

@@ -15,8 +15,7 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
-import { ReceiptCalcButton, ReceiptCalcContext, useReceiptCalc } from "@/components/shared/flow-event-sum";
-import { LiquityEventSum } from "@/components/protocol/liquity-family/liquity-event-sum";
+import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
@@ -96,9 +95,6 @@ export interface BasedollarEventCardProps {
 }
 
 export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: BasedollarEventCardProps) {
-  // The card's calculator (components/shared/flow-event-sum.tsx): the Trove's
-  // lifetime sum as of this event, in place of the grid.
-  const { calc, hasSum } = useReceiptCalc(event.id);
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
@@ -197,10 +193,9 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
   );
 
   return (
-    <ReceiptCalcContext.Provider value={calc}>
+    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
-        infoAction={hasSum ? <ReceiptCalcButton /> : undefined}
         iconColumn={iconSlot}
         header={
           <LiquityForkEventHeader
@@ -224,13 +219,7 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
             flows={event.flows}
           />
         }
-        detail={
-          calc.on && hasSum ? (
-            <LiquityEventSum eventId={event.id} eventTs={event.timestamp} />
-          ) : (
-            <BasedollarEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />
-          )
-        }
+        detail={<BasedollarEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
         detailLabel="Trove state"
         explainer={
           <LiquityForkEventExplainer
@@ -248,6 +237,6 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
         learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, BASEDOLLAR_FORK)} />}
         persistKey={`basedollar:${event.id}`}
       />
-    </ReceiptCalcContext.Provider>
+    </LiquityLedgerProvider>
   );
 }
