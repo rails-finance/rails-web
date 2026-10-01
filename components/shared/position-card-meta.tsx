@@ -12,7 +12,7 @@
 // grammar across surfaces that carry different amounts of metadata.
 
 import { Icon } from "@/components/icons/icon";
-import { formatDuration } from "@/lib/date";
+import { MountedAge } from "@/components/shared/mounted-age";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { LiquidatedBadge } from "@/components/shared/liquidated-badge";
 import { PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
@@ -100,7 +100,7 @@ export function PositionCardMeta({
           className="gap-1 focus-ring rounded-sm"
         >
           <Icon name="clock-zap" size={12} />
-          {formatDuration(toSeconds(lastActivityAt as number), new Date())} ago
+          <MountedAge from={toSeconds(lastActivityAt as number)} suffix=" ago" />
         </RevealTip>
       )}
       {showEvents &&

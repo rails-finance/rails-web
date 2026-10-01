@@ -1,9 +1,13 @@
+"use client";
+
 // The Sky Savings timeline's eyebrow: when the address first held sUSDS and
 // what the span pill counts. An open position counts from its first event to
 // today; a closed one from its first event to the event that emptied it.
 
+import { useMountedNow } from "@/hooks/useMountedNow";
 import { Clock } from "lucide-react";
 import { formatDate, formatDuration } from "@/lib/date";
+import { MountedAge } from "@/components/shared/mounted-age";
 import { PILL_META } from "@/lib/shared/ui-grammar";
 
 const DAY = 86_400;
@@ -42,17 +46,36 @@ export function SkySavingsActivityHeader({
     if (e.timestamp > hi) hi = e.timestamp;
   }
   if (!Number.isFinite(lo) || hi === 0) return null;
-  const now = Math.floor(Date.now() / 1000);
-  const end = closed ? hi : now;
+  // The span pill and the held-days pill read the clock for an open position,
+  // so they appear only once the browser states it (MountedAge); a closed
+  // position's figures are fixed by its events.
+  return <SkySavingsHeaderBody lo={lo} hi={hi} events={events} complete={complete} closed={closed} />;
+}
+
+function SkySavingsHeaderBody({
+  lo,
+  hi,
+  events,
+  complete,
+  closed,
+}: {
+  lo: number;
+  hi: number;
+  events: { timestamp: number; context?: { data?: { sharesAfter?: string } } }[];
+  complete: boolean;
+  closed: boolean;
+}) {
+  const now = useMountedNow();
+  const end = closed ? hi : (now ?? hi);
   const spanDays = Math.floor((end - lo) / DAY);
-  const heldDays = complete ? daysHeld(events, end) : null;
+  const heldDays = complete && (closed || now != null) ? daysHeld(events, end) : null;
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-foreground">
         {closed ? `Held ${formatDate(lo)} to ${formatDate(hi)}` : `Holding since ${formatDate(lo)}`}
       </span>
       <span className={PILL_META} data-prov-exempt="">
-        {closed ? `${formatDuration(lo, hi)} held` : `${formatDuration(lo, now)} to date`}
+        {closed ? `${formatDuration(lo, hi)} held` : <MountedAge from={lo} suffix=" to date" />}
       </span>
       {heldDays != null && heldDays < spanDays && (
         <span className={PILL_META} data-prov-exempt="">
@@ -61,7 +84,7 @@ export function SkySavingsActivityHeader({
       )}
       <span className={PILL_META} data-prov-exempt="">
         <Clock size={12} />
-        last event {formatDuration(hi, now)} ago
+        last event <MountedAge from={hi} suffix=" ago" />
       </span>
     </div>
   );

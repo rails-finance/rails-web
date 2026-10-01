@@ -20,6 +20,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { SpineViewSwitch } from "@/components/shared/mobile-spine";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { useMountedNow } from "@/hooks/useMountedNow";
 import {
   useTimelineDisplay,
   type TimelineDisplayKey,
@@ -104,6 +105,10 @@ export function TimelineActivityHeader({
    *  changes nothing. */
   labelTenure?: boolean | string;
 }) {
+  // Null until the browser mounts: the server and the first browser render
+  // agree on a placeholder, then the age is stated (no layout shift: the
+  // placeholder is the same words, invisible).
+  const clock = useMountedNow();
   if (events.length === 0 && !folders?.length) return null;
   let first = events.length ? events[0].timestamp : folders![0].firstAt;
   let last = first;
@@ -116,7 +121,15 @@ export function TimelineActivityHeader({
     if (f.lastAt > last) last = f.lastAt;
   }
   if (firstAt != null && firstAt > 0 && firstAt < first) first = firstAt;
-  const now = Math.floor(Date.now() / 1000);
+  const now = clock ?? last;
+  // A duration that reads the clock: the placeholder holds the width.
+  const dur = (from: number, to: number | null) =>
+    to == null && clock == null ? (
+      <span className="invisible">00 days</span>
+    ) : (
+      formatDuration(from, to ?? now)
+    );
+  const ago = clock == null ? <span className="invisible">00 days ago</span> : `${formatDuration(last, now)} ago`;
   if (!tenurePending && lives && lives.length > 1) {
     // Past three, the first and the last are named and the rest counted; the
     // tip lists every one.
@@ -133,10 +146,9 @@ export function TimelineActivityHeader({
       <div
         className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
         data-timeline-lives={lives.length}
-        title={`${lives.length} stretches, each starting from an empty account: ${all}`}
+        title={clock == null ? undefined : `${lives.length} stretches, each starting from an empty account: ${all}`}
       >
         {shown.map((l, i) => {
-          const end = l.to ?? now;
           const sameDay = l.to != null && formatDate(l.from) === formatDate(l.to);
           const when =
             l.to == null ? `since ${formatDate(l.from)}` : sameDay ? formatDate(l.from) : formatDateRange(l.from, l.to);
@@ -147,7 +159,7 @@ export function TimelineActivityHeader({
                 {i === 0 && l.to != null ? when.charAt(0).toUpperCase() + when.slice(1) : when}
               </span>
               <span className={PILL_META} data-prov-exempt="">
-                {formatDuration(l.from, end)}
+                {dur(l.from, l.to)}
               </span>
               {i === 0 && between > 0 && (
                 <span className="text-rb-500">
@@ -160,7 +172,7 @@ export function TimelineActivityHeader({
         <span className={PILL_META}>
           <Clock size={12} />
           {labelLastActivity ? "last activity " : ""}
-          {formatDuration(last, now)} ago
+          {ago}
         </span>
       </div>
     );
@@ -170,12 +182,12 @@ export function TimelineActivityHeader({
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-foreground">Open again since {formatDate(reopenedAt)}</span>
         <span className={PILL_META} data-prov-exempt="">
-          {formatDuration(reopenedAt, now)}
+          {dur(reopenedAt, null)}
         </span>
         <span className={PILL_META}>
           <Clock size={12} />
           {labelLastActivity ? "last activity " : ""}
-          {formatDuration(last, now)} ago
+          {ago}
         </span>
         <span className="text-muted-foreground">first opened {formatDate(first)}</span>
       </div>
@@ -198,14 +210,14 @@ export function TimelineActivityHeader({
             title={`${closed ? "Open from" : "Active from"} ${formatDate(first)} to ${closed ? formatDate(last) : "today"}`}
           >
             {labelTenure ? (typeof labelTenure === "string" ? `${labelTenure} ` : closed ? "open " : "active ") : ""}
-            {formatDuration(first, closed ? last : now)}
+            {dur(first, closed ? last : null)}
           </span>
         </>
       )}
       <span className={PILL_META} title={`Last activity ${formatDate(last)}`}>
         <Clock size={12} />
         {labelLastActivity ? "last activity " : ""}
-        {formatDuration(last, now)} ago
+        {ago}
       </span>
     </div>
   );
