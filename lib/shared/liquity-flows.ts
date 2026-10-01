@@ -60,8 +60,12 @@ export interface LiquityFlowEvent {
   upfrontFee: number;
   collFromRedist: number;
   debtFromRedist: number;
-  /** Collateral left for the owner to claim after a liquidation. */
+  /** Collateral left for the owner to claim after a liquidation (or, on
+   *  Liquity V1, a redemption that closed the Trove). */
   surplus: number;
+  /** Liquity V1's 200 LUSD liquidation reserve: added to the debt at an
+   *  open (+), burned at an owner's close or a full redemption (−). */
+  reserve?: number;
   /** The branch's collateral price at the block, where recorded. */
   price: number | null;
   /** The rate and the batch's management fee in force after the event. */
@@ -97,12 +101,19 @@ export const LQ = {
   repaid: "lq-repaid",
   debtRedeemed: "lq-debt-redeemed",
   debtLiquidated: "lq-debt-liquidated",
+  reserve: "lq-reserve",
+  reserveBurned: "lq-reserve-burned",
 } as const;
 
+/** Which Liquity the buckets and words are for: V2 and its forks, or V1 (no
+ *  interest, a borrowing fee, the 200 LUSD liquidation reserve). */
+export type LiquityFamily = "v2" | "v1";
+
 /** The buckets in drawing order: inflows as they add up, outflows in the
- *  bar's order after what is held. */
-export function liquityFlowBuckets(surplusClaimed: boolean): FlowBucket[] {
-  return [
+ *  bar's order after what is held. Liquity V1 has no interest: its debt
+ *  takes the borrowing fee and the liquidation reserve instead. */
+export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamily = "v2"): FlowBucket[] {
+  const all: FlowBucket[] = [
     { key: LQ.deposited, label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
     { key: LQ.redistColl, label: "Redistribution gains", event: "Redistribution", side: "collateral", dir: "in" },
     { key: LQ.withdrawn, label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out" },
@@ -139,7 +150,16 @@ export function liquityFlowBuckets(surplusClaimed: boolean): FlowBucket[] {
     { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in" },
     { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in" },
     { key: LQ.redistDebt, label: "Redistributed debt", event: "Redistribution", side: "debt", dir: "in" },
+    { key: LQ.reserve, label: "Liquidation reserve", event: "Open", side: "debt", dir: "in" },
     { key: LQ.repaid, label: "Repaid", event: "Repay", side: "debt", dir: "out" },
+    {
+      key: LQ.reserveBurned,
+      label: "Reserve burned",
+      event: "Close",
+      side: "debt",
+      dir: "out",
+      hatch: "dashes",
+    },
     {
       key: LQ.debtRedeemed,
       label: "Redeemed",
@@ -161,6 +181,17 @@ export function liquityFlowBuckets(surplusClaimed: boolean): FlowBucket[] {
       link: "liquidation",
     },
   ];
+  if (family === "v2") return all.filter((b) => b.key !== LQ.reserve && b.key !== LQ.reserveBurned);
+  const v1Out = new Set<string>([LQ.interest, LQ.batchFee]);
+  return all
+    .filter((b) => !v1Out.has(b.key))
+    .map((b) =>
+      b.key === LQ.upfront
+        ? { ...b, label: "Borrowing fees", event: "Borrowing fee" }
+        : b.key === LQ.surplus
+          ? { ...b, event: "Liquidation or redemption" }
+          : b,
+    );
 }
 
 /** What a live read of the Trove states now (getLatestTroveData), where the
@@ -184,6 +215,8 @@ export interface LiquityFlowOptions {
   surplusClaimed: boolean;
   /** Unix seconds now; the page's clock. */
   now: number;
+  /** Liquity V1, or V2 and its forks (the default). */
+  family?: LiquityFamily;
   /** The branch's daily price, `[UTC day, usd]` ascending, where the page
    *  read one (Liquity V2's daily route); null or absent keeps each event's
    *  price between events. */
@@ -259,16 +292,19 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
     const collRedist = Math.max(0, ev.collFromRedist);
     const debtRedist = Math.max(0, ev.debtFromRedist);
     const upfront = Math.max(0, ev.upfrontFee);
+    const reserve = ev.reserve ?? 0;
     // The act's collateral move is the change less the redistribution, so the
     // side adds up to the recorded balance whatever the log rounds.
     const collOp = dColl - collRedist;
     add(LQ.redistColl, collRedist);
     add(LQ.redistDebt, debtRedist);
     add(LQ.upfront, upfront);
+    if (reserve > 0) add(LQ.reserve, reserve);
+    else add(LQ.reserveBurned, -reserve);
     let debtOp = ev.debtOp ?? 0;
     if (ev.kind === "liquidation" && ev.debtOp == null) debtOp = -(debtBefore + debtRedist + upfront);
     // Interest accrued since the last event: the rest of the debt's move.
-    const accrued = dDebt - debtOp - upfront - debtRedist;
+    const accrued = dDebt - debtOp - upfront - debtRedist - reserve;
     const share = fee > 0 && rate + fee > 0 ? fee / (rate + fee) : 0;
     add(LQ.batchFee, accrued * share);
     add(LQ.interest, accrued * (1 - share));
@@ -281,7 +317,12 @@ export function replayLiquity(events: LiquityFlowEvent[]): LiquityReplayed[] {
       add(LQ.debtLiquidated, Math.max(0, -debtOp));
       if (debtOp > 0) add(LQ.borrowed, debtOp);
     } else if (ev.kind === "redemption") {
-      add(LQ.collRedeemed, Math.max(0, -collOp));
+      // A Liquity V1 redemption that cancels the last of the debt closes the
+      // Trove and leaves the rest of its collateral to claim.
+      const taken = Math.max(0, -collOp);
+      const surplus = Math.min(taken, Math.max(0, ev.surplus));
+      add(LQ.collRedeemed, taken - surplus);
+      add(LQ.surplus, surplus);
       if (collOp > 0) add(LQ.deposited, collOp);
       add(LQ.debtRedeemed, Math.max(0, -debtOp));
       if (debtOp > 0) add(LQ.borrowed, debtOp);
@@ -310,9 +351,7 @@ const COLL_BUCKETS = new Set<string>([
 ]);
 
 const OUT_BUCKETS = new Set<string>(
-  liquityFlowBuckets(false)
-    .filter((b) => b.dir === "out")
-    .map((b) => b.key),
+  [...liquityFlowBuckets(false), ...liquityFlowBuckets(false, "v1")].filter((b) => b.dir === "out").map((b) => b.key),
 );
 
 /** The debt's price on a day: $1 plus the interest its rate builds on the
@@ -329,7 +368,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   if (replayed.length === 0) return null;
   const coll = `coll:${o.collSymbol}`;
   const debt = `debt:${o.debtSymbol}`;
-  const buckets = liquityFlowBuckets(o.surplusClaimed);
+  const family = o.family ?? "v2";
+  const buckets = liquityFlowBuckets(o.surplusClaimed, family);
   const flowEvents: FlowEvent[] = replayed.map(({ ev, price, legs }) => {
     const moved = { coll: false, debt: false };
     for (const l of legs) {
@@ -437,8 +477,13 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       [debt]: debtObs,
     },
     seriesCarry: true,
-    today,
-    words: liquityFlowWords(o.collSymbol, o.debtSymbol, daily.length > 0),
+    // A closed Liquity V1 life is the page's whole position: its line ends
+    // the day after its last event.
+    today: family === "v1" && !open ? endDay : today,
+    words:
+      family === "v1"
+        ? liquityV1FlowWords(daily.length > 0)
+        : liquityFlowWords(o.collSymbol, o.debtSymbol, daily.length > 0),
   };
 }
 
@@ -448,7 +493,12 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
  *  the event's transaction had run is the transaction's last recorded
  *  balance at that event's price, less the transaction's legs (the interest
  *  stays in the before: it had built up by the block). */
-export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: string, debtSymbol: string): FocusEvent[] {
+export function liquityFocusEvents(
+  events: LiquityFlowEvent[],
+  collSymbol: string,
+  debtSymbol: string,
+  family: LiquityFamily = "v2",
+): FocusEvent[] {
   const replayed = replayLiquity(events);
   const byTx = new Map<string, LiquityReplayed[]>();
   for (const r of replayed) {
@@ -501,7 +551,8 @@ export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: strin
           held: debtAfter,
         },
       },
-      rate: r.ev.rate + r.ev.fee,
+      // Liquity V1 has no rate: its debt stays as its last event left it.
+      ...(family === "v2" ? { rate: r.ev.rate + r.ev.fee } : {}),
     };
   });
 }
@@ -537,6 +588,41 @@ export function liquityFlowWords(
       face: ["debt"],
       noPrice: {
         collateral: `The branch's daily price for ${collSymbol} is not recorded yet, so the collateral is stated in ${collSymbol} only.`,
+      },
+      notes: [
+        "Redistribution from other Troves' liquidations not yet applied to this Trove is not included: it lands on the Trove at its next event.",
+      ],
+    },
+  };
+}
+
+/** The panel's words for a Liquity V1 Trove: ETH at Liquity's price feed,
+ *  LUSD at its face, no interest. `daily`: the page read ETH's daily price. */
+export function liquityV1FlowWords(daily = false): NonNullable<FlowTimeline["words"]> {
+  return {
+    held: "Still deposited",
+    restBySide: { collateral: "Market move", debt: "Unrecorded change" },
+    restNote: {
+      collateral: "the change in ETH's price since each flow",
+      debt: "zero, since Liquity V1 charges no interest and each event records the debt after it",
+    },
+    basis: {
+      collateral: "Each flow is valued at Liquity's ETH price at its block.",
+      debt: "Debt is counted at LUSD's $1 face.",
+    },
+    heldBasis: {
+      collateral: daily
+        ? "the ETH the Trove held after its last event by then, at ETH's price at the close of that day where one is recorded (from 19 May 2025), else at the price of its latest event."
+        : "the ETH the Trove held after its last event by then, at the price of its latest event.",
+      debt: "the LUSD debt the Trove's last event recorded.",
+    },
+    linePrices: daily
+      ? "with ETH at each day's closing price where one is recorded (from 19 May 2025), else at the Trove's latest event's price, and LUSD at $1"
+      : "with ETH at the price of the Trove's latest event by then and LUSD at $1",
+    moment: {
+      face: ["debt"],
+      noPrice: {
+        collateral: "No ETH price is recorded for this day, so the collateral is stated in ETH only.",
       },
       notes: [
         "Redistribution from other Troves' liquidations not yet applied to this Trove is not included: it lands on the Trove at its next event.",

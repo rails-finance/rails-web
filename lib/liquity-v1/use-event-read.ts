@@ -135,3 +135,36 @@ export function useLiquityV1Surplus(txHash?: string | null, owner?: string | nul
     claimed: d.claimed,
   };
 }
+
+/** The receipt reads the Lifetime flows need (lib/liquity-v1/flows.ts
+ *  `liquityV1FlowTxs`), six at a time; null until every one has settled. A
+ *  failed read is absent from the map. The cards' own reads share the cache. */
+export function useLiquityV1FlowReads(
+  txHashes: readonly string[] | null,
+  wallet?: string | null,
+): Map<string, LiquityV1EventRead> | null {
+  const key = wallet && txHashes ? txHashes.join(",") : null;
+  const [state, setState] = useState<{ key: string; reads: Map<string, LiquityV1EventRead> } | null>(null);
+  useEffect(() => {
+    if (key == null || !wallet) return;
+    let live = true;
+    const txs = key === "" ? [] : key.split(",");
+    const m = new Map<string, LiquityV1EventRead>();
+    let next = 0;
+    const worker = async () => {
+      while (live && next < txs.length) {
+        const tx = txs[next++];
+        const r = await load(eventReadUrl(tx, wallet) as string, isEventRead);
+        if (r) m.set(tx, r);
+      }
+    };
+    Promise.all(Array.from({ length: Math.min(6, txs.length) }, worker)).then(() => {
+      if (live) setState({ key, reads: m });
+    });
+    return () => {
+      live = false;
+    };
+  }, [key, wallet]);
+  if (key == null) return null;
+  return state?.key === key ? state.reads : null;
+}
