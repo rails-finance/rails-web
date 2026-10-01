@@ -229,7 +229,7 @@ export function EventCard({
 
   // The (i) row's right end: the card's action, level with the (i).
   const infoActionNode = infoAction ? (
-    <div className="ml-auto flex items-center self-center" onClick={(e) => e.stopPropagation()}>
+    <div className="-my-2 ml-auto flex items-center self-center sm:my-0" onClick={(e) => e.stopPropagation()}>
       {infoAction}
     </div>
   ) : undefined;

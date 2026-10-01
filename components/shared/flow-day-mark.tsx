@@ -24,7 +24,11 @@ export const utcDay = (tsSec: number): number => Math.floor(tsSec / 86_400);
 export function moveChartToDay(store: NonNullable<ReturnType<typeof useFlowFocus>>["store"], tsSec: number): void {
   const s = store.get();
   store.set({ move: { ts: tsSec, n: (s.move?.n ?? 0) + 1 } });
-  const el = document.querySelector<HTMLElement>("[data-lifetime-flows-panel]");
+  // The shared panel, or the panel a page draws around the scrubber (Aave V4).
+  const el =
+    document.querySelector<HTMLElement>("[data-lifetime-flows-panel]") ??
+    document.querySelector<HTMLElement>("[data-flows-combined]")?.closest<HTMLElement>(".rounded-2xl") ??
+    null;
   const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   el?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 }

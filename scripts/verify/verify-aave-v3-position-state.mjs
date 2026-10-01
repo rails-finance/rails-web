@@ -269,6 +269,10 @@ async function openCard(page, fx) {
     .first()
     // A wallet with thousands of events paints its count late on a cold route.
     .waitFor({ state: "visible", timeout: 240000 });
+  // Display's "USD for stablecoins" is off by default; the lines below are
+  // held to their USD figure on every reserve, so it goes on (the rule for a
+  // pegged stablecoin is verify-usd-display.ts).
+  await setDisplayFlag(page, "USD for stablecoins", true);
   let card = null;
   for (let i = 0; i < 25 && !card; i++) {
     const hits = page.locator(`[data-event-id*="${fx.tx}"]`);
