@@ -12,6 +12,8 @@ export interface LiquityFlowsNoteProps {
   /** The Trove closed and was opened again at least once. */
   lives: number;
   zombie: boolean;
+  /** The collateral between events is at the branch's daily price. */
+  daily?: boolean;
 }
 
 export function LiquityFlowsNote({
@@ -20,6 +22,7 @@ export function LiquityFlowsNote({
   unpriced,
   lives,
   zombie,
+  daily = false,
 }: LiquityFlowsNoteProps): ReactNode {
   return (
     <div className="space-y-2" data-liquity-flows-note="" data-anatomy="F14·liquity">
@@ -39,8 +42,9 @@ export function LiquityFlowsNote({
         on their own lines).
       </p>
       <p>
-        No daily price is recorded for the branch yet, so between the Trove&apos;s events its collateral keeps the price
-        of its latest event, and a price more than 30 days old is stated as such.
+        {daily
+          ? "Between the Trove's events its collateral is valued at the branch's price at each day's close: the last price any Trove's operation on the branch recorded that day. A day no Trove touched keeps the day before's."
+          : "No daily price is recorded for the branch yet, so between the Trove's events its collateral keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         {unpriced === 1 &&
           " One of its events carries no price of its own; its flows take the nearest price before it."}
         {unpriced > 1 &&

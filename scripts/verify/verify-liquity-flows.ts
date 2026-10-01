@@ -19,6 +19,10 @@
 // Each cell's ledger (lib/shared/event-ledger.ts) adds in tokens and in USD,
 // with the event's movement on a "This …" row of its legs.
 //
+// With the WETH branch's daily price (/api/liquity-v2/prices/daily, read 1 Oct
+// 2026) the collateral between events moves with the branch's price at each
+// day's close, and the lines still add.
+//
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -56,6 +60,8 @@ const EBISU = liquityForkFlowEvents(
   buildEbisuTimeline(ebisuRaw.rows, ebisuRaw.collateralType, ebisuRaw.troveId).events,
   isEbisuEvent,
 );
+
+const WETH_DAILY = (read("liquity-flows-v2-weth-daily.json") as { obs: [number, number][] }).obs;
 
 /** A fixed clock: noon on 30 Sep 2026. */
 const NOW = Date.UTC(2026, 8, 30, 12) / 1000;
@@ -501,3 +507,48 @@ for (const [name, events, symbols] of [
     assert.ok(checked > 0, "days between events");
   });
 }
+
+test("V2 WETH with the branch's daily price: the collateral moves between events at each day's close", () => {
+  const t = liquityFlowTimeline(REDEEMED, {
+    collSymbol: "WETH",
+    debtSymbol: "BOLD",
+    surplusClaimed: false,
+    now: NOW,
+    live: { price: 4000 },
+    dailyColl: WETH_DAILY,
+  })!;
+  assert.equal(t.seriesCarry, true, "a day the series lacks keeps the day before's");
+  assert.match(t.words!.linePrices!, /each day's close/);
+  const m = buildFlowModel(t)!;
+  assertSumsAdd(m, "V2 WETH daily");
+  const startDay = m.start / 86_400_000;
+  const daily = new Map(WETH_DAILY);
+  const replayed = replayLiquity(REDEEMED);
+  let moved = 0;
+  let checked = 0;
+  for (let stop = 1; stop < m.liveStop - 1; stop++) {
+    if (m.eventDays.includes(stop)) continue;
+    const usd = daily.get(startDay + stop);
+    if (usd == null) continue;
+    const close = (startDay + stop + 1) * 86_400;
+    let coll = 0;
+    for (const r of replayed) if (r.ev.ts < close) coll = r.ev.collAfter;
+    const st = stateAt(m, stop);
+    assert.ok(Math.abs(st.collateral.now - coll * usd) <= Math.max(1e-6, coll * usd * 1e-12), `stop ${stop}`);
+    checked++;
+    if (Math.abs(stateAt(m, stop - 1).collateral.now - st.collateral.now) > 1) moved++;
+  }
+  assert.ok(checked > 10, `days between events priced by the series (${checked})`);
+  assert.ok(moved > 0, `the line moves between events (${moved} days)`);
+  // The state card between events states the collateral's USD on a priced day.
+  const focus = liquityFocusEvents(REDEEMED, "WETH", "BOLD");
+  let priced = 0;
+  for (let stop = 1; stop < m.liveStop - 1; stop++) {
+    if (m.eventDays.includes(stop) || !daily.has(startDay + stop)) continue;
+    const mo = flowMoment(m, focus, (startDay + stop + 1) * 86_400 - 1);
+    if (mo && mo.sides.collateral.assets.length > 0 && mo.sides.collateral.priced) priced++;
+  }
+  assert.ok(priced > 0, "the state card prices the collateral on a day the series recorded");
+  const series = binSeries(binInputFromTimeline(t)!, "day")!;
+  assert.equal(series.gaps.length, 0, "no gaps");
+});

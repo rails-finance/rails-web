@@ -20,8 +20,10 @@
 // one). The debt is the stablecoin at its $1 face; between events it grows
 // by the interest its rate builds on the recorded debt, which the day rows
 // state as the debt's price (1 + rate × time since the last event), so every
-// stop owes what the Trove owed that day. The branch has no daily price lane,
-// so the collateral between events keeps its last event's price
+// stop owes what the Trove owed that day. Between events the collateral takes
+// the branch's daily price where the page read it (Liquity V2's
+// /api/liquity-v2/prices/daily, `dailyColl`); a day the series lacks, and a
+// fork, which has no daily lane, keeps the last price before it
 // (`seriesCarry`).
 //
 // Pure: tested offline in scripts/verify/verify-liquity-flows.ts.
@@ -182,6 +184,10 @@ export interface LiquityFlowOptions {
   surplusClaimed: boolean;
   /** Unix seconds now; the page's clock. */
   now: number;
+  /** The branch's daily price, `[UTC day, usd]` ascending, where the page
+   *  read one (Liquity V2's daily route); null or absent keeps each event's
+   *  price between events. */
+  dailyColl?: [number, number][] | null;
 }
 
 /** A replayed event's legs, for the tests and the Explanation. */
@@ -375,9 +381,13 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const open = last.collAfter > DUST || last.debtAfter > DUST;
   const livePrice = o.live?.price != null && o.live.price > 0 ? o.live.price : null;
 
-  // The collateral's recorded prices, by day (the last each day), and today's.
+  // The collateral's recorded prices, by day (the last each day), the
+  // branch's daily series over them where the page read it (a day's close),
+  // and today's.
   const collObs = new Map<number, number>();
   for (const r of replayed) if (!r.borrowedPrice && r.price > 0) collObs.set(Math.floor(r.ev.ts / DAY_S), r.price);
+  const daily = (o.dailyColl ?? []).filter(([d, usd]) => d <= today && usd > 0);
+  for (const [d, usd] of daily) collObs.set(d, usd);
   if (livePrice != null && open) collObs.set(today, livePrice);
   // The debt's price each day from the first event to today (or the day after
   // the last event on a closed Trove).
@@ -428,7 +438,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     },
     seriesCarry: true,
     today,
-    words: liquityFlowWords(o.collSymbol, o.debtSymbol),
+    words: liquityFlowWords(o.collSymbol, o.debtSymbol, daily.length > 0),
   };
 }
 
@@ -496,8 +506,13 @@ export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: strin
   });
 }
 
-/** The panel's words for a Trove. */
-export function liquityFlowWords(collSymbol: string, debtSymbol: string): NonNullable<FlowTimeline["words"]> {
+/** The panel's words for a Trove; `daily`: the collateral between events is
+ *  at the branch's daily price. */
+export function liquityFlowWords(
+  collSymbol: string,
+  debtSymbol: string,
+  daily = false,
+): NonNullable<FlowTimeline["words"]> {
   return {
     held: "Still deposited",
     restBySide: { collateral: "Market move", debt: "Interest since the last event" },
@@ -510,10 +525,14 @@ export function liquityFlowWords(collSymbol: string, debtSymbol: string): NonNul
       debt: `Debt is counted at ${debtSymbol}'s $1 face.`,
     },
     heldBasis: {
-      collateral: `the ${collSymbol} the Trove held after its last event by then, at the branch's price that event or a later one recorded.`,
+      collateral: daily
+        ? `the ${collSymbol} the Trove held after its last event by then, at the branch's price at the close of that day (the last any Trove's operation on the branch recorded that day).`
+        : `the ${collSymbol} the Trove held after its last event by then, at the branch's price that event or a later one recorded.`,
       debt: `the ${debtSymbol} debt the Trove's last event recorded by then, plus the interest its rate built on it to the end of that day.`,
     },
-    linePrices: `with the collateral at the branch's price on the Trove's latest event by then and the debt at $1 plus the interest built since`,
+    linePrices: daily
+      ? `with the collateral at the branch's price at each day's close and the debt at $1 plus the interest built since`
+      : `with the collateral at the branch's price on the Trove's latest event by then and the debt at $1 plus the interest built since`,
     moment: {
       face: ["debt"],
       noPrice: {

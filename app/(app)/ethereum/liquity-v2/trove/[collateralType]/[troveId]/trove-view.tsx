@@ -28,6 +28,7 @@ import {
 } from "@/lib/shared/liquity-flows";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
 import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
+import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { liquityEconomicsExplanation, liquityRedemptionOutcome } from "@/lib/liquity/economics-explanation";
 import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
@@ -401,15 +402,19 @@ export default function TroveView({
   const flowPrice = prices?.[flowCollSymbol.toLowerCase() as keyof OraclePricesData];
   const flowOpen = troveData?.status === "open";
   const flowSurplusClaimed = surplus?.claimed != null;
+  // The branch's daily price for the collateral between the Trove's events;
+  // where the read fails, each event's price carries.
+  const flowDaily = useLiquityDailyPrices(liquityDailyBranch(flowCollSymbol));
   const flowTimeline = useMemo(
     () =>
-      flowsNow == null
+      flowsNow == null || !flowDaily.settled
         ? null
         : liquityFlowTimeline(flowEvents, {
             collSymbol: flowCollSymbol,
             debtSymbol: flowDebtSymbol,
             surplusClaimed: flowSurplusClaimed,
             now: flowsNow,
+            dailyColl: flowDaily.obs,
             live: flowOpen
               ? {
                   price: flowPrice ?? null,
@@ -425,7 +430,18 @@ export default function TroveView({
                 }
               : null,
           }),
-    [flowEvents, flowCollSymbol, flowDebtSymbol, flowSurplusClaimed, flowsNow, flowOpen, flowPrice, liveState],
+    [
+      flowEvents,
+      flowCollSymbol,
+      flowDebtSymbol,
+      flowSurplusClaimed,
+      flowsNow,
+      flowOpen,
+      flowPrice,
+      liveState,
+      flowDaily.settled,
+      flowDaily.obs,
+    ],
   );
   // The panel and the timeline are tied by the day (components/shared/flow-focus-context.tsx):
   // Apply to timeline, each day's mark, and each card's sum as of its event,
@@ -634,7 +650,7 @@ export default function TroveView({
             <>
               <LifetimeFlowsPanel
                 scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-                read={flowsNow == null ? "reading" : flowsRead}
+                read={flowsNow == null || !flowDaily.settled ? "reading" : flowsRead}
                 explanation={
                   <div className="space-y-2 text-sm text-rb-500">
                     {liquityEconomicsExplanation(
@@ -650,6 +666,7 @@ export default function TroveView({
                       unpriced={unpricedEvents(flowEvents)}
                       lives={troveLives(flowEvents)}
                       zombie={result.economics._meta.isZombie}
+                      daily={flowDaily.obs != null}
                     />
                   </div>
                 }
