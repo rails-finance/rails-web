@@ -47,14 +47,6 @@ export function wholeUsd(v: number, unit?: FlowUnit): string {
   return `$${Math.abs(Math.round(v)).toLocaleString("en-US")}`;
 }
 
-/** Whole dollars, with a positive figure under half a dollar as "<$1": the
- *  whole-dollar rule (flows-ledger's interest lines), where "$0" would read as
- *  none. */
-export function wholeUsdOrUnder(v: number, unit?: FlowUnit): string {
-  if (v > 0 && v < 0.5) return unit ? `<${wholeUsd(1, unit)}` : "<$1";
-  return wholeUsd(v, unit);
-}
-
 /** The side's sum at a stop, as the panel prints it. */
 export function sideSumRows(st: FlowSideState, unit?: FlowUnit): SideSumRows {
   const held = st.bar.find((s) => s.fill === "held") as FlowSegment;

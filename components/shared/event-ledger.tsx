@@ -453,6 +453,15 @@ function BeforeArrow({ children }: { children: ReactNode }) {
   );
 }
 
+/** A caller's own receipts for a ledger's figures (a card that is not an
+ *  event's, as the moment card), in place of the flow model's. */
+export interface LedgerProvs {
+  token?: (r: LedgerRow) => Provenance | undefined;
+  usd?: (r: LedgerRow) => Provenance | undefined;
+  totalTokens?: Provenance;
+  totalUsd?: Provenance;
+}
+
 /** One ledger's rows, a rule and its total line, as cells of a LedgerGrid. */
 function LedgerRows({
   ledger,
@@ -462,6 +471,7 @@ function LedgerRows({
   totalUsdProv,
   totalUsdBeforeProv,
   usdProvOf,
+  provs,
   daily = false,
   spaced = false,
 }: {
@@ -474,17 +484,20 @@ function LedgerRows({
   totalUsdProv?: Provenance;
   totalUsdBeforeProv?: Provenance;
   usdProvOf?: (r: LedgerRow) => Provenance | undefined;
+  provs?: LedgerProvs;
   daily?: boolean;
 }) {
   const side = ledger.side;
+  totalUsdProv = provs?.totalUsd ?? totalUsdProv;
   const { two, hideTok, hideUsd } = cols;
   const unit = ledger.symbol ?? "USD";
   const tokenProv = (r: LedgerRow): Provenance =>
-    r.role === "before" || r.role === "event"
+    provs?.token?.(r) ??
+    (r.role === "before" || r.role === "event"
       ? ledgerPartProv(r.label, unit, at, r.role)
-      : flowTokenProv(r.label, unit, at, r.role === "interest" ? "interest" : "line");
+      : flowTokenProv(r.label, unit, at, r.role === "interest" ? "interest" : "line"));
   const usdProv = (r: LedgerRow): Provenance => {
-    const own = usdProvOf?.(r);
+    const own = provs?.usd?.(r) ?? usdProvOf?.(r);
     if (own) return own;
     if (r.role === "market")
       return flowRemainderProv(r.label, side, at, "the change in the price since each flow, no funds moved");
@@ -584,7 +597,7 @@ function LedgerRows({
               )}
               {total && (
                 <span className="font-semibold text-foreground">
-                  <Prov info={flowTokenProv(name, unit, at, "held")}>{total.after}</Prov>
+                  <Prov info={provs?.totalTokens ?? flowTokenProv(name, unit, at, "held")}>{total.after}</Prov>
                 </span>
               )}
             </span>
@@ -645,9 +658,12 @@ export function LedgerTable({
   at,
   totalUsdProv,
   totalUsdBeforeProv,
+  provs,
   daily = false,
 }: {
   ledger: Ledger;
+  /** The figures' receipts, where the card states its own. */
+  provs?: LedgerProvs;
   /** The total line's words: the cell's name. */
   name: string;
   /** "this event (5 Jul '25)". */
@@ -667,6 +683,7 @@ export function LedgerTable({
         at={at}
         totalUsdProv={totalUsdProv}
         totalUsdBeforeProv={totalUsdBeforeProv}
+        provs={provs}
         daily={daily}
       />
     </LedgerGrid>
@@ -683,15 +700,19 @@ export function AssetLedgers({
   totalUsdProv,
   totalUsdBeforeProv,
   usdShownFor,
+  provsFor,
 }: {
   side: FlowSide;
   assets: Ledger[];
-  usd: { before: string | null; after: string; dollars: number };
+  /** The side's total in USD; null where it has none (an asset unpriced). */
+  usd: { before: string | null; after: string; dollars: number } | null;
   at: string;
   totalUsdProv: Provenance;
   totalUsdBeforeProv?: Provenance;
   /** Whether the Display switches show an asset's USD. */
   usdShownFor: (l: Ledger) => boolean;
+  /** An asset's receipts, where the card states its own. */
+  provsFor?: (l: Ledger) => LedgerProvs | undefined;
 }) {
   const shown = assets.map((a) =>
     usdShownFor(a) ? a : { ...a, usd: null, rows: a.rows.filter((r) => r.tokens).map((r) => ({ ...r, usd: null })) },
@@ -723,31 +744,34 @@ export function AssetLedgers({
                   ? flowAssetProv(a.symbol ?? "", r.seg, side, at, false)
                   : undefined
             }
+            provs={provsFor?.(a)}
           />
         ))}
-        <div aria-hidden className={`${RULE} mt-3`} />
-        <div
-          className="col-span-full flex items-center gap-3 py-1"
-          data-ledger-row="side-total"
-          data-ledger-dollars={usd.dollars}
-        >
-          <span
-            role="group"
-            aria-label={`${SIDE_NAME[side]} total`}
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3"
+        {usd && <div aria-hidden className={`${RULE} mt-3`} />}
+        {usd && (
+          <div
+            className="col-span-full flex items-center gap-3 py-1"
+            data-ledger-row="side-total"
+            data-ledger-dollars={usd.dollars}
           >
-            <span className="ml-auto whitespace-nowrap text-right">
-              {usd.before != null && (
-                <BeforeArrow>
-                  {totalUsdBeforeProv ? <Prov info={totalUsdBeforeProv}>{usd.before}</Prov> : usd.before}
-                </BeforeArrow>
-              )}
-              <span className="font-semibold text-foreground">
-                <Prov info={totalUsdProv}>{usd.after}</Prov>
+            <span
+              role="group"
+              aria-label={`${SIDE_NAME[side]} total`}
+              className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3"
+            >
+              <span className="ml-auto whitespace-nowrap text-right">
+                {usd.before != null && (
+                  <BeforeArrow>
+                    {totalUsdBeforeProv ? <Prov info={totalUsdBeforeProv}>{usd.before}</Prov> : usd.before}
+                  </BeforeArrow>
+                )}
+                <span className="font-semibold text-foreground">
+                  <Prov info={totalUsdProv}>{usd.after}</Prov>
+                </span>
               </span>
             </span>
-          </span>
-        </div>
+          </div>
+        )}
       </LedgerGrid>
     </div>
   );
