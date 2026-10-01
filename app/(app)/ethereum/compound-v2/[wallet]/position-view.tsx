@@ -13,7 +13,7 @@
 //
 // Compound V2 cross-collateralises its twenty markets through one Comptroller,
 // so ONE chain fetch covers the whole account. It rides its own effect + state
-// so the first paint (card + tower + timeline from the index) never waits on
+// so the first paint (card + timeline from the index) never waits on
 // RPC round-trips; the risk surfaces stream in when the read lands, a
 // chainStale response simply leaves them unrendered, and the debt rows upgrade
 // from the last event's emitted accountBorrows to the live borrowBalanceStored
@@ -58,16 +58,14 @@ import {
   CompoundV2ClosedPositionExplanation,
 } from "@/components/protocol/compound-v2/compound-v2-position-explanation";
 import { CompoundV2RiskSlot } from "@/components/protocol/compound-v2/compound-v2-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import {
-  computeCompoundV2Economics,
-  compoundV2LifetimeWithOpening,
-  computeCompoundV2CardCaptions,
-} from "@/lib/compound-v2/economics";
-import { compoundV2EconomicsExplanation, compoundV2EconomicsContent } from "@/lib/compound-v2/economics-explanation";
-import { compoundV2Ledger, compoundV2PricePairs } from "@/lib/compound-v2/ledger";
-import { fetchCompoundV2PricesAt } from "@/lib/api/fetch-compound-v2-prices-at";
+import { compoundV2LifetimeWithOpening, computeCompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CTokenLedgerContext } from "@/components/shared/ctoken-event-ledger";
+import { CompoundV2FlowsNote, compoundV2FlowsContent } from "@/components/protocol/compound-v2/compound-v2-flows-note";
+import { useCompoundV2Flows } from "@/hooks/useCompoundV2Flows";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -280,6 +278,8 @@ export default function CompoundV2PositionView({
     folderParams: { wallet },
     storageKey: `compound-v2-${wallet}`,
     protocolKey: "compound-v2",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
@@ -365,26 +365,22 @@ export default function CompoundV2PositionView({
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest splits; the rates ride the listing row's per-market chain read.
-  // The ledger (each flow at its own block's price, the transfers, seizures
-  // and interest on both sides) needs every row on the page: a windowed or
-  // grouped history keeps the lifetime layer above.
+  // A card's liquidation stories and a closed card's peaks need every row on
+  // the page.
   const wholeRows = historyWindow.state === "whole" && (servedFolders?.length ?? 0) === 0 && v2Events.length > 0;
-  const [eventPrices, setEventPrices] = useState<Map<string, number> | null>(null);
-  const pricePairs = useMemo(() => (wholeRows ? compoundV2PricePairs(v2Events) : []), [wholeRows, v2Events]);
-  useEffect(() => {
-    if (pricePairs.length === 0) return;
-    const ac = new AbortController();
-    fetchCompoundV2PricesAt(pricePairs, ac.signal)
-      .then((m) => setEventPrices(m))
-      .catch(() => {
-        // Today's prices stand in; the receipts say which.
-      });
-    return () => ac.abort();
-  }, [pricePairs]);
-  const ledger = useMemo(
-    () => (wholeRows && eventPrices ? compoundV2Ledger(v2Events, eventPrices) : null),
-    [wholeRows, eventPrices, v2Events],
-  );
+
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/shared/ctoken-flows.ts): the page's rows where they are all of it,
+  // else the flat history read once (the CSV's read); a read the row ceiling
+  // cut short is a failed read.
+  const flows = useCompoundV2Flows({
+    wholeEvents: wholeRows ? v2Events : null,
+    fetchAll: fetchAllHistory,
+    chain,
+    todayPrices: view?.priceByMarket,
+    fixedPrices: view?.priceFixedByMarket,
+  });
+  const ledgerData = useMemo(() => ({ states: flows.states, brand: "Compound" }), [flows.states]);
 
   // What each liquidation did, and a closed card's peaks as each row's balance
   // before and after it (interest included), where the page holds every row.
@@ -432,7 +428,6 @@ export default function CompoundV2PositionView({
   }, [liveView, wholeRows, v2Events, lifetimeKnown, tl.totalCount]);
 
   const captions = liveView ? computeCompoundV2CardCaptions(liveView, lifetimeEvents, precomputedLifetime) : null;
-  const towerData = liveView ? computeCompoundV2Economics(liveView, lifetimeEvents, precomputedLifetime, ledger) : null;
 
   // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches. Deduped by the underlying token
@@ -453,132 +448,144 @@ export default function CompoundV2PositionView({
   }, [view]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="compound-v2"
-        wallet={wallet}
-        assets={stripAssets}
-        closed={liveView != null && liveView.status !== "open"}
-      >
-        {liveView && (
-          <CompoundV2ExportMenu
+    <FlowFocusContext.Provider value={flows.focus}>
+      <CTokenLedgerContext.Provider value={ledgerData}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="compound-v2"
             wallet={wallet}
-            view={liveView}
-            chain={chain}
-            events={v2Events}
-            csvFilename={`compound-v2-${wallet.slice(0, 10)}-activity.csv`}
-            // A folder's members are not in the page's events, so a grouped page
-            // reads the whole history for the CSV as a windowed one does.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            queued={{
-              protocol: "compound-v2",
-              params: { wallet },
-              totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-            }}
-            history={markdownHistoryScope(historyWindow, v2Events, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, v2Events, "this wallet's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
+            assets={stripAssets}
+            closed={liveView != null && liveView.status !== "open"}
+          >
+            {liveView && (
+              <CompoundV2ExportMenu
+                wallet={wallet}
+                view={liveView}
+                chain={chain}
+                events={v2Events}
+                csvFilename={`compound-v2-${wallet.slice(0, 10)}-activity.csv`}
+                // A folder's members are not in the page's events, so a grouped page
+                // reads the whole history for the CSV as a windowed one does.
+                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+                queued={{
+                  protocol: "compound-v2",
+                  params: { wallet },
+                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+                }}
+                history={markdownHistoryScope(historyWindow, v2Events, servedFolders)}
+                scopeNote={exportScopeNote(historyWindow, v2Events, "this wallet's whole history", servedFolders)}
+              />
+            )}
+          </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {liveView && cardView && (
-            <CompoundV2PositionCard
-              v={cardView}
-              receipts
-              viewHref={tl.viewHref}
-              captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the Aave V3
-              // treatment): the Display menu plus the chosen risk picture — the
-              // health-REPLICA runway (1.0 = the Comptroller's shortfall line —
-              // the verdict itself is stated in the Explanation below) or the
-              // borrow-capacity bar. Whatever it draws is on the card face and
-              // in the card's receipts scope, so the Provenance list stays 1:1
-              // with the face figures.
-              rowExtra={
-                chain && liveView.status === "open" && chain.healthReplica != null && chain.healthReplica > 0 ? (
-                  <CompoundV2RiskSlot chain={chain} />
-                ) : undefined
-              }
-              // The Explanation is now pure layman prose about those same face
-              // figures — no secondary figure-strips. The borrow-capacity strip
-              // is absorbed into the risk slot above; the market rates live on
-              // the market view (where pool-wide rate context belongs). A
-              // terminal account narrates from the index alone (peaks, closure,
-              // liquidation record) — it has no live state to read, so the
-              // closed mood never waits on the chain lane.
-              explanation={
-                liveView.status !== "open" ? (
-                  <CompoundV2ClosedPositionExplanation v={cardView} />
-                ) : (
-                  // Passed before the chain read lands (the Fluid treatment):
-                  // the pane, and the copy-view link at its foot, mount with
-                  // the card rather than with the read.
-                  <CompoundV2PositionExplanation
-                    chain={chain}
-                    liquidationCount={liveView.liquidationCount}
-                    captions={captions}
-                    txCount={liveView.txCount}
-                    externalActivity={externalActivityWithOpening}
-                  />
-                )
-              }
-            />
-          )}
-          {towerData && (
-            <ChainTruthTower
-              data={towerData}
-              explanation={compoundV2EconomicsExplanation(towerData)}
-              learnMore={compoundV2EconomicsContent()}
-            />
-          )}
-          <ChainTruthTimeline
-            // The queued export (rails-ops decision 0029) has no row cap: the
-            // card offers the CSV whenever the total is known.
-            csvExportCeiling={null}
-            // Matches `CompoundV2EventCard`'s own `persistKey={`compound-v2:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="compound-v2"
-            closed={liveView ? liveView.status !== "open" : undefined}
-            tl={tl}
-            runs={COMPOUND_V2_LIQUIDATION_RUNS}
-            folderRegister={COMPOUND_V2_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            segments={segments}
-            // Tenure-first header: when the account started, how long it has
-            // run, how fresh the latest activity is.
-            toolbarLeading={
-              liveView ? (
-                <TimelineActivityHeader
-                  events={v2Events}
-                  folders={servedFolders}
-                  closed={liveView.status !== "open"}
-                  // When the account actually opened, not when the window does.
-                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : (
+            <>
+              {liveView && cardView && (
+                <CompoundV2PositionCard
+                  v={cardView}
+                  receipts
+                  viewHref={tl.viewHref}
+                  captions={captions ?? undefined}
+                  // The risk slot rides the card's heading-button row (the Aave V3
+                  // treatment): the Display menu plus the chosen risk picture — the
+                  // health-REPLICA runway (1.0 = the Comptroller's shortfall line —
+                  // the verdict itself is stated in the Explanation below) or the
+                  // borrow-capacity bar. Whatever it draws is on the card face and
+                  // in the card's receipts scope, so the Provenance list stays 1:1
+                  // with the face figures.
+                  rowExtra={
+                    chain && liveView.status === "open" && chain.healthReplica != null && chain.healthReplica > 0 ? (
+                      <CompoundV2RiskSlot chain={chain} />
+                    ) : undefined
+                  }
+                  // The Explanation is now pure layman prose about those same face
+                  // figures — no secondary figure-strips. The borrow-capacity strip
+                  // is absorbed into the risk slot above; the market rates live on
+                  // the market view (where pool-wide rate context belongs). A
+                  // terminal account narrates from the index alone (peaks, closure,
+                  // liquidation record) — it has no live state to read, so the
+                  // closed mood never waits on the chain lane.
+                  explanation={
+                    liveView.status !== "open" ? (
+                      <CompoundV2ClosedPositionExplanation v={cardView} />
+                    ) : (
+                      // Passed before the chain read lands (the Fluid treatment):
+                      // the pane, and the copy-view link at its foot, mount with
+                      // the card rather than with the read.
+                      <CompoundV2PositionExplanation
+                        chain={chain}
+                        liquidationCount={liveView.liquidationCount}
+                        captions={captions}
+                        txCount={liveView.txCount}
+                        externalActivity={externalActivityWithOpening}
+                      />
+                    )
+                  }
                 />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isCompoundV2Event(event) ? (
-                <CompoundV2EventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
+              )}
+              {/* Lifetime flows: the bars and the line over the account's replay
+            (lib/shared/ctoken-flows.ts), in place of the tower (TO-DO-ui-jobs
+            206). */}
+              {liveView && (
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <CompoundV2FlowsNote facts={flows.facts} />
+                    </div>
+                  }
+                  learnMore={compoundV2FlowsContent()}
                 />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+              )}
+              <ChainTruthTimeline
+                // The queued export (rails-ops decision 0029) has no row cap: the
+                // card offers the CSV whenever the total is known.
+                csvExportCeiling={null}
+                // Matches `CompoundV2EventCard`'s own `persistKey={`compound-v2:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="compound-v2"
+                closed={liveView ? liveView.status !== "open" : undefined}
+                tl={tl}
+                runs={COMPOUND_V2_LIQUIDATION_RUNS}
+                folderRegister={COMPOUND_V2_FOLDER_REGISTER}
+                readFolderMembers={readFolderMembers}
+                segments={segments}
+                // Tenure-first header: when the account started, how long it has
+                // run, how fresh the latest activity is.
+                toolbarLeading={
+                  liveView ? (
+                    <TimelineActivityHeader
+                      events={v2Events}
+                      folders={servedFolders}
+                      closed={liveView.status !== "open"}
+                      // When the account actually opened, not when the window does.
+                      firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isCompoundV2Event(event) ? (
+                    <CompoundV2EventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                    />
+                  ) : null
+                }
+              />
+              {/* Ambient oracle-price pill, fixed bottom-right. */}
+              <ProvInspectorLayer />
+            </>
+          )}
+        </div>
+      </CTokenLedgerContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }

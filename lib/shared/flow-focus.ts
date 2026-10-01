@@ -330,6 +330,17 @@ export const interestLine = (side: FlowSide) => ({
   label: side === "collateral" ? "Interest earned" : "Interest",
 });
 
+/** How a family words and floors the interest line of a side by asset. */
+export interface AssetSumOptions {
+  /** The interest line's words, where the family's buckets already name the
+   *  interest its events booked (a Compound V2-family account): the line
+   *  then holds the interest since each market's last event. */
+  interestLabel?: string;
+  /** An asset's interest smaller than this share of its balance is the
+   *  float's rounding of a balance its legs already add to, not interest. */
+  relDust?: number;
+}
+
 /** One side's sum by asset as of the event; null where the page does not
  *  hold every flow before it (its legs do not meet the day rows), so the
  *  tokens cannot be counted. `balances`: the side's assets at the block. */
@@ -340,6 +351,7 @@ export function eventAssetSum(
   cum: EventCum,
   id: string,
   balances: AssetBalance[],
+  opts: AssetSumOptions = {},
 ): AssetSum | null {
   const at = events.findIndex((e) => e.id === id);
   if (at < 0 || model.opening) return null;
@@ -394,13 +406,18 @@ export function eventAssetSum(
     const bal = balances.find((x) => x.symbol === s);
     return { symbol: s, amount: (bal?.amount ?? 0) - net, price: bal?.price ?? flowPrice[s] ?? null };
   });
-  const earned = interest.filter((p) => Math.abs(p.amount) > 1e-12);
+  const rel = opts.relDust ?? 0;
+  const earned = interest.filter(
+    (p) =>
+      Math.abs(p.amount) > Math.max(1e-12, rel * Math.abs(balances.find((x) => x.symbol === p.symbol)?.amount ?? 0)),
+  );
   let interestUsd: number | null = 0;
   for (const p of earned)
     interestUsd = p.price == null || interestUsd == null ? null : interestUsd + p.amount * p.price;
   if (earned.length > 0)
     lines.push({
       ...interestLine(side),
+      ...(opts.interestLabel ? { label: opts.interestLabel } : {}),
       kind: "interest",
       parts: earned.map(({ symbol, amount }) => ({ symbol, amount })),
       hl: false,

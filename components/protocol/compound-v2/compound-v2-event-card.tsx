@@ -175,7 +175,14 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
         />
       }
       detail={
-        <CompoundV2EventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
+        <CompoundV2EventDetail
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          eventId={event.id}
+          eventTs={event.timestamp}
+        />
       }
       detailLabel="Position state"
       explainer={

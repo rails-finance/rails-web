@@ -191,7 +191,8 @@ export function binInputFromWire(s: FlowSeries): BinInput {
 }
 
 /** A timeline's day rows and daily prices as binning input (Sky Savings,
- *  whose rows are on the page). Null without a daily price series. */
+ *  whose rows are on the page), with its indexes where it carries them.
+ *  Null without a daily price series. */
 export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
   if (!t.dailyPrices || t.today == null) return null;
   const symbols: Record<string, string> = {};
@@ -202,5 +203,6 @@ export function binInputFromTimeline(t: FlowTimeline): BinInput | null {
     symbols,
     today: t.today,
     ...(t.seriesCarry ? { carry: true } : {}),
+    ...(t.indexes ? { indexes: t.indexes } : {}),
   };
 }

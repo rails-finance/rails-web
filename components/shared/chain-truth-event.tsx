@@ -773,8 +773,12 @@ export function ChainTruthDetail({
   stats,
   symbolText = false,
   extra,
+  lead,
 }: {
   stats: ChainTruthStat[];
+  /** Cells before the stats: a family's account cells that open into their
+   *  ledgers (components/shared/ctoken-event-ledger.tsx). */
+  lead?: ReactNode;
   /** One more cell after the stats, for a figure that is not an amount (an
    *  event's price at its block). */
   extra?: ReactNode;
@@ -808,6 +812,7 @@ export function ChainTruthDetail({
     // px-5 py-2 mirrors the Liquity / Aave detail bodies so the snapshot grid
     // sits inset from the shared bg-raised detail surface, not flush to its edge.
     <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
+      {lead}
       {stats.map((s, i) => {
         const changed = s.changed ?? true;
         const unread = s.symbol ? unreadOf(s.address, s.symbol) : undefined;

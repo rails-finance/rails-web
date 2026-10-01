@@ -1,61 +1,29 @@
-// Compound V2 economics reduction — the dual tower with lifetime flows and the
-// debt interest split.
+// Compound V2 lifetime flows by market, for the position card's interest
+// captions (the Lifetime flows panel replays the rows itself:
+// lib/shared/ctoken-flows.ts).
 // ----------------------------------------------------------------------------
-// Collateral lines are the CURRENT value when the chain read landed — the exact
-// cToken balance (slot-verified Transfer replay) × the market's
-// exchangeRateStored, i.e. balanceOfUnderlying, interest included — and the
-// replayed principal otherwise (the provenance asserts which basis each line
-// carries). Debt lines are the last event's EMITTED accountBorrows (a
-// liquidation's merged repay leg counts — an account liquidated since its last
-// voluntary repay is not stale), upgraded to the live borrowBalanceStored when
-// the detail page's chain lane lands (each row's `live` flag names the basis).
-// USD is ON-CHAIN: each market valued at Compound's own oracle
-// (getUnderlyingPrice — the same price the Comptroller reads), threaded onto
-// `priceByMarket` (keyed by MARKET, not address: two markets share WBTC's
-// address and cETH has none).
+// Supply lines are the CURRENT value when the chain read landed — the exact
+// cToken balance × the market's exchangeRateStored, i.e. balanceOfUnderlying,
+// interest included; debt lines are the last event's EMITTED accountBorrows,
+// upgraded to the live borrowBalanceStored when the detail page's chain lane
+// lands. USD is ON-CHAIN: each market valued at Compound's own oracle
+// (getUnderlyingPrice), threaded onto `priceByMarket` (keyed by MARKET, not
+// address: two markets share WBTC's address and cETH has none).
 //
-// With the wallet's event stream (optional second arg) the tower gains the
-// lifetime layer: hatched withdrawn/repaid segments per market, the
-// liquidation-cleared debt segments, the faded lifetime-inflow bar, and — on a
-// single-market debt side — the accrued-interest segment (current − net event
-// principal, the Spark legInterest arithmetic with its plausibility gates).
-// Unlike Moonwell's, a liquidation here is ONE row — the index merged its
-// repay leg — so the liquidated bucket needs no de-duplication against repays.
-// Seizures move cTokens on ANOTHER market with no underlying amount, so they
-// are outside the underlying flow buckets (they live on the cToken lane); a
-// seized supply leg therefore fails the interest-attribution gates and the
-// caption simply doesn't render — never a fabricated split.
-// When RPC is down and a contributing market is unpriced, the tower degrades
-// to the token-only gated list (a strict per-total guard) rather than assert a
-// partial USD total.
+// A liquidation here is ONE row — the index merged its repay leg — so the
+// liquidated bucket needs no de-duplication against repays. Seizures move
+// cTokens on ANOTHER market with no underlying amount, so they are outside the
+// underlying flow buckets; a seized supply leg therefore fails the
+// interest-attribution gates and the caption simply doesn't render — never a
+// fabricated split.
 
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundV2Event } from "@/lib/shared/types/event-shape";
-import {
-  positionSupplyCurrentProv,
-  positionSupplyPrincipalProv,
-  positionDebtProv,
-  compoundV2LifetimeFlowProv,
-  compoundV2DebtInterestProv,
-  compoundV2DebtPrincipalProv,
-  compoundV2SupplyInterestProv,
-  compoundV2SupplyNetProv,
-} from "@/lib/compound-v2/event-provenance";
-import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
-import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
-import { ctokenLedgerTower, type LedgerMarket } from "@/lib/shared/ctoken-ledger";
-
-/** Pre-August-2020 rows: how an ETH-denominated oracle price became dollars. */
-const FIXED_NOTE =
-  "One or more markets here have a fixed price set by governance: the oracle stores a number with no live feed behind it, and Compound values those legs at it.";
-
-const COMPOUND_V2_PRICE_NOTE =
-  "(before August 2020 Compound's oracle priced in ETH; those rows are turned into dollars with the same oracle's USDC price in that block)";
 
 const DUST = 1e-9;
 
@@ -143,7 +111,7 @@ function replayCompoundV2Lifetime(events: BaseActivityEvent[]): Map<string, Mark
  * apply over the merged total: a V2 liquidation is ONE row with its repay leg
  * already merged in (mig 119), on both sides of the cut alike.
  *
- * Pass the result to `computeCompoundV2Economics` / `computeCompoundV2CardCaptions`
+ * Pass the result to `computeCompoundV2CardCaptions`
  * as `precomputedLifetime`. The opening buckets stay keyed by MARKET (the
  * reducer's own grain — two markets share WBTC's symbol), their decimals
  * filled in by the summary proxy from the same fixed catalog the rows resolve
@@ -151,7 +119,7 @@ function replayCompoundV2Lifetime(events: BaseActivityEvent[]): Map<string, Mark
  *
  * ⚠️ A leg the opening balance cannot scale — no decimals for its market — is
  * NOT added as zero. The market is dropped from the lifetime layer entirely,
- * even where the loaded rows also touched it, so the tower shows nothing for
+ * even where the loaded rows also touched it, so the captions state nothing for
  * it rather than a total that is short by whatever the summarised part held.
  */
 export function compoundV2LifetimeWithOpening(
@@ -215,18 +183,6 @@ export function compoundV2LifetimeWithOpening(
 function supplyLifetimeInterest(f: MarketFlows | undefined, current: number | undefined | null): number | null {
   if (!f || f.supplyRowsWhole !== true || f.lastSupplyAfter == null || current == null) return null;
   return (f.supplyInterest ?? 0) + (current - f.lastSupplyAfter);
-}
-
-/** Chain-faithful interest on one leg (the Spark legInterest gates):
- *  - no current figure / no gross inflow → can't attribute, bail;
- *  - interest < dust → zero (or negative: missed principal, bail);
- *  - interest > grossIn → >100% cumulative yield, physically implausible → bail. */
-function legInterest(current: number | undefined, netPrincipal: number, grossIn: number): number {
-  if (current == null || grossIn <= 0) return 0;
-  const interest = current - netPrincipal;
-  if (interest < DUST) return 0;
-  if (interest > grossIn) return 0;
-  return interest;
 }
 
 /** Position-card stat captions (the V4 spoke-card grammar, computed with this
@@ -338,247 +294,5 @@ export function computeCompoundV2CardCaptions(
     supplyInterestUsd: sideInterestUsd("supply", view, lifetime, usdOf),
     debtInterestUsd: sideInterestUsd("debt", view, lifetime, usdOf),
     borrowRate,
-  };
-}
-
-export function computeCompoundV2Economics(
-  view: CompoundV2PositionView,
-  events?: BaseActivityEvent[],
-  /** See computeCompoundV2CardCaptions — the same seam, the same rules. */
-  precomputedLifetime?: MarketFlows[],
-  /** The whole-history ledger (lib/compound-v2/ledger.ts), when the page holds
-   *  every row: each flow at its own block's price, with the sent, received
-   *  and seized collateral and the interest on both sides, so each column
-   *  closes. Absent, the lifetime layer below stands. */
-  ledger?: LedgerMarket[] | null,
-): ChainTruthTowerData {
-  const base = computeCompoundV2EconomicsBase(view, events, precomputedLifetime);
-  if (!ledger || ledger.length === 0) return base;
-  const priceOf = (market: string): number | null => {
-    const p = view.priceByMarket?.[market];
-    return typeof p === "number" && p > 0 ? p : null;
-  };
-  const heldSupply = view.supplies
-    .filter((r) => r.cTokens > 0)
-    .map((r) => ({ market: r.market, amount: r.current ?? r.principal, price: priceOf(r.market) }));
-  const heldDebt = view.borrows
-    .filter((r) => r.amount > 0)
-    .map((r) => ({ market: r.market, amount: r.amount, price: priceOf(r.market) }));
-  const flows = ctokenLedgerTower(ledger, { supply: heldSupply, debt: heldDebt }, priceOf, {
-    brand: "Compound",
-    receipt: "cToken",
-    priceNote: COMPOUND_V2_PRICE_NOTE,
-  });
-  if (!flows.valued) return base;
-  // The held lines stay whole: the interest rows above carry the interest,
-  // so no principal/interest split is drawn beside them.
-  const current = (lines: TowerLine[], rows: { market: string; amount: number }[]) =>
-    lines.map((l) => {
-      const r = rows.find((x) => x.market === l.key);
-      return r ? { ...l, amount: r.amount, usd: priceOf(r.market) != null ? r.amount * priceOf(r.market)! : l.usd } : l;
-    });
-  return {
-    ...base,
-    valued: true,
-    priceKind: "chain-derived",
-    collateral: {
-      ...flows.collateral,
-      current: current(base.collateral.current, heldSupply),
-      interest: null,
-    },
-    debt: {
-      ...flows.debt,
-      current: current(base.debt.current, heldDebt),
-      interest: null,
-    },
-    flowsPricedAtEvents: flows.flowsPricedAtEvents,
-    wrapFlowLabels: true,
-    interestNote: base.interestNote?.startsWith(FIXED_NOTE) ? FIXED_NOTE : undefined,
-  };
-}
-
-function computeCompoundV2EconomicsBase(
-  view: CompoundV2PositionView,
-  events?: BaseActivityEvent[],
-  precomputedLifetime?: MarketFlows[],
-): ChainTruthTowerData {
-  const prices = view.priceByMarket;
-  const usdOf = (market: string, amount: number): number | null => {
-    const p = prices?.[market];
-    return typeof p === "number" && p > 0 ? amount * p : null;
-  };
-
-  // Collateral: the current value (interest included) when the chain read
-  // landed, the replayed principal otherwise — the provenance names the basis.
-  const supplyLines: TowerLine[] = view.supplies
-    .filter((r) => r.cTokens > 0)
-    .map((r) => {
-      const amount = r.current ?? r.principal;
-      return {
-        key: r.market,
-        symbol: r.symbol,
-        amount,
-        usd: usdOf(r.market, amount),
-        prov:
-          r.current != null ? positionSupplyCurrentProv(r.symbol, r.cSymbol) : positionSupplyPrincipalProv(r.symbol),
-      };
-    })
-    .filter((l) => l.amount > DUST);
-
-  const debtLines: TowerLine[] = view.borrows
-    .filter((r) => r.amount > 0)
-    .map((r) => {
-      const m = COMPOUND_V2_MARKET_BY_KEY[r.market];
-      return {
-        key: r.market,
-        symbol: r.symbol,
-        amount: r.amount,
-        usd: usdOf(r.market, r.amount),
-        // The live borrowBalanceStored lane when the detail page's chain read
-        // upgraded this row; the emitted-accountBorrows lane otherwise.
-        prov: r.live ? compoundV2LiveDebtProv(r.symbol, r.cSymbol, m?.ctoken) : positionDebtProv(r.symbol),
-      };
-    });
-
-  // ── Lifetime layer (needs the event stream) ────────────────────────────────
-  const lifetime = precomputedLifetime
-    ? new Map(precomputedLifetime.map((f) => [f.market, f]))
-    : events && events.length > 0
-      ? replayCompoundV2Lifetime(events)
-      : null;
-  const flowLines = (
-    pick: (r: MarketFlows) => number,
-    flow: "withdrawn" | "repaid" | "liquidated debt",
-    keyPrefix: string,
-  ): TowerLine[] =>
-    lifetime
-      ? [...lifetime.values()]
-          .filter((r) => pick(r) > DUST)
-          .map((r) => ({
-            key: `${keyPrefix}-${r.market}`,
-            symbol: r.symbol,
-            amount: pick(r),
-            usd: usdOf(r.market, pick(r)),
-            prov: compoundV2LifetimeFlowProv(flow, r.symbol),
-          }))
-      : [];
-
-  const collExited = flowLines((r) => r.withdrawn, "withdrawn", "coll-withdrawn");
-  const debtExited = flowLines((r) => r.repaid, "repaid", "debt-repaid");
-  const debtLiquidated = flowLines((r) => r.liquidatedDebt, "liquidated debt", "debt-liq");
-
-  // Interest segment — only on a SINGLE-market debt side (one symbol, one
-  // token amount; a cross-market token sum would be meaningless). The tower
-  // stacks `current + interest` as the total, so when the split engages the
-  // current line must DROP to the net event principal — the emitted
-  // accountBorrows already includes the interest accrued to that event.
-  let interest: TowerLine | null = null;
-  if (lifetime && debtLines.length === 1) {
-    const cur = debtLines[0];
-    const f = lifetime.get(cur.key);
-    if (f) {
-      const net = f.borrowed - f.repaid - f.liquidatedDebt;
-      const amt = legInterest(cur.amount, net, f.borrowed);
-      if (amt > 0) {
-        interest = {
-          key: "debt-interest",
-          symbol: cur.symbol,
-          amount: amt,
-          usd: usdOf(cur.key, amt),
-          prov: compoundV2DebtInterestProv(cur.symbol, view.borrows.find((r) => r.amount > 0)?.live),
-        };
-        debtLines[0] = {
-          ...cur,
-          amount: net,
-          usd: usdOf(cur.key, net),
-          prov: compoundV2DebtPrincipalProv(cur.symbol),
-        };
-      }
-    }
-  }
-
-  // Supply interest segment — the same single-market rule, from the rows'
-  // own interest (whole event stream only; a windowed page's opening balance
-  // carries flows, not interest). The current line drops to the balance less
-  // that interest.
-  let supplyInterest: TowerLine | null = null;
-  if (lifetime && !precomputedLifetime && supplyLines.length === 1) {
-    const cur = supplyLines[0];
-    const row = view.supplies.find((r) => r.market === cur.key);
-    const amt = supplyLifetimeInterest(lifetime.get(cur.key), row?.current);
-    if (row && amt != null && amt > DUST && amt < cur.amount) {
-      supplyInterest = {
-        key: "coll-interest",
-        symbol: cur.symbol,
-        amount: amt,
-        usd: usdOf(cur.key, amt),
-        prov: compoundV2SupplyInterestProv(cur.symbol, row.cSymbol),
-      };
-      supplyLines[0] = {
-        ...cur,
-        amount: cur.amount - amt,
-        usd: usdOf(cur.key, cur.amount - amt),
-        prov: compoundV2SupplyNetProv(cur.symbol),
-      };
-    }
-  }
-
-  // Value the tower only when EVERY contributing line is oracle-priced — a strict
-  // per-total guard. A single unpriced market drops it to the token gated list,
-  // so a bar height is never a partial (misleading) USD figure.
-  const contributing = [
-    ...supplyLines,
-    ...debtLines,
-    ...collExited,
-    ...debtExited,
-    ...debtLiquidated,
-    ...(interest ? [interest] : []),
-    ...(supplyInterest ? [supplyInterest] : []),
-  ];
-  const valued = contributing.length > 0 && contributing.every((l) => l.usd != null);
-
-  // Lifetime inflow (the faded side bar) — USD when valued; a token amount is
-  // only meaningful when one market flowed, else suppressed.
-  const inflow = (pick: (r: MarketFlows) => number): number => {
-    if (!lifetime) return 0;
-    const rows = [...lifetime.values()].filter((r) => pick(r) > DUST);
-    if (rows.length === 0) return 0;
-    if (valued) return rows.reduce((s, r) => s + (usdOf(r.market, pick(r)) ?? 0), 0);
-    return rows.length === 1 ? pick(rows[0]) : 0;
-  };
-
-  // Whether any priced contributing market rides a stored constant with no
-  // feed — stated in the note so a bar never leans silently on a frozen price.
-  const marketKeys = new Set<string>([
-    ...supplyLines.map((l) => l.key),
-    ...debtLines.map((l) => l.key),
-    ...(lifetime ? [...lifetime.keys()] : []),
-  ]);
-  const anyFixed = [...marketKeys].some((k) => view.priceFixedByMarket?.[k] === true);
-
-  return {
-    valued,
-    // On-chain oracle price → chain-derived, so the USD bars survive On-chain-values.
-    priceKind: valued ? "chain-derived" : undefined,
-    collateral: {
-      current: supplyLines,
-      interest: supplyInterest,
-      exited: collExited,
-      liquidated: [],
-      lifetimeInflow: inflow((r) => r.supplied),
-    },
-    debt: {
-      current: debtLines,
-      interest,
-      exited: debtExited,
-      liquidated: debtLiquidated,
-      lifetimeInflow: inflow((r) => r.borrowed),
-    },
-    interestNote:
-      (anyFixed ? `${FIXED_NOTE} ` : "") +
-        (interest != null
-          ? ""
-          : "Collateral is shown at its current value — the deposit plus the interest it has earned; the spread over the amount deposited is that interest. Debt is shown as of the position's last borrow, repayment or liquidation, so interest that has built up since then isn't counted there yet. Seized collateral moves as receipt tokens with no underlying amount, so it shows up in the balances rather than the flow totals. The principal-versus-interest split is shown only when a single borrowed market's history lines up cleanly. USD is valued at Compound's own oracle price.") ||
-      undefined,
   };
 }
