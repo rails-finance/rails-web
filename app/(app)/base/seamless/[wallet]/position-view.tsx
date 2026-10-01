@@ -100,6 +100,8 @@ import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 import { SweepInFlight } from "@/components/shared/sweep-in-flight";
+import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { aaveV3LastBorrowRate } from "@/lib/aave-v3/last-borrow-rate";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, as on the Ethereum page.
@@ -140,6 +142,37 @@ const FROZEN: AaveV3FrozenMarket = {
   block: SEAMLESS_FREEZE_BLOCK,
   date: SEAMLESS_FREEZE_DATE,
 };
+
+/** What the card's transaction count counts, where the rows are not all in hand. */
+const COUNT_RULE = "Withdrawals as ETH through the WETH gateway and other aToken transfers count";
+
+const plural = (n: number, one: string, many = `${one}s`): string =>
+  `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+
+/** The card's transaction count split the way the listing's differs from it:
+ *  the listing counts the wallet's Pool calls, the page adds its aToken
+ *  transfers (a withdrawal as ETH is an aToken transfer to the WETH gateway).
+ *  Null unless the page's own rows add up to the count. */
+function seamlessCountSplit(events: BaseActivityEvent[], txCount: number): string | null {
+  const own = events.filter((e) => isAaveV3Event(e) && e.context.data.eventType !== "liquidation");
+  if (own.length === 0 || own.length !== txCount) return null;
+  let gateway = 0;
+  let transfers = 0;
+  for (const e of own) {
+    if (!isAaveV3Event(e)) continue;
+    const d = e.context.data;
+    if (d.eventType !== "transfer_in" && d.eventType !== "transfer_out") continue;
+    transfers += 1;
+    if (d.eventType === "transfer_out" && getProtocolContract(d.counterparty, SEAMLESS_CHAIN_ID)?.kind === "gateway")
+      gateway += 1;
+  }
+  if (transfers === 0) return "All of them are Pool calls, which is what the listing counts";
+  const parts = [plural(own.length - transfers, "Pool call")];
+  if (gateway > 0) parts.push(`${plural(gateway, "withdrawal")} as ETH through the WETH gateway`);
+  if (transfers - gateway > 0) parts.push(plural(transfers - gateway, "other aToken transfer"));
+  const joined = parts.length === 3 ? `${parts[0]}, ${parts[1]} and ${parts[2]}` : parts.join(" and ");
+  return `The ${txCount.toLocaleString("en-US")} are ${joined}; the listing counts Pool calls only`;
+}
 
 async function fetchSeamlessPrices(assets: string[]): Promise<Record<string, number>> {
   if (assets.length === 0) return {};
@@ -390,7 +423,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     const v: typeof base = {
       ...base,
       eventTotal: timeline?.totalEvents ?? null,
-      countRule: "Withdrawals as ETH through the WETH gateway and other aToken transfers count",
+      countRule: (wholeRows ? seamlessCountSplit(aaveEvents, base.txCount) : null) ?? COUNT_RULE,
       ...(liqs > 0
         ? {
             countNote:
@@ -401,7 +434,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
         : {}),
     };
     return v;
-  }, [data, prices, events, history, timeline]);
+  }, [data, prices, events, history, timeline, wholeRows, aaveEvents]);
 
   // The month read (hooks/useTimelineSegment.ts): a month the preload does
   // not hold is sliced from the route's replay (`&from=&to=`), whose running
@@ -468,6 +501,14 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
       ),
     [aaveEvents, servedFolders],
   );
+
+  // The rate at the newest borrow of the one reserve owed now, for the
+  // explanation's rate-move bullet; only with every row in hand, so "the last
+  // borrow" is the last one.
+  const lastBorrowRate = useMemo(() => {
+    const owed = data?.reserves.filter((r) => r.debtBalanceRaw !== "0") ?? [];
+    return wholeRows && owed.length === 1 ? aaveV3LastBorrowRate(aaveEvents, owed[0].address) : null;
+  }, [data, wholeRows, aaveEvents]);
 
   // Stat captions (accrued interest, borrow rate). The rate rides the Pool
   // read; the interest split attributes against the sweep's WHOLE-life sums —
@@ -643,6 +684,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           captions={captions}
                           view={view}
                           externalActivity={externalActivity}
+                          lastBorrowRate={lastBorrowRate}
                         />
                         <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
                       </>

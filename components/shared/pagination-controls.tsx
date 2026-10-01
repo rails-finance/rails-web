@@ -17,6 +17,8 @@ export interface PaginationControlsProps {
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   noun?: string;
+  /** Said after the count ("closed and liquidated ones under Status"). */
+  note?: string;
 }
 
 export function PaginationControls({
@@ -26,6 +28,7 @@ export function PaginationControls({
   itemsPerPage,
   onPageChange,
   noun = "positions",
+  note,
 }: PaginationControlsProps) {
   if (totalPages <= 1) return null;
 
@@ -43,8 +46,10 @@ export function PaginationControls({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-      <div className="text-sm text-rb-500 whitespace-nowrap">
-        Showing {showingFrom}-{showingTo} of {totalCount} {noun}
+      <div className={`text-sm text-rb-500 ${note ? "text-center sm:text-left" : "whitespace-nowrap"}`}>
+        Showing {showingFrom.toLocaleString("en-US")}-{showingTo.toLocaleString("en-US")} of{" "}
+        {totalCount.toLocaleString("en-US")} {noun}
+        {note ? <> · {note}</> : null}
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">

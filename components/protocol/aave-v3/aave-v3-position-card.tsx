@@ -290,6 +290,15 @@ function BorrowRateCaption({ rate, pool }: { rate: AaveV3CardCaptions["borrowRat
 function LiquidationFootnote({ v }: { v: AaveV3PositionView }) {
   const dep = useAaveV3CardDeployment();
   const read = aaveV3LiquidationRead(v);
+  if (read.sameAsset) {
+    // One token on both sides: its price cancels out of the health factor.
+    return (
+      <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">
+        <TokenChipIcon symbol={read.sameAsset.symbol} size={14} filterable={false} />
+        {read.sameAsset.symbol} on both sides: only interest moves it
+      </div>
+    );
+  }
   if (read.single) {
     return (
       <div className="text-xs mt-0.5 text-rb-500 inline-flex items-center gap-1">

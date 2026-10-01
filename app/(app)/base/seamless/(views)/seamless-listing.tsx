@@ -5,6 +5,7 @@
 // (base-lending-coverage-banner) live on the rail's /info page with the rest
 // of the intro prose.
 
+import { aaveV3RestingCountLine } from "@/lib/aave-v3/listing-visibility";
 import { fetchAaveV3Positions, type AaveV3PositionRow } from "@/lib/api/fetch-aave-v3-positions";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { AaveV3PositionCard, viewFromSummary } from "@/components/protocol/aave-v3/aave-v3-position-card";
@@ -38,6 +39,7 @@ export function SeamlessListing({ initialItems, initialTotal, initialKey, initia
     <ChainTruthListingPage<AaveV3PositionRow, AaveV3ListFilters>
       title="Seamless Positions"
       noun="positions"
+      countLine={aaveV3RestingCountLine}
       basePath="/base/seamless"
       bookmarksProtocol="seamless"
       defaults={SEAMLESS_LIST_DEFAULTS}

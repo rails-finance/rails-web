@@ -542,8 +542,8 @@ for (const fx of FIXTURES) {
             const flipText = await text(flipEl);
             const now = r.collateral.after ? "on" : "off";
             check(
-              `${fx.label}: ${r.symbol}'s flip text reads "switched ${now} here" (was ${was})`,
-              flipText === `switched ${now} here`,
+              `${fx.label}: ${r.symbol}'s flip text reads "${now === "on" ? "enabled" : "disabled"} as collateral here" (was ${was})`,
+              flipText === `${now === "on" ? "enabled" : "disabled"} as collateral here`,
               flipText,
             );
           } else {
@@ -595,7 +595,7 @@ for (const fx of FIXTURES) {
       }
 
       // §54: no receipt is lost when the icon retires. A flipped row's
-      // "switched on/off here" still opens collateralFlagProv; a row that did not flip
+      // "enabled/disabled as collateral here" still opens collateralFlagProv; a row that did not flip
       // has that same receipt's summary riding on its own balance receipt.
       // By now any dust row is revealed, so a flipped reserve hidden behind
       // the count line is still on the page to click.
@@ -603,7 +603,7 @@ for (const fx of FIXTURES) {
         const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
         if (flippedR) {
           const now = flippedR.collateral.after ? "on" : "off";
-          const receipt = await receiptText(page, scope, `switched ${now} here`);
+          const receipt = await receiptText(page, scope, `${now === "on" ? "enabled" : "disabled"} as collateral here`);
           check(
             `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
             !!receipt && receipt.includes("collateral switch"),

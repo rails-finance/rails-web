@@ -39,7 +39,7 @@ const intro = (
       </Link>
       .
     </p>
-    <BaseLendingCoverageNote route="/api/seamless/coverage" />
+    <BaseLendingCoverageNote route="/api/seamless/coverage" restsOnOpen />
   </>
 );
 

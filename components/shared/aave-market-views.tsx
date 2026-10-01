@@ -651,6 +651,14 @@ const SORT_LABEL: Record<SortKey, string> = {
   util: "Utilisation",
 };
 
+/** What an abbreviated or compound column header stands for, in its tip. */
+const HEADER_TIP: Partial<Record<SortKey, string>> = {
+  reserveFactor:
+    "Reserve factor: the share of the interest borrowers pay that the protocol keeps; suppliers get the rest",
+  caps: "Caps used: how much of the reserve's supply cap and borrow cap is taken",
+  util: "Utilisation & risk: the share of the reserve's supply that is on loan (the bar, its tick the rate model's kink), then the loan-to-value, liquidation threshold and liquidation bonus the Pool applies to it",
+};
+
 /** A cap side as one sortable number: a closed side sorts above any share, a
  *  side with no cap or no borrowing below every share. */
 function capRank(c: CapState): number {
@@ -764,6 +772,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
         type="button"
         onClick={() => toggleSort(k)}
         aria-label={`Sort by ${SORT_LABEL[k]}`}
+        title={HEADER_TIP[k] ? `${HEADER_TIP[k]}. Click to sort.` : undefined}
         className={`inline-flex items-center gap-1 text-[11px] uppercase tracking-wider transition-colors hover:text-foreground ${
           active ? "text-foreground" : "text-rb-500"
         } ${align === "right" ? "flex-row-reverse" : ""}`}

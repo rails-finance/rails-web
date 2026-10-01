@@ -216,7 +216,13 @@ export function marketSummaryText(view: AaveMarketView): string | null {
       k += 1;
       if (cum / view.suppliedUsd >= 0.8) break;
     }
-    parts.push(`Top ${k} of ${supplied.length} reserves hold ${Math.round((cum / view.suppliedUsd) * 100)}% of it.`);
+    // Counted over the reserves holding a supply; the page says so where that
+    // is fewer than the reserves the Pool lists.
+    const pool =
+      supplied.length < view.rows.length
+        ? `the ${supplied.length} reserves with a supply`
+        : `${supplied.length} reserves`;
+    parts.push(`Top ${k} of ${pool} hold ${Math.round((cum / view.suppliedUsd) * 100)}% of it.`);
   }
 
   // Supply-weighted liquidation threshold across reserves that carry one.

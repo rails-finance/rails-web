@@ -453,11 +453,15 @@ async function runExplorer(x) {
     } else check(`${x.key} liquidation #${n}: premium value renders`, false);
     const b = d.liquidationBonusAtBlock;
     const bonusText = `+${((b.bonusBps - 10000) / 100).toFixed(2)}%`;
-    const ref = card.getByText(/Bonus at block/).first();
+    // A premium that rounds to the bonus, with no fee, reads "Equal to the
+    // bonus set at this block" in place of the figure again.
+    const same = b.protocolFeeBps === 0 && `+${(premium * 100).toFixed(2)}%` === bonusText;
+    const refLabel = same ? "Equal to the bonus set at this block" : "Bonus at block";
+    const ref = card.getByText(same ? /Equal to the bonus set at this block/ : /Bonus at block/).first();
     check(
-      `${x.key} liquidation #${n}: "Bonus at block" reference reads ${bonusText}${b.protocolFeeBps > 0 ? ` with the protocol's ${b.protocolFeeBps / 100}% share stated` : ""}`,
+      `${x.key} liquidation #${n}: "${refLabel}" reference${same ? "" : ` reads ${bonusText}`}${b.protocolFeeBps > 0 ? ` with the protocol's ${b.protocolFeeBps / 100}% share stated` : ""}`,
       (await ref.count()) > 0 &&
-        (await ref.innerText()).includes(bonusText) &&
+        (same || (await ref.innerText()).includes(bonusText)) &&
         (b.protocolFeeBps > 0
           ? (await ref.innerText()).includes(`${b.protocolFeeBps / 100}% of it to the protocol`)
           : true),
@@ -477,7 +481,7 @@ async function runExplorer(x) {
     );
     // Matched on the label: with no protocol fee the reference's value equals
     // the realized premium's text, and a value match would open the wrong receipt.
-    const bonusReceipt = await openReceiptFor(page, card, "Bonus at block");
+    const bonusReceipt = await openReceiptFor(page, card, refLabel);
     check(
       `${x.key} liquidation #${n}: the bonus reference's receipt names getConfiguration at the block`,
       !!bonusReceipt && /getConfiguration/.test(bonusReceipt),

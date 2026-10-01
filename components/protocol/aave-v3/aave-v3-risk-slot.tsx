@@ -6,12 +6,16 @@
 
 import { AaveV3Runway } from "@/components/protocol/aave-v3/aave-v3-runway";
 import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import { aaveV3SameAsset } from "@/lib/aave-v3/same-asset";
 
 /** The opened card's distance bar under Health factor, beside its
  *  "Liquidates on a N% drop". The card carries no loan-to-value line: the
  *  Explanation states the ratio, the borrow cap and the threshold. */
 export function AaveV3RiskDetail({ chain }: { chain: AaveV3PositionChainResponse }) {
   if (chain.healthFactor == null || chain.healthFactor <= 0) return null;
+  // One token on both sides: no price fall reaches liquidation, so the bar's
+  // "% from liquidation" axis has nothing to measure (lib/aave-v3/same-asset).
+  if (aaveV3SameAsset(chain)) return null;
   return (
     <div className="mt-1.5 max-w-72">
       <AaveV3Runway compact barOnly healthFactor={chain.healthFactor} />
