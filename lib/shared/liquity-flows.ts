@@ -449,7 +449,13 @@ export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: strin
       legs: r.legs.map((l) =>
         COLL_BUCKETS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * r.price, amount: l.amount, symbol: collSymbol }
-          : { bucket: l.bucket, usd: l.amount, amount: l.amount, symbol: debtSymbol },
+          : {
+              bucket: l.bucket,
+              usd: l.amount,
+              amount: l.amount,
+              symbol: debtSymbol,
+              ...(l.bucket === LQ.interest || l.bucket === LQ.batchFee ? { accrual: true } : {}),
+            },
       ),
       sides: {
         collateral: {

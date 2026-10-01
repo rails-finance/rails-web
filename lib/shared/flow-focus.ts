@@ -29,8 +29,11 @@ export interface FocusEvent {
   /** The transaction: a card states the account once its transaction had
    *  run, so the sum runs to the transaction's last event. */
   tx?: string;
-  /** Each leg's bucket, its USD, and the token amount it moved. */
-  legs: { bucket: string; usd: number | null; amount?: number; symbol?: string }[];
+  /** Each leg's bucket, its USD, and the token amount it moved. An
+   *  `accrual` leg (a Liquity Trove's interest since its last event) is not
+   *  the event's act: its line is highlighted only where it comes to a
+   *  dollar. */
+  legs: { bucket: string; usd: number | null; amount?: number; symbol?: string; accrual?: boolean }[];
   /** Where the family's replay states it (the Liquity family): each side's
    *  USD just before and once the event's transaction had run, at the
    *  transaction's price, and its token move. The Aave family reads these
@@ -107,7 +110,7 @@ export function eventCum(model: FlowModel, events: FocusEvent[], id: string): Ev
     after,
     exact,
     stop,
-    buckets: new Set(ev.legs.map((l) => l.bucket)),
+    buckets: new Set(ev.legs.filter((l) => !(l.accrual && Math.abs(l.usd ?? 0) < 0.5)).map((l) => l.bucket)),
     legs: ev.legs,
     later: at < events.length - 1 || ri < model.rows.length - 1,
   };
