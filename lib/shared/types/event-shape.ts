@@ -2151,6 +2151,14 @@ export interface DolomiteContext {
    *  gaps under an hour, interest under 0.01 of a token, or a previous row
    *  outside the page. */
   interestRate?: { apr: number; sinceTimestamp: number };
+  /** The market's supply and borrow index at the row's block (1e18 raw
+   *  integer strings), the ones `balanceBefore` and `balanceAfter` are read
+   *  at. Absent where the answer carried no index. */
+  index?: { supply: string; borrow: string };
+  /** Dolomite's oracle price for the market at or before the row's block
+   *  (the stored LogOraclePrice, scaled 1e(36 − decimals)), where the route
+   *  serves it; `usd` is per whole token. */
+  oraclePrice?: { usd: number; raw: string };
   /** transfer legs — the other Account.Info. liquidation legs — the other
    *  side's account (borrower ↔ liquidator). */
   counterparty?: string;
