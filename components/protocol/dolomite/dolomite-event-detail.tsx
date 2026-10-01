@@ -16,6 +16,11 @@
 // so a liquidation with collateral to spare lands on it exactly and the card
 // audits itself. The archive read is lazy (this panel mounts on expand) and
 // cached immutable; a miss keeps the card token-only — the safe state.
+//
+// Where the page ties its timeline to the Lifetime flows panel, the grid opens
+// with the account's Collateral and Debt cells (components/shared/
+// ctoken-event-ledger.tsx, over lib/dolomite/flows.ts); the market's own
+// balance cell stays, since it carries the interest since the previous row.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -44,6 +49,7 @@ import {
 } from "@/lib/dolomite/event-provenance";
 import type { DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
 import { dolomiteBalanceAction } from "@/lib/dolomite/balance-action";
+import { CTokenLedgerCells } from "@/components/shared/ctoken-event-ledger";
 import {
   decimalSub,
   formatNumber,
@@ -364,6 +370,11 @@ export function DolomiteEventDetail({
     ctx.eventType === "liquidation" && ctx.balanceBefore != null && ctx.weiDelta != null
       ? Math.abs(Number(ctx.weiDelta)) / Math.abs(Number(ctx.balanceBefore)) || null
       : null;
+  // A protocol call moves no balance and has no account cells.
+  const ledgerLead =
+    event != null && ctx.eventType !== "call" ? (
+      <CTokenLedgerCells eventId={event.id} eventTs={event.timestamp} />
+    ) : null;
   const notes =
     forensics && bothLegs && atBlock ? liquidationNotes(bothLegs.held, bothLegs.owed, atBlock, repaidShare) : [];
 
@@ -456,7 +467,7 @@ export function DolomiteEventDetail({
 
   return (
     <>
-      <ChainTruthDetail stats={stats} />
+      <ChainTruthDetail stats={stats} lead={ledgerLead} />
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
           {lead}{" "}

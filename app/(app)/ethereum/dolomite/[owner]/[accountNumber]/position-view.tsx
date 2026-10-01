@@ -16,7 +16,7 @@
 // and adjusted values, getAccountStatus, and ⚠️ the account's own margin line
 // (getAccountRiskOverrideByAccount — the LST/ETH carve-out — else the global
 // ratio, cross-checked against getMarginRatioForAccount). The first paint
-// (card + tower + timeline from the index) never waits on RPC round-trips;
+// (card + timeline from the index) never waits on RPC round-trips;
 // the risk surfaces stream in when the read lands, and a chainStale response
 // simply leaves them unrendered. The balance legs upgrade from the listing's
 // market-state read to the live getAccountBalances wei when the chain read
@@ -57,13 +57,13 @@ import {
 } from "@/components/protocol/dolomite/dolomite-position-explanation";
 import { dolomiteLiquidationStories, withTokenPeaks } from "@/lib/dolomite/closed-record";
 import { DolomiteRiskSlot } from "@/components/protocol/dolomite/dolomite-risk-slot";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import {
-  computeDolomiteEconomics,
-  dolomiteLifetimeWithOpening,
-  computeDolomiteCardCaptions,
-} from "@/lib/dolomite/economics";
-import { dolomiteEconomicsExplanation, dolomiteEconomicsContent } from "@/lib/dolomite/economics-explanation";
+import { computeDolomiteCardCaptions } from "@/lib/dolomite/economics";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CTokenLedgerContext, type CTokenLedgerData } from "@/components/shared/ctoken-event-ledger";
+import { DolomiteFlowsNote, dolomiteFlowsContent } from "@/components/protocol/dolomite/dolomite-flows-note";
+import { useDolomiteFlows } from "@/hooks/useDolomiteFlows";
 import { normalizeAccountNumber } from "@/lib/dolomite/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -77,6 +77,18 @@ const DolomiteExportMenu = dynamic(
   () => import("@/components/protocol/dolomite/dolomite-export-menu").then((m) => m.DolomiteExportMenu),
   { ssr: false },
 );
+
+/** How the account cells' receipts name a market's balance. */
+const LEDGER_WORDS: CTokenLedgerData["words"] = {
+  held: {
+    collateral: "balance above zero (the par × the market's supply index)",
+    debt: "balance below zero (the par × the market's borrow index)",
+  },
+  token: {
+    collateral: "balance (the par × the market's supply index at the block)",
+    debt: "debt (the par below zero × the market's borrow index at the block)",
+  },
+};
 
 interface DolomitePositionViewProps {
   /** Already lower-cased and address-shaped — the server route rejected
@@ -253,6 +265,8 @@ export default function DolomitePositionView({
     storageKey: `dolomite-${owner}-${accountNumber}`,
     protocolKey: "dolomite",
     window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // A closed card's peaks as each row's token balance before and after it,
@@ -270,7 +284,9 @@ export default function DolomitePositionView({
       if (d.marketToken && !tokenByMarket.has(d.marketId)) tokenByMarket.set(d.marketId, d.marketToken);
     }
     const withToken = <T extends { marketId: number; token?: string }>(lines: T[]): T[] =>
-      lines.map((l) => (l.token == null && tokenByMarket.has(l.marketId) ? { ...l, token: tokenByMarket.get(l.marketId) } : l));
+      lines.map((l) =>
+        l.token == null && tokenByMarket.has(l.marketId) ? { ...l, token: tokenByMarket.get(l.marketId) } : l,
+      );
     const counted = {
       ...liveView,
       eventTotal,
@@ -288,22 +304,6 @@ export default function DolomitePositionView({
     };
   }, [liveView, eventTotal, cutoffBlock, dolomiteEvents]);
 
-  // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
-  const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? dolomiteEvents : undefined;
-  const precomputedLifetime = useMemo(
-    () =>
-      dolomiteLifetimeWithOpening(dolomiteEvents, opening, (marketId) => {
-        const rows = [...(view?.supplies ?? []), ...(view?.borrows ?? [])];
-        return rows.find((r) => r.marketId === marketId)?.symbol;
-      }),
-    [dolomiteEvents, opening, view],
-  );
-
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
   // window under a whole-history filename.
@@ -317,6 +317,22 @@ export default function DolomitePositionView({
       missing: Math.max((res.totalEvents ?? served.length) - served.length, 0),
     };
   }, [owner, accountNumber]);
+
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/dolomite/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read); a read the row ceiling cut
+  // short is a failed read.
+  const flows = useDolomiteFlows({
+    owner,
+    pending: loading,
+    wholeEvents: historyWindow.state === "whole" ? dolomiteEvents : null,
+    fetchAll: fetchAllHistory,
+    chain,
+  });
+  const ledgerData = useMemo<CTokenLedgerData>(
+    () => ({ states: flows.states, brand: "Dolomite", words: LEDGER_WORDS }),
+    [flows.states],
+  );
 
   const captions = liveView ? computeDolomiteCardCaptions(liveView) : null;
 
@@ -344,122 +360,129 @@ export default function DolomitePositionView({
   }
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="dolomite"
-        wallet={owner}
-        assets={stripAssets}
-        closed={liveView != null && liveView.status !== "open"}
-      >
-        {liveView && (
-          <DolomiteExportMenu
-            owner={owner}
-            accountNumber={accountNumber}
-            view={cardView ?? liveView}
-            chain={chain}
-            events={dolomiteEvents}
-            csvFilename={`dolomite-${owner.slice(0, 10)}-${accountNumber.slice(0, 8)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, dolomiteEvents)}
-            scopeNote={exportScopeNote(historyWindow, dolomiteEvents, "this account's whole history")}
-          />
-        )}
-      </DetailTopRow>
+    <FlowFocusContext.Provider value={flows.focus}>
+      <CTokenLedgerContext.Provider value={ledgerData}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="dolomite"
+            wallet={owner}
+            assets={stripAssets}
+            closed={liveView != null && liveView.status !== "open"}
+          >
+            {liveView && (
+              <DolomiteExportMenu
+                owner={owner}
+                accountNumber={accountNumber}
+                view={cardView ?? liveView}
+                chain={chain}
+                events={dolomiteEvents}
+                csvFilename={`dolomite-${owner.slice(0, 10)}-${accountNumber.slice(0, 8)}-activity.csv`}
+                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+                history={markdownHistoryScope(historyWindow, dolomiteEvents)}
+                scopeNote={exportScopeNote(historyWindow, dolomiteEvents, "this account's whole history")}
+              />
+            )}
+          </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {liveView && cardView && (
-            <DolomitePositionCard
-              v={cardView}
-              receipts
-              viewHref={tl.viewHref}
-              captions={captions ?? undefined}
-              // The risk slot rides the card's heading-button row (the Aave
-              // V3 treatment): the Display menu plus the chosen risk picture
-              // — liquidation runway (ratio = the core's own adjusted supply
-              // ÷ adjusted borrow, line = the ACCOUNT's own requirement, the
-              // risk override where one is set) or the margin-ratio view
-              // (the same requirement read as a capacity bar). Whatever it
-              // draws is on the card face and in the card's receipts scope,
-              // so the Provenance list stays 1:1 with the face figures.
-              rowExtra={
-                chain && liveView.status === "open" && chain.collateralization != null ? (
-                  <DolomiteRiskSlot chain={chain} />
-                ) : undefined
-              }
-              // The Explanation is now pure layman prose about those same
-              // face figures — no secondary figure-strips. The margin card
-              // is absorbed into the risk slot above; the per-market rate
-              // rows it used to carry live on the market view.
-              // Passed whatever the status and before the chain read lands:
-              // the pane, and the copy-view link at its foot, mount with the
-              // card. A closed account, or an open one whose read is pending,
-              // narrates nothing.
-              explanation={
-                liveView.status === "open" ? (
-                  <DolomitePositionExplanation
-                    chain={chain}
-                    liquidationCount={liveView.liquidationCount}
-                    txCount={liveView.txCount}
-                    eventTotal={eventTotal}
-                    externalActivity={externalActivityWithOpening}
-                  />
-                ) : (
-                  <DolomiteClosedPositionExplanation v={cardView} />
-                )
-              }
-            />
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : (
+            <>
+              {liveView && cardView && (
+                <DolomitePositionCard
+                  v={cardView}
+                  receipts
+                  viewHref={tl.viewHref}
+                  captions={captions ?? undefined}
+                  // The risk slot rides the card's heading-button row (the Aave
+                  // V3 treatment): the Display menu plus the chosen risk picture
+                  // — liquidation runway (ratio = the core's own adjusted supply
+                  // ÷ adjusted borrow, line = the ACCOUNT's own requirement, the
+                  // risk override where one is set) or the margin-ratio view
+                  // (the same requirement read as a capacity bar). Whatever it
+                  // draws is on the card face and in the card's receipts scope,
+                  // so the Provenance list stays 1:1 with the face figures.
+                  rowExtra={
+                    chain && liveView.status === "open" && chain.collateralization != null ? (
+                      <DolomiteRiskSlot chain={chain} />
+                    ) : undefined
+                  }
+                  // The Explanation is now pure layman prose about those same
+                  // face figures — no secondary figure-strips. The margin card
+                  // is absorbed into the risk slot above; the per-market rate
+                  // rows it used to carry live on the market view.
+                  // Passed whatever the status and before the chain read lands:
+                  // the pane, and the copy-view link at its foot, mount with the
+                  // card. A closed account, or an open one whose read is pending,
+                  // narrates nothing.
+                  explanation={
+                    liveView.status === "open" ? (
+                      <DolomitePositionExplanation
+                        chain={chain}
+                        liquidationCount={liveView.liquidationCount}
+                        txCount={liveView.txCount}
+                        eventTotal={eventTotal}
+                        externalActivity={externalActivityWithOpening}
+                      />
+                    ) : (
+                      <DolomiteClosedPositionExplanation v={cardView} />
+                    )
+                  }
+                />
+              )}
+              {/* Lifetime flows: the bars and the line over the account's replay
+          (lib/dolomite/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
+              {liveView && (
+                <LifetimeFlowsPanel
+                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <DolomiteFlowsNote facts={flows.facts} />
+                    </div>
+                  }
+                  learnMore={dolomiteFlowsContent()}
+                />
+              )}
+              <ChainTruthTimeline
+                csvExportCeiling={DRAINED_ROW_CEILING}
+                // Matches `DolomiteEventCard`'s own `persistKey={`dolomite:${event.id}`}`
+                // — lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="dolomite"
+                closed={liveView ? liveView.status !== "open" : undefined}
+                tl={tl}
+                runs={DOLOMITE_LIQUIDATION_RUNS}
+                toolbarLeading={
+                  liveView ? (
+                    <TimelineActivityHeader
+                      events={dolomiteEvents}
+                      closed={liveView.status !== "open"}
+                      // When the account actually opened, not when the window does.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  ) : undefined
+                }
+                renderCard={(event, meta) =>
+                  isDolomiteEvent(event) ? (
+                    <DolomiteEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                      accountNumber={accountNumber ?? undefined}
+                    />
+                  ) : null
+                }
+              />
+              {/* Ambient oracle-price pill, fixed bottom-right. */}
+              <ProvInspectorLayer />
+            </>
           )}
-          {liveView &&
-            (() => {
-              const towerData = computeDolomiteEconomics(liveView, lifetimeEvents, precomputedLifetime);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={dolomiteEconomicsExplanation(towerData)}
-                  learnMore={dolomiteEconomicsContent()}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={DRAINED_ROW_CEILING}
-            // Matches `DolomiteEventCard`'s own `persistKey={`dolomite:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="dolomite"
-            closed={liveView ? liveView.status !== "open" : undefined}
-            tl={tl}
-            runs={DOLOMITE_LIQUIDATION_RUNS}
-            toolbarLeading={
-              liveView ? (
-                <TimelineActivityHeader
-                  events={dolomiteEvents}
-                  closed={liveView.status !== "open"}
-                  // When the account actually opened, not when the window does.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isDolomiteEvent(event) ? (
-                <DolomiteEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                  accountNumber={accountNumber ?? undefined}
-                />
-              ) : null
-            }
-          />
-          {/* Ambient oracle-price pill, fixed bottom-right. */}
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+        </div>
+      </CTokenLedgerContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }

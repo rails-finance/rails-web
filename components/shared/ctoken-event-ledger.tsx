@@ -48,6 +48,10 @@ export interface CTokenLedgerData {
   brand: string;
   /** The receipt token's name, "cToken" by default ("mToken" on Moonwell). */
   receipt?: string;
+  /** How a family's rows state each side's balance, where it is not a
+   *  receipt token's (Dolomite's par × the market's index): `held` for the
+   *  side's dollars, `token` for one market's tokens. */
+  words?: { held: Record<FlowSide, string>; token: Record<FlowSide, string> };
 }
 export const CTokenLedgerContext = createContext<CTokenLedgerData | null>(null);
 
@@ -57,19 +61,33 @@ const SUM_OPTS = { interestLabel: "Interest since the last event", relDust: 1e-9
 
 const atWords = (ts: number) => `this event (${dayStamp(ts)})`;
 
-function heldProv(side: FlowSide, at: string, brand: string, before: boolean, receipt = "cToken"): Provenance {
+function heldProv(
+  side: FlowSide,
+  at: string,
+  brand: string,
+  before: boolean,
+  receipt = "cToken",
+  words?: CTokenLedgerData["words"],
+): Provenance {
   const what = side === "collateral" ? "held" : "owed";
   return {
     kind: "chain-derived",
-    summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} ${at} — what the account ${what} ${before ? "just before the transaction ran" : "once the transaction had run"}, in USD: each market's ${side === "collateral" ? `supply (${receipt}s × the exchange rate)` : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${brand}'s oracle price of its latest priced event.`,
+    summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} ${at} — what the account ${what} ${before ? "just before the transaction ran" : "once the transaction had run"}, in USD: each market's ${words ? words.held[side] : side === "collateral" ? `supply (${receipt}s × the exchange rate)` : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${brand}'s oracle price of its latest priced event.`,
     formula: "Σ balance × price",
   };
 }
 
-function tokenProv(side: FlowSide, symbol: string, at: string, before: boolean, receipt = "cToken"): Provenance {
+function tokenProv(
+  side: FlowSide,
+  symbol: string,
+  at: string,
+  before: boolean,
+  receipt = "cToken",
+  words?: CTokenLedgerData["words"],
+): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${symbol} ${side === "collateral" ? "supplied" : "owed"} ${before ? "before" : "after"} ${at} — ${before ? "just before the transaction ran" : "once the transaction had run"}: the market's ${side === "collateral" ? `supply (the ${receipt} balance × the exchange rate at the block)` : "debt (the emitted accountBorrows, and that less the act before it)"} as the row states it.`,
+    summary: `${symbol} ${side === "collateral" ? "supplied" : "owed"} ${before ? "before" : "after"} ${at} — ${before ? "just before the transaction ran" : "once the transaction had run"}: the market's ${words ? words.token[side] : side === "collateral" ? `supply (the ${receipt} balance × the exchange rate at the block)` : "debt (the emitted accountBorrows, and that less the act before it)"} as the row states it.`,
   };
 }
 
@@ -107,6 +125,7 @@ function SideLedger({
   const ctx = useContext(CTokenLedgerContext);
   const brand = ctx?.brand ?? "the protocol";
   const receipt = ctx?.receipt;
+  const words = ctx?.words;
   const model = focus?.model;
   if (!model || !cum || !focus) return null;
   const held = state.held[side];
@@ -124,8 +143,8 @@ function SideLedger({
     const b = sum.balances.find((x) => x.symbol === sym);
     return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
   };
-  const totalProv = heldProv(side, at, brand, false, receipt);
-  const totalBeforeProv = heldProv(side, at, brand, true, receipt);
+  const totalProv = heldProv(side, at, brand, false, receipt, words);
+  const totalBeforeProv = heldProv(side, at, brand, true, receipt, words);
   const single = assetTokenSum(sum);
   if (single) {
     const dollars = eventSideSumByAsset(model, sum, cum, held);
@@ -178,6 +197,7 @@ function ClosedSide({
   decimals,
   brand,
   receipt,
+  words,
 }: {
   side: FlowSide;
   state: CTokenEventState;
@@ -185,6 +205,7 @@ function ClosedSide({
   decimals: number | null;
   brand: string;
   receipt?: string;
+  words?: CTokenLedgerData["words"];
 }) {
   const usdShown = useUsdShown();
   const at = atWords(eventTs);
@@ -206,7 +227,7 @@ function ClosedSide({
           {changed && (
             <DeltaToggle
               size="sm"
-              before={<Prov info={tokenProv(side, a.symbol, at, true, receipt)}>{fmt(a.before)}</Prov>}
+              before={<Prov info={tokenProv(side, a.symbol, at, true, receipt, words)}>{fmt(a.before)}</Prov>}
               delta={
                 <Prov
                   info={{
@@ -221,7 +242,7 @@ function ClosedSide({
             />
           )}
           <Prov
-            info={tokenProv(side, a.symbol, at, false, receipt)}
+            info={tokenProv(side, a.symbol, at, false, receipt, words)}
             icon={<TokenChipIcon symbol={a.symbol} size={16} />}
           >
             <span className={`text-sm font-semibold tabular-nums ${changeTone(moved)}`}>{fmt(a.amount)}</span>
@@ -231,10 +252,10 @@ function ClosedSide({
           <ClosedUsd
             before={
               changed && before != null ? (
-                <Prov info={heldProv(side, at, brand, true, receipt)}>{usdText(before)}</Prov>
+                <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
               ) : null
             }
-            after={<Prov info={heldProv(side, at, brand, false, receipt)}>{usdText(held)}</Prov>}
+            after={<Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>}
           />
         )}
       </StateTransition>
@@ -253,11 +274,11 @@ function ClosedSide({
             {moved && before != null && Math.round(before) !== Math.round(held) && (
               <DeltaToggle
                 size="sm"
-                before={<Prov info={heldProv(side, at, brand, true, receipt)}>{usdText(before)}</Prov>}
+                before={<Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>}
                 delta={null}
               />
             )}
-            <Prov info={heldProv(side, at, brand, false, receipt)}>
+            <Prov info={heldProv(side, at, brand, false, receipt, words)}>
               <span className={`text-sm font-semibold tabular-nums ${changeTone(moved)}`}>{usdText(held)}</span>
             </Prov>
           </>
@@ -314,6 +335,7 @@ export function CTokenLedgerCells({ eventId, eventTs }: { eventId: string; event
               decimals={single?.decimals ?? null}
               brand={data.brand}
               receipt={data.receipt}
+              words={data.words}
             />
           </LedgerCell>
         );

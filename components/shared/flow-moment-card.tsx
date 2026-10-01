@@ -56,6 +56,7 @@ const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   comet: { collateral: "base supply index", debt: "base borrow index" },
   "ctoken-rows": { collateral: "exchange rate", debt: "debt growth" },
   "fluid-rows": { collateral: "supply exchange price", debt: "borrow exchange price" },
+  "dolomite-rows": { collateral: "supply index", debt: "borrow index" },
 };
 const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "the Pool's ReserveDataUpdated logs, grown at the logged rate to the moment",
@@ -66,6 +67,8 @@ const INDEX_SOURCE: Record<FlowGrowth["basis"], string> = {
     "the account's rows (the market's exchange rate, and the debt before each row over the debt after the one before), in a straight line between two rows and to today's live read after the last",
   "fluid-rows":
     "the position's rows (each row's balance before it over the balance after the row before), grown at the rate between them to the moment, and after the last row at the vault's rate now",
+  "dolomite-rows":
+    "the market's index at each of the account's rows, in a straight line between two rows and to today's live read after the last",
 };
 /** Whose index it is, and what the grown balance is to the chain's. */
 const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
@@ -74,6 +77,7 @@ const INDEX_OWNER: Record<FlowGrowth["basis"], string> = {
   comet: "the reserve's",
   "ctoken-rows": "the market's",
   "fluid-rows": "the vault's",
+  "dolomite-rows": "the market's",
 };
 const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
   "reserve-data": "The chain's balance is the scaled balance × the index, so this is what the chain held that day.",
@@ -83,6 +87,8 @@ const INDEX_CLAIM: Record<FlowGrowth["basis"], string> = {
     "The index runs in a straight line between the two rows around the day, so this is the chain's balance to within how the market's rate moved between them.",
   "fluid-rows":
     "The index runs in a straight line between the two rows around the day, so this is the vault's balance to within how its rate moved between them.",
+  "dolomite-rows":
+    "The index runs in a straight line between the two rows around the day, so this is the chain's balance to within how the market's rate moved between them.",
 };
 const fmtIndex = (v: number) =>
   v.toLocaleString("en-US", { minimumSignificantDigits: 12, maximumSignificantDigits: 12 });
@@ -545,7 +551,7 @@ export function FlowMomentCard({
         {(() => {
           const g = sides.flatMap((s) => moment.sides[s].assets).find((a) => a.grown)?.grown;
           if (!g) return null;
-          return g.basis === "ctoken-rows"
+          return g.basis === "ctoken-rows" || g.basis === "dolomite-rows"
             ? " Each balance is grown by the interest since its last event: the balance that event recorded × the market's index at the close of the day ÷ its index at that event. The index runs in a straight line between the account's rows, so this is the chain's balance to within how the rate moved between them."
             : g.basis === "fluid-rows"
               ? " Each balance is grown by the interest since its last event: the balance that event recorded × the vault's exchange price at the close of the day ÷ its exchange price at that event. The exchange price runs in a straight line between the position's rows, so this is the vault's balance to within how its rate moved between them."

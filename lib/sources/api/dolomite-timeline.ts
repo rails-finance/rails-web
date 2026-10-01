@@ -87,6 +87,10 @@ export interface DolomiteMvRow {
   borrow_index?: string | null;
   prev_supply_index?: string | null;
   prev_borrow_index?: string | null;
+  /** Dolomite's oracle price for the market at or before this row's block
+   *  (the stored LogOraclePrice, 1e(36 − decimals)). Absent on a payload from
+   *  before the route sent it. */
+  oracle_price?: string | null;
   /** deposit `from` / withdraw `to` / the other account's owner. */
   counterparty: string | null;
   counterparty_number: string | null;
@@ -329,6 +333,15 @@ export function buildDolomiteTimeline(
       }
     }
 
+    // The stored oracle price at or before the block, where the route serves
+    // it and the market's identity (its decimals) resolved.
+    const oracleRaw = r.oracle_price != null && r.oracle_price !== "" ? r.oracle_price.split(".")[0] : null;
+    const oracleUsd = oracleRaw != null && st != null ? Number(oracleRaw) / 10 ** (36 - decimals) : null;
+    const oraclePrice =
+      oracleRaw != null && oracleUsd != null && Number.isFinite(oracleUsd) && oracleUsd > 0
+        ? { usd: oracleUsd, raw: oracleRaw }
+        : null;
+
     const ctx: DolomiteContext = {
       eventType: kind,
       marketId: marketId ?? -1,
@@ -345,6 +358,8 @@ export function buildDolomiteTimeline(
         ? { interestSincePrevious: fmtUnits(interestRaw, decimals) }
         : {}),
       ...(interestRate != null ? { interestRate } : {}),
+      ...(atRow ? { index: { supply: atRow.s.toString(), borrow: atRow.b.toString() } } : {}),
+      ...(oraclePrice != null ? { oraclePrice } : {}),
       ...(r.counterparty ? { counterparty: r.counterparty.toLowerCase() } : {}),
       ...(r.counterparty_number != null ? { counterpartyAccountNumber: r.counterparty_number } : {}),
       ...(r.liquidator ? { liquidator: r.liquidator.toLowerCase() } : {}),

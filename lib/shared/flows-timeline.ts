@@ -150,9 +150,11 @@ export interface FlowGrowth {
  *  a Comet's base supply and borrow index as the account's rows imply them
  *  (lib/compound/flows.ts); a Compound V2-family account's from its rows (the
  *  exchange rate, and the debt's growth between rows: lib/shared/ctoken-flows.ts);
- *  a Fluid position's exchange prices as its rows imply them (lib/fluid/flows.ts). */
+ *  a Fluid position's exchange prices as its rows imply them (lib/fluid/flows.ts);
+ *  a Dolomite market's supply and borrow index as the account's rows state
+ *  them (lib/dolomite/flows.ts). */
 export interface FlowIndexes {
-  basis: "reserve-data" | "hub-state" | "comet" | "ctoken-rows" | "fluid-rows";
+  basis: "reserve-data" | "hub-state" | "comet" | "ctoken-rows" | "fluid-rows" | "dolomite-rows";
   assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
 }
 

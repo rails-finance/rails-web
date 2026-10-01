@@ -553,17 +553,3 @@ export const dolomitePeakTokenProv = (sym: string, side: "supply" | "debt"): Pro
   contract: MARGIN,
   via: `${DOLOMITE_VIA} · max(|par × index|) before and after each of this lane's legs`,
 });
-
-/** A lifetime gross flow (Σ deposited / withdrawn / repaid / borrowed /
- *  liquidation-cleared on one market) — sums of the legs' own emitted
- *  deltaWei amounts, bucketed by which side of zero the balance sat on. */
-export const dolomiteLifetimeFlowProv = (
-  flow: "deposited" | "withdrawn" | "borrowed" | "repaid" | "liquidated debt" | "seized collateral",
-  sym: string,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "emitted",
-  summary: `Lifetime ${flow} (${sym}) — the sum of the emitted \`deltaWei\` amounts of this account's own captured legs, complete from the core's deploy block. Dolomite has no Borrow action, so the buckets follow the balance's side of zero: a delta while the balance was negative is debt moving (borrow/repay), while positive it is the lending side (deposit/withdraw); a leg that crosses zero splits exactly at the par zero-crossing (the split is exact — both pieces of one leg scale by the same index).`,
-  contract: MARGIN,
-  via: `${DOLOMITE_VIA} · Σ deltaWei across the account's own legs · deploy → head`,
-});
