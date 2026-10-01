@@ -1,0 +1,318 @@
+"use client";
+
+// The state card (rails-ops reference/lifetime-flows-scrubber.md, "The day
+// links the chart and the timeline"): where the Lifetime flows chart's "Apply
+// to timeline" cuts the timeline at the close of a day with no events of its
+// own, the cut timeline opens with this card for that moment. It wears an
+// event card's shell with a clock on the spine, and states only what the
+// flow model holds exactly for that day (lib/shared/flow-moment.ts): each
+// asset as its last event left it, its USD where a price was recorded that
+// day, a side counted at its $1 face with the interest built to the moment,
+// and each side's sum where it reads cleanly. It is not an event: no number,
+// no filter, not counted, and it goes when the cut is cleared.
+
+import { useMemo, useState, type ReactNode } from "react";
+import { EventCard } from "@/components/shared/event-card";
+import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCaptionContext } from "@/components/shared/mobile-spine";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { fmtPositionAmount } from "@/components/shared/position-row";
+import {
+  EventSumLines,
+  ReceiptCalcButton,
+  ReceiptCalcContext,
+  SIDE_HUE,
+  dayStamp,
+} from "@/components/shared/flow-event-sum";
+import { wholeUsd } from "@/lib/shared/flows-sum";
+import type { EventCum } from "@/lib/shared/flow-focus";
+import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
+import type { FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
+import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
+
+const DAY_S = 86_400;
+
+export interface MomentNeighbour {
+  /** The event's name as the timeline gives it ("Open Trove"). */
+  label: string;
+  /** Unix seconds. */
+  ts: number;
+}
+
+const SIDE_WORD: Record<FlowSide, string> = { collateral: "Collateral", debt: "Debt" };
+const plural = (n: number, w: string) => `${n.toLocaleString("en-US")} ${w}${n === 1 ? "" : "s"}`;
+
+export function FlowMomentCard({
+  moment,
+  model,
+  prev,
+  next,
+  today,
+  isFirst,
+  flash,
+}: {
+  moment: FlowMoment;
+  model: FlowModel;
+  /** The last event before the moment and the first after it, where the page
+   *  holds them; the model's day stands in for a name it does not hold. */
+  prev: MomentNeighbour | null;
+  next: MomentNeighbour | null;
+  /** Today's UTC day. */
+  today: number;
+  isFirst: boolean;
+  /** The header rings for a moment after the chip's text brings it into view
+   *  or it first comes into view after Apply. */
+  flash: boolean;
+}) {
+  const [calcOn, setCalcOn] = useState(false);
+  const calc = useMemo(() => ({ on: calcOn, toggle: () => setCalcOn((v) => !v) }), [calcOn]);
+  const date = dayStamp(moment.day * DAY_S);
+  const when = `the close of ${date}`;
+  const lastStamp = dayStamp(moment.lastDay * DAY_S);
+  const since = moment.day - moment.lastDay;
+  // A name the page does not hold (an event inside a folder) is the chart's:
+  // the kinds of flow that day's events made.
+  const startDay = model.start / 86_400_000;
+  const kindsOn = (day: number): string | null => {
+    const t = model.ticks.find((x) => x.day === day - startDay);
+    return t && t.kinds.length > 0 ? t.kinds.join(", ") : null;
+  };
+  const prevWords = prev?.label ?? kindsOn(moment.lastDay) ?? `the last event (${lastStamp})`;
+  const nextName = next?.label ?? (moment.nextDay != null ? kindsOn(moment.nextDay) : null) ?? "an event";
+  const nextWords =
+    moment.nextDay == null
+      ? "no later event"
+      : moment.nextDay === today
+        ? `next: ${nextName} today`
+        : `next: ${nextName} on ${dayStamp(moment.nextDay * DAY_S)}`;
+  const sides = (["collateral", "debt"] as const).filter(
+    (s) => s === "collateral" || model.buckets.some((b) => b.side === "debt"),
+  );
+  const words = model.words.moment;
+
+  // ── Receipts ──────────────────────────────────────────────────────────
+  const tokensProv = (side: FlowSide, a: MomentAsset): Provenance =>
+    moment.sides[side].face && moment.accrual
+      ? {
+          kind: "chain-derived",
+          summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
+          formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
+          inputs: [
+            { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
+            {
+              label: "annual rate",
+              value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+              kind: "chain",
+              note: "in force after the last event, fees included",
+            },
+            {
+              label: "time",
+              value: `${(moment.accrual.seconds / DAY_S).toLocaleString("en-US", { maximumFractionDigits: 2 })} days`,
+              kind: "chain-derived",
+              note: `from the last event to the end of ${date}`,
+            },
+          ],
+        }
+      : {
+          kind: "chain",
+          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
+          inputs: [{ label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" }],
+        };
+  const usdProv = (a: MomentAsset): Provenance => ({
+    kind: "chain-derived",
+    summary: `${a.symbol} in USD at ${when} — the balance at the oracle price the index recorded for that day.`,
+    formula: "balance × price at the day's end",
+    pclass: "oracle",
+    inputs: [
+      { label: "balance", value: `${fmtPositionAmount(a.tokens)} ${a.symbol}`, kind: "chain" },
+      {
+        label: "price",
+        value: `$${(a.price ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 })}`,
+        kind: "chain-derived",
+        pclass: "oracle",
+        note: `last oracle price recorded by the end of ${date}`,
+      },
+    ],
+  });
+  const heldSeg = (side: FlowSide): FlowSegment => ({
+    key: `${side}-held`,
+    label: side === "collateral" ? "Held" : "Owed",
+    fill: "held",
+    width: moment.sides[side].held,
+    value: moment.sides[side].held,
+  });
+  const sideUsd = (side: FlowSide): number | null => {
+    const s = moment.sides[side];
+    if (s.face || !s.priced || s.assets.length === 0) return null;
+    return s.assets.reduce((t, a) => t + (a.usd ?? 0), 0);
+  };
+
+  // ── The header: the moment, its place between the events, the figures ──
+  const figure = (side: FlowSide): ReactNode => {
+    const s = moment.sides[side];
+    const usd = sideUsd(side);
+    return (
+      <span key={side} className="inline-flex items-center gap-1.5 text-sm" data-flow-moment-side={side}>
+        <span className="text-rb-500">{SIDE_WORD[side]}</span>
+        {s.assets.length === 0 ? (
+          <span className="font-bold text-foreground">none</span>
+        ) : usd != null && s.assets.length > 1 ? (
+          <Prov info={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}>
+            <span className="font-bold text-foreground">{wholeUsd(usd)}</span>
+          </Prov>
+        ) : (
+          s.assets.map((a) => (
+            <span key={a.symbol} className="inline-flex items-center gap-1">
+              <Prov info={tokensProv(side, a)}>
+                <span className="font-bold text-foreground">{fmtPositionAmount(a.tokens)}</span>
+              </Prov>
+              <TokenChipIcon symbol={a.symbol} size={16} filterable={false} />
+              {a.usd != null && (
+                <Prov info={usdProv(a)}>
+                  <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                </Prov>
+              )}
+            </span>
+          ))
+        )}
+      </span>
+    );
+  };
+  const header = (
+    <div className="px-5 pt-4 pb-3" data-flow-moment-header="" {...(flash ? { "data-flow-day-flash": "" } : {})}>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-sm font-semibold text-foreground" data-flow-moment-date="">
+          {date} · close
+        </span>
+        <span className="text-xs text-rb-500" data-flow-moment-between="">
+          {plural(since, "day")} after {prevWords} · {nextWords}
+        </span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">{sides.map((s) => figure(s))}</div>
+    </div>
+  );
+
+  // ── The open card: each side's assets, or its sum ──────────────────────
+  const cum: EventCum = useMemo(() => {
+    let ri = -1;
+    for (let i = 0; i < model.rows.length && model.rows[i].day <= moment.stop; i++) ri = i;
+    const at = ri >= 0 ? model.rows[ri].cum : {};
+    return { before: at, after: at, exact: true, stop: moment.stop, buckets: new Set(), legs: [], later: false };
+  }, [model, moment.stop]);
+  const noSum = (side: FlowSide): string => {
+    const s = moment.sides[side];
+    const unpriced = s.assets.filter((a) => a.usd == null).map((a) => a.symbol);
+    const what = side === "collateral" ? "collateral" : "debt";
+    return words?.noPrice?.[side]
+      ? `The ${what}'s sum is left out: it needs a price for ${unpriced.join(", ")} on ${date}, which is not recorded yet.`
+      : `The ${what}'s sum is left out: no price was recorded for ${unpriced.join(", ")} on ${date}.`;
+  };
+  const cell = (side: FlowSide) => {
+    const s = moment.sides[side];
+    return (
+      <div
+        key={side}
+        className="flex min-w-0 flex-col rounded-xl bg-background px-4 py-3"
+        data-receipt-cell={side}
+        data-flow-moment-cell={side}
+      >
+        <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-foreground">
+          <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
+          {SIDE_WORD[side]}
+        </div>
+        {calcOn && s.priced && s.assets.length > 0 ? (
+          <EventSumLines
+            side={side}
+            model={model}
+            cum={cum}
+            held={s.held}
+            heldBefore={null}
+            moved={[]}
+            totalLabel={side === "collateral" ? `Held at ${date}` : `Owed at ${date}`}
+            totalProv={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}
+            at={when}
+          />
+        ) : (
+          <>
+            {s.assets.length === 0 ? (
+              <p className="text-[13px] text-rb-500">Nothing {side === "collateral" ? "held" : "owed"}.</p>
+            ) : (
+              <ul className="flex flex-col gap-1 text-[13px] tabular-nums">
+                {s.assets.map((a) => (
+                  <li key={a.symbol} className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TokenChipIcon symbol={a.symbol} size={14} filterable={false} />
+                      {a.symbol}
+                    </span>
+                    <span className="inline-flex items-baseline gap-2">
+                      <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
+                      {a.usd != null && (
+                        <Prov info={usdProv(a)}>
+                          <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                        </Prov>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs leading-snug text-rb-500">
+              {s.face && moment.accrual
+                ? `The debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
+                : `As the last event left it on ${lastStamp}; no event changed it by then.${s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : ""}`}
+            </p>
+          </>
+        )}
+        {!s.priced && s.assets.length > 0 && (
+          <p className="mt-1.5 text-xs leading-snug text-rb-500" data-flow-moment-no-price={side}>
+            {words?.noPrice?.[side] ?? `No price was recorded for this side on ${date}, so it is stated in tokens.`}
+          </p>
+        )}
+        {calcOn && !s.priced && s.assets.length > 0 && (
+          <p className="mt-1.5 text-xs leading-snug text-rb-500" data-flow-moment-no-sum={side}>
+            {noSum(side)}
+          </p>
+        )}
+      </div>
+    );
+  };
+  const detail = (
+    <div className="px-5 py-2" data-flow-moment-detail="">
+      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2" data-receipt="sum">
+        {sides.map((s) => cell(s))}
+      </div>
+      {(words?.notes ?? []).map((n) => (
+        <p key={n} className="mt-2 text-xs leading-snug text-rb-500" data-flow-moment-note="">
+          {n}
+        </p>
+      ))}
+    </div>
+  );
+  const explainer = (
+    <p className="text-sm leading-relaxed text-rb-500">
+      The position at the close of {date}, where the timeline is cut. No event happened that day, so this card is not an
+      event: it has no number, the filters and the count leave it out, and it goes when the cut is cleared. The
+      calculator adds each side up to that day where every figure on it has a price for the day.
+    </p>
+  );
+
+  return (
+    <EventCaptionContext.Provider value={{ kind: "Position at close", ts: moment.endTs }}>
+      <ReceiptCalcContext.Provider value={calc}>
+        <div id="flow-moment" data-flow-moment={moment.day} className="rounded-xl">
+          <EventCard
+            avatar={null}
+            iconColumn={<SpineColumn icon="moment" isFirst={isFirst} isLast={false} tip={null} />}
+            header={header}
+            detail={detail}
+            detailLabel={`The position at the close of ${date}`}
+            explainer={explainer}
+            infoAction={<ReceiptCalcButton />}
+            caption="Position at close"
+          />
+        </div>
+      </ReceiptCalcContext.Provider>
+    </EventCaptionContext.Provider>
+  );
+}

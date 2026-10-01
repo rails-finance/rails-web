@@ -34,7 +34,8 @@ import {
   type LiquityFlowEvent,
 } from "@/lib/shared/liquity-flows";
 import { troveLives } from "@/lib/shared/liquity-flows-explanation";
-import { buildFlowModel, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
+import { buildFlowModel, sideStateFor, stateAt, type FlowModel } from "@/lib/shared/flows-timeline";
+import { flowMoment } from "@/lib/shared/flow-moment";
 import { sideSumRows, sumBasis } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
 import { eventCum, eventSideSum, sinceEvent } from "@/lib/shared/flow-focus";
@@ -311,3 +312,63 @@ test("the daily line: a life of up to a year is drawn by day on the carried pric
     }
   }
 });
+
+for (const [name, events, symbols] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"]],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"]],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"]],
+  ["Ebisu weETH", EBISU, ["weETH", "ebUSD"]],
+] as const) {
+  test(`${name}: the state card between events states the chart's debt and the last event's collateral`, () => {
+    const m = model(events as LiquityFlowEvent[], symbols as unknown as [string, string], true);
+    const focus = liquityFocusEvents(events as LiquityFlowEvent[], symbols[0], symbols[1]);
+    const replayed = replayLiquity(events as LiquityFlowEvent[]);
+    const startDay = m.start / 86_400_000;
+    const today = Math.floor(NOW / 86_400);
+    let checked = 0;
+    for (let stop = 1; stop < m.liveStop && startDay + stop < today; stop++) {
+      const close = (startDay + stop + 1) * 86_400;
+      const mo = flowMoment(m, focus, close - 1);
+      if (m.eventDays.includes(stop)) {
+        assert.equal(mo, null);
+        continue;
+      }
+      assert.ok(mo, `a moment at stop ${stop}`);
+      checked++;
+      let last = replayed[0].ev;
+      for (const r of replayed) if (r.ev.ts < close) last = r.ev;
+      const chart = stateAt(m, stop);
+      const coll = mo.sides.collateral;
+      const debt = mo.sides.debt;
+      // The collateral as the last event left it, in tokens only: no daily price
+      // is recorded for the branch.
+      if (last.collAfter > 1e-12) {
+        assert.equal(coll.assets.length, 1);
+        assert.equal(coll.assets[0].tokens, Math.max(0, last.collAfter));
+        assert.equal(coll.assets[0].usd, null);
+        assert.equal(coll.priced, false);
+      } else assert.equal(coll.assets.length, 0);
+      // The debt: the recorded debt plus its rate's interest to the day's
+      // end, the chart's figure, in tokens at the $1 face.
+      if (last.debtAfter > 1e-12) {
+        assert.equal(debt.face, true);
+        assert.equal(debt.priced, true);
+        const tokens = debt.assets[0].tokens;
+        assert.ok(Math.abs(tokens - chart.debt.now) <= Math.max(1e-9, chart.debt.now * 1e-12), `debt at stop ${stop}`);
+        assert.ok(mo.accrual, "the rate in force");
+        const owed = last.debtAfter * mo.accrual.factor;
+        assert.ok(Math.abs(tokens - owed) <= Math.max(1e-9, owed * 1e-9), `debt by the rate at stop ${stop}`);
+        assert.equal(mo.accrual.rate, last.rate + last.fee);
+        // Its sum to that day adds up to what is owed.
+        let ri = -1;
+        for (let i = 0; i < m.rows.length && m.rows[i].day <= stop; i++) ri = i;
+        const rows = sideSumRows(sideStateFor(m, "debt", m.rows[ri].cum, debt.held));
+        assert.equal(
+          rows.lines.reduce((a, l) => a + l.dollars, 0),
+          rows.total.dollars,
+        );
+      }
+    }
+    assert.ok(checked > 0, "days between events");
+  });
+}

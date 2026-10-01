@@ -2,7 +2,7 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useEffect, type ReactNode } from "react";
-import { ArrowRightToLine, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
+import { ArrowRightToLine, Clock, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
@@ -34,6 +34,7 @@ export type SpineIcon =
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
   | "folder" // A chronological chunk of a longer third-party stretch (lib/shared/timeline-chunks.ts) — disclosure chevron + folder in the LEFT flank, dot on the spine, bare count pill right
+  | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Apply to timeline" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
 /** Spine line style encoding agency */
@@ -1214,6 +1215,28 @@ export function SpineColumn({
               <ArrowRightToLine
                 size={scale.tokenSize}
                 strokeWidth={1.5}
+                absoluteStrokeWidth
+                color="var(--color-rb-500)"
+                aria-hidden="true"
+              />
+              <span />
+              <span />
+            </div>
+          );
+        case "moment":
+          // The state card's node: a clock (lucide `clock`) in the boundary's
+          // neutral ink, where an event row shows its token. The card states
+          // a moment, which no transaction made.
+          return (
+            <div
+              className="grid grid-rows-1 items-center justify-items-center"
+              style={{ gridTemplateColumns: scale.gridCols }}
+            >
+              <span />
+              <span />
+              <Clock
+                size={scale.tokenSize}
+                strokeWidth={1.25}
                 absoluteStrokeWidth
                 color="var(--color-rb-500)"
                 aria-hidden="true"

@@ -583,5 +583,14 @@ export function flowSeriesTimeline(
     today: series.today,
     totalEvents: series.totalEvents,
     ...(series.totalTxs != null ? { totalTxs: series.totalTxs } : {}),
+    // The day rows hold the balances each day's last event recorded, so a
+    // day between events keeps them (rails-ops reference/lifetime-flows-scrubber.md).
+    words: {
+      moment: {
+        notes: [
+          "Interest since the last event is not included: each balance is the one the last event recorded, valued at the day's price.",
+        ],
+      },
+    },
   };
 }

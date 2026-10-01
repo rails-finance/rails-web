@@ -31,8 +31,14 @@ export interface CombinedStop {
 /** The cursor's stops, ascending: every point of the line and every day with
  *  events, one stop per day; the last is the live stop. Without a series, the
  *  event days and the live stop. `from` is the stop the bars' window opens on
- *  (0 where it covers the whole life). */
-export function combinedStops(model: FlowModel, series: FlowBinSeries | null, from: number): CombinedStop[] {
+ *  (0 where it covers the whole life). `extra` adds one more day (a Dates
+ *  span's last day the cursor is parked on) where it has no stop. */
+export function combinedStops(
+  model: FlowModel,
+  series: FlowBinSeries | null,
+  from: number,
+  extra: number | null = null,
+): CombinedStop[] {
   const startDay = model.start / DAY_MS;
   const byStop = new Map<number, { point: number | null; event: boolean }>();
   const n = series?.points.length ?? 0;
@@ -45,6 +51,8 @@ export function combinedStops(model: FlowModel, series: FlowBinSeries | null, fr
     const had = byStop.get(d);
     byStop.set(d, { point: had?.point ?? null, event: true });
   }
+  if (extra != null && extra >= 0 && extra < model.liveStop && !byStop.has(extra))
+    byStop.set(extra, { point: null, event: false });
   const out: CombinedStop[] = [...byStop]
     .sort((a, b) => a[0] - b[0])
     .map(([stop, { point, event }]) => ({

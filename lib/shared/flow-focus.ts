@@ -39,6 +39,10 @@ export interface FocusEvent {
    *  transaction's price, and its token move. The Aave family reads these
    *  from the Pool at the block instead. */
   sides?: Record<FlowSide, { before: number; after: number; amount: number; symbol: string }>;
+  /** The annual rate in percent the event left in force on the debt, the
+   *  batch's management fee included, where the family records one (the
+   *  Liquity family): the state card between events states it. */
+  rate?: number;
 }
 
 /** Where the panel's cursor stands: the last second its figures cover, the
@@ -188,12 +192,16 @@ export interface FlowFocusState {
   /** The cut applied to the timeline by the chart's "Apply to timeline": the
    *  list holds every event up to `endTs` (that day's close), named `word`
    *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
-   *  leaves it where it is; the chip's × or a month picked in Dates clears
-   *  it. */
+   *  leaves it where it is; the chip's × or a month or range picked in Dates
+   *  clears it. */
   rewind: { endTs: number; word: string } | null;
-  /** Bumped to bring the cut's last card into view and flash its header
-   *  (Apply, and the chip's text). */
+  /** Bumped to bring the cut's top card into view and flash its header (the
+   *  chip's text). Apply cuts without it: the page stays where it is. */
   go: number;
+  /** A month or range picked in Dates while a cut stood: the chart's cursor
+   *  goes to the close of the span's last day (`endTs`) and freezes there, or
+   *  to today, unfrozen, where the span reaches today. */
+  park: { endTs: number; n: number } | null;
   /** The Dates filter's span on the timeline (unix seconds, inclusive), which
    *  the chart brackets on its line; null with Dates at All. */
   dates: [number, number] | null;
@@ -206,7 +214,15 @@ export interface FlowFocusStore {
 }
 
 export function createFlowFocusStore(): FlowFocusStore {
-  let state: FlowFocusState = { cursor: null, frozenDay: null, move: null, rewind: null, go: 0, dates: null };
+  let state: FlowFocusState = {
+    cursor: null,
+    frozenDay: null,
+    move: null,
+    rewind: null,
+    go: 0,
+    park: null,
+    dates: null,
+  };
   const subs = new Set<() => void>();
   return {
     get: () => state,

@@ -466,6 +466,7 @@ export function liquityFocusEvents(events: LiquityFlowEvent[], collSymbol: strin
         },
         debt: { before: Math.max(0, debtAfter - debtMove), after: debtAfter, amount: debtMove, symbol: debtSymbol },
       },
+      rate: r.ev.rate + r.ev.fee,
     };
   });
 }
@@ -488,6 +489,15 @@ export function liquityFlowWords(collSymbol: string, debtSymbol: string): NonNul
       debt: `the ${debtSymbol} debt the Trove's last event recorded by then, plus the interest its rate built on it to the end of that day.`,
     },
     linePrices: `with the collateral at the branch's price on the Trove's latest event by then and the debt at $1 plus the interest built since`,
+    moment: {
+      face: ["debt"],
+      noPrice: {
+        collateral: `The branch's daily price for ${collSymbol} is not recorded yet, so the collateral is stated in ${collSymbol} only.`,
+      },
+      notes: [
+        "Redistribution from other Troves' liquidations not yet applied to this Trove is not included: it lands on the Trove at its next event.",
+      ],
+    },
   };
 }
 
