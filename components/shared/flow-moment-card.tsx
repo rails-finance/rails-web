@@ -37,7 +37,7 @@ import { signedTokens, signedUsd, type Ledger, type LedgerRow } from "@/lib/shar
 import { fmtTokens, tokenDecimals } from "@/lib/shared/flow-focus";
 import { apportionSigned, wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
-import type { FlowGrowth, FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
+import { unitOf, type FlowGrowth, type FlowModel, type FlowSegment, type FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 
 const DAY_S = 86_400;
@@ -375,7 +375,7 @@ export function FlowMomentCard({
     const heldUnits = totalUnits - (interestUnits ?? 0);
     const interestDollars = dollars != null && interestUnits != null ? Math.round(a.interestUsd ?? 0) : null;
     const heldDollars = dollars != null ? dollars - (interestDollars ?? 0) : null;
-    const usdCell = (d: number | null) => (d == null ? null : { dollars: d, text: signedUsd(d, model.unit) });
+    const usdCell = (d: number | null) => (d == null ? null : { dollars: d, text: signedUsd(d, unitOf(model, side)) });
     const rows: LedgerRow[] = [
       {
         key: `${side}-${a.symbol}-held`,
@@ -403,7 +403,7 @@ export function FlowMomentCard({
       decimals,
       rows,
       tokens: { before: null, after: fmtTokens(totalUnits / scale, decimals), units: totalUnits },
-      usd: dollars != null ? { before: null, after: wholeUsd(dollars, model.unit), dollars } : null,
+      usd: dollars != null ? { before: null, after: wholeUsd(dollars, unitOf(model, side)), dollars } : null,
     };
     const provs: LedgerProvs = {
       token: (r) =>
@@ -434,7 +434,9 @@ export function FlowMomentCard({
     const built = s.assets.map((a, i) => ({ a, ...assetLedger(side, a, shares[i]) }));
     const shownFor = (a: MomentAsset) => a.usd != null && usdShown(a.symbol, a.usd, a.tokens);
     const sideTotal =
-      multi && usd != null ? { before: null, after: wholeUsd(usd, model.unit), dollars: Math.round(usd) } : null;
+      multi && usd != null
+        ? { before: null, after: wholeUsd(usd, unitOf(model, side)), dollars: Math.round(usd) }
+        : null;
     const totalProv = flowSegmentProv(heldSeg(side), side, when, false, model.daily);
     const ledger =
       built.length === 0 ? null : multi ? (
@@ -471,7 +473,7 @@ export function FlowMomentCard({
       ) : multi && usd != null ? (
         <span className="flex flex-wrap items-center justify-end gap-1">
           <span className="text-sm font-semibold tabular-nums text-foreground">
-            <Prov info={totalProv}>{wholeUsd(usd, model.unit)}</Prov>
+            <Prov info={totalProv}>{wholeUsd(usd, unitOf(model, side))}</Prov>
           </span>
           <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
             {built.map(({ a, ledger: l }) => (
@@ -497,7 +499,7 @@ export function FlowMomentCard({
                 </Prov>
               </ClosedTokens>
               {!multi && a.usd != null && shownFor(a) && (
-                <ClosedUsd after={<Prov info={usdProv(a)}>{wholeUsd(a.usd, model.unit)}</Prov>} />
+                <ClosedUsd after={<Prov info={usdProv(a)}>{wholeUsd(a.usd, unitOf(model, side))}</Prov>} />
               )}
             </span>
           ))}

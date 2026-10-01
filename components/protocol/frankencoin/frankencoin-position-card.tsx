@@ -41,7 +41,7 @@ import {
   peakAbsoluteProv,
   lifetimeFlowProv,
 } from "@/lib/frankencoin/event-provenance";
-import type { TowerSideData } from "@/lib/shared/chain-truth-economics";
+import type { FrankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
 import { fmtZchf } from "@/lib/frankencoin/figures";
 import {
   liveMintedProv,
@@ -239,11 +239,11 @@ function expiryText(expiration: number | null): string | null {
 
 /** A closed card's lifetime line: the peak above is one moment, this is the
  *  whole life (the Lifetime flows panel's debt side). */
-function LifetimeDebtLine({ side }: { side: TowerSideData }) {
-  const minted = side.lifetimeInflow;
+function LifetimeDebtLine({ side }: { side: FrankencoinLifetimeDebt }) {
+  const minted = side.minted;
   if (!(minted > 0)) return null;
-  const repaid = side.exited.reduce((s, l) => s + l.amount, 0);
-  const cleared = side.liquidated[0];
+  const repaid = side.repaid;
+  const cleared = side.cleared;
   const allRepaid = !cleared && Math.abs(repaid - minted) <= Math.max(1e-9, minted * 1e-12);
   return (
     <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
@@ -258,7 +258,7 @@ function LifetimeDebtLine({ side }: { side: TowerSideData }) {
           : {fmtZchf(repaid)} repaid
           {cleared && (
             <>
-              , {fmtZchf(cleared.amount)} {(cleared.flowLabel ?? "cleared by sale").toLowerCase()}
+              , {fmtZchf(cleared.amount)} {cleared.label}
             </>
           )}
         </>
@@ -284,8 +284,8 @@ export function FrankencoinPositionCard({
   ending,
   lifetimeDebt,
 }: {
-  /** The Lifetime flows panel's debt side, for a closed card's lifetime line. */
-  lifetimeDebt?: TowerSideData | null;
+  /** The debt's lifetime totals, for a closed card's lifetime line. */
+  lifetimeDebt?: FrankencoinLifetimeDebt | null;
   /** How a terminal position ended, where the timeline says. */
   ending?: FrankencoinEnding | null;
   v: FrankencoinPositionView;

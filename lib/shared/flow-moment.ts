@@ -19,7 +19,14 @@
 // Pure: tested offline in scripts/verify/verify-lifetime-flows-state.ts and
 // scripts/verify/verify-liquity-flows.ts.
 
-import { DAY_MS, type FlowGrowth, type FlowModel, type FlowSide } from "@/lib/shared/flows-timeline";
+import {
+  DAY_MS,
+  unitOf,
+  type FlowGrowth,
+  type FlowModel,
+  type FlowSide,
+  type FlowUnit,
+} from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 
 const DAY_S = 86_400;
@@ -96,24 +103,30 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   for (const e of events) if (e.ts < close) last = e;
   if (last && Math.floor(last.ts / DAY_S) !== lastDay) last = null;
   const face = new Set(model.words.moment?.face ?? []);
+  const tokensOnly = new Set(model.words.moment?.tokensOnly ?? []);
   const held = model.heldAt[stop] ?? [];
   const valued = model.valued[stop] ?? { collateral: 0, debt: 0 };
   const sideOf = (side: FlowSide): MomentSide => {
     const isFace = face.has(side);
+    const bare = tokensOnly.has(side);
     const assets: MomentAsset[] = held
       .filter((h) => h.side === side && (h.amount ?? 0) > 0)
       .map((h) => {
         const amount = h.amount as number;
         const grown = !isFace && h.grown ? h.grown : null;
         const recorded = grown ? grown.recorded : amount;
-        const today = h.priced != null && h.priced.series && h.priced.day === day;
+        const today = !bare && h.priced != null && h.priced.series && h.priced.day === day;
         const price = !isFace && today ? h.usd / amount : null;
         const interest = grown ? amount - grown.recorded : null;
         return {
           symbol: h.symbol,
           recorded,
           // A token axis states the face side's tokens in grains (FlowUnit).
-          tokens: isFace ? (model.unit ? h.usd / 10 ** model.unit.scale : h.usd) : amount,
+          tokens: isFace
+            ? unitOf(model, side)
+              ? h.usd / 10 ** (unitOf(model, side) as FlowUnit).scale
+              : h.usd
+            : amount,
           usd: !isFace && today ? h.usd : null,
           price,
           grown,
@@ -124,7 +137,7 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
     return {
       assets,
       face: isFace,
-      priced: assets.every((a) => isFace || a.usd != null),
+      priced: bare || assets.every((a) => isFace || a.usd != null),
       held: valued[side],
     };
   };

@@ -149,7 +149,15 @@ export interface FlowCursor {
 /** The model's token axis, where the figures are a token's (Morpho); null,
  *  USD. The scrubber provides it from `FlowModel.unit`. */
 export const FlowUnitContext = createContext<FlowUnit | null>(null);
-export const useFlowUnit = (): FlowUnit | undefined => useContext(FlowUnitContext) ?? undefined;
+/** Each side's token, where the sides have none in common (Frankencoin;
+ *  `FlowModel.sideUnits`). */
+export const FlowSideUnitsContext = createContext<Record<FlowSide, FlowUnit> | null>(null);
+/** The figures' token: the side's own where it has one. */
+export const useFlowUnit = (side?: FlowSide): FlowUnit | undefined => {
+  const unit = useContext(FlowUnitContext);
+  const sides = useContext(FlowSideUnitsContext);
+  return (side ? sides?.[side] : undefined) ?? unit ?? undefined;
+};
 
 export const FlowCursorContext = createContext<FlowCursor | null>(null);
 
@@ -364,7 +372,7 @@ export function SegmentTipBody({
   share?: boolean;
 }) {
   const cursor = useContext(FlowCursorContext);
-  const unit = useFlowUnit();
+  const unit = useFlowUnit(side);
   const share = withShare && st.total > 0 ? (seg.value / st.total) * 100 : null;
   const pct =
     share == null ? null : share > 0 && share < 1 ? "under 1%" : `${Math.round(share).toLocaleString("en-US")}%`;
@@ -424,7 +432,7 @@ export function SegmentPanelBody({
   words: { rest: string };
 }) {
   const cursor = useContext(FlowCursorContext);
-  const unit = useFlowUnit();
+  const unit = useFlowUnit(side);
   const partDollars = apportionDollars(
     parts.map((p) => p.usd),
     Math.round(seg.value),
@@ -491,7 +499,7 @@ function SideSumTable({
   words: { rest: string };
 }) {
   const cursor = useContext(FlowCursorContext);
-  const unit = useFlowUnit();
+  const unit = useFlowUnit(side);
   const sum = sideSumRows(st, unit);
   const coll = side === "collateral";
   const heldWord = coll ? "Held" : "Owed";

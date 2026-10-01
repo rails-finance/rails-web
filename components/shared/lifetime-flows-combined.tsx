@@ -679,6 +679,22 @@ function LineStrip({
     for (const v of model.valued) peak = Math.max(peak, v.collateral, hasDebt ? v.debt : 0);
     return axisFor(peak);
   }, [points, hasDebt, model.valued]);
+  // Where the sides have no common unit (Frankencoin), each line on its own
+  // axis, its top labelled in its token and hue.
+  const sideUnits = model.sideUnits;
+  const axes = useMemo(() => {
+    if (!sideUnits) return null;
+    const peak = { collateral: 0, debt: 0 };
+    for (const p of points) {
+      peak.collateral = Math.max(peak.collateral, p.collateral ?? 0);
+      peak.debt = Math.max(peak.debt, p.debt ?? 0);
+    }
+    for (const v of model.valued) {
+      peak.collateral = Math.max(peak.collateral, v.collateral);
+      peak.debt = Math.max(peak.debt, v.debt);
+    }
+    return { collateral: axisFor(peak.collateral), debt: axisFor(peak.debt) };
+  }, [sideUnits, points, model.valued]);
   // The time axis: the lead-in, then the start of the first event's day at
   // `x0`, and the end of today at the right. A day's figures are its close,
   // drawn at the end of that day, so a life of one day, today's included,
@@ -696,10 +712,19 @@ function LineStrip({
   const every = axis.ticks.length > 1 ? Math.ceil(24 / (((STRIP_H - 8) * axis.ticks[1]) / axis.max)) : 1;
   // A label that reads as the one under it ("$0" thrice on a position worth
   // cents) is left out.
-  const yTicks = axis.ticks
-    .filter((_, i) => i % every === 0)
-    .filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
-  const labelW = Math.max(0, ...yTicks.map((t) => axisLabel(t).length)) * 6 + 8;
+  const yTicks = axes
+    ? []
+    : axis.ticks.filter((_, i) => i % every === 0).filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
+  // Each side's top, its axis's end, in its token (a side that never held
+  // anything has none).
+  const sideTops =
+    axes && sideUnits
+      ? (hasDebt ? (["collateral", "debt"] as const) : (["collateral"] as const))
+          .map((k) => ({ k, t: axes[k].ticks.length > 1 ? axes[k].max : 0 }))
+          .filter((x) => x.t > 0)
+          .map((x) => ({ k: x.k, t: x.t, text: formatFlowToken(x.t, sideUnits[x.k]) }))
+      : [];
+  const labelW = Math.max(0, ...yTicks.map((t) => axisLabel(t).length), ...sideTops.map((x) => x.text.length)) * 6 + 8;
   const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
   const x0 = PAD + Math.min(lead, inner);
   const run = Math.max(0, PAD + inner - x0);
@@ -708,7 +733,8 @@ function LineStrip({
   /** Where a day's close sits: the end of that day. */
   const xClose = (day: number) => xDay(Math.min(day, today) + 1);
   const x = (i: number) => xClose(points[i].to);
-  const y = (v: number) => STRIP_H - 2 - (v / axis.max) * (STRIP_H - 8);
+  const y = (v: number, k?: "collateral" | "debt") =>
+    STRIP_H - 2 - (v / (k && axes ? axes[k].max : axis.max)) * (STRIP_H - 8);
   // A stop's place on the line: its day's close (the live stop at today's).
   const xStop = (s: CombinedStop) => (s.live ? xClose(today) : xClose(startDay + s.stop));
 
@@ -846,8 +872,8 @@ function LineStrip({
   // the first event's day to that day's close.
   const firstClose = model.valued[0] ?? { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
   const lineOf = (k: "collateral" | "debt", seq: number[]) => {
-    const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number)}`);
-    const lead = seq[0] === 0 ? [`${PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k])}`] : [];
+    const pts = seq.map((i) => `${x(i)},${y(points[i][k] as number, k)}`);
+    const lead = seq[0] === 0 ? [`${PAD},${y(0)}`, `${x0},${y(0)}`, `${x0},${y(firstClose[k], k)}`] : [];
     return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
   };
   // Where the side's value at a point rests on an old price (the model's
@@ -861,20 +887,20 @@ function LineStrip({
     const solid: string[] = [];
     const dotted: { d: string; idx: number[] }[] = [];
     if (seq[0] === 0) {
-      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number)}`;
-      solid.push(`M${PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k])}L${p0}`);
+      const p0 = `${x(seq[0])},${y(points[seq[0]][k] as number, k)}`;
+      solid.push(`M${PAD},${y(0)}L${x0},${y(0)}L${x0},${y(firstClose[k], k)}L${p0}`);
     }
     for (let j = 1; j < seq.length; j++) {
       const a = seq[j - 1];
       const b = seq[j];
-      const seg = `M${x(a)},${y(points[a][k] as number)}L${x(b)},${y(points[b][k] as number)}`;
+      const seg = `M${x(a)},${y(points[a][k] as number, k)}L${x(b)},${y(points[b][k] as number, k)}`;
       if (!oldAt(k, b)) {
         solid.push(seg);
         continue;
       }
       const prev = dotted[dotted.length - 1];
       if (prev && prev.idx[prev.idx.length - 1] === a) {
-        prev.d += `L${x(b)},${y(points[b][k] as number)}`;
+        prev.d += `L${x(b)},${y(points[b][k] as number, k)}`;
         prev.idx.push(b);
       } else dotted.push({ d: seg, idx: [a, b] });
     }
@@ -888,7 +914,7 @@ function LineStrip({
     let best = idx[idx.length - 1];
     for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
     const note = oldPriceAt(model, points[best].to - startDay);
-    setOldTip(note ? { x: px, y: y(points[best][k] as number), lines: note.lines } : null);
+    setOldTip(note ? { x: px, y: y(points[best][k] as number, k), lines: note.lines } : null);
   };
   const area = (k: "collateral" | "debt", seq: number[]) =>
     `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;
@@ -1023,7 +1049,7 @@ function LineStrip({
               />
               <circle
                 cx={cx}
-                cy={y(head.collateral)}
+                cy={y(head.collateral, "collateral")}
                 r={3.5}
                 fill={LINE_HUE.collateral}
                 className="stroke-background"
@@ -1032,7 +1058,7 @@ function LineStrip({
               {hasDebt && (
                 <circle
                   cx={cx}
-                  cy={y(head.debt)}
+                  cy={y(head.debt, "debt")}
                   r={3.5}
                   fill={LINE_HUE.debt}
                   className="stroke-background"
@@ -1045,6 +1071,16 @@ function LineStrip({
               above its gridline (under it at the top). */}
           {w > 0 && n > 0 && (
             <div aria-hidden data-prov-exempt="" data-flow-line-axis="">
+              {sideTops.map((x, i) => (
+                <span
+                  key={x.k}
+                  className={`pointer-events-none absolute text-[10px] leading-none tabular-nums ${x.k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
+                  style={{ left: PAD + 1, top: 2 + i * 12 }}
+                  data-flow-line-side-top={x.k}
+                >
+                  {x.text}
+                </span>
+              ))}
               {yTicks.map((t) => {
                 const ty = y(t);
                 return (
