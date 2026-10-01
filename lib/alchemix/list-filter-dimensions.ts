@@ -25,6 +25,10 @@
 // as though they were one number. Debt and collateral sorts are offered once
 // exactly one line is chosen; otherwise the sort is the position's own
 // activity, which is a count of blocks and means the same thing on every line.
+//
+// A CHAIN WITH ONE LINE HAS IT CHOSEN ALREADY. Base has alUSDb alone, so its
+// listing offers the debt and collateral sorts from the start and draws no Line
+// facet, whose one option would change nothing.
 
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
@@ -65,10 +69,18 @@ const WITH_LINE: SortOption[] = [
   { value: "tokenId", label: "Position id" },
 ];
 
+/** The chain's one line, where it has only one. */
+function soleLine(chainId: ChainId): string | null {
+  const lines = linesForChain(chainId);
+  return lines.length === 1 ? lines[0].key : null;
+}
+
 /** Debt and collateral sorts appear once exactly one line is chosen — see the
- *  header. With none or several chosen the page spans two debt tokens. */
-export function alchemixSortOptions(f: AlchemixListFilters): SortOption[] {
-  return f.line.length === 1 ? WITH_LINE : ACTIVITY_ONLY;
+ *  header. With none or several chosen the page spans two debt tokens; on a
+ *  chain with one line, that line is chosen. */
+export function alchemixSortOptions(chainId: ChainId): (f: AlchemixListFilters) => SortOption[] {
+  const sole = soleLine(chainId);
+  return (f) => (sole != null || f.line.length === 1 ? WITH_LINE : ACTIVITY_ONLY);
 }
 
 export function alchemixListDimensions(chainId: ChainId): SerializableDimension<AlchemixListFilters>[] {
@@ -76,6 +88,17 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
     value: l.key,
     label: l.displayName,
   }));
+  const status: SerializableDimension<AlchemixListFilters> = {
+    id: "status",
+    label: "Status",
+    group: "Status",
+    cardinality: "multi",
+    param: "status",
+    options: STATUS_OPTIONS,
+    get: (f) => f.status,
+    set: (f, v) => ({ ...f, status: v }),
+  };
+  if (soleLine(chainId) != null) return [status];
   return [
     {
       id: "line",
@@ -92,16 +115,7 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
       // as though the wallet held nothing.
       set: (f, v) => ({ ...f, line: v.filter((key) => isLineOnChain(chainId, key)) }),
     },
-    {
-      id: "status",
-      label: "Status",
-      group: "Status",
-      cardinality: "multi",
-      param: "status",
-      options: STATUS_OPTIONS,
-      get: (f) => f.status,
-      set: (f, v) => ({ ...f, status: v }),
-    },
+    status,
   ];
 }
 
@@ -119,7 +133,8 @@ export function alchemixFiltersToFetchParams(
   filters: AlchemixListFilters,
   page: number,
 ): FetchAlchemixPositionsParams {
-  const lines = filters.line.filter((key) => isLineOnChain(deployment.chainId, key));
+  const sole = soleLine(deployment.chainId);
+  const lines = sole != null ? [sole] : filters.line.filter((key) => isLineOnChain(deployment.chainId, key));
   const oneLine = lines.length === 1;
   const sortBy =
     filters.sortBy === "debt" || filters.sortBy === "collateral"

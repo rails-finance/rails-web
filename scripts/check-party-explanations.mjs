@@ -136,6 +136,12 @@ const PARTY_ROLES = [
       /\banother (\w+ )?(account|wallet)\b/i,
     ],
   },
+  // Alchemix's opening: where the new position NFT ended its transaction.
+  {
+    role: "position holder",
+    prefixes: ["position to"],
+    phrases: [/\bposition was created\b/i, /\bpassed on to\b/i, /\bminted to\b/i],
+  },
   {
     role: "liquidator",
     prefixes: ["by", "liquidated by", "seized by", "to the liquidator"],

@@ -53,7 +53,7 @@ const CORE_COLLATERAL = {
 
 const CORE_SET_ASIDE = {
   bold: "Set aside for repayment",
-  text: "the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block, and the line's next redemption clears it. See How Alchemix repays a loan, on a redemption card.",
+  text: "the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block. A line redemption clears it, and so does the holder repaying with vault shares (the set-aside part is paid first, with the line's protocol fee) or closing the position with its collateral.",
 };
 
 const CORE_RATIO = {
@@ -73,13 +73,45 @@ const CORE_ROUTER = {
 
 // ── One modal per act ───────────────────────────────────────────────────────
 
+const OPENING =
+  "An Alchemix position is opened by depositing vault shares into the line's Alchemist, which mints an NFT that is the position.";
+
+/** An opening that deposited and minted nothing. */
 export const ALCHEMIX_OPEN_DEPOSIT: LearnMoreContent = {
-  title: "Opening a position and depositing",
-  intro:
-    "An Alchemix position is opened by depositing vault shares into the line's Alchemist, which mints an NFT that is the position. A later deposit adds shares to a position that already exists. A deposit moves the collateral only; the debt stays where it was, so collateralisation rises.",
+  title: "Opening a position",
+  intro: `${OPENING} A position opened this way starts with collateral and no debt; minting against it comes later.`,
   detailsHeading: "Key concepts",
   details: [CORE_COLLATERAL, CORE_RATIO, CORE_ROUTER],
   links: [ALCHEMIX_DOCS.selfRepayingLoans, ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
+};
+
+/** An opening that also minted in the same transaction. */
+export const ALCHEMIX_OPEN_MINT: LearnMoreContent = {
+  title: "Opening a position and minting",
+  intro: `${OPENING} The same transaction can also mint the line's synthetic against that deposit, so the position starts with a debt as well as collateral. The debt is the synthetic minted, one for one, and the Alchemist refuses a mint beyond what the line's minimum collateralisation allows.`,
+  detailsHeading: "Key concepts",
+  details: [CORE_COLLATERAL, CORE_RATIO, CORE_NO_INTEREST, CORE_ROUTER],
+  links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.selfRepayingLoans, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
+};
+
+/** A deposit into a position that already exists, with nothing else moved. */
+export const ALCHEMIX_DEPOSIT: LearnMoreContent = {
+  title: "Depositing collateral",
+  intro:
+    "A deposit adds vault shares to a position that already exists. It moves the collateral only; the debt stays where it was, so collateralisation rises.",
+  detailsHeading: "Key concepts",
+  details: [CORE_COLLATERAL, CORE_RATIO, CORE_ROUTER],
+  links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
+};
+
+/** A deposit and a mint in one transaction, on a position that already exists. */
+export const ALCHEMIX_DEPOSIT_MINT: LearnMoreContent = {
+  title: "Depositing and minting in one step",
+  intro:
+    "A holder can add vault shares and mint the line's synthetic against them in one transaction. The collateral rises by the shares deposited and the debt by the synthetic minted, one for one. The Alchemist checks collateralisation once both have landed and refuses a mint beyond what the line's minimum allows, so a holder minting as much as the deposit allows ends each step at about that minimum.",
+  detailsHeading: "Key concepts",
+  details: [CORE_COLLATERAL, CORE_RATIO, CORE_NO_INTEREST, CORE_ROUTER],
+  links: [ALCHEMIX_DOCS.takeALoan, ALCHEMIX_DOCS.alAssets, ALCHEMIX_DOCS.myt, ALCHEMIX_DOCS.router],
 };
 
 export const ALCHEMIX_MINT: LearnMoreContent = {
@@ -246,8 +278,10 @@ export const ALCHEMIX_CUSTODY: LearnMoreContent = {
 /** The position card's "?": what its figures are and how to read the
  *  timeline under it, true of any position on any line. Liquity V2's
  *  `liquityPositionContent` ("About This Position") is the model; this
- *  position's own figures are in the card's Explanation pane. */
-export function alchemixPositionContent(status: string): LearnMoreContent {
+ *  position's own figures are in the card's Explanation pane. `infoHref` is
+ *  the explorer's Info page, where the set-aside entry sends the reader for
+ *  the whole repayment cycle. */
+export function alchemixPositionContent(status: string, infoHref: string): LearnMoreContent {
   return {
     title: "About this position",
     intro:
@@ -266,7 +300,7 @@ export function alchemixPositionContent(status: string): LearnMoreContent {
       },
       {
         bold: "Set aside for repayment",
-        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic stake it in the Transmuter, and as those stakes mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. A redemption card's \"?\" explains the whole cycle.",
+        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic stake it in the Transmuter, and as those stakes mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. The holder can also clear it: a repay with vault shares pays the set-aside part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
       },
       {
         bold: "Collateralisation",
@@ -290,6 +324,7 @@ export function alchemixPositionContent(status: string): LearnMoreContent {
       },
     ],
     links: [
+      { label: "How Alchemix works, on this explorer's Info page", url: infoHref },
       ALCHEMIX_DOCS.selfRepayingLoans,
       ALCHEMIX_DOCS.myt,
       ALCHEMIX_DOCS.alAssets,
@@ -302,12 +337,12 @@ export function alchemixPositionContent(status: string): LearnMoreContent {
   };
 }
 
-/** The Lifetime flows "?": what the tower sums, in which unit, and what it
+/** The Lifetime flows "?": what the chart sums, in which unit, and what it
  *  leaves out. Liquity V2's `liquityEconomicsContent` is the model. */
 export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
   title: "How the lifetime flows are counted",
   intro:
-    "The tower sums the position's own events over its whole life, each side in its own unit: vault shares on the collateral side, the line's synthetic on the debt side. Nothing is converted into dollars or into the asset underneath.",
+    "The chart sums the position's own events over its whole life, each side in its own unit: vault shares on the collateral side, the line's synthetic on the debt side. Nothing is converted into dollars or into the asset underneath.",
   detailsHeading: "Key concepts",
   details: [
     {
@@ -320,11 +355,11 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
     },
     {
       bold: "What a redemption's row is",
-      text: "the sum of what every line redemption cleared and took from this position, each a difference of the readings either side of it, never a figure from the redemption's own event (rails-ops decisions/0032). Each redemption still has its own two figures on the timeline.",
+      text: "the sum of what every line redemption cleared and took from this position, each a difference of the readings either side of it, never a figure from the redemption's own event. Each redemption still has its own two figures on the timeline.",
     },
     {
       bold: "What the totals leave out",
-      text: "the protocol fee a repay takes from the collateral. The Explanation pane adds it, so its account of the collateral closes on the shares held now.",
+      text: "the protocol fee a repay takes from the collateral. The (i) under the chart adds it, so its account of the collateral closes on the shares held now.",
     },
     {
       bold: "Interest",

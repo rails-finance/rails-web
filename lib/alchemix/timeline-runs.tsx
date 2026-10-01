@@ -131,6 +131,8 @@ export function useAlchemixTimelineRuns(
         sameRun: (prev: BaseActivityEvent, next: BaseActivityEvent) => prev.txHash === next.txHash,
         render: (run, meta) => {
           const legs = withRiders(inLogOrder(run), ridersByTx);
+          // The card's number is the range of the logs it draws ("7–8").
+          const numbered = meta.eventNumbers.filter((n) => n > 0);
           return (
             <AlchemixEventCard
               key={legs[0].id}
@@ -140,6 +142,8 @@ export function useAlchemixTimelineRuns(
               siblings={siblingsByTx.get(legs[0].txHash) ?? legs}
               isFirst={meta.isFirst}
               isLast={meta.isLast}
+              eventNumber={numbered.length > 0 ? Math.min(...numbered) : undefined}
+              eventNumberLast={numbered.length > 0 ? Math.max(...numbered) : undefined}
             />
           );
         },

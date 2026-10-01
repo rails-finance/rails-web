@@ -291,7 +291,17 @@ export interface TimelineRunSpec {
    *  (already rendered via renderCard, date-prefixed) for in-place expansion,
    *  one per member in run order; isFirst/isLast are the run's spine-terminus
    *  flags. */
-  render: (run: BaseActivityEvent[], meta: { isFirst: boolean; isLast: boolean; children: ReactNode[] }) => ReactNode;
+  render: (
+    run: BaseActivityEvent[],
+    meta: {
+      isFirst: boolean;
+      isLast: boolean;
+      children: ReactNode[];
+      /** Each member's event number, in run order: an `asOneEvent` row numbers
+       *  itself by the logs it draws. */
+      eventNumbers: number[];
+    },
+  ) => ReactNode;
 }
 
 /** One displayed row: a lone event (with its index in the flat displayed
@@ -961,6 +971,13 @@ function ChainTruthTimelineBody({
       : () => true;
     return settleRunRows(all, activeRuns, inRange);
   }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents, cut]);
+  // Whether "Collapse like events" would change anything here: some spec that
+  // is a collapse forms a run on this list. Read with every spec on, whatever
+  // the toggle says, so turning it off does not take the toggle away.
+  const collapsible = useMemo(() => {
+    if (servedRows || !runs?.some((r) => !r.asOneEvent)) return false;
+    return settleRunRows(events, runs, () => true).some((r) => r.kind === "run" && !r.spec.asOneEvent);
+  }, [events, runs, servedRows]);
 
   // Market notes, attached by anchor event id — OUTSIDE the rows.
   //
@@ -1701,9 +1718,9 @@ function ChainTruthTimelineBody({
   // 0021). `?folders=0` answers flat, so that page groups in the browser and
   // keeps the toggle.
   // An `asOneEvent` spec is not a collapse and does not earn the toggle on its
-  // own: a page with only those would show one that changes nothing.
-  const baseItems =
-    runs?.some((r) => !r.asOneEvent) && !servedRows ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
+  // own, and neither does a collapse spec that forms no run on this list: a
+  // page with only those would show one that changes nothing.
+  const baseItems = collapsible ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
   const items =
     marketNoteCount > 0 ? [...baseItems, ...(phone ? MARKET_NOTE_ITEMS.slice(0, 1) : MARKET_NOTE_ITEMS)] : baseItems;
 
@@ -1967,6 +1984,7 @@ function ChainTruthTimelineBody({
                                 mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
                               }),
                             ),
+                            eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
                           }),
                           marked,
                         )}

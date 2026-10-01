@@ -476,10 +476,14 @@ export function ChainTruthRow({
   spec,
   timestamp,
   eventNumber,
+  eventNumberLast,
 }: {
   spec: ChainTruthRowSpec;
   timestamp: number;
   eventNumber?: number;
+  /** A row drawing several events (one transaction's logs as one card) ends
+   *  its number range here: the badge reads "7–8". */
+  eventNumberLast?: number;
 }) {
   // Display flags (off-by-default ones are opt-in, matching Liquity / Aave):
   //  • showEventNumbers — the chronological badge.
@@ -711,10 +715,16 @@ export function ChainTruthRow({
         {showEventNumbers && eventNumber != null && (
           <span
             className="inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500"
-            aria-label={`Event ${eventNumber}`}
+            aria-label={
+              eventNumberLast != null && eventNumberLast !== eventNumber
+                ? `Events ${eventNumber} to ${eventNumberLast}`
+                : `Event ${eventNumber}`
+            }
             data-prov-exempt=""
           >
-            {eventNumber}
+            {eventNumberLast != null && eventNumberLast !== eventNumber
+              ? `${eventNumber}–${eventNumberLast}`
+              : eventNumber}
           </span>
         )}
       </span>

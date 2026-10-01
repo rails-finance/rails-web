@@ -54,7 +54,7 @@ export function AlchemixListing({
       headerExtra={<AlchemixTypeTabs deployment={deployment} active="alchemist" />}
       bookmarksProtocol={deployment.session}
       defaults={ALCHEMIX_LIST_DEFAULTS}
-      sortOptions={alchemixSortOptions}
+      sortOptions={alchemixSortOptions(deployment.chainId)}
       searchPlaceholder="Address or position id"
       renderCard={(p) => <AlchemixPositionCard p={p} session={deployment.session} />}
       // Both halves of the key, always: a token id is unique only inside its

@@ -78,6 +78,7 @@ import {
   AlchemixStatusPill,
   amountColumn,
   collateralColumn,
+  collateralUsdText,
 } from "@/components/protocol/alchemix/alchemix-position-card";
 import { computeAlchemixEconomics } from "@/lib/alchemix/economics";
 import { alchemixFlowsExplanation } from "@/lib/alchemix/economics-explanation";
@@ -103,9 +104,14 @@ import {
 import {
   AlchemixPositionExplanation,
   fallPct,
+  hasAlchemixPositionExplanation,
   ratioPct,
+  type AlchemixCloseFacts,
+  type AlchemixPositionExplanationProps,
   type AlchemixRedemptionTotals,
 } from "@/components/protocol/alchemix/alchemix-position-explanation";
+import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
+import { formatDate } from "@/lib/date";
 import { ALCHEMIX_LIFETIME_FLOWS, alchemixPositionContent } from "@/lib/alchemix/learn-more";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
@@ -455,6 +461,16 @@ export function AlchemistPositionView({
     return note ? [note] : [];
   }, [drawnEvents, sharePriceLine, live, position.status]);
 
+  // "21 events in 11 transactions": the count line names the cards' unit
+  // beside the logs it counts. Said where every transaction is a card of its
+  // own; a V2 row is its own transaction.
+  const countDetail = useMemo(() => {
+    const txs = new Set(timelineEvents.map((e) => e.txHash)).size;
+    return txs > 0 && txs < timelineEvents.length
+      ? ` in ${txs.toLocaleString("en-US")} ${txs === 1 ? "transaction" : "transactions"}`
+      : undefined;
+  }, [timelineEvents]);
+
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `alchemix-${lineKey}-${tokenId}`,
     protocolKey: "alchemix-v3",
@@ -504,6 +520,27 @@ export function AlchemistPositionView({
     return seen.size > 0 ? { transactions: seen.size, eth } : null;
   }, [alchemistEvents]);
 
+  // A closed position's close: its last transaction of its own, and the split
+  // where that transaction was a self-liquidation.
+  const closeFacts = useMemo<AlchemixCloseFacts | null>(() => {
+    if (position.status !== "closed" || olderCount > 0) return null;
+    const own = alchemistEvents.filter((e) => e.context.data.scope === "position");
+    if (own.length === 0) return null;
+    const last = own.reduce((a, b) => (b.blockNumber > a.blockNumber ? b : a));
+    const self = own.find((e) => e.txHash === last.txHash && e.context.data.eventType === "self_liquidated");
+    return {
+      blockNumber: last.blockNumber,
+      timestamp: last.timestamp,
+      split: self
+        ? selfLiquidationSplit(
+            self,
+            siblingsByTx.get(self.txHash) ?? [self],
+            beforeByBlock.get(self.blockNumber) ?? null,
+          )
+        : null,
+    };
+  }, [position.status, olderCount, alchemistEvents, siblingsByTx, beforeByBlock]);
+
   // The window, narrowed to the one case it says something the timeline does
   // not: an ENDED position whose line has run on past it. Both blocks must be
   // in hand and the frontier must be the later of the two, or there is nothing
@@ -512,8 +549,9 @@ export function AlchemistPositionView({
     const w = lineEventWindow;
     if (!w?.positionEnded || w.endedAtBlock == null || w.lineFrontierBlock == null) return null;
     if (w.lineFrontierBlock <= w.endedAtBlock) return null;
-    return { endedAtBlock: w.endedAtBlock, lineFrontierBlock: w.lineFrontierBlock };
-  }, [lineEventWindow]);
+    const at = alchemistEvents.find((e) => e.blockNumber === w.endedAtBlock)?.timestamp ?? null;
+    return { endedAtBlock: w.endedAtBlock, endedAt: at };
+  }, [lineEventWindow, alchemistEvents]);
 
   // The top row's price list: the asset underneath in dollars, a vault share
   // in that asset, and the synthetic at the value the protocol counts it at,
@@ -615,13 +653,9 @@ export function AlchemistPositionView({
         ) : null}
       </span>
     ) : undefined;
-  // The collateral column drops the dollar figure where it reads the same as
-  // the figure in the asset underneath (collateralColumn).
-  const usdOnCard = Boolean(
-    live?.collateral.usd &&
-      live.collateral.underlying &&
-      formatCompact(live.collateral.usd.usd).display !== formatCompact(live.collateral.underlying.formatted).display,
-  );
+  // Whether the collateral column states the dollar figure (collateralUsdText).
+  const usdOnCard =
+    live != null && collateralUsdText(live.collateral.underlying ?? null, live.collateral.usd ?? null) != null;
   const v2Names =
     v2History && v2History.links.length > 0 ? (
       <>
@@ -635,6 +669,55 @@ export function AlchemistPositionView({
         ))}
       </>
     ) : null;
+
+  // The card's Explanation pane. A pane with nothing to say draws no (i).
+  const explanationProps: AlchemixPositionExplanationProps | null = live
+    ? {
+        live,
+        syntheticSymbol: sym,
+        mytSymbol,
+        redemptions: redemptionTotals,
+        net:
+          underlyingUnit && olderCount === 0
+            ? {
+                total: redemptionNetTotal,
+                underlyingSymbol: underlyingUnit.symbol,
+                prov:
+                  redemptionNetTotal.netRaw != null
+                    ? redemptionNetTotalProv(
+                        redemptionNetTotal.netRaw,
+                        redemptionNetTotal.counted,
+                        underlyingUnit.symbol,
+                        coords,
+                        redemptionNetTotal.fee,
+                      )
+                    : null,
+              }
+            : null,
+        vaultHref: live.collateral.mytAddress
+          ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
+          : null,
+        clearedOnCard: Boolean(eventsAlone && dlb && eventsAlone.clearedAccounts),
+        usdOnCard,
+        feeBps: lineProtocolFeeBps(chainId, lineKey),
+        lineLiquidations:
+          live.health?.lineLiquidations && live.health.lineLiquidations.count > 0
+            ? {
+                ...live.health.lineLiquidations,
+                prov: lineLiquidationsProv(
+                  live.health.lineLiquidations.count,
+                  live.health.lineLiquidations.throughBlock,
+                  coords,
+                ),
+              }
+            : null,
+        v2: v2History && v2History.links.length > 0 ? { names: v2Names, joined: v2History.joined } : null,
+        fall: live.health
+          ? shareFallToLiquidation(live.health.collateralizationRaw, live.health.collateralizationLowerBoundRaw)
+          : null,
+        close: closeFacts,
+      }
+    : null;
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -651,63 +734,11 @@ export function AlchemistPositionView({
         <PositionCardShell
           receipts
           explanation={
-            live ? (
-              <AlchemixPositionExplanation
-                live={live}
-                syntheticSymbol={sym}
-                mytSymbol={mytSymbol}
-                redemptions={redemptionTotals}
-                net={
-                  underlyingUnit && olderCount === 0
-                    ? {
-                        total: redemptionNetTotal,
-                        underlyingSymbol: underlyingUnit.symbol,
-                        prov:
-                          redemptionNetTotal.netRaw != null
-                            ? redemptionNetTotalProv(
-                                redemptionNetTotal.netRaw,
-                                redemptionNetTotal.counted,
-                                underlyingUnit.symbol,
-                                coords,
-                                redemptionNetTotal.fee,
-                              )
-                            : null,
-                      }
-                    : null
-                }
-                vaultHref={
-                  live.collateral.mytAddress
-                    ? explorerUrl(chainId as ChainId, "address", live.collateral.mytAddress)
-                    : null
-                }
-                clearedOnCard={Boolean(eventsAlone && dlb && eventsAlone.clearedAccounts)}
-                usdOnCard={usdOnCard}
-                feeBps={lineProtocolFeeBps(chainId, lineKey)}
-                lineLiquidations={
-                  live.health?.lineLiquidations && live.health.lineLiquidations.count > 0
-                    ? {
-                        ...live.health.lineLiquidations,
-                        prov: lineLiquidationsProv(
-                          live.health.lineLiquidations.count,
-                          live.health.lineLiquidations.throughBlock,
-                          coords,
-                        ),
-                      }
-                    : null
-                }
-                v2={v2History && v2History.links.length > 0 ? { names: v2Names, joined: v2History.joined } : null}
-                fall={
-                  live.health
-                    ? shareFallToLiquidation(
-                        live.health.collateralizationRaw,
-                        live.health.collateralizationLowerBoundRaw,
-                      )
-                    : null
-                }
-              />
+            explanationProps && hasAlchemixPositionExplanation(explanationProps) ? (
+              <AlchemixPositionExplanation {...explanationProps} />
             ) : undefined
           }
-          learnMore={live ? alchemixPositionContent(position.status) : undefined}
+          learnMore={live ? alchemixPositionContent(position.status, `${deployment.basePath}/info`) : undefined}
         >
           <OpenPositionStats
             statusPill={<AlchemixStatusPill status={position.status} />}
@@ -890,11 +921,12 @@ export function AlchemistPositionView({
                     />
                   }
                   // The count is this position's own logs plus every line
-                  // redemption's, not cards: an opening (deposit + mint) and a
-                  // close (force-repay + self-liquidated) are two logs each but
-                  // one card here, so the count reads ahead of the cards on
-                  // screen.
-                  countTooltip="Counts logs, not cards: an opening and a close each combine two of this position's own logs into one card."
+                  // redemption's: a transaction that moved more than one thing
+                  // (an opening, a deposit with a mint, a close) is two logs
+                  // or more but one card, so the line names the transactions
+                  // too ("21 events in 11 transactions").
+                  countTooltip="Counts logs: a transaction that moved more than one thing (an opening, a deposit with a mint, a close) is one card holding each of its logs."
+                  countDetail={countDetail}
                   notice={
                     (lineScopedNote && redemptionRowDrawn) || endedWindow ? (
                       <div className="space-y-1">
@@ -908,10 +940,11 @@ export function AlchemistPositionView({
                     sentence would restate the timeline. */}
                         {endedWindow ? (
                           <p className="px-1 text-[11px] leading-relaxed text-rb-500">
-                            This position ended at block {block(endedWindow.endedAtBlock)}, and the line has been
-                            indexed to block {block(endedWindow.lineFrontierBlock)} since. A position that has ended
-                            cannot be moved by a later redemption, so none of the line&rsquo;s events past that block
-                            are on this timeline.
+                            This position closed
+                            {endedWindow.endedAt != null ? (
+                              <> on {formatDate(endedWindow.endedAt)}</>
+                            ) : null} (block {block(endedWindow.endedAtBlock)}). Nothing on the line can change it after
+                            that, so the timeline ends there.
                           </p>
                         ) : null}
                       </div>
