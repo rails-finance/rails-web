@@ -53,6 +53,10 @@ function load(url: string): Promise<FrankencoinEventRead | null> {
   return p;
 }
 
+/** One event's read by its URL, from the page's cache: the Lifetime flows
+ *  replay splits every mint and repayment with the cards' own reads. */
+export const loadFrankencoinEventRead = (url: string): Promise<FrankencoinEventRead | null> => load(url);
+
 /** The event kinds whose ZCHF moved through the owner's wallet: a mint, a
  *  repayment, a combined adjust and a close. */
 export function frankencoinEventMovesZchf(ctx: FrankencoinContext): boolean {

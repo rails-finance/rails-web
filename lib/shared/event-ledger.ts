@@ -24,7 +24,14 @@ import {
   type FocusEvent,
   type TokenSum,
 } from "@/lib/shared/flow-focus";
-import type { FlowBucket, FlowModel, FlowSegment, FlowSide, FlowUnit } from "@/lib/shared/flows-timeline";
+import {
+  unitOf,
+  type FlowBucket,
+  type FlowModel,
+  type FlowSegment,
+  type FlowSide,
+  type FlowUnit,
+} from "@/lib/shared/flows-timeline";
 
 /** A row's part: a kind of flow the event left alone, the earlier movements
  *  of a kind it moved, its movement, an asset's interest, the price's
@@ -92,6 +99,9 @@ const THIS_ROW: Record<string, string> = {
   "Collateral swap": "This swap",
   "Debt swap": "This debt swap",
   "Debt written off": "This write-off",
+  Mint: "This mint",
+  "Challenge sale": "This challenge sale",
+  "Forced sale": "This forced sale",
   Rebalance: "This rebalance",
   "Pool liquidation": "This liquidation",
 };
@@ -241,7 +251,15 @@ export function dollarLedger({
 }): Ledger {
   const rows: LedgerRow[] = [];
   const row = (key: string, line: string, label: string, role: LedgerRole, seg: FlowSegment | null, d: number) =>
-    rows.push({ key, line, label, role, seg, tokens: null, usd: { dollars: d, text: signedUsd(d, model.unit) } });
+    rows.push({
+      key,
+      line,
+      label,
+      role,
+      seg,
+      tokens: null,
+      usd: { dollars: d, text: signedUsd(d, unitOf(model, side)) },
+    });
   for (const l of lines) {
     const b = model.buckets.find((x) => x.key === l.key);
     const words = ledgerWords(b, l.label);
@@ -258,7 +276,14 @@ export function dollarLedger({
       row(`${l.key}#event`, l.key, words.event, "event", seg, evDollars);
     } else row(l.key, l.key, interest ? l.label : words.plain, interest ? "interest" : "flow", seg, l.dollars);
   }
-  return { side, symbol: null, decimals: null, rows, tokens: null, usd: usdTotal(dollars, before, model.unit) };
+  return {
+    side,
+    symbol: null,
+    decimals: null,
+    rows,
+    tokens: null,
+    usd: usdTotal(dollars, before, unitOf(model, side)),
+  };
 }
 
 /** A side holding several assets: one ledger per asset in its token, each

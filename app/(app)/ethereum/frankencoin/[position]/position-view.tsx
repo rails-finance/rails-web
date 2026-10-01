@@ -56,9 +56,15 @@ import {
   type FrankencoinEventTally,
 } from "@/components/protocol/frankencoin/frankencoin-position-explanation";
 import { FrankencoinChallengeCard } from "@/components/protocol/frankencoin/frankencoin-challenge-card";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeFrankencoinEconomics, frankencoinLifetimeWithOpening } from "@/lib/frankencoin/economics";
-import { frankencoinEconomicsExplanation, frankencoinEconomicsContent } from "@/lib/frankencoin/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import {
+  FrankencoinFlowsNote,
+  frankencoinFlowsContent,
+} from "@/components/protocol/frankencoin/frankencoin-flows-note";
+import { useFrankencoinFlows } from "@/hooks/useFrankencoinFlows";
+import { frankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
 import { FRANKENCOIN_ADDRESSES, normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -328,18 +334,15 @@ export default function FrankencoinPositionView({
     storageKey: `frankencoin-${position}`,
     protocolKey: "frankencoin",
     window: historyWindow,
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
-  // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
-  const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? frankEvents : undefined;
-  const precomputedLifetime = useMemo(
-    () => frankencoinLifetimeWithOpening(frankEvents, opening),
-    [frankEvents, opening],
+  // A closed card's lifetime line reads the whole history only: a window's
+  // rows are not the life.
+  const lifetimeDebt = useMemo(
+    () => (historyWindow.state === "whole" ? frankencoinLifetimeDebt(frankEvents) : null),
+    [frankEvents, historyWindow.state],
   );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
@@ -355,6 +358,30 @@ export default function FrankencoinPositionView({
       missing: Math.max((res.totalEvents ?? served.length) - served.length, 0),
     };
   }, [position]);
+
+  // The Lifetime flows panel replays the position's whole history
+  // (lib/frankencoin/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read), the opening transaction's
+  // figures put in place; a read short of the whole history is a failed read.
+  const prepareFlows = useCallback(
+    (evs: BaseActivityEvent[]) => applyFrankencoinOpening(evs.filter(isFrankencoinEvent), openingRead),
+    [openingRead],
+  );
+  const flowLive = useMemo(
+    () => (chain ? { coll: chain.collateral ?? null, debt: chain.minted ?? null } : null),
+    [chain],
+  );
+  const flows = useFrankencoinFlows({
+    wholeEvents: historyWindow.state === "whole" ? frankEvents : null,
+    fetchAll: fetchAllHistory,
+    prepare: prepareFlows,
+    preparing: openingPending,
+    collSymbol: view?.collateralSymbol ?? null,
+    open: view != null && view.status !== "closed",
+    live: flowLive,
+    liveSettled: chainSettled,
+  });
+  const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
   if (position == null) {
     return (
@@ -388,161 +415,171 @@ export default function FrankencoinPositionView({
     ];
   }, [view, chain]);
 
-  const towerData = view ? computeFrankencoinEconomics(view, lifetimeEvents, precomputedLifetime) : null;
-
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="frankencoin"
-        assets={stripAssets}
-        priceReason={ORACLE_USD_REASON.frankencoin}
-        closed={view != null && view.status !== "open"}
-      >
-        {view && (
-          <FrankencoinExportMenu
-            position={position}
-            view={view}
-            chain={chain}
-            events={frankEvents}
-            csvFilename={`frankencoin-${position.slice(0, 10)}-activity.csv`}
-            fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, frankEvents)}
-            scopeNote={exportScopeNote(historyWindow, frankEvents, "this position's whole history")}
-          />
-        )}
-      </DetailTopRow>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="frankencoin"
+          assets={stripAssets}
+          priceReason={ORACLE_USD_REASON.frankencoin}
+          closed={view != null && view.status !== "open"}
+        >
+          {view && (
+            <FrankencoinExportMenu
+              position={position}
+              view={view}
+              chain={chain}
+              events={frankEvents}
+              csvFilename={`frankencoin-${position.slice(0, 10)}-activity.csv`}
+              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, frankEvents)}
+              scopeNote={exportScopeNote(historyWindow, frankEvents, "this position's whole history")}
+            />
+          )}
+        </DetailTopRow>
 
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : view == null ? (
-        <div className="text-sm text-rb-500">
-          Nothing readable at this address — not a Frankencoin Position contract, or the chain read is unavailable.
-        </div>
-      ) : (
-        <>
-          <FrankencoinPageFactsProvider value={pageFacts}>
-            <FrankencoinPositionCard
-              v={view}
-              cloneParent={cloneParent}
-              ending={ending}
-              lifetimeDebt={towerData?.debt}
-              receipts
-              viewHref={tl.viewHref}
-              // The context strip riding the heading-button row: the live
-              // challenge state and the cooldown — the risk grammar's own
-              // surfaces, from the position's slots at head.
-              rowExtra={
-                chain && view.status === "open" ? (
-                  <RiskFooterStrip>
-                    {(chain.challengedAmount ?? 0) > 0 ? (
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : view == null ? (
+          <div className="text-sm text-rb-500">
+            Nothing readable at this address — not a Frankencoin Position contract, or the chain read is unavailable.
+          </div>
+        ) : (
+          <>
+            <FrankencoinPageFactsProvider value={pageFacts}>
+              <FrankencoinPositionCard
+                v={view}
+                cloneParent={cloneParent}
+                ending={ending}
+                lifetimeDebt={lifetimeDebt}
+                receipts
+                viewHref={tl.viewHref}
+                // The context strip riding the heading-button row: the live
+                // challenge state and the cooldown — the risk grammar's own
+                // surfaces, from the position's slots at head.
+                rowExtra={
+                  chain && view.status === "open" ? (
+                    <RiskFooterStrip>
+                      {(chain.challengedAmount ?? 0) > 0 ? (
+                        <RiskFigure caution>
+                          Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
+                        </RiskFigure>
+                      ) : summary ? (
+                        <RiskFigure>
+                          {summary.challengeCount === 0
+                            ? "never challenged"
+                            : `challenged ${summary.challengeCount}×, none running`}
+                        </RiskFigure>
+                      ) : null}
+                      {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
+                        <RiskFigure>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
+                      ) : null}
+                      {chain.cooldownActive && chain.cooldownUntil != null ? (
+                        <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
+                      ) : !chain.mintingDisabledForGood ? (
+                        <RiskFigure>no minting cooldown</RiskFigure>
+                      ) : null}
+                    </RiskFooterStrip>
+                  ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
+                    <RiskFooterStrip>
                       <RiskFigure caution>
                         Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
                       </RiskFigure>
-                    ) : summary ? (
-                      <RiskFigure>
-                        {summary.challengeCount === 0
-                          ? "never challenged"
-                          : `challenged ${summary.challengeCount}×, none running`}
-                      </RiskFigure>
-                    ) : null}
-                    {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
-                      <RiskFigure>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
-                    ) : null}
-                    {chain.cooldownActive && chain.cooldownUntil != null ? (
-                      <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
-                    ) : !chain.mintingDisabledForGood ? (
-                      <RiskFigure>no minting cooldown</RiskFigure>
-                    ) : null}
-                  </RiskFooterStrip>
-                ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
-                  <RiskFooterStrip>
-                    <RiskFigure caution>
-                      Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                    </RiskFigure>
-                  </RiskFooterStrip>
-                ) : undefined
-              }
-              // Everything describing the CURRENT on-chain position lives on
-              // the card: the Explanation heading-button holds the narration —
-              // mounted when the live read landed.
-              explanation={
-                chain ? (
-                  <FrankencoinPositionExplanation
-                    chain={chain}
-                    openedAt={summary?.openedAt}
-                    challengeCount={summary?.challengeCount}
-                    denied={summary?.status === "denied"}
-                    txCount={summary?.txCount}
-                    eventTally={eventTally}
-                    cloneParent={cloneParent}
-                    lastMint={lastMint}
-                    ending={ending}
-                    closedAt={summary?.lastActivityAt ?? null}
-                  />
-                ) : undefined
-              }
-            />
-
-            {towerData && (
-              <ChainTruthTower
-                data={towerData}
-                explanation={frankencoinEconomicsExplanation(towerData, view.hub)}
-                learnMore={frankencoinEconomicsContent(view.status === "open")}
+                    </RiskFooterStrip>
+                  ) : undefined
+                }
+                // Everything describing the CURRENT on-chain position lives on
+                // the card: the Explanation heading-button holds the narration —
+                // mounted when the live read landed.
+                explanation={
+                  chain ? (
+                    <FrankencoinPositionExplanation
+                      chain={chain}
+                      openedAt={summary?.openedAt}
+                      challengeCount={summary?.challengeCount}
+                      denied={summary?.status === "denied"}
+                      txCount={summary?.txCount}
+                      eventTally={eventTally}
+                      cloneParent={cloneParent}
+                      lastMint={lastMint}
+                      ending={ending}
+                      closedAt={summary?.lastActivityAt ?? null}
+                    />
+                  ) : undefined
+                }
               />
-            )}
 
-            {/* The challenge forensics card — grouped by (hub, challenge
+              {/* Lifetime flows: the bars and the line over the position's
+              replay (lib/frankencoin/flows.ts), the collateral in its token
+              and the debt in ZCHF, in place of the tower (TO-DO-ui-jobs 206). */}
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <FrankencoinFlowsNote
+                      facts={flows.facts}
+                      collSymbol={view.collateralSymbol}
+                      clone={chain?.isClone ?? cloneParent != null}
+                    />
+                  </div>
+                }
+                learnMore={frankencoinFlowsContent()}
+              />
+
+              {/* The challenge forensics card — grouped by (hub, challenge
               number), slices within; renders only when history carries
               challenges. On a windowed page it reads the loaded rows alone —
               a challenge older than the window is summarised in the counts
               above the timeline, not re-narrated here. No observed position
               is deep enough to reach that case. */}
-            <FrankencoinChallengeCard
-              events={frankEvents}
-              positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
-            />
-
-            {indexPending && frankEvents.length === 0 ? (
-              <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                Event history pending — the indexed backend for this explorer is still being filled. Everything above is
-                read live from the position contract at the latest block.
-              </div>
-            ) : (
-              <ChainTruthTimeline
-                csvExportCeiling={DRAINED_ROW_CEILING}
-                // Matches `FrankencoinEventCard`'s own `persistKey={`frankencoin:${event.id}`}` —
-                // lets pinned mode (the per-event share route) force a landed
-                // card's detail panel open on its first mount.
-                persistKeyPrefix="frankencoin"
-                closed={view.status !== "open"}
-                tl={tl}
-                runs={FRANKENCOIN_AUCTION_RUNS}
-                toolbarLeading={
-                  <TimelineActivityHeader
-                    events={frankEvents}
-                    closed={view.status !== "open"}
-                    // When the position actually opened, not when the window
-                    // does.
-                    firstAt={opening?.firstTimestamp}
-                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  />
-                }
-                renderCard={(event, meta) =>
-                  isFrankencoinEvent(event) ? (
-                    <FrankencoinEventCard
-                      event={event}
-                      eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                    />
-                  ) : null
-                }
+              <FrankencoinChallengeCard
+                events={frankEvents}
+                positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
               />
-            )}
-          </FrankencoinPageFactsProvider>
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+
+              {indexPending && frankEvents.length === 0 ? (
+                <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
+                  Event history pending — the indexed backend for this explorer is still being filled. Everything above
+                  is read live from the position contract at the latest block.
+                </div>
+              ) : (
+                <ChainTruthTimeline
+                  csvExportCeiling={DRAINED_ROW_CEILING}
+                  // Matches `FrankencoinEventCard`'s own `persistKey={`frankencoin:${event.id}`}` —
+                  // lets pinned mode (the per-event share route) force a landed
+                  // card's detail panel open on its first mount.
+                  persistKeyPrefix="frankencoin"
+                  closed={view.status !== "open"}
+                  tl={tl}
+                  runs={FRANKENCOIN_AUCTION_RUNS}
+                  toolbarLeading={
+                    <TimelineActivityHeader
+                      events={frankEvents}
+                      closed={view.status !== "open"}
+                      // When the position actually opened, not when the window
+                      // does.
+                      firstAt={opening?.firstTimestamp}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                    />
+                  }
+                  renderCard={(event, meta) =>
+                    isFrankencoinEvent(event) ? (
+                      <FrankencoinEventCard
+                        event={event}
+                        eventNumber={meta.eventNumber}
+                        isFirst={meta.isFirst}
+                        isLast={meta.isLast}
+                      />
+                    ) : null
+                  }
+                />
+              )}
+            </FrankencoinPageFactsProvider>
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }

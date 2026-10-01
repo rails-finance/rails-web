@@ -36,9 +36,11 @@ import {
   oldPriceAt,
   spokenUsd,
   stateAt,
+  unitOf,
   type FlowModel,
   type FlowSide,
   type FlowSideState,
+  type FlowUnit,
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel } from "@/components/shared/flow-old-price";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
@@ -244,12 +246,16 @@ const throughputProv = (what: string, figure: string): Provenance => ({
 });
 
 export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt: boolean }) {
-  const u = useFlowUnit();
-  const fig = (v: number, what: string) => (
-    <Prov info={throughputProv(what, formatFlowUsd(v, u))}>
-      <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v, u)}</span>
-    </Prov>
-  );
+  const uc = useFlowUnit("collateral");
+  const ud = useFlowUnit("debt");
+  const fig = (v: number, what: string) => {
+    const u = what === "Borrowed" ? ud : uc;
+    return (
+      <Prov info={throughputProv(what, formatFlowUsd(v, u))}>
+        <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v, u)}</span>
+      </Prov>
+    );
+  };
   return (
     <p className="mb-3 text-xs leading-relaxed text-rb-500" data-flow-throughput="" data-anatomy="F11">
       {fig(t.deposited, "Deposited")} deposited
@@ -268,8 +274,18 @@ export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; h
 
 /** The shared axis's labels, once, under the last bar, in both bar views;
  *  a phone thins them (`axisLabelOnPhone`). */
-export function AxisLabels({ ticks, max }: { ticks: number[]; max: number }) {
-  const unit = useFlowUnit();
+export function AxisLabels({
+  ticks,
+  max,
+  unit: sideUnit,
+}: {
+  ticks: number[];
+  max: number;
+  /** The bar's token, where each bar has its own axis (`FlowModel.sideAxes`). */
+  unit?: FlowUnit;
+}) {
+  const ctxUnit = useFlowUnit();
+  const unit = sideUnit ?? ctxUnit;
   return (
     <div
       className="relative mt-1 h-4 text-[11px] tabular-nums text-rb-500"
@@ -316,7 +332,9 @@ export function Headline({
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
-        <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now, model.unit)}</span>
+        <span className="text-xl font-semibold tabular-nums text-foreground">
+          {formatFlowUsd(st.now, unitOf(model, side))}
+        </span>
       </Prov>
       {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
       <span className="text-xs text-rb-500">{word}</span>
@@ -347,10 +365,20 @@ export function Rescaled({
   outline?: boolean;
 }) {
   // Fixed per position: the most either side has held or owed at any stop.
-  const axis = useMemo(() => {
+  const sharedAxis = useMemo(() => {
     let peak = Math.max(model.live.collateralUsd, model.live.debtUsd);
     for (const v of model.valued) peak = Math.max(peak, v.collateral, v.debt);
     return axisFor(peak);
+  }, [model]);
+  // Each bar on its own axis where the sides have no common unit.
+  const axes = useMemo(() => {
+    if (!model.sideUnits) return null;
+    const peak = { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
+    for (const v of model.valued) {
+      peak.collateral = Math.max(peak.collateral, v.collateral);
+      peak.debt = Math.max(peak.debt, v.debt);
+    }
+    return { collateral: axisFor(peak.collateral), debt: axisFor(peak.debt) };
   }, [model]);
   const sides: FlowSide[] = hasDebt ? ["collateral", "debt"] : ["collateral"];
   const live = { collateral: model.live.collateralUsd, debt: model.live.debtUsd };
@@ -376,6 +404,8 @@ export function Rescaled({
       {sides.map((side, i) => {
         const st = s[side];
         const word = side === "collateral" ? model.labels.collateral : model.labels.debt;
+        const axis = axes?.[side] ?? sharedAxis;
+        const u = unitOf(model, side);
         return (
           <div
             key={side}
@@ -386,7 +416,7 @@ export function Rescaled({
             <div className="relative h-10 sm:h-11">
               <div
                 role="img"
-                aria-label={`${word}: ${spokenUsd(st.now, model.unit)}.`}
+                aria-label={`${word}: ${spokenUsd(st.now, u)}.`}
                 className="absolute inset-0 overflow-hidden rounded-md bg-sunken"
               >
                 {axis.ticks.slice(1).map((t) => (
@@ -409,8 +439,8 @@ export function Rescaled({
                 className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!tip && open?.side === side ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 aria-label={
                   tip
-                    ? `${st.bar[0].label}: ${spokenUsd(st.now, model.unit)}`
-                    : `${word}: ${spokenUsd(st.now, model.unit)}. Open how its flows add up.`
+                    ? `${st.bar[0].label}: ${spokenUsd(st.now, u)}`
+                    : `${word}: ${spokenUsd(st.now, u)}. Open how its flows add up.`
                 }
                 aria-expanded={open?.side === side}
                 aria-haspopup="dialog"
@@ -419,7 +449,7 @@ export function Rescaled({
               />
               {open?.side === side && (
                 <FlowPanelShell
-                  label={`${word}: ${spokenUsd(st.now, model.unit)}`}
+                  label={`${word}: ${spokenUsd(st.now, u)}`}
                   anchor={() => document.querySelector<HTMLElement>(`[data-flow-seg="${side}-busy"]`)}
                   onClose={() => setOpen(null)}
                   focusOnOpen={open.keyboard}
@@ -463,7 +493,7 @@ export function Rescaled({
                 />
               )}
             </div>
-            {i === sides.length - 1 && <AxisLabels ticks={axis.ticks} max={axis.max} />}
+            {(i === sides.length - 1 || axes) && <AxisLabels ticks={axis.ticks} max={axis.max} unit={u} />}
           </div>
         );
       })}

@@ -47,6 +47,8 @@ import {
   termText,
 } from "@/lib/frankencoin/figures";
 import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { useFrankencoinLedgerCells } from "./frankencoin-ledger";
 import { dateTimeText, phaseText, spanText, useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
 import { formatDate } from "@/lib/date";
 import type { FrankencoinOpeningRead } from "@/lib/sources/chain/frankencoin-event";
@@ -134,6 +136,15 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
   const dec = ctx.collateralDecimals;
   const { read, pending } = useFrankencoinEventRead(ctx, txHash, eventId);
   const facts = useFrankencoinPageFacts();
+  // The cells that open into the Lifetime flows ledgers: a ledger row's
+  // Collateral and Debt, where the page has them; while the model is on its
+  // way, they stand as placeholder rows.
+  const cells = useFrankencoinLedgerCells();
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const ledgerRow = ctx.raw?.collateral != null || ctx.raw?.minted != null;
+  const collLedger = ledgerRow && (cells != null || flowsPending) ? { ledger: "collateral" as const } : {};
+  const debtLedger = ledgerRow && (cells?.debt || flowsPending) ? { ledger: "debt" as const } : {};
 
   const stats: ChainTruthStat[] = [];
 
@@ -448,7 +459,11 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
       // set, from the page's opening read.
       const o = ctx.eventType === "open" ? (facts?.opening ?? null) : null;
       if (o) {
-        stats.push(...openingStats(o, ctx, coords, timestamp, facts?.deniedAt ?? null));
+        stats.push(
+          ...openingStats(o, ctx, coords, timestamp, facts?.deniedAt ?? null).map((st) =>
+            st.label === "Collateral deposited" ? { ...st, ...collLedger } : st,
+          ),
+        );
         break;
       }
       if (ctx.eventType === "open" && facts?.openingPending) {
@@ -496,6 +511,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
             ctx.beforeReadAtBlock,
           ),
           changed: ctx.collateral !== ctx.collateralBefore,
+          ...collLedger,
         });
       if (ctx.minted != null) {
         const dMint = ctx.mintedBefore != null ? Number(ctx.minted) - Number(ctx.mintedBefore) : 0;
@@ -507,6 +523,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
           prov: mintedAfterProv(coords, ctx.raw?.minted),
           transition: transitionOf(ctx.minted, ctx.mintedBefore, "minted", sym, coords, fmtZchf, ctx.raw?.mintedBefore),
           changed: ctx.minted !== ctx.mintedBefore,
+          ...debtLedger,
           sub:
             zchfSplitLine(read ? frankencoinZchfSplit(read, dMint) : null, coords, sym) ??
             (pending ? <span className="text-rb-400">reading the receipt…</span> : undefined),

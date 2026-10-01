@@ -46,6 +46,7 @@ import {
   FlowCursorContext,
   FlowPanelShell,
   FlowUnitContext,
+  FlowSideUnitsContext,
   useFlowUnit,
   sumSwatch,
   KEEP_PANEL,
@@ -66,8 +67,10 @@ import {
   nextEventDay,
   oldPriceAt,
   prevEventDay,
+  sideAxis,
   spokenUsd,
   stateAt,
+  unitOf,
   type FlowAssetHeld,
   type FlowModel,
   type FlowSegment,
@@ -272,7 +275,7 @@ function Strip({
   focus?: boolean;
 }) {
   const shown = segments.filter((s) => s.width > 0);
-  const unit = useFlowUnit();
+  const unit = useFlowUnit(side);
   const [trackRef, trackPx, settled] = useTrackWidth();
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   // Until the track is measured (the server's render, the first paint) the
@@ -411,7 +414,8 @@ function SideBlock({
   const outs = st.bar.filter((s) => s.fill === "out");
   const liquidated = outs.filter((s) => s.tone === "liquidation").reduce((a, s) => a + s.value, 0);
   const repaid = st.out - liquidated;
-  const u = model.unit;
+  const u = unitOf(model, side);
+  const axis = sideAxis(model, side);
   const spoken = coll
     ? `${word}: ${spokenUsd(st.now, u)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total, u)} that came in; ${spokenUsd(st.out, u)} has left.`
     : `${word}: ${spokenUsd(st.now, u)} owed, of ${spokenUsd(st.total, u)} owed in all; ${spokenUsd(repaid, u)} repaid` +
@@ -439,8 +443,8 @@ function SideBlock({
       <Strip
         side={side}
         segments={st.bar}
-        max={model.axis.max}
-        ticks={model.axis.ticks}
+        max={axis.max}
+        ticks={axis.ticks}
         height="h-10 sm:h-11"
         today={atLive ? null : coll ? model.today.collateral : model.today.debt}
         active={active}
@@ -471,7 +475,8 @@ function SideBlock({
           )
         }
       />
-      {last && <AxisLabels ticks={model.axis.ticks} max={model.axis.max} />}
+      {/* Each bar on its own axis where the sides have no common unit. */}
+      {(last || model.sideAxes) && <AxisLabels ticks={axis.ticks} max={axis.max} unit={u} />}
     </div>
   );
 }
@@ -628,6 +633,10 @@ export function LifetimeFlowsScrubber({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lifetime, seriesKey, binInput, bin]);
 
+  // The line's unit: each side's token where the sides have none in common.
+  const basisUnit = model?.sideUnits
+    ? `${model.sideUnits.collateral.symbol} and ${model.sideUnits.debt.symbol}`
+    : (model?.unit?.symbol ?? "USD");
   const words = useMemo(
     () => (bars && model ? panelWords(model, bars, from, bin, lined, busy, focused) : null),
     [model, bars, from, bin, lined, busy, focused],
@@ -643,36 +652,40 @@ export function LifetimeFlowsScrubber({
       shade: lined && from > 0 ? "The bars' window" : null,
       views: words.key,
       explain: words.explain,
-      basis: lined ? `${model?.unit?.symbol ?? "USD"} at each ${bin}’s close` : undefined,
+      basis: lined ? `${basisUnit} at each ${bin}’s close` : undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, model?.unit?.symbol]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;
   if (!lined)
     return (
       <FlowUnitContext.Provider value={model.unit ?? null}>
-        {busy ? (
-          <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
-        ) : (
-          <ScrubberBody model={bars} onKey={setHatches} />
-        )}
+        <FlowSideUnitsContext.Provider value={model.sideUnits ?? null}>
+          {busy ? (
+            <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
+          ) : (
+            <ScrubberBody model={bars} onKey={setHatches} />
+          )}
+        </FlowSideUnitsContext.Provider>
       </FlowUnitContext.Provider>
     );
   return (
     <FlowUnitContext.Provider value={model.unit ?? null}>
-      <CombinedFlows
-        model={model}
-        bars={bars}
-        from={from}
-        busy={busy}
-        series={lifetime?.series ?? null}
-        failed={lifetime?.failed ?? false}
-        onLedgerNote={ledgerNote ?? undefined}
-        renderBars={(stop, when, isLive, atLive) => (
-          <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
-        )}
-      />
+      <FlowSideUnitsContext.Provider value={model.sideUnits ?? null}>
+        <CombinedFlows
+          model={model}
+          bars={bars}
+          from={from}
+          busy={busy}
+          series={lifetime?.series ?? null}
+          failed={lifetime?.failed ?? false}
+          onLedgerNote={ledgerNote ?? undefined}
+          renderBars={(stop, when, isLive, atLive) => (
+            <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
+          )}
+        />
+      </FlowSideUnitsContext.Provider>
     </FlowUnitContext.Provider>
   );
 }

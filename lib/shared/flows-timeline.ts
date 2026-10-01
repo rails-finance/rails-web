@@ -275,6 +275,12 @@ export interface FlowUnit {
 export interface FlowTimeline {
   /** Set where the figures are a token's (Morpho's loan token); absent, USD. */
   unit?: FlowUnit;
+  /** Set where each side is in its own token and nothing prices one in the
+   *  other (Frankencoin: the collateral token and ZCHF). Each side's figures
+   *  are its token in grains, and each bar and each side of the line is drawn
+   *  on its own axis (`sideAxis`). `unit` names the figures a view cannot
+   *  place on a side. */
+  sideUnits?: Record<FlowSide, FlowUnit>;
   buckets: FlowBucket[];
   /** Ascending by day. */
   days: FlowDayRow[];
@@ -345,6 +351,9 @@ export interface FlowMomentWords {
    *  interest built on the recorded balance since the last event: their
    *  token figure is their USD figure (a Liquity Trove's debt). */
   face?: FlowSide[];
+  /** Sides stated in their token alone, with no price beside it (a side
+   *  whose figures are its own token, `FlowTimeline.sideUnits`). */
+  tokensOnly?: FlowSide[];
   /** Why a side states no USD where no price was recorded that day. */
   noPrice?: Partial<Record<FlowSide, string>>;
   /** Lines under the figures, on what the moment leaves out. */
@@ -383,6 +392,10 @@ interface FlowRow {
 export interface FlowModel {
   /** The timeline's token axis, where it has one; absent, USD. */
   unit?: FlowUnit;
+  /** Each side's token, where the sides have no common unit
+   *  (`FlowTimeline.sideUnits`), and each bar's axis. */
+  sideUnits?: Record<FlowSide, FlowUnit>;
+  sideAxes?: Record<FlowSide, { max: number; ticks: number[] }>;
   buckets: FlowBucket[];
   /** One per active day, ascending. */
   rows: FlowRow[];
@@ -789,16 +802,27 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     debt: t.live.debtUsd + outOf("debt", last.cum),
   };
   let peak = Math.max(today.collateral, today.debt);
+  const sidePeak = { collateral: today.collateral, debt: today.debt };
   let ri = 0;
   for (let stop = 0; stop < liveStop; stop++) {
     while (ri + 1 < rows.length && rows[ri + 1].day <= stop) ri++;
     const c = rows[ri].cum;
-    peak = Math.max(peak, valued[stop].collateral + outOf("collateral", c), valued[stop].debt + outOf("debt", c));
+    const coll = valued[stop].collateral + outOf("collateral", c);
+    const owed = valued[stop].debt + outOf("debt", c);
+    peak = Math.max(peak, coll, owed);
+    sidePeak.collateral = Math.max(sidePeak.collateral, coll);
+    sidePeak.debt = Math.max(sidePeak.debt, owed);
   }
   // An exact inflow can exceed its bar where a price fell; the drill-down
   // strip clamps to the bar, so the axis follows the bars alone.
   return {
     ...(t.unit ? { unit: t.unit } : {}),
+    ...(t.sideUnits
+      ? {
+          sideUnits: t.sideUnits,
+          sideAxes: { collateral: axisFor(sidePeak.collateral), debt: axisFor(sidePeak.debt) },
+        }
+      : {}),
     buckets: t.buckets,
     rows,
     start,
@@ -1089,11 +1113,16 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     debt: m.live.debtUsd + outOf("debt", last.cum),
   };
   let peak = Math.max(today.collateral, today.debt);
+  const sidePeak = { collateral: today.collateral, debt: today.debt };
   let ri = 0;
   for (let stop = 0; stop < liveStop; stop++) {
     while (ri + 1 < rows.length && rows[ri + 1].day <= stop) ri++;
     const c = rows[ri].day <= stop ? rows[ri].cum : {};
-    peak = Math.max(peak, valued[stop].collateral + outOf("collateral", c), valued[stop].debt + outOf("debt", c));
+    const coll = valued[stop].collateral + outOf("collateral", c);
+    const owed = valued[stop].debt + outOf("debt", c);
+    peak = Math.max(peak, coll, owed);
+    sidePeak.collateral = Math.max(sidePeak.collateral, coll);
+    sidePeak.debt = Math.max(sidePeak.debt, owed);
   }
   const before = m.valued[from - 1];
   const baseRow = base >= 0 ? m.rows[base] : null;
@@ -1110,6 +1139,7 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     stale: new Map([...m.stale].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
     heldAt: m.heldAt.slice(from),
     axis: axisFor(peak),
+    ...(m.sideAxes ? { sideAxes: { collateral: axisFor(sidePeak.collateral), debt: axisFor(sidePeak.debt) } } : {}),
     today,
     opening: {
       ts: (m.start + from * DAY_MS) / 1000,
@@ -1172,6 +1202,16 @@ export function spokenUsd(v: number, unit?: FlowUnit): string {
 // units of 10^-scale (grains), so the whole-unit rounding the sums use
 // (lib/shared/flows-sum.ts) rounds to the token's printed decimals and the
 // printed lines still add to the printed total.
+
+/** A side's token: its own where the sides have none in common
+ *  (`FlowTimeline.sideUnits`), else the model's. */
+export const unitOf = (m: Pick<FlowModel, "unit" | "sideUnits">, side: FlowSide): FlowUnit | undefined =>
+  m.sideUnits?.[side] ?? m.unit;
+
+/** A side's bar axis: its own where the sides have no common unit, else the
+ *  shared one. */
+export const sideAxis = (m: Pick<FlowModel, "axis" | "sideAxes">, side: FlowSide): { max: number; ticks: number[] } =>
+  m.sideAxes?.[side] ?? m.axis;
 
 /** Grains to the token. */
 export const unitAmount = (v: number, unit: FlowUnit): number => v / 10 ** unit.scale;

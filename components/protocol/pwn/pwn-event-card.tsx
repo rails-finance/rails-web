@@ -15,6 +15,7 @@ import { PwnEventHeader, fullAmount } from "./pwn-event-header";
 import { PwnEventDetail } from "./pwn-event-detail";
 import { PwnEventExplainer, pwnLearnMoreContent } from "./pwn-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { PwnLedgerProvider } from "./pwn-ledger";
 
 export interface PwnEventCardProps {
   event: PwnEvent;
@@ -161,37 +162,44 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
   );
 
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <PwnEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <PwnEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          timestamp={event.timestamp}
-          siblings={sibs}
-        />
-      }
-      detailLabel="Loan terms"
-      explainer={<PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />}
-      explainerLabel="Plain English"
-      explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
-      txHash={event.txHash}
-      txHashLabel="Transaction"
-      learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
-      persistKey={`pwn:${event.id}`}
-    />
+    <PwnLedgerProvider
+      eventId={event.id}
+      eventTs={event.timestamp}
+      flowRow={ctx.eventType === "created" || ctx.eventType === "paid_back" || isSeizure}
+    >
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <PwnEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            flows={event.flows}
+          />
+        }
+        detail={
+          <PwnEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            timestamp={event.timestamp}
+            siblings={sibs}
+            eventId={event.id}
+          />
+        }
+        detailLabel="Loan terms"
+        explainer={<PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />}
+        explainerLabel="Plain English"
+        explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
+        txHash={event.txHash}
+        txHashLabel="Transaction"
+        learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
+        persistKey={`pwn:${event.id}`}
+      />
+    </PwnLedgerProvider>
   );
 }

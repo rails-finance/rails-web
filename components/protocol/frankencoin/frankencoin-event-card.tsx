@@ -14,6 +14,7 @@
 
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -182,49 +183,53 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
     );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <FrankencoinEventHeader
-          actionLabel={
-            ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel
-          }
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <FrankencoinEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventId={event.id}
-          timestamp={event.timestamp}
-        />
-      }
-      detailLabel="Position state"
-      explainer={
-        <FrankencoinEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          timestamp={event.timestamp}
-          eventId={event.id}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />}
-      persistKey={`frankencoin:${event.id}`}
-    />
+    <FrankencoinLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <FrankencoinEventHeader
+            actionLabel={
+              ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel
+            }
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            flows={event.flows}
+          />
+        }
+        detail={
+          <FrankencoinEventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventId={event.id}
+            timestamp={event.timestamp}
+          />
+        }
+        detailLabel="Position state"
+        explainer={
+          <FrankencoinEventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            timestamp={event.timestamp}
+            eventId={event.id}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />}
+        persistKey={`frankencoin:${event.id}`}
+      />
+    </FrankencoinLedgerProvider>
   );
 }
 
