@@ -2,8 +2,7 @@
 
 // The event card's ledger (rails-ops reference/lifetime-flows-scrubber.md,
 // "The event card's sum"; anatomy T2.1). Each account cell of an opened card
-// (Collateral, Debt) is one row closed, its closing line: the side's name,
-// before → after, and a toggle at the right end of the cell's first line (the
+// (Collateral, Debt) is one row closed, its closing line: before → after, and a toggle at the right end of the cell's first line (the
 // name's line) that opens the cell into its ledger: one row per kind of flow
 // as of the event, the event's row highlighted, a rule, and the closing line.
 // The toggle is one chevron, fixed to the cell's top right, that turns over
@@ -449,14 +448,14 @@ function LedgerRows({
         <span className="flex min-h-7 items-center self-start">
           <Swatch side={side} row={null} />
         </span>
-        {/* The name and the figure share the label's column, so a wide
-            before → after does not widen the column of figures above it. */}
+        {/* The line carries no visible name (the cell's first line states it);
+            the figure shares the label's column, so a wide before → after does
+            not widen the column of figures above it. */}
         <span
+          role="group"
+          aria-label={`${name} total`}
           className={`col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 py-1 ${hideTok ? "@max-md:col-span-1" : ""}`}
         >
-          <span className="truncate font-semibold text-foreground">{name}</span>
-          {/* Where the name and the figure do not share a line, the figure
-              takes the next, set right. */}
           {cols.tokens ? (
             <span className={`ml-auto whitespace-nowrap text-right ${hideTok}`}>
               {total?.before != null && (
@@ -606,8 +605,11 @@ export function AssetLedgers({
           data-ledger-dollars={usd.dollars}
         >
           <Swatch side={side} row={null} />
-          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3">
-            <span className="truncate font-semibold text-foreground">{SIDE_NAME[side]}</span>
+          <span
+            role="group"
+            aria-label={`${SIDE_NAME[side]} total`}
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3"
+          >
             <span className="ml-auto whitespace-nowrap text-right">
               {usd.before != null && (
                 <BeforeArrow>
