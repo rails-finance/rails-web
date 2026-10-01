@@ -20,6 +20,7 @@ import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liqu
 import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
 import { collDeltaProv, debtDeltaProv, closeRepaidProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
+import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 
 export interface LiquityV1EventCardProps {
   event: BaseActivityEvent & { context: { protocol: "liquity-v1"; data: LiquityV1Context } };
@@ -139,46 +140,50 @@ export function LiquityV1EventCard({
     <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
   );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <LiquityV1EventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-        />
-      }
-      detail={
-        <LiquityV1EventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          currentPrice={currentPrice}
-        />
-      }
-      detailLabel="Trove state"
-      explainer={
-        <LiquityV1EventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          currentPrice={currentPrice}
-          ownerOutcome={isLiq ? ownerOutcome : null}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={liquityV1ExplainerTeaser(ctx, coords)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={liquityV1LearnMoreContent(ctx)} />}
-      persistKey={`liquity-v1:${event.id}`}
-    />
+    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <LiquityV1EventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+          />
+        }
+        detail={
+          <LiquityV1EventDetail
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            currentPrice={currentPrice}
+          />
+        }
+        detailLabel="Trove state"
+        explainer={
+          <LiquityV1EventExplainer
+            ctx={ctx}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            wallet={event.wallet}
+            currentPrice={currentPrice}
+            ownerOutcome={isLiq ? ownerOutcome : null}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={liquityV1ExplainerTeaser(ctx, coords)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={liquityV1LearnMoreContent(ctx)} />}
+        persistKey={`liquity-v1:${event.id}`}
+      />
+    </LiquityLedgerProvider>
   );
 }

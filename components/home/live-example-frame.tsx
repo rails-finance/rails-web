@@ -13,7 +13,6 @@ import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary"
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { SpineTipContext } from "@/components/shared/spine-column";
-import { LiquityTroveBarsProvider } from "@/lib/liquity/use-trove-bars";
 import { TimelineDisplayProvider } from "@/components/shared/timeline-display-context";
 import { EventDateContext } from "@/components/shared/event-time";
 import { dayKey, shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -60,7 +59,7 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
   const { trove, liveState, prices, debtInFront, trovesAhead, visibleEvents, towerEvents, visibleTotal, totalEvents } =
     data;
   const currentPrice = prices?.[trove.collateralType.toLowerCase() as keyof OraclePricesData];
-  // The bars provider and previous-event seams take full events; the tower
+  // The previous-event seams take full events; the tower
   // projection carries every field they actually read (see HeroTowerEvent).
   const chronoEvents = towerEvents as unknown as BaseActivityEvent[];
   const chronoIndexById = new Map(towerEvents.map((e, i) => [e.id, i]));
@@ -137,46 +136,44 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
         </div>
 
         <TimelineDisplayProvider>
-          <LiquityTroveBarsProvider events={chronoEvents}>
-            <div className="space-y-2">
-              {visibleEvents.map((event, idx) => {
-                if (!isLiquityEvent(event)) return null;
-                const tempIdx = chronoIndexById.get(event.id) ?? 0;
-                const previousEvent = tempIdx > 0 ? chronoEvents[tempIdx - 1] : undefined;
-                // Day-grouping in display (newest-first) order — same rule as
-                // the trove page's renderCard.
-                // The newest AND the oldest card of each day carry the date,
-                // so an older card never reads as a bare time above a card
-                // dated the day before.
-                const prevDisplayed = idx > 0 ? visibleEvents[idx - 1] : undefined;
-                const nextDisplayed = idx + 1 < visibleEvents.length ? visibleEvents[idx + 1] : undefined;
-                const showDate =
-                  !prevDisplayed ||
-                  !nextDisplayed ||
-                  dayKey(event.timestamp) !== dayKey(prevDisplayed.timestamp) ||
-                  dayKey(event.timestamp) !== dayKey(nextDisplayed.timestamp);
-                const datePrefix = showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
-                return (
-                  <EventDateContext.Provider key={event.id} value={datePrefix}>
-                    {/* Newest-first, so the first card is the tip of the
+          <div className="space-y-2">
+            {visibleEvents.map((event, idx) => {
+              if (!isLiquityEvent(event)) return null;
+              const tempIdx = chronoIndexById.get(event.id) ?? 0;
+              const previousEvent = tempIdx > 0 ? chronoEvents[tempIdx - 1] : undefined;
+              // Day-grouping in display (newest-first) order — same rule as
+              // the trove page's renderCard.
+              // The newest AND the oldest card of each day carry the date,
+              // so an older card never reads as a bare time above a card
+              // dated the day before.
+              const prevDisplayed = idx > 0 ? visibleEvents[idx - 1] : undefined;
+              const nextDisplayed = idx + 1 < visibleEvents.length ? visibleEvents[idx + 1] : undefined;
+              const showDate =
+                !prevDisplayed ||
+                !nextDisplayed ||
+                dayKey(event.timestamp) !== dayKey(prevDisplayed.timestamp) ||
+                dayKey(event.timestamp) !== dayKey(nextDisplayed.timestamp);
+              const datePrefix = showDate ? `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}` : null;
+              return (
+                <EventDateContext.Provider key={event.id} value={datePrefix}>
+                  {/* Newest-first, so the first card is the tip of the
                         timeline and carries the pulsing dot (the frame draws
                         its rows itself, outside the shared timeline). */}
-                    <SpineTipContext.Provider value={idx === 0 ? "above" : null}>
-                      <LiquityEventCard
-                        event={event}
-                        addressDisplay="hidden"
-                        isFirst={idx === 0}
-                        isLast={idx === visibleEvents.length - 1}
-                        previousEvent={previousEvent}
-                        eventNumber={tempIdx + 1}
-                        currentPrice={currentPrice}
-                      />
-                    </SpineTipContext.Provider>
-                  </EventDateContext.Provider>
-                );
-              })}
-            </div>
-          </LiquityTroveBarsProvider>
+                  <SpineTipContext.Provider value={idx === 0 ? "above" : null}>
+                    <LiquityEventCard
+                      event={event}
+                      addressDisplay="hidden"
+                      isFirst={idx === 0}
+                      isLast={idx === visibleEvents.length - 1}
+                      previousEvent={previousEvent}
+                      eventNumber={tempIdx + 1}
+                      currentPrice={currentPrice}
+                    />
+                  </SpineTipContext.Provider>
+                </EventDateContext.Provider>
+              );
+            })}
+          </div>
         </TimelineDisplayProvider>
       </div>
     </div>

@@ -19,6 +19,19 @@
 // Each cell's ledger (lib/shared/event-ledger.ts) adds in tokens and in USD,
 // with the event's movement on a "This …" row of its legs.
 //
+// Liquity V1 (lib/liquity-v1/flows.ts), read on 1 Oct 2026 from the page's
+// own routes: 0x3f9a…4455, redeemed four times and open; 0x4196…f1a9's second
+// life, liquidated in Recovery Mode on 19 May 2021 with a 4.35 ETH surplus
+// since claimed; 0xe0df…e923, nine lives, each closed by a redemption that
+// cancelled its debt and left a surplus, all claimed. No V1 Trove has ever
+// taken a redistribution (L_ETH and L_LUSDDebt read zero at head), so the
+// redistribution rule runs on 0x3f9a…4455 with an applyPendingRewards row
+// written into one of its touches.
+//
+// With the WETH branch's daily price (/api/liquity-v2/prices/daily, read 1 Oct
+// 2026) the collateral between events moves with the branch's price at each
+// day's close, and the lines still add.
+//
 //   npx tsx --test scripts/verify/verify-liquity-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -43,6 +56,7 @@ import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared
 import { eventCum, eventSideSum, eventTokenSum, fmtTokens } from "@/lib/shared/flow-focus";
 import { dollarLedger, ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
 import { buildEbisuTimeline, type MvRow } from "@/lib/sources/api/ebisu-timeline";
+import { liquityV1FlowEvents, type LiquityV1FlowRead } from "@/lib/liquity-v1/flows";
 
 const FIX = join(__dirname, "fixtures");
 const read = (name: string) => JSON.parse(readFileSync(join(FIX, name), "utf8"));
@@ -56,6 +70,83 @@ const EBISU = liquityForkFlowEvents(
   buildEbisuTimeline(ebisuRaw.rows, ebisuRaw.collateralType, ebisuRaw.troveId).events,
   isEbisuEvent,
 );
+
+const WETH_DAILY = (read("liquity-flows-v2-weth-daily.json") as { obs: [number, number][] }).obs;
+
+interface V1Fixture {
+  wallet: string;
+  events: BaseActivityEvent[];
+  reads: Record<string, LiquityV1FlowRead>;
+  surplus: Record<string, { tx: string; eth: number; claimed: boolean }>;
+}
+const v1Fix = (name: string) => read(`liquity-flows-v1-${name}.json`) as V1Fixture;
+/** One life of a V1 fixture, mapped as the page maps it. */
+function v1Life(
+  f: V1Fixture,
+  epoch: number,
+  daily: [number, number][] | null = WETH_DAILY,
+  events?: BaseActivityEvent[],
+) {
+  const rows = (events ?? f.events).filter((e) => (e.context as { data: { epoch?: number } }).data.epoch === epoch);
+  const s = f.surplus[String(epoch)];
+  return liquityV1FlowEvents({
+    events: rows,
+    reads: new Map(Object.entries(f.reads)),
+    daily,
+    surplus: s ? { tx: s.tx, eth: s.eth } : null,
+  });
+}
+const V1_REDEEMED_FIX = v1Fix("redeemed");
+const V1_LIQUIDATED_FIX = v1Fix("liquidated");
+const V1_LIVES_FIX = v1Fix("lives");
+const V1_REDEEMED = v1Life(V1_REDEEMED_FIX, 1).events;
+const V1_LIQUIDATED = v1Life(V1_LIQUIDATED_FIX, 2).events;
+const V1_LIVES = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((ep) => v1Life(V1_LIVES_FIX, ep).events);
+
+/** 0x3f9a…4455 with a redistribution of 0.5 ETH and 300 LUSD applied at its
+ *  ninth row's transaction: an applyPendingRewards row ahead of it, and every
+ *  balance from there on raised by the gain. */
+const V1_REDIST_ROWS: BaseActivityEvent[] = (() => {
+  const rows = V1_REDEEMED_FIX.events.map((e) => structuredClone(e));
+  const at = 8;
+  type C = { collAfter: string; debtAfter: string; collBefore: string; debtBefore: string; eventType: string };
+  const ctx = (e: BaseActivityEvent) => (e.context as unknown as { data: C }).data;
+  const bump = (v: string, d: number) => String(Number(v) + d);
+  rows.forEach((e, i) => {
+    if (i < at) return;
+    const c = ctx(e);
+    c.collAfter = bump(c.collAfter, 0.5);
+    c.debtAfter = bump(c.debtAfter, 300);
+    if (i > at) {
+      c.collBefore = bump(c.collBefore, 0.5);
+      c.debtBefore = bump(c.debtBefore, 300);
+    }
+  });
+  const prev = ctx(rows[at - 1]);
+  const accrue = structuredClone(rows[at]);
+  accrue.id = `${accrue.id}-accrue`;
+  Object.assign(ctx(accrue), {
+    eventType: "accrue",
+    collBefore: prev.collAfter,
+    debtBefore: prev.debtAfter,
+    collAfter: bump(prev.collAfter, 0.5),
+    debtAfter: bump(prev.debtAfter, 300),
+  });
+  return [...rows.slice(0, at), accrue, ...rows.slice(at)];
+})();
+const V1_REDIST_MAPPED = v1Life(V1_REDEEMED_FIX, 1, WETH_DAILY, V1_REDIST_ROWS);
+const V1_REDIST = V1_REDIST_MAPPED.events;
+
+const V1_SIDE_BUCKETS = {
+  collateral: {
+    in: [LQ.deposited, LQ.redistColl],
+    out: [LQ.withdrawn, LQ.collRedeemed, LQ.collLiquidated, LQ.surplus],
+  },
+  debt: {
+    in: [LQ.borrowed, LQ.upfront, LQ.redistDebt, LQ.reserve],
+    out: [LQ.repaid, LQ.debtRedeemed, LQ.debtLiquidated, LQ.reserveBurned],
+  },
+} as const;
 
 /** A fixed clock: noon on 30 Sep 2026. */
 const NOW = Date.UTC(2026, 8, 30, 12) / 1000;
@@ -71,7 +162,7 @@ const SIDE_BUCKETS = {
   },
 } as const;
 
-function totals(events: LiquityFlowEvent[]) {
+function totals(events: LiquityFlowEvent[], sides: typeof SIDE_BUCKETS | typeof V1_SIDE_BUCKETS = SIDE_BUCKETS) {
   const t: Record<string, number> = {};
   let negativeInterest = 0;
   for (const r of replayLiquity(events))
@@ -80,18 +171,25 @@ function totals(events: LiquityFlowEvent[]) {
       if ((l.bucket === LQ.interest || l.bucket === LQ.batchFee) && l.amount < -1e-9) negativeInterest++;
     }
   const net = (side: "collateral" | "debt") =>
-    SIDE_BUCKETS[side].in.reduce((a, k) => a + (t[k] ?? 0), 0) -
-    SIDE_BUCKETS[side].out.reduce((a, k) => a + (t[k] ?? 0), 0);
+    (sides[side].in as readonly string[]).reduce((a, k) => a + (t[k] ?? 0), 0) -
+    (sides[side].out as readonly string[]).reduce((a, k) => a + (t[k] ?? 0), 0);
   return { t, negativeInterest, coll: net("collateral"), debt: net("debt") };
 }
 
-function model(events: LiquityFlowEvent[], symbols: [string, string], open: boolean, price = 4000): FlowModel {
+function model(
+  events: LiquityFlowEvent[],
+  symbols: [string, string],
+  open: boolean,
+  price = 4000,
+  v1 = false,
+): FlowModel {
   const t = liquityFlowTimeline(events, {
     collSymbol: symbols[0],
     debtSymbol: symbols[1],
-    surplusClaimed: false,
+    surplusClaimed: v1,
     now: NOW,
     live: open ? { price } : null,
+    ...(v1 ? { family: "v1" as const, dailyColl: WETH_DAILY } : {}),
   });
   assert.ok(t, "a timeline");
   const m = buildFlowModel(t);
@@ -109,7 +207,7 @@ function cursorStops(m: FlowModel): number[] {
   return [...stops].sort((a, b) => a - b);
 }
 
-function assertSumsAdd(m: FlowModel, label: string) {
+function assertSumsAdd(m: FlowModel, label: string, debtRest = "Interest since the last event") {
   for (const stop of cursorStops(m)) {
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {
@@ -120,21 +218,34 @@ function assertSumsAdd(m: FlowModel, label: string) {
       if (rest)
         assert.equal(
           rest.label,
-          side === "collateral" ? "Market move" : "Interest since the last event",
+          side === "collateral" ? "Market move" : debtRest,
           `${label} ${side}: the remainder is named`,
         );
     }
   }
 }
 
-for (const [name, events, symbols, open] of [
-  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
-  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
-  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
-  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+const V1_CASES = [
+  ["V1 0x3f9a…4455, redeemed", V1_REDEEMED, ["ETH", "LUSD"], true, true],
+  ["V1 0x4196…f1a9 life 2, liquidated", V1_LIQUIDATED, ["ETH", "LUSD"], false, true],
+  ...V1_LIVES.map(
+    (ev, i) => [`V1 0xe0df…e923 life ${i + 1}, redeemed closed`, ev, ["ETH", "LUSD"], false, true] as const,
+  ),
+  ["V1 0x3f9a…4455 with a redistribution", V1_REDIST, ["ETH", "LUSD"], true, true],
+] as const;
+
+for (const [name, events, symbols, open, v1] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true, false],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false, false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true, false],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true, false],
+  ...V1_CASES,
 ] as const) {
   test(`${name}: the replay meets the last recorded balances`, () => {
-    const { coll, debt, negativeInterest } = totals(events as LiquityFlowEvent[]);
+    const { coll, debt, negativeInterest, t } = totals(
+      events as LiquityFlowEvent[],
+      v1 ? V1_SIDE_BUCKETS : SIDE_BUCKETS,
+    );
     const last = replayLiquity(events as LiquityFlowEvent[]).at(-1)!.ev;
     assert.ok(
       Math.abs(coll - last.collAfter) < 1e-9 * Math.max(1, last.collAfter),
@@ -142,9 +253,14 @@ for (const [name, events, symbols, open] of [
     );
     assert.ok(Math.abs(debt - last.debtAfter) < 1e-6, `debt ${debt} vs ${last.debtAfter}`);
     assert.equal(negativeInterest, 0, "no event states negative interest");
+    if (v1) assert.equal(t[LQ.interest] ?? 0, 0, "Liquity V1 charges no interest");
   });
   test(`${name}: at every stop each side's printed lines add to its printed total`, () => {
-    assertSumsAdd(model(events as LiquityFlowEvent[], symbols as unknown as [string, string], open), name);
+    assertSumsAdd(
+      model(events as LiquityFlowEvent[], symbols as unknown as [string, string], open, 4000, v1),
+      name,
+      v1 ? "Unrecorded change" : undefined,
+    );
   });
 }
 
@@ -266,17 +382,18 @@ test("the basis line names what each remainder holds", () => {
 
 // ── The event card's sum (lib/shared/flow-focus.ts over liquityFocusEvents) ──
 
-for (const [name, events, symbols, open] of [
-  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
-  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
-  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
-  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+for (const [name, events, symbols, open, v1] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true, false],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false, false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true, false],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true, false],
+  ...V1_CASES,
 ] as const) {
   test(`${name}: every event card's sum is exact, and its printed lines add to the printed total`, () => {
     const ev = events as LiquityFlowEvent[];
     const [coll, debt] = symbols as unknown as [string, string];
-    const m = model(ev, [coll, debt], open);
-    const focus = liquityFocusEvents(ev, coll, debt);
+    const m = model(ev, [coll, debt], open, 4000, v1);
+    const focus = liquityFocusEvents(ev, coll, debt, v1 ? "v1" : "v2");
     assert.equal(focus.length, ev.length, "one focus event per Trove event");
     for (const f of focus) {
       const cum = eventCum(m, focus, f.id);
@@ -298,17 +415,18 @@ for (const [name, events, symbols, open] of [
   });
 }
 
-for (const [name, events, symbols, open] of [
-  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
-  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
-  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
-  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+for (const [name, events, symbols, open, v1] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true, false],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false, false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true, false],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true, false],
+  ...V1_CASES,
 ] as const) {
   test(`${name}: every event card's sum in tokens adds to the recorded balance, at the printed decimals`, () => {
     const ev = events as LiquityFlowEvent[];
     const [coll, debt] = symbols as unknown as [string, string];
-    const m = model(ev, [coll, debt], open);
-    const focus = liquityFocusEvents(ev, coll, debt);
+    const m = model(ev, [coll, debt], open, 4000, v1);
+    const focus = liquityFocusEvents(ev, coll, debt, v1 ? "v1" : "v2");
     const replayed = replayLiquity(ev);
     const lastOfTx = new Map<string, LiquityFlowEvent>();
     for (const r of replayed) lastOfTx.set(r.ev.tx ?? r.ev.id, r.ev);
@@ -345,17 +463,18 @@ for (const [name, events, symbols, open] of [
   });
 }
 
-for (const [name, events, symbols, open] of [
-  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
-  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
-  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
-  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true],
+for (const [name, events, symbols, open, v1] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true, false],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false, false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true, false],
+  ["Ebisu weETH, redistribution", EBISU, ["weETH", "ebUSD"], true, false],
+  ...V1_CASES,
 ] as const) {
   test(`${name}: every cell's ledger adds in tokens and in USD, the event's movement on a separate row`, () => {
     const ev = events as LiquityFlowEvent[];
     const [coll, debt] = symbols as unknown as [string, string];
-    const m = model(ev, [coll, debt], open);
-    const focus = liquityFocusEvents(ev, coll, debt);
+    const m = model(ev, [coll, debt], open, 4000, v1);
+    const focus = liquityFocusEvents(ev, coll, debt, v1 ? "v1" : "v2");
     let split = 0;
     for (const f of focus) {
       const cum = eventCum(m, focus, f.id)!;
@@ -499,5 +618,188 @@ for (const [name, events, symbols] of [
       }
     }
     assert.ok(checked > 0, "days between events");
+  });
+}
+
+test("V2 WETH with the branch's daily price: the collateral moves between events at each day's close", () => {
+  const t = liquityFlowTimeline(REDEEMED, {
+    collSymbol: "WETH",
+    debtSymbol: "BOLD",
+    surplusClaimed: false,
+    now: NOW,
+    live: { price: 4000 },
+    dailyColl: WETH_DAILY,
+  })!;
+  assert.equal(t.seriesCarry, true, "a day the series lacks keeps the day before's");
+  assert.match(t.words!.linePrices!, /each day's close/);
+  const m = buildFlowModel(t)!;
+  assertSumsAdd(m, "V2 WETH daily");
+  const startDay = m.start / 86_400_000;
+  const daily = new Map(WETH_DAILY);
+  const replayed = replayLiquity(REDEEMED);
+  let moved = 0;
+  let checked = 0;
+  for (let stop = 1; stop < m.liveStop - 1; stop++) {
+    if (m.eventDays.includes(stop)) continue;
+    const usd = daily.get(startDay + stop);
+    if (usd == null) continue;
+    const close = (startDay + stop + 1) * 86_400;
+    let coll = 0;
+    for (const r of replayed) if (r.ev.ts < close) coll = r.ev.collAfter;
+    const st = stateAt(m, stop);
+    assert.ok(Math.abs(st.collateral.now - coll * usd) <= Math.max(1e-6, coll * usd * 1e-12), `stop ${stop}`);
+    checked++;
+    if (Math.abs(stateAt(m, stop - 1).collateral.now - st.collateral.now) > 1) moved++;
+  }
+  assert.ok(checked > 10, `days between events priced by the series (${checked})`);
+  assert.ok(moved > 0, `the line moves between events (${moved} days)`);
+  // The state card between events states the collateral's USD on a priced day.
+  const focus = liquityFocusEvents(REDEEMED, "WETH", "BOLD");
+  let priced = 0;
+  for (let stop = 1; stop < m.liveStop - 1; stop++) {
+    if (m.eventDays.includes(stop) || !daily.has(startDay + stop)) continue;
+    const mo = flowMoment(m, focus, (startDay + stop + 1) * 86_400 - 1);
+    if (mo && mo.sides.collateral.assets.length > 0 && mo.sides.collateral.priced) priced++;
+  }
+  assert.ok(priced > 0, "the state card prices the collateral on a day the series recorded");
+  const series = binSeries(binInputFromTimeline(t)!, "day")!;
+  assert.equal(series.gaps.length, 0, "no gaps");
+});
+
+// ── Liquity V1 (lib/liquity-v1/flows.ts) ──
+
+const v1Totals = (ev: LiquityFlowEvent[]) => totals(ev, V1_SIDE_BUCKETS).t;
+const v1Model = (ev: LiquityFlowEvent[], open: boolean) => model(ev, ["ETH", "LUSD"], open, 4000, true);
+
+test("V1 0x3f9a…4455: fees, the reserve and the redemptions on their own lines, each price at its block", () => {
+  const mapped = v1Life(V1_REDEEMED_FIX, 1);
+  const t = v1Totals(mapped.events);
+  assert.equal(t[LQ.reserve], 200, "the open's 200 LUSD reserve");
+  assert.ok((t[LQ.upfront] ?? 0) > 0, "borrowing fees");
+  assert.equal(mapped.feesUnread, 0);
+  // The fees are the receipts' LUSDBorrowingFeePaid, summed.
+  const fees = Object.values(V1_REDEEMED_FIX.reads).reduce((a, r) => a + Number(r.borrowingFee ?? 0), 0);
+  assert.ok(Math.abs((t[LQ.upfront] ?? 0) - fees) < 1e-6, `fees ${t[LQ.upfront]} vs ${fees}`);
+  assert.ok((t[LQ.collRedeemed] ?? 0) > 0 && (t[LQ.debtRedeemed] ?? 0) > 0, "redemptions on both sides");
+  assert.deepEqual(mapped.prices, { block: mapped.events.length, dayClose: 0, nearest: 0 }, "every price at its block");
+  for (const e of mapped.events)
+    if (e.kind === "owner") assert.equal(e.price, V1_REDEEMED_FIX.reads[e.tx!.toLowerCase()].priceUsd, e.id);
+  const m = v1Model(mapped.events, true);
+  const st = stateAt(m, m.liveStop);
+  const coll = st.collateral.bar.find((s) => s.key === LQ.collRedeemed);
+  assert.ok(coll && coll.tone === "redemption" && coll.link === "redemption", "caution orange, linked");
+  assert.ok(!m.buckets.some((b) => b.key === LQ.interest || b.key === LQ.batchFee), "no interest lines");
+  assert.equal(m.buckets.find((b) => b.key === LQ.upfront)?.label, "Borrowing fees");
+});
+
+test("V1 0x4196…f1a9 life 2: the Recovery Mode liquidation and its claimed surplus", () => {
+  const ev = V1_LIQUIDATED;
+  const liq = replayLiquity(ev).find((r) => r.ev.kind === "liquidation")!;
+  const leg = (k: string) => liq.legs.find((l) => l.bucket === k)?.amount ?? 0;
+  assert.ok(Math.abs(leg(LQ.surplus) - 4.347192568832404) < 1e-9, "the CollSurplusPool credit");
+  assert.ok(Math.abs(leg(LQ.collLiquidated) + leg(LQ.surplus) - liq.ev.collBefore!) < 1e-9, "the whole collateral");
+  assert.ok(Math.abs(leg(LQ.debtLiquidated) - liq.ev.debtBefore!) < 1e-9, "the whole debt, the reserve in it");
+  assert.equal(leg(LQ.reserveBurned), 0, "a liquidation pays the reserve to the liquidator");
+  const t = liquityFlowTimeline(ev, {
+    collSymbol: "ETH",
+    debtSymbol: "LUSD",
+    family: "v1",
+    surplusClaimed: true,
+    now: NOW,
+    live: null,
+    dailyColl: WETH_DAILY,
+  })!;
+  assert.equal(t.buckets.find((b) => b.key === LQ.surplus)?.label, "Surplus claimed");
+  const m = buildFlowModel(t)!;
+  const end = stateAt(m, m.liveStop);
+  assert.equal(Math.round(end.collateral.now), 0);
+  assert.equal(Math.round(end.debt.now), 0);
+  assert.equal(m.liveStop, m.lastDay + 1, "the slider stops the day after the liquidation");
+  assert.ok(m.ticks.some((tk) => tk.tick === "liquidation"));
+});
+
+test("V1 0xe0df…e923: each of nine lives closed by a redemption burns its reserve and leaves its surplus", () => {
+  assert.equal(V1_LIVES.length, 9);
+  V1_LIVES.forEach((ev, i) => {
+    const t = v1Totals(ev);
+    assert.equal(t[LQ.reserve], 200, `life ${i + 1}: the open's reserve`);
+    assert.ok(Math.abs((t[LQ.reserveBurned] ?? 0) - 200) < 1e-9, `life ${i + 1}: the reserve burned`);
+    const last = replayLiquity(ev).at(-1)!;
+    assert.equal(last.ev.kind, "redemption");
+    const leg = (k: string) => last.legs.find((l) => l.bucket === k)?.amount ?? 0;
+    const credit = V1_LIVES_FIX.surplus[String(i + 1)].eth;
+    assert.ok(Math.abs(leg(LQ.surplus) - credit) < 1e-9, `life ${i + 1}: the surplus ${leg(LQ.surplus)} vs ${credit}`);
+    assert.ok(Math.abs(leg(LQ.debtRedeemed) + 200 - last.ev.debtBefore!) < 1e-6, `life ${i + 1}: redeemed + reserve`);
+    assert.equal(troveLives(replayLiquity(ev).map((r) => r.ev)), 1);
+  });
+});
+
+test("V1 redistribution: the applyPendingRewards step lands on the touch that applied it", () => {
+  assert.equal(V1_REDIST_MAPPED.redistributions, 1);
+  const plain = replayLiquity(V1_REDEEMED);
+  const redist = replayLiquity(V1_REDIST);
+  assert.equal(redist.length, plain.length, "the applyPendingRewards row is not an event of its own");
+  redist.forEach((r, i) => {
+    const legs = (x: typeof r) => Object.fromEntries(x.legs.map((l) => [l.bucket, l.amount]));
+    const a = legs(r);
+    const b = legs(plain[i]);
+    if (i === 8) {
+      assert.ok(Math.abs(a[LQ.redistColl] - 0.5) < 1e-9, "Redistribution gains");
+      assert.ok(Math.abs(a[LQ.redistDebt] - 300) < 1e-6, "Redistributed debt");
+      delete a[LQ.redistColl];
+      delete a[LQ.redistDebt];
+    }
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)]))
+      assert.ok(Math.abs((a[k] ?? 0) - (b[k] ?? 0)) < 1e-6, `event ${i} ${k}: the act unchanged`);
+  });
+});
+
+test("V1: between events the debt stays as recorded and the collateral takes ETH's daily close", () => {
+  const ev = V1_REDEEMED;
+  const m = v1Model(ev, true);
+  const focus = liquityFocusEvents(ev, "ETH", "LUSD", "v1");
+  assert.ok(
+    focus.every((f) => f.rate == null),
+    "no rate on a V1 card",
+  );
+  const startDay = m.start / 86_400_000;
+  const daily = new Map(WETH_DAILY);
+  const replayed = replayLiquity(ev);
+  let checked = 0;
+  for (let stop = 1; stop < m.liveStop - 1; stop++) {
+    if (m.eventDays.includes(stop)) continue;
+    const close = (startDay + stop + 1) * 86_400;
+    let last = replayed[0].ev;
+    for (const r of replayed) if (r.ev.ts < close) last = r.ev;
+    const st = stateAt(m, stop);
+    assert.ok(Math.abs(st.debt.now - last.debtAfter) < 1e-6, `debt at stop ${stop}`);
+    const usd = daily.get(startDay + stop);
+    if (usd != null) {
+      assert.ok(Math.abs(st.collateral.now - last.collAfter * usd) < 1e-6 * last.collAfter * usd, `coll ${stop}`);
+      checked++;
+    }
+    const mo = flowMoment(m, focus, close - 1);
+    if (mo) {
+      assert.equal(mo.accrual, null, "no interest built between events");
+      if (last.debtAfter > 0) assert.ok(Math.abs(mo.sides.debt.assets[0].tokens - last.debtAfter) < 1e-6);
+    }
+  }
+  assert.ok(checked > 100, `days priced by the daily close (${checked})`);
+});
+
+for (const [name, events, , open] of V1_CASES) {
+  test(`${name}: on every day each side's printed lines add to its printed total`, () => {
+    const m = v1Model(events as LiquityFlowEvent[], open);
+    for (let stop = 0; stop <= m.liveStop; stop++) {
+      const st = stateAt(m, stop);
+      for (const side of ["collateral", "debt"] as const) {
+        const rows = sideSumRows(st[side]);
+        assert.equal(
+          rows.lines.reduce((a, l) => a + l.dollars, 0),
+          rows.total.dollars,
+          `${name} ${side} at stop ${stop}`,
+        );
+      }
+    }
   });
 }

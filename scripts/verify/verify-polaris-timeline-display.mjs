@@ -3,14 +3,8 @@
 // Scaffold of verify-polaris-equity.mjs. Checks (rails-ops
 // TO-DO-polaris-v2-parity §1.4 and §1.5):
 //
-//   (a) usdp/8's display menu offers exactly the six labels and NOT
+//   (a) usdp/8's display menu offers exactly the four labels and NOT
 //       "Collapse like events" (no run card: measured, 0 no-change touches).
-//   (b) Change bars on: every touch row on usdp/27 (closed, 4 rows) carries a
-//       PositionBar and its close row's collateral change bar is the full
-//       negative width. Balance bars on: usdp/8's last row's two balance bars
-//       are the widths the route's rows give (tolerance 0.2 pp), and the
-//       maxima those widths are measured against equal the listing row's
-//       peakColl / peakDebt. Both flags off: no bar on any row.
 //   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
 //       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
 //       liquidation row's chip is the at-fire ratio and is red (asserted on
@@ -111,14 +105,7 @@ const pct1 = (pct) => {
 };
 const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
-const MENU_LABELS = [
-  "Timestamps (UTC)",
-  "Timeline values",
-  "Change bars",
-  "Balance bars",
-  "Collateral Ratio",
-  "Event numbers",
-];
+const MENU_LABELS = ["Timestamps (UTC)", "Timeline values", "Collateral Ratio", "Event numbers"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -127,39 +114,22 @@ const rowsOf = async (market, id) => {
   return [...t.events].sort(byTime);
 };
 const rows8 = await rowsOf("usdp", "8");
-const rows27 = await rowsOf("usdp", "27");
 const rows175 = await rowsOf("usdp", "175");
-const listing8 = (await api(`/api/polaris/positions?market=usdp&id=8`)).data?.[0];
 
 const touches8 = rows8.filter((e) => e.context.data.eventType !== "transfer");
 const first8 = touches8[0];
 const last8 = touches8[touches8.length - 1];
 const liq175 = rows175.find((e) => e.context.data.eventType === "liquidate");
 const open175 = rows175.find((e) => e.context.data.eventType === "open");
-const close27 = rows27.find((e) => e.context.data.eventType === "close");
 
 check(
-  "0. the routes answer: usdp/8 has an open first row and a priced last row, usdp/27 a close, usdp/175 a liquidation",
+  "0. the routes answer: usdp/8 has an open first row and a priced last row, usdp/175 a liquidation",
   first8?.context.data.eventType === "open" &&
     last8?.context.data.priceAtBlock != null &&
-    close27 != null &&
     liq175 != null &&
     open175 != null,
-  JSON.stringify({ rows8: rows8.length, rows27: rows27.length, rows175: rows175.length }),
+  JSON.stringify({ rows8: rows8.length, rows175: rows175.length }),
 );
-
-// Lifetime maxima over the rows: the bars' scale.
-const maxima = (rows) => {
-  let coll = 0;
-  let debt = 0;
-  for (const e of rows) {
-    const d = e.context.data;
-    if (d.eventType === "transfer" || d.newColl == null || d.newDebt == null) continue;
-    coll = Math.max(coll, n(d.newColl));
-    debt = Math.max(debt, n(d.newDebt));
-  }
-  return { coll, debt };
-};
 
 // ── browser helpers ─────────────────────────────────────────────────────────
 
@@ -276,17 +246,6 @@ async function readChip(page, eventId) {
   };
 }
 
-/** A bar's drawn width in percent (0 when it has no fill), per `data-bar`. */
-async function readBar(page, eventId, name) {
-  const bar = rowOf(page, eventId).locator(`[data-bar="${name}"]`).first();
-  if ((await bar.count()) === 0) return null;
-  const fill = bar.locator("div").first();
-  if ((await fill.count()) === 0) return { width: 0, cls: "" };
-  const style = (await fill.getAttribute("style")) ?? "";
-  const m = style.match(/width:\s*([\d.]+)%/);
-  return { width: m ? Number(m[1]) : 0, cls: (await fill.getAttribute("class")) ?? "" };
-}
-
 /** The "Collateral ratio" stat inside an expanded row: its value, and the
  *  transition's before and change (the DeltaToggle shows the before first;
  *  a click shows the change). */
@@ -357,72 +316,16 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers exactly the six labels, then the two market-note items, and no collapse item",
-    menu.length === 8 &&
+    "a. usdp/8's display menu offers exactly the four labels, then the two market-note items, and no collapse item",
+    menu.length === 6 &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
-      NOTE_LABELS.every((l, i) => menu[6 + i] === l) &&
+      NOTE_LABELS.every((l, i) => menu[4 + i] === l) &&
       !menu.includes("collapse like events"),
     JSON.stringify(menu),
   );
 
-  // ── (b) the bars ──────────────────────────────────────────────────────────
-  await setDisplayFlag(page8, "Change bars", false);
-  await setDisplayFlag(page8, "Balance bars", true);
   await showAll(page8);
-  const max8 = maxima(rows8);
   const dLast = last8.context.data;
-  const expColl = (n(dLast.newColl) / max8.coll) * 100;
-  const expDebt = (n(dLast.newDebt) / max8.debt) * 100;
-  const collBar = await readBar(page8, last8.id, "coll-balance");
-  const debtBar = await readBar(page8, last8.id, "debt-balance");
-  check(
-    `b1. usdp/8's last row's balance bars are ${expColl.toFixed(1)}% / ${expDebt.toFixed(1)}% of the lifetime maxima (tolerance 0.2 pp)`,
-    collBar != null &&
-      debtBar != null &&
-      Math.abs(collBar.width - expColl) <= 0.2 &&
-      Math.abs(debtBar.width - expDebt) <= 0.2,
-    JSON.stringify({ collBar, debtBar, expColl, expDebt }),
-  );
-  check(
-    "b2. the maxima the bars are measured against equal the listing row's peakColl / peakDebt",
-    listing8 != null &&
-      Math.abs(max8.coll - listing8.peakColl) / listing8.peakColl < 1e-6 &&
-      Math.abs(max8.debt - listing8.peakDebt) / listing8.peakDebt < 1e-6,
-    JSON.stringify({ max8, peakColl: listing8?.peakColl, peakDebt: listing8?.peakDebt }),
-  );
-  check(
-    "b3. balance bars alone: no change bar on the last row",
-    (await readBar(page8, last8.id, "coll-change")) == null,
-  );
-  await setDisplayFlag(page8, "Balance bars", false);
-  check(
-    "b4. both flags off: no bar on any row",
-    (await page8.locator("[data-position-bar]").count()) === 0,
-    `${await page8.locator("[data-position-bar]").count()} bars`,
-  );
-
-  const page27 = await open(context, polarisUrl("usdp", "27"));
-  await setDisplayFlag(page27, "Change bars", true);
-  const touches27 = rows27.filter((e) => e.context.data.eventType !== "transfer");
-  let barsOnTouches = 0;
-  for (const e of touches27)
-    if ((await rowOf(page27, e.id).locator("[data-position-bar]").count()) > 0) barsOnTouches++;
-  check(
-    `b5. usdp/27 change bars on: every touch row (${touches27.length}) carries a PositionBar`,
-    barsOnTouches === touches27.length,
-    `${barsOnTouches} of ${touches27.length}`,
-  );
-  const max27 = maxima(rows27);
-  const dClose = close27.context.data;
-  const expCloseColl = (Math.abs(n(dClose.newColl) - n(dClose.collBefore)) / max27.coll) * 100;
-  const closeBar = await readBar(page27, close27.id, "coll-change");
-  check(
-    `b6. usdp/27's close row's collateral change bar is the full negative change (${expCloseColl.toFixed(1)}%, removal tint)`,
-    closeBar != null && Math.abs(closeBar.width - expCloseColl) <= 0.2 && /bg-blue-200/.test(closeBar.cls),
-    JSON.stringify({ closeBar, expCloseColl }),
-  );
-  await setDisplayFlag(page27, "Change bars", false);
-  await page27.close();
 
   // ── (c) the chips ─────────────────────────────────────────────────────────
   check(
@@ -582,7 +485,7 @@ try {
   });
   check(
     "z. the run leaves the display flags at their defaults",
-    restored?.showCollateralRatio === false && !restored?.showChangeBars && !restored?.showBalanceBars,
+    restored?.showCollateralRatio === false,
     JSON.stringify(restored),
   );
   await page8.close();

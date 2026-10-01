@@ -250,8 +250,7 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
 ];
 
 /** Display flags the chain-state timeline (Morpho + MakerDAO) exposes — only the
- *  ones with a render path on these pared-down cards (no change/balance bars, no
- *  USD/ratio layers). Shared so the two can't drift. */
+ *  ones with a render path on these pared-down cards (no USD/ratio layers). Shared so the two can't drift. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
@@ -272,8 +271,8 @@ export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
-/** The Liquity V2 trove page's own display menu — its richer grammar (change
- *  bars, balance bars, the two USD switches, the collateral-ratio chip) on
+/** The Liquity V2 trove page's own display menu — its richer grammar (the two
+ *  USD switches, the collateral-ratio chip) on
  *  top of the chain-truth base, in the V2 menu's original order. `showCollateralRatio`'s label is
  *  resolved dynamically below (Collateral Ratio vs Loan-to-Value, the user's
  *  ratio-mode preference) — the string here is just the CR-mode fallback.
@@ -282,26 +281,20 @@ export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
 export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showChangeBars", label: "Change bars" },
-  { key: "showBalanceBars", label: "Balance bars" },
   { key: "showUsdStable", label: "USD for stablecoins" },
   { key: "showUsdOther", label: "USD for other tokens" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
-/** The Polaris CDP page's own display menu — the same six items as the Liquity
- *  V2 preset: every Polaris touch and liquidation row carries its resulting
- *  figures and the lag columns, so the change and balance bars have a render
- *  path, and the oracle-at-block lane prices the ratio chip. The ratio item
+/** The Polaris CDP page's own display menu — the Liquity V2 preset less the
+ *  USD switches: the oracle-at-block lane prices the ratio chip. The ratio item
  *  keeps its label: the Polaris chip states CR only, never LTV, so the menu
  *  says what the chip says. No collapse item: the CDP timeline passes no
  *  `runs` (rails-ops TO-DO-polaris-v2-parity §1.4, measured 2026-09-10). */
 export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showChangeBars", label: "Change bars" },
-  { key: "showBalanceBars", label: "Balance bars" },
   { key: "showCollateralRatio", label: "Collateral Ratio", fixedLabel: true },
   { key: "showEventNumbers", label: "Event numbers" },
 ];

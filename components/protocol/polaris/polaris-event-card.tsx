@@ -18,7 +18,6 @@ import { polarisExplainerTeaser } from "@/lib/polaris/explainer-clauses";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { PolarisEventHeader } from "./polaris-event-header";
-import { PolarisBarsSlot } from "./polaris-bars-slot";
 import { PolarisEventDetail } from "./polaris-event-detail";
 import { PolarisEventExplainer, polarisLearnMoreContent } from "./polaris-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -120,9 +119,6 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
           eventNumber={eventNumber}
         />
       }
-      // The change / balance bars under the header (flag-gated; nothing
-      // without the CDP page's provider, nothing on a transfer row).
-      headerBars={<PolarisBarsSlot eventId={event.id} />}
       detail={<PolarisEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
       detailLabel="CDP state"
       explainer={

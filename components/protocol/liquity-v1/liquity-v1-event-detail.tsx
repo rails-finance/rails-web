@@ -28,6 +28,8 @@ import {
   changeTone,
 } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { LedgerCell } from "@/components/shared/event-ledger";
+import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
@@ -195,6 +197,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
     split?.full || ctx.eventType === "liquidation" ? wallet : null,
   );
   const price = liquityV1EventPrice(ctx, read);
+  const usdShown = useUsdShown();
 
   const isOpen = ctx.eventType === "openTrove";
   const isClose = ctx.eventType === "closeTrove";
@@ -288,7 +291,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
     <>
       <div className="px-5 py-2">
         <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2">
-          <StatCard label="Collateral">
+          <LedgerCell label="Collateral" side="collateral">
             <Transition
               before={collBeforeStr}
               after={collAfterStr}
@@ -301,7 +304,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                 <P info={collDeltaProv(coords, { after: ctx.collAfter, before: ctx.collBefore })}>{collDeltaStr}</P>
               }
               beforeExtra={
-                (isRedemption || isLiq) && usdBefore != null ? (
+                (isRedemption || isLiq) && usdBefore != null && usdShown(COLLATERAL_SYMBOL, usdBefore, s.collBefore) ? (
                   <P
                     info={collUsdAtBlockProv(coords, {
                       coll: ctx.collBefore,
@@ -314,7 +317,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                 ) : undefined
               }
               afterExtra={
-                usdAfter != null ? (
+                usdAfter != null && usdShown(COLLATERAL_SYMBOL, usdAfter, s.collAfter) ? (
                   <P
                     info={collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price as number, side: "after" })}
                   >
@@ -324,9 +327,9 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
               }
             />
             {!collChanged && <StatSubline>unchanged</StatSubline>}
-          </StatCard>
+          </LedgerCell>
 
-          <StatCard label="Debt">
+          <LedgerCell label="Debt" side="debt">
             <Transition
               before={debtBeforeStr}
               after={debtAfterStr}
@@ -351,7 +354,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
             ) : !debtChanged ? (
               <StatSubline>unchanged</StatSubline>
             ) : null}
-          </StatCard>
+          </LedgerCell>
 
           <StatCard label="Collateral ratio">
             {crBeforeStr == null && crAfterStr == null ? (

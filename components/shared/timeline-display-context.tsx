@@ -5,8 +5,6 @@ import { usdShown } from "@/lib/shared/usd-display";
 
 export type TimelineDisplayKey =
   | "showTimestamps"
-  | "showChangeBars"
-  | "showBalanceBars"
   | "showTimelineValues"
   | "showTickerLabels"
   | "showUsdStable"
@@ -20,10 +18,6 @@ export type TimelineDisplayKey =
 
 export interface TimelineDisplayState {
   showTimestamps: boolean;
-  /** Top delta bar: the collateral/debt value transacted in this event. */
-  showChangeBars: boolean;
-  /** Bottom total bar: the underlying collateral/debt balance after this event. */
-  showBalanceBars: boolean;
   /** When true, the SpineColumn surfaces flanking values along the timeline
    * spine and event-card headers hide their amount on desktop to avoid
    * duplication. When false, values move into the card header instead. */
@@ -77,8 +71,6 @@ export interface TimelineDisplayState {
 
 const DEFAULTS = {
   showTimestamps: true,
-  showChangeBars: false,
-  showBalanceBars: false,
   showTimelineValues: true,
   showTickerLabels: false,
   showUsdStable: false,
@@ -124,9 +116,13 @@ function markSpineView(on: boolean) {
 }
 
 /** A stored preference from before the two USD switches: a reader who hid
- *  every USD value ("USD values" off) keeps both off. */
-function migrate(parsed: Partial<typeof DEFAULTS> & { showUsdValues?: boolean }): Partial<typeof DEFAULTS> {
-  const { showUsdValues, ...rest } = parsed;
+ *  every USD value ("USD values" off) keeps both off. The retired bar
+ *  switches (`showChangeBars`, `showBalanceBars`) are dropped. */
+function migrate(
+  parsed: Partial<typeof DEFAULTS> & { showUsdValues?: boolean; showChangeBars?: boolean; showBalanceBars?: boolean },
+): Partial<typeof DEFAULTS> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { showUsdValues, showChangeBars, showBalanceBars, ...rest } = parsed;
   if (showUsdValues === false && rest.showUsdOther === undefined)
     return { ...rest, showUsdOther: false, showUsdStable: false };
   return rest;

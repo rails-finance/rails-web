@@ -11,7 +11,6 @@ import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-heade
 import { LiquityEventDetail } from "./liquity-event-detail";
 import { LiquityEventExplainer, getLiquityExplainerTeaser, liquityLearnMoreContent } from "./liquity-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { TroveBarsSlot } from "./trove-bar";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
@@ -275,7 +274,6 @@ export function LiquityEventCard({
             eventNumber={eventNumber}
           />
         }
-        headerBars={<TroveBarsSlot eventId={event.id} />}
         detail={
           <LiquityEventDetail
             ctx={ctx}

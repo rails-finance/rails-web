@@ -182,7 +182,7 @@ export const debtBeforeProv = (coords: LiquityV1Coords): Provenance => ({
 // own PriceFeed.lastGoodPrice captured at the event's block (mig 110) — the
 // figure liquidate() itself read via fetchPrice() before acting. The LUSD leg
 // needs no price: the protocol's own ICR math counts debt at $1 redemption
-// face value (same convention as the position economics tower). The premium
+// face value (the convention of the Lifetime flows panel). The premium
 // (seized ÷ cleared − 1 = the trove's ICR at fire − 1) is what the Stability
 // Pool depositors — or, in a redistribution, the surviving troves — realized.
 
@@ -256,7 +256,7 @@ export const liqPremiumProv = (
   ],
 });
 
-// ── Position card + economics tower: current Trove state ─────────────────────
+// ── Position card: current Trove state ───────────────────────────────────────
 
 export const positionCollateralProv = (atBlockNum?: number): Provenance => ({
   kind: "chain",
@@ -264,53 +264,6 @@ export const positionCollateralProv = (atBlockNum?: number): Provenance => ({
   summary: `ETH collateral the Trove currently holds — the latest absolute balance the TroveManager emitted for this borrower${atBlockNum ? ` at block ${atBlockNum}` : ""}. Emitted whole.`,
   contract: TROVE_MANAGER,
   via: `${LIQUITY_V1_VIA} · latest TroveUpdated log · _coll · ÷10^18`,
-});
-
-// ── Economics tower: lifetime flow sums ───────────────────────────────────────
-
-export type LiquityV1LifetimeFlow =
-  | "deposited"
-  | "withdrawn"
-  | "returned at close"
-  | "borrowed"
-  | "repaid"
-  | "reserve burned"
-  | "liquidated collateral"
-  | "liquidated debt"
-  | "redeemed collateral"
-  | "redeemed debt"
-  | "surplus collateral";
-
-const FLOW_STORY: Record<LiquityV1LifetimeFlow, string> = {
-  deposited: "ETH added to the Trove (open + top-ups)",
-  withdrawn: "ETH voluntarily withdrawn from the Trove",
-  "returned at close": "ETH returned to the owner when the owner closed the Trove (BorrowerOperations.closeTrove)",
-  borrowed:
-    "debt taken on against the Trove (the LUSD received, plus the one-time borrowing fees and the 200 LUSD liquidation reserve)",
-  repaid:
-    "LUSD voluntarily repaid, a close counting the debt less the 200 LUSD liquidation reserve (the reserve is its own row)",
-  "reserve burned":
-    "the 200 LUSD liquidation reserve the GasPool burned when the owner closed the Trove or a redemption cancelled the last of its debt",
-  "liquidated collateral": "ETH seized when the Trove was liquidated",
-  "liquidated debt": "LUSD debt cleared when the Trove was liquidated",
-  "redeemed collateral": "ETH that went to redeemers (LUSD holders redeeming at $1 against the lowest-ratio troves)",
-  "redeemed debt":
-    "LUSD debt the redeemers' LUSD cancelled (a full redemption's last 200 LUSD is the reserve, counted in its own row)",
-  "surplus collateral":
-    "ETH a full redemption left over, moved to the CollSurplusPool for the owner (the collateral less the redeemer's ETH at the redemption's PriceFeed price)",
-};
-
-/** A lifetime gross flow — the sum of one kind of signed TroveUpdated delta
- *  across the Trove's life. Each delta is exact arithmetic over two emitted
- *  absolutes (chain-derived) and the sum only renders when the whole replay
- *  reconciles to the current emitted balance, so the total stays chain-derived. */
-export const lifetimeFlowProv = (flow: LiquityV1LifetimeFlow): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Lifetime ${flow} — ${FLOW_STORY[flow]}, summed across the Trove's life. Each event's delta is exact arithmetic over two consecutive emitted TroveUpdated absolutes; the sum renders only when the full replay reconciles to the Trove's current emitted balance.`,
-  contract: TROVE_MANAGER,
-  via: `${LIQUITY_V1_VIA} · Σ TroveUpdated deltas (${flow}) · ÷10^18`,
-  formula: "Σ (after − before) over this flow's events",
 });
 
 export const positionDebtProv = (atBlockNum?: number): Provenance => ({

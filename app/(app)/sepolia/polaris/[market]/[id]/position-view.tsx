@@ -28,7 +28,6 @@ import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PolarisEventCard } from "@/components/protocol/polaris/polaris-event-card";
-import { PolarisCdpBarsProvider } from "@/lib/polaris/use-cdp-bars";
 import {
   PolarisPositionCard,
   viewFromChain,
@@ -553,50 +552,41 @@ export default function PolarisPositionView({
               above is read from the market&rsquo;s contracts at the latest Sepolia block.
             </div>
           ) : (
-            // The bars provider reads the CDP's rows once (lifetime maxima,
-            // per-row shifts); each card's slot looks its own row up. No
-            // `runs`: measured 2026-09-10, no CDP on the index holds a run of
+            // No `runs`: measured 2026-09-10, no CDP on the index holds a run of
             // no-change touches (rails-ops TO-DO-polaris-v2-parity §1.4), so
-            // the menu offers the six display items and no collapse.
-            <PolarisCdpBarsProvider events={tl.sortedEvents}>
-              <ChainTruthTimeline
-                persistKeyPrefix="polaris"
-                closed={view.status !== "open"}
-                tl={tl}
-                notes={notes}
-                liveNotes={liveNotes}
-                liveNotesPending={positionOpen && !chainSettled}
-                // The window between this CDP's last touch and now, as the
-                // timeline's head row — where every other window between two
-                // touches is already told. Undefined wherever the split is not
-                // a fact (a closed CDP, an overlay that has not answered), and
-                // the slot draws nothing.
-                liveWindow={
-                  sinceTouch
-                    ? ({ isFirst }) => (
-                        <PolarisSinceLastTouchRow
-                          window={sinceTouch}
-                          market={market}
-                          stable={stable}
-                          isFirst={isFirst}
-                        />
-                      )
-                    : undefined
-                }
-                displayItems={POLARIS_DISPLAY_ITEMS}
-                toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
-                renderCard={(event, meta) =>
-                  isPolarisEvent(event) ? (
-                    <PolarisEventCard
-                      event={event}
-                      eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                    />
-                  ) : null
-                }
-              />
-            </PolarisCdpBarsProvider>
+            // the menu offers no collapse.
+            <ChainTruthTimeline
+              persistKeyPrefix="polaris"
+              closed={view.status !== "open"}
+              tl={tl}
+              notes={notes}
+              liveNotes={liveNotes}
+              liveNotesPending={positionOpen && !chainSettled}
+              // The window between this CDP's last touch and now, as the
+              // timeline's head row — where every other window between two
+              // touches is already told. Undefined wherever the split is not
+              // a fact (a closed CDP, an overlay that has not answered), and
+              // the slot draws nothing.
+              liveWindow={
+                sinceTouch
+                  ? ({ isFirst }) => (
+                      <PolarisSinceLastTouchRow window={sinceTouch} market={market} stable={stable} isFirst={isFirst} />
+                    )
+                  : undefined
+              }
+              displayItems={POLARIS_DISPLAY_ITEMS}
+              toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
+              renderCard={(event, meta) =>
+                isPolarisEvent(event) ? (
+                  <PolarisEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                  />
+                ) : null
+              }
+            />
           )}
           <ProvInspectorLayer />
         </>
