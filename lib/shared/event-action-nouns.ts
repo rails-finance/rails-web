@@ -3,7 +3,9 @@
 // labels (`actionLabel`); a pill reads inside a sentence, where a verb does
 // not parse. Each name is the shortest plural noun for its menu item, one or
 // two words (a hyphenated pair counts as one); the pill's tooltip carries the
-// menu's label beside every name that differs from it.
+// menu's label beside every name that differs from it. A menu item that covers
+// two actions ("Deposit & Generate") takes the noun of its main act, the
+// collateral leg where one moves ("deposits"); the tooltip carries the whole label.
 //
 // Keyed by the action key, never by the label's text. A key can mean one
 // thing on one roster and another elsewhere ("mint" is a supply on Moonwell,
@@ -56,7 +58,7 @@ const COMMON: Record<string, string> = {
   remove_collateral: "collateral removals",
   collateral_toggle: "collateral toggles",
   collateral: "collateral toggles",
-  supply_with_collateral: "collateral supplies",
+  supply_with_collateral: "supplies",
   // Aave and Spark.
   bad_debt_written_off: "write-offs",
   liquidation_fee: "liquidation fees",
@@ -67,10 +69,10 @@ const COMMON: Record<string, string> = {
   "Adjust Vault": "vault adjustments",
   Deposit: "deposits",
   Withdraw: "withdrawals",
-  "Deposit & Generate": "deposit-generations",
-  "Deposit & Repay": "deposit-repayments",
-  "Withdraw & Generate": "withdraw-generations",
-  "Repay & Withdraw": "repay-withdrawals",
+  "Deposit & Generate": "deposits",
+  "Deposit & Repay": "deposits",
+  "Withdraw & Generate": "withdrawals",
+  "Repay & Withdraw": "withdrawals",
   "Move to Another Vault": "moves out",
   "Move from Another Vault": "moves in",
   "Ownership Transferred": "ownership transfers",
@@ -94,8 +96,8 @@ const BY_PROTOCOL: Record<string, Record<string, string>> = {
     transfer_collateral_out: "collateral outflows",
   },
   dolomite: {
-    repay_deposit: "repay-deposits",
-    withdraw_borrow: "withdraw-borrows",
+    repay_deposit: "deposits",
+    withdraw_borrow: "withdrawals",
     sent_borrow: "sent borrows",
     received_repay: "received repayments",
     trade_taker: "trade spends",
@@ -111,10 +113,10 @@ const BY_PROTOCOL: Record<string, Record<string, string>> = {
     request_fill: "withdrawal fills",
   },
   fluid: {
-    deposit_borrow: "deposit-borrows",
-    withdraw_payback: "withdraw-repayments",
-    deposit_payback: "deposit-repayments",
-    withdraw_borrow: "withdraw-borrows",
+    deposit_borrow: "deposits",
+    withdraw_payback: "withdrawals",
+    deposit_payback: "deposits",
+    withdraw_borrow: "withdrawals",
     payback: "repayments",
     absorbed: "absorptions",
     mint: "position mints",
@@ -131,7 +133,7 @@ const BY_PROTOCOL: Record<string, Record<string, string>> = {
   ebisu: {
     adjustTroveInterestRate: "rate adjustments",
     applyPendingDebt: "debt applications",
-    openTroveAndJoinBatch: "batch openings",
+    openTroveAndJoinBatch: "openings",
     setInterestBatchManager: "batch-manager changes",
     removeFromBatch: "batch exits",
   },
