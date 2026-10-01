@@ -362,7 +362,7 @@ async function runProtocol(proto, wallet, cases) {
 
   // ── Priced liquidation: both legs + forensics ───────────────────────
   if (cases.liquidation?.num != null) {
-    const { num, block, premiumPct, seizedUsd, clearedUsd, collSymbol, collPrice, debtSymbol, debtPrice } =
+    const { num, block, premiumPct, seizedUsd, clearedUsd, collSymbol, collPrice, debtSymbol, debtPrice, captions } =
       cases.liquidation;
     await expandCard(page, num);
     const card = cardFor(page, num);
@@ -375,17 +375,20 @@ async function runProtocol(proto, wallet, cases) {
       `${await chips.count()} chip(s)`,
     );
 
+    // LiquidationForensics draws the three captions its adapter passes
+    // (`captions` below), not the shared defaults "Seized, at liquidation" /
+    // "Cleared, at liquidation" / "Realized premium".
     check(
-      `${proto}: LiquidationForensics "Seized, at liquidation" renders`,
-      (await card.getByText("Seized, at liquidation").count()) > 0,
+      `${proto}: LiquidationForensics seized-leg caption ${captions.seized} renders`,
+      (await card.getByText(captions.seized).count()) > 0,
     );
     check(
-      `${proto}: LiquidationForensics "Cleared, at liquidation" renders`,
-      (await card.getByText("Cleared, at liquidation").count()) > 0,
+      `${proto}: LiquidationForensics cleared-leg caption ${captions.cleared} renders`,
+      (await card.getByText(captions.cleared).count()) > 0,
     );
     check(
-      `${proto}: LiquidationForensics "Realized premium" renders`,
-      (await card.getByText("Realized premium").count()) > 0,
+      `${proto}: LiquidationForensics premium caption ${captions.premium} renders`,
+      (await card.getByText(captions.premium).count()) > 0,
     );
 
     const bodyText = await card.innerText();
@@ -448,6 +451,13 @@ await runProtocol("aave-v3", AAVE_V3_WALLET, {
     collPrice: "211.80",
     debtSymbol: "GHO",
     debtPrice: "1.00",
+    // aave-v3-ct-event-detail.tsx: "Collateral to the liquidator" when the
+    // block took a protocol fee, "Collateral seized" otherwise (web 9ac0b06).
+    captions: {
+      seized: /^Collateral (seized|to the liquidator)$/,
+      cleared: "Debt cleared",
+      premium: "Liquidator's premium",
+    },
   },
 });
 
@@ -470,6 +480,12 @@ await runProtocol("spark", SPARK_WALLET, {
     collPrice: "3,653.19",
     debtSymbol: "USDC",
     debtPrice: "1.00",
+    // spark-event-detail.tsx (web dc72536).
+    captions: {
+      seized: "Seized, to the liquidator",
+      cleared: "Debt repaid by the liquidator",
+      premium: "Liquidator's premium over the debt",
+    },
   },
 });
 
