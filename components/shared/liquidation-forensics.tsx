@@ -26,6 +26,7 @@ import { decimalsTitle } from "@/lib/shared/decimals-unread";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { StatCard, StateTransition } from "@/components/shared/state-transition";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatUsdValue, formatPrice } from "@/lib/utils/format";
 
@@ -91,6 +92,9 @@ export interface LiquidationForensicsProps {
    *  ((1 + premium) × 100%, "122.09%") rather than a signed premium — for a
    *  protocol whose seized-over-cleared figure is that ratio, not a bonus. */
   premiumAsRatio?: boolean;
+  /** Stand each cell as one row, label at the left and figures at the right,
+   *  as the Aave family's other T2 cells do. */
+  rowCells?: boolean;
   /** The at-block prices the legs derive from, one pill per asset. */
   pricePills: AtBlockPricePill[];
   /** Denomination formatters — default USD. A protocol whose own unit is not
@@ -213,6 +217,7 @@ export function LiquidationForensics({
   seizedLabel,
   clearedLabel,
   premiumAsRatio,
+  rowCells = false,
 }: LiquidationForensicsProps) {
   const fmtValue = format?.value ?? formatUsdValue;
   const fmtPrice = format?.price ?? formatPrice;
@@ -230,29 +235,31 @@ export function LiquidationForensics({
     ? `${((1 + premium) * 100).toFixed(2)}%`
     : `${sign}${(Math.abs(premium) * 100).toFixed(2)}%`;
   return (
-    <div className="px-5 pb-2">
-      <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-3">
-        <LegStat label={seizedLabel ?? "Seized, at liquidation"} leg={seized} formatValue={fmtValue} />
-        <LegStat label={clearedLabel ?? "Cleared, at liquidation"} leg={cleared} formatValue={fmtValue} />
-        <StatCard label={premiumLabel ?? "Realized premium"}>
-          <StateTransition>
-            <Prov info={premiumProv} value={premiumPct}>
-              <span className="text-sm font-semibold tabular-nums">{premiumPct}</span>
-            </Prov>
-          </StateTransition>
-          {premiumReference && (
-            <div className="mt-1 text-xs text-rb-500">
-              <Prov info={premiumReference.prov} value={premiumReference.value}>
-                <span className="tabular-nums">
-                  {premiumReference.label} {premiumReference.value}
-                </span>
+    <EventLedgerContext.Provider value={rowCells ? ROW_CELLS : null}>
+      <div className="px-5 pb-2">
+        <div className={`grid grid-cols-1 gap-2.5 ${rowCells ? "sm:grid-cols-2" : "sm:auto-rows-fr sm:grid-cols-3"}`}>
+          <LegStat label={seizedLabel ?? "Seized, at liquidation"} leg={seized} formatValue={fmtValue} />
+          <LegStat label={clearedLabel ?? "Cleared, at liquidation"} leg={cleared} formatValue={fmtValue} />
+          <StatCard label={premiumLabel ?? "Realized premium"}>
+            <StateTransition>
+              <Prov info={premiumProv} value={premiumPct}>
+                <span className="text-sm font-semibold tabular-nums">{premiumPct}</span>
               </Prov>
-            </div>
-          )}
-        </StatCard>
+            </StateTransition>
+            {premiumReference && (
+              <div className="mt-1 text-xs text-rb-500">
+                <Prov info={premiumReference.prov} value={premiumReference.value}>
+                  <span className="tabular-nums">
+                    {premiumReference.label} {premiumReference.value}
+                  </span>
+                </Prov>
+              </div>
+            )}
+          </StatCard>
+        </div>
+        <AtBlockPriceFootnote pills={pricePills} format={fmtPrice} />
       </div>
-      <AtBlockPriceFootnote pills={pricePills} format={fmtPrice} />
-    </div>
+    </EventLedgerContext.Provider>
   );
 }
 

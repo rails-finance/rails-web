@@ -26,7 +26,7 @@
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useContext, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
@@ -58,6 +58,7 @@ import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
+import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
@@ -785,6 +786,17 @@ export function ChainTruthDetail({
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
   const usdShown = useUsdShown();
   const unreadOf = useUnreadTokenOf();
+  const ledgerSrc = useContext(EventLedgerContext);
+  // A ledger cell's closed figures stand at the decimals its opened ledger
+  // prints ("1,037.52"); a figure of a million or more keeps its compact form.
+  const atLedger = (side: FlowSide | undefined, exact: string, shown: string): string => {
+    const dec = side ? (ledgerSrc?.decimals?.(side) ?? null) : null;
+    const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
+    const n = m ? Number(m[2].replace(/,/g, "")) : NaN;
+    if (dec == null || !Number.isFinite(n) || n >= 1e6) return shown;
+    const text = ledgerFigure(n, dec, shown);
+    return text === shown ? shown : `${m![1] === "-" ? "\u2212" : m![1]}${text}`;
+  };
   // The before→after toggle surfaces a reconstructed before (after − change).
   // Every leaf is on-chain (the replayed after, the logged delta), so the before
   // is chain-derived — it belongs in the chain-state view alongside the after it
@@ -835,7 +847,11 @@ export function ChainTruthDetail({
                               text={
                                 s.transition.shownAsIs
                                   ? s.transition.before
-                                  : transitionFigure(s.transition.before, s.transition.beforeExact, false)
+                                  : atLedger(
+                                      s.ledger,
+                                      s.transition.beforeExact,
+                                      transitionFigure(s.transition.before, s.transition.beforeExact, false),
+                                    )
                               }
                               exact={s.transition.beforeExact}
                               symbol={s.symbol}
@@ -850,7 +866,11 @@ export function ChainTruthDetail({
                               text={
                                 s.transition.shownAsIs
                                   ? s.transition.change
-                                  : transitionFigure(s.transition.change, s.transition.changeExact)
+                                  : atLedger(
+                                      s.ledger,
+                                      s.transition.changeExact,
+                                      transitionFigure(s.transition.change, s.transition.changeExact),
+                                    )
                               }
                               exact={s.transition.changeExact}
                               symbol={s.symbol}
@@ -869,7 +889,7 @@ export function ChainTruthDetail({
                       <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
                         <ExactTip
                           always
-                          text={s.display ?? compactAmount(s.value)}
+                          text={atLedger(s.ledger, s.value, s.display ?? compactAmount(s.value))}
                           exact={s.value}
                           symbol={s.symbol}
                           label={

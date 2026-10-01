@@ -90,9 +90,13 @@ export function LiquityLedgerProvider({
         ? {
             has: () => true,
             render: (side) => <LiquityLedger side={side} eventId={eventId} eventTs={eventTs} />,
+            decimals: (side) =>
+              focus?.model && cum
+                ? (eventTokenSum(focus.model, focus.events, side, cum, eventId)?.decimals ?? null)
+                : null,
           }
         : null,
-    [has, eventId, eventTs],
+    [has, eventId, eventTs, focus?.model, focus?.events, cum],
   );
   return <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>;
 }

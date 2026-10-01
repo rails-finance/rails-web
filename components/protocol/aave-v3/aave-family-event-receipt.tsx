@@ -15,6 +15,8 @@
 // dollars where the page does not hold every flow before the event.
 
 import type { ReactNode } from "react";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { StatCard } from "@/components/shared/state-transition";
 import {
   AssetLedgers,
   DayCloseNote,
@@ -145,61 +147,57 @@ export function AaveFamilyEventReceipt({
   const cum = useEventCum(eventId);
   const touchedOn = (side: "supply" | "debt") => new Set(touched.filter((t) => t.side === side).map((t) => t.reserve));
   return (
-    <div className="px-5 py-2" data-position-state="ready" data-position-complete={state.complete ? "true" : "false"}>
-      <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2" data-receipt="open">
-        {(["collateral", "debt"] as const).map((side) => {
-          const f = sideFacts(state, side, touched);
-          const ledger =
-            cum && focus?.model ? (
-              <SideLedger
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <div className="px-5 py-2" data-position-state="ready" data-position-complete={state.complete ? "true" : "false"}>
+        <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2" data-receipt="open">
+          {(["collateral", "debt"] as const).map((side) => {
+            const f = sideFacts(state, side, touched);
+            const ledger =
+              cum && focus?.model ? (
+                <SideLedger
+                  side={side}
+                  state={state}
+                  coords={coords}
+                  cum={cum}
+                  facts={f}
+                  eventId={eventId}
+                  eventTs={eventTs}
+                />
+              ) : null;
+            return (
+              <LedgerCell
+                key={side}
                 side={side}
-                state={state}
-                coords={coords}
-                cum={cum}
-                facts={f}
-                eventId={eventId}
-                eventTs={eventTs}
-              />
-            ) : null;
-          return (
-            <LedgerCell
-              key={side}
-              side={side}
-              ledger={ledger}
-              label={SIDE_NAME[side]}
-              data={{
-                "data-position-card": side,
-                "data-receipt-cell": side,
-                "data-receipt-changed": f.changed || f.touchedHere ? "true" : "false",
-              }}
-            >
-              <ClosedSide
-                state={state}
-                side={f.leg as "supply" | "debt"}
-                coords={coords}
-                touched={touchedOn(f.leg as "supply" | "debt")}
-                usd={sideUsd(side, state, coords, f, eventTs)}
-              />
-              {side === "collateral" && state.sources.settings == null && (
-                <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
-              )}
-            </LedgerCell>
-          );
-        })}
+                ledger={ledger}
+                label={SIDE_NAME[side]}
+                data={{
+                  "data-position-card": side,
+                  "data-receipt-cell": side,
+                  "data-receipt-changed": f.changed || f.touchedHere ? "true" : "false",
+                }}
+              >
+                <ClosedSide
+                  state={state}
+                  side={f.leg as "supply" | "debt"}
+                  coords={coords}
+                  touched={touchedOn(f.leg as "supply" | "debt")}
+                  usd={sideUsd(side, state, coords, f, eventTs)}
+                />
+                {side === "collateral" && state.sources.settings == null && (
+                  <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
+                )}
+              </LedgerCell>
+            );
+          })}
+          {risk.map((r) => (
+            <StatCard key={r.key} label={r.label} data={{ "data-position-card": r.key }}>
+              {r.body}
+            </StatCard>
+          ))}
+        </div>
+        {notes && <div className="mt-2 space-y-0.5 text-xs text-rb-500">{notes}</div>}
       </div>
-      <div
-        className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] sm:gap-4 sm:px-4"
-        data-receipt-risk=""
-      >
-        {risk.map((r) => (
-          <div key={r.key} className="min-w-0" data-position-card={r.key}>
-            <div className="text-xs text-rb-500">{r.label}</div>
-            <div className="mt-0.5">{r.body}</div>
-          </div>
-        ))}
-      </div>
-      {notes && <div className="mt-2 space-y-0.5 text-xs text-rb-500">{notes}</div>}
-    </div>
+    </EventLedgerContext.Provider>
   );
 }
 

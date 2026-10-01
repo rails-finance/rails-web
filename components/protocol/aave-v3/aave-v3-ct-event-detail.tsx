@@ -752,7 +752,7 @@ export function AaveV3CtEventDetail({
           eventTs={eventTs}
         />
       )}
-      {forensics && <LiquidationForensics {...forensics} />}
+      {forensics && <LiquidationForensics {...forensics} rowCells />}
       {fee && ctx.collateralSymbol && (
         <div className="px-5 pb-2 text-xs text-rb-500">
           {fmt2(ctx.liquidatedCollateralAmount)} {ctx.collateralSymbol} to the liquidator + {fmt2(fee.amount)}{" "}

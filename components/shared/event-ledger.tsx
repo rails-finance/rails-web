@@ -3,9 +3,11 @@
 // The event card's ledger (rails-ops reference/lifetime-flows-scrubber.md,
 // "The event card's sum"; anatomy T2.1). Each account cell of an opened card
 // (Collateral, Debt) is one row closed, its closing line: the side's name,
-// before → after, and a toggle at the row's right end that opens the cell
-// into its ledger above that line: one row per kind of flow as of the event,
-// the event's row highlighted, a rule, and the closing line again. Tokens
+// before → after, and a toggle at the right end of the cell's first line (the
+// name's line) that opens the cell into its ledger: one row per kind of flow
+// as of the event, the event's row highlighted, a rule, and the closing line.
+// The toggle is one chevron, fixed to the cell's top right, that turns over
+// when the cell is open, so a tap opens and a tap at the same point closes. Tokens
 // first; USD in a second column after a thin divider where the timeline's
 // Display switches show it, with Market move, the price's effect, in that
 // column alone. In a cell narrower than 28rem the two columns take turns
@@ -16,18 +18,15 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -76,41 +75,26 @@ const ColContext = createContext<{ col: Col; offer: (unit: string | null) => voi
  *  where the two number columns take turns. */
 const NARROW_HIDE = "@max-md:hidden";
 
-/** The opened cell's toggle, which the ledger's closing line places at its
- *  right end (`LedgerToggleSlot`). */
-const ToggleSlotContext = createContext<{ toggle: ReactNode; count: { current: number } } | null>(null);
-
-/** Where the opened ledger's closing line puts the cell's toggle. */
-function LedgerToggleSlot() {
-  const ctx = useContext(ToggleSlotContext);
-  useLayoutEffect(() => {
-    if (!ctx) return;
-    const count = ctx.count;
-    count.current += 1;
-    return () => {
-      count.current -= 1;
-    };
-  }, [ctx]);
-  return <>{ctx?.toggle ?? null}</>;
-}
-
 /** The side's swatch beside its name, as the ledger's closing line draws it. */
 const SideSwatch = ({ side }: { side: FlowSide }) => (
   <i aria-hidden className="inline-block size-3 shrink-0 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
 );
 
-/** The toggle's box: the same in the closed row and on the ledger's closing
- *  line, so it sits at the cell's right end in both. */
+/** The toggle's box: fixed to the cell's top right, level with the name's
+ *  line, closed and opened, so it never moves. 32px (44px at phone width,
+ *  where the cell's padding holds the larger box without growing the row). */
 const TOGGLE =
-  "-my-1.5 -mr-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-md text-rb-500 hover:bg-sunken hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500";
+  "absolute right-2.5 top-1.5 inline-flex size-8 items-center justify-center rounded-md text-rb-500 hover:bg-sunken hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 max-sm:right-1 max-sm:top-0 max-sm:size-11";
+/** The first line leaves room for the toggle at its right end. */
+const TOGGLE_ROOM = "pr-11 sm:pr-[38px]";
 
 /** A T2 cell that can open into its side's ledger (anatomy T2.1). Closed, the
  *  cell is one row, the ledger's closing line on its own: the side's swatch
  *  and name, its figures at the right (before → after in tokens, USD after
- *  a thin divider), and the toggle at the row's right end where the side has
- *  a ledger. Opened, the ledger's rows stand above a rule and the same line,
- *  the toggle at its right end, so the name is stated once in both states
- *  and the cell grows downward. `ledger`, where given, is the cell's ledger
+ *  a thin divider), and the toggle at the first line's right end where the side
+ *  has a ledger. Opened, the first line stays (swatch, name, toggle) and the
+ *  ledger's rows stand under it above a rule and the closing line, so the
+ *  toggle stays where the pointer pressed it and the cell grows downward. `ledger`, where given, is the cell's ledger
  *  (null for none); else the card's EventLedgerContext provides it by
  *  `side`. On a card with ledgers the cell takes the grid's full width
  *  closed and opened (`data-ledger-span`), so no other cell moves sideways;
@@ -147,18 +131,8 @@ export function LedgerCell({
   const body = isOpen ? (ledger !== undefined ? ledger : side ? src?.render(side) : null) : null;
   const name = typeof label === "string" ? label : side ? SIDE_NAME[side] : "cell";
   const ledgerCard = src != null || ledger !== undefined;
-  // The toggle moves between the closed row and the ledger's closing line;
-  // the press that moved it takes the focus along.
-  const refocus = useRef(false);
-  const placeFocus = useCallback((el: HTMLButtonElement | null) => {
-    if (el && refocus.current) {
-      refocus.current = false;
-      el.focus({ preventScroll: true });
-    }
-  }, []);
   const toggle = has ? (
     <button
-      ref={placeFocus}
       type="button"
       className={TOGGLE}
       aria-expanded={isOpen}
@@ -168,23 +142,17 @@ export function LedgerCell({
       data-ledger-toggle={side ?? ""}
       onClick={(e) => {
         e.stopPropagation();
-        refocus.current = true;
         setOpen((v) => !v);
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      {isOpen ? <ChevronsDownUp size={16} aria-hidden /> : <ChevronsUpDown size={16} aria-hidden />}
+      <ChevronDown
+        size={16}
+        aria-hidden
+        className={`transition-transform duration-150 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
+      />
     </button>
   ) : null;
-  // A ledger with no closing line (a side it cannot state) keeps the toggle
-  // in a row of its own.
-  const placed = useRef({ current: 0 }).current;
-  const [loose, setLoose] = useState(false);
-  useLayoutEffect(() => {
-    const need = isOpen && placed.current === 0;
-    if (need !== loose) setLoose(need);
-  });
-  const slot = useMemo(() => ({ toggle: loose ? null : toggle, count: placed }), [loose, toggle, placed]);
   const nameRow = (
     <span className="flex min-h-5 shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
       {side && <SideSwatch side={side} />}
@@ -194,65 +162,67 @@ export function LedgerCell({
   const right = alignRight ?? ledgerCard;
   return (
     <div
-      className={`@container flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
+      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
       {...data}
       {...(side ? { "data-ledger-cell": side } : {})}
       {...(ledgerCard ? { "data-ledger-span": "" } : {})}
       {...(isOpen ? { "data-ledger-open": "" } : {})}
     >
       {isOpen ? (
-        <ColContext.Provider value={{ col, offer: setUnit }}>
-          {unit && (
-            <div className="mb-1.5 flex justify-end @md:hidden">
-              <div
-                role="group"
-                aria-label="Column shown"
-                className="inline-flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold"
-                data-ledger-switch=""
-              >
-                {(["tokens", "usd"] as const).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-pressed={col === c}
-                    className={`min-h-7 rounded px-2 ${col === c ? "bg-background text-foreground" : "text-rb-500"}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCol(c);
-                    }}
-                  >
-                    {c === "tokens" ? unit : "USD"}
-                  </button>
-                ))}
+        <>
+          <div className={`mb-1.5 flex items-start ${TOGGLE_ROOM}`} data-ledger-row="head">
+            {nameRow}
+          </div>
+          <ColContext.Provider value={{ col, offer: setUnit }}>
+            {unit && (
+              <div className="mb-1.5 flex justify-end @md:hidden">
+                <div
+                  role="group"
+                  aria-label="Column shown"
+                  className="inline-flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold"
+                  data-ledger-switch=""
+                >
+                  {(["tokens", "usd"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={col === c}
+                      className={`min-h-7 rounded px-2 ${col === c ? "bg-background text-foreground" : "text-rb-500"}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCol(c);
+                      }}
+                    >
+                      {c === "tokens" ? unit : "USD"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          {loose && <div className="mb-1.5 flex justify-end">{toggle}</div>}
-          <ToggleSlotContext.Provider value={slot}>
+            )}
             <div id={id} data-anatomy="T2.1">
               {body}
             </div>
-          </ToggleSlotContext.Provider>
-        </ColContext.Provider>
+          </ColContext.Provider>
+        </>
       ) : right ? (
-        // The figures and the toggle keep to the name's line where they fit,
-        // else they take the next line, the toggle still at its right end.
-        <div className="flex flex-wrap items-start gap-x-3 gap-y-1" data-ledger-row="closed">
+        // The figures keep to the name's line where they fit, else they take
+        // the next line; the toggle stays at the name's line's right end.
+        <div
+          className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${has ? TOGGLE_ROOM : ""}`}
+          data-ledger-row="closed"
+        >
           {nameRow}
-          <div className="flex flex-1 items-start justify-end gap-3">
-            <div className="flex flex-col items-end text-right">{children}</div>
-            {toggle}
-          </div>
+          <div className="flex flex-1 flex-col items-end text-right">{children}</div>
         </div>
       ) : (
         <>
-          <div className="mb-1.5 flex items-start gap-3" data-ledger-row="closed">
-            <span className="min-w-0 flex-1">{nameRow}</span>
-            {toggle}
+          <div className={`mb-1.5 flex items-start ${has ? TOGGLE_ROOM : ""}`} data-ledger-row="closed">
+            {nameRow}
           </div>
           {children}
         </>
       )}
+      {toggle}
     </div>
   );
 }
@@ -353,10 +323,9 @@ function useCols(tokens: boolean, usd: boolean, unitWord: string, offerSwitch: b
 /** The grid the rows sit in. In a narrow cell one of two number columns
  *  shows. */
 function LedgerGrid({ cols, children }: { cols: Cols; children: ReactNode }) {
-  // The last column holds the cell's toggle on the closing line.
   const grid = cols.two
-    ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
-    : "grid-cols-[auto_minmax(0,1fr)_auto_auto]";
+    ? "grid-cols-[auto_minmax(0,1fr)_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto]"
+    : "grid-cols-[auto_minmax(0,1fr)_auto]";
   return <div className={`grid ${grid} items-center gap-x-3 text-sm tabular-nums`}>{children}</div>;
 }
 
@@ -384,12 +353,9 @@ function LedgerRows({
   daily = false,
   subhead,
   spaced = false,
-  closing = false,
 }: {
   ledger: Ledger;
   cols: Cols;
-  /** The total line closes the cell: the toggle stands at its right end. */
-  closing?: boolean;
   /** Space above the subhead (a ledger after another). */
   spaced?: boolean;
   name: string;
@@ -470,7 +436,6 @@ function LedgerRows({
                 {r.usd && ledger.usd ? <Prov info={usdProv(r)}>{r.usd.text}</Prov> : null}
               </span>
             )}
-            <span aria-hidden className={hideRow} />
           </div>
         );
       })}
@@ -533,7 +498,6 @@ function LedgerRows({
             )}
           </span>
         )}
-        <span className="flex justify-end self-end py-1">{closing && <LedgerToggleSlot />}</span>
       </div>
     </div>
   );
@@ -573,7 +537,6 @@ export function LedgerTable({
         totalUsdBeforeProv={totalUsdBeforeProv}
         daily={daily}
         subhead={subhead}
-        closing
       />
     </LedgerGrid>
   );
@@ -656,7 +619,6 @@ export function AssetLedgers({
               </span>
             </span>
           </span>
-          <LedgerToggleSlot />
         </div>
       </LedgerGrid>
     </div>

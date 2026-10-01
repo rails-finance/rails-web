@@ -419,6 +419,7 @@ export function SparkEventDetail({
           seizedLabel="Seized, to the liquidator"
           clearedLabel="Debt repaid by the liquidator"
           premiumLabel="Liquidator's premium over the debt"
+          rowCells
         />
       )}
       {showBasket && (

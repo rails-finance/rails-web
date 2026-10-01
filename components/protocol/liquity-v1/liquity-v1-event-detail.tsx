@@ -29,6 +29,7 @@ import {
 } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LedgerCell } from "@/components/shared/event-ledger";
+import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
@@ -207,17 +208,22 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
 
   // ── Collateral ──
   const collChanged = Math.abs(s.collDelta) > EPS;
-  const collBeforeStr = fmtEth(s.collBefore);
-  const collAfterStr = fmtEth(s.collAfter);
-  const collDeltaStr = `${s.collDelta >= 0 ? "+" : "−"}${fmtEth(Math.abs(s.collDelta))}`;
+  // The closed cells state their figures at the decimals the opened ledger prints.
+  const collDec = useLedgerDecimals("collateral");
+  const debtDec = useLedgerDecimals("debt");
+  const fc = (n: number) => ledgerFigure(n, collDec, fmtEth(n));
+  const fl = (n: number) => ledgerFigure(n, debtDec, fmtLusd(n));
+  const collBeforeStr = fc(s.collBefore);
+  const collAfterStr = fc(s.collAfter);
+  const collDeltaStr = `${s.collDelta >= 0 ? "+" : "−"}${fc(Math.abs(s.collDelta))}`;
   const usdAfter = price != null && s.collAfter > EPS ? s.collAfter * price : null;
   const usdBefore = price != null && s.collBefore > EPS ? s.collBefore * price : null;
 
   // ── Debt ──
   const debtChanged = Math.abs(s.debtDelta) > EPS;
-  const debtBeforeStr = fmtLusd(s.debtBefore);
-  const debtAfterStr = fmtLusd(s.debtAfter);
-  const debtDeltaStr = `${s.debtDelta >= 0 ? "+" : "−"}${fmtLusd(Math.abs(s.debtDelta))}`;
+  const debtBeforeStr = fl(s.debtBefore);
+  const debtAfterStr = fl(s.debtAfter);
+  const debtDeltaStr = `${s.debtDelta >= 0 ? "+" : "−"}${fl(Math.abs(s.debtDelta))}`;
 
   // What the debt change was made of, where the receipt says.
   const fee = read?.borrowingFee != null ? Number(read.borrowingFee) : null;
@@ -290,7 +296,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
   return (
     <>
       <div className="px-5 py-2">
-        <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
           <LedgerCell label="Collateral" side="collateral">
             <Transition
               before={collBeforeStr}

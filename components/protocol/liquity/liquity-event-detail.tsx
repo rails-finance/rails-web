@@ -21,6 +21,7 @@ import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
+import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
@@ -122,7 +123,9 @@ function DebtMetric({
   // ECHOES into that receipt so the locator pulse reaches it; otherwise it's a
   // genuinely different derived figure and carries its own (derived) provenance.
   const delta = after - before;
-  const deltaStr = `${delta >= 0 ? "+" : "−"}${toLocaleStringHelper(Math.abs(delta))}`;
+  const dec = useLedgerDecimals("debt");
+  const fd = (n: number) => ledgerFigure(n, dec, toLocaleStringHelper(n));
+  const deltaStr = `${delta >= 0 ? "+" : "−"}${fd(Math.abs(delta))}`;
   const deltaProv: Provenance = {
     kind: "derived",
     summary: `Trove debt (${stablecoinSymbol}) change at this event — the debt after minus the debt before, including any interest and fee.`,
@@ -147,10 +150,7 @@ function DebtMetric({
         <StateTransition>
           <ClosedTokens>
             {showBefore && (
-              <DeltaToggle
-                before={<P info={provBefore}>{toLocaleStringHelper(before)}</P>}
-                delta={isClose ? null : deltaNode}
-              />
+              <DeltaToggle before={<P info={provBefore}>{fd(before)}</P>} delta={isClose ? null : deltaNode} />
             )}
             {isClose ? (
               <>
@@ -159,7 +159,7 @@ function DebtMetric({
               </>
             ) : (
               <P info={provAfter} icon={<TokenChipIcon symbol={stablecoinSymbol} size={16} />}>
-                <span className={`text-sm font-semibold ${changeTone(changed)}`}>{toLocaleStringHelper(after)}</span>
+                <span className={`text-sm font-semibold ${changeTone(changed)}`}>{fd(after)}</span>
               </P>
             )}
           </ClosedTokens>
@@ -242,7 +242,9 @@ function CollateralMetric({
   // found them indistinguishable (changeEcho); otherwise derived figure →
   // derived provenance.
   const collDelta = after - before;
-  const collDeltaStr = `${collDelta >= 0 ? "+" : "−"}${formatColl(Math.abs(collDelta))}`;
+  const dec = useLedgerDecimals("collateral");
+  const fc = (n: number) => ledgerFigure(n, dec, formatColl(n));
+  const collDeltaStr = `${collDelta >= 0 ? "+" : "−"}${fc(Math.abs(collDelta))}`;
   const deltaProv: Provenance = {
     kind: "derived",
     summary: `Collateral (${collateralType}) change at this event — the collateral after minus the collateral before.`,
@@ -263,7 +265,7 @@ function CollateralMetric({
       <StateTransition>
         <ClosedTokens>
           {showBefore && (
-            <DeltaToggle before={<P info={provBefore}>{formatColl(before)}</P>} delta={isClose ? null : deltaNode} />
+            <DeltaToggle before={<P info={provBefore}>{fc(before)}</P>} delta={isClose ? null : deltaNode} />
           )}
           {isClose ? (
             <>
@@ -272,9 +274,7 @@ function CollateralMetric({
             </>
           ) : (
             <P info={provAfter} icon={<TokenChipIcon symbol={collateralType} size={16} />}>
-              <span className={`text-sm font-semibold ${changeTone(changed)}`}>
-                {after === 0 ? "0" : formatColl(after)}
-              </span>
+              <span className={`text-sm font-semibold ${changeTone(changed)}`}>{after === 0 ? "0" : fc(after)}</span>
             </P>
           )}
         </ClosedTokens>
