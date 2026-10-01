@@ -239,7 +239,7 @@ export function EventCard({
     <div className="min-w-0 grow">
       {/* ── Header panel ─────────────────────────────────────────── */}
       {/* The ring: the header of a day's last event flashes after the Lifetime
-          flows chart's "Apply to timeline" or the timeline chip brings it into
+          flows chart's "Show timeline to {date}" or the timeline chip brings it into
           view (flow-day-mark.tsx). */}
       <div
         data-anatomy="T1"

@@ -10,8 +10,8 @@
 // bars state there is `combinedAt` (lib/shared/flows-combined.ts). The strip
 // after the cursor is dimmed. The dashed outline marks where each bar ends today. Before the bars'
 // window opens the bars grey out at the window's first day and say so. Under
-// the strip, the playback controls, and on a page tied to its timeline "Apply
-// to timeline". The line's key sits in the panel's Explanation and its basis
+// the strip, the playback controls, and on a page tied to its timeline "Show
+// timeline to {date}". The line's key sits in the panel's Explanation and its basis
 // beside the (i).
 
 import {
@@ -25,7 +25,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight, List, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { Headline, Rescaled, Throughput, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -221,9 +221,9 @@ export function CombinedFlows({
 
   // On a page that ties the panel to its timeline, the day is the unit the
   // two share. A click on the strip freezes the cursor on a day; the chart and
-  // the bars show it and the list is untouched. "Apply to timeline" cuts the
+  // the bars show it and the list is untouched. "Show timeline to {date}" cuts the
   // list at the cursor's day close and brings that day's last card into
-  // view; the cut stays where it is while the chart moves, until Apply is
+  // view; the cut stays where it is while the chart moves, until the button is
   // pressed again or the timeline chip's × clears it. A card's "View on
   // chart" freezes the cursor on its day from the other side. The back and
   // forward steps go by days with events. A second click on the frozen day,
@@ -281,12 +281,11 @@ export function CombinedFlows({
     if (focus && focus.store.get().frozenDay !== frozenDay) focus.store.set({ frozenDay });
   }, [focus, frozenDay]);
   useEffect(() => () => focus?.store.set({ cursor: null, frozenDay: null }), [focus?.store]);
-  // "Apply to timeline": the cut at the cursor's day close. At today it
+  // "Show timeline to {date}": the cut at the cursor's day close. At today it
   // clears a standing cut, as the chip's × does; with no cut there is nothing
   // to apply, nor where that cut already stands.
   const applied = useFlowFocusState((s) => s.rewind?.endTs ?? null);
-  const canApply =
-    byDays && !!committed && (committed.live ? applied != null : applied !== committedEnd);
+  const canApply = byDays && !!committed && (committed.live ? applied != null : applied !== committedEnd);
   // The page stays where it is (Miles, 1 Oct 2026): the cut's top card
   // flashes once the visitor scrolls it into view.
   const apply = () => {
@@ -294,6 +293,36 @@ export function CombinedFlows({
     if (committed?.live) focus.store.set({ rewind: null });
     else focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
   };
+  // The button names the day the cursor is on, in the cut pill's format. The
+  // row gives it what the controls leave; the longer wording goes first and
+  // the shorter ones follow where the width runs out (no shrunk text).
+  const cursorTs = committed ? (committed.live ? Date.now() / 1000 : dayStart(model, committed.stop)) : 0;
+  const applyLabels = committed?.live
+    ? ["Show timeline to today", "Show to today", "Show to today"]
+    : [`Show timeline to ${committedWord}`, `Show to ${committedWord}`, `Show to ${shortDate(cursorTs)}`];
+  const rowRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [labelLevel, setLabelLevel] = useState(0);
+  const labelKey = applyLabels.join("|");
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const controls = controlsRef.current;
+    const probe = measureRef.current;
+    if (!row || !controls || !probe) return;
+    const fit = () => {
+      // Button chrome: 12px padding each side, the 16px icon and its 6px gap;
+      // 12px between the controls and the button.
+      const room = row.clientWidth - controls.offsetWidth - 12 - 24 - 22;
+      const widths = Array.from(probe.children).map((c) => (c as HTMLElement).offsetWidth);
+      const i = widths.findIndex((w) => w <= room);
+      setLabelLevel(i < 0 ? widths.length - 1 : i);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, [labelKey, byDays]);
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
   useEffect(() => {
@@ -463,10 +492,16 @@ export function CombinedFlows({
             />
           </div>
 
-          {/* The playback controls at the left; "Apply to timeline" at the
+          {/* The playback controls at the left; "Show timeline to {date}" at the
               right, on a page that ties the panel to its timeline. */}
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div className="-ml-2 flex items-center gap-x-1" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
+          <div ref={rowRef} className="relative mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div
+              ref={controlsRef}
+              className="-ml-2 flex items-center gap-x-1"
+              data-flow-controls=""
+              data-anatomy="F5"
+              {...KEEP_PANEL}
+            >
               <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
                 <SkipBack size={16} aria-hidden />
               </button>
@@ -502,6 +537,19 @@ export function CombinedFlows({
               </button>
             </div>
             {byDays && (
+              <span
+                ref={measureRef}
+                aria-hidden
+                className="pointer-events-none invisible absolute -z-10 flex flex-col text-xs font-semibold whitespace-nowrap"
+              >
+                {applyLabels.map((t, i) => (
+                  <span key={i} className="w-max">
+                    {t}
+                  </span>
+                ))}
+              </span>
+            )}
+            {byDays && (
               <button
                 type="button"
                 className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ml-auto min-h-11 gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9`}
@@ -520,8 +568,8 @@ export function CombinedFlows({
                 data-anatomy="F6"
                 {...KEEP_PANEL}
               >
-                <List size={16} aria-hidden />
-                Apply to timeline
+                <ListEnd size={16} aria-hidden />
+                {applyLabels[Math.min(labelLevel, applyLabels.length - 1)]}
               </button>
             )}
           </div>

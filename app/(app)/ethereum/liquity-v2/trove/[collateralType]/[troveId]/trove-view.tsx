@@ -444,7 +444,7 @@ export default function TroveView({
     ],
   );
   // The panel and the timeline are tied by the day (components/shared/flow-focus-context.tsx):
-  // Apply to timeline, each day's mark, and each card's sum as of its event,
+  // "Show timeline to {date}", each day's mark, and each card's sum as of its event,
   // read from the same replay.
   const focusEvents = useMemo(
     () => liquityFocusEvents(flowEvents, flowCollSymbol, flowDebtSymbol),

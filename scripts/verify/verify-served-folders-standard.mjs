@@ -32,7 +32,7 @@
 //       event and no folder: no loose card, folder rows drawn, no "filtered
 //       out" label
 //   E4  E1's wallet cut at 2023-05-17 (`?to=`, the Lifetime flows chart's
-//       Apply), a day inside its OLDEST folder: the list's ends read the
+//       "Show timeline to {date}" button), a day inside its OLDEST folder: the list's ends read the
 //       folders' own dates, so the top carries the "tip" boundary row and no
 //       pulsing dot. Until 2026-10-01 this was a `?from=&to=` Dates filter,
 //       which also drew the "view" row at the bottom; a cut hides nothing

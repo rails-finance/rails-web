@@ -2282,8 +2282,8 @@ for (const g of GROUPED_FIXTURES) {
 
 // ── THE NO-DATES ARM (2026-10-01) ─────────────────────────────────────────
 // The families tied to a Lifetime flows chart (Aave V3, SparkLend, Aave V4,
-// Liquity V2 and its three forks) draw no Dates control: the chart's "Apply to
-// timeline" navigates them by day, and `?to=` restores its cut. N1 asserts the
+// Liquity V2 and its three forks) draw no Dates control: the chart's "Show timeline to {date}"
+// button navigates them by day, and `?to=` restores its cut. N1 asserts the
 // absence only after the toolbar's count line, the positive signal, is drawn.
 const NO_DATES = [
   { id: "nodates-aave-v3", path: `${AAVE_V3.page}/0xee7ca610d896c53ffe716b801c05748efd902954?market=core` },
@@ -2299,7 +2299,7 @@ for (const f of NO_DATES) {
     await page.waitForSelector("[data-timeline-total]");
     await page.waitForSelector("[data-flow-apply]");
     const dates = await page.locator("[data-date-control]").count();
-    check(`N1 ${f.id}: the toolbar draws no Dates control beside Apply to timeline`, dates === 0, `${dates} found`);
+    check(`N1 ${f.id}: the toolbar draws no Dates control beside Show timeline to`, dates === 0, `${dates} found`);
   } catch (err) {
     check(`N1 ${f.id}: the page loaded`, false, String(err?.message ?? err).slice(0, 200));
   } finally {

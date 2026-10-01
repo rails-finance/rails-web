@@ -1,8 +1,7 @@
 "use client";
 
 // The state card (rails-ops reference/lifetime-flows-scrubber.md, "The day
-// links the chart and the timeline"): where the Lifetime flows chart's "Apply
-// to timeline" cuts the timeline at the close of a day with no events of its
+// links the chart and the timeline"): where the Lifetime flows chart's "Show timeline to {date}" cuts the timeline at the close of a day with no events of its
 // own, the cut timeline opens with this card for that moment. It wears an
 // event card's shell with a clock on the spine, and states only what the
 // flow model holds exactly for that day (lib/shared/flow-moment.ts): each
@@ -73,7 +72,7 @@ export function FlowMomentCard({
   today: number;
   isFirst: boolean;
   /** The header rings for a moment after the chip's text brings it into view
-   *  or it first comes into view after Apply. */
+   *  or it first comes into view after "Show timeline to {date}". */
   flash: boolean;
 }) {
   const date = dayStamp(moment.day * DAY_S);

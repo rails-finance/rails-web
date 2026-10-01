@@ -4,7 +4,7 @@
 // event cards (lib/shared/flow-focus.ts; rails-ops TO-DO-ui-jobs 141). A page
 // that has it (the Aave and Liquity families) wraps both in <FlowFocusContext.Provider>: a
 // click on a chart segment opens a short tip with its line, value and share,
-// the chart's "Apply to timeline" cuts the timeline at its cursor's day, each
+// the chart's "Show timeline to {date}" cuts the timeline at its cursor's day, each
 // day's last card carries the day's date and a button that freezes the chart
 // there, and each event card can state the lifetime sum as of its event. A
 // page without it keeps the segment panels (Sky Savings).
@@ -74,7 +74,7 @@ const DAY_S = 86_400;
  *  chart's cursor on its day. A link from before Dates was removed on these
  *  pages carries `from` and `to`; it lands on the cut at `to`, the range's last
  *  day, and `from` goes. After that the param follows the cut: written when
- *  Apply moves it, removed with the chip's ×. Other params stay as they are. */
+ *  "Show timeline to {date}" moves it, removed with the chip's ×. Other params stay as they are. */
 export function useRewindParam(store: FlowFocusStore | null): void {
   useEffect(() => {
     if (!store) return;

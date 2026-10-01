@@ -1,6 +1,6 @@
 // The Lifetime flows panel and the timeline under it, tied together by the day
 // (rails-ops TO-DO-ui-jobs 141, reference/lifetime-flows-scrubber.md, "The day
-// links the chart and the timeline"): the chart's "Apply to timeline" cuts the
+// links the chart and the timeline"): the chart's "Show timeline to {date}" cuts the
 // timeline at its cursor's day close, and a day mark's button on the timeline
 // freezes the chart's cursor there. Freezing the chart cuts nothing. An event
 // card states the side's lifetime sum as of that event, from the same day rows
@@ -524,14 +524,14 @@ export interface FlowFocusState {
   /** A card's "View on chart": the chart's cursor goes to that day's close
    *  and freezes there. The timeline is untouched. */
   move: { ts: number; n: number } | null;
-  /** The cut applied to the timeline by the chart's "Apply to timeline": the
+  /** The cut applied to the timeline by the chart's "Show timeline to {date}": the
    *  list holds every event up to `endTs` (that day's close), named `word`
    *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
    *  leaves it where it is; the chip's × clears it. The address bar carries
    *  it as `?to=2026-09-02` (`useRewindParam`). */
   rewind: { endTs: number; word: string } | null;
   /** Bumped to bring the cut's top card into view and flash its header (the
-   *  chip's text). Apply cuts without it: the page stays where it is. */
+   *  chip's text). "Show timeline to {date}" cuts without it: the page stays where it is. */
   go: number;
   /** A cut restored from the address bar: the chart's cursor goes to its
    *  day (`endTs`, that day's close) and freezes there. */

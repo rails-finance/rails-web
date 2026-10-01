@@ -460,7 +460,7 @@ export default function LiquityV1TroveView({
     [flowsReady, flowMapped, flowSurplusClaimed, flowsNow, flowDaily.obs, flowOpen, priceNow, chainLive],
   );
   const flowsRead: FlowsRead = !flowsReady ? "reading" : flowWhole ? "done" : flowHistory.read;
-  // The panel and the timeline are tied by the day: Apply to timeline, each
+  // The panel and the timeline are tied by the day: "Show timeline to {date}", each
   // day's mark and each card's ledgers read the same replay.
   const focusEvents = useMemo(() => liquityFocusEvents(flowMapped.events, "ETH", "LUSD", "v1"), [flowMapped]);
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(focusEvents), flowTimeline);

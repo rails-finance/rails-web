@@ -74,7 +74,7 @@ import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
 import { FlowMomentCard, type MomentNeighbour } from "@/components/shared/flow-moment-card";
-import { List, X } from "lucide-react";
+import { List, ListEnd, X } from "lucide-react";
 import { unreadTokensIn } from "@/lib/shared/decimals-unread";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, usePathname } from "next/navigation";
@@ -732,7 +732,7 @@ function ChainTruthTimelineBody({
   // choice to give back.
   const activeRuns = useMemo(() => (collapseRuns ? runs : runs?.filter((r) => r.asOneEvent)), [collapseRuns, runs]);
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
-  // "Apply to timeline" is pressed, the list holds every event up to that
+  // "Show timeline to {date}" is pressed, the list holds every event up to that
   // day's close. What goes is the list's top, so the rows keep their order
   // and move up by what was cut.
   const rewind = useFlowFocusState((st) => st.rewind);
@@ -1164,7 +1164,7 @@ function ChainTruthTimelineBody({
     setWindowSize(WINDOW_CHUNK);
   }, [events]);
 
-  // The cut's other half. "Apply to timeline" (and the chip's text) brings
+  // The cut's other half. "Show timeline to {date}" (and the chip's text) brings
   // the list's top event (the cut day's last, or the last before it) into
   // view and flashes its header; the card stays open or closed as the
   // visitor left it. Where the page holds another month (a served,
@@ -1174,7 +1174,7 @@ function ChainTruthTimelineBody({
   // pages have no Dates (`tl.datesAxis`): the cut is how they are navigated
   // by day, and the address bar carries it (`useRewindParam`).
   const focusStore = useFlowFocus()?.store ?? null;
-  // Aave V4 on Base wears the provider without a series, so without Apply,
+  // Aave V4 on Base wears the provider without a series, so without the Show timeline button,
   // and keeps Dates and its `?from=&to=`.
   useRewindParam(tl.datesAxis ? null : focusStore);
   const go = useFlowFocusState((st) => st.go);
@@ -1199,7 +1199,7 @@ function ChainTruthTimelineBody({
    *  month is still loading scrolls once its rows land. */
   const pendingGo = useRef(0);
   /** The cut last seen, and whether its top card flashes once it first comes
-   *  into view: Apply cuts and leaves the page where it is (Miles, 1 Oct
+   *  into view: "Show timeline to {date}" cuts and leaves the page where it is (Miles, 1 Oct
    *  2026), so the flash waits for the visitor to scroll to the card. */
   const lastRewindKey = useRef<string | null>(null);
   const watchTop = useRef(false);
@@ -1211,7 +1211,7 @@ function ChainTruthTimelineBody({
     folderId: string | null;
     runId: string | null;
     /** "scroll": into view, flashing (the chip's text); "watch": flash once
-     *  it comes into view (Apply); "none": open it only. */
+     *  it comes into view ("Show timeline to {date}"); "none": open it only. */
     mode: "scroll" | "watch" | "none";
   } | null>(null);
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
@@ -1312,7 +1312,7 @@ function ChainTruthTimelineBody({
   // members are read, a run's once it is open: look for it until it is. The
   // moment's card, where the cut has one, is the top.
   const hasMoment = moment != null;
-  /** Apply's watch for its top card; a new seek or cut replaces it. */
+  /** The button's watch for its top card; a new seek or cut replaces it. */
   const watcher = useRef<IntersectionObserver | null>(null);
   useEffect(() => {
     watcher.current?.disconnect();
@@ -1337,7 +1337,7 @@ function ChainTruthTimelineBody({
           }),
         60,
       );
-    /** Apply: the header flashes once the card is half in view. */
+    /** "Show timeline to {date}": the header flashes once the card is half in view. */
     const watch = (el: HTMLElement, id: string) => {
       const seen = new IntersectionObserver(
         (entries) => {
@@ -1844,7 +1844,7 @@ function ChainTruthTimelineBody({
                   className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-l-full py-1 pl-2.5 pr-1.5 text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 dark:text-blue-300"
                   data-flow-rewind-go=""
                 >
-                  <List size={13} aria-hidden />
+                  <ListEnd size={13} aria-hidden />
                   Timeline to {rewind.word}
                 </button>
                 <button

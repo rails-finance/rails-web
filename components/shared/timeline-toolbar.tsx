@@ -934,7 +934,7 @@ export function TimelineToolbar({
             />
           )}
           {/* No Dates on a page tied to its Lifetime flows chart
-              (`tl.datesAxis`): the chart's scrubber and "Apply to timeline"
+              (`tl.datesAxis`): the chart's scrubber and "Show timeline to {date}"
               navigate it by the day. */}
           {tl.datesAxis && (
             <button

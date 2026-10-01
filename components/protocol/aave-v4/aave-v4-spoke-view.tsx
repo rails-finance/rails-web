@@ -557,8 +557,8 @@ function AaveV4SpokePageInner({
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
     olderCount,
-    // Navigated by the Lifetime flows chart's Apply: no Dates. Base has no
-    // flows series (`flowSeriesEnabled` below), so no Apply, and keeps Dates.
+    // Navigated by the Lifetime flows chart's Show timeline button: no Dates. Base has no
+    // flows series (`flowSeriesEnabled` below), so no Show timeline button, and keeps Dates.
     dates: deployment.key === "base",
   });
 

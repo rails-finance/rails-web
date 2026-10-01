@@ -1,6 +1,6 @@
 // The state card: the position at a moment between its events (rails-ops
 // reference/lifetime-flows-scrubber.md, "The day links the chart and the
-// timeline"). Where "Apply to timeline" cuts the timeline at the close of a
+// timeline"). Where "Show timeline to {date}" cuts the timeline at the close of a
 // day with no events of its own, the cut timeline opens with a card for that
 // moment. It states only what the flow model holds exactly for that day, the
 // figures the chart states there:
