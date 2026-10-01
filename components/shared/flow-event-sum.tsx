@@ -9,8 +9,9 @@
 // "=" and what is held or owed. The line the event filled is highlighted with
 // its running total before → after. The printed lines add to the printed
 // total (lib/shared/flow-focus.ts `eventSideSum`, on lib/shared/flows-sum.ts),
-// and every figure keeps its receipt. A "Since this event" line follows where
-// the position has later events.
+// and every figure keeps its receipt. A side in its token
+// (EventTokenSumLines) or by asset (EventAssetSumLines) states tokens first,
+// its dollars by the timeline's Display switches.
 //
 // The Aave family's receipt (components/protocol/aave-v3/aave-family-event-receipt.tsx)
 // and the Liquity family's (components/protocol/liquity-family/liquity-event-sum.tsx)
@@ -19,15 +20,29 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { Calculator } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { wholeUsd } from "@/lib/shared/flows-sum";
 import type { FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
-import { flowRemainderProv, flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
-import { eventCum, eventSideSum, sinceEvent, type EventCum } from "@/lib/shared/flow-focus";
+import {
+  flowInterestUsdProv,
+  flowRemainderProv,
+  flowSegmentProv,
+  flowTokenProv,
+} from "@/lib/shared/flows-timeline-provenance";
+import {
+  eventCum,
+  eventSideSum,
+  fmtTokens,
+  interestLine,
+  type AssetSum,
+  type EventCum,
+  type EventSumLine,
+  type TokenSum,
+} from "@/lib/shared/flow-focus";
 
 /** The card's calculator: on, and its switch. */
 export interface ReceiptCalc {
@@ -193,55 +208,381 @@ export function EventSumLines({
   );
 }
 
+/** One side's sum as of the event in its token (lib/shared/flow-focus.ts
+ *  `eventTokenSum`): each line its running total in the token, landing on
+ *  the tokens held or owed. With `usd`, each line carries its USD beside it
+ *  (EventSumLines' figures), and the USD column's balancing item (Market
+ *  move) follows the token lines: it has no token amount. */
+export function EventTokenSumLines({
+  side,
+  model,
+  cum,
+  sum,
+  usd,
+  held,
+  heldBefore,
+  totalLabel,
+  totalProv,
+  eventTs,
+  dollars,
+  caption = false,
+}: {
+  side: FlowSide;
+  model: FlowModel;
+  cum: EventCum;
+  sum: TokenSum;
+  /** Name the token above the lines, where the cell's header does not. */
+  caption?: boolean;
+  /** The dollar lines, where the family splits them (`eventSideSumByAsset`);
+   *  else `eventSideSum`'s. */
+  dollars?: ReturnType<typeof eventSideSum>;
+  /** Show each line's USD beside its tokens (the page's Display switch). */
+  usd: boolean;
+  /** The side's USD once the transaction had run, and just before it. */
+  held: number;
+  heldBefore: number | null;
+  totalLabel: string;
+  /** The USD total's receipt. */
+  totalProv: Provenance;
+  eventTs?: number;
+}) {
+  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  // The dollar lines: their segments draw the swatches; with `usd` they are the USD column.
+  const dollarRows = dollars ?? eventSideSum(model, side, cum, held);
+  const usdRows = usd ? dollarRows : null;
+  const usdLine = new Map(usdRows?.lines.map((l) => [l.key, l]) ?? []);
+  const usdProv = (l: EventSumLine) => dollarLineProv(l, side, at, model.daily);
+  const sym = <span className="font-normal text-rb-500"> {sum.symbol}</span>;
+  const grid = `grid ${usd ? "grid-cols-[12px_12px_minmax(4.5rem,1fr)_auto_auto] gap-x-1.5" : "grid-cols-[12px_12px_minmax(7.5rem,1fr)_auto] gap-x-2"} items-center rounded-lg px-1.5 -mx-1.5 py-1`;
+  const usdCell = (node: ReactNode) => (
+    <span className="whitespace-nowrap text-right font-normal text-rb-500" data-receipt-usd="">
+      {node}
+    </span>
+  );
+  const dirOf = (key: string) => model.buckets.find((b) => b.key === key)?.dir;
+  const segOf = (key: string): FlowSegment | null => dollarRows.lines.find((l) => l.key === key)?.seg ?? null;
+  // USD lines with no token amount: the balancing item, an opening line.
+  const usdOnly = usdRows?.lines.filter((l) => !sum.lines.some((t) => t.key === l.key)) ?? [];
+  const movedWord =
+    sum.move !== 0 ? (
+      <>
+        <Prov info={flowTokenProv(totalLabel, sum.symbol, at, "move")}>
+          {`${sum.move < 0 ? "−" : "+"}${fmtTokens(sum.move, sum.decimals)} ${sum.symbol}`}
+        </Prov>
+        {usd && heldBefore != null && Math.round(held) !== Math.round(heldBefore)
+          ? ` (${held - heldBefore < 0 ? "−" : "+"}${wholeUsd(held - heldBefore)})`
+          : ""}
+      </>
+    ) : null;
+  return (
+    <div
+      className="flex flex-col text-[13px] tabular-nums"
+      data-receipt-sum={side}
+      data-receipt-unit="token"
+      data-receipt-decimals={sum.decimals}
+      data-anatomy="T8.1"
+    >
+      {caption && <div className="mb-0.5 text-xs text-rb-500">In {sum.symbol}</div>}
+      {sum.lines.map((l) => {
+        const u = usdLine.get(l.key);
+        return (
+          <div
+            key={l.key}
+            className={`${grid}${l.hl ? " font-semibold" : ""}`}
+            style={
+              l.hl
+                ? {
+                    background: "var(--rb-hl, rgba(127,127,127,0.12))",
+                    boxShadow: `inset 0 0 0 1.5px ${SIDE_HUE[side]}`,
+                  }
+                : undefined
+            }
+            data-receipt-line={l.kind}
+            data-receipt-line-key={l.key}
+            data-receipt-units={l.units}
+            {...(u ? { "data-receipt-dollars": u.dollars } : usd ? { "data-receipt-dollars": 0 } : {})}
+            {...(l.hl ? { "data-receipt-hl": "" } : {})}
+          >
+            <span className="text-right text-rb-500">{l.sign}</span>
+            {swatchFor(side, segOf(l.key), l.kind === "interest" ? "rest" : l.kind)}
+            <span className="min-w-0">
+              {l.label}
+              {l.hl && (
+                <small className="block text-xs font-normal text-rb-500">
+                  {hlNote(cum, l.key, dirOf(l.key) === "in" ? "+" : "−", usd, sum.decimals)}
+                </small>
+              )}
+            </span>
+            {pairCell(
+              l.hl ? `${l.before}` : null,
+              <Prov info={flowTokenProv(l.label, sum.symbol, at, l.kind === "interest" ? "interest" : "line")}>
+                {l.amount}
+              </Prov>,
+            )}
+            {usd && usdCell(u ? <Prov info={usdProv(u)}>{u.amount}</Prov> : "$0")}
+          </div>
+        );
+      })}
+      {usdOnly.map((l) => (
+        <div
+          key={l.key}
+          className={grid}
+          data-receipt-line={l.kind}
+          data-receipt-line-key={l.key}
+          data-receipt-dollars={l.dollars}
+        >
+          <span className="text-right text-rb-500">{l.sign}</span>
+          {swatchFor(side, l.seg, l.kind)}
+          <span className="min-w-0">
+            {l.label}
+            {l.kind === "rest" && (
+              <small className="block text-xs font-normal text-rb-500">
+                The price&rsquo;s effect: no {sum.symbol} moved.
+              </small>
+            )}
+          </span>
+          <span />
+          {usdCell(<Prov info={usdProv(l)}>{l.amount}</Prov>)}
+        </div>
+      ))}
+      <div
+        className={`${grid} mt-1 rounded-none border-t border-rb-300 pt-1.5 font-semibold dark:border-rb-600`}
+        data-receipt-line="total"
+        data-receipt-units={sum.total.units}
+        {...(usdRows ? { "data-receipt-dollars": usdRows.total.dollars } : {})}
+      >
+        <span className="text-right text-foreground">=</span>
+        <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
+        <span className="min-w-0">
+          {totalLabel}
+          {movedWord && <small className="block text-xs font-normal text-rb-500">{movedWord}</small>}
+        </span>
+        {pairCell(
+          sum.before,
+          <>
+            <Prov info={flowTokenProv(totalLabel, sum.symbol, at, "held")}>{sum.total.amount}</Prov>
+            {sym}
+          </>,
+        )}
+        {usdRows && usdCell(<Prov info={totalProv}>{usdRows.total.amount}</Prov>)}
+      </div>
+    </div>
+  );
+}
+
+/** One side's sum as of the event by asset, where it holds several
+ *  (lib/shared/flow-focus.ts `eventAssetSum`): each line its running total
+ *  per asset in tokens ("80 WETH, 12,000 USDC"), with its dollars beside it
+ *  where `usd`. The total is in dollars whatever `usd` says, since the
+ *  assets add only in dollars, with each asset's balance under it. */
+export function EventAssetSumLines({
+  side,
+  model,
+  cum,
+  sum,
+  dollars,
+  usd,
+  held,
+  heldBefore,
+  moved,
+  totalLabel,
+  totalProv,
+  eventTs,
+}: {
+  side: FlowSide;
+  model: FlowModel;
+  cum: EventCum;
+  sum: AssetSum;
+  /** The dollar lines (`eventSideSumByAsset`). */
+  dollars: ReturnType<typeof eventSideSum>;
+  usd: boolean;
+  held: number;
+  heldBefore: number | null;
+  /** The token moves at this event ("+200 USDC"). */
+  moved: string[];
+  totalLabel: string;
+  totalProv: Provenance;
+  eventTs?: number;
+}) {
+  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  const usdLine = new Map(dollars.lines.map((l) => [l.key, l]));
+  const grid = `grid ${usd ? "grid-cols-[12px_12px_minmax(4.5rem,1fr)_auto_auto] gap-x-1.5" : "grid-cols-[12px_12px_minmax(6rem,1fr)_auto] gap-x-2"} items-center rounded-lg px-1.5 -mx-1.5 py-1`;
+  const usdCell = (node: ReactNode) => (
+    <span className="whitespace-nowrap text-right font-normal text-rb-500" data-receipt-usd="">
+      {node}
+    </span>
+  );
+  const dirOf = (key: string) => model.buckets.find((b) => b.key === key)?.dir;
+  const partsCell = (parts: { symbol: string; amount: number }[], signed: boolean) => (
+    <span className="flex max-w-[11rem] flex-wrap justify-end gap-x-1 text-right">
+      {parts.map((p, i) => (
+        <span key={p.symbol} className="whitespace-nowrap">
+          {signed && p.amount < 0 ? "−" : ""}
+          {fmtPositionAmount(Math.abs(p.amount))}
+          <span className="font-normal text-rb-500"> {p.symbol}</span>
+          {i < parts.length - 1 ? "," : ""}
+        </span>
+      ))}
+    </span>
+  );
+  const usdOnly = usd ? dollars.lines.filter((l) => !sum.lines.some((t) => t.key === l.key)) : [];
+  const changed = heldBefore != null && Math.round(heldBefore) !== Math.round(held);
+  let first = true;
+  const signOf = (kind: string) => {
+    const sgn = first && kind === "in" ? "" : kind === "out" ? "−" : "+";
+    first = false;
+    return sgn;
+  };
+  const balances = sum.balances.filter((b) => b.amount > 0);
+  return (
+    <div
+      className="flex flex-col text-[13px] tabular-nums"
+      data-receipt-sum={side}
+      data-receipt-unit="asset"
+      data-anatomy="T8.1"
+    >
+      {sum.lines.map((l) => {
+        const u = usdLine.get(l.key);
+        const interest = l.kind === "interest";
+        return (
+          <div
+            key={l.key}
+            className={`${grid}${l.hl ? " font-semibold" : ""}`}
+            style={
+              l.hl
+                ? {
+                    background: "var(--rb-hl, rgba(127,127,127,0.12))",
+                    boxShadow: `inset 0 0 0 1.5px ${SIDE_HUE[side]}`,
+                  }
+                : undefined
+            }
+            data-receipt-line={l.kind}
+            data-receipt-line-key={l.key}
+            {...(usd ? { "data-receipt-dollars": u?.dollars ?? 0 } : {})}
+            {...(l.hl ? { "data-receipt-hl": "" } : {})}
+          >
+            <span className="text-right text-rb-500">{signOf(l.kind)}</span>
+            {swatchFor(side, u?.seg ?? null, interest ? "rest" : l.kind)}
+            <span className="min-w-0">
+              {l.label}
+              {l.hl && (
+                <small className="block text-xs font-normal text-rb-500">
+                  {hlNote(cum, l.key, dirOf(l.key) === "in" ? "+" : "−", usd)}
+                </small>
+              )}
+            </span>
+            <Prov
+              info={
+                interest
+                  ? flowTokenProv(l.label, l.parts.map((p) => p.symbol).join(", "), at, "interest")
+                  : flowTokenProv(l.label, l.parts.map((p) => p.symbol).join(", "), at, "line")
+              }
+            >
+              {partsCell(l.parts, interest)}
+            </Prov>
+            {usd && usdCell(u ? <Prov info={dollarLineProv(u, side, at, model.daily)}>{u.amount}</Prov> : "$0")}
+          </div>
+        );
+      })}
+      {usdOnly.map((l) => (
+        <div
+          key={l.key}
+          className={grid}
+          data-receipt-line={l.kind}
+          data-receipt-line-key={l.key}
+          data-receipt-dollars={l.dollars}
+        >
+          <span className="text-right text-rb-500">{l.sign}</span>
+          {swatchFor(side, l.seg, l.kind)}
+          <span className="min-w-0">
+            {l.label}
+            {l.kind === "rest" && (
+              <small className="block text-xs font-normal text-rb-500">The price&rsquo;s effect: no token moved.</small>
+            )}
+          </span>
+          <span />
+          {usdCell(<Prov info={dollarLineProv(l, side, at, model.daily)}>{l.amount}</Prov>)}
+        </div>
+      ))}
+      <div
+        className={`${grid} mt-1 rounded-none border-t border-rb-300 pt-1.5 font-semibold dark:border-rb-600`}
+        data-receipt-line="total"
+        data-receipt-dollars={dollars.total.dollars}
+      >
+        <span className="text-right text-foreground">=</span>
+        <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
+        <span className="min-w-0">
+          {totalLabel}
+          {changed && heldBefore != null && (
+            <small className="block text-xs font-normal text-rb-500">
+              {`${held - heldBefore < 0 ? "−" : "+"}${wholeUsd(held - heldBefore)}`}
+              {moved.length > 0 && ` (${moved.join(", ")})`}
+            </small>
+          )}
+        </span>
+        <span className={`flex flex-col items-end${usd ? " col-span-2" : ""}`}>
+          {pairCell(
+            changed && heldBefore != null ? wholeUsd(heldBefore) : null,
+            <Prov info={totalProv}>{dollars.total.amount}</Prov>,
+          )}
+          {balances.length > 0 && (
+            <Prov info={flowTokenProv(totalLabel, balances.map((b) => b.symbol).join(", "), at, "held")}>
+              <small className="block text-right text-xs font-normal text-rb-500" data-receipt-assets="">
+                {balances.map((b) => `${fmtPositionAmount(b.amount)} ${b.symbol}`).join(", ")}
+              </small>
+            </Prov>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** A dollar line's receipt: the balancing item's, the interest by asset's,
+ *  or the segment's. */
+function dollarLineProv(l: EventSumLine, side: FlowSide, at: string, daily: boolean): Provenance {
+  if (l.kind === "rest") return flowRemainderProv(l.label, side, at, l.seg.note);
+  if (l.key === interestLine(side).key) return flowInterestUsdProv(l.label, at);
+  return flowSegmentProv(l.seg, side, at, false, daily);
+}
+
+/** A line's swatch: the bar's fill, or the balancing item's dashed box. */
+function swatchFor(side: FlowSide, seg: FlowSegment | null, kind: string) {
+  return kind === "rest" ? (
+    <i aria-hidden className="inline-block size-2.5 rounded-[2px] border border-dashed border-rb-500" />
+  ) : (
+    <i
+      aria-hidden
+      className="inline-block size-2.5 rounded-[2px]"
+      style={seg ? fillStyle(side, seg) : { background: SIDE_HUE[side] }}
+    />
+  );
+}
+
+/** A figure, after its before → where the event moved it. */
+function pairCell(before: string | null, after: ReactNode) {
+  return (
+    <span className="flex flex-wrap items-baseline justify-end gap-x-1 text-right">
+      {before != null && <span className="whitespace-nowrap font-normal text-rb-500">{before} →</span>}
+      <span className="whitespace-nowrap">{after}</span>
+    </span>
+  );
+}
+
 /** The highlighted line's note: what this event put on it. */
-function hlNote(cum: EventCum, key: string, sign: string): string {
+function hlNote(cum: EventCum, key: string, sign: string, usdShown = true, decimals?: number): string {
   const legs = cum.legs.filter((l) => l.bucket === key);
   const usd = `${sign}${wholeUsd(legs.reduce((a, l) => a + (l.usd ?? 0), 0))}`;
   const tokens = legs
     .filter((l) => l.amount != null && l.symbol)
-    .map((l) => `${sign}${fmtPositionAmount(l.amount)} ${l.symbol}`);
-  return tokens.length > 0 ? `${tokens.join(", ")} (${usd.slice(sign.length)}) at this event` : `${usd} at this event`;
-}
-
-/** "Since this event": where the position has later events, what the side
- *  holds or owes at the cursor's date (today where the cursor is not later),
- *  and each line that has moved since. */
-export function SinceLine({ side, cum, held }: { side: FlowSide; cum: EventCum; held: number | null }) {
-  const focus = useFlowFocus();
-  const cursor = useFlowFocusState((s) => s.cursor);
-  const model = focus?.model;
-  if (!model || !cum.later || held == null) return null;
-  const startSec = model.start / 1000;
-  const cursorStop = cursor && !cursor.live ? Math.floor(cursor.endTs / 86_400) - startSec / 86_400 : null;
-  const later = cursorStop != null && cursorStop > cum.stop;
-  const stop = later ? (cursorStop as number) : model.liveStop;
-  const word = later && cursor ? cursor.word : "today";
-  const s = sinceEvent(model, side, cum, stop);
-  const isLive = stop >= model.liveStop;
-  const when = isLive ? "now" : `the end of ${word}`;
-  const heldSeg: FlowSegment = {
-    key: `${side}-held`,
-    label: side === "collateral" ? "Held" : "Owed",
-    fill: "held",
-    width: s.held,
-    value: s.held,
-  };
-  return (
-    <p className="mt-2 rounded-lg bg-raised px-2 py-1.5 text-xs leading-snug text-foreground" data-receipt-since={side}>
-      Since this event: {side === "collateral" ? "held" : "owed"} {wholeUsd(held)} →{" "}
-      <Prov info={flowSegmentProv(heldSeg, side, when, isLive, model.daily)}>{wholeUsd(s.held)}</Prov>
-      {s.lines.map((l) => {
-        const seg: FlowSegment = { key: l.key, label: l.label, fill: "in", width: l.now, value: l.now };
-        return (
-          <span key={l.key}>
-            ; {l.label.toLowerCase()} {wholeUsd(l.at)} →{" "}
-            <Prov info={flowSegmentProv(seg, side, when, isLive, model.daily)}>{wholeUsd(l.now)}</Prov>
-          </span>
-        );
-      })}{" "}
-      {isLive ? "today" : `at ${word}`}.
-    </p>
-  );
+    .map(
+      (l) =>
+        `${sign}${decimals != null ? fmtTokens(l.amount as number, decimals) : fmtPositionAmount(l.amount)} ${l.symbol}`,
+    );
+  if (tokens.length === 0) return `${usd} at this event`;
+  return usdShown
+    ? `${tokens.join(", ")} (${usd.slice(sign.length)}) at this event`
+    : `${tokens.join(", ")} at this event`;
 }
 
 /** Where the page does not hold every event of the day, the lines stand at

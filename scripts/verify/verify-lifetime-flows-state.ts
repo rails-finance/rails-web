@@ -97,7 +97,14 @@ import {
   stopForDay,
 } from "@/lib/shared/flows-combined";
 import { apportionDollars, sideSumRows, wholeUsd } from "@/lib/shared/flows-sum";
-import { eventCum, eventSideSum } from "@/lib/shared/flow-focus";
+import {
+  assetTokenSum,
+  eventAssetSum,
+  eventCum,
+  eventSideSum,
+  eventSideSumByAsset,
+  type AssetBalance,
+} from "@/lib/shared/flow-focus";
 import { flowMoment, type FlowMoment, type MomentSide } from "@/lib/shared/flow-moment";
 
 const fixture = JSON.parse(
@@ -1357,6 +1364,76 @@ test("the event card's sum: the running totals around each event meet the route'
     const cum = eventCum(route, focus, borrow.id)!;
     assert.ok(near(cum.after.borrowed - cum.before.borrowed, 200, 1));
   }
+});
+
+test("the event card's sum by asset: each asset's lines and its interest add to its balance, in its token", () => {
+  const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
+  const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
+  const focus = aaveV3FocusEvents(fixture.events, fixture.view.priceByAddress);
+  let multi = 0;
+  let single = 0;
+  for (const ev of focus) {
+    const cum = eventCum(route, focus, ev.id)!;
+    for (const side of ["collateral", "debt"] as const) {
+      // Balances standing in for the Pool's read: each asset's net flows plus
+      // a little interest, at a price of $2.
+      const probe = eventAssetSum(route, focus, side, cum, ev.id, []);
+      assert.ok(probe, `${ev.id} ${side}: the page holds every flow`);
+      const balances: AssetBalance[] = probe.symbols.map((symbol) => {
+        let net = 0;
+        for (const l of probe.lines)
+          if (l.kind !== "interest") {
+            const p = l.parts.find((x) => x.symbol === symbol);
+            net += (l.kind === "out" ? -1 : 1) * (p?.amount ?? 0);
+          }
+        const amount = Math.max(0, net * 1.01);
+        return { symbol, amount, before: amount, price: 2 };
+      });
+      const sum = eventAssetSum(route, focus, side, cum, ev.id, balances)!;
+      for (const b of balances) {
+        let total = 0;
+        for (const l of sum.lines) {
+          const p = l.parts.find((x) => x.symbol === b.symbol);
+          total += (l.kind === "out" ? -1 : 1) * (p?.amount ?? 0);
+        }
+        assert.ok(
+          Math.abs(total - b.amount) <= 1e-9 * Math.max(1, b.amount),
+          `${ev.id} ${b.symbol}: ${total} vs ${b.amount}`,
+        );
+      }
+      const held = balances.reduce((a, b) => a + b.amount * 2, 0);
+      const dollars = eventSideSumByAsset(route, sum, cum, held);
+      assert.equal(
+        dollars.lines.reduce((a, l) => a + l.dollars, 0),
+        dollars.total.dollars,
+        `${ev.id} ${side}: the dollar lines add`,
+      );
+      const t = assetTokenSum(sum);
+      if (sum.symbols.length === 1) {
+        single++;
+        assert.ok(t);
+        assert.equal(
+          t.lines.reduce((a, l) => a + l.units, 0),
+          t.total.units,
+          `${ev.id} ${side}: token lines add`,
+        );
+      } else {
+        assert.equal(t, null);
+        if (sum.symbols.length > 1) multi++;
+      }
+    }
+  }
+  assert.ok(multi > 0 && single > 0, `both kinds of side (${multi} multi, ${single} single)`);
+  // A page missing an earlier flow cannot count tokens: the sum stays in dollars.
+  const firstFlow = focus.findIndex((e) => e.legs.some((l) => (l.usd ?? 0) > 10));
+  const page = focus.filter((_, i) => i !== firstFlow);
+  const late = page[page.length - 1];
+  const cum = eventCum(route, page, late.id)!;
+  const sides = (["collateral", "debt"] as const).map((side) => eventAssetSum(route, page, side, cum, late.id, []));
+  assert.ok(
+    sides.some((x) => x === null),
+    "a missing flow is noticed",
+  );
 });
 
 test("the event card's sum where the page lacks some of a day's events: the day's close, said so", () => {

@@ -8,24 +8,35 @@
 // used one).
 //
 // The card's calculator (components/shared/flow-event-sum.tsx) grows each
-// cell into its side's lifetime sum as of the event, its assets under it.
+// cell into its side's lifetime sum as of the event, its assets under it: in
+// the asset's token where the side holds one, by asset with the dollars
+// beside where it holds several (lib/shared/flow-focus.ts `eventAssetSum`),
+// in dollars where the page does not hold every flow before the event.
 
 import { useContext, type ReactNode } from "react";
 import {
   DayCloseNote,
+  EventAssetSumLines,
   EventSumLines,
+  EventTokenSumLines,
   ReceiptCalcContext,
   SIDE_HUE,
-  SinceLine,
   useEventCum,
 } from "@/components/shared/flow-event-sum";
+import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { Prov } from "@/components/shared/provenance";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
-import type { EventCum } from "@/lib/shared/flow-focus";
+import {
+  assetTokenSum,
+  eventAssetSum,
+  eventSideSumByAsset,
+  type AssetBalance,
+  type EventCum,
+} from "@/lib/shared/flow-focus";
 import { accountTotalProv, heldAtEventProv, sideChangeProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
-import { baseToUsd, big, legChange, rawToUsd, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
+import { baseToUsd, big, humanOf, legChange, rawToUsd, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { ReserveList, TotalHeadline, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
 
 /** One figure of the row under the cells. */
@@ -87,6 +98,23 @@ function sideFacts(state: AaveV3PositionState, side: FlowSide, touched: TouchedL
   };
 }
 
+/** Each asset of a side at the block, in tokens, for the sum by asset. */
+function sideBalances(state: AaveV3PositionState, side: FlowSide): AssetBalance[] {
+  const out: AssetBalance[] = [];
+  for (const r of state.reserves) {
+    if (r.decimals == null) continue;
+    const l = side === "collateral" ? r.supply : r.debt;
+    if (big(l.after) <= BigInt(0) && big(l.before) <= BigInt(0)) continue;
+    out.push({
+      symbol: reserveSymbol(r),
+      amount: Number(humanOf(l.after, r.decimals)),
+      before: Number(humanOf(l.before, r.decimals)),
+      price: r.priceBase != null ? Number(big(r.priceBase)) / 1e8 : null,
+    });
+  }
+  return out;
+}
+
 /** The receipt block of an open Aave-family event card. */
 export function AaveFamilyEventReceipt({
   state,
@@ -129,7 +157,15 @@ export function AaveFamilyEventReceipt({
                 {side === "collateral" ? "Collateral" : "Debt"}
               </div>
               {sum && cum ? (
-                <SideSum side={side} state={state} coords={coords} cum={cum} facts={f} eventTs={eventTs} />
+                <SideSum
+                  side={side}
+                  state={state}
+                  coords={coords}
+                  cum={cum}
+                  facts={f}
+                  eventId={eventId}
+                  eventTs={eventTs}
+                />
               ) : (
                 <SideCell side={side} state={state} coords={coords} facts={f} />
               )}
@@ -142,7 +178,6 @@ export function AaveFamilyEventReceipt({
               {side === "collateral" && state.sources.settings == null && (
                 <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
               )}
-              {sum && cum && <SinceLine side={side} cum={cum} held={f.held} />}
             </div>
           );
         })}
@@ -206,6 +241,7 @@ function SideSum({
   coords,
   cum,
   facts,
+  eventId,
   eventTs,
 }: {
   side: FlowSide;
@@ -213,9 +249,11 @@ function SideSum({
   coords: V3Coords;
   cum: EventCum;
   facts: ReturnType<typeof sideFacts>;
+  eventId?: string;
   eventTs?: number;
 }) {
   const focus = useFlowFocus();
+  const usdShown = useUsdShown();
   const model = focus?.model;
   if (!model) return null;
   if (facts.held == null)
@@ -225,6 +263,8 @@ function SideSum({
       </p>
     );
   const what = side === "collateral" ? "collateral" : "debt";
+  const balances = sideBalances(state, side);
+  const bySum = focus && eventId ? eventAssetSum(model, focus.events, side, cum, eventId, balances) : null;
   const totalProv =
     side === "collateral" && facts.offSupply
       ? heldAtEventProv(coords, { parts: facts.parts, total: facts.held })
@@ -235,6 +275,49 @@ function SideSum({
               : (state.account?.after.totalDebtBase ?? "0"),
           poolRevision: state.sources.poolRevision,
         });
+  const totalLabel = side === "collateral" ? "Held at this event" : "Owed at this event";
+  if (bySum) {
+    const dollars = eventSideSumByAsset(model, bySum, cum, facts.held);
+    // USD beside the tokens where the Display switches show it for any of the side's assets.
+    const usd = bySum.symbols.some((sym) => {
+      const b = bySum.balances.find((x) => x.symbol === sym);
+      return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
+    });
+    const single = assetTokenSum(bySum);
+    if (single)
+      return (
+        <EventTokenSumLines
+          side={side}
+          model={model}
+          cum={cum}
+          sum={single}
+          usd={usd}
+          held={facts.held}
+          heldBefore={facts.heldBefore}
+          totalLabel={totalLabel}
+          totalProv={totalProv}
+          eventTs={eventTs}
+          dollars={dollars}
+          caption
+        />
+      );
+    return (
+      <EventAssetSumLines
+        side={side}
+        model={model}
+        cum={cum}
+        sum={bySum}
+        dollars={dollars}
+        usd={usd}
+        held={facts.held}
+        heldBefore={facts.heldBefore}
+        moved={facts.moved}
+        totalLabel={totalLabel}
+        totalProv={totalProv}
+        eventTs={eventTs}
+      />
+    );
+  }
   return (
     <EventSumLines
       side={side}

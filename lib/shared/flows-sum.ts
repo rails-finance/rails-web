@@ -105,11 +105,11 @@ export function sumBasis(st: FlowSideState, rest: string, held: string, at: stri
   return `${seg?.basis ?? "Each flow is valued at the price on its own day."} ${rest} is the remainder, ${held} ${at} less the lines above it${tail}`;
 }
 
-/** Signed whole-dollar parts that add to `total`: each part rounded, then the
- *  difference moved a dollar at a time onto the parts whose rounding moved
- *  them furthest the other way. Parts that do not add to within a dollar of
+/** Signed whole parts that add to `total`: each part rounded, then the
+ *  difference moved a unit at a time onto the parts whose rounding moved
+ *  them furthest the other way. Parts that do not add to within a unit of
  *  the total are left rounded on their own. */
-function apportionSigned(parts: number[], total: number): number[] {
+export function apportionSigned(parts: number[], total: number): number[] {
   const out = parts.map((v) => Math.round(v));
   const sum = parts.reduce((a, v) => a + v, 0);
   if (Math.abs(sum - total) >= 1) return out;
