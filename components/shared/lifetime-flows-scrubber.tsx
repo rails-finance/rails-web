@@ -913,11 +913,8 @@ function ScrubberBody({
       ? (model.words.live ?? "Today, live prices")
       : dayStamp(dayStart(model, stop));
   const when = atClose ? `the close on ${closeDay}` : s.isLive ? "now" : `the end of ${dateText}`;
-  const dateLine = atClose
-    ? `Position at close, ${closeDay}`
-    : s.isLive
-      ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
-      : `Position on ${dateText}`;
+  // The readout states the date alone (Miles, 1 Oct 2026).
+  const dateLine = s.isLive && !atClose ? (model.words.live ?? "Today") : dateText;
   // Receipts read the live stop as the close's where the position closed.
   const liveReceipts = s.isLive && !closed;
   // The Key goes to the panel's Explanation. Its dashed outline, which marks

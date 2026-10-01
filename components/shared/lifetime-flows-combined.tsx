@@ -346,11 +346,8 @@ export function CombinedFlows({
       ? (model.words.live ?? "Today, live prices")
       : dayStamp(dayStart(model, cur.stop));
   const when = atClose ? `the close on ${closeDay}` : head.isLive ? "now" : `the end of ${dateText}`;
-  const dateLine = atClose
-    ? `Position at close, ${closeDay}`
-    : head.isLive
-      ? `Position ${dateText.charAt(0).toLowerCase()}${dateText.slice(1)}`
-      : `Position on ${dateText}`;
+  // The readout states the date alone (Miles, 1 Oct 2026).
+  const dateLine = head.isLive && !atClose ? (model.words.live ?? "Today") : dateText;
   const liveReceipts = head.isLive && !closed;
   const ledgerText = head.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
   useEffect(() => {
@@ -456,6 +453,7 @@ export function CombinedFlows({
               hasDebt={hasDebt}
               windowFrom={from > 0 ? model.start / DAY_MS + from : null}
               valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
+              cursorWord={atClose ? "Close" : head.isLive ? "Today" : dayStamp(dayStart(model, cur.stop))}
               onPick={go}
               ends={{ start: dayStamp(dayStart(model, 0)), end: closed ? closeDay : "Today" }}
               freeze={byDays ? { frozen, onTap: tapStop } : null}
@@ -578,6 +576,7 @@ function LineStrip({
   hasDebt,
   windowFrom,
   valueText,
+  cursorWord,
   onPick,
   ends,
   freeze,
@@ -592,6 +591,8 @@ function LineStrip({
   hasDebt: boolean;
   windowFrom: number | null;
   valueText: string;
+  /** The cursor's day, over it while a press drags. */
+  cursorWord: string;
   onPick: (i: number) => void;
   /** The words under the strip's two ends: the first event's day, and today
    *  or the close's day. */
@@ -1010,6 +1011,21 @@ function LineStrip({
               }}
             >
               <OldPriceTip lines={oldTip.lines} />
+            </span>
+          )}
+          {grabbing && w > 0 && n > 0 && (
+            <span
+              aria-hidden
+              data-prov-hidden=""
+              data-flow-drag-date=""
+              className="pointer-events-none absolute bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-xs font-medium tabular-nums text-foreground shadow-lg"
+              style={{
+                left: Math.max(36, Math.min(w - 36, cx)),
+                background: "var(--rb-tooltip-bg)",
+                borderColor: "var(--rb-tooltip-border)",
+              }}
+            >
+              {cursorWord}
             </span>
           )}
           {w > 0 && n > 0 ? null : (
