@@ -27,7 +27,7 @@ import {
   SIDE_HUE,
   dayStamp,
 } from "@/components/shared/flow-event-sum";
-import { wholeUsd } from "@/lib/shared/flows-sum";
+import { wholeUsd, wholeUsdOrUnder } from "@/lib/shared/flows-sum";
 import type { EventCum } from "@/lib/shared/flow-focus";
 import type { FlowMoment, MomentAsset } from "@/lib/shared/flow-moment";
 import type { FlowGrowth, FlowModel, FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -351,7 +351,7 @@ export function FlowMomentCard({
                           </Prov>
                           {a.interestUsd != null && (
                             <Prov info={interestProv(side, a)}>
-                              <span>{wholeUsd(a.interestUsd)}</span>
+                              <span>{wholeUsdOrUnder(a.interestUsd)}</span>
                             </Prov>
                           )}
                         </span>
