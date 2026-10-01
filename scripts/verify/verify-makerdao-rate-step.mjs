@@ -1119,6 +1119,9 @@ const flatLive16745 = near(live16745.stabilityFeeApr * 100, 9.5, 0.01);
 const heads16745 = flatLive16745 ? 0 : 1;
 const notes16745 = MERGED_16745.length + heads16745;
 const page16745 = await open(context, vaultUrl("16745"), 0);
+// The count arrives with the rate log, two round trips after the page is
+// readable; wait for it rather than read a page that has not got there.
+for (let i = 0; i < 60 && (await pillText(page16745)) !== notes16745; i += 1) await page16745.waitForTimeout(1000);
 const windowedNotes16745 = await page16745.locator("[data-market-note]").count();
 const windowedPill16745 = await pillText(page16745);
 const expanded16745 = await showAllRows(page16745);
