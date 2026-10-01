@@ -194,6 +194,9 @@ export interface TimelineEventsState {
   /** Keys currently shown (FilterDropdown `selected` for multi mode). */
   visibleActionKeys: Set<string>;
   toggleHiddenAction: (key: string) => void;
+  /** The hidden types are a fixed list the page passed (`initialHidden`), not
+   *  the visitor's to change: the narrowing row draws no pill for them. */
+  actionsFixed: boolean;
   resetHiddenActions: () => void;
 
   /** Asset buckets for the FilterDropdown — the symbols this position's events
@@ -931,6 +934,7 @@ export function useTimelineEvents(
     eventOptions,
     visibleActionKeys,
     toggleHiddenAction,
+    actionsFixed: initialHidden != null,
     resetHiddenActions,
     assetOptions,
     visibleAssetKeys,

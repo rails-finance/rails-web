@@ -17,6 +17,7 @@
 import { Fragment, useEffect, useRef } from "react";
 import { CalendarRange, Clock, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
+import { actionNoun } from "@/lib/shared/event-action-nouns";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { SpineViewSwitch } from "@/components/shared/mobile-spine";
@@ -587,13 +588,6 @@ export interface TimelineFilterPillSpec {
   clear: () => void;
 }
 
-/** A menu label as it reads inside a sentence: each capitalised word
- *  lowercased ("Withdraw Collateral" → "withdraw collateral"), an acronym or
- *  a symbol left as written ("Set DSR" → "set DSR"). */
-function inSentence(label: string): string {
-  return label.replace(/\b([A-Z])([a-z]+)\b/g, (_, a: string, b: string) => a.toLowerCase() + b);
-}
-
 /** Name the shorter side of one axis: "Only a, b" when fewer are kept than
  *  hidden, "Hiding a, b" otherwise. Hidden keys the menu does not offer (a
  *  saved filter from another history) are not named. Null when the axis
@@ -621,12 +615,20 @@ function narrowing(
 /** Every filter pill the toolbar's state calls for, in the toolbar's order. */
 export function timelineFilterPills(tl: TimelineEventsState): TimelineFilterPillSpec[] {
   const pills: TimelineFilterPillSpec[] = [];
-  const action = narrowing(tl.eventOptions, tl.visibleActionKeys, (o) => inSentence(o.label), "types of event");
+  // A fixed hidden list (the embed's `?hide=`) is not the visitor's to undo: no pill.
+  const action = tl.actionsFixed
+    ? null
+    : narrowing(
+        tl.eventOptions,
+        tl.visibleActionKeys,
+        (o) => actionNoun(o.key, tl.protocolKey, o.label),
+        "types of event",
+      );
   if (action)
     pills.push({
       axis: "action",
       ...action,
-      clearLabel: "Show every type of event",
+      clearLabel: `Clear the filter: ${action.title}`,
       clear: tl.resetHiddenActions,
     });
   const asset = narrowing(tl.assetOptions, tl.visibleAssetKeys, (o) => o.label, "assets");
