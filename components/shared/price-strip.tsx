@@ -111,7 +111,10 @@ export function PriceStrip({
     // Compact, right-aligned cluster — hugs its content rather than spanning
     // the viewport. Caps at the viewport width and scrolls for asset-heavy
     // spokes. Each pill drops its symbol label; the tooltip names the asset.
-    <div className="fixed bottom-3 right-3 md:right-4 z-30 max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-lg bg-white dark:bg-rb-900 shadow-lg">
+    <div
+      className="fixed bottom-3 right-3 md:right-4 z-30 max-w-[calc(100vw-1.5rem)] overflow-x-auto rounded-lg bg-white dark:bg-rb-900 shadow-lg"
+      data-anatomy="H12"
+    >
       {minimized ? (
         <div className="flex items-center p-1.5">{toggle}</div>
       ) : (

@@ -269,6 +269,7 @@ export function SpineNoteGap({
     <div
       ref={ref}
       data-note-gap={head ? "head" : ""}
+      data-anatomy={head ? "L5" : "L7"}
       // A gap between two rows cancels the list's own 8px so its growth is
       // what the markers ask for; the head slot keeps it.
       className={`relative flex flex-col ${head ? "" : "-mt-2"}`}
@@ -440,6 +441,7 @@ export function ListNoteGap({
     <div
       ref={ref}
       data-note-gap={head ? "head" : ""}
+      data-anatomy={head ? "L5" : "L7"}
       // Between two rows the gap cancels the list's own 8px, so one marker
       // takes no height at all.
       className={`relative hidden flex-col sm:flex ${head ? "" : "-mt-2"}`}

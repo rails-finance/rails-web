@@ -76,8 +76,6 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
           debtInFront={debtInFront}
           trovesAhead={trovesAhead}
           debtInFrontLoading={false}
-          summaryExplanationOpen={false}
-          onToggleSummaryExplanation={() => {}}
           loadingStatus={{ message: null, snapshotDate: lastEventTs }}
         />
 

@@ -451,12 +451,9 @@ export function PwnPositionCard({
           ? {
               label: "Interest",
               value: (
-                <>
-                  <StatValue>
-                    <span className="tabular-nums">{aprText(v.accruingInterestApr!)}</span>
-                  </StatValue>
-                  <StatFootnote>accrues by the minute on the principal</StatFootnote>
-                </>
+                <StatValue>
+                  <span className="tabular-nums">{aprText(v.accruingInterestApr!)}</span>
+                </StatValue>
               ),
             }
           : undefined;

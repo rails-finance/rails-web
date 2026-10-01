@@ -70,6 +70,7 @@ export function ReceiptCalcButton() {
       className={`${CTRL_GHOST} ${calc.on ? "bg-sunken text-foreground ring-1 ring-foreground" : CTRL_OFF} size-11 shrink-0 rounded-lg sm:size-8`}
       aria-pressed={calc.on}
       aria-label="Show how the position adds up"
+      data-anatomy="T8"
       title="Show how the position adds up"
       data-receipt-calc=""
       onClick={(e) => {
@@ -139,7 +140,7 @@ export function EventSumLines({
   );
   const dirOf = (key: string) => model.buckets.find((b) => b.key === key)?.dir;
   return (
-    <div className="flex flex-col text-[13px] tabular-nums" data-receipt-sum={side}>
+    <div className="flex flex-col text-[13px] tabular-nums" data-receipt-sum={side} data-anatomy="T8.1">
       {rows.lines.map((l) => (
         <div
           key={l.key}

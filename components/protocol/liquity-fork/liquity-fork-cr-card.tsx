@@ -18,7 +18,14 @@ import { forkLiveVocab, FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { AmountText } from "@/components/shared/amount-text";
 
-export function LiquityForkCrCard({ chain }: { chain: LiquityForkTroveChainResponse }) {
+export function LiquityForkCrCard({
+  chain,
+  alignStart = false,
+}: {
+  chain: LiquityForkTroveChainResponse;
+  /** Left-aligned, under Collateral ratio in the card's opened layer. */
+  alignStart?: boolean;
+}) {
   // Meaningful only for a trove with live debt and a live price.
   if (
     chain.chainStale ||
@@ -40,14 +47,14 @@ export function LiquityForkCrCard({ chain }: { chain: LiquityForkTroveChainRespo
   // note rides the strip as a basis-full caution line.
   return (
     <>
-      <RiskFigure>
+      <RiskFigure alignStart={alignStart}>
         <Prov info={vocab.liqPriceProv(chain.symbol)}>
           <AmountText value={headroom} format="compact" /> {debtSymbol}
         </Prov>{" "}
         more to the {pct(chain.mcr)} minimum
       </RiskFigure>
       {chain.branchTcr != null && (
-        <RiskFigure>
+        <RiskFigure alignStart={alignStart}>
           branch ratio <Prov info={vocab.tcrProv(chain.symbol)}>{pct(chain.branchTcr)}</Prov>
           {branchGated && (
             <>
@@ -60,7 +67,9 @@ export function LiquityForkCrCard({ chain }: { chain: LiquityForkTroveChainRespo
         </RiskFigure>
       )}
       {branchShutdownRisk && (
-        <p className="basis-full text-right text-[11px] leading-relaxed font-semibold text-caution-600 dark:text-caution-400">
+        <p
+          className={`basis-full ${alignStart ? "text-left" : "text-right"} text-[11px] leading-relaxed font-semibold text-caution-600 dark:text-caution-400`}
+        >
           The branch ratio sits below its {pct(chain.scr)} shutdown threshold (SCR) — the branch can be shut down and
           wound through urgent redemptions.
         </p>

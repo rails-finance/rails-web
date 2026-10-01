@@ -96,7 +96,7 @@ export function ToolsMenu({
   return (
     // `data-export-menu` stays on the wrapper: it is what the export verifiers
     // reach for, and this is still the element they mean.
-    <div ref={ref} className="relative" data-export-menu data-tools-menu>
+    <div ref={ref} className="relative" data-export-menu data-tools-menu data-anatomy="H7.3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

@@ -30,6 +30,7 @@ export function HeaderThemeToggle() {
   const isDark = resolvedTheme === "dark";
   return (
     <button
+      data-anatomy="H10"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className="group cursor-pointer p-2.5 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}

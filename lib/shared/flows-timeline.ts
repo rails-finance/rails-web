@@ -19,6 +19,12 @@
 // `SERIES_GAP_DAYS` keeps its older price and is marked. Without one, an asset
 // keeps the price its last event carried and a price older than `STALE_DAYS`
 // is marked. Nothing is interpolated.
+//
+// Balances between events. Where the timeline carries the reserves' indexes
+// (`indexes`: the Aave family's route), a balance on a day after the event
+// that recorded it is grown by interest: recorded × the index at the day's
+// close ÷ the index at that event, the chain's balance that day. Without them
+// it stays as the event recorded it.
 
 export type FlowSide = "collateral" | "debt";
 
@@ -80,8 +86,9 @@ export interface FlowEvent {
    *  liquidation or a transfer). Default counted. */
   tx?: string;
   countsTx?: boolean;
-  /** Token balances after the event, for the assets it touched. */
-  balances: { asset: string; symbol: string; side: FlowSide; amount: number }[];
+  /** Token balances after the event, for the assets it touched; `index` is
+   *  the side's reserve index at the event, where the timeline carries indexes. */
+  balances: { asset: string; symbol: string; side: FlowSide; amount: number; index?: number }[];
   /** Prices the event carries, USD per token at its block. */
   prices: { asset: string; usd: number }[];
 }
@@ -114,6 +121,79 @@ export interface FlowAssetHeld {
    *  epoch) its price was recorded, and whether a daily series recorded it
    *  (else an event's block). */
   priced?: { day: number; series: boolean };
+  /** Grown by interest since the event that recorded it (`FlowIndexes`):
+   *  `amount` is `recorded` × `index` ÷ `anchor`. */
+  grown?: FlowGrowth;
+}
+
+/** How a balance between events was grown by interest. */
+export interface FlowGrowth {
+  /** The balance its last event recorded, and that event's UTC day. */
+  recorded: number;
+  recordedDay: number;
+  /** The side's index at that event and at the close of `indexDay`. */
+  anchor: number;
+  index: number;
+  indexDay: number;
+  /** Where the index comes from (`FlowIndexes.basis`). */
+  basis: FlowIndexes["basis"];
+}
+
+/** The reserves' indexes at each held day's close, per asset: [UTC day,
+ *  supply index, borrow index] (the Aave family's route). The Aave V3 Pool
+ *  family's from its ReserveDataUpdated logs (liquidityIndex,
+ *  variableBorrowIndex); Aave V4's from the hub (share price, drawn index). */
+export interface FlowIndexes {
+  basis: "reserve-data" | "hub-state";
+  assets: Record<string, [day: number, supply: number | null, borrow: number | null][]>;
+}
+
+/** The side's index for `asset` at the close of `day`, or of the last day
+ *  before it that has one; null where none is at or before it. */
+export function indexAt(
+  indexes: FlowIndexes,
+  asset: string,
+  side: FlowSide,
+  day: number,
+): { index: number; day: number } | null {
+  const rows = indexes.assets[asset];
+  if (!rows || rows.length === 0) return null;
+  let lo = 0;
+  let hi = rows.length - 1;
+  let hit = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid][0] <= day) {
+      hit = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  for (let i = hit; i >= 0; i--) {
+    const v = rows[i][side === "collateral" ? 1 : 2];
+    if (v != null && v > 0) return { index: v, day: rows[i][0] };
+  }
+  return null;
+}
+
+/** A balance recorded on `recordedDay` (with the side's index then) at the
+ *  close of `day`: grown by the index where both are known and the index read
+ *  is after the event's day; otherwise as recorded. */
+export function grownBalance(
+  indexes: FlowIndexes | undefined,
+  asset: string,
+  side: FlowSide,
+  recorded: number,
+  recordedDay: number,
+  anchor: number | undefined,
+  day: number,
+): { amount: number; grown?: FlowGrowth } {
+  if (!indexes || !(recorded > 0) || !(anchor != null && anchor > 0) || day <= recordedDay) return { amount: recorded };
+  const at = indexAt(indexes, asset, side, day);
+  if (!at || at.day <= recordedDay) return { amount: recorded };
+  return {
+    amount: (recorded * at.index) / anchor,
+    grown: { recorded, recordedDay, anchor, index: at.index, indexDay: at.day, basis: indexes.basis },
+  };
 }
 
 /** One active UTC day: the position after the day's last event. */
@@ -162,6 +242,9 @@ export interface FlowTimeline {
    *  line's bin between keeps the last one, and a price older than
    *  STALE_DAYS is stated as such. */
   seriesCarry?: boolean;
+  /** The reserves' indexes at each held day's close: a balance between events
+   *  is grown by interest from the event that recorded it. */
+  indexes?: FlowIndexes;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -510,7 +593,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     return o && o.day <= stop ? { usd: o.usd, ts: (startDay + o.day) * DAY_S, day: o.day, series: true } : null;
   };
 
-  const held = new Map<string, { symbol: string; side: FlowSide; amount: number }>();
+  const held = new Map<string, { symbol: string; side: FlowSide; amount: number; index?: number; day: number }>();
   const eventPrice = new Map<string, PriceAt>();
   const seriesCursor = new Map<string, { i: number }>();
   const valued: FlowModel["valued"] = [];
@@ -526,7 +609,13 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       for (const p of d.prices)
         if (p.usd > 0) eventPrice.set(p.asset, { usd: p.usd, ts: p.ts, day: utcDay(p.ts) - startDay, series: false });
       for (const b of d.balances)
-        held.set(`${b.side}:${b.asset}`, { symbol: b.symbol, side: b.side, amount: b.amount });
+        held.set(`${b.side}:${b.asset}`, {
+          symbol: b.symbol,
+          side: b.side,
+          amount: b.amount,
+          ...(b.index != null ? { index: b.index } : {}),
+          day: d.day,
+        });
     }
     const priceNow = new Map<string, PriceAt>();
     let coll = 0;
@@ -537,10 +626,22 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       h: { symbol: string; side: FlowSide; amount: number };
       usd: number;
       p: PriceAt | undefined;
+      grown?: FlowGrowth;
     }[] = [];
-    for (const [key, h] of held) {
-      if (!(h.amount > 0)) continue;
+    for (const [key, recorded] of held) {
+      if (!(recorded.amount > 0)) continue;
       const asset = key.slice(key.indexOf(":") + 1);
+      // Interest since the event that recorded it, where the indexes say.
+      const g = grownBalance(
+        t.indexes,
+        asset,
+        recorded.side,
+        recorded.amount,
+        recorded.day,
+        recorded.index,
+        startDay + stop,
+      );
+      const h = { symbol: recorded.symbol, side: recorded.side, amount: g.amount };
       let p = priceNow.get(asset);
       if (!p) {
         const cursor = seriesCursor.get(asset) ?? { i: 0 };
@@ -558,7 +659,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       const usd = h.amount * usdPer;
       if (h.side === "collateral") coll += usd;
       else debt += usd;
-      lines.push({ asset, h, usd, p });
+      lines.push({ asset, h, usd, p, ...(g.grown ? { grown: g.grown } : {}) });
       if (p && usd >= STALE_FLOOR_USD) {
         const old = daily ? stop - p.day > gapDays : (startDay + stop + 1) * DAY_S - p.ts > gapDays * DAY_S;
         if (old) staleHere.push({ symbol: h.symbol, side: h.side, pricedAt: p.ts, usd });
@@ -590,12 +691,13 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     prevPrice = priceNow;
     valued.push({ collateral: coll, debt });
     heldAt.push(
-      lines.map(({ h, usd, p }) => ({
+      lines.map(({ h, usd, p, grown }) => ({
         side: h.side,
         symbol: h.symbol,
         amount: h.amount,
         usd,
         ...(p ? { priced: { day: utcDay(p.ts), series: p.series } } : {}),
+        ...(grown ? { grown } : {}),
       })),
     );
     if (staleHere.length) stale.set(stop, staleHere);

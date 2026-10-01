@@ -1,8 +1,8 @@
 "use client";
 
-// Per-wallet UI state for /aave-v4/[wallet]. Mirrors useTroveUiState's
-// localStorage-keyed pattern so that filter / sort / heatmap-range
-// preferences persist across reloads on a per-wallet basis.
+// Per-wallet UI state for /aave-v4/[wallet], kept in localStorage so that
+// filter / sort / heatmap-range preferences persist across reloads on a
+// per-wallet basis.
 
 import { useCallback, useEffect, useState } from "react";
 import { DEFAULT_HIDDEN_ACTIONS } from "@/lib/shared/event-filter-helpers";

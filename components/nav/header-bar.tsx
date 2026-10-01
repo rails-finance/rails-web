@@ -74,6 +74,7 @@ function BookmarksButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
       aria-label="Bookmarks"
+      data-anatomy="H11"
       title="Bookmarks"
     >
       <svg
@@ -113,6 +114,7 @@ export function HeaderBar() {
 
   return (
     <header
+      data-anatomy="H2"
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}${
         // From `md` up an app route has nothing left for this bar to carry:
         // the mark, the bookmark and the theme toggle are in BrandRail and the

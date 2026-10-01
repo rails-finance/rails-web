@@ -136,6 +136,7 @@ export function TimelineBoundaryRow({
   return (
     <div
       data-figure="timeline-boundary-row"
+      data-anatomy="L8"
       data-boundary-row={kind}
       className="relative flex w-full items-start"
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}

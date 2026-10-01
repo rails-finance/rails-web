@@ -263,7 +263,10 @@ export function liquityForkRedemptionOutcome(
         }
       : null;
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
+      data-anatomy="F13·liquity"
+    >
       <span>Borrower&apos;s net outcome from redemptions was</span>
       <Prov info={realizedProv} value={formatExact(atRedemption)}>
         <span className={atRedemption >= 0 ? "text-green-400" : "text-red-400"}>{signedUsd(atRedemption)}</span>

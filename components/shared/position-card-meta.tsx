@@ -91,7 +91,7 @@ export function PositionCardMeta({
     // liquidation tally are the tripwire's documented "event numbers" class
     // (index row counts, not chain-state figures), stated here without a
     // receipt on every consumer. Exempted once at the cluster root.
-    <span data-prov-exempt="" className="flex items-center gap-2 text-xs text-rb-500">
+    <span data-prov-exempt="" data-anatomy="C8" className="flex items-center gap-2 text-xs text-rb-500">
       {showTime && (
         <RevealTip
           tip={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}

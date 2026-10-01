@@ -6,29 +6,28 @@
 // the end of the header's activity meta opens the detail beneath each
 // headline and the Explanation row. A card without the key draws as before.
 //
-// The opened state is remembered per viewer and per position with the store
-// the timeline's event cards use (lib/shared/card-open-store.ts), restored in
-// a post-mount effect as EventCard does, so the server render and the first
-// client render agree (closed). Arming the provenance inspector opens every
+// Two states are remembered per viewer and per position, in the store the
+// timeline's event cards use (lib/shared/card-open-store.ts): whether the
+// card is open, and whether its Explanation is open. They are read through
+// useSyncExternalStore with a closed server snapshot, so the server render
+// and the hydrating render agree (closed), a card that mounts on the client
+// (after a loading skeleton, or on a client navigation) paints in its
+// remembered state at once, and a hydrated card left open settles open
+// straight after hydration. Arming the provenance inspector opens every
 // disclosing card, so an armed click can reach a figure in the detail layer —
 // the rule `useReserveDisclosure` follows.
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { provInspector } from "@/components/shared/provenance";
-import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
+import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
 
 export interface PositionCardDisclosure {
   open: boolean;
   toggle: () => void;
+  /** The Explanation row's remembered state, for the shell to restore. */
+  explanationOpen: boolean;
+  setExplanationOpen: (open: boolean) => void;
 }
 
 const DisclosureContext = createContext<PositionCardDisclosure | null>(null);
@@ -40,24 +39,32 @@ export function usePositionCardDisclosure(): PositionCardDisclosure | null {
 
 /** The store key for one position: prefixed so it never meets an event id. */
 const storeKey = (key: string) => `position:${key}`;
+const explanationKey = (key: string) => `position:${key}:explanation`;
+
+const closedOnServer = () => false;
+
+/** One remembered flag, read from the store on every client render. */
+function useStoredOpen(storeId: string | null): boolean {
+  return useSyncExternalStore(subscribeCardOpen, () => (storeId ? isCardOpen(storeId) : false), closedOnServer);
+}
 
 /** Open/closed state for a card that opts in with `key`; null without one.
  *  Hooks run either way, so a card can switch the key on and off. */
 export function usePositionCardDisclosureState(key: string | undefined): PositionCardDisclosure | null {
-  const [stored, setStored] = useState(false);
+  const stored = useStoredOpen(key ? storeKey(key) : null);
+  const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  useEffect(() => {
-    setStored(key ? isCardOpen(storeKey(key)) : false);
-  }, [key]);
   const toggle = useCallback(() => {
-    setStored((was) => {
-      const next = !was;
-      if (key) setCardOpen(storeKey(key), next);
-      return next;
-    });
+    if (key) setCardOpen(storeKey(key), !isCardOpen(storeKey(key)));
   }, [key]);
+  const setExplanationOpen = useCallback(
+    (open: boolean) => {
+      if (key) setCardOpen(explanationKey(key), open);
+    },
+    [key],
+  );
   if (!key) return null;
-  return { open: stored || armed, toggle };
+  return { open: stored || armed, toggle, explanationOpen, setExplanationOpen };
 }
 
 export function PositionCardDisclosureProvider({
@@ -78,6 +85,7 @@ export function PositionCardDisclosureToggle() {
     <button
       type="button"
       data-card-disclosure-toggle=""
+      data-anatomy="C9"
       aria-expanded={d.open}
       aria-label={d.open ? "Hide position details" : "Show position details"}
       onClick={d.toggle}

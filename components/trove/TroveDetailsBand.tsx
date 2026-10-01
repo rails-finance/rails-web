@@ -14,6 +14,12 @@ interface TroveDetailsBandProps {
   debtInFront?: number | null;
   trovesAhead?: number | null;
   debtInFrontLoading?: boolean;
+  /** One item alone, for the position card's opened layer (ui-jobs 209):
+   *  the costs under Debt, the debt in front under Collateral ratio. Both by
+   *  default, as the right-aligned strip draws them. */
+  part?: "costs" | "queue";
+  /** Left-aligned, under a headline. Right-aligned (the strip) by default. */
+  alignStart?: boolean;
 }
 
 /**
@@ -39,6 +45,8 @@ export function TroveDetailsBand({
   debtInFront,
   trovesAhead,
   debtInFrontLoading,
+  part,
+  alignStart = false,
 }: TroveDetailsBandProps) {
   if (trove.status !== "open") return null;
 
@@ -78,37 +86,46 @@ export function TroveDetailsBand({
   const debtInFrontProv = troveDebtInFrontProv(trove.collateralType);
   const trovesAheadProv = troveTrovesAheadProv(trove.collateralType);
 
+  const showCosts = part !== "queue";
+  const showQueue = part !== "costs";
+  const align = alignStart ? "text-left" : "text-right";
+
   return (
     <>
       {/* Costs — annual base interest plus the delegate's fee percentage, one
           band item. `justify-end` on its own internal wrap keeps the fee
           badge flush right under the cost figure rather than trailing at the
           box's left edge, should the two need their own line. */}
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-right text-xs text-rb-500 leading-relaxed">
-        <div className="tabular-nums">
-          Costs:{" "}
-          <Prov info={costsProv} value={formatExact(annualInterestCost)}>
-            <span className="text-foreground/80 font-semibold">
-              ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
-            </span>
-          </Prov>{" "}
-          BOLD / year
-        </div>
-        {trove.batch.isMember && (
-          <div className="text-rb-500 inline-flex items-center gap-1 tabular-nums">
-            <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
-              <span className="text-foreground/80 font-semibold">+{trove.batch.managementFee}%</span>
-            </Prov>
-            <Users className="w-3 h-3 shrink-0 text-pink-500" aria-hidden="true" />
+      {showCosts && (
+        <div
+          className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${alignStart ? "justify-start" : "justify-end"} ${align} text-xs text-rb-500 leading-relaxed`}
+          data-anatomy="C15·liquity"
+        >
+          <div className="tabular-nums">
+            Costs:{" "}
+            <Prov info={costsProv} value={formatExact(annualInterestCost)}>
+              <span className="text-foreground/80 font-semibold">
+                ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
+              </span>
+            </Prov>{" "}
+            BOLD / year
           </div>
-        )}
-      </div>
+          {trove.batch.isMember && (
+            <div className="text-rb-500 inline-flex items-center gap-1 tabular-nums">
+              <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
+                <span className="text-foreground/80 font-semibold">+{trove.batch.managementFee}%</span>
+              </Prov>
+              <Users className="w-3 h-3 shrink-0 text-pink-500" aria-hidden="true" />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Debt in front — its own band item, flowing on from costs. */}
-      {debtInFrontLoading ? (
+      {!showQueue ? null : debtInFrontLoading ? (
         <div className="h-3 w-48 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
       ) : debtInFront !== null && debtInFront !== undefined ? (
-        <div className="text-right text-xs text-rb-500 leading-relaxed tabular-nums">
+        <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`} data-anatomy="C16·liquity">
           Debt in front:{" "}
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
             <span className="text-foreground/80 font-semibold">{formatApproximate(debtInFront)}</span>
@@ -123,7 +140,7 @@ export function TroveDetailsBand({
           )}
         </div>
       ) : (
-        <div className="text-right text-xs text-rb-500/70 leading-relaxed">Debt in front unavailable.</div>
+        <div className={`${align} text-xs text-rb-500/70 leading-relaxed`}>Debt in front unavailable.</div>
       )}
     </>
   );

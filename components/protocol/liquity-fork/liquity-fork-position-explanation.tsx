@@ -231,7 +231,7 @@ export function LiquityForkPositionExplanation({
   bullets.push(
     <span key="pending-caveat">
       {hasDebt
-        ? "The figures above include pending redistribution gains and interest built up since the Trove's last change."
+        ? "The figures above include pending redistribution gains and interest built up since the Trove's last change, up to the latest block. The debt keeps growing at the Trove's rate while it is open."
         : "That collateral figure includes any pending redistribution gains."}
     </span>,
   );

@@ -128,6 +128,8 @@ interface FilterDropdownProps {
    *  that answers each tap belongs inside the sheet where the thumb is.
    *  Desktop ignores it: there the dropdown floats beside the count. */
   sheetStatus?: React.ReactNode;
+  /** App-anatomy code for the control (rails-ops reference/app-anatomy.md). */
+  anatomy?: string;
 }
 
 export function FilterDropdown({
@@ -147,6 +149,7 @@ export function FilterDropdown({
   variant = "ghost",
   verbatimLabels = false,
   sheetStatus,
+  anatomy,
 }: FilterDropdownProps) {
   const [open, setOpen] = useState(false);
   // Type-to-filter text for a long option list (see filter-bar/option-search).
@@ -227,7 +230,11 @@ export function FilterDropdown({
   }
 
   return (
-    <div ref={ref} className={`relative ${trigger ? "flex items-center" : "inline-flex items-center"}`}>
+    <div
+      ref={ref}
+      className={`relative ${trigger ? "flex items-center" : "inline-flex items-center"}`}
+      data-anatomy={anatomy}
+    >
       {trigger ? (
         <div onClick={() => setOpen(!open)} className="cursor-pointer hover:opacity-80 transition-opacity">
           {trigger(open)}

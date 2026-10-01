@@ -93,7 +93,7 @@ export function RailHeader({
   const litSubPage = venue === "subPage" ? subPageForPathname(entry, pathname) : undefined;
   if (venue === "position") {
     return (
-      <div className="flex min-h-9 items-center justify-between gap-3">
+      <div className="flex min-h-9 items-center justify-between gap-3" data-anatomy="H3">
         <div className="min-w-0">
           <ProtocolIdentity session={session} scale="title" />
         </div>
@@ -117,7 +117,7 @@ export function RailHeader({
           ProtocolIdentity, so every explorer wears the same one. The chooser
           takes the far end of the row, and `min-w-0` lets a long name shrink
           rather than push it off. */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3" data-anatomy="H3">
         <div className="min-w-0">
           <ProtocolIdentity session={session} scale="title" />
         </div>
@@ -128,7 +128,7 @@ export function RailHeader({
           gap. With the stamp on, the two ends split it as before. */}
       <div className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 ${stamp ? "justify-between" : "justify-end"}`}>
         {stamp && <RecencyStamp />}
-        <nav aria-label="Explorer sections" className="flex flex-wrap items-center gap-4">
+        <nav aria-label="Explorer sections" className="flex flex-wrap items-center gap-4" data-anatomy="H5">
           {/* The position listing, where the explorer has one. A vault-native
               explorer has none — a share in a vault is not a position in the
               roster's sense (rails-ops decision 0027 call 2) — so its first tab

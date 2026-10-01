@@ -127,7 +127,7 @@ export function FilterSections<F>({ dimensions, filters, onChange }: FilterSecti
   const groups = groupDimensions(dimensions, filters);
 
   return (
-    <div className="flex flex-wrap items-center gap-2" ref={ref}>
+    <div className="flex flex-wrap items-center gap-2" ref={ref} data-anatomy="N1.2">
       {groups.map((group) => {
         const open = openGroup === group.name;
         const groupActive = group.dims.some((d) => isDimensionActive(d, filters));

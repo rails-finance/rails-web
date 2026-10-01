@@ -65,7 +65,10 @@ import {
   viewFromSummary,
   type BasedollarTroveView,
 } from "@/components/protocol/basedollar/basedollar-position-card";
-import { LiquityForkRiskSlot } from "@/components/protocol/liquity-fork/liquity-fork-risk-slot";
+import {
+  LiquityForkDebtDetail,
+  LiquityForkRiskDetail,
+} from "@/components/protocol/liquity-fork/liquity-fork-risk-slot";
 import {
   LiquityForkPositionExplanation,
   LiquityForkClosedExplanation,
@@ -476,15 +479,17 @@ export default function BasedollarTroveDetail({
                 surplus={surplus}
                 viewHref={tl.viewHref}
                 live={liveRisk ? chain : undefined}
-                // The risk slot rides the card's heading-button row (the Aave V3
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway (default) or the collateral-ratio card —
-                // alongside the always-on redemption runway. Whatever it draws is
-                // on the card face and in the card's receipts scope, so the
-                // Provenance list stays 1:1 with the face figures.
-                rowExtra={liveRisk ? <LiquityForkRiskSlot chain={chain} /> : undefined}
+                // Closed by default, remembered per viewer and Trove with its
+                // Explanation (ui-jobs 209). The live read's lines sit in the
+                // opened layer: the yearly cost under Debt; the price bar, the
+                // room to the branch minimum, the branch ratio and the
+                // redemption queue under Collateral ratio. Inside the card's
+                // receipts scope, so the Provenance list stays 1:1 with them.
+                disclosureKey={`basedollar:${collateralType.toLowerCase()}:${troveId}`}
+                debtDetail={liveRisk ? <LiquityForkDebtDetail chain={chain} /> : undefined}
+                riskDetail={liveRisk ? <LiquityForkRiskDetail chain={chain} /> : undefined}
                 // The Explanation is now pure prose about those same face figures.
-                // The CR strip is absorbed into the risk slot above; the
+                // The CR strip is absorbed into the opened layer above; the
                 // redemption card's branch-context figures live on the protocol
                 // view — the card keeps its own queue exposure (the redemption
                 // runway) and the trove's own rate (a card stat). A terminal life

@@ -46,14 +46,14 @@ export default async function Home() {
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
-        <section className="pt-10 pb-12">
+        <section className="pt-10 pb-12" data-anatomy="S2">
           <LiveExampleFrame data={liveExample} />
         </section>
 
         {/* The roster, counted — sits between the example and the directory so
             it reads off both: the position above was one of these, the tiles
             below are the protocols named. */}
-        <section className="pb-12">
+        <section className="pb-12" data-anatomy="S3">
           <CoveredStats covered={covered} stats={stats} />
         </section>
 
@@ -66,13 +66,16 @@ export default async function Home() {
             the @theme value and never sees the html.dark override — and
             `var(--background)` in dark would resolve to rgb(23 27 36), a
             different tone from the floor it is meant to disappear into. */}
-        <section className="pb-12 [--track-casing:var(--background)] dark:[--track-casing:rgb(20_22_30)]">
+        <section
+          className="pb-12 [--track-casing:var(--background)] dark:[--track-casing:rgb(20_22_30)]"
+          data-anatomy="S4"
+        >
           <TrackLines />
         </section>
 
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}
-        <section className="pb-16">
+        <section className="pb-16" data-anatomy="S5">
           <ProtocolRow />
         </section>
       </div>
@@ -86,7 +89,7 @@ export default async function Home() {
           step in the middle of a downward ramp. The personas lead: the
           directory says what Rails covers, this says who it's for, and the
           capability list below answers the "how" for whoever they caught. */}
-      <div className="bg-rb-50 dark:bg-rb-600">
+      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S6">
         <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
           <div className="mb-6">
             <h2 className="font-sans font-semibold tracking-tight leading-tight mb-10 text-[clamp(24px,3.5vw,38px)]">
@@ -149,7 +152,7 @@ export default async function Home() {
           traces to the contracts) that hand off to the StageRail fork, which
           draws the path a number travels from the contracts to the page. ═══ */}
       <div className="bg-background">
-        <section className="max-w-7xl mx-auto px-4 py-16">
+        <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
           <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
 
           {/* Copy constraints (rails-ops decisions 0006/0010) for this intro
@@ -187,7 +190,7 @@ export default async function Home() {
           two are far apart, so the page reads as three alternating tones rather
           than five arbitrary ones. From here the close settles: sheet → band →
           the footer's canvas, each step its own tone. */}
-      <div className="bg-rb-50 dark:bg-rb-600">
+      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <TeamSection />
         </div>
@@ -206,7 +209,7 @@ export default async function Home() {
  *  neighbours at band scale. */
 function GetInTouch() {
   return (
-    <div className="bg-band">
+    <div className="bg-band" data-anatomy="S9">
       <div className="max-w-7xl mx-auto px-4 py-16">
         <h2 className="font-semibold tracking-tight leading-tight pb-4 text-[clamp(28px,4vw,42px)]">Get in touch</h2>
 

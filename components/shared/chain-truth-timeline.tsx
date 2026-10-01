@@ -1788,6 +1788,7 @@ function ChainTruthTimelineBody({
     <SpineViewProvider active={spineActive}>
       <div
         className="space-y-3"
+        data-anatomy="P3"
         data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
         data-timeline-rows-loaded={rows.length}
         data-market-notes={marketNoteCount || undefined}
@@ -1822,6 +1823,7 @@ function ChainTruthTimelineBody({
             <span
               className="inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800"
               data-flow-rewind-chip=""
+              data-anatomy="L2"
             >
               <button
                 type="button"
@@ -2099,7 +2101,7 @@ function ChainTruthTimelineBody({
               for the reader (0019, amendment 2026-09-24); the two data
               attributes on the root carry it for a machine. */}
             {hasMore && (
-              <div ref={sentinelRef} className="flex flex-col items-center gap-1.5 pt-1">
+              <div ref={sentinelRef} className="flex flex-col items-center gap-1.5 pt-1" data-anatomy="L9">
                 <button
                   type="button"
                   onClick={growWindow}

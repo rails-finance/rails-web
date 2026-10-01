@@ -201,7 +201,12 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
           <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
         </div>
 
-        <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="" {...KEEP_PANEL}>
+        <div
+          className="mt-1 flex items-center justify-center gap-x-1"
+          data-flow-controls=""
+          data-anatomy="F5"
+          {...KEEP_PANEL}
+        >
           <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
             <SkipBack size={16} aria-hidden />
           </button>
@@ -251,7 +256,7 @@ export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; h
     </Prov>
   );
   return (
-    <p className="mb-3 text-xs leading-relaxed text-rb-500" data-flow-throughput="">
+    <p className="mb-3 text-xs leading-relaxed text-rb-500" data-flow-throughput="" data-anatomy="F11">
       {fig(t.deposited, "Deposited")} deposited
       {hasDebt && t.borrowed > 0.5 && <> and {fig(t.borrowed, "Borrowed")} borrowed</>} across{" "}
       <span className="font-medium tabular-nums text-foreground" data-prov-exempt="">
@@ -366,7 +371,7 @@ export function Rescaled({
   return (
     <div>
       {headlines && (
-        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
           {sides.map((side) => (
             <Headline key={side} side={side} st={s[side]} model={model} when={when} isLive={isLive} assets={assets} />
           ))}
@@ -376,7 +381,12 @@ export function Rescaled({
         const st = s[side];
         const word = side === "collateral" ? model.labels.collateral : model.labels.debt;
         return (
-          <div key={side} className={i === 0 ? "" : "mt-3"} data-flow-side={side}>
+          <div
+            key={side}
+            className={i === 0 ? "" : "mt-3"}
+            data-flow-side={side}
+            data-anatomy={side === "collateral" ? "F3.1" : "F3.2"}
+          >
             <div className="relative h-10 sm:h-11">
               <div
                 role="img"
@@ -506,6 +516,7 @@ function Density({
         className="relative"
         style={{ height: H }}
         data-flow-density=""
+        data-anatomy="F12"
         onPointerMove={(e) => e.pointerType === "mouse" && setHover(idx(e.clientX))}
         onPointerLeave={() => setHover(null)}
         onClick={(e) => {

@@ -98,7 +98,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   if (!holed && coverage.fromDeployment && undated === 0) return null;
 
   return (
-    <div className={`mt-2 pt-3 ${NOTE}`}>
+    <div className={`mt-2 pt-3 ${NOTE}`} data-anatomy="L10">
       {holed ? (
         <p>
           <span className="text-foreground">This history has holes in it.</span> Rails swept {sourceLabel} from block{" "}

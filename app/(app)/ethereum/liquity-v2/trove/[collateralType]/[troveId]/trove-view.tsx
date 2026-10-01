@@ -34,7 +34,6 @@ import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary"
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
-import { useTroveUiState } from "@/hooks/useTroveUiState";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useWalletContext } from "@/components/nav/wallet-context";
@@ -113,8 +112,6 @@ export default function TroveView({
   const [totalEvents, setTotalEvents] = useState<number | null>(initialTotalEvents);
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
-
-  const { summaryExplanationOpen, setSummaryExplanationOpen } = useTroveUiState(troveKey);
 
   // Live blockchain data and prices
   const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
@@ -612,8 +609,9 @@ export default function TroveView({
           trovesAhead={trovesAhead}
           queueDebtTotal={queueDebtTotal}
           debtInFrontLoading={debtInFrontLoading}
-          summaryExplanationOpen={summaryExplanationOpen}
-          onToggleSummaryExplanation={setSummaryExplanationOpen}
+          // Closed by default, remembered per viewer and Trove with its
+          // Explanation (ui-jobs 209).
+          disclosureKey={`liquity-v2:${troveKey.toLowerCase()}`}
           viewHref={tl.viewHref}
           surplus={surplus}
           loadingStatus={{

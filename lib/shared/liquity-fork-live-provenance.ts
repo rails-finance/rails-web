@@ -169,6 +169,7 @@ export interface LiquityForkLiveVocab {
   liqPriceProv: (branchSymbol: string) => Provenance;
   tcrProv: (branchSymbol: string) => Provenance;
   debtInFrontProv: (branchSymbol: string) => Provenance;
+  trovesAheadProv: (branchSymbol: string) => Provenance;
   queueShareProv: (branchSymbol: string) => Provenance;
   forkUsdProv: (what: string, branchSymbol: string) => Provenance;
   debtFaceUsdProv: (what: string) => Provenance;
@@ -312,6 +313,18 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
       },
       via: `${LANE_VIA} · SortedTroves walk @ head`,
+    }),
+    trovesAheadProv: (sym) => ({
+      kind: "chain-derived",
+      pclass: "state",
+      verify: recompute("SortedTroves", "getFirst/getNext walk"),
+      summary: `Troves ahead — the number of other ${sym} branch troves sitting at a lower or equal interest rate, counted in the same live walk of the branch's SortedTroves as the debt in front. A redemption reaches them first.`,
+      contract: {
+        name: `${cfg.protocolName} ${sym} SortedTroves`,
+        address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
+      },
+      via: `${LANE_VIA} · SortedTroves walk @ head`,
+      formula: "count of same-branch troves at rate ≤ this trove's",
     }),
     queueShareProv: (sym) => ({
       kind: "chain-derived",

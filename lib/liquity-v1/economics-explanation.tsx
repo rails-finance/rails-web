@@ -189,7 +189,10 @@ export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, 
   const tone = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
   const shownThen = Math.abs(netThen) < 0.005 ? 0 : netThen;
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
+      data-anatomy="F13·liquity"
+    >
       <span>Owner&apos;s net outcome from redemptions was</span>
       <Prov info={thenProv}>
         <span className={tone(shownThen)}>{fmtUsdSigned(shownThen)}</span>

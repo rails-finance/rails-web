@@ -68,6 +68,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
   return (
     <button
       type="button"
+      data-anatomy="H6"
       onClick={() => setShowBlock((v) => !v)}
       aria-pressed={showBlock}
       // The visible text is a value, so the action goes in the name: a reader

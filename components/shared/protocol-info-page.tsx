@@ -24,15 +24,19 @@ export function ProtocolInfoPage({ session, children }: { session: SessionProtoc
       <div className="mb-6">
         <RailHeader session={session} venue="info" />
       </div>
-      <h1 className="text-2xl font-semibold text-foreground">About this explorer</h1>
+      <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I1">
+        About this explorer
+      </h1>
       {/* A div, not a <p>: the blurbs are multi-paragraph and carry their own
           <p> elements. max-w-3xl matches the sub-page intro measure. */}
-      <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500">{children}</div>
+      <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
+        {children}
+      </div>
       {/* The door to the chain's coverage page — every protocol keeps it,
           ungated. The structural coverage note itself renders only there (its
           audit reader wants that register); the intro above carries any
           reader-facing consequence in plain words instead. */}
-      <p className="mt-4 text-sm text-rb-500">
+      <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
         <Link href={`/coverage/${CHAINS[chainId].slug}`} className="text-blue-500 hover:underline">
           See what Rails covers on each {CHAINS[chainId].name} explorer
         </Link>

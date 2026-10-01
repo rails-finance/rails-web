@@ -35,7 +35,11 @@ const LIFECYCLE: Record<LifecycleStatus, { label: string; cls: string; title?: s
 export function LifecyclePill({ status }: { status: LifecycleStatus }) {
   const st = LIFECYCLE[status] ?? LIFECYCLE.open;
   return (
-    <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`} title={st.title}>
+    <span
+      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}
+      title={st.title}
+      data-anatomy="C6"
+    >
       {st.label}
     </span>
   );

@@ -44,7 +44,7 @@ export function SortControl({ options, sortBy, sortOrder, onChange }: SortContro
   const current = options.find((o) => o.value === sortBy)?.label ?? "Sort";
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1" data-anatomy="N1.3">
       <button
         onClick={() => onChange(sortBy, sortOrder === "asc" ? "desc" : "asc")}
         className={`${CTRL_GHOST} ${CTRL_OFF} w-8 h-8 rounded-md`}

@@ -20,7 +20,10 @@ export function FeedbackCluster({ variant = "stacked" }: { variant?: "stacked" |
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const inline = variant === "inline";
   return (
-    <div className={inline ? "flex flex-wrap items-center justify-center gap-x-3 gap-y-2" : undefined}>
+    <div
+      className={inline ? "flex flex-wrap items-center justify-center gap-x-3 gap-y-2" : undefined}
+      data-anatomy="H8.1"
+    >
       {inline ? (
         <p className="text-xs text-rb-500">Spotted a wrong number or a rough edge?</p>
       ) : (

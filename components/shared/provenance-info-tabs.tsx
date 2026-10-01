@@ -77,6 +77,9 @@ export interface ProvenanceInfoTabsProps {
    *  `InfoTabsDisclosure`. */
   rowExtra?: ReactNode;
   className?: string;
+  /** App-anatomy codes (rails-ops reference/app-anatomy.md) for the
+   *  Explanation and its "?": C3/C4 on a position card, F8/F9 on Lifetime flows. */
+  anatomy?: { explanation?: string; learnMore?: string };
 }
 
 export function ProvenanceInfoTabs({
@@ -87,6 +90,7 @@ export function ProvenanceInfoTabs({
   onExplanationToggle,
   rowExtra,
   className,
+  anatomy,
 }: ProvenanceInfoTabsProps) {
   const [openTab, setOpenTab] = useState<string | null>(
     explanation != null && explanationDefaultOpen ? "explanation" : null,
@@ -121,7 +125,7 @@ export function ProvenanceInfoTabs({
                   {explanation}
                   <div className="flex items-center justify-end gap-2 mt-3">
                     {viewHref && <CopyViewLink href={viewHref} />}
-                    {learnMore && <LearnMore content={learnMore} inline />}
+                    {learnMore && <LearnMore content={learnMore} inline anatomy={anatomy?.learnMore} />}
                   </div>
                 </>
               ) : (
@@ -147,6 +151,7 @@ export function ProvenanceInfoTabs({
       }}
       keepMounted
       className={className}
+      anatomy={anatomy?.explanation}
     />
   );
 }

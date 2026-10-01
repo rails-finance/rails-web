@@ -26,6 +26,8 @@ import {
   usePositionCardDisclosureState,
 } from "@/components/shared/position-card-disclosure";
 
+const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
+
 export function PositionCardShell({
   receipts = false,
   rowExtra,
@@ -64,8 +66,10 @@ export function PositionCardShell({
   /** Opt in to progressive disclosure (ui-jobs 209): one stable key per
    *  position. The card then draws closed by default, a chevron in the
    *  header's activity meta opens it, and the Explanation row shows only
-   *  while it is open (components/shared/position-card-disclosure.tsx). Only
-   *  meaningful with `receipts`: a listing row never discloses. */
+   *  while it is open (components/shared/position-card-disclosure.tsx). Both
+   *  the card's state and its Explanation's are remembered under the key, so
+   *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
+   *  Only meaningful with `receipts`: a listing row never discloses. */
   disclosureKey?: string;
   children: ReactNode;
 }) {
@@ -76,8 +80,11 @@ export function PositionCardShell({
     // inside a listing's row <Link> (which declares the group) — inert everywhere else.
     // data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
     // `receipts` already distinguishes the detail render from the listing row.
+    // data-anatomy (rails-ops reference/app-anatomy.md): P1 on the detail page,
+    // with the card's state, C1 closed or C2 opened, where the card discloses.
     <div
       data-skel-section={receipts ? "detail-card" : "listing-row"}
+      data-anatomy={receipts ? (disclosure ? `P1 ${disclosure.open ? "C2" : "C1"}` : "P1") : undefined}
       className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500"
     >
       {children}
@@ -88,8 +95,10 @@ export function PositionCardShell({
           explanation={explanation}
           learnMore={learnMore}
           viewHref={viewHref}
-          explanationDefaultOpen={explanationDefaultOpen}
-          onExplanationToggle={onExplanationToggle}
+          // A disclosing card remembers its Explanation with its open state.
+          explanationDefaultOpen={disclosure ? disclosure.explanationOpen : explanationDefaultOpen}
+          onExplanationToggle={disclosure ? disclosure.setExplanationOpen : onExplanationToggle}
+          anatomy={CARD_ANATOMY}
         />
       )}
     </div>

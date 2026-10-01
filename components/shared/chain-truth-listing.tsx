@@ -237,7 +237,11 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           </>
         )}
       </div>
-      {headerExtra != null && <div data-skel-section="listing-header-extra">{headerExtra}</div>}
+      {headerExtra != null && (
+        <div data-skel-section="listing-header-extra" data-anatomy="N4">
+          {headerExtra}
+        </div>
+      )}
       {filter ? (
         <ListToolbar
           dimensions={filter.dimensions}
@@ -301,6 +305,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
                       href={hrefFor(item)}
                       prefetch={true}
                       className="group/listing-row block"
+                      data-anatomy="N2"
                       onClick={() => markNavStart(hrefFor(item))}
                     >
                       {renderCard(item)}
