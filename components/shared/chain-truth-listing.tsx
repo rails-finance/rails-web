@@ -89,6 +89,10 @@ export interface ChainTruthListingPagination {
   totalCount: number;
   itemsPerPage: number;
   onPageChange: (page: number) => void;
+  /** The count line's noun where the selection narrows it ("open positions"). */
+  countNoun?: string;
+  /** Said after the count, e.g. where the rest of the set sits. */
+  countNote?: string;
 }
 
 export interface ChainTruthListingProps<T, F extends BaseListFilters = BaseListFilters> {
@@ -313,7 +317,8 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
               totalCount={pagination.totalCount}
               itemsPerPage={pagination.itemsPerPage}
               onPageChange={pagination.onPageChange}
-              noun={noun}
+              noun={pagination.countNoun ?? noun}
+              note={pagination.countNote}
             />
           )}
         </>

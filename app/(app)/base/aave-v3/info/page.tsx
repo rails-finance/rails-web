@@ -22,7 +22,7 @@ const intro = (
       </Link>
       .
     </p>
-    <BaseLendingCoverageNote route="/api/aave-v3-base/coverage" />
+    <BaseLendingCoverageNote route="/api/aave-v3-base/coverage" restsOnOpen />
   </>
 );
 

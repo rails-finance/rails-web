@@ -28,8 +28,8 @@
 // RULE (§54, §213): a supplied reserve is placed by its AFTER-state flag —
 // switched on, directly under the Collateral total; switched off, under the
 // "Supplied, not collateral" line; an empty group draws nothing. A row whose
-// flag flipped on the event carries a short muted "switched on here" /
-// "switched off here" holding the receipt the icon used to carry
+// flag flipped on the event carries a short muted "enabled as collateral here" /
+// "disabled as collateral here" holding the receipt the icon used to carry
 // (collateralFlagProv). A row that did not flip has no per-row flag words; its
 // flag receipt rides on the row's own after-balance receipt instead (see
 // `withFlagNote` below), since `collateralFlagProv` names one reserve and a
@@ -203,7 +203,7 @@ function CollateralFlipNote({
   return (
     <Prov info={collateralFlagProv(sym, "before", flag.before, coords)} value={was}>
       <span className="text-xs text-rb-500" data-collateral-flip={flag.after ? "on" : "off"}>
-        switched {flag.after ? "on" : "off"} here
+        {flag.after ? "enabled" : "disabled"} as collateral here
       </span>
     </Prov>
   );

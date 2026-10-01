@@ -63,6 +63,7 @@ export function BaseLendingCoverageBanner({
   subject = "this Pool",
   subjectPossessive = "the Pool\u2019s",
   noun = "account",
+  restsOnOpen = false,
 }: {
   c: BaseLendingCoverage | null | undefined;
   /** Whether an account the chain sweep has not read yet appears in the list
@@ -76,6 +77,12 @@ export function BaseLendingCoverageBanner({
   subjectPossessive?: string;
   /** What a row is — an account (a wallet) or, on a per-market lane, a position. */
   noun?: string;
+  /** The listing opens on the open positions (the Aave-family resting view,
+   *  lib/aave-v3/listing-visibility.ts); the sentence says so, since the
+   *  listing's count is then that subset. The browse also leaves out named
+   *  protocol contracts and router accounts (rails-server baseLending.ts), which
+   *  this count includes. */
+  restsOnOpen?: boolean;
 }) {
   if (c === undefined) return null;
   if (c === null) {
@@ -98,6 +105,14 @@ export function BaseLendingCoverageBanner({
         Every {noun} that ever touched {subject} is listed — {c.accountsTotal.toLocaleString("en-US")} of them, from{" "}
         {subjectPossessive} first block — and each one&rsquo;s balances were read from the chain at the block its row
         names.
+        {restsOnOpen ? (
+          <>
+            {" "}
+            The listing opens on the ones still open, with the closed and liquidated ones under its Status filter, and
+            leaves out the protocol contracts among them (WETH gateways, swap routers and the like), which a search by
+            address still finds.
+          </>
+        ) : null}
       </p>
     );
   }

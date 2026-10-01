@@ -66,3 +66,11 @@ export function effectiveStatuses(f: AaveV3VisibilityInput): AaveV3StatusBucket[
 export function isAllStatuses(f: AaveV3VisibilityInput): boolean {
   return effectiveStatuses(f).length === ALL_AAVE_V3_STATUS_BUCKETS.length;
 }
+
+/** The count line on a resting directory: the default narrows the set to the open positions
+ *  without drawing a chip, so the line names the filter and where the rest are. An explicit
+ *  selection draws its own chips and needs nothing here. */
+export function aaveV3RestingCountLine(f: AaveV3VisibilityInput): { noun: string; note: string } | null {
+  if (canonicalStatuses(f.status ?? []).length > 0 || namesIdentity(f.q)) return null;
+  return { noun: "open positions", note: "closed and liquidated ones are under Status" };
+}

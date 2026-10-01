@@ -170,6 +170,9 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   /** The title's heading level — "h2" under another page's h1. Passed through
    *  to the presentation shell. */
   titleAs?: "h1" | "h2";
+  /** Server tier: the count line's noun and note for the live selection, where
+   *  a default filter narrows the set without drawing a chip. */
+  countLine?: (filters: F) => { noun?: string; note?: string } | null;
 }
 
 export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefined>({
@@ -195,6 +198,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   identity,
   titleHidden,
   titleAs,
+  countLine,
 }: ChainTruthListingPageProps<T, F, Ext>) {
   const searchParams = useUrlSearchParams(initialSearch ?? "");
 
@@ -434,9 +438,12 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   );
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
+  const line = countLine?.(filters) ?? null;
   const pagination =
     strategy.kind === "server"
       ? {
+          countNoun: line?.noun,
+          countNote: line?.note,
           currentPage: page,
           totalPages: Math.max(1, Math.ceil(total / strategy.itemsPerPage)),
           totalCount: total,

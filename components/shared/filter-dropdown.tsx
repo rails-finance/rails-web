@@ -168,8 +168,19 @@ export function FilterDropdown({
     function handle(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    // Escape closes it too, wherever focus sits, and hands focus back to the
+    // trigger when it was inside the menu.
+    function esc(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      if (ref.current?.contains(document.activeElement)) ref.current.querySelector<HTMLElement>("button")?.focus();
+    }
     document.addEventListener("pointerdown", handle);
-    return () => document.removeEventListener("pointerdown", handle);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", handle);
+      document.removeEventListener("keydown", esc);
+    };
   }, [open, isPhone]);
 
   // Normalize selected into a set for rendering

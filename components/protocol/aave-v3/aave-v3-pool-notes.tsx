@@ -96,6 +96,7 @@ export function AaveV3PoolNotes({
   }
 
   if (frozen) {
+    const owes = chain.reserves.some((r) => r.debtBalanceRaw !== "0");
     items.push(
       <span key="frozen">
         Every reserve on this Pool has been frozen since{" "}
@@ -108,8 +109,13 @@ export function AaveV3PoolNotes({
           one transaction
         </a>{" "}
         at block {frozen.block.toLocaleString("en-US")} ({frozen.date}).{" "}
-        {held.length === 0 && !chain.reserves.some((r) => r.debtBalanceRaw !== "0") ? (
+        {held.length === 0 && !owes ? (
           <>This position is closed, and nothing new can be supplied or borrowed on this Pool.</>
+        ) : !owes ? (
+          <>
+            Interest still accrues on the supplied balance, so the figures above are live. Nothing new can be supplied,
+            so the balance can only be withdrawn.
+          </>
         ) : (
           <>
             Interest still accrues and the account is still liquidatable below a health factor of 1.000, so the figures

@@ -604,11 +604,27 @@ export interface AaveV3LiquidationRead {
   dropPct: number | null;
   /** The single-collateral anchor, when one reserve dominates. */
   single: { symbol: string; price: number; liqPrice: number } | null;
+  /** Every supplied and every borrowed reserve is this one token: one oracle
+   *  price stands on both sides of the health factor and cancels, so no price
+   *  can liquidate the account and the two figures above are null. */
+  sameAsset: { symbol: string } | null;
+}
+
+/** The one token every supplied and every borrowed reserve is, or null. The
+ *  rule behind `AaveV3LiquidationRead.sameAsset`, over the view's amounts. */
+export function aaveV3SameAssetOfView(view: AaveV3PositionView): { symbol: string; address: string } | null {
+  const s = view.supplies.filter((r) => r.amount > 0);
+  const d = view.borrows.filter((r) => r.amount > 0);
+  if (s.length !== 1 || d.length !== 1) return null;
+  if (s[0].address.toLowerCase() !== d[0].address.toLowerCase()) return null;
+  return { symbol: s[0].symbol, address: s[0].address.toLowerCase() };
 }
 
 export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3LiquidationRead {
   const hf = view.healthFactor;
-  if (hf == null || hf <= 1 || hf >= 100) return { dropPct: null, single: null };
+  if (hf == null || hf <= 1 || hf >= 100) return { dropPct: null, single: null, sameAsset: null };
+  const same = aaveV3SameAssetOfView(view);
+  if (same) return { dropPct: null, single: null, sameAsset: { symbol: same.symbol } };
   const prices = view.priceByAddress;
   const priced = view.supplies
     .filter((r) => r.amount > 0)
@@ -625,7 +641,7 @@ export function aaveV3LiquidationRead(view: AaveV3PositionView): AaveV3Liquidati
       single = { symbol: top.r.symbol, price: top.price as number, liqPrice: (top.price as number) / hf };
     }
   }
-  return { dropPct: (1 - 1 / hf) * 100, single };
+  return { dropPct: (1 - 1 / hf) * 100, single, sameAsset: null };
 }
 
 /** Position-card stat captions (the V4 spoke-card grammar, computed with this

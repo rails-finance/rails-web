@@ -27,6 +27,8 @@ import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
+import { aaveV3SameAsset } from "@/lib/aave-v3/same-asset";
+import type { AaveV3LastBorrowRate } from "@/lib/aave-v3/last-borrow-rate";
 
 /** Oxford-join asset symbols ("wstETH, WBTC and USDC"). */
 function joinSymbols(syms: string[]): string {
@@ -46,6 +48,7 @@ export function AaveV3PositionExplanation({
   externalActivity,
   marketName,
   countNote,
+  lastBorrowRate,
 }: {
   /** The live Pool read. Null until it lands (or when it came back stale):
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
@@ -65,6 +68,9 @@ export function AaveV3PositionExplanation({
   marketName?: string;
   /** Why the timeline lists more events than the count (aaveV3CountSentence). */
   countNote?: AaveV3CountNote | null;
+  /** The rate the Pool logged at the newest borrow of the reserve owed now
+   *  (lib/aave-v3/last-borrow-rate). Omit to skip the rate-move bullet. */
+  lastBorrowRate?: AaveV3LastBorrowRate | null;
 }) {
   const brand = v3Brand(v3Protocol(useV3Pool()));
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
@@ -86,6 +92,7 @@ export function AaveV3PositionExplanation({
   const hf = chain.healthFactor;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
   const liqRead = view ? aaveV3LiquidationRead(view) : null;
+  const same = aaveV3SameAsset(chain);
   const supplyInterestUsd = captions?.supplyInterestUsd ?? null;
   const debtInterestUsd = captions?.debtInterestUsd ?? null;
 
@@ -110,7 +117,7 @@ export function AaveV3PositionExplanation({
   if (supplySyms.length > 0) {
     bullets.push(
       <span key="composition">
-        The collateral totals <H>{fmtUsd(chain.totalCollateralUsd).display}</H> across {supplySyms.length} asset
+        The collateral totals <H>{formatUsd(chain.totalCollateralUsd)}</H> across {supplySyms.length} asset
         {supplySyms.length === 1 ? "" : "s"}
         {supplySyms.length <= 4 ? <> ({joinSymbols(supplySyms)})</> : null}.
       </span>,
@@ -132,7 +139,7 @@ export function AaveV3PositionExplanation({
   } else {
     bullets.push(
       <span key="backs">
-        The borrowing totals <H>{fmtUsd(chain.totalDebtUsd).display}</H>
+        The borrowing totals <H>{formatUsd(chain.totalDebtUsd)}</H>
         {debtSyms.length > 0 ? <> in {joinSymbols(debtSyms)}</> : null}
         {collateralSyms.length > 0 ? <>, collateralised by {joinSymbols(collateralSyms)}</> : null}.
       </span>,
@@ -168,7 +175,9 @@ export function AaveV3PositionExplanation({
         </span>,
       );
     }
-    if (liqRead?.single) {
+    if (same) {
+      bullets.push(<span key="same-asset">{sameAssetSentence(same)}</span>);
+    } else if (liqRead?.single) {
       bullets.push(
         <span key="liq-price">
           Liquidation tracks {liqRead.single.symbol}: the position liquidates at{" "}
@@ -176,7 +185,7 @@ export function AaveV3PositionExplanation({
         </span>,
       );
     }
-    if (dropPct != null) {
+    if (dropPct != null && !same) {
       bullets.push(
         <span key="drop">
           The collateral basket can fall about <H>{dropPct}%</H> before liquidation begins.
@@ -197,6 +206,8 @@ export function AaveV3PositionExplanation({
           {captions.borrowRate.avg ? " average" : ""} borrow rate.
         </span>,
       );
+      const moved = rateMove(chain, captions.borrowRate, lastBorrowRate);
+      if (moved) bullets.push(<span key="rate-move">{moved}</span>);
     }
   }
 
@@ -312,6 +323,88 @@ export function AaveV3PositionExplanation({
   }
 
   return <ProseExplainer paragraph={lead} items={bullets} />;
+}
+
+/** A rate under 0.1% at two significant figures, so it does not read 0.00%. */
+const ratePct = (p: number): string =>
+  p > 0 && p < 0.1
+    ? `${p.toLocaleString("en-US", { maximumSignificantDigits: 2 })}%`
+    : `${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+
+/** The same-asset account's risk sentence (lib/aave-v3/same-asset): no price
+ *  can liquidate it, and the two rates set how fast its health factor moves. */
+function sameAssetSentence(same: NonNullable<ReturnType<typeof aaveV3SameAsset>>): React.ReactNode {
+  const sym = same.symbol;
+  const head = (
+    <>
+      The collateral and the debt are both {sym}, priced by one oracle feed, so a move in {sym}&rsquo;s price changes
+      both sides alike and leaves the health factor where it is. Only interest moves it
+    </>
+  );
+  if (same.supplyApr == null || same.borrowApr == null || same.hfDriftPerYear == null) return <>{head}.</>;
+  const drift = Math.abs(same.hfDriftPerYear) * 100;
+  const rates = (
+    <>
+      : the {sym} supply earns {ratePct(same.supplyApr * 100)} a year and the debt accrues{" "}
+      {ratePct(same.borrowApr * 100)}
+    </>
+  );
+  if (same.hfDriftPerYear >= 0)
+    return (
+      <>
+        {head}
+        {rates}, so the health factor rises by about {ratePct(drift)} a year at today&rsquo;s rates.
+      </>
+    );
+  const years = same.yearsToOne;
+  return (
+    <>
+      {head}
+      {rates}, so the health factor falls by about {ratePct(drift)} a year
+      {years != null ? (
+        <>
+          {" "}
+          and would take about{" "}
+          {years >= 1000
+            ? "more than a thousand years"
+            : years >= 2
+              ? `${Math.round(years).toLocaleString("en-US")} years`
+              : `${Math.max(1, Math.round(years * 12))} month${Math.round(years * 12) === 1 ? "" : "s"}`}{" "}
+          to reach 1 at today&rsquo;s rates
+        </>
+      ) : null}
+      .
+    </>
+  );
+}
+
+/** The borrow rate now against the rate the Pool logged at the newest borrow
+ *  of that reserve, where the two are far apart: the rate follows how much of
+ *  the reserve is on loan, and the read gives that share today. */
+function rateMove(
+  chain: AaveV3PositionChainResponse,
+  now: NonNullable<AaveV3CardCaptions["borrowRate"]>,
+  then: AaveV3LastBorrowRate | null | undefined,
+): React.ReactNode {
+  if (!then || now.avg) return null;
+  const r = chain.reserves.find((x) => x.address.toLowerCase() === then.address && x.debtBalanceRaw !== "0");
+  if (!r) return null;
+  const far = Math.abs(now.pct - then.pct) >= 0.5 && (now.pct > then.pct * 2 || now.pct < then.pct / 2);
+  if (!far) return null;
+  const util = typeof r.utilization === "number" ? r.utilization : null;
+  return (
+    <>
+      The {r.symbol} borrow rate was {ratePct(then.pct)} at the last borrow ({formatDate(then.at)}) and is{" "}
+      {now.pct.toFixed(2)}% now. The rate follows how much of the reserve is on loan
+      {util != null ? (
+        <>
+          : {(util * 100).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% of the{" "}
+          {r.symbol} reserve is on loan now
+        </>
+      ) : null}
+      .
+    </>
+  );
 }
 
 // ── the terminal pane — a closed or liquidated account narrated from the

@@ -214,6 +214,10 @@ export function aaveV3PositionToMarkdown(args: AaveV3PositionMarkdownArgs): stri
       `- **Liquidation price:** ${usd(read.single.liqPrice)} / ${read.single.symbol} ` +
         `(current oracle price ${usd(read.single.price)}${read.dropPct != null ? ` — a ${num(read.dropPct, 1)}% drop reaches liquidation` : ""})`,
     );
+  } else if (read.sameAsset) {
+    lines.push(
+      `- **Liquidation price:** none — collateral and debt are both ${read.sameAsset.symbol}, so its price moves both sides alike; only interest moves the health factor`,
+    );
   } else if (read.dropPct != null) {
     lines.push(
       `- **Liquidation buffer:** collateral can fall ${num(read.dropPct, 1)}% before the health factor reaches 1.0`,

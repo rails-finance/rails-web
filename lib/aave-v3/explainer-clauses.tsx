@@ -55,6 +55,7 @@ import {
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { getProtocolContract } from "@/lib/shared/known-infrastructure";
 import { v3Brand, v3Possessive, v3Protocol, type V3Protocol } from "./protocol-name";
@@ -279,12 +280,21 @@ function healthFactorLine(state: V3StateRead | undefined, withdraw = false): Cla
   // event lifted the account clear): under 1.1 "close to the liquidation
   // line"; from 1.1 to 1.2 the fall that would liquidate it, without "close".
   const coll = state.collateralSymbols?.length === 1 ? state.collateralSymbols[0] : null;
-  const fall = (hf: number) => (
-    <>
-      a fall of about {Math.round((1 - 1 / hf) * 100)}% in{" "}
-      {coll ? <>{coll}&rsquo;s price</> : <>the collateral&rsquo;s value</>} would have made the account liquidatable
-    </>
-  );
+  // One token on both sides after the event: its price cancels out of the
+  // health factor (lib/aave-v3/same-asset), so no price fall is named.
+  const owed = [...new Set((state.left ?? []).filter((l) => l.side === "debt").map((l) => l.symbol))];
+  const sameAsset = coll != null && owed.length === 1 && owed[0] === coll;
+  const fall = (hf: number) =>
+    sameAsset ? (
+      <>
+        {coll} is on both sides, so a move in its price leaves the health factor where it is and only interest moves it
+      </>
+    ) : (
+      <>
+        a fall of about {Math.round((1 - 1 / hf) * 100)}% in{" "}
+        {coll ? <>{coll}&rsquo;s price</> : <>the collateral&rsquo;s value</>} would have made the account liquidatable
+      </>
+    );
   const tail =
     a < CLOSE_LIQUIDATION_HF ? (
       <>, close to the liquidation line at 1{a > 1 ? <>: {fall(a)}</> : null}</>
@@ -1081,10 +1091,21 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
           Received {transferFig} of supplied {sym} from {sender} as an aToken transfer.
         </>
       );
+      const back = returnedTransfer(ctx, opts.previousEvent, opts.timestamp);
       return {
         happened: [clause(happened)],
         meansNow: [
           named ? clause(<>The sender is {named.role}.</>) : null,
+          back
+            ? clause(
+                <>
+                  It comes back from the account this position sent {back.sent} {sym} to on {back.sentOn}. Grown by the
+                  Pool&rsquo;s {sym} supply index over the {back.days} days between (+{back.growthPct}), {back.sent}{" "}
+                  {sym} is {back.grown} {sym}, the amount received (+{back.gain} {sym})
+                  {back.sameScaled ? <>: the same scaled balance came back</> : null}.
+                </>,
+              )
+            : null,
           clause(
             <>
               This is a position move between accounts, not a fresh supply: the aTokens changed hands inside the Pool,
@@ -1163,6 +1184,13 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
               {named ? null : <> The chain does not say whether that account belongs to the same owner.</>}
             </>,
           ),
+          clause(
+            <>
+              An aToken is the Pool&rsquo;s receipt for a supply; sending it hands the supplied {sym}, and the interest
+              it earns from then on, to the receiving account.
+            </>,
+          ),
+          leftAfterTransferLine(ctx, sym),
           switchedOffLine(state, sym),
           healthFactorLine(state),
           priorMoveLine(state),
@@ -1179,6 +1207,92 @@ function aaveV3EventSlotsBase(ctx: AaveV3Context, coords: V3Coords, opts: V3Slot
     default:
       return { happened: [] };
   }
+}
+
+/** A transfer in that returns what this position sent the same account at
+ *  the previous event: the sent amount grown by the reserve's supply index
+ *  between the two rows, against the amount received. Null unless the
+ *  previous row is a transfer out of the same reserve to the same account and
+ *  both rows carry their index. */
+function returnedTransfer(
+  ctx: AaveV3Context,
+  prev: AaveV3TimelineEvent | undefined,
+  timestamp: number | undefined,
+): {
+  sent: string;
+  sentOn: string;
+  days: string;
+  growthPct: string;
+  grown: string;
+  gain: string;
+  sameScaled: boolean;
+} | null {
+  const p = prev?.context.data;
+  if (!p || !prev || p.eventType !== "transfer_out" || timestamp == null) return null;
+  if (!ctx.counterparty || p.counterparty?.toLowerCase() !== ctx.counterparty.toLowerCase()) return null;
+  if (p.reserveSymbol !== ctx.reserveSymbol) return null;
+  const inIdx = ctx.raw?.supplyIndex;
+  const outIdx = p.raw?.supplyIndex;
+  const inAmt = ctx.raw?.amount;
+  const outAmt = p.raw?.amount;
+  if (!inIdx || !outIdx || !inAmt || !outAmt) return null;
+  let grownRaw: bigint, scaledIn: bigint, scaledOut: bigint;
+  try {
+    const i1 = BigInt(outIdx);
+    const i2 = BigInt(inIdx);
+    if (i1 <= BigInt(0) || i2 <= BigInt(0)) return null;
+    grownRaw = (BigInt(outAmt) * i2) / i1;
+    scaledOut = (BigInt(outAmt) * BigInt(10) ** BigInt(27)) / i1;
+    scaledIn = (BigInt(inAmt) * BigInt(10) ** BigInt(27)) / i2;
+  } catch {
+    return null;
+  }
+  const ratio = Number(grownRaw) / Number(BigInt(outAmt));
+  const received = Math.abs(Number(ctx.amount ?? "0"));
+  const sent = Math.abs(Number(p.amount ?? "0"));
+  if (!(sent > 0) || !(received > 0)) return null;
+  const grown = sent * ratio;
+  // The index is the whole story only where it accounts for the received
+  // amount to a millionth of it.
+  if (Math.abs(grown - received) / received > 1e-6) return null;
+  const diff = scaledIn > scaledOut ? scaledIn - scaledOut : scaledOut - scaledIn;
+  const three = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  const days = Math.round((timestamp - prev.timestamp) / 86400);
+  return {
+    sent: three(sent),
+    sentOn: formatDate(prev.timestamp),
+    days: days.toLocaleString("en-US"),
+    growthPct: `${((ratio - 1) * 100).toLocaleString("en-US", { maximumSignificantDigits: 3 })}%`,
+    grown: three(grown),
+    gain: (received - sent).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    // Rounding in the two rayDivs moves the scaled figure by a few units.
+    sameScaled: diff * BigInt(1_000_000_000) <= scaledOut,
+  };
+}
+
+/** What a transfer out left supplied: the balance the row read before it,
+ *  less the amount sent, with the interest it had earned since the previous
+ *  event where the row carries it. */
+function leftAfterTransferLine(ctx: AaveV3Context, sym: string): ClauseInput {
+  const after = Number(ctx.supplyAfter ?? "0");
+  const before = Number(ctx.supplyBefore ?? "0");
+  if (!(after > 0) || !(before > 0) || ctx.balanceBasis !== "chain") return null;
+  const interest = Number(ctx.supplyInterestSincePrevious ?? "0");
+  const exact = (s: string | undefined) =>
+    Math.abs(Number(s ?? "0")).toLocaleString("en-US", { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+  return clause(
+    <>
+      {exact(ctx.supplyAfter)} {sym} stayed supplied here: the transfer sent {exact(ctx.amount)} of the{" "}
+      {exact(ctx.supplyBefore)} {sym} held
+      {interest > 0 ? (
+        <>
+          , a balance that had earned {exact(ctx.supplyInterestSincePrevious)} {sym} of interest since the previous
+          event
+        </>
+      ) : null}
+      .
+    </>,
+  );
 }
 
 /** The write-off (DeficitCreated). The log lands BEFORE the liquidation's own

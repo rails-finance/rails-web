@@ -76,6 +76,13 @@ const LANES = [
   { api: "aave-v3", line: "Health factor", debt: aaveDebt, path: (r) => `/ethereum/aave-v3/${r.wallet}` },
   { api: "spark", line: "Health factor", debt: borrowsDebt, path: (r) => `/ethereum/spark/${r.wallet}` },
 ];
+/** Every supplied and every borrowed reserve on the row is one token. */
+const sameAsset = (r) => {
+  const res = r.reserves ?? [];
+  const s = res.filter((x) => (x.supplyBalanceRaw ?? "0") !== "0").map((x) => x.address?.toLowerCase());
+  const d = res.filter((x) => (x.debtBalanceRaw ?? "0") !== "0").map((x) => x.address?.toLowerCase());
+  return s.length === 1 && d.length === 1 && s[0] === d[0];
+};
 /** Below this the page may say "No debt" instead of drawing a strip. */
 const DEBT_FLOOR = 1;
 
@@ -108,6 +115,9 @@ for (const lane of LANES) {
     continue;
   }
   const row = listing.rows
+    // An Aave-family account with one token on both sides draws no runway:
+    // price cancels out of its health factor (lib/aave-v3/same-asset).
+    .filter((r) => !sameAsset(r))
     .map((r) => ({ r, debt: lane.debt(r) }))
     .filter((x) => x.debt >= DEBT_FLOOR)
     .sort((a, b) => b.debt - a.debt)[0]?.r;
