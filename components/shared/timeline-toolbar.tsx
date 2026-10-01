@@ -14,8 +14,8 @@
 // in the position card's Explanation pane now, not here — see `CopyViewLink`
 // in `provenance-info-tabs.tsx`.
 
-import { useEffect, useRef } from "react";
-import { CalendarRange, Clock, Coins, Layers, Wallet } from "lucide-react";
+import { Fragment, useEffect, useRef } from "react";
+import { CalendarRange, Clock, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
@@ -552,6 +552,166 @@ const monthIdxOfTs = (ts: number): number => {
   return d.getUTCFullYear() * 12 + d.getUTCMonth();
 };
 
+/** The Date button's words for a range: one calendar month reads as that
+ *  month ("Jul 2023"), anything else as its two days ("1 Oct – 31 Oct"). */
+export function dateRangeLabel(range: [number, number]): string {
+  const idx = monthIdxOfTs(range[0]);
+  return range[0] === monthStartOfIdx(idx) && range[1] === monthEndOfIdx(idx)
+    ? `${MONTH_SHORT[idx % 12]} ${Math.floor(idx / 12)}`
+    : `${formatDayMonth(range[0])} – ${formatDayMonth(range[1])}`;
+}
+
+// ── The narrowing row (L2) ──────────────────────────────────────────────────
+//
+// One pill under the toolbar per filter narrowing the list, each with a ×
+// that undoes that filter alone (the dropdown's own reset), beside the cut's
+// chip where a cut stands. Display settings get none: they change how events
+// read. ChainTruthTimeline draws the row (rails-ops detail-page-anatomy §3,
+// "The narrowing row").
+
+/** One filter pill: which axis, its words, and the reset it runs. */
+export interface TimelineFilterPillSpec {
+  axis: "action" | "asset" | "version" | "counterparty" | "date";
+  /** "Only" or "Hiding", then the names; null for the date range. */
+  verb: "Only" | "Hiding" | null;
+  /** The names drawn on the pill: every one up to three, past that the
+   *  first two, with `more` counting the rest. */
+  names: string[];
+  more: number;
+  /** Every name, for the tooltip. */
+  title: string;
+  /** Each name is a token symbol and wears its chip icon. */
+  chips?: boolean;
+  /** The ×'s accessible name. */
+  clearLabel: string;
+  clear: () => void;
+}
+
+/** A menu label as it reads inside a sentence: each capitalised word
+ *  lowercased ("Withdraw Collateral" → "withdraw collateral"), an acronym or
+ *  a symbol left as written ("Set DSR" → "set DSR"). */
+function inSentence(label: string): string {
+  return label.replace(/\b([A-Z])([a-z]+)\b/g, (_, a: string, b: string) => a.toLowerCase() + b);
+}
+
+/** Name the shorter side of one axis: "Only a, b" when fewer are kept than
+ *  hidden, "Hiding a, b" otherwise. Hidden keys the menu does not offer (a
+ *  saved filter from another history) are not named. Null when the axis
+ *  hides nothing it offers. */
+function narrowing(
+  options: FilterOption[],
+  visible: Set<string>,
+  name: (o: FilterOption) => string,
+  /** The axis's plural, for a pill that hides every option ("Hiding all
+   *  assets"). */
+  noun: string,
+): (Pick<TimelineFilterPillSpec, "verb" | "names" | "more" | "title"> & { every: boolean }) | null {
+  const hidden = options.filter((o) => !visible.has(o.key));
+  if (hidden.length === 0) return null;
+  const kept = options.filter((o) => visible.has(o.key));
+  if (kept.length === 0)
+    return { verb: "Hiding", names: [`all ${noun}`], more: 0, title: `Hiding all ${noun}`, every: true };
+  const only = kept.length < hidden.length;
+  const side = (only ? kept : hidden).map(name);
+  const verb = only ? "Only" : "Hiding";
+  const names = side.length > 3 ? side.slice(0, 2) : side;
+  return { verb, names, more: side.length - names.length, title: `${verb} ${side.join(", ")}`, every: false };
+}
+
+/** Every filter pill the toolbar's state calls for, in the toolbar's order. */
+export function timelineFilterPills(tl: TimelineEventsState): TimelineFilterPillSpec[] {
+  const pills: TimelineFilterPillSpec[] = [];
+  const action = narrowing(tl.eventOptions, tl.visibleActionKeys, (o) => inSentence(o.label), "types of event");
+  if (action)
+    pills.push({
+      axis: "action",
+      ...action,
+      clearLabel: "Show every type of event",
+      clear: tl.resetHiddenActions,
+    });
+  const asset = narrowing(tl.assetOptions, tl.visibleAssetKeys, (o) => o.label, "assets");
+  if (asset)
+    pills.push({
+      axis: "asset",
+      ...asset,
+      chips: !asset.every,
+      clearLabel: "Show every asset",
+      clear: tl.resetHiddenAssets,
+    });
+  const version = narrowing(tl.versionOptions, tl.visibleVersionKeys, (o) => o.label, "versions");
+  if (version)
+    pills.push({ axis: "version", ...version, clearLabel: "Show every version", clear: tl.resetHiddenVersions });
+  const counterparty = narrowing(tl.counterpartyOptions, tl.visibleCounterpartyKeys, (o) => o.label, "addresses");
+  if (counterparty)
+    pills.push({
+      axis: "counterparty",
+      ...counterparty,
+      clearLabel: "Show every address",
+      clear: tl.resetHiddenCounterparties,
+    });
+  if (tl.datesAxis && tl.dateRange) {
+    const words = dateRangeLabel(tl.dateRange);
+    pills.push({
+      axis: "date",
+      verb: null,
+      names: [words],
+      more: 0,
+      title: `Events from ${formatDate(tl.dateRange[0])} to ${formatDate(tl.dateRange[1])}`,
+      clearLabel: "Show every date",
+      clear: () => tl.setDateRange(null),
+    });
+  }
+  return pills;
+}
+
+/** The pill's shell, shared with the cut's chip: neutral ground, its words
+ *  first, its × last. */
+export const NARROWING_PILL = "inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800";
+/** The ×: a 44px target on a phone, the pill's own height from `sm`. */
+export const NARROWING_PILL_X =
+  "inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 text-rb-500 transition-colors hover:bg-rb-200/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1 dark:hover:bg-rb-700/60";
+
+const PILL_GLYPH: Record<TimelineFilterPillSpec["axis"], React.ReactNode> = {
+  // The same glyphs as the controls they undo, so a pill points at its menu.
+  action: <ListFilter size={12} aria-hidden />,
+  asset: <Coins size={12} aria-hidden />,
+  version: <Layers size={12} aria-hidden />,
+  counterparty: <Wallet size={12} aria-hidden />,
+  date: <CalendarRange size={12} aria-hidden />,
+};
+
+export function TimelineFilterPill({ pill }: { pill: TimelineFilterPillSpec }) {
+  return (
+    <span className={NARROWING_PILL} data-anatomy="L2.2" data-filter-pill={pill.axis}>
+      <span
+        className="inline-flex min-h-11 items-center gap-1.5 py-1 pl-2.5 pr-1.5 sm:min-h-0"
+        title={pill.title}
+        data-filter-pill-words=""
+      >
+        <span className="text-rb-500">{PILL_GLYPH[pill.axis]}</span>
+        <span className="whitespace-nowrap">
+          {pill.verb && `${pill.verb} `}
+          {pill.names.map((n, i) => (
+            <Fragment key={n}>
+              {i > 0 && ", "}
+              {pill.chips && (
+                <span className="mr-1 inline-flex align-[-2px]">
+                  <TokenChipIcon symbol={n} size={12} filterable={false} />
+                </span>
+              )}
+              {n}
+            </Fragment>
+          ))}
+          {pill.more > 0 && <span className="text-rb-500"> +{pill.more} more</span>}
+        </span>
+      </span>
+      <button type="button" onClick={pill.clear} aria-label={pill.clearLabel} className={NARROWING_PILL_X}>
+        <X className="size-3.5" aria-hidden />
+      </button>
+    </span>
+  );
+}
+
 export function TimelineToolbar({
   tl,
   displayItems,
@@ -580,28 +740,17 @@ export function TimelineToolbar({
   const segmentMonth = monthReach?.month ?? null;
   const filterActive = dateActive || segmentMonth != null;
   const monthLabel = (idx: number) => `${MONTH_SHORT[idx % 12]} ${Math.floor(idx / 12)}`;
-  // A direct filter that IS exactly one calendar month reads as that month
-  // — "Jul 2023" — the same as a segment read does, since the reader picked
-  // the same kind of thing either path. Anything else (a typed or
-  // URL-carried span wider than one month) keeps the short date-to-date
-  // form this button has always shown.
-  const pickedMonthIdx =
-    dateActive &&
-    tl.dateRange![0] === monthStartOfIdx(monthIdxOfTs(tl.dateRange![0])) &&
-    tl.dateRange![1] === monthEndOfIdx(monthIdxOfTs(tl.dateRange![0]))
-      ? monthIdxOfTs(tl.dateRange![0])
-      : null;
   // On a phone the panel is a live sheet rather than a dropdown — the same
   // register as the filter menus beside it.
   const isPhone = useMediaQuery(PHONE_QUERY);
-  const dateLabel =
-    pickedMonthIdx != null
-      ? monthLabel(pickedMonthIdx)
-      : segmentMonth != null
-        ? monthLabel(segmentMonth)
-        : dateActive
-          ? `${formatDayMonth(tl.dateRange![0])} – ${formatDayMonth(tl.dateRange![1])}`
-          : "Dates";
+  // A direct filter that IS one calendar month reads as that month — "Jul
+  // 2023" — the same as a segment read does, since the reader picked the same
+  // kind of thing either path (`dateRangeLabel`).
+  const dateLabel = dateActive
+    ? dateRangeLabel(tl.dateRange!)
+    : segmentMonth != null
+      ? monthLabel(segmentMonth)
+      : "Dates";
   const baseCountLine = eventCountLine(tl);
   const countLine =
     countDetail && !tl.isFiltered && tl.historyWindow.state === "whole" && tl.olderCount === 0

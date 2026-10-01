@@ -92,6 +92,10 @@ import {
   CHAIN_TRUTH_DISPLAY_ITEMS,
   COLLAPSE_RUNS_ITEM,
   MARKET_NOTE_ITEMS,
+  NARROWING_PILL,
+  NARROWING_PILL_X,
+  TimelineFilterPill,
+  timelineFilterPills,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
 import { LiveNoteGroupRow, MarketNoteRow } from "@/components/shared/market-note-row";
@@ -1164,8 +1168,9 @@ function ChainTruthTimelineBody({
   // the list's top event (the cut day's last, or the last before it) into
   // view and flashes its header; the card stays open or closed as the
   // visitor left it. Where the page holds another month (a served,
-  // month-navigated page) it reads the cut's month; where a filter would
-  // leave the cut list empty the filters clear; a line says either. These
+  // month-navigated page) it reads the cut's month, and a line says so;
+  // where a filter leaves the cut list empty the filters stay and the empty
+  // list says it (Miles, 1 Oct 2026). These
   // pages have no Dates (`tl.datesAxis`): the cut is how they are navigated
   // by day, and the address bar carries it (`useRewindParam`).
   const focusStore = useFlowFocus()?.store ?? null;
@@ -1179,6 +1184,17 @@ function ChainTruthTimelineBody({
   const releaseRewind = useCallback(() => {
     if (focusStore?.get().rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
+  // A pill per filter narrowing the list (the narrowing row, L2).
+  const filterPills = timelineFilterPills(tl);
+  /** "Clear all": every filter reset and the cut released. */
+  const clearAllNarrowing = () => {
+    tl.resetHiddenActions();
+    tl.resetHiddenAssets();
+    tl.resetHiddenVersions();
+    tl.resetHiddenCounterparties();
+    if (tl.dateRange) tl.setDateRange(null);
+    releaseRewind();
+  };
   /** The last "go" not yet answered by a card brought into view: a cut whose
    *  month is still loading scrolls once its rows land. */
   const pendingGo = useRef(0);
@@ -1223,7 +1239,7 @@ function ChainTruthTimelineBody({
     },
     [rows, cut],
   );
-  // The rewind moved: its month read, its filters cleared, its top opened.
+  // The rewind moved: its month read, its top opened.
   const rewindKey = rewind ? `${rewind.endTs}` : null;
   const topKey = rows[0]
     ? rows[0].kind === "event"
@@ -1265,14 +1281,10 @@ function ChainTruthTimelineBody({
         setRewindNote(`The timeline now shows the month of ${words}.`);
         return;
       }
-      if (rows.length === 0 && tl.isFiltered && tl.sortedEvents.some((e) => e.timestamp <= cut)) {
-        tl.resetHiddenActions();
-        tl.resetHiddenAssets();
-        tl.resetHiddenCounterparties();
-        tl.resetHiddenVersions();
-        setRewindNote(`The filters are cleared so the timeline to ${words} shows.`);
-        return;
-      }
+      // A filter that leaves the cut list empty stands: the list says so in
+      // one line and the pills undo it. The top waits, its watch or scroll
+      // still armed, for the row a pill's × brings back.
+      if (rows.length === 0 && tl.isFiltered) return;
     }
     // Draw from the top, where the cut list starts.
     setWindowSize(WINDOW_CHUNK);
@@ -1818,34 +1830,49 @@ function ChainTruthTimelineBody({
             }
           />
         </div>
-        {rewind && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span
-              className="inline-flex items-center rounded-full bg-rb-100 text-xs text-foreground dark:bg-rb-800"
-              data-flow-rewind-chip=""
-              data-anatomy="L2"
-            >
+        {/* THE NARROWING ROW (L2): everything narrowing the list, one pill
+            each — the cut's chip, then a pill per filter — and "Clear all"
+            once two stand. No narrowing, no row. */}
+        {(rewind || filterPills.length > 0) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-anatomy="L2" data-narrowing-row="">
+            {rewind && (
+              <span className={NARROWING_PILL} data-flow-rewind-chip="" data-anatomy="L2.1">
+                <button
+                  type="button"
+                  onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
+                  title={`Bring the last event of ${rewind.word} into view`}
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-l-full py-1 pl-2.5 pr-1.5 text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 dark:text-blue-300"
+                  data-flow-rewind-go=""
+                >
+                  <List size={13} aria-hidden />
+                  Timeline to {rewind.word}
+                </button>
+                <button
+                  type="button"
+                  onClick={releaseRewind}
+                  aria-label={`Clear the cut at ${rewind.word}`}
+                  className={NARROWING_PILL_X}
+                  data-flow-rewind-release=""
+                >
+                  <X className="size-3.5" aria-hidden />
+                </button>
+              </span>
+            )}
+            {filterPills.map((pill) => (
+              <TimelineFilterPill key={pill.axis} pill={pill} />
+            ))}
+            {(rewind ? 1 : 0) + filterPills.length >= 2 && (
               <button
                 type="button"
-                onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
-                title={`Bring the last event of ${rewind.word} into view`}
-                className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-l-full py-1 pl-2.5 pr-1.5 text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 dark:text-blue-300"
-                data-flow-rewind-go=""
+                onClick={clearAllNarrowing}
+                className="inline-flex min-h-11 cursor-pointer items-center px-1.5 text-xs text-rb-500 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
+                data-anatomy="L2.3"
+                data-narrowing-clear=""
               >
-                <List size={13} aria-hidden />
-                Timeline to {rewind.word}
+                Clear all
               </button>
-              <button
-                type="button"
-                onClick={releaseRewind}
-                aria-label={`Clear the cut at ${rewind.word}`}
-                className="inline-flex min-h-11 min-w-9 cursor-pointer items-center justify-center rounded-r-full pl-0.5 pr-1.5 text-rb-500 transition-colors hover:bg-rb-200/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 sm:min-h-0 sm:min-w-0 sm:py-1 dark:hover:bg-rb-700/60"
-                data-flow-rewind-release=""
-              >
-                <X className="size-3.5" aria-hidden />
-              </button>
-            </span>
-            {rewindNote && (
+            )}
+            {rewind && rewindNote && (
               <p className="text-xs text-rb-500" data-flow-reveal-note="">
                 {rewindNote}
               </p>
@@ -2165,7 +2192,11 @@ function ChainTruthTimelineBody({
                   </div>
                 )}
                 <div className="py-8 text-center text-sm text-rb-500">
-                  {tl.isFiltered ? "All events filtered out — adjust the filters above to show some." : emptyLabel}
+                  {tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
+                    ? `Nothing to ${rewind!.word} matches these filters.`
+                    : tl.isFiltered
+                      ? "All events filtered out — adjust the filters above to show some."
+                      : emptyLabel}
                 </div>
               </>
             )}
