@@ -1,13 +1,13 @@
 "use client";
 
-// One (market, wallet) position on Morpho Blue Base — card, economics tower and
+// One (market, wallet) position on Morpho Blue Base — card, Lifetime flows and
 // whole-life timeline, stacked the way the Ethereum position page stacks them.
 //
 // The Ethereum explorer's detail page IS one of these: a position is a
 // (market, wallet) pair, and that page renders exactly one. So does the Base
 // position page (/base/morpho/<wallet>/<market>), which renders this section
 // for the one market its route names, fed by the wallet's sweep instead of an
-// index; the wallet page above it lists the cards and links here. The cards, the tower arithmetic and
+// index; the wallet page above it lists the cards and links here. The cards, the flows replay and
 // the timeline body are the Ethereum ones, imported rather than reimplemented.
 //
 // Two lanes meet in the card. The REPLAY (the sweep) knows the history —
@@ -28,7 +28,6 @@ import {
 import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -41,10 +40,7 @@ import type { MorphoChainTimelineResponse } from "@/lib/api/fetch-morpho-base-ti
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
 import type { MorphoSweptPosition } from "@/lib/api/fetch-morpho-base-timeline";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
-import { computeMorphoEconomics } from "@/lib/morpho/economics";
-import { morphoEconomicsExplanation, morphoEconomicsContent } from "@/lib/morpho/economics-explanation";
 import { morphoViewFromSweep } from "@/lib/morpho/swept-position-view";
-import { MORPHO_BASE_TOWER_VOCABULARY } from "@/lib/morpho-base/position-provenance";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { isMorphoEvent } from "@/lib/shared/types/event-shape";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
@@ -82,7 +78,7 @@ export interface MorphoBasePositionSectionProps {
    *  each position's own list with that position's cap and undated counts. */
   coverage: ChainTimelineCoverage;
   /** True when the sweep read every block from the singleton's first — the
-   *  only case the shared card and the tower's "all time" are entitled to. */
+   *  only case the shared card and the Lifetime flows panel are entitled to. */
   sweptClean: boolean;
   /** Set when `wallet` is a catalogued MetaMorpho vault (the census — a
    *  floor, not a ceiling; lib/morpho-base/vault-catalog.ts) — its name and
@@ -111,9 +107,9 @@ export function MorphoBasePositionSection({
     () => (grouped?.grouped && grouped.rowPlan ? interleaveRowPlan(grouped.rowPlan, events) : undefined),
     [grouped, events],
   );
-  /** The folders, whole and unfiltered. The tower, the card's counts and the
-   *  peaks need nothing from them: the route replayed every row before it
-   *  grouped, and those figures ride the replay. */
+  /** The folders, whole and unfiltered. The card's counts and the peaks need
+   *  nothing from them: the route replayed every row before it grouped, and
+   *  those figures ride the replay. The Lifetime flows panel opens them. */
   const servedFolders = useMemo(
     () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
     [servedRows],
@@ -140,11 +136,11 @@ export function MorphoBasePositionSection({
     () => replaySegmentReads(TIMELINE_ROUTE, wallet, { market: pos.marketId }),
     [wallet, pos.marketId],
   );
-  // The Lifetime flows panel (lib/morpho/flows.ts). Lenders first: a
-  // borrower's position keeps the tower until its panel lands.
+  // The Lifetime flows panel (lib/morpho/flows.ts), drawn under the rule the
+  // card follows: only a sweep that read every block.
   const borrowerSide =
     pos.peakCollateral > 0 || pos.peakBorrowed > 0 || pos.lifetime.deposited > 0 || pos.lifetime.borrowed > 0;
-  const flowsOn = sweptClean && !borrowerSide;
+  const flowsOn = sweptClean;
   const live = chain && !chain.chainStale ? chain : null;
   // The whole history: the drawn rows where they are all of it; a grouped
   // answer's folders opened (the export's read); a position cut below its
@@ -227,27 +223,6 @@ export function MorphoBasePositionSection({
     [events, servedFolders],
   );
 
-  // The tower is borrower-scoped, as on Ethereum: collateral against debt. A
-  // market the wallet only ever LENT in has neither, and an empty tower would
-  // assert a borrowable axis the position never used.
-  const towerData = useMemo(
-    () =>
-      borrowerSide
-        ? computeMorphoEconomics(view, undefined, MORPHO_BASE_TOWER_VOCABULARY, {
-            deposited: pos.lifetime.deposited,
-            collateralWithdrawn: pos.lifetime.collateralWithdrawn,
-            collateralLiquidated: pos.lifetime.collateralLiquidated,
-            borrowed: pos.lifetime.borrowed,
-            repaid: pos.lifetime.repaid,
-            // Set where every row carried the market's totals (the index):
-            // T3 then states the interest the debt accrued over its life.
-            interest: pos.lifetime.interest,
-            lastDebtAfter: pos.lifetime.lastDebtAfter,
-          })
-        : null,
-    [borrowerSide, view, pos.lifetime],
-  );
-
   // This position's own statement: the wallet-wide sweep facts, with the cap
   // and the undated count that apply to THIS list rather than to the wallet.
   const ownCoverage = useMemo<ChainTimelineCoverage>(
@@ -325,7 +300,8 @@ export function MorphoBasePositionSection({
         )}
 
         {/* Lifetime flows: the bars and the line over the position's replay
-          (lib/morpho/flows.ts), in the loan token (TO-DO-ui-jobs 206). */}
+          (lib/morpho/flows.ts), in the loan token, in place of the tower
+            (TO-DO-ui-jobs 206). */}
         {flowsOn && (
           <LifetimeFlowsPanel
             scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
@@ -341,18 +317,6 @@ export function MorphoBasePositionSection({
               </div>
             }
             learnMore={morphoFlowsContent("Morpho Blue on Base")}
-          />
-        )}
-
-        {sweptClean && towerData && (
-          <ChainTruthTower
-            data={towerData}
-            explanation={morphoEconomicsExplanation(towerData, {
-              onBase: true,
-              lltv: view.lltv,
-              badDebt: view.badDebt,
-            })}
-            learnMore={morphoEconomicsContent({ onBase: true })}
           />
         )}
 

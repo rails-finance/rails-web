@@ -89,11 +89,11 @@ export function morphoFlowBuckets(roles: MorphoRoles): FlowBucket[] {
   const out: FlowBucket[] = [];
   if (roles.borrower)
     out.push(
-      { key: MO.collIn, label: "Collateral deposited", event: "Supply collateral", side: "collateral", dir: "in" },
+      { key: MO.collIn, label: "Collateral deposited", event: "Deposit", side: "collateral", dir: "in" },
       {
         key: MO.collOut,
         label: "Collateral withdrawn",
-        event: "Withdraw collateral",
+        event: "Withdraw",
         side: "collateral",
         dir: "out",
       },
@@ -157,7 +157,7 @@ export function morphoFlowBuckets(roles: MorphoRoles): FlowBucket[] {
       {
         key: MO.badDebt,
         label: "Bad debt written off",
-        event: "Liquidation",
+        event: "Debt written off",
         side: "debt",
         dir: "out",
         tone: "liquidation",
