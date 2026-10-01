@@ -14,7 +14,7 @@
 //
 // Pure, tested offline (scripts/verify/verify-lifetime-flows-state.ts).
 
-import type { FlowSegment, FlowSideState } from "@/lib/shared/flows-timeline";
+import type { FlowSegment, FlowSideState, FlowUnit } from "@/lib/shared/flows-timeline";
 
 export type SumSign = "" | "+" | "−";
 
@@ -38,19 +38,25 @@ export interface SideSumRows {
 }
 
 /** "$79,412": whole dollars with thousands separators, unsigned. */
-export function wholeUsd(v: number): string {
+export function wholeUsd(v: number, unit?: FlowUnit): string {
+  if (unit) {
+    const x = Math.abs(Math.round(v)) / 10 ** unit.scale;
+    const d = unit.scale;
+    return `${x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })} ${unit.symbol}`;
+  }
   return `$${Math.abs(Math.round(v)).toLocaleString("en-US")}`;
 }
 
 /** Whole dollars, with a positive figure under half a dollar as "<$1": the
  *  whole-dollar rule (flows-ledger's interest lines), where "$0" would read as
  *  none. */
-export function wholeUsdOrUnder(v: number): string {
-  return v > 0 && v < 0.5 ? "<$1" : wholeUsd(v);
+export function wholeUsdOrUnder(v: number, unit?: FlowUnit): string {
+  if (v > 0 && v < 0.5) return unit ? `<${wholeUsd(1, unit)}` : "<$1";
+  return wholeUsd(v, unit);
 }
 
 /** The side's sum at a stop, as the panel prints it. */
-export function sideSumRows(st: FlowSideState): SideSumRows {
+export function sideSumRows(st: FlowSideState, unit?: FlowUnit): SideSumRows {
   const held = st.bar.find((s) => s.fill === "held") as FlowSegment;
   const totalDollars = Math.round(st.now);
   const raw: Omit<SumLine, "sign" | "amount">[] = [];
@@ -85,9 +91,9 @@ export function sideSumRows(st: FlowSideState): SideSumRows {
   const lines = shown.map((l, i) => ({
     ...l,
     sign: (i === 0 && l.dollars > 0 ? "" : l.dollars < 0 ? "−" : "+") as SumSign,
-    amount: wholeUsd(l.dollars),
+    amount: wholeUsd(l.dollars, unit),
   }));
-  return { lines, total: { dollars: totalDollars, amount: wholeUsd(totalDollars), seg: held } };
+  return { lines, total: { dollars: totalDollars, amount: wholeUsd(totalDollars, unit), seg: held } };
 }
 
 /** The line under a side's sum that says how it is valued and what its

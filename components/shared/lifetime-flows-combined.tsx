@@ -36,6 +36,7 @@ import {
   axisFor,
   DAY_MS,
   dayStart,
+  formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
   type FlowModel,
@@ -686,6 +687,8 @@ function LineStrip({
   // its length in days.
   const today = series?.today ?? startDay + model.liveStop;
   const span = axisSpanDays(startDay, today);
+  // A token axis (Morpho) labels its values without the symbol.
+  const axisLabel = (t: number) => (model.unit ? formatFlowToken(t, model.unit, false) : formatFlowUsd(t));
   const inner = Math.max(0, w - PAD * 2);
   // The lead-in also holds the value labels, so it is never narrower than
   // the widest of them (about 6px a character at 10px, and some air).
@@ -695,8 +698,8 @@ function LineStrip({
   // cents) is left out.
   const yTicks = axis.ticks
     .filter((_, i) => i % every === 0)
-    .filter((t, i, a) => i === 0 || formatFlowUsd(t) !== formatFlowUsd(a[i - 1]));
-  const labelW = Math.max(0, ...yTicks.map((t) => formatFlowUsd(t).length)) * 6 + 8;
+    .filter((t, i, a) => i === 0 || axisLabel(t) !== axisLabel(a[i - 1]));
+  const labelW = Math.max(0, ...yTicks.map((t) => axisLabel(t).length)) * 6 + 8;
   const lead = Math.max(LEAD_MIN_PX, labelW, Math.round(inner * LEAD_SHARE));
   const x0 = PAD + Math.min(lead, inner);
   const run = Math.max(0, PAD + inner - x0);
@@ -1050,7 +1053,7 @@ function LineStrip({
                     className="pointer-events-none absolute text-[10px] leading-none tabular-nums text-rb-500"
                     style={{ left: PAD + 1, ...(ty < 14 ? { top: ty + 2 } : { top: ty - 11 }) }}
                   >
-                    {formatFlowUsd(t)}
+                    {axisLabel(t)}
                   </span>
                 );
               })}

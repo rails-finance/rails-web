@@ -21,6 +21,7 @@ import {
   SegmentTipBody,
   SegmentPanelBody,
   sumSwatch,
+  useFlowUnit,
 } from "@/components/shared/lifetime-flows-tip";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
@@ -30,6 +31,7 @@ import {
   axisFor,
   axisLabelOnPhone,
   dayStart,
+  formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
   spokenUsd,
@@ -242,9 +244,10 @@ const throughputProv = (what: string, figure: string): Provenance => ({
 });
 
 export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt: boolean }) {
+  const u = useFlowUnit();
   const fig = (v: number, what: string) => (
-    <Prov info={throughputProv(what, formatFlowUsd(v))}>
-      <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v)}</span>
+    <Prov info={throughputProv(what, formatFlowUsd(v, u))}>
+      <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v, u)}</span>
     </Prov>
   );
   return (
@@ -266,6 +269,7 @@ export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; h
 /** The shared axis's labels, once, under the last bar, in both bar views;
  *  a phone thins them (`axisLabelOnPhone`). */
 export function AxisLabels({ ticks, max }: { ticks: number[]; max: number }) {
+  const unit = useFlowUnit();
   return (
     <div
       className="relative mt-1 h-4 text-[11px] tabular-nums text-rb-500"
@@ -284,7 +288,7 @@ export function AxisLabels({ ticks, max }: { ticks: number[]; max: number }) {
               transform: at === 0 ? "none" : at > 0.9 ? "translateX(-100%)" : "translateX(-50%)",
             }}
           >
-            {formatFlowUsd(t)}
+            {unit ? formatFlowToken(t, unit, false) : formatFlowUsd(t)}
           </span>
         );
       })}
@@ -312,7 +316,7 @@ export function Headline({
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <Prov info={flowSegmentProv(st.bar[0], side, when, isLive, model.daily)}>
-        <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now)}</span>
+        <span className="text-xl font-semibold tabular-nums text-foreground">{formatFlowUsd(st.now, model.unit)}</span>
       </Prov>
       {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
       <span className="text-xs text-rb-500">{word}</span>
@@ -382,7 +386,7 @@ export function Rescaled({
             <div className="relative h-10 sm:h-11">
               <div
                 role="img"
-                aria-label={`${word}: ${spokenUsd(st.now)}.`}
+                aria-label={`${word}: ${spokenUsd(st.now, model.unit)}.`}
                 className="absolute inset-0 overflow-hidden rounded-md bg-sunken"
               >
                 {axis.ticks.slice(1).map((t) => (
@@ -405,8 +409,8 @@ export function Rescaled({
                 className={`absolute inset-0 block cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!tip && open?.side === side ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 aria-label={
                   tip
-                    ? `${st.bar[0].label}: ${spokenUsd(st.now)}`
-                    : `${word}: ${spokenUsd(st.now)}. Open how its flows add up.`
+                    ? `${st.bar[0].label}: ${spokenUsd(st.now, model.unit)}`
+                    : `${word}: ${spokenUsd(st.now, model.unit)}. Open how its flows add up.`
                 }
                 aria-expanded={open?.side === side}
                 aria-haspopup="dialog"
@@ -415,7 +419,7 @@ export function Rescaled({
               />
               {open?.side === side && (
                 <FlowPanelShell
-                  label={`${word}: ${spokenUsd(st.now)}`}
+                  label={`${word}: ${spokenUsd(st.now, model.unit)}`}
                   anchor={() => document.querySelector<HTMLElement>(`[data-flow-seg="${side}-busy"]`)}
                   onClose={() => setOpen(null)}
                   focusOnOpen={open.keyboard}

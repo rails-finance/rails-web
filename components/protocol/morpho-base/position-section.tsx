@@ -17,7 +17,7 @@
 // borrow-shares slot equals the replayed one exactly, which is the proof the
 // sweep read every row; otherwise the interest split is gated with its reason.
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
@@ -57,6 +57,14 @@ import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-valu
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
 import { marketLabel } from "@/lib/morpho/asset-catalog";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
+import { useMorphoFlows } from "@/hooks/useMorphoFlows";
+import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
+import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
+import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
 /** The contract the sweep read, for the footer's "from its first block" claim. */
 const SOURCE_LABEL = "the Morpho Blue singleton on Base";
@@ -132,6 +140,55 @@ export function MorphoBasePositionSection({
     () => replaySegmentReads(TIMELINE_ROUTE, wallet, { market: pos.marketId }),
     [wallet, pos.marketId],
   );
+  // The Lifetime flows panel (lib/morpho/flows.ts). Lenders first: a
+  // borrower's position keeps the tower until its panel lands.
+  const borrowerSide =
+    pos.peakCollateral > 0 || pos.peakBorrowed > 0 || pos.lifetime.deposited > 0 || pos.lifetime.borrowed > 0;
+  const flowsOn = sweptClean && !borrowerSide;
+  const live = chain && !chain.chainStale ? chain : null;
+  // The whole history: the drawn rows where they are all of it; a grouped
+  // answer's folders opened (the export's read); a position cut below its
+  // newest rows has no read here, and the panel says it was not read.
+  const whole = !servedFolders?.length && !pos.omitted?.count;
+  const fetchAll = useCallback(async () => {
+    const all: BaseActivityEvent[] = [...events];
+    for (const f of servedFolders ?? []) {
+      const opened = await fetchTimelineFolderMembers({
+        path: FOLDER_ROUTE,
+        params: { wallet, market: pos.marketId },
+        folder: f.responseId,
+      });
+      all.push(...opened.events);
+    }
+    all.sort((a, b) => a.blockNumber - b.blockNumber);
+    return { events: all, missing: 0 };
+  }, [events, servedFolders, wallet, pos.marketId]);
+  const flowLive = useMemo(
+    () =>
+      live
+        ? {
+            price: live.oraclePrice > 0 ? live.oraclePrice : null,
+            coll: live.collateral,
+            debt: live.currentDebt,
+            supply: live.currentSupply,
+            borrowApr: live.borrowApr,
+            supplyApr: live.supplyApr,
+          }
+        : null,
+    [live],
+  );
+  const flows = useMorphoFlows({
+    wholeEvents: flowsOn && whole ? events : null,
+    fetchAll: flowsOn && !pos.omitted?.count ? fetchAll : null,
+    marketId: pos.marketId,
+    chainId: MORPHO_BASE_CHAIN_ID,
+    loanSymbol: flowsOn && !pos.loanDecimalsUnread ? pos.loanSymbol : null,
+    collSymbol: pos.collateralDecimalsUnread ? null : pos.collateralSymbol,
+    lltv: pos.lltv,
+    open: morphoViewFromSweep(pos, wallet, chain).status === "open",
+    live: flowLive,
+  });
+
   const { tl, segments, readFolderMembers } = useTimelineSegment({
     events,
     groupedTail,
@@ -151,6 +208,8 @@ export function MorphoBasePositionSection({
     folderParams: { wallet, market: pos.marketId },
     storageKey: `morpho-base-${pos.marketId}-${wallet}`,
     protocolKey: "morpho",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: !flowsOn,
   });
 
   const view = useMemo(() => morphoViewFromSweep(pos, wallet, chain), [pos, wallet, chain]);
@@ -171,8 +230,6 @@ export function MorphoBasePositionSection({
   // The tower is borrower-scoped, as on Ethereum: collateral against debt. A
   // market the wallet only ever LENT in has neither, and an empty tower would
   // assert a borrowable axis the position never used.
-  const borrowerSide =
-    pos.peakCollateral > 0 || pos.peakBorrowed > 0 || pos.lifetime.deposited > 0 || pos.lifetime.borrowed > 0;
   const towerData = useMemo(
     () =>
       borrowerSide
@@ -203,117 +260,146 @@ export function MorphoBasePositionSection({
     [coverage, pos.firstEventAt, pos.omitted, pos.undated],
   );
 
-  const live = chain && !chain.chainStale ? chain : null;
-
   return (
-    <section className="space-y-6">
-      {/* A market the wallet only ever LENT in gets the slot card (open) or a
+    <FlowFocusContext.Provider value={flowsOn ? flows.focus : null}>
+      <section className="space-y-6">
+        {/* A market the wallet only ever LENT in gets the slot card (open) or a
           plain closing statement (closed), not the shared card: that card's
           grammar is a borrower's — collateral against debt, peaks of each —
           and would read "nothing ever borrowed against its collateral" over a
           position that never had collateral. */}
-      {sweptClean &&
-        !borrowerSide &&
-        (live ? (
-          <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} />
-        ) : (
-          <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} />
-        ))}
-      {sweptClean && borrowerSide && (
-        <MorphoPositionCard
-          v={{ ...view, vaultOwner }}
-          receipts
-          viewHref={tl.viewHref}
-          session="morpho-base"
-          rowExtra={
-            view.status === "open" && live && live.healthFactor != null && live.healthFactor > 0 ? (
-              <MorphoRiskSlot chain={live} />
-            ) : undefined
-          }
-          explanation={
-            view.status !== "open" ? (
-              <MorphoClosedPositionExplanation
-                v={view}
-                events={events}
-                folders={servedFolders}
-                // The counts are stated only where the rows and folders drawn are the whole history.
-                {...(events.length + (servedFolders ?? []).reduce((n, f) => n + f.count, 0) === view.eventCount
-                  ? {
-                      eventCount: view.eventCount,
-                      liquidationCount:
-                        events.filter((e) => e.context.data.eventType === "liquidation").length +
-                        (servedFolders ?? []).reduce(
-                          (n, f) => n + (f.counts.find((c) => c.key === "liquidation")?.count ?? 0),
-                          0,
-                        ),
-                    }
-                  : {})}
-              />
-            ) : live ? (
-              <MorphoPositionExplanation
-                chain={live}
-                txCount={view.txCount}
-                // The counts are stated only where the drawn rows are the whole history.
-                {...(events.length === view.eventCount && !servedFolders?.length
-                  ? {
-                      eventCount: view.eventCount,
-                      liquidationCount: events.filter((e) => e.context.data.eventType === "liquidation").length,
-                    }
-                  : {})}
-                everLiquidated={view.everLiquidated}
-                externalActivity={externalActivity}
-              />
-            ) : undefined
-          }
-        />
-      )}
-
-      {sweptClean && towerData && (
-        <ChainTruthTower
-          data={towerData}
-          explanation={morphoEconomicsExplanation(towerData, { onBase: true, lltv: view.lltv, badDebt: view.badDebt })}
-          learnMore={morphoEconomicsContent({ onBase: true })}
-        />
-      )}
-
-      <ChainTruthTimeline
-        tl={tl}
-        // Both grouping paths: the spec groups a flat answer in the browser,
-        // the register draws the folders the route served.
-        runs={MORPHO_LIQUIDATION_RUNS}
-        folderRegister={MORPHO_FOLDER_REGISTER}
-        readFolderMembers={readFolderMembers}
-        segments={segments}
-        persistKeyPrefix="morpho"
-        closed={view.status !== "open"}
-        toolbarLeading={
-          <TimelineActivityHeader
-            events={events}
-            folders={servedFolders}
-            closed={view.status !== "open"}
-            firstAt={pos.firstEventAt}
+        {sweptClean &&
+          !borrowerSide &&
+          (live ? (
+            <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} />
+          ) : (
+            <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} />
+          ))}
+        {sweptClean && borrowerSide && (
+          <MorphoPositionCard
+            v={{ ...view, vaultOwner }}
+            receipts
+            viewHref={tl.viewHref}
+            session="morpho-base"
+            rowExtra={
+              view.status === "open" && live && live.healthFactor != null && live.healthFactor > 0 ? (
+                <MorphoRiskSlot chain={live} />
+              ) : undefined
+            }
+            explanation={
+              view.status !== "open" ? (
+                <MorphoClosedPositionExplanation
+                  v={view}
+                  events={events}
+                  folders={servedFolders}
+                  // The counts are stated only where the rows and folders drawn are the whole history.
+                  {...(events.length + (servedFolders ?? []).reduce((n, f) => n + f.count, 0) === view.eventCount
+                    ? {
+                        eventCount: view.eventCount,
+                        liquidationCount:
+                          events.filter((e) => e.context.data.eventType === "liquidation").length +
+                          (servedFolders ?? []).reduce(
+                            (n, f) => n + (f.counts.find((c) => c.key === "liquidation")?.count ?? 0),
+                            0,
+                          ),
+                      }
+                    : {})}
+                />
+              ) : live ? (
+                <MorphoPositionExplanation
+                  chain={live}
+                  txCount={view.txCount}
+                  // The counts are stated only where the drawn rows are the whole history.
+                  {...(events.length === view.eventCount && !servedFolders?.length
+                    ? {
+                        eventCount: view.eventCount,
+                        liquidationCount: events.filter((e) => e.context.data.eventType === "liquidation").length,
+                      }
+                    : {})}
+                  everLiquidated={view.everLiquidated}
+                  externalActivity={externalActivity}
+                />
+              ) : undefined
+            }
           />
-        }
-        emptyLabel={
-          sweptClean
-            ? "No events to show for this market."
-            : "No events to show — the sweep could not read this wallet's history."
-        }
-        footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={SOURCE_LABEL} />}
-        // On a grouped answer the list covers `eventsServed`; a month read
-        // holds no card, the grid holding the other months.
-        boundary={
-          tl.historyWindow.state === "span"
-            ? null
-            : boundaryFromChainCoverage(ownCoverage, groupedTail ? groupedTail.eventsServed : events.length)
-        }
-        renderCard={(event, meta) =>
-          isMorphoEvent(event) ? (
-            <MorphoEventCard event={event} eventNumber={meta.eventNumber} isFirst={meta.isFirst} isLast={meta.isLast} />
-          ) : null
-        }
-      />
-    </section>
+        )}
+
+        {/* Lifetime flows: the bars and the line over the position's replay
+          (lib/morpho/flows.ts), in the loan token (TO-DO-ui-jobs 206). */}
+        {flowsOn && (
+          <LifetimeFlowsPanel
+            scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+            read={flows.read}
+            explanation={
+              <div className="space-y-2 text-sm text-rb-500">
+                <MorphoFlowsNote
+                  facts={flows.facts}
+                  loanSymbol={pos.loanSymbol}
+                  collSymbol={pos.collateralSymbol}
+                  name="Morpho Blue on Base"
+                />
+              </div>
+            }
+            learnMore={morphoFlowsContent("Morpho Blue on Base")}
+          />
+        )}
+
+        {sweptClean && towerData && (
+          <ChainTruthTower
+            data={towerData}
+            explanation={morphoEconomicsExplanation(towerData, {
+              onBase: true,
+              lltv: view.lltv,
+              badDebt: view.badDebt,
+            })}
+            learnMore={morphoEconomicsContent({ onBase: true })}
+          />
+        )}
+
+        <ChainTruthTimeline
+          tl={tl}
+          // Both grouping paths: the spec groups a flat answer in the browser,
+          // the register draws the folders the route served.
+          runs={MORPHO_LIQUIDATION_RUNS}
+          folderRegister={MORPHO_FOLDER_REGISTER}
+          readFolderMembers={readFolderMembers}
+          segments={segments}
+          persistKeyPrefix="morpho"
+          closed={view.status !== "open"}
+          toolbarLeading={
+            <TimelineActivityHeader
+              events={events}
+              folders={servedFolders}
+              closed={view.status !== "open"}
+              firstAt={pos.firstEventAt}
+            />
+          }
+          emptyLabel={
+            sweptClean
+              ? "No events to show for this market."
+              : "No events to show — the sweep could not read this wallet's history."
+          }
+          footer={<TimelineCoverageFooter coverage={ownCoverage} sourceLabel={SOURCE_LABEL} />}
+          // On a grouped answer the list covers `eventsServed`; a month read
+          // holds no card, the grid holding the other months.
+          boundary={
+            tl.historyWindow.state === "span"
+              ? null
+              : boundaryFromChainCoverage(ownCoverage, groupedTail ? groupedTail.eventsServed : events.length)
+          }
+          renderCard={(event, meta) =>
+            isMorphoEvent(event) ? (
+              <MorphoEventCard
+                event={event}
+                eventNumber={meta.eventNumber}
+                isFirst={meta.isFirst}
+                isLast={meta.isLast}
+              />
+            ) : null
+          }
+        />
+      </section>
+    </FlowFocusContext.Provider>
   );
 }
 

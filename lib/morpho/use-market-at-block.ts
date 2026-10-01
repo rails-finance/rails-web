@@ -17,6 +17,12 @@ export type MorphoAtBlock =
 
 const cache = new Map<string, Promise<MorphoMarketAtBlockResponse | null>>();
 
+/** The market read at one block, cached for the page's life (a past
+ *  block's answer never changes); null where the read failed. */
+export function loadMorphoAtBlock(marketId: string, block: number, chainId: number) {
+  return load(marketId, block, chainId);
+}
+
 function load(marketId: string, block: number, chainId: number) {
   // `v=3`: the answer gained each block's time (v2 the market totals); a new
   // key keeps a cached older answer (max-age a day) from standing in for it.

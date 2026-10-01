@@ -38,8 +38,6 @@ export interface MomentNeighbour {
   ts: number;
 }
 
-const SIDE_WORD: Record<FlowSide, string> = { collateral: "Collateral", debt: "Debt" };
-
 /** What the index is called on each side, by where it comes from. */
 const INDEX_NAME: Record<FlowGrowth["basis"], Record<FlowSide, string>> = {
   "reserve-data": { collateral: "liquidity index", debt: "variable borrow index" },
@@ -222,12 +220,12 @@ export function FlowMomentCard({
     const usd = sideUsd(side);
     return (
       <span key={side} className="inline-flex items-center gap-1.5 text-sm" data-flow-moment-side={side}>
-        <span className="text-rb-500">{SIDE_WORD[side]}</span>
+        <span className="text-rb-500">{model.labels[side]}</span>
         {s.assets.length === 0 ? (
           <span className="font-bold text-foreground">none</span>
         ) : usd != null && s.assets.length > 1 ? (
           <Prov info={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}>
-            <span className="font-bold text-foreground">{wholeUsd(usd)}</span>
+            <span className="font-bold text-foreground">{wholeUsd(usd, model.unit)}</span>
           </Prov>
         ) : (
           s.assets.map((a) => (
@@ -238,7 +236,7 @@ export function FlowMomentCard({
               <TokenChipIcon symbol={a.symbol} size={16} filterable={false} />
               {a.usd != null && (
                 <Prov info={usdProv(a)}>
-                  <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                  <span className="text-rb-500">{wholeUsd(a.usd, model.unit)}</span>
                 </Prov>
               )}
             </span>
@@ -297,7 +295,7 @@ export function FlowMomentCard({
                   dollars: rows.total.dollars,
                   before: null,
                 })}
-                name={SIDE_WORD[side]}
+                name={model.labels[side]}
                 at={when}
                 totalUsdProv={flowSegmentProv(heldSeg(side), side, when, false, model.daily)}
                 daily={model.daily}
@@ -312,7 +310,7 @@ export function FlowMomentCard({
         ledger={ledger}
         alignRight={false}
         data={{ "data-receipt-cell": side, "data-flow-moment-cell": side }}
-        label={SIDE_WORD[side]}
+        label={model.labels[side]}
       >
         <>
           {s.assets.length === 0 ? (
@@ -330,7 +328,7 @@ export function FlowMomentCard({
                       <Prov info={tokensProv(side, a)}>{fmtPositionAmount(a.tokens)}</Prov>
                       {a.usd != null && (
                         <Prov info={usdProv(a)}>
-                          <span className="text-rb-500">{wholeUsd(a.usd)}</span>
+                          <span className="text-rb-500">{wholeUsd(a.usd, model.unit)}</span>
                         </Prov>
                       )}
                     </span>
@@ -347,7 +345,7 @@ export function FlowMomentCard({
                         </Prov>
                         {a.interestUsd != null && (
                           <Prov info={interestProv(side, a)}>
-                            <span>{wholeUsdOrUnder(a.interestUsd)}</span>
+                            <span>{wholeUsdOrUnder(a.interestUsd, model.unit)}</span>
                           </Prov>
                         )}
                       </span>

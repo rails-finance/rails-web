@@ -45,6 +45,8 @@ import {
   fillStyle,
   FlowCursorContext,
   FlowPanelShell,
+  FlowUnitContext,
+  useFlowUnit,
   sumSwatch,
   KEEP_PANEL,
   SegmentTipContext,
@@ -270,6 +272,7 @@ function Strip({
   focus?: boolean;
 }) {
   const shown = segments.filter((s) => s.width > 0);
+  const unit = useFlowUnit();
   const [trackRef, trackPx, settled] = useTrackWidth();
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
   // Until the track is measured (the server's render, the first paint) the
@@ -332,7 +335,7 @@ function Strip({
                 type="button"
                 className={`block h-full w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground ${!focus && (on || isOpen) ? "outline outline-2 -outline-offset-2 outline-foreground" : ""}`}
                 style={{ borderRadius: boxes[i].radius }}
-                aria-label={`${s.label}: ${spokenUsd(s.value)}`}
+                aria-label={`${s.label}: ${spokenUsd(s.value, unit)}`}
                 aria-expanded={isOpen}
                 aria-haspopup="dialog"
                 data-flow-seg={s.key}
@@ -358,7 +361,7 @@ function Strip({
       )}
       {openSeg && open && (
         <FlowPanelShell
-          label={`${openSeg.label}: ${spokenUsd(openSeg.value)}`}
+          label={`${openSeg.label}: ${spokenUsd(openSeg.value, unit)}`}
           anchor={() => trackRef.current?.querySelector<HTMLElement>(`[data-flow-seg="${openSeg.key}"]`) ?? null}
           onClose={() => onOpen(null)}
           focusOnOpen={open.keyboard}
@@ -408,13 +411,14 @@ function SideBlock({
   const outs = st.bar.filter((s) => s.fill === "out");
   const liquidated = outs.filter((s) => s.tone === "liquidation").reduce((a, s) => a + s.value, 0);
   const repaid = st.out - liquidated;
+  const u = model.unit;
   const spoken = coll
-    ? `${word}: ${spokenUsd(st.now)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total)} that came in; ${spokenUsd(st.out)} has left.`
-    : `${word}: ${spokenUsd(st.now)} owed, of ${spokenUsd(st.total)} owed in all; ${spokenUsd(repaid)} repaid` +
-      (liquidated > 0 ? `, ${spokenUsd(liquidated)} liquidated.` : ".");
+    ? `${word}: ${spokenUsd(st.now, u)} ${(model.words.held ?? "Still supplied").toLowerCase()}, of ${spokenUsd(st.total, u)} that came in; ${spokenUsd(st.out, u)} has left.`
+    : `${word}: ${spokenUsd(st.now, u)} owed, of ${spokenUsd(st.total, u)} owed in all; ${spokenUsd(repaid, u)} repaid` +
+      (liquidated > 0 ? `, ${spokenUsd(liquidated, u)} liquidated.` : ".");
   // The strip's label names every segment it draws, so the bar reads without
   // the Key.
-  const named = st.bar.filter((s) => s.width > 0).map((s) => `${s.label} ${spokenUsd(s.value)}`);
+  const named = st.bar.filter((s) => s.width > 0).map((s) => `${s.label} ${spokenUsd(s.value, u)}`);
   const label = named.length > 0 ? `${spoken} Segments: ${named.join(", ")}.` : spoken;
   // Each segment's assets: held from the stop's balances, flows from the
   // day rows' per-asset totals.
@@ -639,31 +643,37 @@ export function LifetimeFlowsScrubber({
       shade: lined && from > 0 ? "The bars' window" : null,
       views: words.key,
       explain: words.explain,
-      basis: lined ? `USD at each ${bin}’s close` : undefined,
+      basis: lined ? `${model?.unit?.symbol ?? "USD"} at each ${bin}’s close` : undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, model?.unit?.symbol]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;
   if (!lined)
-    return busy ? (
-      <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
-    ) : (
-      <ScrubberBody model={bars} onKey={setHatches} />
+    return (
+      <FlowUnitContext.Provider value={model.unit ?? null}>
+        {busy ? (
+          <BusyFlows model={bars} onLedgerNote={ledgerNote ?? undefined} />
+        ) : (
+          <ScrubberBody model={bars} onKey={setHatches} />
+        )}
+      </FlowUnitContext.Provider>
     );
   return (
-    <CombinedFlows
-      model={model}
-      bars={bars}
-      from={from}
-      busy={busy}
-      series={lifetime?.series ?? null}
-      failed={lifetime?.failed ?? false}
-      onLedgerNote={ledgerNote ?? undefined}
-      renderBars={(stop, when, isLive, atLive) => (
-        <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
-      )}
-    />
+    <FlowUnitContext.Provider value={model.unit ?? null}>
+      <CombinedFlows
+        model={model}
+        bars={bars}
+        from={from}
+        busy={busy}
+        series={lifetime?.series ?? null}
+        failed={lifetime?.failed ?? false}
+        onLedgerNote={ledgerNote ?? undefined}
+        renderBars={(stop, when, isLive, atLive) => (
+          <PlainBars model={bars} stop={stop} when={when} isLive={isLive} atLive={atLive} onKey={setHatches} />
+        )}
+      />
+    </FlowUnitContext.Provider>
   );
 }
 

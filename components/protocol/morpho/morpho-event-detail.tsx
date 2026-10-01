@@ -60,6 +60,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
+import { useMorphoLedgerCells } from "./morpho-ledger";
 
 export interface MorphoEventDetailProps {
   ctx: MorphoContext;
@@ -297,6 +298,8 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
     source: useCaptureSource(),
   };
   const read = useMorphoAtBlock(ctx.marketId, blockNumber, chainId);
+  // Which cells open into the Lifetime flows ledgers, where the page has them.
+  const cells = useMorphoLedgerCells();
   // The address for each axis, read off the event's own flows under the
   // single-match rule (soleFlowAddress): a symbol two flows share resolves to
   // nothing rather than to whichever contract happened to come first. Only the
@@ -319,6 +322,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       prov: collateralAfterProv(ctx.collateralSymbol, coords),
       changed: collActive,
       display: ctx.collateralAfter != null ? fmtMorphoAmount(ctx.collateralAfter) : undefined,
+      ...(cells?.collateral === "collateral" ? { ledger: "collateral" as const } : {}),
       transition:
         ctx.side === "collateral"
           ? atPrecision(
@@ -341,6 +345,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           label: "Debt",
           value: fmt(ctx.debtAfter),
           display: fmtMorphoAmount(ctx.debtAfter),
+          ...(cells?.debt ? { ledger: "debt" as const } : {}),
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: debtAfterProv(ctx.loanSymbol, coords),
@@ -403,6 +408,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: supplyAfterProv(ctx.loanSymbol, coords),
+      ...(cells?.collateral === "supply" ? { ledger: "collateral" as const } : {}),
       changed: lenderActive || Boolean(gap),
       transition: lenderActive
         ? reconstructTransition({
