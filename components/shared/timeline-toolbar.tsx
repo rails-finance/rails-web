@@ -124,11 +124,7 @@ export function TimelineActivityHeader({
   const now = clock ?? last;
   // A duration that reads the clock: the placeholder holds the width.
   const dur = (from: number, to: number | null) =>
-    to == null && clock == null ? (
-      <span className="invisible">00 days</span>
-    ) : (
-      formatDuration(from, to ?? now)
-    );
+    to == null && clock == null ? <span className="invisible">00 days</span> : formatDuration(from, to ?? now);
   const ago = clock == null ? <span className="invisible">00 days ago</span> : `${formatDuration(last, now)} ago`;
   if (!tenurePending && lives && lives.length > 1) {
     // Past three, the first and the last are named and the rest counted; the
@@ -342,6 +338,7 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
   return (
     <FilterDropdown
       label="Display"
+      anatomy="L1.9"
       options={options}
       selected={selected}
       onSelect={() => {}}
@@ -666,9 +663,11 @@ export function TimelineToolbar({
   }, [dropdownOpen, tl.toggleHeatmap]);
 
   return (
-    <div ref={stripRef} className="relative space-y-3" {...ctrlWaking(hydrated)}>
+    <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="min-w-0">{leading}</div>
+        <div className="min-w-0" data-anatomy="L1.1">
+          {leading}
+        </div>
         {/* Below sm the count takes a row of its own above the controls — on a
             phone it used to wrap mid-figure (Miles, 2026-09-02). From sm up it
             is the first item of the one control row, as before. */}
@@ -687,6 +686,7 @@ export function TimelineToolbar({
             data-timeline-total={countState.total}
             data-timeline-unit={countState.unit}
             data-timeline-shown={countState.shown}
+            data-anatomy="L1.2"
             className="inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap"
           >
             <span className="text-xs text-rb-500 tabular-nums" title={countTooltip}>
@@ -697,6 +697,7 @@ export function TimelineToolbar({
           {tl.eventOptions.length > 1 && (
             <FilterDropdown
               label="Types of event"
+              anatomy="L1.3"
               options={tl.eventOptions}
               selected={tl.visibleActionKeys}
               onSelect={() => tl.resetHiddenActions()}
@@ -712,6 +713,7 @@ export function TimelineToolbar({
           {assetOptions.length > 0 && (
             <FilterDropdown
               label="Assets"
+              anatomy="L1.4"
               options={assetOptions.map((o) => ({
                 ...o,
                 icon: <TokenChipIcon symbol={o.key} size={16} filterable={false} />,
@@ -735,6 +737,7 @@ export function TimelineToolbar({
           {versionOptions.length > 0 && (
             <FilterDropdown
               label="Versions"
+              anatomy="L1.5"
               options={versionOptions}
               selected={tl.visibleVersionKeys}
               onSelect={() => tl.resetHiddenVersions()}
@@ -751,6 +754,7 @@ export function TimelineToolbar({
           {counterpartyOptions.length > 0 && (
             <FilterDropdown
               label="Addresses"
+              anatomy="L1.6"
               options={counterpartyOptions}
               selected={tl.visibleCounterpartyKeys}
               onSelect={() => tl.resetHiddenCounterparties()}
@@ -768,6 +772,7 @@ export function TimelineToolbar({
           <button
             type="button"
             data-date-control=""
+            data-anatomy="L1.7"
             onClick={tl.toggleHeatmap}
             aria-pressed={datePanelOpen}
             // Sized and spaced exactly like the FilterDropdown triggers either
@@ -869,7 +874,7 @@ export function TimelineToolbar({
           // `shadow-none!` this branch needed to cancel `overlay-panel`'s own
           // `shadow-xl`, and the border that went with the floating surface:
           // `bg-raised` carries neither.
-          <div data-nav-dropdown="" className="mt-2 rounded-xl bg-raised p-3">
+          <div data-nav-dropdown="" data-anatomy="L1.8" className="mt-2 rounded-xl bg-raised p-3">
             <TimelineNavigatorPanel tl={tl} reach={monthReach} />
           </div>
         ))}

@@ -137,7 +137,7 @@ export function LatestPrices({
         : `${first.symbol}, held with no price stated by the protocol.${moreNote}`;
 
   return (
-    <div ref={ref} className="relative" data-latest-prices>
+    <div ref={ref} className="relative" data-latest-prices data-anatomy="H7.2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

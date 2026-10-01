@@ -99,6 +99,7 @@ export function TroveDetailsBand({
       {showCosts && (
         <div
           className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${alignStart ? "justify-start" : "justify-end"} ${align} text-xs text-rb-500 leading-relaxed`}
+          data-anatomy="C15·liquity"
         >
           <div className="tabular-nums">
             Costs:{" "}
@@ -124,7 +125,7 @@ export function TroveDetailsBand({
       {!showQueue ? null : debtInFrontLoading ? (
         <div className="h-3 w-48 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
       ) : debtInFront !== null && debtInFront !== undefined ? (
-        <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`}>
+        <div className={`${align} text-xs text-rb-500 leading-relaxed tabular-nums`} data-anatomy="C16·liquity">
           Debt in front:{" "}
           <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
             <span className="text-foreground/80 font-semibold">{formatApproximate(debtInFront)}</span>

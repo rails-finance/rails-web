@@ -253,6 +253,10 @@ export interface InfoTabsDisclosureProps {
    *  crowding the buttons on narrow viewports. */
   rowExtra?: React.ReactNode;
   className?: string;
+  /** The app-anatomy code of the Explanation (rails-ops reference/app-anatomy.md),
+   *  set on its heading-button and its pane: "T3" on an event card, "C3" on a
+   *  position card. */
+  anatomy?: string;
 }
 
 /**
@@ -273,6 +277,7 @@ export function InfoTabsDisclosure({
   keepMounted,
   rowExtra,
   className,
+  anatomy,
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
@@ -303,6 +308,7 @@ export function InfoTabsDisclosure({
                 else buttons.current.delete(t.key);
               }}
               type="button"
+              data-anatomy={anatomy}
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenTabChange(active ? null : t.key);
@@ -354,6 +360,7 @@ export function InfoTabsDisclosure({
         <div
           className={open ? `mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}` : "hidden"}
           data-prov-exempt=""
+          data-anatomy={anatomy}
         >
           {tabs.map((t) => (
             <div key={t.key} className={open?.key === t.key ? "px-3 pb-3 pt-3 text-sm" : "hidden"}>
@@ -367,6 +374,7 @@ export function InfoTabsDisclosure({
           <div
             className={`mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}`}
             data-prov-exempt=""
+            data-anatomy={anatomy}
           >
             <div className="px-3 pb-3 pt-3 text-sm">{open.content}</div>
             {footer}

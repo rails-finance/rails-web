@@ -293,7 +293,7 @@ export function CombinedFlows({
             {through && <Throughput t={through} hasDebt={hasDebt} />}
             {/* The headlines, and the date they are at on the same row's
                 right end. */}
-            <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2" data-flow-headlines="">
+            <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
               <Headline
                 side="collateral"
                 st={head.collateral}
@@ -309,11 +309,12 @@ export function CombinedFlows({
                 className="ml-auto min-w-0 text-xs font-semibold tabular-nums text-foreground sm:text-sm"
                 aria-live="polite"
                 data-flow-date=""
+                data-anatomy="F2.1"
               >
                 {dateLine}
               </p>
             </div>
-            <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"}>
+            <div className="relative" data-flow-combined-bars={outside ? "outside" : "inside"} data-anatomy="F3">
               <div
                 className={outside ? "pointer-events-none opacity-35 grayscale" : undefined}
                 aria-hidden={outside || undefined}
@@ -366,7 +367,7 @@ export function CombinedFlows({
           {/* The playback controls at the left; "Apply to timeline" at the
               right, on a page that ties the panel to its timeline. */}
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div className="-ml-2 flex items-center gap-x-1" data-flow-controls="" {...KEEP_PANEL}>
+            <div className="-ml-2 flex items-center gap-x-1" data-flow-controls="" data-anatomy="F5" {...KEEP_PANEL}>
               <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
                 <SkipBack size={16} aria-hidden />
               </button>
@@ -415,6 +416,7 @@ export function CombinedFlows({
                 }
                 onClick={apply}
                 data-flow-apply=""
+                data-anatomy="F6"
                 {...KEEP_PANEL}
               >
                 <List size={16} aria-hidden />
@@ -729,6 +731,7 @@ function LineStrip({
           className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-grab"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
           style={{ height: STRIP_H }}
           data-flow-strip=""
+          data-anatomy="F4"
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
@@ -865,6 +868,7 @@ function LineStrip({
         ref={pipRef}
         className="relative h-5 cursor-pointer sm:h-3.5"
         data-flow-pips=""
+        data-anatomy="F4.1"
         onPointerMove={(e) => {
           if (e.pointerType !== "mouse") return;
           const t = tickAt(e.clientX, TICK_REACH.mouse);

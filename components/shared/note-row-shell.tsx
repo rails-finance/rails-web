@@ -81,6 +81,7 @@ export function NoteRowShell({
     <ProvReceiptsScope registry={registry}>
       <div
         {...{ [marker.attr]: marker.value, [`${marker.attr}-open`]: open ? "" : undefined }}
+        data-anatomy="L7"
         className={`flex w-full items-start relative ${scale.cardRounded}`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
       >

@@ -45,7 +45,7 @@ export function PaginationControls({
   for (let i = start; i <= end; i++) pageNumbers.push(i);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8" data-anatomy="N3">
       <div className={`text-sm text-rb-500 ${note ? "text-center sm:text-left" : "whitespace-nowrap"}`}>
         Showing {showingFrom.toLocaleString("en-US")}-{showingTo.toLocaleString("en-US")} of{" "}
         {totalCount.toLocaleString("en-US")} {noun}

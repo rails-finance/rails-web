@@ -22,7 +22,7 @@ export function LiquityFlowsNote({
   zombie,
 }: LiquityFlowsNoteProps): ReactNode {
   return (
-    <div className="space-y-2" data-liquity-flows-note="">
+    <div className="space-y-2" data-liquity-flows-note="" data-anatomy="F14·liquity">
       <p>
         The collateral side adds up to what the Trove holds: {collSymbol} deposited, plus redistribution gains from
         liquidated Troves, less what was withdrawn, taken by redemptions and liquidated (and, after a liquidation, the

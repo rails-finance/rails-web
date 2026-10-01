@@ -61,6 +61,7 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
     <span
       className="inline-flex items-center gap-1"
       data-flow-day-mark={utcDay(ts)}
+      data-anatomy="T7"
       {...(flash ? { "data-flow-day-flash": "" } : {})}
     >
       {focus?.model && !frozenHere && (

@@ -63,7 +63,7 @@ import type { ReactNode } from "react";
  */
 export function RiskFooterStrip({ children }: { children: ReactNode }) {
   return (
-    <div className="@container min-w-0 flex-1 pl-2">
+    <div className="@container min-w-0 flex-1 pl-2" data-anatomy="C12">
       <div className="flex flex-col items-end gap-2 @min-[560px]:grid @min-[560px]:grid-cols-[auto_auto] @min-[560px]:items-center @min-[560px]:justify-end @min-[560px]:gap-x-6 @min-[560px]:gap-y-1 @min-[560px]:[&>*:nth-child(odd):last-child]:col-start-2 @5xl:flex @5xl:flex-row @5xl:flex-wrap @5xl:items-center @5xl:justify-end @5xl:gap-x-6 @5xl:gap-y-1">
         {children}
       </div>

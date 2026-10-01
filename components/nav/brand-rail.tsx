@@ -78,6 +78,7 @@ function BookmarksButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
       aria-label="Bookmarks"
+      data-anatomy="H11"
       title="Bookmarks"
     >
       <svg
@@ -110,6 +111,7 @@ export function BrandRail() {
           box. */}
       <aside
         aria-label="Rails"
+        data-anatomy="H1"
         className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
       >
         <RailsGlyph />

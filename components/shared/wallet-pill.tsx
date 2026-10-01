@@ -104,7 +104,7 @@ export function WalletPill({
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" data-anatomy="C7">
       <Facehash address={wallet} size={16} />
       <span className="inline-flex items-center gap-1 text-xs text-rb-500">
         {href ? (

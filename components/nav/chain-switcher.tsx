@@ -140,7 +140,7 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
   const showChainTrigger = variant === "chain" && activeChain;
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative" ref={rootRef} data-anatomy="H4">
       {showChainTrigger ? (
         <button
           onClick={toggle}

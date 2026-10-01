@@ -408,7 +408,7 @@ export function FlowMomentCard({
   return (
     <EventCaptionContext.Provider value={{ kind: "Position at close", ts: moment.endTs }}>
       <ReceiptCalcContext.Provider value={calc}>
-        <div id="flow-moment" data-flow-moment={moment.day} className="rounded-xl">
+        <div id="flow-moment" data-flow-moment={moment.day} data-anatomy="L4" className="rounded-xl">
           <EventCard
             avatar={null}
             iconColumn={<SpineColumn icon="moment" isFirst={isFirst} isLast={false} tip={null} />}

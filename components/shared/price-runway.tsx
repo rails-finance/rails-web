@@ -252,7 +252,7 @@ export function PriceRunway({
     // echo filling whatever line-length the host grants. No ruler, no
     // threshold caption; underwater collapses to the factual state.
     return (
-      <div className="flex w-full items-center gap-2.5">
+      <div className="flex w-full items-center gap-2.5" data-anatomy="C13">
         {/* The price-fall wording is twice the length of the bare figure, so
             it may wrap onto a second line on a phone rather than squeeze the
             bar below its minimum. */}
@@ -279,7 +279,7 @@ export function PriceRunway({
   }
 
   return (
-    <div className="group/runway relative" style={{ paddingTop: 6 }}>
+    <div className="group/runway relative" style={{ paddingTop: 6 }} data-anatomy="C13">
       <div className="flex" style={{ height: H_BAR, gap: SEG_GAP_PX }}>
         {segments}
       </div>

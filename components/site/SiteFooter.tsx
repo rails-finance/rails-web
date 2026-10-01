@@ -15,7 +15,7 @@ export function SiteFooter() {
   // entry point (with recent/pinned in its dropdown). The chrome stays
   // simple: one route to discover, one to drill in.
   return (
-    <footer className="bg-background border-rb-200">
+    <footer className="bg-background border-rb-200" data-anatomy="H9">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}

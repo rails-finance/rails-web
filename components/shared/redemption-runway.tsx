@@ -65,7 +65,10 @@ export function RedemptionRunway({
   const markerLeft = Math.min(98.5, Math.max(1.5, share * 100));
 
   return (
-    <div className={`flex w-full items-center gap-2.5${shareLabel ? " flex-wrap gap-y-1" : ""}`}>
+    <div
+      className={`flex w-full items-center gap-2.5${shareLabel ? " flex-wrap gap-y-1" : ""}`}
+      data-anatomy="C14·liquity"
+    >
       <span className={`text-[11px] tabular-nums text-rb-500 ${shareLabel ? "min-w-0" : "shrink-0 whitespace-nowrap"}`}>
         <Prov info={shareProv}>{pct(share)}</Prov> {shareLabel ?? "of queue in front"}
       </span>

@@ -75,7 +75,7 @@ export function OpenPositionStats({
   const visibleCount = columns.filter(Boolean).length;
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-3" data-anatomy="C5">
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -84,7 +84,7 @@ export function OpenPositionStats({
         </span>
         {identity}
       </div>
-      <div className={gridClass}>
+      <div className={gridClass} data-anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         {columns.map((col, i) => {
           if (!col) return <div key={`empty-${i}`} className="hidden sm:block" />;

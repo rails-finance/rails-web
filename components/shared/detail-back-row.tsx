@@ -62,7 +62,7 @@ export function DetailBackButton({
     }
   };
   return (
-    <button type="button" onClick={onBack} aria-label="Back" className={NAV_BUTTON}>
+    <button type="button" onClick={onBack} aria-label="Back" className={NAV_BUTTON} data-anatomy="H7.1">
       <ArrowLeft size={14} />
       <span className={compact ? "hidden sm:inline" : undefined}>Back</span>
     </button>
@@ -147,7 +147,7 @@ export function DetailTopRow({
       <div className="mb-2.5">
         <RailHeader session={session} venue="position" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2" data-anatomy="H7">
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <DetailBackButton session={session} wallet={wallet} compact />
           {showStamp && !closed && <RecencyStamp compact />}

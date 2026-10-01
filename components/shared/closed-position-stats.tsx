@@ -119,8 +119,8 @@ export function ClosedPositionStats({
     ? "grid grid-cols-2 sm:grid-cols-[80px_repeat(4,_1fr)] lg:grid-cols-[120px_repeat(4,_1fr)] gap-4 sm:items-start"
     : "grid grid-cols-2 sm:grid-cols-4 gap-4";
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+    <div data-anatomy="C11">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-3" data-anatomy="C5">
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -135,7 +135,7 @@ export function ClosedPositionStats({
         </span>
         {identity}
       </div>
-      <div className={gridClass}>
+      <div className={gridClass} data-anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         <Gate>
           <div>

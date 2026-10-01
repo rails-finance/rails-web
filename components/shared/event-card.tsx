@@ -242,6 +242,7 @@ export function EventCard({
           flows chart's "Apply to timeline" or the timeline chip brings it into
           view (flow-day-mark.tsx). */}
       <div
+        data-anatomy="T1"
         className={`overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
           showDetail ? "rounded-b-none bg-raised" : hasDetail ? "hover:bg-raised" : ""
         }`}
@@ -270,7 +271,10 @@ export function EventCard({
           <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
             <div className="flex-1 min-w-0">{header}</div>
             {showChevron && (
-              <div className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static">
+              <div
+                className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
+                data-anatomy="T5"
+              >
                 <ExpandChevron isOpen={showDetail} group="evt" />
               </div>
             )}
@@ -285,7 +289,7 @@ export function EventCard({
             child's top margin inside the panel: let through, it opens a seam
             of page background under the header. ─────────────────────── */}
       {showDetail && (
-        <div className="flow-root rounded-b-xl bg-raised">
+        <div className="flow-root rounded-b-xl bg-raised" data-anatomy="T2">
           {detailLoading && (
             <div className="flex items-center justify-center gap-2 py-8 text-sm ">
               <span className="relative flex size-2">
@@ -331,6 +335,7 @@ export function EventCard({
             <div className="px-4 pb-3 pt-1">
               {infoTabs.length > 0 ? (
                 <InfoTabsDisclosure
+                  anatomy="T3"
                   tabs={infoTabs}
                   openTab={openInfoTab}
                   onOpenTabChange={setOpenInfoTab}
@@ -392,7 +397,9 @@ export function EventCard({
         {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
             header there). Matches the sm breakpoint the card's own detail grid uses,
             so the spine and the card body reflow together. */}
-        <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center">{iconColumn}</div>
+        <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
+          {iconColumn}
+        </div>
         {contentTiers}
       </div>
     </ProvReceiptsScope>

@@ -55,6 +55,8 @@ export interface LifetimeFlowsPanelProps {
   rowExtra?: ReactNode;
 }
 
+const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
+
 export function LifetimeFlowsPanel({
   scrubber,
   read,
@@ -97,13 +99,17 @@ export function LifetimeFlowsPanel({
       <section
         data-skel-section="detail-economics"
         data-lifetime-flows-panel=""
+        data-anatomy="P2"
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
         suppressHydrationWarning
         className="rounded-2xl bg-raised px-5 py-4"
       >
         {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
-        <div className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2">
+        <div
+          className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
+          data-anatomy="F1"
+        >
           {collapseKey ? (
             <button
               type="button"
@@ -161,6 +167,7 @@ export function LifetimeFlowsPanel({
               )
             }
             learnMore={learnMore}
+            anatomy={FLOWS_ANATOMY}
             rowExtra={
               flowsKey?.basis || rowExtra ? (
                 <>

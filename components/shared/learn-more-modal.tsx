@@ -69,7 +69,16 @@ export function LearnMoreButton({ onClick }: { onClick: () => void }) {
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
-export function LearnMoreModal({ content, onClose }: { content: LearnMoreContent; onClose: () => void }) {
+export function LearnMoreModal({
+  content,
+  onClose,
+  anatomy,
+}: {
+  content: LearnMoreContent;
+  onClose: () => void;
+  /** The app-anatomy code of the "?" that opened it (rails-ops reference/app-anatomy.md). */
+  anatomy?: string;
+}) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -107,6 +116,7 @@ export function LearnMoreModal({ content, onClose }: { content: LearnMoreContent
           role="dialog"
           aria-modal="true"
           aria-label={content.title}
+          data-anatomy={anatomy}
           className="relative rounded-2xl max-w-lg w-full my-8 p-6 shadow-xl"
           style={{ background: "var(--surface-overlay)" }}
           onClick={(e) => e.stopPropagation()}
@@ -255,18 +265,22 @@ export function LearnMore({
   content,
   inline = false,
   label,
+  anatomy,
 }: {
   content: LearnMoreContent;
   inline?: boolean;
   /** A text label before the "?" that opens the same modal. */
   label?: string;
+  /** The app-anatomy code (rails-ops reference/app-anatomy.md): "T4" on an event
+   *  card, "C4" on a position card. Set on the trigger and the modal. */
+  anatomy?: string;
 }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
   return (
     <>
-      <div className={inline || label ? "flex items-center gap-2" : "flex justify-end mt-3"}>
+      <div className={inline || label ? "flex items-center gap-2" : "flex justify-end mt-3"} data-anatomy={anatomy}>
         {label && (
           <button
             type="button"
@@ -278,7 +292,7 @@ export function LearnMore({
         )}
         <LearnMoreButton onClick={() => setOpen(true)} />
       </div>
-      {open && <LearnMoreModal content={content} onClose={close} />}
+      {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy} />}
     </>
   );
 }

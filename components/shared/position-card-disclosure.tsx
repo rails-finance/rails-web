@@ -85,6 +85,7 @@ export function PositionCardDisclosureToggle() {
     <button
       type="button"
       data-card-disclosure-toggle=""
+      data-anatomy="C9"
       aria-expanded={d.open}
       aria-label={d.open ? "Hide position details" : "Show position details"}
       onClick={d.toggle}

@@ -316,7 +316,11 @@ function Strip({
           />
         ))}
       </div>
-      <div className="absolute inset-0" data-flow-segments={side}>
+      <div
+        className="absolute inset-0"
+        data-flow-segments={side}
+        data-anatomy={side === "collateral" ? "F3.1" : "F3.2"}
+      >
         {shown.map((s, i) => {
           const on = active != null && active === hlKey(s);
           const isOpen = open?.key === s.key;
@@ -473,7 +477,7 @@ function SideBlock({
 export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems) {
   if (items.length === 0 && !outline && !lines?.length && !shade && !views) return null;
   return (
-    <div className="mt-3 first:mt-0" data-flow-key="">
+    <div className="mt-3 first:mt-0" data-flow-key="" data-anatomy="F10">
       <p className="text-xs font-semibold text-foreground">Key</p>
       <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-rb-500" aria-label="Key">
         {items.map(({ side, s }) => (
@@ -513,7 +517,7 @@ export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems)
 /** The line's basis beside the panel's (i): how a point is valued. */
 export function FlowsBasis({ text }: { text: string }) {
   return (
-    <span className="self-center text-[11px] text-rb-500" data-flow-basis="">
+    <span className="self-center text-[11px] text-rb-500" data-flow-basis="" data-anatomy="F7">
       {text}
     </span>
   );
@@ -950,7 +954,7 @@ function ScrubberBody({
     <FlowCursorContext.Provider value={cursor}>
       <div className="text-sm">
         <DateRow>{dateLine}</DateRow>
-        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="">
+        <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
           <Headline
             side="collateral"
             st={s.collateral}
@@ -1006,6 +1010,7 @@ function ScrubberBody({
             ref={pipRef}
             className="relative mx-2 h-4 sm:h-3"
             data-flow-pips=""
+            data-anatomy="F4.1"
             onPointerMove={(e) => e.pointerType === "mouse" && setPip(pipAt(e.clientX))}
             onPointerLeave={(e) => e.pointerType === "mouse" && setPip(null)}
             onClick={(e) => setPip(pipAt(e.clientX))}
@@ -1070,7 +1075,12 @@ function ScrubberBody({
           <TrackEnds start={dayStamp(dayStart(model, 0))} end={closed ? closeDay : "Today"} />
         </div>
 
-        <div className="mt-1 flex items-center justify-center gap-x-1" data-flow-controls="" {...KEEP_PANEL}>
+        <div
+          className="mt-1 flex items-center justify-center gap-x-1"
+          data-flow-controls=""
+          data-anatomy="F5"
+          {...KEEP_PANEL}
+        >
           <button type="button" className={btn} aria-label="Jump to opening" onClick={() => go(0)}>
             <SkipBack size={16} aria-hidden />
           </button>

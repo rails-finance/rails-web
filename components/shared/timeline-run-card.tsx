@@ -282,6 +282,7 @@ export function TimelineRunCard({
   // narrow-width stand-ins for the spine, which the segment draws.
   const headerRow = (spine: boolean) => (
     <div
+      data-anatomy="L6"
       className={
         spine
           ? "rounded-xl px-5 pt-4 pb-3"

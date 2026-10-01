@@ -51,9 +51,14 @@ export function ListToolbar<F extends BaseListFilters>({
   const showBookmarks = !!bookmarks && focused && !filters.q;
 
   return (
-    <div className="mb-6 flex flex-col gap-3" data-skel-section="listing-toolbar" {...ctrlWaking(hydrated)}>
+    <div
+      className="mb-6 flex flex-col gap-3"
+      data-skel-section="listing-toolbar"
+      data-anatomy="N1"
+      {...ctrlWaking(hydrated)}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px]" ref={searchRef}>
+        <div className="relative flex-1 min-w-[200px]" ref={searchRef} data-anatomy="N1.1">
           <Search
             size={14}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-rb-500"

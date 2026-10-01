@@ -88,7 +88,7 @@ export function EventCardFooter({ txHash, extra, learnMore, shareHref, txHashLab
   const chainId = useChainId();
   const explorer = chainMeta(chainId).explorerName;
   return (
-    <div className="pt-1 px-4 pb-2 flex flex-wrap justify-between items-center gap-2">
+    <div className="pt-1 px-4 pb-2 flex flex-wrap justify-between items-center gap-2" data-anatomy="T6">
       <div className="flex items-center gap-2">
         <TxHashBadge txHash={txHash} label={txHashLabel} />
         <a

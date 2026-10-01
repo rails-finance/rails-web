@@ -288,7 +288,10 @@ export function liquityRedemptionOutcome(economics: TroveEconomicsType, currentP
   return (
     // Right-aligned to mirror the position card's context line: the
     // heading-buttons hold the left edge, the summary the right.
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
+      data-anatomy="F13·liquity"
+    >
       <span>Borrower&apos;s net outcome from redemptions was</span>
       <Prov info={realizedPLProv} value={formatExact(redemption.realizedPL)}>
         <span className={redemption.realizedPL >= 0 ? "text-green-400" : "text-red-400"}>

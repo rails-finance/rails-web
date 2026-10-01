@@ -43,7 +43,7 @@ export function FilterChips<F>({ dimensions, filters, onChange }: FilterChipsPro
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2" data-anatomy="N1.4">
       {defaultChips.map((c) => (
         <span
           key={c.id}
