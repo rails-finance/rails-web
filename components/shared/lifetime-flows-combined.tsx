@@ -281,15 +281,18 @@ export function CombinedFlows({
     if (focus && focus.store.get().frozenDay !== frozenDay) focus.store.set({ frozenDay });
   }, [focus, frozenDay]);
   useEffect(() => () => focus?.store.set({ cursor: null, frozenDay: null }), [focus?.store]);
-  // "Apply to timeline": the cut at the cursor's day close. Nothing to cut at
-  // today, nor where that cut already stands.
+  // "Apply to timeline": the cut at the cursor's day close. At today it
+  // clears a standing cut, as the chip's × does; with no cut there is nothing
+  // to apply, nor where that cut already stands.
   const applied = useFlowFocusState((s) => s.rewind?.endTs ?? null);
-  const canApply = byDays && !!committed && !committed.live && applied !== committedEnd;
+  const canApply =
+    byDays && !!committed && (committed.live ? applied != null : applied !== committedEnd);
   // The page stays where it is (Miles, 1 Oct 2026): the cut's top card
   // flashes once the visitor scrolls it into view.
   const apply = () => {
     if (!focus || !canApply) return;
-    focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
+    if (committed?.live) focus.store.set({ rewind: null });
+    else focus.store.set({ rewind: { endTs: committedEnd, word: committedWord } });
   };
   const move = useFlowFocusState((s) => s.move);
   const moved = useRef<number | null>(null);
@@ -505,7 +508,9 @@ export function CombinedFlows({
                 disabled={!canApply}
                 title={
                   canApply
-                    ? `Show the timeline up to the end of ${committedWord}`
+                    ? committed?.live
+                      ? "Show the timeline up to today"
+                      : `Show the timeline up to the end of ${committedWord}`
                     : committed?.live
                       ? "Move the cursor to a past day to cut the timeline there"
                       : `The timeline is cut at ${committedWord}`
