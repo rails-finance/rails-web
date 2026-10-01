@@ -755,9 +755,15 @@ function LineStrip({
     day: t.day,
   });
   // A tapped tick's tip closes once the cursor moves off its day.
+  // It sets state only where a tip is open: a no-op update queued on every
+  // step rendered at default priority and committed nothing, so React never
+  // cleared its nested-update count, and about 160 quick arrow presses hit
+  // its limit (rails-ops TO-DO-ui-jobs 227).
   const atDay = stops[at]?.stop;
+  const pipNow = useRef(pip);
+  pipNow.current = pip;
   useEffect(() => {
-    setPip((p) => (p && p.day !== atDay ? null : p));
+    if (pipNow.current && pipNow.current.day !== atDay) setPip(null);
   }, [atDay]);
   useEffect(() => {
     if (!pip) return;
