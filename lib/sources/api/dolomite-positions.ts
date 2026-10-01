@@ -45,6 +45,8 @@ export interface DolomiteBalanceAmount {
   par: number;
   /** SIGNED raw par (integer string). */
   parRaw: string;
+  /** The market token's address, where the page resolved it (the logo). */
+  token?: string;
   /** |par| × the market's CURRENT index — the token amount NOW, interest
    *  included (chain-derived). Null when RPC is down. */
   current: number | null;
@@ -101,6 +103,8 @@ export interface DolomitePeakAmount {
   /** |peak par| scaled by decimals — par, not wei (labeled so). */
   amount: number;
   amountRaw: string;
+  /** The market token's address, where the page resolved it (the logo). */
+  token?: string;
   /** As DolomiteBalanceAmount.decimalsUnread. */
   decimalsUnread?: true;
   /** Set when the page replaced the par peak with the token balance read
