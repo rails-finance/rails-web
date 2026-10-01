@@ -31,7 +31,17 @@ import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/s
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { assetsAt, axisFor, DAY_MS, dayStart, formatFlowUsd, type FlowModel } from "@/lib/shared/flows-timeline";
+import {
+  assetsAt,
+  axisFor,
+  DAY_MS,
+  dayStart,
+  formatFlowUsd,
+  type FlowModel,
+  type FlowTick,
+  tickRank,
+} from "@/lib/shared/flows-timeline";
+import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { throughput } from "@/lib/shared/flows-busy";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
@@ -44,13 +54,72 @@ import {
   type CombinedStop,
 } from "@/lib/shared/flows-combined";
 
-/** Tick colours: the side an event moved; a liquidation in the critical red. */
-export const FLOW_TICK: Record<FlowModel["ticks"][number]["tick"], string> = {
+/** Tick hues: the side an event moved; a liquidation in the critical red; a
+ *  redemption or another change the owner did not make in caution orange; a
+ *  delegate's rate change in the party pink, the owner's in the debt hue. */
+export const FLOW_TICK: Record<FlowTick, string> = {
   collateral: "var(--color-blue-500)",
   debt: "var(--color-green-400)",
   both: "linear-gradient(to bottom, var(--color-blue-500) 50%, var(--color-green-400) 50%)",
   liquidation: "var(--color-red-500)",
+  redemption: "var(--caution)",
+  caution: "var(--caution)",
+  "rate-delegate": "var(--color-pink-500)",
+  "rate-owner": "var(--color-green-400)",
 };
+
+/** The triangle pip's size: large enough to read as a triangle. */
+const PIP_TRIANGLE = 7;
+
+/** The pips to draw, strongest last so a dot never covers a triangle. In a
+ *  run of same-kind triangles closer than a triangle's width (a redemption a
+ *  day, on a phone) each is drawn only once it clears the last one drawn, so
+ *  the run reads as spaced triangles; every day keeps its hit area and tip. */
+function visiblePips<T extends { day: number; tick: FlowTick }>(ticks: T[], x: (day: number) => number): T[] {
+  const kept: T[] = [];
+  const lastX: Partial<Record<FlowTick, number>> = {};
+  for (const t of [...ticks].sort((a, b) => a.day - b.day)) {
+    const tri = t.tick === "liquidation" || t.tick === "redemption" || t.tick === "caution";
+    const at = x(t.day);
+    const prev = lastX[t.tick];
+    if (tri && prev != null && at - prev < PIP_TRIANGLE - 1) continue;
+    lastX[t.tick] = at;
+    kept.push(t);
+  }
+  return kept.sort((a, b) => tickRank(a.tick) - tickRank(b.tick));
+}
+
+/** One pip on the line strip, centred on `left`: a filled warning triangle
+ *  (the spine's path) for a liquidation, a redemption or another caution
+ *  event; a ring in the debt hue for the owner's rate change; a dot for
+ *  everything else, in its tick's hue. */
+export function FlowPip({ tick, left, opacity }: { tick: FlowTick; left: number; opacity: number }) {
+  if (tick === "liquidation" || tick === "redemption" || tick === "caution")
+    return (
+      <svg
+        className="pointer-events-none absolute top-[3px] -translate-x-1/2"
+        width={PIP_TRIANGLE}
+        height={PIP_TRIANGLE}
+        viewBox="1.5 2.5 21 19"
+        style={{ left, opacity }}
+        data-flow-pip={tick}
+      >
+        <path d={WARNING_TRIANGLE_PATH} fill={FLOW_TICK[tick]} />
+      </svg>
+    );
+  const ring = tick === "rate-owner";
+  return (
+    <i
+      className={`pointer-events-none absolute -translate-x-1/2 rounded-full ${ring ? "top-[3.5px] size-[6px] border-[1.5px]" : "top-1 size-[5px]"}`}
+      style={{
+        left,
+        opacity,
+        ...(ring ? { borderColor: FLOW_TICK[tick] } : { background: FLOW_TICK[tick] }),
+      }}
+      data-flow-pip={tick}
+    />
+  );
+}
 
 /** The line's hues; the panel's Key draws the same. */
 export const LINE_HUE = { collateral: "var(--color-blue-500)", debt: "var(--color-green-400)" };
@@ -878,15 +947,12 @@ function LineStrip({
             <i className="pointer-events-none absolute inset-y-0 w-px bg-foreground" style={{ left: cx - 0.5 }} />
           )}
           {w > 0 &&
-            model.ticks.map((t, i) => (
-              <i
-                key={i}
-                className="pointer-events-none absolute top-1 size-[5px] -translate-x-1/2 rounded-full"
-                style={{
-                  left: xClose(startDay + t.day),
-                  background: FLOW_TICK[t.tick],
-                  opacity: dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1,
-                }}
+            visiblePips(model.ticks, (d) => xClose(startDay + d)).map((t) => (
+              <FlowPip
+                key={t.day}
+                tick={t.tick}
+                left={xClose(startDay + t.day)}
+                opacity={dim && xClose(startDay + t.day) > cx + 0.5 ? 0.35 : 1}
               />
             ))}
         </div>

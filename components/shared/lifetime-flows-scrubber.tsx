@@ -91,7 +91,7 @@ import { fetchFlowBinSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 const PLAY_DAYS = 7;
 const PLAY_MS = 60;
 
-/** Tick colours: the side an event moved; a liquidation in the critical red. */
+/** Tick hues (FLOW_TICK): the bars' slider draws each day as a bar in its hue. */
 const TICK = FLOW_TICK;
 
 const pct = (v: number, max: number) => `${Math.max(0, (v / max) * 100)}%`;
@@ -669,6 +669,22 @@ export function LifetimeFlowsScrubber({
 const FOCUS_READ =
   "A click on the line freezes the cursor on a day, and the line after it is dimmed; “Apply to timeline” then cuts the timeline below at that day's close, which is how the timeline is read by date, and the page's link keeps that day. Each day's last event has a chart button that brings the chart to its day. Each event's card adds up its side as of that event, line by line.";
 
+/** The Explanation's sentence on the marks under the line, naming only the
+ *  kinds this position has; empty where every mark is a plain dot. */
+function tickWords(model: FlowModel, hasDebt: boolean): string {
+  const has = new Set(model.ticks.map((t) => t.tick));
+  const parts: string[] = [];
+  if (has.has("liquidation")) parts.push("a red triangle for a liquidation");
+  if (has.has("redemption")) parts.push("an orange triangle for a redemption");
+  if (has.has("caution")) parts.push("an orange triangle for another change the owner did not make");
+  if (has.has("rate-delegate")) parts.push("a pink dot for a rate change the delegate set");
+  if (has.has("rate-owner")) parts.push("a ring for a rate change the owner made");
+  if (parts.length === 0) return "";
+  const side = hasDebt ? "a dot in the hue of the side it moved" : "a dot";
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `Under the line each day with events has one mark: ${list}, and otherwise ${side}; a day with several shows the strongest. `;
+}
+
 /** The Key's and the Explanation's lines on what the bars and the line cover
  *  and how to read them, and the line's two sides for the Key. */
 function panelWords(
@@ -712,13 +728,14 @@ function panelWords(
       ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
       : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";
   const today = closed ? "at the close" : "today";
+  const marks = tickWords(model, hasDebt);
   return {
     key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
     explain: lined
       ? cover +
         `The line under ${them} draws ${what} at the end of each ${bin} since the open, ${model.words.linePrices ?? "at the daily prices the index records"}` +
         `${from > 0 ? `, with the ${bs}' window shaded` : ""}${model.words.linePrices ? "" : `, and leaves a gap where a held asset has no price that ${bin}`}. ` +
-        `One cursor moves both; press the line and drag to scrub it. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
+        `One cursor moves both; press the line and drag to scrub it. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ${marks}` +
         `${read} The dashed outline is where ${each} ${today}.` +
         (from > 0
           ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`

@@ -78,8 +78,12 @@ export interface FlowEvent {
   /** Unix seconds. */
   ts: number;
   block: number;
-  /** Which side the event moved, for the tick strip under the slider. */
-  tick: "collateral" | "debt" | "both" | "liquidation";
+  /** What the event was, for the tick strip under the slider: the side it
+   *  moved, or a liquidation, a redemption, another change the owner did not
+   *  make ("caution": a force repay, a tick rebalance), or a rate change set by
+   *  a delegate or batch manager ("rate-delegate") or by the owner
+   *  ("rate-owner"). A day draws its strongest (`tickRank`). */
+  tick: FlowTick;
   /** What the event adds to each bucket, in USD, and the asset it moved. */
   legs: { bucket: string; usd: number; symbol?: string }[];
   /** The transaction, and whether the position card counts it (false: a
@@ -196,14 +200,48 @@ export function grownBalance(
   };
 }
 
+export type FlowTick =
+  | "collateral"
+  | "debt"
+  | "both"
+  | "liquidation"
+  | "redemption"
+  | "caution"
+  | "rate-delegate"
+  | "rate-owner";
+
+/** A tick's strength: a day with several events draws the strongest —
+ *  liquidation, then a redemption or other caution event, then a rate change
+ *  (a delegate's before the owner's), then a movement. */
+export function tickRank(t: FlowTick): number {
+  switch (t) {
+    case "liquidation":
+      return 4;
+    case "redemption":
+    case "caution":
+      return 3;
+    case "rate-delegate":
+      return 2.5;
+    case "rate-owner":
+      return 2;
+    default:
+      return 1;
+  }
+}
+
+/** A rate change's words in the tick's tip. */
+const RATE_WORD = { "rate-delegate": "Rate set by the delegate", "rate-owner": "Rate change" } as const;
+
 /** One active UTC day: the position after the day's last event. */
 export interface FlowDayRow {
   /** UTC day number (unix seconds / 86400). */
   day: number;
   /** Events on or before this day. */
   events: number;
-  /** Which sides the day's events moved, or a liquidation: the tick strip. */
+  /** The day's strongest event for the tick strip (`tickRank`). */
   tick: FlowEvent["tick"];
+  /** The day's rate changes, which move no bucket, for the tick's words. */
+  rates?: ("rate-delegate" | "rate-owner")[];
   /** Running USD per bucket after the day. */
   cum: Record<string, number>;
   /** Balances the day's events stated, after its last event. */
@@ -478,7 +516,9 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
   let cur: {
     day: number;
     sides: Set<"collateral" | "debt">;
-    liq: boolean;
+    /** The day's strongest event that is not a movement. */
+    mark: FlowTick | null;
+    rates: Set<"rate-delegate" | "rate-owner">;
     balances: Map<string, FlowEvent["balances"][number]>;
     prices: Map<string, { usd: number; ts: number }>;
     cells: Set<string>;
@@ -491,7 +531,8 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     days.push({
       day: cur.day,
       events: n,
-      tick: cur.liq ? "liquidation" : cur.sides.size === 2 ? "both" : cur.sides.has("debt") ? "debt" : "collateral",
+      tick: cur.mark ?? (cur.sides.size === 2 ? "both" : cur.sides.has("debt") ? "debt" : "collateral"),
+      ...(cur.rates.size ? { rates: [...cur.rates] } : {}),
       cum: { ...cum },
       balances: [...cur.balances.values()],
       prices: [...cur.prices].map(([asset, p]) => ({ asset, usd: p.usd, ts: p.ts })),
@@ -507,7 +548,15 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
   for (const ev of ordered) {
     const day = utcDay(ev.ts);
     if (cur && cur.day !== day) close();
-    cur ??= { day, sides: new Set(), liq: false, balances: new Map(), prices: new Map(), cells: new Set() };
+    cur ??= {
+      day,
+      sides: new Set(),
+      mark: null,
+      rates: new Set(),
+      balances: new Map(),
+      prices: new Map(),
+      cells: new Set(),
+    };
     n += 1;
     // A transaction's events are consecutive; the card leaves some out.
     if (ev.countsTx !== false) {
@@ -528,11 +577,14 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       }
     }
     for (const b of ev.balances) cur.balances.set(`${b.side}:${b.asset}`, b);
-    if (ev.tick === "liquidation") cur.liq = true;
-    else if (ev.tick === "both") {
+    if (ev.tick === "both") {
       cur.sides.add("collateral");
       cur.sides.add("debt");
-    } else cur.sides.add(ev.tick);
+    } else if (ev.tick === "collateral" || ev.tick === "debt") cur.sides.add(ev.tick);
+    else {
+      if (ev.tick === "rate-delegate" || ev.tick === "rate-owner") cur.rates.add(ev.tick);
+      if (cur.mark == null || tickRank(ev.tick) > tickRank(cur.mark)) cur.mark = ev.tick;
+    }
   }
   close();
   return days;
@@ -735,6 +787,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
         const now = d.cum[b.key];
         if (now != null && Math.abs(now - (prev?.cum[b.key] ?? 0)) > 1e-9 && !kinds.includes(word)) kinds.push(word);
       }
+      for (const r of d.rates ?? []) kinds.push(RATE_WORD[r]);
       return { day: d.day - startDay, tick: d.tick, kinds };
     }),
     repricings,

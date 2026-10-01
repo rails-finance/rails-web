@@ -155,6 +155,49 @@ test("V2 WETH, redeemed: the redemptions sit on both bars, linked", () => {
   assert.equal(totals(REDEEMED).t[LQ.redistColl] ?? 0, 0);
 });
 
+test("the tick strip: one mark a day, the strongest kind, every rate change named", () => {
+  const rank = { liquidation: 4, redemption: 3, caution: 3, "rate-delegate": 2.5, "rate-owner": 2 } as const;
+  const strength = (t: string) => rank[t as keyof typeof rank] ?? 1;
+  const evStrength = (e: LiquityFlowEvent) =>
+    e.kind === "liquidation"
+      ? 4
+      : e.kind === "redemption"
+        ? 3
+        : e.rateBy === "delegate"
+          ? 2.5
+          : e.rateBy === "owner"
+            ? 2
+            : 1;
+  for (const [label, events, open] of [
+    ["redeemed", REDEEMED, true],
+    ["liquidated", LIQUIDATED, false],
+    ["zombie", ZOMBIE, true],
+  ] as const) {
+    const m = model(events, ["X", "BOLD"], open);
+    const byDay = new Map<number, LiquityFlowEvent[]>();
+    for (const ev of replayLiquity(events).map((r) => r.ev)) {
+      const d = Math.floor(ev.ts / 86_400);
+      byDay.set(d, [...(byDay.get(d) ?? []), ev]);
+    }
+    const days = [...byDay.keys()].sort((a, b) => a - b);
+    assert.equal(m.ticks.length, days.length, `${label}: one tick per active day`);
+    m.ticks.forEach((tk, i) => {
+      const evs = byDay.get(days[i])!;
+      const strongest = Math.max(...evs.map(evStrength));
+      assert.equal(strength(tk.tick), strongest, `${label}: day ${days[i]} draws its strongest (${tk.tick})`);
+      if (evs.some((e) => e.rateBy === "owner")) assert.ok(tk.kinds.includes("Rate change"), `${label}: named`);
+      if (evs.some((e) => e.rateBy === "delegate"))
+        assert.ok(tk.kinds.includes("Rate set by the delegate"), `${label}: the delegate's rate change is named`);
+    });
+  }
+  const ticks = (e: LiquityFlowEvent[], open: boolean) =>
+    new Set(model(e, ["X", "BOLD"], open).ticks.map((t) => t.tick));
+  assert.ok(ticks(REDEEMED, true).has("redemption"), "a redemption day draws the redemption mark");
+  assert.ok(ticks(REDEEMED, true).has("rate-owner"), "an owner's rate change draws the ring");
+  assert.ok(ticks(LIQUIDATED, false).has("liquidation"), "the liquidation day draws the liquidation mark");
+  assert.ok(ticks(ZOMBIE, true).has("rate-delegate"), "a batch manager's rate change draws the delegate mark");
+});
+
 test("V2 rETH, liquidated: the liquidation and its surplus leave the collateral whole", () => {
   const { t } = totals(LIQUIDATED);
   assert.ok((t[LQ.collLiquidated] ?? 0) > 0, "collateral liquidated");

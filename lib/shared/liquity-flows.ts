@@ -65,6 +65,18 @@ export interface LiquityFlowEvent {
   /** The rate and the batch's management fee in force after the event. */
   rate: number;
   fee: number;
+  /** A rate change, and who set it: the owner (adjustTroveInterestRate) or
+   *  the Trove's batch manager (setBatchManagerAnnualInterestRate). */
+  rateBy?: "owner" | "delegate";
+}
+
+/** Who set a rate change, by the operation's name. */
+function rateByOf(op: string | undefined): LiquityFlowEvent["rateBy"] {
+  return op === "adjustTroveInterestRate"
+    ? "owner"
+    : op === "setBatchManagerAnnualInterestRate"
+      ? "delegate"
+      : undefined;
 }
 
 /** Bucket keys. */
@@ -326,11 +338,17 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       tick:
         ev.kind === "liquidation"
           ? "liquidation"
-          : moved.coll && moved.debt
-            ? "both"
-            : moved.coll
-              ? "collateral"
-              : "debt",
+          : ev.kind === "redemption"
+            ? "redemption"
+            : ev.rateBy === "delegate"
+              ? "rate-delegate"
+              : ev.rateBy === "owner"
+                ? "rate-owner"
+                : moved.coll && moved.debt
+                  ? "both"
+                  : moved.coll
+                    ? "collateral"
+                    : "debt",
       legs: legs.map((l) =>
         COLL_BUCKETS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * price, symbol: o.collSymbol }
@@ -584,6 +602,7 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
       price: c.collateralPrice > 0 ? c.collateralPrice : null,
       rate: after.rate,
       fee,
+      rateBy: rateByOf(c.operation),
     });
   }
   return out;
@@ -653,6 +672,7 @@ export function liquityForkFlowEvents(
       price: c.priceAtBlock?.usd != null && c.priceAtBlock.usd > 0 ? c.priceAtBlock.usd : null,
       rate: num(c.interestRate),
       fee,
+      rateBy: rateByOf(c.eventType),
     });
   }
   return out;
