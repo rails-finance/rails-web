@@ -147,12 +147,6 @@ function SideLedger({
           totalUsdProv={totalProv}
           totalUsdBeforeProv={totalBeforeProv}
           daily={model.daily}
-          subhead={
-            <>
-              <TokenChipIcon symbol={single.symbol} size={16} filterable={false} />
-              {single.symbol}
-            </>
-          }
         />
         {note}
       </>

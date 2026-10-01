@@ -7,7 +7,8 @@
 // as of the event, the event's row highlighted, a rule, and the closing line.
 // The toggle is one chevron, fixed to the cell's top right, that turns over
 // when the cell is open, so a tap opens and a tap at the same point closes; a click anywhere on that first line does the same. Tokens
-// first; USD in a second column after a thin divider where the timeline's
+// first, each token figure followed by its asset's icon (the symbol once,
+// on the asset's total line); USD in a second column after a thin divider where the timeline's
 // Display switches show it, with Market move, the price's effect, in that
 // column alone. In a cell narrower than 28rem the two columns take turns
 // behind a small switch over the rows. The figures come from
@@ -30,6 +31,7 @@ import { ChevronDown } from "lucide-react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
 import { EventLedgerContext, LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -75,7 +77,7 @@ const ColContext = createContext<{ col: Col; offer: (unit: string | null) => voi
  *  where the two number columns take turns. */
 const NARROW_HIDE = "@max-md:hidden";
 
-/** The side's swatch beside its name, as the ledger's closing line draws it. */
+/** The side's swatch beside its name: the one swatch that keys the side (closing lines carry none). */
 const SideSwatch = ({ side }: { side: FlowSide }) => (
   <i aria-hidden className="inline-block size-3 shrink-0 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
 );
@@ -381,12 +383,16 @@ interface Cols {
   usd: boolean;
   /** Both number columns, which a narrow cell shows one at a time. */
   two: boolean;
+  /** The asset's icon after each token figure, in a column of its own. */
+  unit: boolean;
+  /** In a narrow cell, the column the switch shows. */
+  col: Col;
   /** In a narrow cell, the column the switch hides. */
   hideTok: string;
   hideUsd: string;
 }
 
-function useCols(tokens: boolean, usd: boolean, unitWord: string, offerSwitch: boolean): Cols {
+function useCols(tokens: boolean, usd: boolean, unitWord: string, offerSwitch: boolean, unit: boolean): Cols {
   const colCtx = useContext(ColContext);
   const two = tokens && usd;
   const col: Col = colCtx?.col ?? "tokens";
@@ -398,18 +404,41 @@ function useCols(tokens: boolean, usd: boolean, unitWord: string, offerSwitch: b
     tokens,
     usd,
     two,
+    unit: tokens && unit,
+    col,
     hideTok: two && col === "usd" ? NARROW_HIDE : "",
     hideUsd: two && col === "tokens" ? NARROW_HIDE : "",
   };
 }
 
-/** The grid the rows sit in. In a narrow cell one of two number columns
- *  shows. */
+/** The grid the rows sit in: swatch, label, tokens, the asset's icon, USD.
+ *  In a narrow cell one of two number columns shows (the icon goes with the
+ *  tokens). */
 function LedgerGrid({ cols, children }: { cols: Cols; children: ReactNode }) {
-  const grid = cols.two
-    ? "grid-cols-[auto_minmax(0,1fr)_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto]"
-    : "grid-cols-[auto_minmax(0,1fr)_auto]";
+  const grid = cols.unit
+    ? cols.two
+      ? cols.col === "usd"
+        ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto]"
+        : "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+      : "grid-cols-[auto_minmax(0,1fr)_auto_auto]"
+    : cols.two
+      ? "grid-cols-[auto_minmax(0,1fr)_auto_auto] @max-md:grid-cols-[auto_minmax(0,1fr)_auto]"
+      : "grid-cols-[auto_minmax(0,1fr)_auto]";
   return <div className={`grid ${grid} items-center gap-x-3 text-sm tabular-nums`}>{children}</div>;
+}
+
+/** The asset's icon after a token figure: 14px in a slot of fixed width, so
+ *  the figures line up whether or not the icon loaded. Its accessible name
+ *  and its tip are the symbol. Muted on an item row, full strength on the
+ *  asset's total line. */
+export function LedgerIcon({ symbol, muted = false }: { symbol: string; muted?: boolean }) {
+  return (
+    <span className="inline-flex size-3.5 shrink-0 items-center justify-center" data-ledger-icon={symbol}>
+      <RevealTip tip={symbol} label={symbol} align="end" className={muted ? "opacity-70" : ""}>
+        <TokenChipIcon symbol={symbol} size={14} filterable={false} untitled />
+      </RevealTip>
+    </span>
+  );
 }
 
 const USD_CELL = "border-l border-rb-300 pl-3 dark:border-rb-600 @max-md:border-l-0 @max-md:pl-0";
@@ -434,12 +463,11 @@ function LedgerRows({
   totalUsdBeforeProv,
   usdProvOf,
   daily = false,
-  subhead,
   spaced = false,
 }: {
   ledger: Ledger;
   cols: Cols;
-  /** Space above the subhead (a ledger after another). */
+  /** A gap above the rows (a ledger after another). */
   spaced?: boolean;
   name: string;
   at: string;
@@ -447,7 +475,6 @@ function LedgerRows({
   totalUsdBeforeProv?: Provenance;
   usdProvOf?: (r: LedgerRow) => Provenance | undefined;
   daily?: boolean;
-  subhead?: ReactNode;
 }) {
   const side = ledger.side;
   const { two, hideTok, hideUsd } = cols;
@@ -481,13 +508,9 @@ function LedgerRows({
       {...(ledger.symbol ? { "data-ledger-symbol": ledger.symbol } : {})}
       {...(ledger.decimals != null ? { "data-ledger-decimals": ledger.decimals } : {})}
     >
-      {subhead && (
-        <div
-          className={`col-span-full flex items-center gap-1.5 pb-1 font-semibold text-foreground${spaced ? " mt-5" : ""}`}
-        >
-          {subhead}
-        </div>
-      )}
+      {/* A group after another starts after a clear gap: the rule and the
+          total line above close the group before it. */}
+      {spaced && <div aria-hidden className="col-span-full h-4" data-ledger-gap="" />}
       {ledger.rows.map((r) => {
         // The price's effect has no token amount: it goes with the USD column.
         const hideRow = two && r.tokens == null ? hideUsd : "";
@@ -511,6 +534,11 @@ function LedgerRows({
                 {r.tokens ? <Prov info={tokenProv(r)}>{r.tokens.text}</Prov> : null}
               </span>
             )}
+            {cols.unit && (
+              <span className={`flex items-center py-1 ${hideTok} ${hideRow}`} data-ledger-unit-cell="">
+                {r.tokens && ledger.symbol ? <LedgerIcon symbol={ledger.symbol} muted /> : null}
+              </span>
+            )}
             {cols.usd && (
               <span
                 className={`whitespace-nowrap py-1 text-right ${tone(r)} ${two ? USD_CELL : ""} ${hideUsd} ${hideRow}`}
@@ -529,9 +557,8 @@ function LedgerRows({
         {...(total ? { "data-ledger-units": total.units } : {})}
         {...(ledger.usd ? { "data-ledger-dollars": ledger.usd.dollars } : {})}
       >
-        <span className="flex min-h-7 items-center self-start">
-          <Swatch side={side} row={null} />
-        </span>
+        {/* A closing line carries no swatch: the cell's first line keys the side. */}
+        <span aria-hidden />
         {/* The line carries no visible name (the cell's first line states it);
             the figure shares the label's column, so a wide before → after does
             not widen the column of figures above it. */}
@@ -540,6 +567,14 @@ function LedgerRows({
           aria-label={`${name} total`}
           className={`col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 py-1 ${hideTok ? "@max-md:col-span-1" : ""}`}
         >
+          {/* A narrow cell showing USD names the group at the line's start,
+              where the token column would close it. */}
+          {hideTok && cols.unit && ledger.symbol && (
+            <span className="hidden items-center gap-1.5 font-semibold text-foreground @max-md:inline-flex">
+              <LedgerIcon symbol={ledger.symbol} />
+              <span aria-hidden>{ledger.symbol}</span>
+            </span>
+          )}
           {cols.tokens ? (
             <span className={`ml-auto whitespace-nowrap text-right ${hideTok}`}>
               {total?.before != null && (
@@ -572,6 +607,23 @@ function LedgerRows({
             )
           )}
         </span>
+        {cols.unit && (
+          // The asset's icon, then its symbol once per group (some icons are
+          // alike at 14px).
+          <span
+            className={`flex items-center gap-1.5 self-end whitespace-nowrap py-1 font-semibold text-foreground ${hideTok}`}
+            data-ledger-unit-cell=""
+          >
+            {total && ledger.symbol && (
+              <>
+                <LedgerIcon symbol={ledger.symbol} />
+                <span aria-hidden data-ledger-total-symbol="">
+                  {ledger.symbol}
+                </span>
+              </>
+            )}
+          </span>
+        )}
         {cols.tokens && cols.usd && (
           <span className={`self-end whitespace-nowrap py-1 text-right ${USD_CELL} ${hideUsd}`} data-ledger-usd="">
             {ledger.usd && (
@@ -594,7 +646,6 @@ export function LedgerTable({
   totalUsdProv,
   totalUsdBeforeProv,
   daily = false,
-  subhead,
 }: {
   ledger: Ledger;
   /** The total line's words: the cell's name. */
@@ -605,10 +656,8 @@ export function LedgerTable({
   totalUsdProv?: Provenance;
   totalUsdBeforeProv?: Provenance;
   daily?: boolean;
-  /** A line above the rows (an asset's icon and symbol). */
-  subhead?: ReactNode;
 }) {
-  const cols = useCols(ledger.tokens != null, ledger.usd != null, ledger.symbol ?? "Tokens", true);
+  const cols = useCols(ledger.tokens != null, ledger.usd != null, ledger.symbol ?? "Tokens", true, !!ledger.symbol);
   return (
     <LedgerGrid cols={cols}>
       <LedgerRows
@@ -619,7 +668,6 @@ export function LedgerTable({
         totalUsdProv={totalUsdProv}
         totalUsdBeforeProv={totalUsdBeforeProv}
         daily={daily}
-        subhead={subhead}
       />
     </LedgerGrid>
   );
@@ -653,6 +701,7 @@ export function AssetLedgers({
     shown.some((a) => a.usd != null),
     "Tokens",
     true,
+    shown.some((a) => !!a.symbol),
   );
   const held = side === "collateral" ? "Held" : "Owed";
   return (
@@ -674,12 +723,6 @@ export function AssetLedgers({
                   ? flowAssetProv(a.symbol ?? "", r.seg, side, at, false)
                   : undefined
             }
-            subhead={
-              <>
-                <TokenChipIcon symbol={a.symbol ?? ""} size={16} filterable={false} />
-                {a.symbol}
-              </>
-            }
           />
         ))}
         <div aria-hidden className={`${RULE} mt-3`} />
@@ -688,7 +731,6 @@ export function AssetLedgers({
           data-ledger-row="side-total"
           data-ledger-dollars={usd.dollars}
         >
-          <Swatch side={side} row={null} />
           <span
             role="group"
             aria-label={`${SIDE_NAME[side]} total`}

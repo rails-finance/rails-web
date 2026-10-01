@@ -24,7 +24,6 @@ import {
   type EventLedgerSource,
 } from "@/components/shared/event-ledger";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { assetTokenSum, eventAssetSum, eventSideSum, eventSideSumByAsset } from "@/lib/shared/flow-focus";
 import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -89,12 +88,6 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
             totalUsdProv={totalProv}
             totalUsdBeforeProv={beforeProv}
             daily={model.daily}
-            subhead={
-              <>
-                <TokenChipIcon symbol={single.symbol} size={16} filterable={false} />
-                {single.symbol}
-              </>
-            }
           />
           {note}
         </>
