@@ -9,7 +9,9 @@
 // there, and each event card can state the lifetime sum as of its event. A
 // page without it keeps the segment panels (Sky Savings).
 
-import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { formatUtcDay, parseUtcDay } from "@/hooks/useTimelineEvents";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { buildFlowModel, type FlowModel, type FlowTimeline } from "@/lib/shared/flows-timeline";
 import {
   createFlowFocusStore,
@@ -63,4 +65,54 @@ export function useFlowFocusValue(root: FlowFocusRoot, timeline: FlowTimeline | 
   const model = useMemo(() => (timeline ? buildFlowModel(timeline) : null), [timeline]);
   const { store, events } = root;
   return useMemo<FlowFocusValue>(() => ({ store, model, events }), [store, model, events]);
+}
+
+const DAY_S = 86_400;
+
+/** The cut in the address bar: `?to=2025-06-15`, the UTC day whose close it
+ *  ends at. On mount a `to` before today restores the cut and freezes the
+ *  chart's cursor on its day. A link from before Dates was removed on these
+ *  pages carries `from` and `to`; it lands on the cut at `to`, the range's last
+ *  day, and `from` goes. After that the param follows the cut: written when
+ *  Apply moves it, removed with the chip's ×. Other params stay as they are. */
+export function useRewindParam(store: FlowFocusStore | null): void {
+  useEffect(() => {
+    if (!store) return;
+    const write = (endTs: number | null) => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("from");
+        if (endTs == null) url.searchParams.delete("to");
+        else url.searchParams.set("to", formatUtcDay(endTs));
+        const next = `${url.pathname}${url.search}${url.hash}`;
+        const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (next !== current) window.history.replaceState(window.history.state, "", next);
+      } catch {
+        /* non-fatal: the cut stands, it just is not in the link */
+      }
+    };
+    let last: number | null = store.get().rewind?.endTs ?? null;
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const day = parseUtcDay(sp.get("to"));
+      const today = Math.floor(Date.now() / 1000 / DAY_S) * DAY_S;
+      if (day != null && day < today && last == null) {
+        const endTs = day + DAY_S - 1;
+        store.set({
+          rewind: { endTs, word: `${shortDate(day)} ${shortDateYear(day)}` },
+          restore: { endTs, n: (store.get().restore?.n ?? 0) + 1 },
+        });
+        last = endTs;
+        if (sp.has("from")) write(endTs);
+      } else if (sp.has("from") || sp.has("to")) write(last);
+    } catch {
+      /* a malformed query string restores nothing */
+    }
+    return store.subscribe(() => {
+      const endTs = store.get().rewind?.endTs ?? null;
+      if (endTs === last) return;
+      last = endTs;
+      write(endTs);
+    });
+  }, [store]);
 }

@@ -8,8 +8,7 @@
 // arrow keys move the cursor there, and play walks it along. The cursor stands on the line's points and on every day
 // with events (tapping an event dot jumps to it); what the headlines and the
 // bars state there is `combinedAt` (lib/shared/flows-combined.ts). The strip
-// after the cursor is dimmed, and the timeline's Dates span is bracketed on
-// it. The dashed outline marks where each bar ends today. Before the bars'
+// after the cursor is dimmed. The dashed outline marks where each bar ends today. Before the bars'
 // window opens the bars grey out at the window's first day and say so. Under
 // the strip, the playback controls, and on a page tied to its timeline "Apply
 // to timeline". The line's key sits in the panel's Explanation and its basis
@@ -99,18 +98,33 @@ export function CombinedFlows({
   onLedgerNote,
   renderBars,
 }: CombinedFlowsProps) {
-  // A Dates pick after Apply parks the cursor at its span's last day, which
-  // is a stop of its own where the line has no point there.
-  const [parkStop, setParkStop] = useState<number | null>(null);
-  const stops = useMemo(() => combinedStops(model, series, from, parkStop), [model, series, from, parkStop]);
+  // A cut restored from the address bar puts the cursor on its day, which
+  // is a stop of its own where the line has no point there. Days here are
+  // absolute UTC days: a stop counts from `model.start`, which moves where a
+  // page's model is rebuilt over more of the life (a Liquity fork's whole
+  // history landing after its preload).
+  const startDay = model.start / DAY_MS;
+  const [restoreDay, setRestoreDay] = useState<number | null>(null);
+  const stops = useMemo(
+    () => combinedStops(model, series, from, restoreDay == null ? null : restoreDay - model.start / DAY_MS),
+    [model, series, from, restoreDay],
+  );
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
   const [playing, setPlaying] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-  // A new series (the first read landing) puts the cursor at today.
+  // A new series (the first read landing) puts the cursor at today, or on
+  // the day a frozen cursor stands on (`keepDay`, kept below).
   const lastRef = useRef(last);
   lastRef.current = last;
-  useEffect(() => setAt(lastRef.current), [model, series, from]);
+  const stopsRef = useRef(stops);
+  stopsRef.current = stops;
+  const keepDay = useRef<number | null>(null);
+  useEffect(() => {
+    const keep = keepDay.current == null ? null : keepDay.current - model.start / DAY_MS;
+    const i = keep == null ? -1 : stopsRef.current.findIndex((x) => !x.live && x.stop === keep);
+    setAt(i >= 0 ? i : lastRef.current);
+  }, [model, series, from]);
   const halt = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
     timer.current = null;
@@ -176,6 +190,17 @@ export function CombinedFlows({
   useEffect(() => {
     focus?.store.set({ cursor: { endTs: committedEnd, word: committedWord, live: !!committed?.live } });
   }, [focus?.store, committedEnd, committedWord, committed?.live]);
+  // Read by the series effect above in the next commit, so it holds the
+  // stop the cursor was last put on. Only a move or a freeze writes it: in a
+  // commit whose stops changed, `at` is still the old list's index until that
+  // effect moves it.
+  const tracked = useRef({ at, frozen, stops });
+  useEffect(() => {
+    const prev = tracked.current;
+    tracked.current = { at, frozen, stops };
+    if (prev.stops !== stops || (prev.at === at && prev.frozen === frozen)) return;
+    keepDay.current = frozen && committed && !committed.live ? startDay + committed.stop : null;
+  });
   // The frozen day, which a card's chart button hides on.
   const frozenDay =
     frozen && committed ? Math.floor((committed.live ? Date.now() / 1000 : committedEnd) / 86_400) : null;
@@ -205,37 +230,35 @@ export function CombinedFlows({
       setFrozen(true);
     }
   }, [move, stops, model.start, halt]);
-  // A month or range picked in Dates while a cut stood: the cursor goes to
-  // the close of the span's last day, frozen there, or to today, unfrozen,
-  // where the span reaches today.
-  const park = useFlowFocusState((s) => s.park);
-  const parked = useRef<number | null>(null);
-  const parkTo = useRef<number | "live" | null>(null);
+  // A cut restored from the address bar (`useRewindParam`): the cursor goes
+  // to its day's close, frozen there.
+  const restore = useFlowFocusState((s) => s.restore);
+  const restored = useRef<number | null>(null);
+  const restoreTo = useRef<number | null>(null);
   useEffect(() => {
-    if (!park || parked.current === park.n) return;
-    parked.current = park.n;
+    if (!restore || restored.current === restore.n) return;
+    const day = Math.floor(restore.endTs / 86_400);
+    const stop = day - model.start / DAY_MS;
+    // A model that does not reach the day yet (a preload's) waits for the
+    // one that does.
+    if (stop < 0 || stop >= model.liveStop) return;
+    restored.current = restore.n;
+    // Taken once: a panel mounted later starts at today.
+    focus?.store.set({ restore: null });
     halt();
-    const stop = Math.max(0, Math.floor(park.endTs / 86_400) - model.start / DAY_MS);
-    if (stop >= model.liveStop) {
-      parkTo.current = "live";
-      setParkStop(null);
-      setFrozen(false);
-    } else {
-      parkTo.current = stop;
-      setParkStop(stop);
-      setFrozen(true);
-    }
-  }, [park, model.start, model.liveStop, halt]);
+    restoreTo.current = day;
+    keepDay.current = day;
+    setRestoreDay(day);
+    setFrozen(true);
+  }, [restore, model.start, model.liveStop, halt, focus?.store]);
   useEffect(() => {
-    const to = parkTo.current;
+    const to = restoreTo.current == null ? null : restoreTo.current - startDay;
     if (to == null) return;
-    const i = to === "live" ? stops.length - 1 : stops.findIndex((x) => !x.live && x.stop === to);
+    const i = stops.findIndex((x) => !x.live && x.stop === to);
     if (i < 0) return;
-    parkTo.current = null;
+    restoreTo.current = null;
     setAt(i);
-  }, [stops, park]);
-  // The Dates filter's span on the timeline, bracketed on the line.
-  const dates = useFlowFocusState((s) => s.dates);
+  }, [stops, restore]);
 
   const cur: CombinedStop = stops[Math.min(at, last)];
   const { head, bars: barState } = combinedAt(model, bars, cur);
@@ -355,7 +378,6 @@ export function CombinedFlows({
               head={{ collateral: head.collateral.now, debt: head.debt.now }}
               hasDebt={hasDebt}
               windowFrom={from > 0 ? model.start / DAY_MS + from : null}
-              dates={dates}
               valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
               onPick={go}
               ends={{ start: dayStamp(dayStart(model, 0)), end: closed ? closeDay : "Today" }}
@@ -485,7 +507,6 @@ function LineStrip({
   head,
   hasDebt,
   windowFrom,
-  dates,
   valueText,
   onPick,
   ends,
@@ -500,8 +521,6 @@ function LineStrip({
   head: { collateral: number; debt: number };
   hasDebt: boolean;
   windowFrom: number | null;
-  /** The timeline's Dates span (unix seconds), bracketed on the line. */
-  dates: [number, number] | null;
   valueText: string;
   onPick: (i: number) => void;
   /** The words under the strip's two ends: the first event's day, and today
@@ -592,7 +611,6 @@ function LineStrip({
     dragging.current = true;
     pressX.current = e.clientX;
     dragged.current = false;
-    setGrabbing(true);
     e.currentTarget.setPointerCapture?.(e.pointerId);
     if (!freeze) onPick(i);
   };
@@ -601,6 +619,9 @@ function LineStrip({
     const i = nearest(e.clientX);
     if (i == null) return;
     if (freeze && !dragged.current && Math.abs(e.clientX - (pressX.current ?? e.clientX)) < 5) return;
+    // The hand closes only once the press drags: at rest the strip shows a
+    // crosshair (Miles, 1 Oct 2026).
+    if (!dragged.current) setGrabbing(true);
     dragged.current = true;
     onPick(i);
   };
@@ -699,14 +720,6 @@ function LineStrip({
   const area = (k: "collateral" | "debt", seq: number[]) =>
     `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;
   const shade = windowFrom != null && windowFrom > startDay ? xDay(windowFrom) : null;
-  // The Dates span, from the start of its first day to the end of its last,
-  // held inside the plot.
-  const bracket = (() => {
-    if (!dates || run <= 0) return null;
-    const a = Math.max(x0, Math.min(PAD + inner, xDay(Math.floor(dates[0] / 86_400))));
-    const b = Math.max(x0, Math.min(PAD + inner, xDay(Math.floor(dates[1] / 86_400) + 1)));
-    return b - a >= 1 ? { a, b } : null;
-  })();
   const per = series?.bin ?? "week";
   const cx = n > 0 && stops[at] ? xStop(stops[at]) : PAD + inner;
   // The strip after the cursor lies under a translucent layer, except at
@@ -726,7 +739,7 @@ function LineStrip({
           aria-valuemax={Math.max(0, stops.length - 1)}
           aria-valuenow={at}
           aria-valuetext={valueText}
-          className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-grab"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
+          className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-crosshair"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
           style={{ height: STRIP_H }}
           data-flow-strip=""
           onPointerDown={onDown}
@@ -764,29 +777,6 @@ function LineStrip({
                     data-flow-gridline=""
                   />
                 ))}
-              {/* The Dates span: a faint band with a thin bracket at each
-                  end, in the Dates control's teal, under the lines. */}
-              {bracket && (
-                <g className="text-teal-500 dark:text-teal-400" data-flow-dates="">
-                  <rect
-                    x={bracket.a}
-                    y={0}
-                    width={bracket.b - bracket.a}
-                    height={STRIP_H}
-                    fill="currentColor"
-                    fillOpacity={0.1}
-                  />
-                  {[bracket.a, bracket.b].map((bx, j) => (
-                    <path
-                      key={j}
-                      d={`M${bx + (j ? -4 : 4)},1.5H${bx}V${STRIP_H - 1.5}H${bx + (j ? -4 : 4)}`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                    />
-                  ))}
-                </g>
-              )}
               {sides.map((k) =>
                 runs(k).map((seq) => (
                   <g key={`${k}${seq[0]}`}>

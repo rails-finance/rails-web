@@ -262,13 +262,15 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
   const subjectSearch = new URL(url).search;
   const expectedHref = `${positionPath}?at=${encodeURIComponent(expectedId)}${subjectSearch ? `&${subjectSearch.slice(1)}` : ""}`;
   check(`${label} @${width}: "View in timeline" points at ?at=`, href === expectedHref, `${href} vs ${expectedHref}`);
-  // The toolbar is named by its own Date control. Until 2026-09-11 it was
-  // named by its copy-view-link, and `ec46e137` moved that control into the
-  // position card's Explanation pane, where a pinned page still draws it on
-  // most families — so the old selector read the CARD and called the toolbar
-  // present. Check 1 proves this selector finds the toolbar where there is one.
-  const toolbarDate = await page.locator("[data-date-control]").count();
-  check(`${label} @${width}: toolbar absent (no Date control)`, toolbarDate === 0, `${toolbarDate} found`);
+  // The toolbar is named by its count line (`data-timeline-total`). Until
+  // 2026-09-11 it was named by its copy-view-link, and `ec46e137` moved that
+  // control into the position card's Explanation pane, where a pinned page
+  // still draws it on most families — so that selector read the CARD and
+  // called the toolbar present. From then to 2026-10-01 it was the Date
+  // control, which the families tied to a Lifetime flows chart no longer
+  // draw. Check 1 proves this selector finds the toolbar where there is one.
+  const toolbarCount = await page.locator("[data-timeline-total]").count();
+  check(`${label} @${width}: toolbar absent (no count line)`, toolbarCount === 0, `${toolbarCount} found`);
   const sortBtn = await page.locator('button[aria-label^="Currently"]').count();
   check(`${label} @${width}: toolbar sort control absent`, sortBtn === 0);
   // These families pass the card an Explanation whatever the account's status
@@ -517,8 +519,8 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
   // The positive half of check 2's "toolbar absent": the same selector finds
   // the toolbar on the position page, so an absence there is not a selector
   // that matches nothing.
-  const posDate = await posPage.locator("[data-date-control]").count();
-  check(`${name}: position page draws the toolbar's Date control`, posDate > 0, `${posDate} found`);
+  const posToolbar = await posPage.locator("[data-timeline-total]").count();
+  check(`${name}: position page draws the toolbar's count line`, posToolbar > 0, `${posToolbar} found`);
   const idsOnPage = await eventIds(posPage);
   const link = await copyEventLink(posPage);
   const linkUrl = new URL(link);

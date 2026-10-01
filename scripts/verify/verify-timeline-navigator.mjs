@@ -19,7 +19,7 @@
 //      holds ONE grid, at month grain, whose live cells run from the month
 //      holding the summary's own `firstTimestamp` to the month holding its
 //      `lastTimestamp` with no month between them missing. Read from
-//      `/api/aave-v3/timeline/summary` on the run — never a pasted number;
+//      the family's `/timeline/summary` on the run — never a pasted number;
 //   2  A MONTH CLICK SHOWS THAT MONTH'S ROWS. Where the loaded rows hold it,
 //      which is every month of a `?folders=0` page the grid lets you click,
 //      it FILTERS: it writes `?from=`/`?to=` as the whole month, moves the
@@ -193,8 +193,8 @@
 // are the pulsing spine tip's animation phase and the dotted spine's
 // antialiasing. The change moves nothing with the flag off.
 //
-// Fixtures are the five the plan pins (2026-09-11), all Aave V3 Ethereum,
-// market `core`: the deepest user position measured, a short dense life, a
+// Fixtures are five Compound V2 wallets (`WALLETS`; Aave V3 Ethereum `core`
+// from 2026-09-11 to 2026-10-01, the history below describes those): the deepest user position measured, a short dense life, a
 // long thin one, a liquidated account whose whole history is under the cut,
 // and a shallow control. Every figure is read from the routes on the run.
 //
@@ -562,12 +562,20 @@ const monthEndOf = (at) => {
   return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) / 1000) - 1;
 };
 
+// Compound V2 since 2026-10-01. These fixtures were Aave V3 `core` wallets
+// until then; Aave V3 navigates by its Lifetime flows chart now and draws no
+// Dates control, so the arm moved to a family with the same summary and
+// windowed timeline routes. Counted 2026-10-01: deep 25,787 events,
+// dense-short 12,255, broad 44,898, liquidated 120 (five liquidations,
+// still open), control 13. Check 9 needs open positions: a closed one draws
+// no pulsing tip.
+const NAV = { page: "/ethereum/compound-v2", api: "/api/compound-v2", q: "" };
 const WALLETS = {
-  deep: "0xee7ca610d896c53ffe716b801c05748efd902954",
-  "dense-short": "0xd411d428a63cf4c7029bc53f0e0f56c4933fdbb7",
-  broad: "0x4d431856295413906075dd40266d83624e09c672",
-  liquidated: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47",
-  control: "0x1ddd6f79b93825158f0aa7d5964039deb2cb3361",
+  deep: "0x29fe7d60ddf151e5b52e5fab4f1325da6b2bd958",
+  "dense-short": "0x8888882f8f843896699869179fb6e4f7e3b58888",
+  broad: "0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56",
+  liquidated: "0xcd49361e9286fee25e11cb228f99b8dcd35de988",
+  control: "0xa7c9b1962d47ecd2df6f6819af9bae3655728d62",
 };
 
 /** `cut` — the page draws a WINDOW of a longer history, so checks 5 and 6
@@ -1016,15 +1024,15 @@ for (const f of FIXTURES) {
   // `?folders=0` is PINNED on every page URL below rather than in `path`, so
   // the URLs that add `from=`/`to=` join it with `&` — see the note at the
   // head of this file for why it is pinned at all.
-  const path = `/ethereum/aave-v3/${wallet}`;
+  const path = `${NAV.page}/${wallet}`;
   const page = await ctx.newPage();
   page.setDefaultTimeout(300_000);
   try {
     // Both routes on the same run: the whole-life summary the span is measured
     // against, and the listed rows checks 5 and 6 measure the cut against.
     const [summary, rows] = await Promise.all([
-      getJson(`/api/aave-v3/timeline/summary?market=core&wallet=${wallet}&cutoffBlock=99999999`),
-      getJson(`/api/aave-v3/timeline?market=core&wallet=${wallet}&${RECENT_QS}`),
+      getJson(`${NAV.api}/timeline/summary?${NAV.q}wallet=${wallet}&cutoffBlock=99999999`),
+      getJson(`${NAV.api}/timeline?${NAV.q}wallet=${wallet}&${RECENT_QS}`),
     ]);
     if (summary.error || rows.error) {
       check(`0  ${f.id}: the routes answered`, false, summary.error ?? rows.error);
@@ -1209,7 +1217,7 @@ for (const f of FIXTURES) {
         );
       } else {
         const span = await getJson(
-          `/api/aave-v3/timeline?market=core&wallet=${wallet}&from=${pick.at}&to=${pick.at + SECONDS_PER_DAY - 1}`,
+          `${NAV.api}/timeline?${NAV.q}wallet=${wallet}&from=${pick.at}&to=${pick.at + SECONDS_PER_DAY - 1}`,
         );
         const got = span.events ?? [];
         const outside = got.filter((e) => e.timestamp < pick.at || e.timestamp >= pick.at + SECONDS_PER_DAY);
@@ -1635,8 +1643,9 @@ for (const f of FIXTURES) {
 // reference/timeline-navigator-prototype.md, "the day × action cross-tab").
 // What the map DRAWS on a grouped page is `H1` in verify-folder-reductions.mjs.
 //
-// Fixtures (Aave V3 Ethereum, `core`), timed grouped on preview 2026-09-21
-// before being chosen: `grouped-deep` 0xee7c…2954, a user position (not in
+// Fixtures (Aave V3 Ethereum, `core`; retired from this arm 2026-10-01, see
+// `ASYM_SUSDS_DEEPEST`), timed grouped on preview 2026-09-21 before being
+// chosen: `grouped-deep` 0xee7c…2954, a user position (not in
 // `protocol_plumbing_contracts`, not router-flagged) whose grouped answer is
 // cut by ROWS — 1,000 rows, 86 folders beside 914 events, of 7,150 — in 7.7 s;
 // `grouped-whole` 0x9984…bb47 (`liquidated` above), whole history, one folder
@@ -1729,16 +1738,13 @@ const morphoBaseView = (market) => (route) => {
 };
 const MORPHO_BASE_DEEPEST_MARKET = "0x3a4048c64ba1b375330d376b1ce40e4047d03b47ab4d48af484edec9fec801ba";
 const MORPHO_BASE_WETH_MARKET = "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
-// Row-cut batch 7 (2026-09-28) puts the three Liquity V2 forks on the same read,
-// grouped by rails-server (the redemption spec and the owner run).
-// `grouped-asym-deepest` is Asymmetry's deepest Trove, sUSDS 8309…2410 (4,731
-// events, 4,708 of them redemptions), which groups whole into 73 rows; a
-// Trove's `wallet` is its id, and its reads are named whole.
+// Asymmetry's deepest Trove, sUSDS 8309…2410 (4,731 events, 4,708 of them
+// redemptions). It was `grouped-asym-deepest` here until 2026-10-01, with
+// `grouped-deep` and `grouped-whole` (Aave V3) and `grouped-spark-deep`: those
+// families navigate by their Lifetime flows chart now and draw no Dates
+// control, which the NO-DATES arm at the foot asserts on the same pages.
 const ASYM_SUSDS_DEEPEST = "8309122898133156698498852897464396224593631760337811282458430493454418132410";
 const GROUPED_FIXTURES = [
-  { id: "grouped-deep", wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", ...AAVE_V3 },
-  { id: "grouped-whole", wallet: "0x9984a1d407bc6ac53b404aabf66b80b99d96bb47", ...AAVE_V3 },
-  { id: "grouped-spark-deep", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...SPARK },
   { id: "grouped-cv2-deep", wallet: "0x29fe7d60ddf151e5b52e5fab4f1325da6b2bd958", ...COMPOUND_V2 },
   { id: "grouped-cv2-liq", wallet: "0x8888882f8f843896699869179fb6e4f7e3b58888", ...COMPOUND_V2 },
   { id: "grouped-cv2-deepest", wallet: "0xa2b47e3d5c44877cca798226b7b8118f9bfb7a56", ...COMPOUND_V2, folders: false },
@@ -1759,13 +1765,6 @@ const GROUPED_FIXTURES = [
   },
   { id: "grouped-maple-deepest", wallet: "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76", ...MAPLE, folders: false },
   { id: "grouped-maple-whole", wallet: "0x1601843c5e9bc251a3272907010afa41fa18347e", ...MAPLE },
-  {
-    id: "grouped-asym-deepest",
-    wallet: ASYM_SUSDS_DEEPEST,
-    page: "/ethereum/asymmetry/sUSDS",
-    timeline: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline?group=1`,
-    summary: `/api/asymmetry/susds/${ASYM_SUSDS_DEEPEST}/timeline/summary?cutoffBlock=99999999`,
-  },
   {
     id: "grouped-aave-v3-base-deep",
     wallet: "0x065c8c2cabf489b80634a16269df7a4935c788ce",
@@ -2279,6 +2278,33 @@ for (const g of GROUPED_FIXTURES) {
     await page.close();
   }
   console.log("");
+}
+
+// ── THE NO-DATES ARM (2026-10-01) ─────────────────────────────────────────
+// The families tied to a Lifetime flows chart (Aave V3, SparkLend, Aave V4,
+// Liquity V2 and its three forks) draw no Dates control: the chart's "Apply to
+// timeline" navigates them by day, and `?to=` restores its cut. N1 asserts the
+// absence only after the toolbar's count line, the positive signal, is drawn.
+const NO_DATES = [
+  { id: "nodates-aave-v3", path: `${AAVE_V3.page}/0xee7ca610d896c53ffe716b801c05748efd902954?market=core` },
+  { id: "nodates-spark", path: `${SPARK.page}/0x1601843c5e9bc251a3272907010afa41fa18347e` },
+  { id: "nodates-asym", path: `/ethereum/asymmetry/sUSDS/${ASYM_SUSDS_DEEPEST}` },
+];
+for (const f of NO_DATES) {
+  if (ONLY && !ONLY.has(f.id)) continue;
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(300_000);
+  try {
+    await page.goto(`${BASE}${f.path}`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector("[data-timeline-total]");
+    await page.waitForSelector("[data-flow-apply]");
+    const dates = await page.locator("[data-date-control]").count();
+    check(`N1 ${f.id}: the toolbar draws no Dates control beside Apply to timeline`, dates === 0, `${dates} found`);
+  } catch (err) {
+    check(`N1 ${f.id}: the page loaded`, false, String(err?.message ?? err).slice(0, 200));
+  } finally {
+    await page.close();
+  }
 }
 
 await browser.close();

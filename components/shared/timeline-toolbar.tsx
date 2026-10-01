@@ -3,7 +3,8 @@
 // TimelineToolbar — the shared control strip above a position timeline: an
 // event count, a chronological sort flip, an event-type show/hide filter, an
 // asset show/hide filter, a date-range (heatmap) toggle and the display "eye"
-// menu — plus the heatmap itself when open. The asset control appears only
+// menu — plus the heatmap itself when open. A page tied to its Lifetime
+// flows chart has no date-range control (`tl.datesAxis`). The asset control appears only
 // where there is an asset axis to offer (a pooled lender's wallet touching
 // more than one reserve); see getEventAssetKeys. Driven entirely by a
 // useTimelineEvents() state object, so a page wires it in one line. Extracted
@@ -124,11 +125,7 @@ export function TimelineActivityHeader({
   const now = clock ?? last;
   // A duration that reads the clock: the placeholder holds the width.
   const dur = (from: number, to: number | null) =>
-    to == null && clock == null ? (
-      <span className="invisible">00 days</span>
-    ) : (
-      formatDuration(from, to ?? now)
-    );
+    to == null && clock == null ? <span className="invisible">00 days</span> : formatDuration(from, to ?? now);
   const ago = clock == null ? <span className="invisible">00 days ago</span> : `${formatDuration(last, now)} ago`;
   if (!tenurePending && lives && lives.length > 1) {
     // Past three, the first and the last are named and the rest counted; the
@@ -765,42 +762,47 @@ export function TimelineToolbar({
               onToggle={(addr) => tl.toggleHiddenCounterparty(addr)}
             />
           )}
-          <button
-            type="button"
-            data-date-control=""
-            onClick={tl.toggleHeatmap}
-            aria-pressed={datePanelOpen}
-            // Sized and spaced exactly like the FilterDropdown triggers either
-            // side of it (`h-7 gap-2 px-2.5 rounded-md text-xs`) — it opens a
-            // panel the same way they do, so it is one of them, not a
-            // one-off.
-            className={`${CTRL_GHOST} h-7 gap-2 px-2.5 rounded-md text-xs ${
-              filterActive ? CTRL_ON_ACCENT : datePanelOpen ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF
-            }`}
-            title={datePanelOpen ? "Hide the date span" : "Filter by a span of dates"}
-          >
-            <CalendarRange size={12} aria-hidden />
-            {dateLabel}
-            {/* The same chevron the event-type, asset and address triggers
+          {/* No Dates on a page tied to its Lifetime flows chart
+              (`tl.datesAxis`): the chart's scrubber and "Apply to timeline"
+              navigate it by the day. */}
+          {tl.datesAxis && (
+            <button
+              type="button"
+              data-date-control=""
+              onClick={tl.toggleHeatmap}
+              aria-pressed={datePanelOpen}
+              // Sized and spaced exactly like the FilterDropdown triggers either
+              // side of it (`h-7 gap-2 px-2.5 rounded-md text-xs`) — it opens a
+              // panel the same way they do, so it is one of them, not a
+              // one-off.
+              className={`${CTRL_GHOST} h-7 gap-2 px-2.5 rounded-md text-xs ${
+                filterActive ? CTRL_ON_ACCENT : datePanelOpen ? `${CTRL_ON} ${CTRL_ON_HOVER}` : CTRL_OFF
+              }`}
+              title={datePanelOpen ? "Hide the date span" : "Filter by a span of dates"}
+            >
+              <CalendarRange size={12} aria-hidden />
+              {dateLabel}
+              {/* The same chevron the event-type, asset and address triggers
                 carry, turning over when the panel is open. Without it a button
                 reading "1 Oct – 31 Oct" is a label, and nothing on it says a
                 click opens anything. */}
-            <svg
-              data-date-chevron=""
-              aria-hidden
-              width={10}
-              height={10}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`ml-auto transition-transform ${datePanelOpen ? "rotate-180" : ""}`}
-            >
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
+              <svg
+                data-date-chevron=""
+                aria-hidden
+                width={10}
+                height={10}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`ml-auto transition-transform ${datePanelOpen ? "rotate-180" : ""}`}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          )}
           <TimelineDisplayMenu items={displayItems} />
         </div>
       </div>
@@ -811,7 +813,8 @@ export function TimelineToolbar({
           hangs from: the month matrix is a twelve-column grid and a
           button-width popover would make each month four pixels wide.
           z-40 clears the spine's own z-20. */}
-      {tl.heatmapOpen &&
+      {tl.datesAxis &&
+        tl.heatmapOpen &&
         (isPhone ? (
           <MobileSheet
             label="Date range"

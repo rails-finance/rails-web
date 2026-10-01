@@ -445,6 +445,8 @@ export default function AaveV3PositionDetail({
     folderParams: { wallet, market },
     storageKey: `aave-v3-${market}-${wallet}`,
     protocolKey: "aave-v3",
+    // Navigated by the Lifetime flows chart's Apply: no Dates.
+    dates: false,
   });
   /** The preload's own total, for the export: `tl.totalCount` counts the
    *  segment once one is loaded. */

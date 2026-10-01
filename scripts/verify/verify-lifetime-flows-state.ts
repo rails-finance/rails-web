@@ -1432,7 +1432,7 @@ test("the state card: a day between events states the chart's figures, each asse
   assert.equal(flowMoment(route, focus, (startDay + route.liveStop) * 86_400 + 10), null);
 });
 
-test("Combined: a Dates span's last day parks the cursor on a stop of its own, which the steps pass over", () => {
+test("Combined: a cut restored from the address bar puts the cursor on a stop of its own, which the steps pass over", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const full = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
   const line = binSeries(binInputFromWire(series), "month")!;
@@ -1440,14 +1440,14 @@ test("Combined: a Dates span's last day parks the cursor on a stop of its own, w
   // A day that is neither a month's end nor a day with events.
   let day = 1;
   while (plain.some((s) => s.stop === day)) day++;
-  const parked = combinedStops(full, line, 0, day);
-  assert.equal(parked.length, plain.length + 1);
-  const i = stopForDay(parked, day);
+  const restored = combinedStops(full, line, 0, day);
+  assert.equal(restored.length, plain.length + 1);
+  const i = stopForDay(restored, day);
   assert.ok(i != null);
-  assert.equal(parked[i].point, null);
-  assert.equal(parked[i].event, false);
+  assert.equal(restored[i].point, null);
+  assert.equal(restored[i].event, false);
   // The back and forward steps go by days with events, so they pass over it.
-  assert.notEqual(eventStep(parked, i - 1, 1), i);
+  assert.notEqual(eventStep(restored, i - 1, 1), i);
   // A day that already has a stop adds none.
   assert.equal(combinedStops(full, line, 0, full.eventDays[3]).length, plain.length);
 });

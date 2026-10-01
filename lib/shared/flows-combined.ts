@@ -31,8 +31,8 @@ export interface CombinedStop {
 /** The cursor's stops, ascending: every point of the line and every day with
  *  events, one stop per day; the last is the live stop. Without a series, the
  *  event days and the live stop. `from` is the stop the bars' window opens on
- *  (0 where it covers the whole life). `extra` adds one more day (a Dates
- *  span's last day the cursor is parked on) where it has no stop. */
+ *  (0 where it covers the whole life). `extra` adds one more day (the day
+ *  of a cut restored from the address bar) where it has no stop. */
 export function combinedStops(
   model: FlowModel,
   series: FlowBinSeries | null,

@@ -496,6 +496,8 @@ export default function SparkPositionDetail({
     folderParams: { wallet },
     storageKey: `spark-${wallet}`,
     protocolKey: "spark",
+    // Navigated by the Lifetime flows chart's Apply: no Dates.
+    dates: false,
   });
 
   // ── Market notes: the reserve's own rate across this position's own

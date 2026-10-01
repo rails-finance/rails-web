@@ -69,7 +69,7 @@
 // On a client-grouped page the flag still bypasses the run specs, as before.
 
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
-import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
+import { useFlowFocus, useFlowFocusState, useRewindParam } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
 import { rewindEvents, rewindRows } from "@/lib/shared/flow-focus";
 import { flowMoment } from "@/lib/shared/flow-moment";
@@ -1165,18 +1165,17 @@ function ChainTruthTimelineBody({
   // view and flashes its header; the card stays open or closed as the
   // visitor left it. Where the page holds another month (a served,
   // month-navigated page) it reads the cut's month; where a filter would
-  // leave the cut list empty the filters clear; a line says either. A month
-  // picked in Dates clears the cut.
+  // leave the cut list empty the filters clear; a line says either. These
+  // pages have no Dates (`tl.datesAxis`): the cut is how they are navigated
+  // by day, and the address bar carries it (`useRewindParam`).
   const focusStore = useFlowFocus()?.store ?? null;
+  // Aave V4 on Base wears the provider without a series, so without Apply,
+  // and keeps Dates and its `?from=&to=`.
+  useRewindParam(tl.datesAxis ? null : focusStore);
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
-  /** The month this code asked the page to read, and whether it cleared the
-   *  Dates range: changes it made release nothing. */
+  /** The month this code asked the page to read. */
   const askedMonth = useRef<number | null>(null);
-  const clearedRange = useRef(false);
-  /** A month picked in Dates is clearing the cut: nothing more is read for
-   *  it meanwhile. */
-  const releasing = useRef(false);
   const releaseRewind = useCallback(() => {
     if (focusStore?.get().rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
@@ -1233,54 +1232,6 @@ function ChainTruthTimelineBody({
         ? rows[0].folder.responseId
         : rows[0].events[0].id
     : null;
-  // A month picked in Dates clears the cut. Declared before the effect
-  // below, which reads `releasing` in the same commit.
-  const rangeKey = tl.dateRange ? `${tl.dateRange[0]}:${tl.dateRange[1]}` : null;
-  const monthNow = segments?.month ?? null;
-  const lastDates = useRef({ range: rangeKey, month: monthNow });
-  // The Dates span, for the chart's bracket on its line: the range picked,
-  // or the month the page reads as its own segment.
-  useEffect(() => {
-    if (!focusStore) return;
-    const r = tl.dateRange;
-    const span: [number, number] | null = r
-      ? [r[0], r[1]]
-      : monthNow != null
-        ? [
-            Date.UTC(Math.floor(monthNow / 12), monthNow % 12, 1) / 1000,
-            Date.UTC(Math.floor(monthNow / 12), (monthNow % 12) + 1, 1) / 1000 - 1,
-          ]
-        : null;
-    focusStore.set({ dates: span });
-    // `rangeKey` stands for `tl.dateRange`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusStore, rangeKey, monthNow]);
-  useEffect(() => {
-    const prev = lastDates.current;
-    lastDates.current = { range: rangeKey, month: monthNow };
-    const rangeMoved = prev.range !== rangeKey;
-    const monthMoved = prev.month !== monthNow;
-    if (!rangeMoved && !monthMoved) return;
-    const own =
-      (!rangeMoved || (clearedRange.current && rangeKey == null)) && (!monthMoved || monthNow === askedMonth.current);
-    if (rangeMoved) clearedRange.current = false;
-    if (own || !rewind) return;
-    releasing.current = true;
-    releaseRewind();
-    // Dates wins: the last choice sets the timeline, and the chart's cursor
-    // goes to the close of the span's last day (lib/shared/flow-focus.ts
-    // `park`). Clearing Dates leaves the cursor where it is.
-    const r = tl.dateRange;
-    const end =
-      r != null
-        ? r[1]
-        : monthNow != null
-          ? Date.UTC(Math.floor(monthNow / 12), (monthNow % 12) + 1, 1) / 1000 - 1
-          : null;
-    if (end != null && focusStore) focusStore.set({ park: { endTs: end, n: (focusStore.get().park?.n ?? 0) + 1 } });
-    // `rewind` and `tl.dateRange` are read at the moment Dates changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey, monthNow, releaseRewind]);
   useEffect(() => {
     // A new cut states its own line: one the last cut left would name the
     // wrong day.
@@ -1291,15 +1242,13 @@ function ChainTruthTimelineBody({
     }
     if (rewindKey == null) {
       // Cleared: a month the cut read goes back to the rows the page
-      // opened with, unless a month picked in Dates cleared it.
-      if (!releasing.current && askedMonth.current != null && segments?.month === askedMonth.current)
-        segments.onReset?.();
-      releasing.current = false;
+      // opened with.
+      if (askedMonth.current != null && segments?.month === askedMonth.current) segments.onReset?.();
       askedMonth.current = null;
       pendingGo.current = 0;
       return;
     }
-    if (releasing.current || segments?.loading != null) return;
+    if (segments?.loading != null) return;
     if (cut != null) {
       const words = rewind?.word ?? "";
       const d = new Date(cut * 1000);
@@ -1317,12 +1266,10 @@ function ChainTruthTimelineBody({
         return;
       }
       if (rows.length === 0 && tl.isFiltered && tl.sortedEvents.some((e) => e.timestamp <= cut)) {
-        clearedRange.current = tl.dateRange != null;
         tl.resetHiddenActions();
         tl.resetHiddenAssets();
         tl.resetHiddenCounterparties();
         tl.resetHiddenVersions();
-        tl.setDateRange(null);
         setRewindNote(`The filters are cleared so the timeline to ${words} shows.`);
         return;
       }

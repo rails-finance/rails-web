@@ -17,6 +17,11 @@
 //   ?hideVersions=V2            hidden protocol versions
 //   ?from=2025-01-01&to=2025-03-31   date range, UTC calendar days inclusive
 //
+// A page tied to its Lifetime flows chart passes `dates: false`: it has no
+// date range, and `?to=` there is the chart's cut, which the flow-focus store
+// reads and writes (components/shared/flow-focus-context.tsx). This hook then
+// leaves `from` and `to` alone.
+//
 // Every axis is written as what is HIDDEN, never what is shown: a list of
 // hidden keys is the state itself, applies unchanged when a deeper read adds
 // rows the sender never saw, and reads as the same act the menus perform. The
@@ -222,6 +227,9 @@ export interface TimelineEventsState {
 
   dateRange: [number, number] | null;
   setDateRange: (next: [number, number] | null) => void;
+  /** False on a page that navigates by its Lifetime flows chart: no date
+   *  range, and the toolbar draws no Dates control. */
+  datesAxis: boolean;
   heatmapOpen: boolean;
   toggleHeatmap: () => void;
 
@@ -290,14 +298,14 @@ const UTC_DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** `2025-03-01` → its first second UTC; null for anything that is not a real
  *  calendar day (`2025-02-30` rolls over in Date.UTC, so the round trip is
  *  checked too). */
-function parseUtcDay(s: string | null): number | null {
+export function parseUtcDay(s: string | null): number | null {
   if (!s || !UTC_DAY.test(s)) return null;
   const ts = Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
   if (!Number.isFinite(ts) || formatUtcDay(ts / 1000) !== s) return null;
   return ts / 1000;
 }
 
-const formatUtcDay = (ts: number): string => new Date(ts * 1000).toISOString().slice(0, 10);
+export const formatUtcDay = (ts: number): string => new Date(ts * 1000).toISOString().slice(0, 10);
 
 const splitList = (s: string | null): string[] | null => (s === null ? null : s.split(",").filter(Boolean));
 
@@ -305,7 +313,7 @@ const splitList = (s: string | null): string[] | null => (s === null ? null : s.
  *  axis is at its default so an untouched view keeps a clean URL. The ONE
  *  place the grammar is written — the address-bar mirror and `viewHref()`
  *  both go through it, so a copied link and a written-back one never differ. */
-function writeViewParams(sp: URLSearchParams, view: ViewParams): void {
+function writeViewParams(sp: URLSearchParams, view: ViewParams, datesAxis: boolean): void {
   const list = (key: string, values: string[]) => {
     if (values.length > 0) sp.set(key, values.join(","));
     else sp.delete(key);
@@ -318,6 +326,7 @@ function writeViewParams(sp: URLSearchParams, view: ViewParams): void {
   list("hideAssets", view.hiddenAssets);
   list("hideAddresses", view.hiddenCounterparties);
   list("hideVersions", view.hiddenVersions);
+  if (!datesAxis) return;
   if (view.dateRange) {
     sp.set("from", formatUtcDay(view.dateRange[0]));
     sp.set("to", formatUtcDay(view.dateRange[1]));
@@ -358,7 +367,10 @@ export function useTimelineEvents(
     olderCountIsFloor = false,
     servedRows,
     eventsServed,
+    dates = true,
   }: {
+    /** False on a page tied to its Lifetime flows chart (see the header). */
+    dates?: boolean;
     storageKey?: string;
     protocolKey: string;
     /** The index's own answer as ROWS, in ASCENDING chain order: folders and
@@ -452,13 +464,13 @@ export function useTimelineEvents(
         if (view.hiddenAssets) setHiddenAssets(view.hiddenAssets);
         if (view.hiddenCounterparties) setHiddenCounterparties(view.hiddenCounterparties);
         if (view.hiddenVersions) setHiddenVersions(view.hiddenVersions);
-        if (view.dateRange) setDateRange(view.dateRange);
+        if (view.dateRange && dates) setDateRange(view.dateRange);
       } catch {
         /* malformed query string — keep the storage-derived state */
       }
       setHydrated(true);
     }
-  }, [storageKey, defaultHidden]);
+  }, [storageKey, defaultHidden, dates]);
 
   // Persist after hydration.
   useEffect(() => {
@@ -489,35 +501,43 @@ export function useTimelineEvents(
     if (!hydrated || !interactedRef.current || initialHidden) return;
     try {
       const url = new URL(window.location.href);
-      writeViewParams(url.searchParams, {
-        hiddenActions,
-        hiddenAssets,
-        hiddenCounterparties,
-        hiddenVersions,
-        dateRange,
-      });
+      writeViewParams(
+        url.searchParams,
+        {
+          hiddenActions,
+          hiddenAssets,
+          hiddenCounterparties,
+          hiddenVersions,
+          dateRange,
+        },
+        dates,
+      );
       const next = `${url.pathname}${url.search}${url.hash}`;
       const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       if (next !== current) window.history.replaceState(window.history.state, "", next);
     } catch {
       /* non-fatal — the view still works, it just won't be shareable */
     }
-  }, [hydrated, initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange]);
+  }, [hydrated, initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
 
   // The same grammar, composed on demand for the copy-link control. Reads the
   // pinned set where an embed pins one, so the link carries what the page
   // actually shows.
   const viewHref = useCallback(() => {
     const url = new URL(window.location.href);
-    writeViewParams(url.searchParams, {
-      hiddenActions: initialHidden ?? hiddenActions,
-      hiddenAssets,
-      hiddenCounterparties,
-      hiddenVersions,
-      dateRange,
-    });
+    writeViewParams(
+      url.searchParams,
+      {
+        hiddenActions: initialHidden ?? hiddenActions,
+        hiddenAssets,
+        hiddenCounterparties,
+        hiddenVersions,
+        dateRange,
+      },
+      dates,
+    );
     return url.toString();
-  }, [initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange]);
+  }, [initialHidden, hiddenActions, hiddenAssets, hiddenCounterparties, hiddenVersions, dateRange, dates]);
 
   const hiddenSet = useMemo(() => new Set(initialHidden ?? hiddenActions), [initialHidden, hiddenActions]);
   const hiddenAssetSet = useMemo(() => new Set(hiddenAssets), [hiddenAssets]);
@@ -926,6 +946,7 @@ export function useTimelineEvents(
     resetHiddenVersions,
     dateRange,
     setDateRange: setDateRangeLive,
+    datesAxis: dates,
     heatmapOpen,
     toggleHeatmap,
     viewHref,

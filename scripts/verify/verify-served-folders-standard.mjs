@@ -31,9 +31,12 @@
 //   E3  SparkLend 0x0000…8a90 with ?hide=supply, which hides its one loose
 //       event and no folder: no loose card, folder rows drawn, no "filtered
 //       out" label
-//   E4  E1's wallet filtered to 2023-05-17, a day inside its OLDEST folder:
-//       the list's ends read the folders' own dates, so the top carries the
-//       "tip" boundary row and no pulsing dot, and the bottom the "view" row
+//   E4  E1's wallet cut at 2023-05-17 (`?to=`, the Lifetime flows chart's
+//       Apply), a day inside its OLDEST folder: the list's ends read the
+//       folders' own dates, so the top carries the "tip" boundary row and no
+//       pulsing dot. Until 2026-10-01 this was a `?from=&to=` Dates filter,
+//       which also drew the "view" row at the bottom; a cut hides nothing
+//       older, so it draws none
 //
 // Absence is only ever asserted after a positive signal: the menu is read once
 // one of its other items is visible, and "no folder read" is counted once the
@@ -111,7 +114,9 @@ const NEVER_EMPTY = [
   // (its `byDay`, read 2026-09-13); the newest folder ends 2026-08-31.
   {
     id: "ends-spark",
-    path: "/ethereum/spark/0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5?from=2023-05-17&to=2023-05-17",
+    // SparkLend has no Dates since 2026-10-01: `?to=` is the Lifetime flows
+    // chart's cut at that day's close, which this link restores.
+    path: "/ethereum/spark/0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5?to=2023-05-17",
     loose: null,
     ends: true,
   },
@@ -357,13 +362,16 @@ async function runNeverEmpty(f, name) {
   );
   if (f.ends) {
     // Read only once folders are drawn: an absent dot on an empty page says nothing.
+    // The cut is applied after hydration, so the folders are counted again
+    // here, after SETTLE_MS: the one straddling the cut stands.
+    const cutFolders = await page.locator(FOLDER_HEADER).count();
     const tipRows = await page.locator('[data-boundary-row="tip"]').count();
     const viewRows = await page.locator('[data-boundary-row="view"]').count();
     const dots = await page.locator("[data-spine-tip]").count();
     check(
-      `E4 a past day inside the oldest folder: tip row, no pulsing dot, view row [${f.id}]`,
-      folders > 0 && tipRows === 1 && dots === 0 && viewRows === 1,
-      `${folders} folder row(s), ${tipRows} tip row(s), ${dots} pulsing dot(s), ${viewRows} view row(s)`,
+      `E4 a cut inside the oldest folder: tip row, no pulsing dot, no view row [${f.id}]`,
+      cutFolders > 0 && tipRows === 1 && dots === 0 && viewRows === 0,
+      `${cutFolders} folder row(s), ${tipRows} tip row(s), ${dots} pulsing dot(s), ${viewRows} view row(s)`,
     );
   }
   await ctx.close();
@@ -379,7 +387,7 @@ try {
   if (!ONLY || ONLY.has(e3.id))
     await runNeverEmpty(e3, 'E3 a filter that hides every loose event leaves the folders, not "filtered out"');
   if (!ONLY || ONLY.has(e4.id))
-    await runNeverEmpty(e4, "E4a a past-day filter on an all-folder answer draws the folder, not the empty label");
+    await runNeverEmpty(e4, "E4a a past-day cut on an all-folder answer draws the folder, not the empty label");
   if (!ONLY || ONLY.has(CLIENT.id)) {
     console.log(`\n── ${CLIENT.id} ${CLIENT.path}`);
     const { ctx, page } = await openPage(CLIENT.path);

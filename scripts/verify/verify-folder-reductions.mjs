@@ -839,24 +839,41 @@ async function runArm(arm, ctx) {
     return new Map(JSON.parse(prev));
   };
 
-  const groupedGrid = await readHeatmap(true);
-  const flatGrid = await readHeatmap(false);
-  const months = new Set([...groupedGrid.keys(), ...flatGrid.keys()]);
-  const monthGaps = [...months]
-    .filter((k) => groupedGrid.get(k) !== flatGrid.get(k))
-    .map((k) => `${isoDay(k).slice(0, 7)}: ${fmt(groupedGrid.get(k) ?? 0)} vs ${fmt(flatGrid.get(k) ?? 0)}`);
-  const sum = (grid) => [...grid.values()].reduce((a, n) => a + (n ?? 0), 0);
-  check(
-    id("H1 the page's heatmap counts the same events with folders on and off"),
-    monthGaps.length === 0 && sum(groupedGrid) === grouped.totalEvents && months.size > 0,
-    monthGaps.length === 0 && sum(groupedGrid) === grouped.totalEvents
-      ? `both arms draw ${fmt(sum(groupedGrid))} events over ${months.size} months — the position's whole history, ${fmt(
-          inFolders,
-        )} of them reaching the grid through a folder`
-      : `grouped draws ${fmt(sum(groupedGrid))} events over ${groupedGrid.size} months, flat draws ${fmt(
-          sum(flatGrid),
-        )} — ${monthGaps.length} month(s) differ (e.g. ${monthGaps.slice(0, 3).join(", ")})`,
-  );
+  // Both arms' families navigate by their Lifetime flows chart since
+  // 2026-10-01 and draw no Dates control, so no grid stands on the page to
+  // read: H1 is skipped there. The families that keep Dates check
+  // their grid in verify-timeline-navigator.mjs.
+  const hasGrid = await (async () => {
+    const page = await openPage(true, "[data-timeline-total]");
+    const n = await page.locator("[data-date-control]").count();
+    await page.close();
+    return n > 0;
+  })();
+  if (!hasGrid) {
+    skip(
+      id("H1 the page's heatmap counts the same events with folders on and off"),
+      "this family draws no Dates control (navigated by its Lifetime flows chart since 2026-10-01); R1 and R2 check the folders' days",
+    );
+  } else {
+    const groupedGrid = await readHeatmap(true);
+    const flatGrid = await readHeatmap(false);
+    const months = new Set([...groupedGrid.keys(), ...flatGrid.keys()]);
+    const monthGaps = [...months]
+      .filter((k) => groupedGrid.get(k) !== flatGrid.get(k))
+      .map((k) => `${isoDay(k).slice(0, 7)}: ${fmt(groupedGrid.get(k) ?? 0)} vs ${fmt(flatGrid.get(k) ?? 0)}`);
+    const sum = (grid) => [...grid.values()].reduce((a, n) => a + (n ?? 0), 0);
+    check(
+      id("H1 the page's heatmap counts the same events with folders on and off"),
+      monthGaps.length === 0 && sum(groupedGrid) === grouped.totalEvents && months.size > 0,
+      monthGaps.length === 0 && sum(groupedGrid) === grouped.totalEvents
+        ? `both arms draw ${fmt(sum(groupedGrid))} events over ${months.size} months — the position's whole history, ${fmt(
+            inFolders,
+          )} of them reaching the grid through a folder`
+        : `grouped draws ${fmt(sum(groupedGrid))} events over ${groupedGrid.size} months, flat draws ${fmt(
+            sum(flatGrid),
+          )} — ${monthGaps.length} month(s) differ (e.g. ${monthGaps.slice(0, 3).join(", ")})`,
+    );
+  }
 
   // ── H2/H3 — the export menu's two claims, read from one open of it ────────
   // The scope note is ON the page; the transcript heading is inside the

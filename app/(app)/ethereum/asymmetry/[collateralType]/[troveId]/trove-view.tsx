@@ -342,6 +342,8 @@ export default function AsymmetryTroveDetail({
     folderParams: {},
     storageKey: `asymmetry-${collateralType}-${troveId}`,
     protocolKey: "asymmetry",
+    // Navigated by the Lifetime flows chart's Apply: no Dates.
+    dates: false,
   });
 
   // ⚠️ On a windowed page every lifetime surface must read the MERGED history,

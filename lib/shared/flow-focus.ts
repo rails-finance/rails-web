@@ -192,19 +192,15 @@ export interface FlowFocusState {
   /** The cut applied to the timeline by the chart's "Apply to timeline": the
    *  list holds every event up to `endTs` (that day's close), named `word`
    *  ("2 Sep '26"). Null where nothing is cut. Freezing or moving the chart
-   *  leaves it where it is; the chip's × or a month or range picked in Dates
-   *  clears it. */
+   *  leaves it where it is; the chip's × clears it. The address bar carries
+   *  it as `?to=2026-09-02` (`useRewindParam`). */
   rewind: { endTs: number; word: string } | null;
   /** Bumped to bring the cut's top card into view and flash its header (the
    *  chip's text). Apply cuts without it: the page stays where it is. */
   go: number;
-  /** A month or range picked in Dates while a cut stood: the chart's cursor
-   *  goes to the close of the span's last day (`endTs`) and freezes there, or
-   *  to today, unfrozen, where the span reaches today. */
-  park: { endTs: number; n: number } | null;
-  /** The Dates filter's span on the timeline (unix seconds, inclusive), which
-   *  the chart brackets on its line; null with Dates at All. */
-  dates: [number, number] | null;
+  /** A cut restored from the address bar: the chart's cursor goes to its
+   *  day (`endTs`, that day's close) and freezes there. */
+  restore: { endTs: number; n: number } | null;
 }
 
 export interface FlowFocusStore {
@@ -220,8 +216,7 @@ export function createFlowFocusStore(): FlowFocusStore {
     move: null,
     rewind: null,
     go: 0,
-    park: null,
-    dates: null,
+    restore: null,
   };
   const subs = new Set<() => void>();
   return {

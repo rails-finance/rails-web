@@ -663,7 +663,7 @@ export function LifetimeFlowsScrubber({
 
 /** How the chart and the timeline meet, on a page that ties them. */
 const FOCUS_READ =
-  "A click on the line freezes the cursor on a day, and the line after it is dimmed; “Apply to timeline” then cuts the timeline below at that day's close and brings its last event into view. Each day's last event has a chart button that brings the chart to its day, and a month or range picked in the timeline's Dates is bracketed on the line. Each event's card adds up its side as of that event, line by line.";
+  "A click on the line freezes the cursor on a day, and the line after it is dimmed; “Apply to timeline” then cuts the timeline below at that day's close, which is how the timeline is read by date, and the page's link keeps that day. Each day's last event has a chart button that brings the chart to its day. Each event's card adds up its side as of that event, line by line.";
 
 /** The Key's and the Explanation's lines on what the bars and the line cover
  *  and how to read them, and the line's two sides for the Key. */
