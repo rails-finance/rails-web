@@ -52,16 +52,23 @@ export function FluidFlowsNote({ facts, collSymbol, debtSymbol }: FluidFlowsNote
       )}
       {borrower && p && (
         <p>
-          {p.row > 0
-            ? `${p.row === 1 ? "One collateral flow, a liquidation, is" : `${p.row.toLocaleString("en-US")} collateral flows, liquidations, are`} valued at the vault oracle's price at ${p.row === 1 ? "its block" : "their blocks"}. `
-            : ""}
+          {p.row > 0 ? rowSentence(p) : ""}
           {p.nearest + p.today > 0 ? nearestSentence(p) : ""}
-          No daily oracle price is recorded for Fluid yet, so between events the collateral keeps the price of its
-          latest event, and a price more than 30 days old is stated as such.
+          {facts?.between === "store"
+            ? "Between events the collateral takes the vault oracle's price at the close of each day, the last one carried over a day with none recorded, and a price more than 30 days old is stated as such."
+            : "No daily oracle price is recorded for Fluid yet, so between events the collateral keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}
     </div>
   );
+}
+
+/** The flows valued at their own block's price. While the index priced
+ *  liquidation blocks only, those were all liquidations. */
+function rowSentence(p: FluidFlowsNoteFacts["pricing"]): string {
+  if (p.rowLiq === p.row)
+    return `${p.row === 1 ? "One collateral flow, a liquidation, is" : `${p.row.toLocaleString("en-US")} collateral flows, liquidations, are`} valued at the vault oracle's price at ${p.row === 1 ? "its block" : "their blocks"}. `;
+  return `${p.row === 1 ? "One collateral flow is" : `${p.row.toLocaleString("en-US")} collateral flows are`} valued at the vault oracle's price at ${p.row === 1 ? "its block" : "their blocks"}. `;
 }
 
 /** The flows that took a price from another moment, and which. */
@@ -79,7 +86,13 @@ function nearestSentence(p: FluidFlowsNoteFacts["pricing"]): string {
       : k === 1
         ? "the one collateral flow takes"
         : `all ${k.toLocaleString("en-US")} collateral flows take`;
-  return `The index records the vault oracle's price only on liquidation blocks, so ${which} the nearest recorded price in time${whose}, and Market move runs from that price. `;
+  // Until the server's filler reaches a position, its liquidation blocks are
+  // the only ones priced.
+  const why =
+    p.row > p.rowLiq
+      ? `The index has not recorded the vault oracle's price at ${k === 1 ? "that flow's block" : "those flows' blocks"} yet`
+      : "The index records the vault oracle's price only on liquidation blocks";
+  return `${why}, so ${which} the nearest recorded price in time${whose}, and Market move runs from that price. `;
 }
 
 export function fluidFlowsContent(): LearnMoreContent {

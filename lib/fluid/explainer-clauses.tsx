@@ -17,11 +17,11 @@
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────
 // Checklist items Fluid cannot fill, each a data fact of its pipeline:
-//   • §5.1 (risk consequence per event) on operate events: the indexed stream
-//     carries no per-event oracle price for operates — only liquidations embed
-//     oraclePriceAtBlock — so a ratio-vs-threshold read at event time cannot
-//     be computed. Stated on liquidation events only, where the sweep itself
-//     carries the price.
+//   • §5.1 (risk consequence per event) on operate events: stated on
+//     liquidation events only, where the sweep carries the price. Operate rows
+//     carry oraclePriceAtBlock too once the server's event filler has reached
+//     their block (server mig 114, fill-fluid-event-prices.mjs); the
+//     ratio-vs-threshold read at event time is not built on it yet.
 //   • §5.2 (mechanic-why on fees): Fluid operates charge no per-event fee (no
 //     borrow fee, no close fee). The only fee-like figures are the liquidation
 //     penalty / absorption margin, priced by the valued sentence (§5.4).
