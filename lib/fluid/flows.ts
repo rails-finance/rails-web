@@ -246,8 +246,10 @@ export function replayFluid(events: FluidFlowEvent[], livePrice: number | null, 
     };
     const liq = isLiquidation(ev.kind);
     // Each side: the gap since the last row (interest; a fall past the
-    // vault's rounding is a liquidation no row records), then the act. A
-    // fall within the rounding stays inside the act.
+    // vault's rounding, three base units and a ten-thousandth of the balance,
+    // is a liquidation no row records), then the act. A fall within the
+    // rounding (a few millionths of the balance at most on victoria, 1 Oct
+    // 2026) stays inside the act.
     const side = (
       before: number,
       after: number,
@@ -256,7 +258,7 @@ export function replayFluid(events: FluidFlowEvent[], livePrice: number | null, 
       k: { interest: string; liq: string; up: string; down: string },
     ): boolean => {
       const gap = before - last;
-      const fell = gap < -Math.max(3 * unit, last * 1e-6);
+      const fell = gap < -Math.max(3 * unit, last * 1e-4);
       if (fell) add(k.liq, -gap);
       const interest = Math.max(0, gap);
       add(k.interest, interest);
