@@ -3,9 +3,9 @@
 // The Lifetime flows panel on a position with a series (rails-ops
 // reference/lifetime-flows-scrubber.md): the headlines with the date on their
 // row, the bars, and the collateral and debt line under them as a short strip,
-// one cursor for both. The strip's horizontal axis is the slider: pointing
-// previews a point, a tap, a drag or the arrow keys move the cursor there, and
-// play walks it along. The cursor stands on the line's points and on every day
+// one cursor for both. The strip's horizontal axis is the slider: a press, a
+// press and drag (mouse, pen and touch alike; hovering moves nothing) or the
+// arrow keys move the cursor there, and play walks it along. The cursor stands on the line's points and on every day
 // with events (tapping an event dot jumps to it); what the headlines and the
 // bars state there is `combinedAt` (lib/shared/flows-combined.ts). The strip
 // after the cursor is dimmed, and the timeline's Dates span is bracketed on
@@ -102,7 +102,6 @@ export function CombinedFlows({
   const stops = useMemo(() => combinedStops(model, series, from), [model, series, from]);
   const last = stops.length - 1;
   const [at, setAt] = useState(last);
-  const [preview, setPreview] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   // A new series (the first read landing) puts the cursor at today.
@@ -157,7 +156,6 @@ export function CombinedFlows({
       return;
     }
     go(i);
-    setPreview(null);
     setFrozen(true);
   };
   const stepBack = () => go(byDays ? eventStep(stops, at, -1) : at - 1);
@@ -197,15 +195,13 @@ export function CombinedFlows({
     if (i != null) {
       halt();
       setAt(i);
-      setPreview(null);
       setFrozen(true);
     }
   }, [move, stops, model.start, halt]);
   // The Dates filter's span on the timeline, bracketed on the line.
   const dates = useFlowFocusState((s) => s.dates);
 
-  const shown = frozen ? at : (preview ?? at);
-  const cur: CombinedStop = stops[Math.min(shown, last)];
+  const cur: CombinedStop = stops[Math.min(at, last)];
   const { head, bars: barState } = combinedAt(model, bars, cur);
   const assets = useMemo(() => assetsAt(model, cur.stop), [model, cur.stop]);
   const hasDebt = model.buckets.some((b) => b.side === "debt");
@@ -319,13 +315,12 @@ export function CombinedFlows({
               series={series}
               failed={failed}
               stops={stops}
-              at={Math.min(shown, last)}
+              at={Math.min(at, last)}
               head={{ collateral: head.collateral.now, debt: head.debt.now }}
               hasDebt={hasDebt}
               windowFrom={from > 0 ? model.start / DAY_MS + from : null}
               dates={dates}
               valueText={tickHere?.kinds.length ? `${dateLine}: ${tickHere.kinds.join(", ")}` : dateLine}
-              onPreview={setPreview}
               onPick={go}
               ends={{ start: dayStamp(dayStart(model, 0)), end: closed ? closeDay : "Today" }}
               freeze={byDays ? { frozen, onTap: tapStop } : null}
@@ -456,7 +451,6 @@ function LineStrip({
   windowFrom,
   dates,
   valueText,
-  onPreview,
   onPick,
   ends,
   freeze,
@@ -473,7 +467,6 @@ function LineStrip({
   /** The timeline's Dates span (unix seconds), bracketed on the line. */
   dates: [number, number] | null;
   valueText: string;
-  onPreview: (i: number | null) => void;
   onPick: (i: number) => void;
   /** The words under the strip's two ends: the first event's day, and today
    *  or the close's day. */
@@ -549,32 +542,36 @@ function LineStrip({
     if (i === last - 1 && Math.abs(xStop(stops[last]) - px) < Math.abs(xStop(stops[i]) - px)) return last;
     return i;
   };
-  // Where a press started, to tell a click or a tap (which freezes, where
-  // the page has `freeze`) from a drag (which scrubs).
+  // Mouse, pen and touch scrub alike: only a press moves the cursor, a drag
+  // carries it (held by pointer capture off the strip until release), and
+  // hovering moves nothing. Where a press started tells a click or a tap
+  // (which freezes, where the page has `freeze`) from a drag (which scrubs).
   const pressX = useRef<number | null>(null);
   const dragged = useRef(false);
+  const [grabbing, setGrabbing] = useState(false);
   const onDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     const i = nearest(e.clientX);
     if (i == null) return;
     dragging.current = true;
     pressX.current = e.clientX;
     dragged.current = false;
+    setGrabbing(true);
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    onPreview(null);
     if (!freeze) onPick(i);
   };
   const onMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!dragging.current) return;
     const i = nearest(e.clientX);
     if (i == null) return;
-    if (dragging.current) {
-      if (freeze && !dragged.current && Math.abs(e.clientX - (pressX.current ?? e.clientX)) < 5) return;
-      dragged.current = true;
-      onPick(i);
-    } else if (e.pointerType === "mouse" && !freeze?.frozen) onPreview(i);
+    if (freeze && !dragged.current && Math.abs(e.clientX - (pressX.current ?? e.clientX)) < 5) return;
+    dragged.current = true;
+    onPick(i);
   };
   const onUp = (e: PointerEvent<HTMLDivElement>) => {
     const wasPress = dragging.current && !dragged.current;
     dragging.current = false;
+    setGrabbing(false);
     if (freeze && wasPress) {
       const i = nearest(e.clientX);
       if (i != null) freeze.onTap(i);
@@ -582,6 +579,7 @@ function LineStrip({
   };
   const onCancel = () => {
     dragging.current = false;
+    setGrabbing(false);
   };
   const onKey = (e: KeyboardEvent) => {
     const step: Record<string, number> = {
@@ -602,7 +600,6 @@ function LineStrip({
     else if (e.key in step) onPick(at + step[e.key]);
     else return;
     e.preventDefault();
-    onPreview(null);
   };
 
   // The event ticks: the nearest within reach of the pointer names its day's
@@ -693,14 +690,14 @@ function LineStrip({
           aria-valuemax={Math.max(0, stops.length - 1)}
           aria-valuenow={at}
           aria-valuetext={valueText}
-          className="relative mt-0.5 cursor-crosshair touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400"
+          className={`relative mt-0.5 ${grabbing ? "cursor-grabbing" : "cursor-grab"} touch-none select-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-rb-400`}
           style={{ height: STRIP_H }}
           data-flow-strip=""
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
           onPointerCancel={onCancel}
-          onPointerLeave={() => onPreview(null)}
+          onLostPointerCapture={onCancel}
           onKeyDown={onKey}
         >
           {w > 0 && n > 0 ? (
@@ -843,10 +840,7 @@ function LineStrip({
           if (!t) return setPip(null);
           setPip(openTick(t));
           const i = stops.findIndex((s) => !s.live && s.stop === t.day);
-          if (i >= 0) {
-            onPreview(null);
-            onPick(i);
-          }
+          if (i >= 0) onPick(i);
         }}
       >
         <div aria-hidden>

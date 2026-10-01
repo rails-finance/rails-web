@@ -714,7 +714,7 @@ function panelWords(
       ? cover +
         `The line under ${them} draws ${what} at the end of each ${bin} since the open, ${model.words.linePrices ?? "at the daily prices the index records"}` +
         `${from > 0 ? `, with the ${bs}' window shaded` : ""}${model.words.linePrices ? "" : `, and leaves a gap where a held asset has no price that ${bin}`}. ` +
-        `One cursor moves both. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
+        `One cursor moves both; press the line and drag to scrub it. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ` +
         `${read} The dashed outline is where ${each} ${today}.` +
         (from > 0
           ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`
