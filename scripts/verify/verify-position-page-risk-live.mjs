@@ -9,10 +9,15 @@
 // ----------------------------------------------------------------------------
 //   1  the listing offers an open row with debt (the fixture is derived from
 //      the route, never pasted; a lane with no indebted open row is INFO);
-//   2  the position page draws the risk strip: the "% from liquidation" figure
-//      that every lane's runway prints from the live read;
+//   2  the position page draws the risk strip: the runway figure the lane
+//      prints from the live read — "N% from liquidation" on the Aave family,
+//      Spark and Moonwell; "<collateral> can fall N% before liquidation" on
+//      Morpho Blue (web b1f0fe5, the price-fall wording for a single
+//      collateral); "collateral value can fall N% before absorb" on Compound
+//      V3 (web 6e63b8e, where the protocol absorbs rather than liquidates);
 //   3  the strip names its line — "Health factor" on the Aave family and Spark,
-//      "Borrow capacity" on Compound V3, Moonwell and Morpho Blue;
+//      "Borrow capacity" on Moonwell and Morpho Blue, "Borrowing limit" on
+//      Compound V3 (web 6e63b8e);
 //   4  the page carries no "could not be read" / "unavailable" wording, and the
 //      browser logged no page error while drawing it. A React hydration
 //      mismatch (#418 / #423) is reported as INFO, not FAIL: it was seen once
@@ -42,7 +47,8 @@ import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3762";
 const PAGE = 40;
-/** The figure every lane's runway prints from the live read. */
+/** The figure the runway prints from the live read, unless the lane's own
+ *  wording differs (see the header, check 2). */
 const RUNWAY = "from liquidation";
 
 /** A row's debt in the loan asset's USD (or its own units where the lane
@@ -63,13 +69,15 @@ const LANES = [
   { api: "moonwell-base", line: "Borrow capacity", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
   {
     api: "compound-base",
-    line: "Borrow capacity",
+    line: "Borrowing limit",
+    runway: "before absorb",
     debt: (r) => Math.max(0, -Number(r.base?.amount ?? 0)),
     path: (r) => `/base/compound-v3/${r.account}`,
   },
   {
     api: "morpho-base",
     line: "Borrow capacity",
+    runway: "before liquidation",
     debt: (r) => Number(r.borrowed?.amount ?? 0),
     path: (r) => `/base/morpho/${r.owner}/${r.marketId}`,
   },
@@ -147,10 +155,13 @@ for (const lane of LANES) {
   await openPositionCards(page);
   const text = (await page.evaluate(() => document.body.innerText)) ?? "";
 
-  const at = text.indexOf(RUNWAY);
-  const window = at >= 0 ? text.slice(Math.max(0, at - 120), at + RUNWAY.length).replace(/\s+/g, " ") : "";
+  const runway = lane.runway ?? RUNWAY;
+  // A figure, not the words alone: "before liquidation" also sits in prose.
+  const hit = new RegExp(`\\d%\\s+${runway}`).exec(text);
+  const at = hit ? hit.index : -1;
+  const window = at >= 0 ? text.slice(Math.max(0, at - 120), at + hit[0].length).replace(/\s+/g, " ") : "";
   check(
-    `2  ${lane.api}: the page draws the "% ${RUNWAY}" figure`,
+    `2  ${lane.api}: the page draws the "% ${runway}" figure`,
     at >= 0,
     navError ?? (at >= 0 ? `…${window}` : "absent"),
   );
