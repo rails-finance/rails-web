@@ -319,6 +319,7 @@ export default function FluidPositionView({
   const flowColl = view ? fluidLegName(view, "supply", chain) : null;
   const flowDebt = view ? fluidLegName(view, "borrow", chain) : null;
   const flows = useFluidFlows({
+    vault: fluidEvents[0]?.context.data.vault ?? null,
     wholeEvents: historyWindow.state === "whole" ? fluidEvents : null,
     fetchAll: fetchAllHistory,
     collSymbol: flowColl,
@@ -385,8 +386,8 @@ export default function FluidPositionView({
   }, [view, chain]);
 
   // A closed position's prices: the vault oracle at the closing block, which
-  // the index carries on liquidation rows only. A position closed by its
-  // owner has no read there, and the dropdown is left out.
+  // the index carries on every row its price filler has reached (server mig
+  // 114). Where the closing row has no read yet, the dropdown is left out.
   const closing = useMemo(() => {
     if (!view || view.status === "open") return undefined;
     const supply = fluidLegName(view, "supply", chain);

@@ -5,15 +5,20 @@
 // as events hands them over; a windowed page reads the flat history once (the
 // read its CSV export makes), and a read short of the whole history is a
 // failed read, since a replay of part of a history would state the wrong
-// lifetime. The vault oracle comes from the rows (liquidation blocks) and the
-// page's live read; nothing is read per row. It also gives the page the value
-// that ties the panel to the timeline (components/shared/flow-focus-context.tsx).
+// lifetime. The vault oracle comes from the rows (each row's block, server mig
+// 114), the shared daily price store between events (/api/prices/daily,
+// series `fluid:<vault>`, read once per page) and the page's live read;
+// nothing is read per row. Where the store's read fails or answers nothing,
+// the collateral keeps its latest event's price between events. It also gives
+// the page the value that ties the panel to the timeline
+// (components/shared/flow-focus-context.tsx).
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import { dailyPricesFromAnswer, fetchDailyAnswer } from "@/lib/api/fetch-daily-prices";
 import {
   FL,
   fluidFlowEvents,
@@ -24,7 +29,14 @@ import {
   type FluidLive,
 } from "@/lib/fluid/flows";
 
+const DAY_S = 86_400;
+
+/** The store's series key for a vault (rails-ops reference/daily-prices.md). */
+export const fluidSeriesKey = (vault: string) => `fluid:${vault.toLowerCase()}`;
+
 export interface FluidFlowsInput {
+  /** The vault's address, for the daily store's series. */
+  vault: string | null;
   /** The page's events, when they are the whole history; null otherwise. */
   wholeEvents: BaseActivityEvent[] | null;
   /** Reads the whole flat history; null where the page has no such read. */
@@ -42,9 +54,13 @@ export interface FluidFlowsInput {
 
 export interface FluidFlowsNoteFacts {
   borrower: boolean;
-  /** Collateral flows valued at their own block's oracle price, at the
-   *  nearest priced row's, and at today's oracle read. */
-  pricing: { row: number; nearest: number; today: number };
+  /** Collateral flows valued at their own block's oracle price (`rowLiq`
+   *  of them liquidations), at the nearest priced row's, and at today's
+   *  oracle read. */
+  pricing: { row: number; rowLiq: number; nearest: number; today: number };
+  /** "store": days between events at the store's price; "carried": the store
+   *  did not answer. */
+  between: "store" | "carried";
   liquidations: number;
   absorbs: number;
   /** Rows before which a balance fell with no row of its own, booked as
@@ -91,15 +107,43 @@ export function useFluidFlows(p: FluidFlowsInput): {
   const source = p.enabled ? (p.wholeEvents ?? fetched.events) : null;
   const rows = useMemo(() => (source ? fluidFlowEvents(source) : null), [source]);
 
+  // The daily store, one read per page from the first row's day. A failed or
+  // empty read leaves `prices` null.
+  const want = useMemo(
+    () => (p.vault && rows && rows.length > 0 ? { vault: p.vault, from: Math.floor(rows[0].ts / DAY_S) } : null),
+    [p.vault, rows],
+  );
+  const wantKey = want ? `${want.vault}:${want.from}` : null;
+  const [daily, setDaily] = useState<{ key: string; prices: [number, number][] | null } | null>(null);
+  useEffect(() => {
+    if (!want || !wantKey) return;
+    const ac = new AbortController();
+    const key = fluidSeriesKey(want.vault);
+    fetchDailyAnswer(1, [key], { from: want.from, signal: ac.signal })
+      .then((body) => {
+        const byKey = body ? dailyPricesFromAnswer(body, (u) => u.startsWith("token:")) : null;
+        setDaily({ key: wantKey, prices: byKey?.[key] ?? null });
+      })
+      .catch((err) => {
+        if ((err as { name?: string })?.name !== "AbortError") setDaily({ key: wantKey, prices: null });
+      });
+    return () => ac.abort();
+    // `wantKey` stands for `want`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantKey]);
+  // No rows: nothing to wait for.
+  const dailySettled = want == null || daily?.key === wantKey;
+  const dailyPrices = want != null && daily?.key === wantKey ? daily.prices : null;
+
   // Set on mount, so the server's render and the first client render agree.
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now() / 1000), []);
   const opts = useMemo(
     () =>
-      now != null && p.collSymbol && p.debtSymbol && p.liveSettled
-        ? { collSymbol: p.collSymbol, debtSymbol: p.debtSymbol, now, open: p.open, live: p.live }
+      now != null && p.collSymbol && p.debtSymbol && p.liveSettled && dailySettled
+        ? { collSymbol: p.collSymbol, debtSymbol: p.debtSymbol, now, open: p.open, live: p.live, daily: dailyPrices }
         : null,
-    [now, p.collSymbol, p.debtSymbol, p.open, p.live, p.liveSettled],
+    [now, p.collSymbol, p.debtSymbol, p.open, p.live, p.liveSettled, dailySettled, dailyPrices],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? fluidFlowReplay(rows, opts) : null), [rows, opts]);
   const timeline = useMemo(() => (rows && opts ? fluidFlowTimeline(rows, opts) : null), [rows, opts]);
@@ -120,13 +164,14 @@ export function useFluidFlows(p: FluidFlowsInput): {
       unrecorded: replay.replayed.filter((r) => r.unrecorded).length,
       earnedRows: replay.replayed.filter((r) => r.legs.some((l) => l.bucket === FL.earned)).length,
       accruedRows: replay.replayed.filter((r) => r.legs.some((l) => l.bucket === FL.accrued)).length,
+      between: dailyPrices && dailyPrices.length > 0 ? "store" : "carried",
     };
-  }, [replay]);
+  }, [replay, dailyPrices]);
   const read: FlowsRead = !p.enabled
     ? "failed"
     : p.wholeEvents == null && fetched.read !== "done"
       ? fetched.read
-      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol
+      : now == null || !p.liveSettled || !p.collSymbol || !p.debtSymbol || !dailySettled
         ? "reading"
         : // A borrower whose collateral has no price at all (no priced row and
           // no live read) cannot be drawn in the debt token.

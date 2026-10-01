@@ -2795,8 +2795,8 @@ export interface FluidContext {
   /** The vault's OWN oracle read at this event's block (mig 114) — Fluid prices
    *  collateral IN THE DEBT TOKEN and runs no USD feed anywhere, so this is the
    *  only valuation the protocol offers and the exact space its liquidation
-   *  engine judges in. Present on T1 liquidation blocks the filler has reached;
-   *  absent on smart vaults (DEX-share legs, no oracle in that layout) and
+   *  engine judges in. Present on every balance-bearing T1 row whose block a
+   *  server filler has reached (liquidation blocks first); absent on smart vaults (DEX-share legs, no oracle in that layout) and
    *  wherever decimals are unknown — the card stays token-only there.
    *  `liquidationPenaltyPct` is the vault's own constant at the same block, the
    *  figure the realized premium should reproduce. */

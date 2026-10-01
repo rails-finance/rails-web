@@ -54,9 +54,12 @@ import {
   MakerdaoPositionExplanation,
   MakerdaoClosedPositionExplanation,
 } from "@/components/protocol/makerdao/makerdao-position-explanation";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeMakerEconomics, makerLifetimeWithOpening } from "@/lib/makerdao/economics";
-import { makerdaoEconomicsExplanation, makerdaoEconomicsContent } from "@/lib/makerdao/economics-explanation";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { MakerFlowsNote, makerdaoFlowsContent } from "@/components/protocol/makerdao/makerdao-flows-note";
+import { useMakerFlows } from "@/hooks/useMakerFlows";
+import type { MakerLive } from "@/lib/makerdao/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { fetchMakerRateLog, type MakerRateLogResponse } from "@/lib/api/fetch-makerdao-rate-log";
 import { liveMakerRateStepNote, makerRateStepNotesFor } from "@/lib/makerdao/market-notes";
@@ -84,8 +87,8 @@ import {
 } from "@/lib/makerdao/vault-history";
 
 /** How many of a vault's blocks the page reads the ilk at: the rows' price,
- *  minimum ratio and minimum debt. Past it the flows stay at today's price and
- *  a row reads its own block when opened. */
+ *  minimum ratio and minimum debt, for the cards. Past it a row reads its own
+ *  block when opened. */
 const ILK_AT_PAGE_LIMIT = 60;
 /** How many of the vault's newest non-ownership transactions the page reads
  *  for their sender (one route call each). */
@@ -435,16 +438,6 @@ export default function MakerVaultDetailView({
         : view,
     [view, lastSplit, servedFolders, peakDebtOwed],
   );
-  const feeLiquidated = useMemo(() => {
-    let sum = 0;
-    for (const e of sortedMaker) {
-      if (e.context.data.eventType !== "grab") continue;
-      const sp = debtSplit.get(e.id);
-      if (sp?.feeBefore == null || sp.feeAfter == null) return undefined;
-      sum += sp.feeBefore - sp.feeAfter;
-    }
-    return sum;
-  }, [sortedMaker, debtSplit]);
   // "12 events in 11 transactions": the count line and the card's counter
   // state one pair. A liquidation is the keeper's transaction, so it is named
   // beside the owner's own.
@@ -476,19 +469,9 @@ export default function MakerVaultDetailView({
     folderParams: {},
     storageKey: `makerdao-${vault}`,
     protocolKey: "makerdao-vaults",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
-
-  // ⚠️ On a windowed page every lifetime surface must read the MERGED history,
-  // not the window's. `lifetimeEvents` is undefined until the opening balance
-  // is known, and the tower treats an absent event list as "no lifetime layer"
-  // rather than as an empty one — so it states nothing while it cannot state
-  // the whole, which is the only correct answer between the two requests.
-  const lifetimeKnown = lifetimeFiguresKnown(historyWindow);
-  const lifetimeEvents = lifetimeKnown ? makerEvents : undefined;
-  const precomputedLifetime = useMemo(
-    () => makerLifetimeWithOpening(makerEvents, opening, servedFolders),
-    [makerEvents, opening, servedFolders],
-  );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
   // fetches the whole history at click time rather than handing over the
@@ -501,6 +484,39 @@ export default function MakerVaultDetailView({
       missing: Math.max((res.totalEvents ?? served.length) - served.length, 0),
     };
   }, [vault]);
+
+  // The Lifetime flows panel replays the vault's whole history
+  // (lib/makerdao/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read); a read short of the whole
+  // history is a failed read.
+  const flowLive = useMemo<MakerLive | null>(() => {
+    if (!chainState) return null;
+    const rate = Number(chainState.rate) / 1e27;
+    return {
+      price: chainState.priceUsd,
+      ink: chainState.ink,
+      debt: chainState.debtDai,
+      rate: Number.isFinite(rate) && rate > 0 ? rate : null,
+      feeApr: chainState.stabilityFeeApr,
+    };
+  }, [chainState]);
+  const returnedIds = useMemo(
+    () => new Set([...vaultHistory.leftover].filter(([, l]) => l.role === "in").map(([id]) => id)),
+    [vaultHistory.leftover],
+  );
+  const flowColl = view?.collateralSymbol ?? null;
+  const flowDebt = ilk ? ilkDebtSymbol(ilk) : null;
+  const flows = useMakerFlows({
+    ilk,
+    pending: loading,
+    wholeEvents: wholeRows ? makerEvents : null,
+    fetchAll: fetchAllHistory,
+    collSymbol: flowColl,
+    debtSymbol: flowDebt,
+    live: flowLive,
+    liveSettled: chainSettled,
+    returnedIds,
+  });
 
   // Who executed this vault's events — the SAME two-fact verdict each event
   // card renders on its spine (txTo plays the party-param role), reduced over
@@ -583,134 +599,136 @@ export default function MakerVaultDetailView({
   }, [view, makerEvents]);
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="makerdao"
-        assets={
-          view && view.priceUsd != null && view.priceUsd > 0
-            ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
-            : []
-        }
-        closed={view != null && view.status !== "open"}
-        closing={closing}
-      >
-        {view && (
-          <MakerdaoExportMenu
-            view={view}
-            events={makerEvents}
-            notes={notes}
-            liveNotes={liveNotes}
-            csvFilename={`makerdao-${vault}-activity.csv`}
-            // A folder's members are not in `makerEvents`, so a grouped page
-            // reads the whole history for the CSV as a windowed one does.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            history={markdownHistoryScope(historyWindow, makerEvents, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, makerEvents, "this vault's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <MakerVaultHistoryProvider value={vaultHistory}>
-          {cardView && (
-            <MakerVaultCard
-              v={cardView}
-              receipts
-              viewHref={tl.viewHref}
-              // The risk slot rides the card's heading-button row (the Aave V3
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway (default) or the collateral-ratio card.
-              // Whatever it draws is on the card face and in the card's receipts
-              // scope, so the Provenance list stays 1:1 with the face figures.
-              // Mounts only when the live overlay landed and the vault is open.
-              rowExtra={
-                cardView.source === "chain" && cardView.status === "open" ? (
-                  <MakerdaoRiskSlot v={cardView} />
-                ) : undefined
-              }
-              // The Explanation is now pure prose about those same face figures
-              // (the 3-section page anatomy: card → economics → timeline). The
-              // CR strip is absorbed into the risk slot above.
-              // A terminal vault narrates from the replay + the timeline
-              // already on the page (no chain overlay needed); the open pane
-              // still needs the live overlay for the ilk parameters and
-              // declines without it.
-              explanation={
-                cardView.status !== "open" ? (
-                  <MakerdaoClosedPositionExplanation v={cardView} events={makerEvents} folders={servedFolders} />
-                ) : cardView.source === "chain" ? (
-                  <MakerdaoPositionExplanation v={cardView} externalActivity={externalActivityWithOpening} />
-                ) : undefined
-              }
+    <FlowFocusContext.Provider value={flows.focus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="makerdao"
+          assets={
+            view && view.priceUsd != null && view.priceUsd > 0
+              ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
+              : []
+          }
+          closed={view != null && view.status !== "open"}
+          closing={closing}
+        >
+          {view && (
+            <MakerdaoExportMenu
+              view={view}
+              events={makerEvents}
+              notes={notes}
+              liveNotes={liveNotes}
+              csvFilename={`makerdao-${vault}-activity.csv`}
+              // A folder's members are not in `makerEvents`, so a grouped page
+              // reads the whole history for the CSV as a windowed one does.
+              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+              history={markdownHistoryScope(historyWindow, makerEvents, servedFolders)}
+              scopeNote={exportScopeNote(historyWindow, makerEvents, "this vault's whole history", servedFolders)}
             />
           )}
-          {view &&
-            (() => {
-              const towerData = computeMakerEconomics(cardView ?? view, lifetimeEvents ?? [], precomputedLifetime, {
-                priceAt: ilkAtRead?.complete ? (b) => ilkAtRead.reads.get(b)?.priceUsd ?? null : undefined,
-                leftover: vaultHistory.leftover,
-                feeLiquidated,
-              });
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={makerdaoEconomicsExplanation(towerData, { capped: (cardView ?? view).priceCap != null })}
-                  learnMore={makerdaoEconomicsContent({
-                    debtSym: ilkDebtSymbol((cardView ?? view).ilk),
-                    ilk: (cardView ?? view).ilk,
-                    priceChangeRow: towerData.collateral.priceChange?.usd != null,
-                    capped: (cardView ?? view).priceCap != null,
-                  })}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={null}
-            // Matches `MakerdaoEventCard`'s own `persistKey={`makerdao:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="makerdao"
-            closed={view?.status !== "open"}
-            countDetail={countDetail}
-            tl={tl}
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={liveNotesPending}
-            runs={MAKERDAO_LIQUIDATION_RUNS}
-            folderRegister={MAKERDAO_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            segments={segments}
-            phoneNoteLine={MAKER_PHONE_NOTE_LINE}
-            notice={<MakerSpineKey debtSym={ilkDebtSymbol(view?.ilk ?? "")} />}
-            toolbarLeading={
-              <TimelineActivityHeader
-                events={tl.sortedEvents}
-                folders={servedFolders}
-                closed={view?.status !== "open"}
-                // When the vault actually opened, not when the window does.
-                firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                labelLastActivity
-                labelTenure
+        </DetailTopRow>
+
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <MakerVaultHistoryProvider value={vaultHistory}>
+            {cardView && (
+              <MakerVaultCard
+                v={cardView}
+                receipts
+                viewHref={tl.viewHref}
+                // The risk slot rides the card's heading-button row (the Aave V3
+                // treatment): the Display menu plus the chosen risk picture —
+                // liquidation runway (default) or the collateral-ratio card.
+                // Whatever it draws is on the card face and in the card's receipts
+                // scope, so the Provenance list stays 1:1 with the face figures.
+                // Mounts only when the live overlay landed and the vault is open.
+                rowExtra={
+                  cardView.source === "chain" && cardView.status === "open" ? (
+                    <MakerdaoRiskSlot v={cardView} />
+                  ) : undefined
+                }
+                // The Explanation is now pure prose about those same face figures
+                // (the 3-section page anatomy: card → economics → timeline). The
+                // CR strip is absorbed into the risk slot above.
+                // A terminal vault narrates from the replay + the timeline
+                // already on the page (no chain overlay needed); the open pane
+                // still needs the live overlay for the ilk parameters and
+                // declines without it.
+                explanation={
+                  cardView.status !== "open" ? (
+                    <MakerdaoClosedPositionExplanation v={cardView} events={makerEvents} folders={servedFolders} />
+                  ) : cardView.source === "chain" ? (
+                    <MakerdaoPositionExplanation v={cardView} externalActivity={externalActivityWithOpening} />
+                  ) : undefined
+                }
               />
-            }
-            renderCard={(event, meta) =>
-              isMakerDAOEvent(event) ? (
-                <MakerDAOEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
+            )}
+            {/* Lifetime flows: the bars and the line over the vault's replay
+            (lib/makerdao/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
+            {view && flowColl && flowDebt && (
+              <LifetimeFlowsPanel
+                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                read={flows.read}
+                explanation={
+                  <div className="space-y-2 text-sm text-rb-500">
+                    <MakerFlowsNote
+                      facts={flows.facts}
+                      collSymbol={flowColl}
+                      debtSymbol={flowDebt}
+                      ilk={view.ilk}
+                      capped={(cardView ?? view).priceCap != null}
+                    />
+                  </div>
+                }
+                learnMore={makerdaoFlowsContent({ debtSym: flowDebt, ilk: view.ilk })}
+              />
+            )}
+            <ChainTruthTimeline
+              csvExportCeiling={null}
+              // Matches `MakerdaoEventCard`'s own `persistKey={`makerdao:${event.id}`}` —
+              // lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="makerdao"
+              closed={view?.status !== "open"}
+              countDetail={countDetail}
+              tl={tl}
+              notes={notes}
+              liveNotes={liveNotes}
+              liveNotesPending={liveNotesPending}
+              runs={MAKERDAO_LIQUIDATION_RUNS}
+              folderRegister={MAKERDAO_FOLDER_REGISTER}
+              readFolderMembers={readFolderMembers}
+              segments={segments}
+              phoneNoteLine={MAKER_PHONE_NOTE_LINE}
+              notice={<MakerSpineKey debtSym={ilkDebtSymbol(view?.ilk ?? "")} />}
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={tl.sortedEvents}
+                  folders={servedFolders}
+                  closed={view?.status !== "open"}
+                  // When the vault actually opened, not when the window does.
+                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  labelLastActivity
+                  labelTenure
                 />
-              ) : null
-            }
-          />
-          <ProvInspectorLayer />
-        </MakerVaultHistoryProvider>
-      )}
-    </div>
+              }
+              renderCard={(event, meta) =>
+                isMakerDAOEvent(event) ? (
+                  <MakerDAOEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                  />
+                ) : null
+              }
+            />
+            <ProvInspectorLayer />
+          </MakerVaultHistoryProvider>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }
 

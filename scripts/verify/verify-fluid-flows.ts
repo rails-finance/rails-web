@@ -25,6 +25,16 @@
 // priced by its row and the rest by the nearest priced moment; and the state
 // card between events states the chart's grown figures.
 //
+// Three modes of every fixture. As read (`<name>`): the rows priced at
+// liquidation blocks only, as the index served them before the server's event
+// filler. Stored (`<name>+stored`): every balance-bearing row carries the
+// price the filler stores (fixtures/fluid-stored-prices.json: server
+// scripts/lib/fluid-prices.mjs's one batched read per block, each equal to
+// the liquidation filler's single reads), mapped by the timeline transform.
+// Daily (`<name>+daily`): stored, with a daily store series between events
+// (synthetic: the latest event's price moved by a day-dependent step, so a
+// quiet day's figure is the store's and no event's).
+//
 //   npx tsx --test scripts/verify/verify-fluid-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -46,6 +56,7 @@ import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared
 import { eventCum, eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
 import { ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
 import { flowMoment } from "@/lib/shared/flow-moment";
+import { fluidOraclePriceOf } from "@/lib/sources/api/fluid-timeline";
 
 interface Fixture {
   name: string;
@@ -55,20 +66,87 @@ interface Fixture {
   debtSymbol: string;
   live: NonNullable<FluidFlowOptions["live"]>;
   events: BaseActivityEvent[];
+  daily?: [number, number][];
+}
+
+interface StoredPrice {
+  oracle: string;
+  raw: string;
+  source: "fluid-oracle-liquidate" | "fluid-oracle";
+  penalty: number;
+  /** The liquidation filler's single reads gave the same row. */
+  single: boolean;
 }
 
 const FIX = join(__dirname, "fixtures", "fluid-flows.json");
 const ALL = (JSON.parse(readFileSync(FIX, "utf8")) as { fixtures: Fixture[] }).fixtures;
-const fx = (name: string) => ALL.find((f) => f.name === name) as Fixture;
+const STORED = (
+  JSON.parse(readFileSync(join(__dirname, "fixtures", "fluid-stored-prices.json"), "utf8")) as {
+    prices: Record<string, StoredPrice | null>;
+  }
+).prices;
 /** 1 Oct 2026, 22:00 UTC: after every fixture's last row. */
 const NOW = 1_790_892_000;
 const DAY = 86_400;
 const NAMES = ALL.map((f) => f.name);
+const dataOf = (e: BaseActivityEvent) => (e.context as unknown as { data: Record<string, unknown> }).data;
+const bears = (e: BaseActivityEvent) => !["mint", "transfer"].includes(dataOf(e).eventType as string);
+const decimalsOf = (unit: number) => Math.round(-Math.log10(unit));
+
+/** The fixture with every balance-bearing row carrying its stored price, as
+ *  the timeline transform maps the server's row. */
+function withStored(f: Fixture): Fixture {
+  const ev = fluidFlowEvents(f.events);
+  const colDec = decimalsOf(ev[0].colUnit);
+  const debtDec = decimalsOf(ev[0].debtUnit);
+  const events = f.events.map((e) => {
+    if (!bears(e)) return e;
+    const d = dataOf(e);
+    const s = STORED[`${String(d.vault).toLowerCase()}:${e.blockNumber}`];
+    assert.ok(s, `${f.name} ${e.id}: a stored price`);
+    const price = fluidOraclePriceOf(
+      { price_raw: s.raw, oracle: s.oracle, price_source: s.source, liquidation_penalty: s.penalty },
+      colDec,
+      debtDec,
+    );
+    assert.ok(price, `${f.name} ${e.id}: the transform maps it`);
+    return { ...e, context: { ...e.context, data: { ...d, oraclePriceAtBlock: price } } } as BaseActivityEvent;
+  });
+  return { ...f, name: `${f.name}+stored`, events };
+}
+
+/** A synthetic daily series over the position's span: each day the latest
+ *  event's price, moved by a step that depends on the day. */
+function withDaily(f: Fixture): Fixture {
+  const ev = fluidFlowEvents(f.events).filter((e) => e.price != null);
+  const first = Math.floor(ev[0].ts / DAY);
+  const last = Math.floor(NOW / DAY) - 1;
+  const daily: [number, number][] = [];
+  let i = 0;
+  for (let d = first; d <= last; d++) {
+    while (i + 1 < ev.length && Math.floor(ev[i + 1].ts / DAY) <= d) i++;
+    daily.push([d, (ev[i].price as number) * (1 + 0.001 * ((d % 7) - 3))]);
+  }
+  return { ...f, name: f.name.replace("+stored", "+daily"), daily };
+}
+
+const STORED_ALL = ALL.map(withStored);
+const MODES = [...ALL, ...STORED_ALL, ...STORED_ALL.map(withDaily)];
+const MODE_NAMES = MODES.map((f) => f.name);
+const fx = (name: string) => MODES.find((f) => f.name === name) as Fixture;
+const base = (name: string) => name.split("+")[0];
 const OUT = new Set<string>([FL.collOut, FL.collSeized, FL.repaid, FL.debtLiquidated]);
 const COLL = new Set<string>([FL.collIn, FL.earned, FL.collOut, FL.collSeized]);
 
 function opts(f: Fixture): FluidFlowOptions {
-  return { collSymbol: f.collSymbol, debtSymbol: f.debtSymbol, now: NOW, open: f.status === "open", live: f.live };
+  return {
+    collSymbol: f.collSymbol,
+    debtSymbol: f.debtSymbol,
+    now: NOW,
+    open: f.status === "open",
+    live: f.live,
+    daily: f.daily ?? null,
+  };
 }
 const rows = (f: Fixture) => fluidFlowEvents(f.events);
 function model(f: Fixture): FlowModel {
@@ -93,7 +171,7 @@ test("the fixtures are the positions the header names", () => {
   ]);
 });
 
-for (const name of NAMES) {
+for (const name of MODE_NAMES) {
   test(`${name}: the replay meets every row's recorded balances`, () => {
     const f = fx(name);
     const ev = rows(f);
@@ -163,7 +241,11 @@ test("the interest is the rows' gaps, and the open position's both sides earn an
 
 test("prices: a liquidation row's own, the rest the nearest priced moment", () => {
   const open = fluidFlowReplay(rows(fx("open-interest")), opts(fx("open-interest")));
-  assert.deepEqual(fluidPricing(open), { row: 0, nearest: 0, today: 3 }, "no liquidation: today's oracle read");
+  assert.deepEqual(
+    fluidPricing(open),
+    { row: 0, rowLiq: 0, nearest: 0, today: 3 },
+    "no liquidation: today's oracle read",
+  );
   for (const r of open.replayed) assert.equal(r.price, fx("open-interest").live.price);
   const absorbed = fluidFlowReplay(rows(fx("absorbed")), opts(fx("absorbed")));
   // Deposited Dec 2024 and Jan 2025, absorbed Feb 2025: the absorb is nearer
@@ -187,12 +269,12 @@ test("a position that never borrowed is one bar in its collateral token", () => 
   assert.ok(Math.abs(st.collateral.now / 10 ** t.unit!.scale - f.live.coll!) < 1e-6, "today is the live read");
 });
 
-for (const name of NAMES) {
+for (const name of MODE_NAMES) {
   test(`${name}: at every day and the live stop each side's printed lines add to its printed total`, () => {
     const f = fx(name);
     const m = model(f);
     assert.ok(m.unit, "a token axis");
-    const unit = name === "supply-only" ? f.collSymbol : f.debtSymbol;
+    const unit = base(name) === "supply-only" ? f.collSymbol : f.debtSymbol;
     for (let stop = 0; stop <= m.liveStop; stop++) {
       const st = stateAt(m, stop);
       for (const side of ["collateral", "debt"] as const) {
@@ -214,15 +296,15 @@ for (const name of NAMES) {
     } else {
       // Today meets the live read.
       const G = 10 ** m.unit!.scale;
-      if (name !== "supply-only")
+      if (base(name) !== "supply-only")
         assert.ok(Math.abs(end.debt.now / G - f.live.debt!) < 1e-6 * Math.max(1, f.live.debt!), `${name}: debt now`);
-      const collNow = f.live.coll! * (name === "supply-only" ? 1 : f.live.price!);
+      const collNow = f.live.coll! * (base(name) === "supply-only" ? 1 : f.live.price!);
       assert.ok(Math.abs(end.collateral.now / G - collNow) < 1e-6 * Math.max(1, collNow), `${name}: collateral now`);
     }
   });
 }
 
-for (const name of NAMES) {
+for (const name of MODE_NAMES) {
   test(`${name}: every event card's sum is exact, and its token lines add to the recorded balance`, () => {
     const f = fx(name);
     const ev = rows(f);
@@ -265,7 +347,7 @@ for (const name of NAMES) {
   });
 }
 
-for (const name of NAMES) {
+for (const name of MODE_NAMES) {
   test(`${name}: the line's points are the bars' figures`, () => {
     const f = fx(name);
     const t = fluidFlowTimeline(rows(f), opts(f))!;
@@ -355,5 +437,65 @@ test("a fall between events with no row is booked as a liquidation, and only the
     assert.ok(Math.abs(leg(FL.debtLiquidated) - 19.625377) < 1e-6, `cleared ${leg(FL.debtLiquidated)}`);
     // The row's own act is the owner's.
     assert.ok(leg(FL.collOut) > 0 && leg(FL.repaid) > 0);
+  }
+});
+
+test("stored prices: each batched read is the liquidation filler's single read, and a liquidation row's is its served price", () => {
+  for (const [key, s] of Object.entries(STORED)) {
+    assert.ok(s, `${key}: a price`);
+    assert.ok(s.single, `${key}: the batch and the single reads agree`);
+  }
+  let checked = 0;
+  for (const name of NAMES) {
+    const served = fluidFlowEvents(fx(name).events);
+    const stored = fluidFlowEvents(fx(`${name}+stored`).events);
+    served.forEach((r, i) => {
+      if (r.price == null) return;
+      assert.equal(stored[i].price, r.price, `${name} ${r.id}: the stored price gives the served figure`);
+      checked++;
+    });
+  }
+  assert.ok(checked >= 16, `${checked} liquidation rows`);
+});
+
+test("stored prices: every collateral flow is valued at its own block, a liquidation's figures unchanged", () => {
+  for (const name of NAMES) {
+    const asRead = fluidFlowReplay(rows(fx(name)), opts(fx(name)));
+    const stored = fluidFlowReplay(rows(fx(`${name}+stored`)), opts(fx(`${name}+stored`)));
+    const p = fluidPricing(stored);
+    assert.equal(p.nearest + p.today, 0, `${name}: nothing priced from another moment`);
+    if (stored.borrower) assert.ok(p.row > 0, `${name}: priced by the rows`);
+    stored.replayed.forEach((r, i) => {
+      const a = asRead.replayed[i];
+      assert.deepEqual(r.legs, a.legs, `${name} ${r.ev.id}: the same token legs`);
+      if (a.priceFrom === "row") assert.equal(r.price, a.price, `${name} ${r.ev.id}: the liquidation's price`);
+    });
+  }
+  // #6 never liquidated: as read, every flow took today's oracle read.
+  const open = fluidFlowReplay(rows(fx("open-interest+stored")), opts(fx("open-interest+stored")));
+  assert.deepEqual(fluidPricing(open), { row: 3, rowLiq: 0, nearest: 0, today: 0 });
+  assert.ok(
+    open.replayed.every((r) => r.price !== fx("open-interest").live.price),
+    "no row at today's price",
+  );
+});
+
+test("the daily store: a quiet day takes the store's price, an event day its row's", () => {
+  for (const name of NAMES) {
+    const f = fx(`${name}+daily`);
+    const t = fluidFlowTimeline(rows(f), opts(f))!;
+    const rp = fluidFlowReplay(rows(f), opts(f));
+    if (!rp.borrower) continue;
+    const G = rp.grain;
+    const obs = new Map(t.dailyPrices!.coll);
+    const eventDays = new Map(rp.replayed.map((r) => [Math.floor(r.ev.ts / DAY), r.price * G]));
+    let quiet = 0;
+    for (const [d, p] of f.daily!) {
+      const want = eventDays.get(d) ?? p * G;
+      assert.equal(obs.get(d), want, `${name} day ${d}`);
+      if (!eventDays.has(d)) quiet++;
+    }
+    assert.ok(quiet > 0, `${name}: quiet days`);
+    assert.match(t.words!.linePrices!, /each day's close/, `${name}: the line names the store`);
   }
 });

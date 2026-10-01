@@ -202,51 +202,6 @@ export const daiDebtProv = (artHuman: string, rateRay: string, symbol: string = 
   ],
 });
 
-/** Lifetime gross collateral flow (deposited / withdrawn / liquidated / moved
- *  out) — the sum of the signed dink deltas of that kind over the vault's life.
- *  Chain-state amounts (frob/grab/fork dink); the tower values them at the
- *  current OSM price. */
-export const collateralFlowProv = (
-  flow: "deposited" | "withdrawn" | "liquidated" | "moved out",
-  collSym: string,
-): Provenance => ({
-  kind: "chain",
-  pclass: "indexed",
-  summary: `Total ${collSym} ${flow} over the vault's life — the sum of the ${
-    flow === "liquidated"
-      ? "grab seizures"
-      : flow === "moved out"
-        ? "Vat fork position moves to another urn (no tokens transferred — the collateral relocated with its debt)"
-        : `frob dink ${flow === "deposited" ? "increases" : "decreases"}`
-  } across the vault's own Vat operations. Chain-state amounts; valued at the current OSM price.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · Σ dink (${flow})`,
-});
-
-/** Lifetime gross DAI debt flow (generated / repaid / liquidated) — each historic
- *  `dart` valued at the Vat rate accumulator AS OF its own block, i.e. the DAI
- *  actually minted or burned at that draw/wipe. Chain-state: dart is a decoded
- *  LogNote word and rate@block is reconstructed from the captured `maker_fold`
- *  deltas, so the product is the §2 multiply at a historic block — not a model. */
-export const debtFlowProv = (flow: "generated" | "repaid" | "liquidated" | "moved out"): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Total DAI ${flow} over the vault's life — the sum of each ${
-    flow === "liquidated"
-      ? "grab debt seizure"
-      : flow === "moved out"
-        ? "Vat fork debt move to another urn (no DAI burned — the debt relocated with its collateral)"
-        : `frob dart ${flow === "generated" ? "draw" : "repayment"}`
-  } valued at the ilk's rate accumulator as of that event's block${
-    flow === "generated" || flow === "repaid"
-      ? ` (the DAI actually ${flow === "repaid" ? "burned" : "minted"} then)`
-      : ""
-  }. Both operands are chain values — the dart LogNote word and the rate replayed from the Vat's own fold deltas — so each term is read from the chain.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) (${flow})`,
-  formula: "Σ dart × rate@block ÷ 10^45",
-});
-
 // ── Liquidation forensics (the valued grab legs) ─────────────────────────────
 //
 // A grab moves the vault's seized collateral (dink) and cleared debt (dart)
@@ -616,97 +571,35 @@ export const feeInDebtProv = (vals: { debt: string; drawn: string; since?: strin
   ],
 });
 
-/** The DAI drawn and still owed (the debt less its fee). */
-export const drawnDaiProv = (vals: { drawn: string; since?: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Principal: DAI drawn less DAI repaid since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}, each valued at the rate accumulator at its block, which is the DAI minted or burned then. A repayment counts against principal first and against fee only once principal reaches zero.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) since the debt was last zero`,
-  formula: "Σ draws − Σ repayments since zero debt",
-  inputs: [{ label: "DAI drawn", value: vals.drawn, kind: "chain-derived", pclass: "indexed" }],
-});
-
-/** One part of the lifetime repayments: the principal it cleared, or the fee
- *  paid inside it. A repayment counts against principal first and against fee
- *  only once principal reaches zero, so the fee part is the lifetime fee less
- *  the fee owed now and the fee a liquidation cleared. */
-export const repaidPartProv = (part: "principal" | "fee", vals: { repaid: string; fee: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary:
-    part === "fee"
-      ? "Stability fee paid inside repayments — the fee over the vault's life less the fee in today's debt and the fee a liquidation cleared. A repayment counts against principal first and against fee only once principal reaches zero."
-      : "Principal cleared by repayments — every repayment, each at its block's rate, less the stability fee paid inside them.",
-  contract: VAT,
-  via: `${MAKER_VIA} · Σ (dart × rate@block ÷ 10^45) (repaid), split principal-first`,
-  formula: part === "fee" ? "lifetime fee − fee owed − fee liquidated" : "Σ repaid − fee paid in repayments",
-  inputs: [
-    { label: "repaid", value: vals.repaid, kind: "chain-derived", pclass: "indexed", note: "each at its block's rate" },
-    { label: "fee paid in repayments", value: vals.fee, kind: "chain-derived", pclass: "indexed" },
-  ],
-});
-
-/** The stability fee accrued over the vault's whole life. */
-export const lifetimeFeeProv = (vals: { debt: string; net: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary:
-    "Stability fee over the vault's life — the debt owed now less every DAI drawn net of every repayment and liquidation, each at its block's rate. It is the fee in the debt today plus the fee paid inside repayments and cleared by liquidations.",
-  contract: VAT,
-  via: "art × rate (live) − Σ (dart × rate@block) over every event",
-  formula: "debt now − (drawn − repaid − liquidated)",
-  inputs: [
-    { label: "debt now", value: vals.debt, kind: "chain-derived", pclass: "state", note: "art × rate (Vat)" },
-    { label: "net drawn", value: vals.net, kind: "chain-derived", pclass: "indexed", note: "each at its block's rate" },
-  ],
-});
-
-/** A lifetime collateral flow valued at the OSM price at each event's block. */
-export const collateralFlowAtEventsProv = (
-  flow: "deposited" | "withdrawn" | "liquidated" | "returned",
-  collSym: string,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${collSym} ${flow} over the vault's life, at the price of each event — each ${
-    flow === "liquidated"
-      ? "seizure"
-      : flow === "returned"
-        ? "move of auction leftovers back into the vault"
-        : flow === "deposited"
-          ? "deposit"
-          : "withdrawal"
-  } valued at the ${collSym} OSM price at its own block (Vat spot × Spotter mat, read at that block), then added up.`,
-  contract: { name: "Spotter", address: MAKER_ADDRESSES.SPOTTER },
-  via: `${MAKER_VIA} · Σ |dink| × (spot × mat at the event's block)`,
-  formula: "Σ amount × price at block",
-});
-
-/** Collateral an auction handed back, moved into the vault by its owner. */
-export const returnedCollateralProv = (collSym: string): Provenance => ({
-  kind: "chain",
-  pclass: "indexed",
-  summary: `${collSym} returned by a liquidation auction — what was left of the seized collateral once the debt and penalty were covered. The Clipper sends it to the vault's address as free collateral, and the owner's frob moved it into the vault.`,
-  contract: VAT,
-  via: `${MAKER_VIA} · frob dink equal to the auction's remaining lot`,
-});
-
-/** The price-change row on the collateral side. */
-export const collateralPriceChangeProv = (collSym: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `Price change — the difference between valuing each ${collSym} deposit, withdrawal and liquidation at the OSM price at its block and valuing what the vault holds at today's OSM price. In ${collSym} the column adds up without it.`,
-  formula: "held now − (in − out)",
-  inputs: [
-    { label: "flows", kind: "chain-derived", pclass: "oracle", note: "each at its event's OSM price" },
-    { label: "held now", kind: "chain-derived", pclass: "oracle", note: "at today's OSM price" },
-  ],
-});
-
 // ── The ilk at an event's block (T2 of a row) ────────────────────────────────
 
 /** The OSM price at a row's block. */
+/** The collateral after an event valued as the Lifetime flows ledger values
+ *  it: at the ilk's price at the close of the event's day in the daily price
+ *  store (Vat spot × Spotter mat at the day's last block), or a liquidation's
+ *  price at its block. */
+export const flowValueProv = (
+  collSym: string,
+  coords: MakerCoords,
+  vals: { amount: string; priceUsd: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  formula: "ink after × the ilk's price at the day's close",
+  verify: {
+    kind: "recompute",
+    text: "Read Vat.ilks(ilk).spot × Spotter.ilks(ilk).mat at the last block of the event's day (archive node) and multiply by the collateral after the event",
+  },
+  summary: `What the ${collSym} in the vault after this event was worth at Maker's oracle price at the close of the event's day, the price the Lifetime flows ledger values the event at. Rails records that price once a day for each collateral type.`,
+  contract: SPOTTER,
+  via: "the daily price store (maker:<ILK>, Vat spot × Spotter mat at the day's last block)",
+  inputs: [
+    { label: "collateral after", value: `${vals.amount} ${collSym}`, kind: "chain", note: "ink after the event" },
+    { label: `${collSym} price`, value: String(vals.priceUsd), kind: "chain", note: "spot × mat at the day's close" },
+    ...eventInputs(coords),
+  ],
+});
+
 export const eventPriceProv = (collSym: string, coords: MakerCoords, priceUsd: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",

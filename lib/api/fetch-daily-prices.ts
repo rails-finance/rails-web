@@ -45,13 +45,19 @@ export async function fetchDailyAnswer(
   return out;
 }
 
-/** One answer's series as `[day, usd]` ascending, the USD rows only. */
-export function dailyPricesFromAnswer(body: DailyAnswer): Record<string, [number, number][]> {
+/** One answer's series as `[day, price]` ascending, the rows whose unit
+ *  `accept` takes: USD by default; a ratio family (Fluid's `token:<debt
+ *  token>`) passes its own. */
+export function dailyPricesFromAnswer(
+  body: DailyAnswer,
+  accept: (unit: string) => boolean = (u) => u === "usd",
+): Record<string, [number, number][]> {
   const out: Record<string, [number, number][]> = {};
   for (const [key, s] of Object.entries(body.series ?? {})) {
     const list: [number, number][] = [];
     for (const [day, raw, , unit, scale] of s.obs ?? []) {
-      if ((unit ?? s.unit) !== "usd") continue;
+      const u = unit ?? s.unit;
+      if (u == null || !accept(u)) continue;
       const sc = scale ?? s.scale;
       const p = sc != null ? Number(raw) / 10 ** sc : NaN;
       if (Number.isFinite(p) && p > 0) list.push([day, p]);

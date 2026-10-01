@@ -23,12 +23,15 @@
 // base units below zero: that rounding stays inside the act, and the lines
 // still add to the recorded balance.
 //
-// Prices. The rows carry the vault oracle's price only on liquidation blocks
-// (server mig 114). Every other collateral flow takes the nearest priced
+// Prices. Each row carries the vault oracle's price at its block (server mig
+// 114: every T1 event block, filled by the server's event filler, liquidation
+// blocks first). A row the filler has not reached takes the nearest priced
 // moment in time: a priced row of the position, or today's oracle read; the
-// Explanation counts them. Fluid is in a later phase of the daily price
-// store, so between events the collateral keeps its latest priced event's
-// price (`seriesCarry`).
+// Explanation counts them. Between events the collateral takes the daily
+// price store's price for the vault (`fluid:<vault>`, rails-ops
+// reference/daily-prices.md, the oracle at each day's close), carrying the
+// last one over days it lacks (`seriesCarry`); where the store did not
+// answer, the collateral keeps its latest event's price.
 //
 // Between events each balance grows by the vault's exchange price as the rows
 // imply it (`FlowTimeline.indexes`, basis `fluid-rows`): from one row to the
@@ -138,7 +141,7 @@ export interface FluidFlowEvent {
   colUnit: number;
   debtUnit: number;
   /** The vault oracle at the row's block (debt token per collateral token),
-   *  where the row carries it (liquidation blocks, mig 114). */
+   *  where the row carries it (mig 114). */
   price: number | null;
 }
 
@@ -325,6 +328,9 @@ export interface FluidFlowOptions {
   /** The position is open (the page's verdict). */
   open: boolean;
   live: FluidLive | null;
+  /** The daily store's price for the vault, `[UTC day, debt per collateral]`
+   *  ascending; null or absent where the read failed or answered nothing. */
+  daily?: [number, number][] | null;
 }
 
 /** The replay with the rates between rows, for the timeline, the cards and
@@ -500,10 +506,12 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
   const nowDebt = open ? (o.live?.debt ?? last.debt * grow(rp.borrowRate[li], sinceLast)) : 0;
   const priceNow = borrower ? (livePrice ?? last.price) * G : G;
 
-  // The collateral's price on each event day (the price its flows were
-  // valued at), and today's.
+  // The collateral's price: the store's on each day, each event day the price
+  // its flows were valued at, and today's.
+  const daily = o.daily && o.daily.length > 0 ? o.daily : null;
   const collObs = new Map<number, number>();
   if (borrower) {
+    for (const [d, p] of daily ?? []) if (d < today && p > 0) collObs.set(d, p * G);
     for (const r of replayed) collObs.set(Math.floor(r.ev.ts / DAY_S), cp(r));
     if (livePrice != null && open) collObs.set(today, livePrice * G);
   }
@@ -563,15 +571,16 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
     indexes,
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
-    words: fluidFlowWords(o.collSymbol, o.debtSymbol, borrower),
+    words: fluidFlowWords(o.collSymbol, o.debtSymbol, borrower, daily != null),
   };
 }
 
-/** The panel's words for a Fluid position. */
+/** The panel's words for a Fluid position; `daily`: the store answered. */
 export function fluidFlowWords(
   collSymbol: string,
   debtSymbol: string,
   borrower: boolean,
+  daily = false,
 ): NonNullable<FlowTimeline["words"]> {
   if (!borrower)
     return {
@@ -602,10 +611,14 @@ export function fluidFlowWords(
       debt: `Every figure is in ${debtSymbol}, the vault's debt token.`,
     },
     heldBasis: {
-      collateral: `the ${collSymbol} held after the last event by then, grown at the rate the vault paid until its next event (after the last, its supply rate now), at the vault oracle's price of the latest event that priced it, in ${debtSymbol}.`,
+      collateral: daily
+        ? `the ${collSymbol} held after the last event by then, grown at the rate the vault paid until its next event (after the last, its supply rate now), at the vault oracle's price at the close of that day, in ${debtSymbol}.`
+        : `the ${collSymbol} held after the last event by then, grown at the rate the vault paid until its next event (after the last, its supply rate now), at the vault oracle's price of the latest event that priced it, in ${debtSymbol}.`,
       debt: `the ${debtSymbol} owed after the last event by then, grown at the rate the vault charged until its next event (after the last, its borrow rate now).`,
     },
-    linePrices: `in ${debtSymbol}, with the collateral at the vault oracle's price of its latest priced event and both sides grown at the vault's rates since the last event`,
+    linePrices: daily
+      ? `in ${debtSymbol}, with the collateral at the vault oracle's price at each day's close and both sides grown at the vault's rates since the last event`
+      : `in ${debtSymbol}, with the collateral at the vault oracle's price of its latest priced event and both sides grown at the vault's rates since the last event`,
     moment: {
       noPrice: {
         collateral: `No oracle price is recorded for this day, so the ${collSymbol} is stated in tokens.`,
@@ -688,14 +701,16 @@ export function fluidFocusEvents(rp: FluidFlowReplay, collSymbol: string, debtSy
   });
 }
 
-/** How the collateral flows were priced: at their own block, at the nearest
- *  priced row's, or at today's oracle read. */
-export function fluidPricing(rp: FluidFlowReplay): { row: number; nearest: number; today: number } {
-  const out = { row: 0, nearest: 0, today: 0 };
+/** How the collateral flows were priced: at their own block (`rowLiq` of
+ *  them liquidations), at the nearest priced row's, or at today's oracle
+ *  read. */
+export function fluidPricing(rp: FluidFlowReplay): { row: number; rowLiq: number; nearest: number; today: number } {
+  const out = { row: 0, rowLiq: 0, nearest: 0, today: 0 };
   if (!rp.borrower) return out;
   for (const r of rp.replayed) {
     if (!r.legs.some((l) => COLL_KEYS.has(l.bucket) && l.bucket !== FL.earned)) continue;
     out[r.priceFrom]++;
+    if (r.priceFrom === "row" && isLiquidation(r.ev.kind)) out.rowLiq++;
   }
   return out;
 }

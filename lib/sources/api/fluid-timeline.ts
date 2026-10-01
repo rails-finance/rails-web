@@ -134,7 +134,7 @@ function rawVal(v: string | null): string | undefined {
   return v == null ? undefined : String(v).split(".")[0];
 }
 
-/** The vault's own oracle price at a liquidation block (mig 114), raw → the
+/** The vault's own oracle price at the row's block (mig 114), raw → the
  *  debt-per-col figure its engine judged with.
  *
  *  Takes the row's decimals RAW AND NULLABLE rather than the defaulted values
@@ -145,8 +145,8 @@ function rawVal(v: string | null): string | undefined {
  *  probe was throttled and the NULL latched), and defaulting it would render
  *  gold at 1e12 times its price. Unknown decimals ⇒ no price ⇒ token-only,
  *  which is the same safe state as a block the filler hasn't reached. */
-function fluidOraclePriceOf(
-  r: FluidMvRow,
+export function fluidOraclePriceOf(
+  r: Pick<FluidMvRow, "price_raw" | "oracle" | "price_source" | "liquidation_penalty">,
   colDecimals: number | null,
   debtDecimals: number | null,
 ): FluidContext["oraclePriceAtBlock"] | undefined {
@@ -262,6 +262,14 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
       },
     };
 
+    // The vault oracle at the row's block: every T1 event block once the
+    // server's filler has reached it (server fill-fluid-event-prices.mjs),
+    // liquidation blocks before that.
+    if (bearsBalance) {
+      const price = fluidOraclePriceOf(r, r.supply_decimals, r.borrow_decimals);
+      if (price) ctx.oraclePriceAtBlock = price;
+    }
+
     let flows: AssetFlow[] = [];
 
     if (kind === "liquidated" || kind === "absorbed") {
@@ -272,7 +280,6 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
       ctx.liquidator = r.liquidator?.toLowerCase() ?? undefined;
       ctx.liqSource = (r.liq_source as "liquidate" | "absorb" | null) ?? undefined;
       ctx.fullyLiquidated = r.fully_liquidated || undefined;
-      ctx.oraclePriceAtBlock = fluidOraclePriceOf(r, r.supply_decimals, r.borrow_decimals);
       ctx.colDelta = fmtUnits(colAmt, supplyDec);
       ctx.debtDelta = fmtUnits(debtAmt, borrowDec);
       ctx.raw = {
