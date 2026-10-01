@@ -15,7 +15,7 @@ interface TroveDetailsBandProps {
   trovesAhead?: number | null;
   debtInFrontLoading?: boolean;
   /** One item alone, for the position card's opened layer (ui-jobs 209):
-   *  the costs under Debt, the debt in front under Collateral ratio. Both by
+   *  the costs under Debt, then the debt in front below them. Both by
    *  default, as the right-aligned strip draws them. */
   part?: "costs" | "queue";
   /** Left-aligned, under a headline. Right-aligned (the strip) by default. */

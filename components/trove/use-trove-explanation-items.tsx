@@ -402,12 +402,6 @@ function buildOpenItems({
         )}
       </span>,
     );
-    items.push(
-      <span key="debt-live" className="text-rb-500">
-        That debt includes interest up to the latest block and keeps growing at the trove&apos;s rate while the trove
-        is open
-      </span>,
-    );
   }
 
   if (hasLiveData && currentPrice && collateralUsd) {
@@ -550,7 +544,8 @@ function buildOpenItems({
             {trove.batch.managementFee}%
           </HighlightableValue>
         </Prov>{" "}
-        management fee. Base interest costs approximately{" "}
+        management fee; interest accrues on the debt every block while the trove is open, the base interest costing
+        approximately{" "}
         <Prov info={annualInterestProv}>
           <HighlightableValue type="annualInterest" state="after" value={annualInterestCost}>
             {formatPrice(annualInterestCost)} BOLD
@@ -568,13 +563,13 @@ function buildOpenItems({
   } else {
     items.push(
       <span key="rate-cost" className="text-rb-500">
-        Self-managed interest rate of{" "}
+        The owner sets the interest rate,{" "}
         <Prov info={rateProv}>
           <HighlightableValue type="interestRate" state="after" value={displayInterestRate}>
             {displayInterestRate}%
           </HighlightableValue>
-        </Prov>{" "}
-        accrues continuously on the principal debt, costing approximately{" "}
+        </Prov>
+        , which accrues on the debt every block while the trove is open, costing approximately{" "}
         <Prov info={annualInterestProv}>
           <HighlightableValue type="annualInterest" state="after" value={annualInterestCost}>
             {formatPrice(annualInterestCost)} BOLD

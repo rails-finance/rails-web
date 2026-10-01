@@ -50,6 +50,9 @@ export interface ClosedPositionStatsProps {
   debtAssetIcons?: ReactNode;
   collateralFootnote?: ReactNode;
   debtFootnote?: ReactNode;
+  /** A line under Outcome that stays in view on a disclosing card's closed
+   *  layer: what the owner can still claim (a liquidated Trove's surplus). */
+  outcomeFootnote?: ReactNode;
   /** The Outcome column's word when the protocol names how the position
    *  ended more finely than `outcome` (Liquity V1's "Fully redeemed"). The
    *  badge and colour still follow `outcome`. */
@@ -96,6 +99,7 @@ export function ClosedPositionStats({
   debtAssetIcons,
   collateralFootnote,
   debtFootnote,
+  outcomeFootnote,
   closedAt,
   outcomeDates,
   extra,
@@ -185,6 +189,7 @@ export function ClosedPositionStats({
                 </div>
               ))
             : closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
+          {outcomeFootnote}
         </div>
         <Gate>
           {extra ? (

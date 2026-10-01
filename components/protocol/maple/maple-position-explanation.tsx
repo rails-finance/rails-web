@@ -270,8 +270,8 @@ export function MaplePositionExplanation({
       bullets.push(
         <span key={`rate-${p.pool}`}>
           The claim is the shares priced at the pool&rsquo;s exit rate, <H>{st.exitRate.toFixed(4)}</H> {p.assetSymbol}{" "}
-          per share. That rate rises as the pool&rsquo;s borrowers pay interest, so the claim grows without new
-          deposits.
+          per share, read at block {st.blockNumber.toLocaleString("en-US")}. That rate rises every block as the
+          pool&rsquo;s borrowers pay interest, so the claim grows without new deposits.
         </span>,
       );
     }

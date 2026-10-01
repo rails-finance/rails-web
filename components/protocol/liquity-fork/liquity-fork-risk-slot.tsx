@@ -5,12 +5,13 @@
 // Provenance list holds exactly these figures:
 //
 //   • under Debt, the Liquity V2 band's yearly cost at the live rate
-//     ("Costs: ~X ebUSD / year");
+//     ("Costs: ~X ebUSD / year"), then the redemption queue, whose order the
+//     rate sets: its bar and the debt ahead ("Debt in front: X ebUSD" with
+//     the Trove count);
 //   • under Collateral ratio, the price bar (how far the collateral can fall
 //     before the branch MCR; the card's "Liquidates at" line states the
 //     price), the borrowing headroom to the MCR and the branch ratio (with the
-//     CCR borrow-gate / SCR shutdown notes), then the redemption queue: its
-//     bar and the debt ahead ("Debt in front: X ebUSD" with the Trove count).
+//     CCR borrow-gate / SCR shutdown notes).
 //
 // The trove's own ratio and liquidation price are NOT restated here — the
 // shared Liquity-family card states both. The redemption runway is an
@@ -98,31 +99,38 @@ function LiquityForkDetailsBand({
   );
 }
 
-/** The opened layer under Debt (ui-jobs 209): a year's interest at the live rate. */
+/** The opened layer under Debt (ui-jobs 209): a year's interest at the live
+ *  rate, then the redemption queue (its bar and the debt in front), since
+ *  redemptions take the lowest-rate Troves first. */
 export function LiquityForkDebtDetail({ chain }: { chain: LiquityForkTroveChainResponse }) {
-  return <LiquityForkDetailsBand chain={chain} part="costs" alignStart />;
+  const queued =
+    chain.status === "active" && chain.debtInFront != null && chain.branchDebt != null && chain.branchDebt > 0;
+  return (
+    <>
+      <LiquityForkDetailsBand chain={chain} part="costs" alignStart />
+      <div className="mt-1.5 max-w-72 space-y-1">
+        {queued && (
+          <RedemptionRunway
+            debtInFront={chain.debtInFront as number}
+            queueDebtTotal={chain.branchDebt as number}
+            shareProv={forkLiveVocab(chain.protocol).queueShareProv(chain.symbol)}
+            markerTitle="This trove's place in the branch's redemption queue — everything left of the marker is redeemed first"
+          />
+        )}
+        <LiquityForkDetailsBand chain={chain} part="queue" alignStart />
+      </div>
+    </>
+  );
 }
 
 /** The opened layer under Collateral ratio (ui-jobs 209): the price bar, the
- *  room to the branch minimum and the branch ratio, then the redemption queue
- *  (its bar and the debt in front). The card's "Liquidates at" line above it
- *  states the price the bar measures to. */
+ *  room to the branch minimum and the branch ratio. The card's "Liquidates
+ *  at" line above it states the price the bar measures to. */
 export function LiquityForkRiskDetail({ chain }: { chain: LiquityForkTroveChainResponse }) {
-  const queued =
-    chain.status === "active" && chain.debtInFront != null && chain.branchDebt != null && chain.branchDebt > 0;
   return (
     <div className="mt-1.5 max-w-72 space-y-1">
       <LiquityForkRunway chain={chain} barOnly />
       <LiquityForkCrCard chain={chain} alignStart />
-      {queued && (
-        <RedemptionRunway
-          debtInFront={chain.debtInFront as number}
-          queueDebtTotal={chain.branchDebt as number}
-          shareProv={forkLiveVocab(chain.protocol).queueShareProv(chain.symbol)}
-          markerTitle="This trove's place in the branch's redemption queue — everything left of the marker is redeemed first"
-        />
-      )}
-      <LiquityForkDetailsBand chain={chain} part="queue" alignStart />
     </div>
   );
 }

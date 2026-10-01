@@ -122,7 +122,7 @@ function ClaimStack({ v }: { v: MaplePositionView }) {
 }
 
 /** Per-pool share amounts, demoted beneath the claim — the exact lanes. */
-function ClaimFootnoteLines({ v, asOf = false }: { v: MaplePositionView; asOf?: boolean }) {
+function ClaimFootnoteLines({ v }: { v: MaplePositionView }) {
   const live = v.pools.filter((p) => p.shares + p.escrowedShares > 0);
   if (live.length === 0) return null;
   return (
@@ -142,13 +142,6 @@ function ClaimFootnoteLines({ v, asOf = false }: { v: MaplePositionView; asOf?: 
                 <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
                   <span className="text-rb-500">@ {v.poolState[p.pool].exitRate.toFixed(4)}</span>
                 </Prov>
-                {/* The claim moves with the exit rate every block: say which. */}
-                {asOf && (
-                  <span className="text-rb-500">
-                    {" "}
-                    · as of block {v.poolState[p.pool].blockNumber.toLocaleString("en-US")}
-                  </span>
-                )}
               </>
             )}
           </div>
@@ -395,10 +388,10 @@ export function MaplePositionCard({
                 {claimDisclosure.collapsible ? (
                   <ReserveDisclosureList disclosure={claimDisclosure}>
                     <ClaimStack v={v} />
-                    <ClaimFootnoteLines v={v} asOf={receipts} />
+                    <ClaimFootnoteLines v={v} />
                   </ReserveDisclosureList>
                 ) : (
-                  <ClaimFootnoteLines v={v} asOf={receipts} />
+                  <ClaimFootnoteLines v={v} />
                 )}
                 <InterestCaption captions={captions} />
               </>

@@ -467,10 +467,11 @@ export function LiquityPositionCard({
    *  three headlines; opened, each headline's lines and the Explanation. */
   disclosureKey?: string;
   /** Opened-layer lines under Debt from the page's live read (the yearly
-   *  cost). Only drawn on a disclosing card. */
+   *  cost, then the redemption queue the rate places the Trove in). Only
+   *  drawn on a disclosing card. */
   debtDetail?: ReactNode;
   /** Opened-layer lines under Collateral ratio from the page's live read
-   *  (the price bar, the redemption queue). Only drawn on a disclosing card. */
+   *  (the price bar). Only drawn on a disclosing card. */
   riskDetail?: ReactNode;
 }) {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
@@ -588,8 +589,10 @@ export function LiquityPositionCard({
         <StatDash />
       );
     // One state for the card: the life's peaks stay the headline figures, and
-    // a surplus the owner can still claim is its own line under them, so the
-    // card does not change meaning when the head read lands.
+    // a surplus the owner can still claim is its own line under Outcome, in
+    // view on the closed card while there is something to claim, so the card
+    // does not change meaning when the head read lands. Once claimed it goes;
+    // the claim stays on the timeline.
     const claimableFootnote = claimable ? (
       <div className="text-xs mt-0.5 text-rb-500">
         <Prov info={collSurplusClaimableProv(claimable, ct)}>
@@ -617,8 +620,8 @@ export function LiquityPositionCard({
       >
         {deprecationBanner}
         <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the life's highest balances (and any claimable surplus) open.
+          // A disclosing card's closed layer is the header, the outcome and any
+          // claimable surplus; the life's highest balances open.
           detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           closedAt={v.lastActivityAt}
@@ -643,7 +646,7 @@ export function LiquityPositionCard({
           collateralIcon={<TokenChipIcon symbol={ct} size={28} filterable={false} />}
           debtIcon={<TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />}
           collateral={peakCollateralStat}
-          collateralFootnote={claimableFootnote}
+          outcomeFootnote={claimableFootnote}
           debt={peakDebtStat}
         />
         {footer}

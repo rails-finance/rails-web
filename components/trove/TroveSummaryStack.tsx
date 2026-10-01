@@ -107,19 +107,24 @@ export function TroveSummaryStack({
   ) : null;
   const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
 
-  // The opened layer (trove page): the yearly cost under Debt; the price bar
-  // and the redemption queue under Collateral ratio, whose "Liquidates at"
-  // line states the price the bar measures to.
+  // The opened layer (trove page): under Debt, the yearly cost and then the
+  // redemption queue, since the rate sets the Trove's place in it; under
+  // Collateral ratio, the price bar, whose "Liquidates at" line states the
+  // price the bar measures to.
   const debtDetail =
-    disclosureKey && showBand ? <TroveDetailsBand {...bandProps} part="costs" alignStart /> : undefined;
+    disclosureKey && showBand ? (
+      <>
+        <TroveDetailsBand {...bandProps} part="costs" alignStart />
+        <div className="mt-1.5 max-w-72 space-y-1">
+          {queueRunway}
+          <TroveDetailsBand {...bandProps} part="queue" alignStart />
+        </div>
+      </>
+    ) : undefined;
   const riskDetail =
-    disclosureKey && (showBand || showRunway) ? (
+    disclosureKey && showRunway && liqPrice && collPrice ? (
       <div className="mt-1.5 max-w-72 space-y-1">
-        {showRunway && liqPrice && collPrice && (
-          <PriceRunway compact barOnly currentPrice={collPrice} liqPrice={liqPrice} asset={trove.collateralType} />
-        )}
-        {queueRunway}
-        {showBand && <TroveDetailsBand {...bandProps} part="queue" alignStart />}
+        <PriceRunway compact barOnly currentPrice={collPrice} liqPrice={liqPrice} asset={trove.collateralType} />
       </div>
     ) : undefined;
 
