@@ -1,24 +1,15 @@
-// Maple economics reduction — the lender tower with lifetime flows and the
-// interest earned.
+// Maple lifetime flows per pool, for the position card's interest captions
+// and the Explanation's received pools.
 // ----------------------------------------------------------------------------
-// A Maple lender has ONE side: the pool claim. The tower's collateral column
-// carries it — the CURRENT redeemable value when the chain read landed
-// ((shares + escrowed) × the pool's convertToExitAssets at head) and the
-// replayed deposited principal otherwise; the spread between the two is
-// earned interest. There is no debt column (nothing is borrowed against).
-//
+// A Maple lender has ONE side: the pool claim, the CURRENT redeemable value
+// ((shares + escrowed) × the pool's convertToExitAssets at head). Interest
+// earned is that claim less the net principal replayed from the wallet's rows.
 // USD is deliberately NOT asserted: the funds assets ARE dollar stablecoins
-// (USDC / USDT), and pinning them to $1 is charter-forbidden (S3 — a pin
-// erases exactly the depeg signal this explorer exists to show). The tower
-// renders token amounts in the pool's own asset; a Chainlink USDC/USD ambient
-// is a later layer if wanted.
-//
-// With the wallet's event stream (optional second arg) the tower gains the
-// lifetime layer: hatched withdrawn segments per pool, the faded
-// lifetime-inflow bar, and the interest each pool earned over its life. The
-// card's "incl." caption renders only when a single pool holds shares and its
+// (USDC / USDT), and pinning them to $1 is charter-forbidden (S3). The card's
+// "incl." caption renders only when a single pool holds shares and its
 // interest is still inside the claim (the Spark legInterest gates) — a
-// cross-pool token sum would mix USDC and USDT.
+// cross-pool token sum would mix USDC and USDT. The Lifetime flows panel
+// replays the rows separately (lib/maple/flows.ts).
 //
 // Pool shares also move wallet to wallet with no pool event. Each such transfer
 // is valued at the pool's rate in its block (rails-server mig 339: an archive
@@ -32,15 +23,7 @@
 import type { MaplePositionView } from "@/components/protocol/maple/maple-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isMapleEvent } from "@/lib/shared/types/event-shape";
-import {
-  positionCurrentValueProv,
-  positionPrincipalProv,
-  interestEarnedLifetimeProv,
-  mapleLifetimeFlowProv,
-  mapleTransferFlowProv,
-} from "@/lib/maple/event-provenance";
 import { maplePoolOf } from "@/lib/maple/asset-catalog";
-import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { folderFlows, mergeFlowBuckets } from "@/lib/shared/timeline-folder-reductions";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
@@ -389,136 +372,4 @@ export function computeMapleCardCaptions(
           .map((i) => ({ amount: i.earned, symbol: i.symbol }))
       : [];
   return { interestEarned, interestWithdrawn, earnedElsewhere };
-}
-
-export function computeMapleEconomics(
-  view: MaplePositionView,
-  events?: BaseActivityEvent[],
-  /** The whole position's flows where `events` is only a window of them — see
-   *  `mapleLifetimeWithOpening`. Omitted, the flows are replayed from `events`,
-   *  which is the whole history on every unwindowed page. */
-  precomputedLifetime?: Map<string, PoolFlows>,
-): ChainTruthTowerData {
-  // The claim: current redeemable value where the chain read landed, the
-  // replayed principal otherwise — the provenance names the basis.
-  let claimLines: TowerLine[] = view.pools
-    .filter((p) => p.shares + p.escrowedShares > 0)
-    .map((p) => ({
-      key: p.pool,
-      symbol: p.assetSymbol,
-      amount: p.currentValue ?? p.depositedPrincipal,
-      usd: null,
-      prov:
-        p.currentValue != null
-          ? positionCurrentValueProv(p.assetSymbol, p.symbol)
-          : positionPrincipalProv(p.assetSymbol),
-    }))
-    .filter((l) => l.amount > DUST);
-
-  // ── Lifetime layer (needs the event stream) ────────────────────────────────
-  const lifetime = precomputedLifetime ?? (events && events.length > 0 ? replayMapleLifetime(events) : null);
-  const okFlows = lifetime ? [...lifetime.values()].filter((f) => poolReconciles(view, f)) : [];
-  const exited: TowerLine[] = [
-    ...okFlows
-      .filter((f) => f.withdrawn > DUST)
-      .map((f) => ({
-        key: `withdrawn-${f.pool}`,
-        symbol: f.assetSymbol,
-        amount: f.withdrawn,
-        usd: null,
-        prov: mapleLifetimeFlowProv("withdrawn", f.assetSymbol),
-      })),
-    ...okFlows
-      .filter((f) => f.transferredOut > DUST)
-      .map((f) => ({
-        key: `sent-${f.pool}`,
-        symbol: f.assetSymbol,
-        amount: f.transferredOut,
-        usd: null,
-        flowLabel: "Transferred out",
-        prov: mapleTransferFlowProv("out", f.assetSymbol),
-      })),
-  ];
-  // Shares received by transfer: inflow that is not a deposit, drawn as the
-  // tower's "+ Received by transfer" row beside the all-time deposits.
-  const received: TowerLine[] = okFlows
-    .filter((f) => f.transferredIn > DUST)
-    .map((f) => ({
-      key: `received-${f.pool}`,
-      symbol: f.assetSymbol,
-      amount: f.transferredIn,
-      usd: null,
-      flowLabel: "Received by transfer",
-      prov: mapleTransferFlowProv("in", f.assetSymbol),
-    }));
-
-  // Interest earned over the position's life, one line per pool. The card's
-  // "incl." caption keeps to interest inside the claim and, wherever it shows,
-  // states this same figure.
-  const earned: TowerLine[] = lifetime
-    ? lifetimeInterest(view, lifetime).map((i) => ({
-        key: `earned-${i.pool}`,
-        symbol: i.symbol,
-        amount: i.earned,
-        usd: null,
-        flowLabel: "Interest earned",
-        prov: interestEarnedLifetimeProv(i.symbol),
-      }))
-    : [];
-
-  // A pool the wallet has left keeps a claim line at 0 where the panel lists
-  // more than one asset (the list form), so every pool in the flows below
-  // shows on the panel's face. A one-asset panel draws bars and has no list.
-  if (new Set(okFlows.map((f) => f.assetSymbol)).size > 1) {
-    const heldPools = new Set(claimLines.map((l) => l.key));
-    claimLines = [
-      ...claimLines,
-      ...okFlows
-        .filter((f) => !heldPools.has(f.pool))
-        .map((f) => ({
-          key: f.pool,
-          symbol: f.assetSymbol,
-          amount: 0,
-          usd: null,
-          prov: positionCurrentValueProv(f.assetSymbol, maplePoolOf(f.pool).symbol),
-        })),
-    ];
-  }
-
-  // Lifetime inflow (the faded side bar) — a token amount is only meaningful
-  // when one pool flowed, else suppressed. Shares received ride `received`,
-  // which the tower adds to the bar.
-  const inflow = ((): number => {
-    const rows = okFlows.filter((f) => f.deposited > DUST);
-    return rows.length === 1 ? rows[0].deposited : 0;
-  })();
-
-  return {
-    // Never valued: the assets are dollar stablecoins and a $1 pin is
-    // charter-forbidden (S3) — token amounts carry the meaning.
-    valued: false,
-    collateral: {
-      current: claimLines,
-      interest: null,
-      earned,
-      exited,
-      received,
-      liquidated: [],
-      lifetimeInflow: inflow,
-    },
-    debt: {
-      current: [],
-      interest: null,
-      exited: [],
-      liquidated: [],
-      lifetimeInflow: 0,
-    },
-    // The card's own column label — the lender's claim is not collateral
-    // (that word belongs to the borrowers' custodied assets on this protocol),
-    // and a lender has no debt axis at all, so the empty Debt column goes too.
-    collateralListLabel: "Pool claim",
-    debtAxisAbsent: true,
-    // No grey note under the list: the Explanation beneath the panel says
-    // what the figures are and which of them the chain proves.
-  };
 }

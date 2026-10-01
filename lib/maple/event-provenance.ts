@@ -640,16 +640,6 @@ export const interestEarnedProv = (sym: string): Provenance => ({
   ],
 });
 
-/** Lifetime shares received / sent by transfer, valued at the pool rate. */
-export const mapleTransferFlowProv = (direction: "in" | "out", sym: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Lifetime ${sym} value of the pool shares this wallet ${direction === "in" ? "received from" : "sent to"} other wallets — each Transfer's shares times the pool's rate in its block (a same-block Deposit or Withdraw log's assets ÷ shares, or an archive read of totalAssets ÷ totalSupply where the block has none), added up across the captured history.`,
-  contract: { name: "Maple pool (ERC-4626)", address: "" },
-  via: `${MAPLE_VIA} · Σ Transfer shares × pool rate at the block · deploy → head`,
-  formula: "Σ shares × rate",
-});
-
 /** Closed-card peak: the highest share balance the wallet ever held. */
 export const peakSharesProv = (poolSym: string): Provenance => ({
   kind: "chain-derived",
@@ -666,15 +656,6 @@ export const peakDepositedProv = (sym: string): Provenance => ({
   summary: `The highest ${sym} deposited PRINCIPAL this wallet ever recorded — the maximum of the principal lane (Σ deposits − withdrawals − queue fills) across its whole captured history. No on-chain slot holds deposited principal; this is the index's replay. Shares that arrived by transfer carry no deposit, so a transfer-acquired position peaks at zero here while its share peak carries the real height.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: `${MAPLE_VIA} · MAX over the replayed principal lane · deploy → head`,
-});
-
-/** A lifetime gross flow (Σ deposited / withdrawn on one pool). */
-export const mapleLifetimeFlowProv = (flow: "deposited" | "withdrawn", sym: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Lifetime ${flow} (${sym}) — the sum of every ${sym} amount this wallet's own events ${flow === "deposited" ? "deposited into" : "took out of"} the pool across its whole captured history (complete from the pool's deploy block). Pool events only: shares moved wallet to wallet have no Deposit/Withdraw log and are summed on their own rows, valued at the pool rate in their block.`,
-  contract: { name: "Maple pool (ERC-4626)", address: "" },
-  via: `${MAPLE_VIA} · Σ assets across the wallet's own logs · deploy → head`,
 });
 
 // ── the access band (pool-level chain reads) ─────────────────────────────────

@@ -7,7 +7,7 @@
 // the listing proxy already takes (exit/NAV rates + the liquid/deployed
 // split — one multicall, no per-wallet RPC). A lender has no liquidation
 // surface, so no risk gauges are asserted — the card, the pool band, the
-// tower and the timeline carry the whole page.
+// Lifetime flows panel and the timeline carry the whole page.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -42,13 +42,15 @@ import {
   type MaplePositionView,
 } from "@/components/protocol/maple/maple-position-card";
 import { MaplePositionExplanation } from "@/components/protocol/maple/maple-position-explanation";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import {
-  computeMapleEconomics,
-  computeMapleCardCaptions,
-  mapleFlowSummaries,
-  mapleLifetimeWithOpening,
-} from "@/lib/maple/economics";
+import { computeMapleCardCaptions, mapleFlowSummaries, mapleLifetimeWithOpening } from "@/lib/maple/economics";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { MapleFlowsNote, mapleFlowsContent } from "@/components/protocol/maple/maple-flows-note";
+import { MapleFlowsPoolSwitch } from "@/components/protocol/maple/maple-flows-pools";
+import { MapleFlowsPoolContext } from "@/components/protocol/maple/maple-ledger";
+import { useMapleFlows } from "@/hooks/useMapleFlows";
+import type { MapleLive } from "@/lib/maple/flows";
 import {
   mapleBoundaryFolders,
   mapleHoldings,
@@ -59,7 +61,6 @@ import {
 } from "@/lib/maple/row-times";
 import { MapleSinceLastEventRow } from "@/components/protocol/maple/maple-since-last-event";
 import type { FolderMembersReader } from "@/lib/shared/folder-members";
-import { mapleEconomicsExplanation, mapleEconomicsContent } from "@/lib/maple/economics-explanation";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -295,6 +296,8 @@ export default function MaplePositionView({
     folderParams: { wallet },
     storageKey: `maple-${wallet}`,
     protocolKey: "maple",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // Who executed this account's events — the SAME verdict each event card
@@ -435,6 +438,38 @@ export default function MaplePositionView({
     return out;
   }, [view, walletPoolState]);
 
+  // The Lifetime flows panel replays the wallet's whole history, one pool at a
+  // time (lib/maple/flows.ts): the page's rows where they are all of it, else
+  // the flat history read once (the CSV's read); a read the row ceiling cut
+  // short is a failed read. Today's claim and rate are the card's chain read.
+  const flowWhole = historyWindow.state === "whole" && !servedFolders?.length;
+  const flowLive = useMemo<Record<string, MapleLive>>(() => {
+    const out: Record<string, MapleLive> = {};
+    for (const p of view?.pools ?? []) {
+      const rate = poolState[p.pool]?.exitRate;
+      out[p.pool] = {
+        claim: p.currentValue,
+        rate: rate != null && Number.isFinite(rate) && rate > 0 ? rate : null,
+      };
+    }
+    return out;
+  }, [view, poolState]);
+  // The pool the panel opens on: the one the wallet holds most of now, else
+  // the one it put most into.
+  const preferredPool = useMemo(() => {
+    const pools = view?.pools ?? [];
+    const held = [...pools].sort((a, b) => (b.currentValue ?? 0) - (a.currentValue ?? 0))[0];
+    if (held && (held.currentValue ?? 0) > 0) return held.pool;
+    return [...pools].sort((a, b) => b.lifetimeDeposited - a.lifetimeDeposited)[0]?.pool ?? null;
+  }, [view]);
+  const flows = useMapleFlows({
+    wholeEvents: flowWhole ? mapleEvents : null,
+    fetchAll: fetchAllHistory,
+    live: flowLive,
+    preferred: preferredPool,
+  });
+  const flowFocus = flows.read !== "failed" ? flows.focus : null;
+
   // The custody view — the factual page for a bridge escrow address. The
   // identity card states what the contract is and links the verified source;
   // the custody card beneath it carries what the escrow holds in the pool,
@@ -469,146 +504,162 @@ export default function MaplePositionView({
   }
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="maple"
-        wallet={wallet}
-        assets={stripAssets}
-        priceReason={ORACLE_USD_REASON.maple}
-        closed={view != null && view.status !== "open"}
-      >
-        {view && (
-          <MapleExportMenu
-            view={view}
-            events={mapleEvents}
-            captions={captions}
-            csvFilename={`maple-${wallet}-activity.csv`}
-            // A folder's members are not in `mapleEvents`, so a grouped page
-            // reads the whole history for the CSV as a windowed one does.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            queued={{
-              protocol: "maple",
-              params: { wallet },
-              totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-            }}
-            history={markdownHistoryScope(historyWindow, mapleEvents, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
+    <FlowFocusContext.Provider value={flowFocus}>
+      <MapleFlowsPoolContext.Provider value={flowFocus ? flows.pool : null}>
+        <div className="py-8 space-y-6">
+          <DetailTopRow
+            session="maple"
+            wallet={wallet}
+            assets={stripAssets}
+            priceReason={ORACLE_USD_REASON.maple}
+            closed={view != null && view.status !== "open"}
+          >
+            {view && (
+              <MapleExportMenu
+                view={view}
+                events={mapleEvents}
+                captions={captions}
+                csvFilename={`maple-${wallet}-activity.csv`}
+                // A folder's members are not in `mapleEvents`, so a grouped page
+                // reads the whole history for the CSV as a windowed one does.
+                fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+                queued={{
+                  protocol: "maple",
+                  params: { wallet },
+                  totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+                }}
+                history={markdownHistoryScope(historyWindow, mapleEvents, servedFolders)}
+                scopeNote={exportScopeNote(historyWindow, mapleEvents, "this wallet's whole history", servedFolders)}
+              />
+            )}
+          </DetailTopRow>
 
-      {protocolContract && (
-        <ContractIdentityCard
-          kicker="Protocol contract"
-          name={protocolContract.name}
-          wallet={wallet}
-          contractName={protocolContract.contractName}
-        >
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-rb-500">
-            This address is {protocolContract.role}. It is not a lender position, so the Maple listing leaves it out.
-            The timeline below is its record in Maple&rsquo;s pools.
-          </p>
-        </ContractIdentityCard>
-      )}
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
-          {view && (
-            <MaplePositionCard
-              v={view}
-              receipts
-              viewHref={tl.viewHref}
-              captions={captions ?? undefined}
-              cancelledRequests={cancelledRequests}
-              // The Explanation pane: layman narration of the card's own face
-              // figures (claim, exit rate, escrow, the pool's queue and split).
-              explanation={
-                <MaplePositionExplanation
-                  v={view}
-                  captions={captions}
-                  externalActivity={externalActivity}
-                  holdings={holdings}
-                  cancelledRequests={cancelledRequests}
-                  receivedPools={receivedPools}
-                />
-              }
-            />
+          {protocolContract && (
+            <ContractIdentityCard
+              kicker="Protocol contract"
+              name={protocolContract.name}
+              wallet={wallet}
+              contractName={protocolContract.contractName}
+            >
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-rb-500">
+                This address is {protocolContract.role}. It is not a lender position, so the Maple listing leaves it
+                out. The timeline below is its record in Maple&rsquo;s pools.
+              </p>
+            </ContractIdentityCard>
           )}
-          {Object.keys(walletPoolState).length > 0 && <MaplePoolStatsBand poolState={walletPoolState} />}
-          {view &&
-            (() => {
-              const towerData = computeMapleEconomics(view, lifetimeEvents, precomputedLifetime);
-              return (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={mapleEconomicsExplanation(
-                    towerData,
-                    mapleFlowSummaries(view, lifetimeEvents, precomputedLifetime),
-                  )}
-                  learnMore={mapleEconomicsContent()}
+
+          {loading ? (
+            <DetailBodySkeleton />
+          ) : (
+            <>
+              {view && (
+                <MaplePositionCard
+                  v={view}
+                  receipts
+                  viewHref={tl.viewHref}
+                  captions={captions ?? undefined}
+                  cancelledRequests={cancelledRequests}
+                  // The Explanation pane: layman narration of the card's own face
+                  // figures (claim, exit rate, escrow, the pool's queue and split).
+                  explanation={
+                    <MaplePositionExplanation
+                      v={view}
+                      captions={captions}
+                      externalActivity={externalActivity}
+                      holdings={holdings}
+                      cancelledRequests={cancelledRequests}
+                      receivedPools={receivedPools}
+                    />
+                  }
                 />
-              );
-            })()}
-          <ChainTruthTimeline
-            // The queued export (rails-ops decision 0029) has no row cap: the
-            // card offers the CSV whenever the total is known.
-            csvExportCeiling={null}
-            // Matches `MapleEventCard`'s own `persistKey={`maple:${event.id}`}` —
-            // lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="maple"
-            closed={view ? view.status !== "open" : undefined}
-            tl={tl}
-            // Tenure-first header: when the account started, how long it has
-            // run, how fresh the latest activity is.
-            toolbarLeading={
-              view ? (
-                <TimelineActivityHeader
-                  events={mapleEvents}
-                  folders={servedFolders}
-                  closed={view.status !== "open"}
-                  // When the position actually opened, not when the window
-                  // does — otherwise a wallet with 41,000 events reads as days
-                  // old because its oldest loaded card is.
-                  firstAt={opening?.firstTimestamp ?? oldestFolderAt}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  // "in the pool 315 days" runs to today. A wallet that left
-                  // and came back names each stretch it held shares.
-                  labelTenure={view.status === "open" ? "in the pool" : true}
-                  lives={lives}
-                  labelLastActivity
+              )}
+              {Object.keys(walletPoolState).length > 0 && <MaplePoolStatsBand poolState={walletPoolState} />}
+              {/* Lifetime flows: the bars and the line over the pool's replay
+            (lib/maple/flows.ts), in its funds asset, in place of the tower
+            (TO-DO-ui-jobs 206). */}
+              {view && (
+                <LifetimeFlowsPanel
+                  scrubber={
+                    flows.timeline ? (
+                      <>
+                        <MapleFlowsPoolSwitch pools={flows.pools} pool={flows.pool} onChange={flows.setPool} />
+                        <LifetimeFlowsScrubber key={flows.pool ?? ""} timeline={flows.timeline} />
+                      </>
+                    ) : null
+                  }
+                  read={flows.read}
+                  explanation={
+                    <div className="space-y-2 text-sm text-rb-500">
+                      <MapleFlowsNote facts={flows.facts} pools={flows.pools.length} />
+                    </div>
+                  }
+                  learnMore={mapleFlowsContent()}
                 />
-              ) : undefined
-            }
-            runs={MAPLE_QUEUE_FILL_RUNS}
-            folderRegister={MAPLE_FOLDER_REGISTER}
-            readFolderMembers={readMembers}
-            segments={segments}
-            liveWindow={
-              sinceLast.length > 0
-                ? ({ isFirst }) => (
-                    <MapleSinceLastEventRow lines={sinceLast} isFirst={isFirst} now={Math.floor(Date.now() / 1000)} />
-                  )
-                : undefined
-            }
-            renderCard={(event, meta) =>
-              isMapleEvent(event) ? (
-                <MapleEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  times={rowTimes.get(event.id)}
-                />
-              ) : null
-            }
-          />
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+              )}
+              <ChainTruthTimeline
+                // The queued export (rails-ops decision 0029) has no row cap: the
+                // card offers the CSV whenever the total is known.
+                csvExportCeiling={null}
+                // Matches `MapleEventCard`'s own `persistKey={`maple:${event.id}`}` —
+                // lets pinned mode (the per-event share route) force a landed
+                // card's detail panel open on its first mount.
+                persistKeyPrefix="maple"
+                closed={view ? view.status !== "open" : undefined}
+                tl={tl}
+                // Tenure-first header: when the account started, how long it has
+                // run, how fresh the latest activity is.
+                toolbarLeading={
+                  view ? (
+                    <TimelineActivityHeader
+                      events={mapleEvents}
+                      folders={servedFolders}
+                      closed={view.status !== "open"}
+                      // When the position actually opened, not when the window
+                      // does — otherwise a wallet with 41,000 events reads as days
+                      // old because its oldest loaded card is.
+                      firstAt={opening?.firstTimestamp ?? oldestFolderAt}
+                      tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                      // "in the pool 315 days" runs to today. A wallet that left
+                      // and came back names each stretch it held shares.
+                      labelTenure={view.status === "open" ? "in the pool" : true}
+                      lives={lives}
+                      labelLastActivity
+                    />
+                  ) : undefined
+                }
+                runs={MAPLE_QUEUE_FILL_RUNS}
+                folderRegister={MAPLE_FOLDER_REGISTER}
+                readFolderMembers={readMembers}
+                segments={segments}
+                liveWindow={
+                  sinceLast.length > 0
+                    ? ({ isFirst }) => (
+                        <MapleSinceLastEventRow
+                          lines={sinceLast}
+                          isFirst={isFirst}
+                          now={Math.floor(Date.now() / 1000)}
+                        />
+                      )
+                    : undefined
+                }
+                renderCard={(event, meta) =>
+                  isMapleEvent(event) ? (
+                    <MapleEventCard
+                      event={event}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      times={rowTimes.get(event.id)}
+                    />
+                  ) : null
+                }
+              />
+              <ProvInspectorLayer />
+            </>
+          )}
+        </div>
+      </MapleFlowsPoolContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }
 
