@@ -84,8 +84,9 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
           {facts.nearest > 0
             ? `${n(facts.priced, "One event is", "events are")} valued at the prices read at its block; ${n(facts.nearest, "one takes", "take")} the nearest priced event's. `
             : "Every event is valued at the prices at its block. "}
-          No daily price is recorded for Compound V3, so between events each asset keeps the price of its latest event,
-          and a price more than 30 days old is stated as such.
+          {facts.between === "store"
+            ? "Between events each asset is valued at Comet's oracle price at the end of each day; today's is the live read's."
+            : "No daily price is recorded for Compound V3, so between events each asset keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}
     </div>

@@ -33,6 +33,13 @@
 // points are the bars' figures; and between events a balance grows by its
 // market's index.
 //
+// Stored prices (scripts/verify/fixtures/compound-stored-prices.json): what
+// rails-server stores for each fixture's pairs (mig 372,
+// /api/compound-v2/prices-at) turns into the archive read's dollars to the
+// bit, the ETH years and a liquidation's seeded legs included, and a panel
+// read from them, with the pairs not stored from the archive, is the archive
+// panel. The daily store's ETH-year days take the same day's USDC price.
+//
 //   npx tsx --test scripts/verify/verify-compound-v2-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -56,6 +63,14 @@ import { sideSumRows } from "@/lib/shared/flows-sum";
 import { binInputFromTimeline, binSeries, seriesRouteBinFor } from "@/lib/shared/flows-series";
 import { assetTokenSum, assetTokenSumFor, eventAssetSum, eventCum, eventSideSumByAsset } from "@/lib/shared/flow-focus";
 import { assetLedgers, ledgerAdds, tokenLedger } from "@/lib/shared/event-ledger";
+import {
+  compoundV2DailyPrices,
+  compoundV2SeriesKey,
+  storedV2Prices,
+  type StoredV2Answer,
+} from "@/lib/compound-v2/at-block-prices";
+import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
+import { rawToNum } from "@/lib/compound-v2/liquidation-values";
 
 interface ChainMarket {
   market: string;
@@ -362,4 +377,100 @@ test("open-interest: between events each debt grows by its market's index, and t
     );
     assert.ok(l, `${h.symbol}: the live borrow balance`);
   }
+});
+
+// ── Stored prices (rails-server mig 372) and the daily store ──────────────────
+
+const STORED = JSON.parse(readFileSync(join(__dirname, "fixtures", "compound-stored-prices.json"), "utf8")) as {
+  v2: Record<string, StoredV2Answer>;
+};
+
+for (const name of NAMES) {
+  test(`${name}: the stored prices are the archive read's, to the bit`, () => {
+    const f = fx(name);
+    const stored = STORED.v2[name];
+    assert.ok(stored, `${name}: stored answer`);
+    assert.deepEqual(stored.missing, [], `${name}: every pair stored`);
+    const usd = storedV2Prices(stored);
+    for (const [pair, archive] of Object.entries(f.prices)) assert.equal(usd.get(pair), archive, `${name} ${pair}`);
+  });
+
+  test(`${name}: a panel read from the stored prices, the rest from the archive, is the archive panel`, () => {
+    const f = fx(name);
+    const pairs = Object.keys(f.prices).sort();
+    const stored = storedV2Prices(STORED.v2[name]);
+    // Every other pair as if not stored yet: those come from the archive.
+    const mixed = new Map(pairs.map((p, i) => [p, i % 2 === 1 ? f.prices[p] : stored.get(p)!] as [string, number]));
+    const fromStore = ctokenFlowTimeline(
+      compoundV2FlowRows(f.events, new Map([...compoundV2RowPrices(f.events), ...mixed])),
+      opts(f),
+    );
+    assert.deepEqual(fromStore, ctokenFlowTimeline(rows(f), opts(f)), `${name}: the same timeline`);
+  });
+}
+
+test("the daily store's ETH-year days take the same day's USDC price, as an event's do", () => {
+  const ceth = compoundV2SeriesKey(COMPOUND_V2_MARKET_BY_KEY.eth.ctoken);
+  const cusdc = compoundV2SeriesKey(COMPOUND_V2_MARKET_BY_KEY.usdc.ctoken);
+  const body = {
+    series: {
+      // The series' unit is its latest row's; the ETH years carry theirs.
+      [ceth]: {
+        unit: "usd",
+        scale: 18,
+        obs: [
+          [18_000, "1000000000000000000", "8000000", "eth", 18],
+          [18_001, "1000000000000000000", "8006000", "eth", 18],
+          [18_500, "380000000000000000000", "10700000"],
+        ] as [number, string, string, string?, number?][],
+      },
+      [cusdc]: {
+        unit: "usd",
+        scale: 30,
+        obs: [[18_000, "3500000000000000000000000000", "8000000", "eth", 30]] as [
+          number,
+          string,
+          string,
+          string?,
+          number?,
+        ][],
+      },
+    },
+  };
+  const out = compoundV2DailyPrices(body, ["eth"]);
+  assert.deepEqual(
+    out.eth,
+    [
+      [
+        18_000,
+        rawToNum(BigInt("1000000000000000000"), 18) * (1 / rawToNum(BigInt("3500000000000000000000000000"), 30)),
+      ],
+      [18_500, 380],
+    ],
+    "the ETH day in dollars, the day with no USDC price left out, the USD day as it is",
+  );
+});
+
+test("open-interest: a quiet day takes the daily store's price, an event's day the row's", () => {
+  const f = fx("open-interest");
+  const evs = rows(f);
+  const market = evs[evs.length - 1].market;
+  const days = new Set(evs.filter((r) => r.market === market).map((r) => Math.floor(r.ts / DAY)));
+  const first = Math.min(...days);
+  let quiet = first + 1;
+  while (days.has(quiet)) quiet++;
+  const carried = ctokenFlowTimeline(evs, opts(f))!;
+  const stored = ctokenFlowTimeline(evs, {
+    ...opts(f),
+    dailyPrices: {
+      [market]: [
+        [first, 1],
+        [quiet, 4_321],
+      ],
+    },
+  })!;
+  const at = (t: typeof stored, d: number) => t.dailyPrices![market].find(([x]) => x === d)?.[1];
+  assert.equal(at(stored, quiet), 4_321, "a quiet day takes the store's price");
+  assert.equal(at(carried, quiet), undefined, "without the store the day carries");
+  assert.equal(at(stored, first), at(carried, first), "an event's day keeps the row's price");
 });
