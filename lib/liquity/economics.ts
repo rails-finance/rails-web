@@ -349,6 +349,11 @@ export function computeLiquityEconomics(
      *  CollSurplusPool — the index does not see the claim). The surplus then
      *  leaves the held stack as an exit. */
     surplusClaimed?: boolean;
+    /** The clock (unix seconds) the interest since the last event accrues
+     *  to. Passed in, never read here: a page that renders on the server must
+     *  hand the server and the browser the same instant, or the debt differs
+     *  between the two renders and React discards the server's markup. */
+    now: number;
   },
 ): LiquityEconomicsResult | null {
   const baseResult = calculateEconomicsFromEvents(events);
@@ -394,8 +399,7 @@ export function computeLiquityEconomics(
   // calculation the bespoke tower used.
   const entireDebt =
     meta.status === "open" && meta.currentDebt > 0
-      ? meta.currentDebt +
-        calculateAccruedInterest(meta.currentDebt, meta.interestRate, meta.lastActivityAt, Date.now() / 1000)
+      ? meta.currentDebt + calculateAccruedInterest(meta.currentDebt, meta.interestRate, meta.lastActivityAt, opts.now)
       : meta.currentDebt;
 
   // Total interest including what's still outstanding in current debt —

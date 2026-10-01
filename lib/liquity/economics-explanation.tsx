@@ -33,6 +33,9 @@ const DUST = 1e-9;
 export function liquityEconomicsExplanation(
   economics: TroveEconomicsType,
   meta: TroveMeta,
+  /** The clock (unix seconds) the debt owed today accrues to — the one
+   *  computeLiquityEconomics was given, shared by the server and the browser. */
+  now: number,
   currentPrice?: number,
   /** The owner has claimed the liquidation surplus (a head read). */
   surplusClaimed = false,
@@ -45,8 +48,7 @@ export function liquityEconomicsExplanation(
   // fuller comments on each formula.
   const entireDebt =
     meta.status === "open" && meta.currentDebt > 0
-      ? meta.currentDebt +
-        calculateAccruedInterest(meta.currentDebt, meta.interestRate, meta.lastActivityAt, Date.now() / 1000)
+      ? meta.currentDebt + calculateAccruedInterest(meta.currentDebt, meta.interestRate, meta.lastActivityAt, now)
       : meta.currentDebt;
   const totalInterestAndMgmtFees = Math.max(
     0,
