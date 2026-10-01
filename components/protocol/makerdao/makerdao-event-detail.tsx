@@ -28,6 +28,7 @@ import {
   interestSincePreviousProv,
   atBlockPriceProv,
   grabSeizedUsdProv,
+  flowValueProv,
   eventPriceProv,
   eventRatioProv,
   matAtBlockProv,
@@ -38,6 +39,8 @@ import {
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { useMakerLedgerCells } from "./makerdao-ledger";
 import { useMakerIlkAt } from "@/lib/makerdao/use-chain-history";
 import type { MakerAuctionRead, MakerIlkAt } from "@/lib/makerdao/chain-history-types";
 import { formatDate } from "@/lib/date";
@@ -148,6 +151,23 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
         : "unchanged by this event"
     : undefined;
 
+  // The cells that open into the Lifetime flows ledgers, where the page has
+  // them; while the model is on its way, the cells that will open stand as
+  // placeholder rows. A give or an auction marker moves no balance and has
+  // no ledger.
+  const cells = useMakerLedgerCells();
+  const focus = useFlowFocus();
+  const flowsPending = !!focus && !focus.model;
+  const flowRow = isFrob || isGrab || ctx.eventType === "fork-in" || ctx.eventType === "fork-out";
+  const owes = (Number(ctx.debtAfter ?? "0") || 0) > 0 || debtMove !== 0;
+  const flowEv = focus?.model && eventId ? focus.events.find((e) => e.id === eventId) : undefined;
+  const flowPrice =
+    flowEv?.sides && flowEv.sides.collateral.held > 0
+      ? flowEv.sides.collateral.after / flowEv.sides.collateral.held
+      : null;
+  const collLedger = flowRow && (cells != null || flowsPending) ? { ledger: "collateral" as const } : {};
+  const debtLedger = flowRow && (cells?.debt || (flowsPending && owes)) ? { ledger: "debt" as const } : {};
+
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
@@ -165,16 +185,27 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
       ),
       changed: Number(ctx.dink) !== 0,
       ...(collSub ? { sub: <>{collSub}</> } : {}),
-      // The collateral's value at this block's OSM price.
-      ...(ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
+      ...collLedger,
+      // Where the cell opens into the Lifetime flows ledger, the collateral's
+      // value at the ledger's price, so the closed cell and the opened ledger
+      // state one figure; otherwise at this block's OSM price.
+      ...(ctx.eventType === "frob" && flowPrice != null && inkAfter != null && inkAfter > 1e-9 && collLedger.ledger
         ? {
             usdAlways: true,
             usd: {
-              value: inkAfter * price,
-              prov: grabSeizedUsdProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: price }),
+              value: inkAfter * flowPrice,
+              prov: flowValueProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: flowPrice }),
             },
           }
-        : {}),
+        : ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
+          ? {
+              usdAlways: true,
+              usd: {
+                value: inkAfter * price,
+                prov: grabSeizedUsdProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: price }),
+              },
+            }
+          : {}),
     },
     // The debt owed: art × the rate at the block (DAI, or USDS on LockStake
     // urns). Before = after − dart × rate; the gap from the previous row's
@@ -192,6 +223,7 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
       }),
       changed: Number(ctx.dart) !== 0,
       ...(debtSub ? { sub: <>{debtSub}</> } : {}),
+      ...debtLedger,
       ...(ctx.interestSincePrevious
         ? {
             interestSincePrevious: {

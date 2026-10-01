@@ -14,6 +14,7 @@ import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
 import { dinkProv, debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
 import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
 import { MakerDAOEventHeader } from "./makerdao-event-header";
+import { MakerLedgerProvider } from "./makerdao-ledger";
 import { MakerDAOEventDetail } from "./makerdao-event-detail";
 import { MakerDAOEventExplainer, makerdaoLearnMoreContent, useMakerRowExtras } from "./makerdao-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -136,43 +137,47 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
       />
     );
 
+  // The Collateral and Debt cells open into their ledgers where the page ties
+  // its timeline to the Lifetime flows panel.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <MakerDAOEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-          ownership={isGive ? history.ownership.get(event.id) : undefined}
-          txContext={isGive ? history.txContext.get(makerTxHashOf(event)) : undefined}
-        />
-      }
-      detail={
-        <MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
-      }
-      detailLabel="Vault state"
-      explainer={
-        <MakerDAOEventExplainer
-          ctx={ctx}
-          eventId={event.id}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          skipLead
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={makerdaoExplainerTeaser(ctx, coords, extras)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />}
-      persistKey={`makerdao:${event.id}`}
-    />
+    <MakerLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+      <EventCard
+        avatar={null}
+        iconColumn={iconSlot}
+        header={
+          <MakerDAOEventHeader
+            actionLabel={event.actionLabel}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+            wallet={event.wallet}
+            flows={event.flows}
+            ownership={isGive ? history.ownership.get(event.id) : undefined}
+            txContext={isGive ? history.txContext.get(makerTxHashOf(event)) : undefined}
+          />
+        }
+        detail={
+          <MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
+        }
+        detailLabel="Vault state"
+        explainer={
+          <MakerDAOEventExplainer
+            ctx={ctx}
+            eventId={event.id}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            skipLead
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={makerdaoExplainerTeaser(ctx, coords, extras)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />}
+        persistKey={`makerdao:${event.id}`}
+      />
+    </MakerLedgerProvider>
   );
 }
