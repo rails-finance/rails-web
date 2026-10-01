@@ -32,6 +32,7 @@ import {
 import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { AmountText } from "@/components/shared/amount-text";
+import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 
 /** The fork vocabulary's builders the cells read (lib/<fork>/event-provenance.ts). */
 export interface LiquityForkStateProvs {
@@ -341,6 +342,14 @@ export function liquityForkStateStats(
             value: f.collUsdAfter,
             prov: p.collUsdProv(coords, { coll: ctx.collAfter, priceUsd: f.price, which: "after" }),
           },
+          ...(Number(ctx.collBefore) > 0
+            ? {
+                usdBefore: {
+                  value: Number(ctx.collBefore) * f.price,
+                  prov: p.collUsdProv(coords, { coll: ctx.collBefore, priceUsd: f.price, which: "before" }),
+                },
+              }
+            : {}),
           // The Display menu's USD switches govern it (lib/shared/usd-display.ts).
           usdAmount: Number(ctx.collAfter),
         }
@@ -418,6 +427,22 @@ export function liquityForkStateStats(
       ctx.debtDelta,
     ),
     ...(debtSub ? { sub: debtSub } : {}),
+    // The debt's USD at its $1 face, as the cell's ledger counts it; the
+    // Display menu's "USD for stablecoins" governs it.
+    ...(Number(ctx.debtAfter) > 0
+      ? {
+          usd: { value: Number(ctx.debtAfter), prov: faceUsdProv(debtSymbol, fmt(ctx.debtAfter), "after") },
+          usdAmount: Number(ctx.debtAfter),
+          ...(Number(ctx.debtBefore) > 0
+            ? {
+                usdBefore: {
+                  value: Number(ctx.debtBefore),
+                  prov: faceUsdProv(debtSymbol, fmt(ctx.debtBefore), "before"),
+                },
+              }
+            : {}),
+        }
+      : {}),
   });
 
   if (f.crAfter != null && f.price != null) {

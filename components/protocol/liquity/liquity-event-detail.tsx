@@ -20,8 +20,9 @@ import {
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
-import { LedgerCell } from "@/components/shared/event-ledger";
+import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   streamVia,
   eventInputs,
@@ -136,25 +137,45 @@ function DebtMetric({
     <P info={deltaProv}>{deltaStr}</P>
   );
 
+  // The debt's USD at its $1 face, as the cell's ledger counts it, where the
+  // Display menu's "USD for stablecoins" shows it.
+  const usdShown = useUsdShown();
+  const debtUsd = !isClose && after > 0 && usdShown(stablecoinSymbol, after, after);
   return (
     <LedgerCell label="Debt" side="debt">
       <div>
         <StateTransition>
-          {showBefore && (
-            <DeltaToggle
-              before={<P info={provBefore}>{toLocaleStringHelper(before)}</P>}
-              delta={isClose ? null : deltaNode}
+          <ClosedTokens>
+            {showBefore && (
+              <DeltaToggle
+                before={<P info={provBefore}>{toLocaleStringHelper(before)}</P>}
+                delta={isClose ? null : deltaNode}
+              />
+            )}
+            {isClose ? (
+              <>
+                <ClosedLabel />
+                <TokenChipIcon symbol={stablecoinSymbol} size={16} />
+              </>
+            ) : (
+              <P info={provAfter} icon={<TokenChipIcon symbol={stablecoinSymbol} size={16} />}>
+                <span className={`text-sm font-semibold ${changeTone(changed)}`}>{toLocaleStringHelper(after)}</span>
+              </P>
+            )}
+          </ClosedTokens>
+          {debtUsd && (
+            <ClosedUsd
+              before={
+                showBefore ? (
+                  <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(before), "before")}>
+                    {formatUsd(before)}
+                  </P>
+                ) : null
+              }
+              after={
+                <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(after), "after")}>{formatUsd(after)}</P>
+              }
             />
-          )}
-          {isClose ? (
-            <>
-              <ClosedLabel />
-              <TokenChipIcon symbol={stablecoinSymbol} size={16} />
-            </>
-          ) : (
-            <P info={provAfter} icon={<TokenChipIcon symbol={stablecoinSymbol} size={16} />}>
-              <span className={`text-sm font-semibold ${changeTone(changed)}`}>{toLocaleStringHelper(after)}</span>
-            </P>
           )}
         </StateTransition>
         {((upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01) && (
@@ -185,7 +206,6 @@ function CollateralMetric({
   beforeInUsd,
   afterInUsd,
   isClose,
-  beforeKnownAtThisBlock,
   provBefore,
   provAfter,
   usdProvBefore,
@@ -198,9 +218,6 @@ function CollateralMetric({
   beforeInUsd: number;
   afterInUsd: number;
   isClose: boolean;
-  /** The before amount is reconstructed at this event's block (liquidation,
-   *  close, redemption), so it can be valued at this event's price. */
-  beforeKnownAtThisBlock: boolean;
   provBefore?: Provenance;
   provAfter?: Provenance;
   usdProvBefore?: Provenance;
@@ -213,11 +230,10 @@ function CollateralMetric({
   // price where that price is known and the Display menu's USD switches show
   // it (lib/shared/usd-display.ts: "USD for other tokens", on by default; a
   // dollar share follows "USD for stablecoins" and shows past 1% off $1).
-  // The before amount carries one where it is reconstructed at this same block
-  // (liquidation, close, redemption); an ordinary adjustment's before state
-  // was priced at the previous event, so it takes none here.
+  // Before → after, both at this event's price, as the cell's ledger totals
+  // them (`beforeInUsd`: the collateral before × the price at this block).
   const usdShown = useUsdShown();
-  const beforeUsdKnown = beforeKnownAtThisBlock && beforeInUsd > 0 && usdShown(collateralType, beforeInUsd, before);
+  const beforeUsdKnown = showBefore && beforeInUsd > 0 && usdShown(collateralType, beforeInUsd, before);
   const afterUsdShown = usdShown(collateralType, afterInUsd, after);
 
   // Same arrow-as-toggle as Debt: `before →` ⟷ `+delta =` (delta in collateral
@@ -245,32 +261,29 @@ function CollateralMetric({
   return (
     <LedgerCell label="Collateral" side="collateral">
       <StateTransition>
-        {showBefore && (
-          <DeltaToggle before={<P info={provBefore}>{formatColl(before)}</P>} delta={isClose ? null : deltaNode} />
-        )}
-        {isClose ? (
-          <>
-            <ClosedLabel />
-            <TokenChipIcon symbol={collateralType} size={16} />
-          </>
-        ) : (
-          <P info={provAfter} icon={<TokenChipIcon symbol={collateralType} size={16} />}>
-            <span className={`text-sm font-semibold ${changeTone(changed)}`}>
-              {after === 0 ? "0" : formatColl(after)}
-            </span>
-          </P>
-        )}
-        {(beforeUsdKnown || afterUsd) && (
+        <ClosedTokens>
+          {showBefore && (
+            <DeltaToggle before={<P info={provBefore}>{formatColl(before)}</P>} delta={isClose ? null : deltaNode} />
+          )}
+          {isClose ? (
+            <>
+              <ClosedLabel />
+              <TokenChipIcon symbol={collateralType} size={16} />
+            </>
+          ) : (
+            <P info={provAfter} icon={<TokenChipIcon symbol={collateralType} size={16} />}>
+              <span className={`text-sm font-semibold ${changeTone(changed)}`}>
+                {after === 0 ? "0" : formatColl(after)}
+              </span>
+            </P>
+          )}
+        </ClosedTokens>
+        {afterUsd && (
           // The USD at this event's price, after a thin divider.
-          <span className="ml-1 inline-flex items-center gap-1 border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600">
-            {beforeUsdKnown && (
-              <>
-                <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P>
-                {afterUsd && <span aria-hidden>→</span>}
-              </>
-            )}
-            {afterUsd && <P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>}
-          </span>
+          <ClosedUsd
+            before={beforeUsdKnown ? <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P> : null}
+            after={<P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>}
+          />
         )}
       </StateTransition>
     </LedgerCell>
@@ -503,6 +516,9 @@ export function LiquityEventDetail({
   }
 
   const afterCollInUsd = stateAfter.coll * collPrice;
+  // The collateral before the event at this event's price (a liquidation's at
+  // the price it ran at), as the ledger's total states it.
+  const beforeCollAtEventUsd = isLiquidation && liquidation ? beforeCollInUsd : beforeColl * collPrice;
 
   // Derived-CR fallback: the API source fills collateralRatio; the chain source
   // leaves it 0 but sets collateralPrice, so recompute CR from price ONLY when
@@ -856,15 +872,14 @@ export function LiquityEventDetail({
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-open]]:auto-rows-auto">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
               <CollateralMetric
                 collateralType={ctx.collateralType}
                 before={beforeColl}
                 after={stateAfter.coll}
-                beforeInUsd={beforeCollInUsd}
+                beforeInUsd={beforeCollAtEventUsd}
                 afterInUsd={afterCollInUsd}
                 isClose={isClose}
-                beforeKnownAtThisBlock={isLiquidation || isCloseRecon || (isRedemption && !!troveOperation)}
                 provBefore={collBeforeProv}
                 provAfter={collAfterProv}
                 usdProvBefore={usdBeforeProv}

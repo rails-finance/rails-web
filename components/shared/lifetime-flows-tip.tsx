@@ -109,7 +109,7 @@ export function fillStyle(side: FlowSide, s: Pick<FlowSegment, "fill" | "hatch" 
 
 /** The inflow swatch: the side's hue, faded, as the towers' key drew what
  *  came in, with the line's texture over it. */
-const INFLOW_SWATCH: Record<FlowSide, string> = {
+export const INFLOW_SWATCH: Record<FlowSide, string> = {
   collateral: "rgba(96, 165, 250, 0.35)",
   debt: "rgba(74, 222, 128, 0.35)",
 };

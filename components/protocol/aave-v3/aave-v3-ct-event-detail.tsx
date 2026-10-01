@@ -307,10 +307,10 @@ export function AaveV3CtEventDetail({
     }
     const sym = reserveSymbol(r);
     const leg = a.side === "supply" ? r.supply : r.debt;
-    // The block below draws a row for every reserve it holds on this side
-    // (ReserveList's filter). Where it draws this one, that row is the balance's
-    // one statement and the grid says nothing about it — and the block's dust
-    // rule never hides that row (§52).
+    // The block below states every reserve held on this side (its closed
+    // cell's tokens or icon, and the cell's ledger line by asset). Where it
+    // holds this one, the grid says nothing about it, and the block's dust
+    // rule never hides its icon (§52).
     if (legHeld(leg)) {
       touched.push({ reserve: r.reserve, side: a.side });
       const line = interestOf(a);

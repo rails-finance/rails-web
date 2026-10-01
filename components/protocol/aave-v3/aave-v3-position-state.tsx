@@ -3,14 +3,14 @@
 // The open Aave V3 family card's position block: the account as it stood
 // immediately before the event's transaction and once it had run (rails-ops
 // TO-DO-ui-jobs §19, §213, §141), laid out as a receipt
-// (aave-family-event-receipt.tsx): a Collateral and a Debt cell, each its
-// total before → after with every reserve beneath (supplies with the switch
-// off under "Supplied, not collateral"), then one row: health factor, LTV
-// against the weighted max LTV and the liquidation threshold, what the account
-// could still borrow, and eMode where the account used a category. The card's
-// calculator turns each cell into the side's lifetime sum as of the event.
-// The paragraph on how the weighted limits move is in the card's (i)
-// (LtvWeightingNote, drawn by the explainer).
+// (aave-family-event-receipt.tsx): a Collateral and a Debt cell, each one row
+// closed (`ClosedSide`: one asset's tokens before → after, several assets'
+// dollars before → after with their icons) that opens into the side's
+// ledger, then one row: health factor, LTV against the weighted max LTV and
+// the liquidation threshold, what the account could still borrow, and eMode
+// where the account used a category. The paragraph on how the weighted
+// limits move is in the card's (i) (LtvWeightingNote, drawn by the
+// explainer).
 //
 // Balances are exact, interest included. USD is each balance at the oracle price
 // read at the block, behind the USD toggle. The account figures are Aave's own
@@ -18,35 +18,36 @@
 // switches, eMode or the at-block read are not known, a card says so rather than
 // guess.
 //
-// RULE (§52): a reserve row whose priced after-balance is under a cent is dust,
-// whatever its collateral flag — a row with no price is held, not dust. Dust
-// rows sit behind a "N dust reserve(s) hidden" line per side, local state, not
-// persisted, counting hidden rows across both collateral groups (§54). The
-// reserve an event touched (the one the grid above gives way for, §47) always
-// draws, dust or not, and is never counted in that line.
+// RULE (§52): a reserve whose priced after-balance is under a cent is dust,
+// whatever its collateral flag; a reserve with no price is held, not dust. A
+// closed cell draws no icon for a dust reserve the event did not touch.
 //
-// RULE (§54, §213): a supplied reserve is placed by its AFTER-state flag —
-// switched on, directly under the Collateral total; switched off, under the
-// "Supplied, not collateral" line; an empty group draws nothing. A row whose
-// flag flipped on the event carries a short muted "enabled as collateral here" /
-// "disabled as collateral here" holding the receipt the icon used to carry
-// (collateralFlagProv). A row that did not flip has no per-row flag words; its
-// flag receipt rides on the row's own after-balance receipt instead (see
-// `withFlagNote` below), since `collateralFlagProv` names one reserve and a
-// group can list several.
+// RULE (§54): a supply whose collateral flag flipped on the event carries a
+// short muted "enabled as collateral here" / "disabled as collateral here"
+// holding the flag's receipt (collateralFlagProv). One that did not flip has
+// no flag words; its flag receipt rides on its after-balance receipt instead
+// (see `withFlagNote` below).
 
 import { AaveFamilyEventReceipt, type RiskItem } from "./aave-family-event-receipt";
-import { DustToggle, isDustUsd, useDustOpen } from "@/components/shared/dust-reserves";
+import { isDustUsd } from "@/components/shared/dust-reserves";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import {
+  DeltaToggle,
+  StatSubline,
+  StateTransition,
+  TransitionArrow,
+  changeTone,
+} from "@/components/shared/state-transition";
+import { ClosedTokens, ClosedUsd } from "@/components/shared/event-ledger";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
-import { PositionRow, fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
+import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import { formatUsdValue } from "@/lib/utils/format";
 import { v3Brand, v3Protocol } from "@/lib/aave-v3/protocol-name";
 import {
   accountRatioProv,
-  accountTotalProv,
   borrowableProv,
   currentLtvProv,
   collateralFlagProv,
@@ -179,13 +180,6 @@ function NotAvailable() {
   return <span className="text-sm text-rb-500">Not available at this block</span>;
 }
 
-/** A supplied reserve is placed by its after-state flag (rails-ops
- *  TO-DO-ui-jobs §54, §213): switched on, straight under the Collateral total;
- *  switched off, under "Supplied, not collateral". No per-row icon or words
- *  repeat the flag. */
-type CollateralGroup = "on" | "off";
-const collateralGroup = (on: boolean): CollateralGroup => (on ? "on" : "off");
-
 /** The muted "was on" / "was off" a row carries only where its flag flipped on
  *  the event — the receipt the icon used to carry (§53), now on this text
  *  (§54). `data-collateral-flip` is the AFTER state, matching the group the
@@ -194,15 +188,19 @@ function CollateralFlipNote({
   sym,
   flag,
   coords,
+  named = false,
 }: {
   sym: string;
   flag: { before: boolean; after: boolean };
   coords: V3Coords;
+  /** Name the asset (a cell that states several). */
+  named?: boolean;
 }) {
   const was = flag.before ? "on" : "off";
   return (
     <Prov info={collateralFlagProv(sym, "before", flag.before, coords)} value={was}>
       <span className="text-xs text-rb-500" data-collateral-flip={flag.after ? "on" : "off"}>
+        {named ? `${sym} ` : ""}
         {flag.after ? "enabled" : "disabled"} as collateral here
       </span>
     </Prov>
@@ -232,174 +230,183 @@ function reserveUsdAfter(r: AaveV3PositionStateReserve, side: Side): number | nu
  *  the position cards use (components/shared/dust-reserves.tsx). */
 const isDustRow = (r: AaveV3PositionStateReserve, side: Side): boolean => isDustUsd(reserveUsdAfter(r, side));
 
-function ReserveLine({
-  state,
-  r,
-  side,
-  coords,
-  dust,
-}: {
-  state: AaveV3PositionState;
-  r: AaveV3PositionStateReserve;
-  side: Side;
-  coords: V3Coords;
-  dust?: boolean;
-}) {
-  const decimals = r.decimals ?? 0;
-  const sym = reserveSymbol(r);
-  const leg = side === "supply" ? r.supply : r.debt;
-  const before = humanOf(leg.before, decimals);
-  const after = humanOf(leg.after, decimals);
-  const moved = legChange(leg, decimals);
-  const sign = moved.sign < 0 ? "−" : "+";
-  const flag = side === "supply" ? r.collateral : null;
-  const flipped = !!flag && flag.before !== flag.after;
-  let afterProv = exactBalanceProv(sym, side, "after", coords, exactLeg(leg, "after", decimals, state.blockTimestamp));
-  if (flag && !flipped) afterProv = withFlagNote(afterProv, sym, flag.after, coords);
-  return (
-    <PositionRow
-      symbol={sym}
-      address={r.reserve}
-      ticker={sym}
-      amount={after}
-      before={before}
-      isChanged={moved.sign !== 0}
-      afterProv={afterProv}
-      beforeProv={exactBalanceProv(
-        sym,
-        side,
-        "before",
-        coords,
-        exactLeg(leg, "before", decimals, state.blockTimestamp),
-      )}
-      deltaProv={exactBalanceChangeProv(sym, side, coords, { before: groupExact(before), after: groupExact(after) })}
-      deltaText={`${sign}${fmtPositionAmount(moved.magnitude)}`}
-      exact={{ after: groupExact(after), before: groupExact(before), delta: `${sign}${groupExact(moved.magnitude)}` }}
-      usd={exactUsd(state, r, side, "after", coords)}
-      trailing={flipped && flag ? <CollateralFlipNote sym={sym} flag={flag} coords={coords} /> : null}
-      dust={dust}
-    />
-  );
-}
-
-/** One collateral group inside the Collateral cell (§54, §213): the "on"
- *  group has no heading of its own (the cell is the collateral), the "off"
- *  group reads "Supplied, not collateral"; an empty group draws nothing. Dust
- *  rows are the caller's concern — this places whichever rows it is given. */
-function CollateralGroupBlock({
-  group,
-  rows,
-  state,
-  coords,
-  showDust,
-  touched,
-}: {
-  group: CollateralGroup;
-  rows: AaveV3PositionStateReserve[];
-  state: AaveV3PositionState;
-  coords: V3Coords;
-  showDust: boolean;
-  touched: Set<string>;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1" data-collateral-group={group}>
-      {group === "off" && <div className="text-[11px] font-semibold text-rb-500">Supplied, not collateral</div>}
-      {rows.map((r) => {
-        const dust = !touched.has(r.reserve) && isDustRow(r, "supply");
-        if (dust && !showDust) return null;
-        return <ReserveLine key={r.reserve} state={state} r={r} side="supply" coords={coords} dust={dust} />;
-      })}
-    </div>
-  );
-}
-
-export function ReserveList({
+/** A closed Collateral or Debt cell of the event card (anatomy T2.1), the
+ *  figures of its one row: with one asset, its balance before → after in
+ *  tokens and, where the Display switches show it, its dollars after a thin
+ *  divider; with several, the side's dollars before → after (the assets add
+ *  only in dollars) and each asset's icon, which carries its balance's
+ *  receipt. A reserve under a cent the event did not touch draws no icon
+ *  (§52). A supply whose collateral switch flipped says so under the figures
+ *  (§54); an unflipped one's flag rides on its balance's receipt. */
+export function ClosedSide({
   state,
   side,
   coords,
   touched,
+  usd,
 }: {
   state: AaveV3PositionState;
   side: Side;
   coords: V3Coords;
   touched: Set<string>;
+  /** The side's dollars before → after, as its ledger totals them; null
+   *  where the block's read has none. */
+  usd: { before: Figure | null; after: Figure; change: Figure | null } | null;
 }) {
-  const { open: showDust, toggle: toggleDust } = useDustOpen();
-  const rows = state.reserves.filter((r) => r.decimals != null && legHeld(side === "supply" ? r.supply : r.debt));
-  // The total above already reads $0 where the account holds nothing here.
-  if (rows.length === 0) return state.account ? null : <span className="text-sm text-rb-500">None</span>;
-
-  // The touched reserve always draws, dust or not, and never joins the count
-  // behind the toggle (§52), which counts across both groups (§54).
-  const dustCount = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side)).length;
-
-  // A reserve is placed by its AFTER-state flag (§54); grouping needs every
-  // held reserve's flag known, which tracks whether the block's own settings
-  // read landed (sources.settings). Where it did not, the flat list stands
-  // alongside the "Collateral on/off isn't available" note.
-  const canGroup = side === "supply" && rows.every((r) => r.collateral != null);
-
-  const body = canGroup ? (
-    <div className="flex flex-col gap-2">
-      <CollateralGroupBlock
-        group="on"
-        rows={rows.filter((r) => collateralGroup(r.collateral!.after) === "on")}
-        state={state}
-        coords={coords}
-        showDust={showDust}
-        touched={touched}
-      />
-      <CollateralGroupBlock
-        group="off"
-        rows={rows.filter((r) => collateralGroup(r.collateral!.after) === "off")}
-        state={state}
-        coords={coords}
-        showDust={showDust}
-        touched={touched}
-      />
-    </div>
-  ) : (
-    rows.map((r) => {
-      const dust = !touched.has(r.reserve) && isDustRow(r, side);
-      if (dust && !showDust) return null;
-      return <ReserveLine key={r.reserve} state={state} r={r} side={side} coords={coords} dust={dust} />;
-    })
-  );
-
-  return (
-    <div className="mt-2 flex flex-col gap-1" data-position-reserves={side}>
-      {body}
-      <DustToggle count={dustCount} open={showDust} onToggle={toggleDust} />
-    </div>
-  );
-}
-
-/** A cell's headline: the account's total collateral or total debt in USD,
- *  before → after where it moved. */
-export function TotalHeadline({
-  state,
-  what,
-  coords,
-}: {
-  state: AaveV3PositionState;
-  what: "collateral" | "debt";
-  coords: V3Coords;
-}) {
-  const { account, sources } = state;
-  if (!account) return <NotAvailable />;
-  const fig = (a: AaveV3AccountSide, when: When): Figure => {
-    const base = what === "collateral" ? a.totalCollateralBase : a.totalDebtBase;
-    const usd = baseToUsd(base);
-    return {
-      text: big(base) === ZERO ? "$0" : fmtPositionUsd(usd),
-      value: formatUsdValue(usd),
-      prov: accountTotalProv(what, when, coords, { base, poolRevision: sources.poolRevision }),
-    };
+  const usdShown = useUsdShown();
+  const legOf = (r: AaveV3PositionStateReserve) => (side === "supply" ? r.supply : r.debt);
+  const rows = state.reserves.filter((r) => r.decimals != null && legHeld(legOf(r)));
+  const afterProvOf = (r: AaveV3PositionStateReserve): Provenance => {
+    const sym = reserveSymbol(r);
+    const leg = legOf(r);
+    const flag = side === "supply" ? r.collateral : null;
+    const prov = exactBalanceProv(
+      sym,
+      side,
+      "after",
+      coords,
+      exactLeg(leg, "after", r.decimals!, state.blockTimestamp),
+    );
+    return flag && flag.before === flag.after ? withFlagNote(prov, sym, flag.after, coords) : prov;
   };
+  const flips = rows.flatMap((r) => {
+    const flag = side === "supply" ? r.collateral : null;
+    return flag && flag.before !== flag.after ? [{ r, flag }] : [];
+  });
+  const flipNotes = flips.map(({ r, flag }) => (
+    <CollateralFlipNote key={r.reserve} sym={reserveSymbol(r)} flag={flag} coords={coords} named={rows.length > 1} />
+  ));
+
+  if (rows.length === 1) {
+    const r = rows[0];
+    const decimals = r.decimals!;
+    const sym = reserveSymbol(r);
+    const leg = legOf(r);
+    const before = humanOf(leg.before, decimals);
+    const after = humanOf(leg.after, decimals);
+    const moved = legChange(leg, decimals);
+    const sign = moved.sign < 0 ? "−" : "+";
+    const uAfter = exactUsd(state, r, side, "after", coords);
+    const uBefore = moved.sign !== 0 ? exactUsd(state, r, side, "before", coords) : undefined;
+    const usdOn = (uAfter != null || uBefore != null) && usdShown(sym, uAfter?.value ?? null, Number(after));
+    return (
+      <div className="flex flex-col items-end" data-receipt-total={side}>
+        <StateTransition>
+          <ClosedTokens>
+            {moved.sign !== 0 && (
+              <DeltaToggle
+                before={
+                  <Prov
+                    info={exactBalanceProv(
+                      sym,
+                      side,
+                      "before",
+                      coords,
+                      exactLeg(leg, "before", decimals, state.blockTimestamp),
+                    )}
+                    value={groupExact(before)}
+                  >
+                    {fmtPositionAmount(before)}
+                  </Prov>
+                }
+                delta={
+                  <Prov
+                    info={exactBalanceChangeProv(sym, side, coords, {
+                      before: groupExact(before),
+                      after: groupExact(after),
+                    })}
+                    value={`${sign}${groupExact(moved.magnitude)}`}
+                  >
+                    {`${sign}${fmtPositionAmount(moved.magnitude)}`}
+                  </Prov>
+                }
+              />
+            )}
+            <Prov
+              info={afterProvOf(r)}
+              value={groupExact(after)}
+              icon={<TokenChipIcon symbol={sym} address={r.reserve} size={16} />}
+            >
+              <span className={`text-sm font-semibold tabular-nums ${changeTone(moved.sign !== 0)}`}>
+                {fmtPositionAmount(after)}
+              </span>
+            </Prov>
+          </ClosedTokens>
+          {usdOn && (
+            <ClosedUsd
+              before={
+                uBefore ? (
+                  <Prov info={uBefore.prov} value={uBefore.exact}>
+                    {fmtPositionUsd(uBefore.value)}
+                  </Prov>
+                ) : null
+              }
+              after={
+                uAfter ? (
+                  <Prov info={uAfter.prov} value={uAfter.exact}>
+                    {fmtPositionUsd(uAfter.value)}
+                  </Prov>
+                ) : (
+                  "$0"
+                )
+              }
+            />
+          )}
+        </StateTransition>
+        {flipNotes}
+      </div>
+    );
+  }
+
+  const icons = rows.filter((r) => big(legOf(r).after) > ZERO && (touched.has(r.reserve) || !isDustRow(r, side)));
   return (
-    <div data-account-total={what}>
-      <BeforeAfter before={fig(account.before, "before")} after={fig(account.after, "after")} />
+    <div className="flex flex-col items-end" data-receipt-total={side}>
+      <StateTransition>
+        {usd ? (
+          <span
+            className="inline-flex items-center gap-1"
+            data-account-total={side === "supply" ? "collateral" : "debt"}
+          >
+            {usd.before && usd.before.value !== usd.after.value && (
+              <DeltaToggle
+                before={
+                  <Prov info={usd.before.prov} value={usd.before.value}>
+                    {usd.before.text}
+                  </Prov>
+                }
+                delta={
+                  usd.change ? (
+                    <Prov info={usd.change.prov} value={usd.change.value}>
+                      {usd.change.text}
+                    </Prov>
+                  ) : null
+                }
+              />
+            )}
+            <span
+              className={`text-sm font-semibold tabular-nums ${changeTone(!!usd.before && usd.before.value !== usd.after.value)}`}
+            >
+              <Prov info={usd.after.prov} value={usd.after.value}>
+                {usd.after.text}
+              </Prov>
+            </span>
+          </span>
+        ) : (
+          <NotAvailable />
+        )}
+        {icons.length > 0 && (
+          <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
+            {icons.map((r) => (
+              <Prov key={r.reserve} info={afterProvOf(r)} value={groupExact(humanOf(legOf(r).after, r.decimals!))}>
+                <span title={`${fmtPositionAmount(humanOf(legOf(r).after, r.decimals!))} ${reserveSymbol(r)}`}>
+                  <TokenChipIcon symbol={reserveSymbol(r)} address={r.reserve} size={16} filterable={false} />
+                </span>
+              </Prov>
+            ))}
+          </span>
+        )}
+      </StateTransition>
+      {flipNotes}
     </div>
   );
 }

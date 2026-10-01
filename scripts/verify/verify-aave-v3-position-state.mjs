@@ -357,7 +357,12 @@ async function receiptText(page, scope, valueText) {
   // a Market-type page; armInspector reads either, and is a no-op once armed
   // (the tool is STICKY — a blind second click would put it down).
   if (!(await armInspector(page))) return null;
-  const target = scope.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
+  // A string finds the figure by its text; a locator is the figure (an
+  // asset's icon, which carries its balance's receipt).
+  const target =
+    typeof valueText === "string"
+      ? scope.locator("span.prov-locate-box").filter({ hasText: valueText }).first()
+      : valueText;
   if ((await target.count()) === 0) return null;
   await target.scrollIntoViewIfNeeded();
   await target.click();
@@ -461,168 +466,88 @@ for (const fx of FIXTURES) {
         check(`${fx.label}: the grid's ${r.symbol} ${m.side} stat is the exact after-balance ${grouped}`, titled > 0);
     }
 
-    // Supplied and borrowed lists: one line per held reserve, amount and USD.
-    // A reserve under a cent is dust and sits behind a count line by default,
-    // unless it is one of the reserves this event touched (§52) — that row
-    // always draws, whatever its side reads. The Collateral cell places its
-    // rows by each reserve's AFTER flag: switched on, straight under the
-    // total; switched off, under "Supplied, not collateral" (§213). An empty
-    // group draws nothing, and a row whose flag flipped carries "was on"/"was
-    // off" (§54).
+    // The closed Collateral and Debt cells (rails-ops reference/
+    // lifetime-flows-scrubber.md, "The event card's sum"): a side holding one
+    // reserve states its tokens after the event; a side holding several states
+    // its dollars and one icon per reserve it holds after the event, whose
+    // title reads its balance. A reserve under a cent is dust and draws no
+    // icon, unless the event touched it (§52). A supply whose collateral flag
+    // flipped carries "enabled/disabled as collateral here" (§54), its receipt
+    // the collateral-flag one; a steady flag rides on the balance's receipt.
     for (const [side, rows] of [
       ["supply", supplied],
       ["debt", borrowed],
     ]) {
       const touched = new Set(fx.moved.filter((m) => m.side === side).map((m) => m.reserve));
-      const dustRows = rows.filter((r) => !touched.has(r.reserve) && isDustRow(r, side));
-      const shownRows = rows.filter((r) => touched.has(r.reserve) || !isDustRow(r, side));
-      const scope = block.locator(`[data-position-reserves="${side}"]`);
-      // Supply rows sit one level deeper, under a collateral-group heading;
-      // debt rows are still a flat list (§54: "Debt rows unchanged").
-      const rowSel = side === "supply" ? "[data-collateral-group] > span" : "> span";
-
-      const lines = scope.locator(rowSel);
-      const n = await lines.count();
-      check(
-        `${fx.label}: ${side} list shows ${shownRows.length} line(s) before any dust toggle`,
-        n === shownRows.length,
-        `${n} drawn`,
-      );
-      const texts = [];
-      for (let i = 0; i < n; i++) texts.push(await text(lines.nth(i)));
-
-      if (side === "supply") {
-        // A group with no rows in it draws nothing.
-        for (const group of ["on", "off"]) {
-          const wantsGroup = rows.some((r) => r.collateral && (r.collateral.after ? "on" : "off") === group);
-          check(
-            `${fx.label}: the collateral-${group} group draws only when it has rows`,
-            (await scope.locator(`[data-collateral-group="${group}"]`).count()) === (wantsGroup ? 1 : 0),
-          );
-        }
-        const offGroup = scope.locator('[data-collateral-group="off"]');
-        const offText = (await offGroup.count()) > 0 ? await text(offGroup.first()) : "";
-        const scopeText = await text(scope);
-        check(
-          `${fx.label}: switched-off supplies read "Supplied, not collateral"; no "Collateral on" heading`,
-          !scopeText.includes("Collateral on") &&
-            (!rows.some((r) => r.collateral && !r.collateral.after) || offText.startsWith("Supplied, not collateral")),
-          offText.slice(0, 60),
+      const scope = block.locator(`[data-receipt-total="${side}"]`);
+      const scopeText = await text(scope);
+      if (rows.length === 1) {
+        const r = rows[0];
+        const amount = fmtAmount(humanOf(r[side].after, r.decimals));
+        check(`${fx.label}: the ${side} cell states ${r.symbol}'s ${amount}`, scopeText.includes(amount), scopeText);
+      } else {
+        const want = rows.filter(
+          (r) => big(r[side].after) > BigInt(0) && (touched.has(r.reserve) || !isDustRow(r, side)),
         );
-      }
-
-      for (const r of shownRows) {
-        const leg = r[side];
-        const amount = fmtAmount(humanOf(leg.after, r.decimals));
-        const usd =
-          r.priceBase && big(leg.after) > BigInt(0) ? fmtUsd(rawToUsd(leg.after, r.priceBase, r.decimals)) : null;
-        const lineIdx = texts.findIndex((t) => t.includes(amount) && (!usd || t.includes(usd)));
+        const icons = scope.locator("[data-closed-assets] span[title]");
+        const titles = [];
+        for (let k = 0; k < (await icons.count()); k++) titles.push(await icons.nth(k).getAttribute("title"));
         check(
-          `${fx.label}: ${side} line for ${r.symbol} reads ${amount}${usd ? ` and ${usd}` : ""}`,
-          lineIdx !== -1,
-          texts.join(" | "),
+          `${fx.label}: the ${side} cell draws ${want.length} asset icon(s)`,
+          titles.length === want.length,
+          titles.join(" | "),
         );
-        // A supplied reserve sits under its AFTER flag's heading (§54), no
-        // per-row icon or words.
-        if (side === "supply" && r.collateral && lineIdx !== -1) {
-          const wantGroup = r.collateral.after ? "on" : "off";
-          const line = lines.nth(lineIdx);
-          const gotGroup = await line.locator("xpath=..").getAttribute("data-collateral-group");
-          check(
-            `${fx.label}: ${r.symbol} sits in the collateral-${wantGroup} group`,
-            gotGroup === wantGroup,
-            `got ${gotGroup}`,
-          );
-          const flipped = r.collateral.before !== r.collateral.after;
-          const flipEl = line.locator("[data-collateral-flip]");
-          const flipCount = await flipEl.count();
-          if (flipped) {
-            const was = r.collateral.before ? "on" : "off";
-            check(
-              `${fx.label}: ${r.symbol} carries "was ${was}" — its flag flipped this transaction`,
-              flipCount === 1 && (await flipEl.getAttribute("data-collateral-flip")) === wantGroup,
-              `count=${flipCount}`,
-            );
-            const flipText = await text(flipEl);
-            const now = r.collateral.after ? "on" : "off";
-            check(
-              `${fx.label}: ${r.symbol}'s flip text reads "${now === "on" ? "enabled" : "disabled"} as collateral here" (was ${was})`,
-              flipText === `${now === "on" ? "enabled" : "disabled"} as collateral here`,
-              flipText,
-            );
-          } else {
-            check(`${fx.label}: ${r.symbol} carries no flip text — its flag did not change`, flipCount === 0);
-          }
-        }
-      }
-
-      const dustButton = scope.locator("[data-dust-hidden]");
-      if (dustRows.length > 0) {
-        check(`${fx.label}: ${side} carries a dust count line`, (await dustButton.count()) === 1);
-        check(
-          `${fx.label}: ${side} data-dust-hidden reads ${dustRows.length}`,
-          (await dustButton.getAttribute("data-dust-hidden")) === String(dustRows.length),
-        );
-        const label = `${dustRows.length} dust reserve${dustRows.length === 1 ? "" : "s"} hidden`;
-        const before = await text(dustButton);
-        check(`${fx.label}: ${side} count line reads "${label}"`, before === label, before);
-        check(
-          `${fx.label}: ${side} dust rows are absent before the toggle`,
-          (await scope.locator("[data-dust-row]").count()) === 0,
-        );
-        await dustButton.click();
-        await scope
-          .locator("[data-dust-row]")
-          .first()
-          .waitFor({ timeout: 5000 })
-          .catch(() => {});
-        check(
-          `${fx.label}: ${side} dust rows draw once the count line is clicked`,
-          (await scope.locator("[data-dust-row]").count()) === dustRows.length,
-        );
-        const after = await text(dustButton);
-        check(`${fx.label}: ${side} count line now reads "Hide dust"`, after === "Hide dust", after);
-        const shownTexts = [];
-        const allLines = scope.locator(rowSel);
-        const total = await allLines.count();
-        for (let i = 0; i < total; i++) shownTexts.push(await text(allLines.nth(i)));
-        for (const r of dustRows) {
+        for (const r of want) {
           const amount = fmtAmount(humanOf(r[side].after, r.decimals));
           check(
-            `${fx.label}: dust row for ${r.symbol} reads ${amount} once shown`,
-            shownTexts.some((t) => t.includes(amount)),
-            shownTexts.join(" | "),
+            `${fx.label}: ${r.symbol}'s icon reads ${amount} ${r.symbol}`,
+            titles.includes(`${amount} ${r.symbol}`),
+            titles.join(" | "),
           );
         }
-      } else {
-        check(`${fx.label}: ${side} carries no dust count line`, (await dustButton.count()) === 0);
       }
-
-      // §54: no receipt is lost when the icon retires. A flipped row's
-      // "enabled/disabled as collateral here" still opens collateralFlagProv; a row that did not flip
-      // has that same receipt's summary riding on its own balance receipt.
-      // By now any dust row is revealed, so a flipped reserve hidden behind
-      // the count line is still on the page to click.
-      if (side === "supply" && fx.checkFlagProv) {
-        const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
-        if (flippedR) {
-          const now = flippedR.collateral.after ? "on" : "off";
-          const receipt = await receiptText(page, scope, `${now === "on" ? "enabled" : "disabled"} as collateral here`);
-          check(
-            `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
-            !!receipt && receipt.includes("collateral switch"),
-            receipt,
-          );
+      if (side === "supply") {
+        for (const r of rows.filter((x) => x.collateral)) {
+          const flipped = r.collateral.before !== r.collateral.after;
+          const flipEl = scope.locator("[data-collateral-flip]").filter({ hasText: rows.length > 1 ? r.symbol : "" });
+          const n = await flipEl.count();
+          if (flipped) {
+            const now = r.collateral.after ? "enabled" : "disabled";
+            const flipText = n ? await text(flipEl.first()) : "";
+            check(
+              `${fx.label}: ${r.symbol} carries "${now} as collateral here" — its flag flipped this transaction`,
+              n === 1 && flipText.endsWith(`${now} as collateral here`),
+              flipText,
+            );
+          } else if (rows.length > 1)
+            check(`${fx.label}: ${r.symbol} carries no flip text — its flag did not change`, n === 0);
         }
-        const steadyR = rows.find((r) => r.collateral && r.collateral.before === r.collateral.after);
-        if (steadyR) {
-          const amount = fmtAmount(humanOf(steadyR.supply.after, steadyR.decimals));
-          const receipt = await receiptText(page, scope, amount);
-          check(
-            `${fx.label}: ${steadyR.symbol}'s balance receipt also states its collateral flag`,
-            !!receipt && receipt.includes("collateral switch"),
-            receipt,
-          );
+        if (fx.checkFlagProv) {
+          const flippedR = rows.find((r) => r.collateral && r.collateral.before !== r.collateral.after);
+          if (flippedR) {
+            const now = flippedR.collateral.after ? "on" : "off";
+            const receipt = await receiptText(
+              page,
+              scope,
+              `${now === "on" ? "enabled" : "disabled"} as collateral here`,
+            );
+            check(
+              `${fx.label}: ${flippedR.symbol}'s flip note opens the collateral-flag receipt`,
+              !!receipt && receipt.includes("collateral switch"),
+              receipt,
+            );
+          }
+          const steadyR =
+            rows.length === 1 ? rows.find((r) => r.collateral && r.collateral.before === r.collateral.after) : null;
+          if (steadyR) {
+            const amount = fmtAmount(humanOf(steadyR.supply.after, steadyR.decimals));
+            const receipt = await receiptText(page, scope, amount);
+            check(
+              `${fx.label}: ${steadyR.symbol}'s balance receipt also states its collateral flag`,
+              !!receipt && receipt.includes("collateral switch"),
+              receipt,
+            );
+          }
         }
       }
     }
@@ -633,19 +558,24 @@ for (const fx of FIXTURES) {
     const cardText = async (key) => text(block.locator(`[data-position-card="${key}"]`));
     const a = state.account;
     if (a) {
+      // A cell holding several reserves states the Pool's total (every
+      // supplied balance where a supply's switch is off, which this skips).
       const total = async (what) => text(block.locator(`[data-account-total="${what}"]`));
-      check(
-        `${fx.label}: total collateral heads the Collateral cell at ${fmtUsd(baseToUsd(a.after.totalCollateralBase))}`,
-        (await total("collateral")).endsWith(
-          big(a.after.totalCollateralBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalCollateralBase)),
-        ),
-      );
-      check(
-        `${fx.label}: total debt heads the Debt cell at ${fmtUsd(baseToUsd(a.after.totalDebtBase))}`,
-        (await total("debt")).endsWith(
-          big(a.after.totalDebtBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalDebtBase)),
-        ),
-      );
+      const offSupply = supplied.some((r) => r.collateral && !r.collateral.after);
+      if (supplied.length !== 1 && !offSupply)
+        check(
+          `${fx.label}: the Collateral cell states total collateral ${fmtUsd(baseToUsd(a.after.totalCollateralBase))}`,
+          (await total("collateral")).endsWith(
+            big(a.after.totalCollateralBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalCollateralBase)),
+          ),
+        );
+      if (borrowed.length !== 1)
+        check(
+          `${fx.label}: the Debt cell states total debt ${fmtUsd(baseToUsd(a.after.totalDebtBase))}`,
+          (await total("debt")).endsWith(
+            big(a.after.totalDebtBase) === BigInt(0) ? "$0" : fmtUsd(baseToUsd(a.after.totalDebtBase)),
+          ),
+        );
       check(
         `${fx.label}: no Supplied, Borrowed, Total or Max LTV cells`,
         (await block
@@ -710,15 +640,20 @@ for (const fx of FIXTURES) {
     );
 
     if (fx.deep) {
-      const chipSel = '[data-position-state="ready"] span.border-l-2.border-r-2.border-rb-500';
-      check(`${fx.label}: USD chips render in the position block`, (await card.locator(chipSel).count()) > 0);
-      // Display's two USD switches (stablecoins off by default, other tokens on).
-      await setDisplayFlag(page, "USD for stablecoins", false);
-      await setDisplayFlag(page, "USD for other tokens", false);
-      check(`${fx.label}: USD chips leave when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
+      // The closed cells' dollars (a side holding one reserve) follow
+      // Display's two USD switches.
+      const chipSel = '[data-position-state="ready"] [data-ledger-closed-usd]';
       await setDisplayFlag(page, "USD for stablecoins", true);
       await setDisplayFlag(page, "USD for other tokens", true);
-      check(`${fx.label}: USD chips return when both USD switches are on`, (await card.locator(chipSel).count()) > 0);
+      check(
+        `${fx.label}: USD shows in the closed cells with both USD switches on`,
+        (await card.locator(chipSel).count()) > 0,
+      );
+      await setDisplayFlag(page, "USD for stablecoins", false);
+      await setDisplayFlag(page, "USD for other tokens", false);
+      check(`${fx.label}: USD leaves when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
+      await setDisplayFlag(page, "USD for stablecoins", true);
+      await setDisplayFlag(page, "USD for other tokens", true);
       if (a) {
         const hfReceipt = await receiptText(
           page,
@@ -733,7 +668,14 @@ for (const fx of FIXTURES) {
       const r0 = supplied[0];
       if (r0) {
         const amount = fmtAmount(humanOf(r0.supply.after, r0.decimals));
-        const balReceipt = await receiptText(page, block.locator('[data-position-reserves="supply"]'), amount);
+        const cell = block.locator('[data-receipt-total="supply"]');
+        const balReceipt = await receiptText(
+          page,
+          cell,
+          supplied.length === 1
+            ? amount
+            : cell.locator(`[data-closed-assets] span.prov-locate-box:has([title^="${amount} "])`).first(),
+        );
         check(
           `${fx.label}: a supplied balance's receipt states scaled × index accrued to block time`,
           !!balReceipt && balReceipt.includes("scaled × index accrued to block time"),

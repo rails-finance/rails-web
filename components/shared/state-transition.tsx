@@ -101,13 +101,24 @@ export function ClosedLabel() {
  *  single CSS grid so they balance in width and — via `sm:auto-rows-fr` on the
  *  grid plus `h-full` here — match the tallest card's height per row. */
 export function StatCard({ label, children }: { label: ReactNode; children: ReactNode }) {
-  // On a card whose account cells open into ledgers, every cell sets its
-  // figures right, as the ledger cells do (components/shared/event-ledger.tsx).
+  // On a card whose account cells open into ledgers, every cell is one row
+  // as the ledger cells are (components/shared/event-ledger.tsx): its label
+  // at the left, its figures at the right with any sub-line under them.
   const right = useContext(EventLedgerContext) != null;
+  if (right)
+    return (
+      <div
+        className="flex h-full flex-wrap items-start gap-x-3 gap-y-1 rounded-xl bg-background px-4 py-3"
+        data-stat-row=""
+      >
+        <div className="flex min-h-5 items-center text-sm font-semibold text-foreground">{label}</div>
+        <div className="flex flex-1 basis-36 flex-col items-end text-right">{children}</div>
+      </div>
+    );
   return (
     <div className="flex h-full flex-col rounded-xl bg-background px-4 py-3">
-      <div className={`mb-1.5 text-xs font-semibold text-rb-500${right ? " min-h-5" : ""}`}>{label}</div>
-      {right ? <div className="flex flex-col items-end text-right">{children}</div> : children}
+      <div className="mb-1.5 text-xs font-semibold text-rb-500">{label}</div>
+      {children}
     </div>
   );
 }

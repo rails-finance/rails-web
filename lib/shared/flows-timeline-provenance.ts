@@ -177,6 +177,18 @@ export function ledgerPartProv(
   };
 }
 
+/** A stablecoin debt's dollars at its $1 face, as the event card's Debt
+ *  cell and its ledger count it: the debt before or after the event's
+ *  transaction, one dollar a token. */
+export function faceUsdProv(symbol: string, amount: string, which: "before" | "after"): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `Debt ${which} this event in USD — the ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
+    formula: `${symbol} × $1`,
+    inputs: [{ label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which }],
+  };
+}
+
 /** An asset's dollar rows in a side's ledger by asset: its interest at
  *  the block's price, or the price's effect on it. */
 export function ledgerAssetUsdProv(
