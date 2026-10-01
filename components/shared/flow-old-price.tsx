@@ -45,6 +45,7 @@ export function OldPriceLabel({ note }: { note: ReturnType<typeof oldPriceAt> })
         <RevealTip
           className="focus-ring col-start-1 row-start-1 justify-self-end rounded-full"
           focusable
+          align="end"
           label={`${note.word}: ${note.lines.join(" ")}`}
           tip={<OldPriceTip lines={note.lines} />}
         >

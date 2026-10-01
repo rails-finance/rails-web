@@ -38,6 +38,7 @@ export function RevealTip({
   className,
   label,
   focusable,
+  align = "start",
 }: {
   tip: ReactNode;
   children: ReactNode;
@@ -48,6 +49,9 @@ export function RevealTip({
    *  leaves navigation to the second tap). Give it `role="img"`-style
    *  semantics through `label`. */
   focusable?: boolean;
+  /** Which edge of the content the bubble lines up with: "end" for content at
+   *  the right of its row, so the bubble opens leftward. */
+  align?: "start" | "end";
 }) {
   const [open, setOpen] = useState(false);
   const hasHover = useHasHover();
@@ -62,10 +66,15 @@ export function RevealTip({
     if (!open) return setShift(0);
     const b = bubbleRef.current;
     if (!b) return;
+    if (align === "end") {
+      // Opening leftward: shift right by however far it would run past the left edge.
+      const under = 8 - b.getBoundingClientRect().left;
+      return setShift(under > 0 ? -under : 0);
+    }
     const over = b.getBoundingClientRect().right - (document.documentElement.clientWidth - 8);
     const room = ref.current ? ref.current.getBoundingClientRect().left - 8 : 0;
     setShift(over > 0 ? Math.min(over, Math.max(room, 0)) : 0);
-  }, [open]);
+  }, [open, align]);
 
   // Touch: dismiss when tapping elsewhere.
   useEffect(() => {
@@ -126,11 +135,11 @@ export function RevealTip({
           ref={bubbleRef}
           role="tooltip"
           data-prov-hidden=""
-          className="pointer-events-none absolute bottom-full left-0 z-50 mb-2.5 whitespace-nowrap rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg"
+          className={`pointer-events-none absolute bottom-full ${align === "end" ? "right-0" : "left-0"} z-50 mb-2.5 whitespace-nowrap rounded-2xl border p-3 text-xs font-medium tabular-nums text-foreground shadow-lg`}
           style={{
             background: "var(--rb-tooltip-bg)",
             borderColor: "var(--rb-tooltip-border)",
-            transform: shift ? `translateX(-${shift}px)` : undefined,
+            transform: shift ? `translateX(${-shift}px)` : undefined,
           }}
         >
           {tip}
@@ -138,7 +147,7 @@ export function RevealTip({
             aria-hidden="true"
             className="absolute top-full -mt-[5px] size-2.5 rotate-45 border-b border-r"
             style={{
-              left: 12 + shift,
+              ...(align === "end" ? { right: 12 - shift } : { left: 12 + shift }),
               background: "var(--rb-tooltip-bg)",
               borderColor: "var(--rb-tooltip-border)",
             }}
