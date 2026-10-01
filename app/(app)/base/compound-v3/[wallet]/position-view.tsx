@@ -14,7 +14,8 @@
 //
 // Each market the wallet has ever touched is its own section, and each section
 // is the Ethereum page's body: the shared position card with the live risk
-// slot, the economics tower, and a market-scoped timeline. That is deliberate.
+// slot, the Lifetime flows panel (lib/compound/flows.ts, in place of the tower,
+// rails-ops TO-DO-ui-jobs 206), and a market-scoped timeline. That is deliberate.
 // A Comet market is single-base and multi-collateral, nothing is
 // cross-collateralised between markets, and they do not all measure in the
 // same unit (cWETHv3 quotes in ETH) — so there is no combined health factor to
@@ -24,7 +25,7 @@
 // Two reads feed the sections, in the order they can answer: the Comets
 // (fast — three batched calls at one pinned block — feeds the cards) and the
 // history (the index in one read, or the sweep — slow, the whole chain in
-// chunks — feeds the timelines, the tower's lifetime layer, and the card's
+// chunks — feeds the timelines, the Lifetime flows panel, and the card's
 // principal and peaks). A market with a live balance but no history, or
 // history but no live balance (a closed position), is a section either way.
 // The history's completeness is a property of the request rather than of the
@@ -47,7 +48,14 @@ import {
 import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { CompoundFlowsNote, compoundFlowsContent } from "@/components/protocol/compound/compound-flows-note";
+import { CompoundFlowReplayContext } from "@/components/protocol/compound/compound-ledger";
+import { useCompoundFlows } from "@/hooks/useCompoundFlows";
+import type { CompoundLive } from "@/lib/compound/flows";
+import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -74,8 +82,6 @@ import type { CompoundBaseMarketRows } from "@/lib/compound-base/timeline-folder
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { previousEventById, previousEventByTx } from "@/lib/compound/row-facts";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
-import { computeCompoundEconomics } from "@/lib/compound/economics";
-import { compoundEconomicsExplanation, compoundEconomicsContent } from "@/lib/compound/economics-explanation";
 import { COMPOUND_BASE_READ_VOCABULARY, COMPOUND_SWEPT_VOCABULARY } from "@/lib/compound/swept-tower-provenance";
 import { cometViewFromChain } from "@/lib/compound/chain-position-view";
 import { CometDeploymentProvider } from "@/lib/compound/deployment-context";
@@ -146,7 +152,8 @@ interface Section {
 const holdsSomething = (live: CompoundMarketChainResponse | null): boolean =>
   live != null && (live.supplyBalanceRaw !== "0" || live.borrowBalanceRaw !== "0" || live.collateral.length > 0);
 
-/** One market's position: card + risk slot, tower, and its own timeline. */
+/** One market's position: card + risk slot, the Lifetime flows panel, and its
+ *  own timeline. */
 function MarketSection({
   section,
   wallet,
@@ -231,6 +238,8 @@ function MarketSection({
     folderParams: { wallet, market: market.key },
     storageKey: `compound-base-${market.key}-${view.account}`,
     protocolKey: "compound",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
   const sideUsd = cardSideUsd(view);
 
@@ -251,146 +260,181 @@ function MarketSection({
     [compoundEvents, servedFolders],
   );
 
-  // The tower's lifetime layer is labelled "all time" and is only entitled to
-  // that word if the history covers every block. A holed or short sweep keeps
-  // the bars (the current state comes from the Comet, not the logs) and drops
-  // the flows; an index read is served only when whole, so it never lands
-  // here. The sums come from the SERVER's replay over every row, never from
-  // the capped list on this page.
   // Rows read at their blocks state the chain's balance (decision 0033); a
   // market whose last row is not read yet keeps the running-sum wording.
   const vocab = replay?.baseAtChain ? COMPOUND_BASE_READ_VOCABULARY : COMPOUND_SWEPT_VOCABULARY;
-  const towerData = useMemo(() => {
-    const built = computeCompoundEconomics(view, undefined, vocab, sweptClean && replay ? replay.lifetime : undefined);
-    return sweptClean
-      ? built
-      : {
-          ...built,
-          flowsNote:
-            "Lifetime flows are hidden because the history sweep did not read every block of this market's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Comet.",
-        };
-  }, [view, replay, sweptClean, vocab]);
+
+  // The Lifetime flows panel replays this market's whole history
+  // (lib/compound/flows.ts): the loaded rows where they are all of it, else
+  // the rows with each folder opened for its members. A history the sweep
+  // did not read whole, or one cut below its newest rows (a seeded heavy
+  // wallet), has no read: the panel says the history was not read.
+  const omitted = replay?.omitted?.count ?? 0;
+  const flowWhole = sweptClean && omitted === 0 && !servedFolders?.length;
+  const fetchMarketHistory = useCallback(async () => {
+    const all: BaseActivityEvent[] = [...compoundEvents];
+    for (const f of servedFolders ?? []) {
+      const opened = await fetchTimelineFolderMembers({ path: FOLDER_ROUTE, params: { wallet }, folder: f.responseId });
+      all.push(...opened.events.filter((e) => isCompoundEvent(e) && e.context.data.market === market.key));
+    }
+    all.sort((a, b) => a.blockNumber - b.blockNumber || a.id.localeCompare(b.id));
+    return { events: all, missing: omitted };
+  }, [compoundEvents, servedFolders, wallet, market.key, omitted]);
+  const flowLive = useMemo<CompoundLive | null>(() => {
+    if (!chain || chain.chainStale || view.status !== "open") return null;
+    const supply = scaleCompoundChainBalance(chain.supplyBalanceRaw || "0", chain.baseDecimals);
+    const borrow = scaleCompoundChainBalance(chain.borrowBalanceRaw || "0", chain.baseDecimals);
+    return {
+      base: supply - borrow,
+      coll: Object.fromEntries(
+        chain.collateral.map((c) => [c.address.toLowerCase(), scaleCompoundChainBalance(c.balanceRaw, c.decimals)]),
+      ),
+      prices: Object.fromEntries(Object.entries(view.priceByAddress ?? {}).map(([a, p]) => [a.toLowerCase(), p])),
+      supplyApr: chain.supplyApr,
+      borrowApr: chain.borrowApr,
+    };
+  }, [chain, view]);
+  const flows = useCompoundFlows({
+    wholeEvents: flowWhole ? compoundEvents : null,
+    fetchAll: sweptClean && omitted === 0 ? fetchMarketHistory : null,
+    deployment: "base",
+    market,
+    open: view.status === "open",
+    live: flowLive,
+  });
 
   const live = chain && !chain.chainStale ? chain : null;
   const holds = holdsSomething(live);
 
   return (
-    <section id={`market-${market.key}`} className="scroll-mt-20 space-y-6">
-      <CompoundPositionCard
-        v={view}
-        receipts
-        viewHref={tl.viewHref}
-        vocab={vocab}
-        session="compound-base"
-        rowExtra={
-          live && view.status === "open" && live.healthFactor != null && live.healthFactor > 0 ? (
-            <CompoundRiskSlot chain={live} />
-          ) : undefined
-        }
-        explanation={
-          view.status !== "open" ? (
-            <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
-          ) : live ? (
-            <CompoundPositionExplanation
-              chain={live}
-              collateralUsd={sideUsd.supplyUsd}
-              debtUsd={sideUsd.borrowUsd}
-              externalActivity={externalActivity}
+    <FlowFocusContext.Provider value={flows.focus}>
+      <CompoundFlowReplayContext.Provider value={flows.replay}>
+        <section id={`market-${market.key}`} className="scroll-mt-20 space-y-6">
+          <CompoundPositionCard
+            v={view}
+            receipts
+            viewHref={tl.viewHref}
+            vocab={vocab}
+            session="compound-base"
+            rowExtra={
+              live && view.status === "open" && live.healthFactor != null && live.healthFactor > 0 ? (
+                <CompoundRiskSlot chain={live} />
+              ) : undefined
+            }
+            explanation={
+              view.status !== "open" ? (
+                <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
+              ) : live ? (
+                <CompoundPositionExplanation
+                  chain={live}
+                  collateralUsd={sideUsd.supplyUsd}
+                  debtUsd={sideUsd.borrowUsd}
+                  externalActivity={externalActivity}
+                />
+              ) : undefined
+            }
+          />
+
+          {/* Lifetime flows: the bars and the line over this market's replay
+          (lib/compound/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
+          {timelineState === "ready" && (
+            <LifetimeFlowsPanel
+              scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+              read={flows.read}
+              explanation={
+                <div className="space-y-2 text-sm text-rb-500">
+                  <CompoundFlowsNote
+                    facts={flows.facts}
+                    baseSymbol={market.baseSymbol}
+                    ethQuoted={market.quoteUnit === "ETH"}
+                  />
+                </div>
+              }
+              learnMore={compoundFlowsContent()}
             />
-          ) : undefined
-        }
-      />
+          )}
 
-      {timelineState === "ready" && (
-        <ChainTruthTower
-          data={towerData}
-          explanation={compoundEconomicsExplanation(towerData, {
-            onBase: true,
-            todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
-          })}
-          learnMore={compoundEconomicsContent({ onBase: true })}
-        />
-      )}
-
-      {timelineState === "ready" && timeline ? (
-        <ChainTruthTimeline
-          // Matches `CompoundEventCard`'s own `persistKey={`compound:${event.id}`}`
-          // — lets pinned mode (the per-event share route) force a landed
-          // card's detail panel open on its first mount. Only ONE
-          // `MarketSection` ever mounts this component while an `eventId` is
-          // on the URL — see `renderedSectionsWithViews` above for why (this
-          // page holds one section per market, each with its own timeline).
-          persistKeyPrefix="compound"
-          closed={view.status !== "open"}
-          tl={tl}
-          // Both grouping paths: the spec groups a flat answer in the browser,
-          // the register draws the folders the route served.
-          runs={COMPOUND_LIQUIDATION_RUNS}
-          folderRegister={COMPOUND_FOLDER_REGISTER}
-          readFolderMembers={readFolderMembers}
-          segments={segments}
-          // Tenure-first header: when the wallet's activity in THIS market
-          // started — the replay's own first-event date, resolved from the
-          // market's oldest row even when the drawn list is a capped slice
-          // that starts much later. The coverage's `firstEventAt` is the
-          // wallet's oldest event across every market, which is a different
-          // date, so it is not the one used here.
-          toolbarLeading={
-            <TimelineActivityHeader
-              events={compoundEvents}
-              folders={servedFolders}
+          {timelineState === "ready" && timeline ? (
+            <ChainTruthTimeline
+              // Matches `CompoundEventCard`'s own `persistKey={`compound:${event.id}`}`
+              // — lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount. Only ONE
+              // `MarketSection` ever mounts this component while an `eventId` is
+              // on the URL — see `renderedSectionsWithViews` above for why (this
+              // page holds one section per market, each with its own timeline).
+              persistKeyPrefix="compound"
               closed={view.status !== "open"}
-              firstAt={replay?.firstEventAt ?? null}
-              labelLastActivity
+              tl={tl}
+              // Both grouping paths: the spec groups a flat answer in the browser,
+              // the register draws the folders the route served.
+              runs={COMPOUND_LIQUIDATION_RUNS}
+              folderRegister={COMPOUND_FOLDER_REGISTER}
+              readFolderMembers={readFolderMembers}
+              segments={segments}
+              // Tenure-first header: when the wallet's activity in THIS market
+              // started — the replay's own first-event date, resolved from the
+              // market's oldest row even when the drawn list is a capped slice
+              // that starts much later. The coverage's `firstEventAt` is the
+              // wallet's oldest event across every market, which is a different
+              // date, so it is not the one used here.
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={compoundEvents}
+                  folders={servedFolders}
+                  closed={view.status !== "open"}
+                  firstAt={replay?.firstEventAt ?? null}
+                  labelLastActivity
+                />
+              }
+              emptyLabel={
+                !sweptClean
+                  ? "No events to show — the sweep could not read this wallet's history."
+                  : holds
+                    ? captureSource === "index"
+                      ? "The index holds every block and has no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account."
+                      : "The sweep read every block and found no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account."
+                    : "This wallet has no Compound V3 activity in this market."
+              }
+              footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
+              // On a grouped answer the list covers the market's `eventsServed`; a
+              // month read holds no card, the grid holding the other months.
+              boundary={
+                tl.historyWindow.state === "span"
+                  ? null
+                  : boundaryFromChainCoverage(
+                      { ...timeline.coverage, omitted: replay?.omitted },
+                      rows ? rows.eventsServed : compoundEvents.length,
+                    )
+              }
+              renderCard={(event, meta) =>
+                isCompoundEvent(event) ? (
+                  <CompoundEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                    previous={previousById.get(event.id)}
+                    previousTx={previousByTx.get(event.txHash)}
+                  />
+                ) : null
+              }
             />
-          }
-          emptyLabel={
-            !sweptClean
-              ? "No events to show — the sweep could not read this wallet's history."
-              : holds
-                ? captureSource === "index"
-                  ? "The index holds every block and has no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account."
-                  : "The sweep read every block and found no Comet event naming this account in this market — the balance arrived by a route the Comet logs without naming the account."
-                : "This wallet has no Compound V3 activity in this market."
-          }
-          footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
-          // On a grouped answer the list covers the market's `eventsServed`; a
-          // month read holds no card, the grid holding the other months.
-          boundary={
-            tl.historyWindow.state === "span"
-              ? null
-              : boundaryFromChainCoverage(
-                  { ...timeline.coverage, omitted: replay?.omitted },
-                  rows ? rows.eventsServed : compoundEvents.length,
-                )
-          }
-          renderCard={(event, meta) =>
-            isCompoundEvent(event) ? (
-              <CompoundEventCard
-                event={event}
-                eventNumber={meta.eventNumber}
-                isFirst={meta.isFirst}
-                isLast={meta.isLast}
-                siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                previous={previousById.get(event.id)}
-                previousTx={previousByTx.get(event.txHash)}
-              />
-            ) : null
-          }
-        />
-      ) : timelineState === "loading" ? (
-        <SweepInFlight>
-          Reading this wallet&rsquo;s whole history from the Comets&rsquo; logs — the sweep runs from the earliest
-          market&rsquo;s first block, so it takes a moment.
-        </SweepInFlight>
-      ) : (
-        <p className="py-6 text-center text-sm text-rb-500">
-          {timelineState === "unavailable"
-            ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comet and is unaffected."
-            : "The history sweep failed. Reload to try again — the position above is read live from the Comet and is unaffected."}
-        </p>
-      )}
-    </section>
+          ) : timelineState === "loading" ? (
+            <SweepInFlight>
+              Reading this wallet&rsquo;s whole history from the Comets&rsquo; logs — the sweep runs from the earliest
+              market&rsquo;s first block, so it takes a moment.
+            </SweepInFlight>
+          ) : (
+            <p className="py-6 text-center text-sm text-rb-500">
+              {timelineState === "unavailable"
+                ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Comet and is unaffected."
+                : "The history sweep failed. Reload to try again — the position above is read live from the Comet and is unaffected."}
+            </p>
+          )}
+        </section>
+      </CompoundFlowReplayContext.Provider>
+    </FlowFocusContext.Provider>
   );
 }
 
