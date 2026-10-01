@@ -27,8 +27,8 @@
 //      (maker_fold, maker_ilk_state, mv_makerdao_positions) on 2026-09-06 —
 //      never derived from this code either.
 //
-// TWO PINS THIS FILE DELIBERATELY DEPARTS FROM, both stated at the check that
-// departs (and in the run's own summary):
+// SUPERSEDED BY THE 2026-10-01 NOTE BELOW — the two departures from the plan
+// this file carried from 2026-09-06, kept for how the pins got here:
 //
 //   * ETH-A serves 51 sets and FOUR artefacts, not the 53 / 2 the plan pins.
 //     The §0 artefact rule — a derived set confirming to its predecessor's own
@@ -72,6 +72,31 @@
 // 8 against 10. That is designed (§9), so MERGED_* pins the sum and §2f holds
 // the two figures apart so neither can be silently swapped for the other.
 //
+// 2026-10-01 — RE-PINNED AFTER ROUND 3 AND THE SERVER'S FOLD FILL (this file's
+// own replica of the rule, §2, was updated first; every table below is what it
+// yields over the served rate log and each vault's served timeline, with §1
+// reading the Jug for the figures the new rule newly states).
+//
+//   * Server ba2f3f1 (mig 321, 2026-09-24) filled ETH-A's fold gap: it serves
+//     53 sets and NO artefacts, and the newest set's derived figure is the
+//     confirmed 9.50, not the gap-inflated 9.5094. The "51 sets / 4 artefacts"
+//     departure and the 1e-6 pp slack are gone with the rule that needed them.
+//   * Server ba67ac7 (2026-09-29): a zero-delta drip evidences a 0% fee, so
+//     WSTETH-B serves 33 sets, the first at 0%.
+//   * Web 2ffd7b5 (2026-09-30): Maker states EVERY fee change (floor 0.01 pp,
+//     MAKER_RATE_STEP_MIN_PP; was 1 pp with a truncation slack), a stretch the
+//     vault began owing nothing stands alone, and the merged-note stats read
+//     "Covers" / "Times governance changed the fee" (f32f322 renamed them from
+//     "Merges" / "Fee changes in between"). The old 1 pp rule applied to
+//     today's data still yields the old 10 and 14 stretches (§2c), so what
+//     moved is the rule, not the index.
+//   * Web f0eaf46 (2026-09-28): the page serves folders by default and its
+//     notes are drawn over the ungrouped events only, so every page here is
+//     opened with `?folders=0`, the flat answer (rails-ops decision 0021),
+//     as the Aave-family verifiers do.
+//   * The set counts are pinned UP TO the block the pin was read at: governance
+//     adding a set later moves neither the tables nor the counts.
+//
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3611 node scripts/verify/verify-makerdao-rate-step.mjs
 //       BASE=https://rails-web.vercel.app node scripts/verify/verify-makerdao-rate-step.mjs
@@ -88,9 +113,14 @@ import { mainnet } from "viem/chains";
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-const RATE_STEP_MIN_PP = 1;
-/** See the header: Maker's duty is a truncated per-second ray. */
-const RATE_TRUNCATION_SLACK_PP = 1e-6;
+/** Maker states every governance change: the floor is 0.01 pp (web 2ffd7b5,
+ *  MAKER_RATE_STEP_MIN_PP in lib/makerdao/market-notes.ts), far above the
+ *  duty's ~5e-7 pp truncation and under the finest step governance has filed
+ *  (0.25 pp). It replaced a 1 pp floor with a 1e-6 pp slack. */
+const RATE_STEP_MIN_PP = 0.01;
+/** The rule the floor replaced, kept so §2c can show what it withheld. */
+const OLD_RATE_STEP_MIN_PP = 1;
+const OLD_RATE_TRUNCATION_SLACK_PP = 1e-6;
 const SECONDS_PER_YEAR = 31_536_000;
 const JUG = "0x19c0976f590D67707E62397C87829d896Dc0f1F1";
 
@@ -147,14 +177,16 @@ function feeAt(sets, block, logIndex) {
 
 /**
  * The stretches on one vault, computed from the route's own rate log and the
- * route's own timeline, and the NOTES they merge into. `strict` drops the
- * truncation slack, so §2c can show what a knife-edge comparison would do to
- * the same data.
+ * route's own timeline, and the NOTES they merge into. `minPp` is the floor,
+ * so §2c can show what the 1 pp rule it replaced would have withheld from the
+ * same data.
  *
  * `steps` is every stretch over the threshold; `notes` is what the page must
- * show, which since 2026-09-20 is `steps` put through the collapse.
+ * show, which since 2026-09-20 is `steps` put through the collapse, and since
+ * web 2ffd7b5 (2026-09-30) leaves a stretch the vault began owing nothing
+ * standing alone.
  */
-function computeNotes(events, sets, ilk, { strict = false } = {}) {
+function computeNotes(events, sets, ilk, { minPp = RATE_STEP_MIN_PP } = {}) {
   const rows = events
     .filter((e) => {
       const t = e.context?.data?.eventType;
@@ -171,7 +203,7 @@ function computeNotes(events, sets, ilk, { strict = false } = {}) {
   }
   const rated = moments.map((m) => ({ ...m, set: feeAt(sets, m.block, m.logIndex) })).filter((m) => m.set);
 
-  const floor = strict ? RATE_STEP_MIN_PP : RATE_STEP_MIN_PP - RATE_TRUNCATION_SLACK_PP;
+  const floor = minPp;
   const out = [];
   for (let i = 1; i < rated.length; i += 1) {
     const a = rated[i - 1];
@@ -185,6 +217,7 @@ function computeNotes(events, sets, ilk, { strict = false } = {}) {
     const art = Number(d.artAfter);
     const rate = Number(d.rateAtBlock ?? 0);
     const debt = rate > 0 && art > 0 ? (art * rate) / 1e27 : null;
+    const owedNothing = !(art > 0);
     out.push({
       id: `rate-step:makerdao-${ilk.toLowerCase()}:${a.block}-${b.block}`,
       fromBlock: a.block,
@@ -199,6 +232,7 @@ function computeNotes(events, sets, ilk, { strict = false } = {}) {
       ).length,
       ordinalA: a.set.ordinal,
       ordinalB: b.set.ordinal,
+      owedNothing,
       interest: debt == null ? null : { debt, before: debt * rateA, after: debt * rateB },
     });
   }
@@ -262,6 +296,14 @@ function collapseRuns(steps) {
     run = [];
   };
   for (const step of steps) {
+    // A stretch the vault began owing nothing stands alone: it neither joins a
+    // run nor lets the run on either side join across it.
+    if (step.owedNothing) {
+      settle();
+      run = [step];
+      settle();
+      continue;
+    }
     const last = run[run.length - 1];
     if (last && Math.sign(last.deltaPp) === Math.sign(step.deltaPp)) run.push(step);
     else {
@@ -307,15 +349,22 @@ async function chainFeePct(ilk, block) {
 
 // ── the pins (plan §1) ─────────────────────────────────────────────────────
 
+/** WSTETH-B's two newest sets AS OF block 25,630,785 (the pin was read there):
+ *  ordinals count the zero set at the head of the log, so the 33rd is 10.25. */
+const WSTETH_B_PIN_BLOCK = 25630785;
+const WSTETH_B_PIN_SETS = 33;
 const WSTETH_B_LAST_TWO = [
-  { ordinal: 31, block: 25193461, logIndex: 809, aprPct: 9.25 },
-  { ordinal: 32, block: 25630785, logIndex: 276, aprPct: 10.25 },
+  { ordinal: 32, block: 25193461, logIndex: 809, aprPct: 9.25 },
+  { ordinal: 33, block: 25630785, logIndex: 276, aprPct: 10.25 },
 ];
-/** The plan's own §1b table for vault 28699 — from/to/fees/Δ. PRE-COLLAPSE:
- *  these are the stretches, and the page has shown the runs they merge into
- *  since 2026-09-20. Reproduced row for row on that date, which is what rules
- *  index drift out of the count that moved (MERGED_28699). */
-const STRETCHES_28699 = [
+/** ETH-A as of its newest set at the pin, block 25,596,295 (9.50, derived and confirmed agreeing). */
+const ETH_A_PIN_BLOCK = 25596295;
+const ETH_A_PIN_SETS = 53;
+
+/** The plan's own §1b tables (2026-09-06), under the 1 pp rule. §2c applies the
+ *  old rule to today's data and requires these exactly, which is what shows the
+ *  index has not drifted under the pins below. */
+const PLAN_STRETCHES_28699 = [
   [17278625, 17737533, 0.75, 3.19, 2.44],
   [17737533, 17988836, 3.19, 5.0, 1.81],
   [18980306, 19936166, 5.0, 9.0, 4.0],
@@ -327,8 +376,7 @@ const STRETCHES_28699 = [
   [22676311, 23524448, 6.75, 8.5, 1.75],
   [25256129, 25917081, 9.25, 10.25, 1.0],
 ];
-/** The plan's own §1b table for vault 16745, pre-collapse, likewise intact. */
-const STRETCHES_16745 = [
+const PLAN_STRETCHES_16745 = [
   [11642230, 11703337, 2.5, 3.5, 1.0],
   [11781275, 12078235, 3.5, 5.5, 2.0],
   [12563830, 13106460, 5.5, 2.0, -3.5],
@@ -345,31 +393,81 @@ const STRETCHES_16745 = [
   [25547112, 25634095, 8.5, 9.5, 1.0],
 ];
 
+/** Every stretch under the 0.01 pp floor — from/to/fees/Δ — re-derived
+ *  2026-10-01. The plan's rows are all in here; the rest are the moves under a
+ *  point (0.25 to 0.75) and, on 28699, the two 0% stretches. */
+const STRETCHES_28699 = [
+  [15310062, 15662568, 0.75, 0.0, -0.75],
+  [16134354, 16523794, 0.0, 0.25, 0.25],
+  [16694191, 17069702, 0.25, 0.75, 0.5],
+  [17278625, 17737533, 0.75, 3.19, 2.44],
+  [17737533, 17988836, 3.19, 5.0, 1.81],
+  [18980306, 19936166, 5.0, 9.0, 4.0],
+  [19936166, 20323030, 9.0, 8.0, -1.0],
+  [20394878, 21374251, 8.0, 13.5, 5.5],
+  [21374251, 21922144, 13.5, 10.5, -3.0],
+  [21922144, 22018729, 10.5, 8.5, -2.0],
+  [22018822, 22158643, 8.5, 6.75, -1.75],
+  [22676311, 23524448, 6.75, 8.5, 1.75],
+  [23524448, 24392332, 8.5, 8.75, 0.25],
+  [24392499, 25255186, 8.75, 9.25, 0.5],
+  [25256129, 25917081, 9.25, 10.25, 1.0],
+];
+const STRETCHES_16745 = [
+  [11465814, 11631925, 2.0, 2.5, 0.5],
+  [11642230, 11703337, 2.5, 3.5, 1.0],
+  [11781275, 12078235, 3.5, 5.5, 2.0],
+  [12563830, 13106460, 5.5, 2.0, -3.5],
+  [13464687, 13627913, 2.0, 2.5, 0.5],
+  [13627913, 13891488, 2.5, 2.75, 0.25],
+  [14051850, 14757280, 2.75, 2.25, -0.5],
+  [15410427, 15534760, 2.25, 1.5, -0.75],
+  [15582694, 17937478, 1.5, 3.44, 1.94],
+  [17937478, 19214177, 3.44, 6.74, 3.3],
+  [19214177, 21036719, 6.74, 6.25, -0.49],
+  [21139601, 21219604, 6.25, 8.25, 2.0],
+  [21219604, 21339612, 8.25, 9.25, 1.0],
+  [21339612, 21391746, 9.25, 12.75, 3.5],
+  [21588554, 21868658, 12.75, 9.75, -3.0],
+  [21884626, 21926675, 9.75, 7.75, -2.0],
+  [21989099, 22213537, 7.75, 6.0, -1.75],
+  [22556727, 23105751, 6.0, 7.0, 1.0],
+  [23105773, 24685938, 7.0, 8.0, 1.0],
+  [25188237, 25225710, 8.0, 8.5, 0.5],
+  [25547112, 25634095, 8.5, 9.5, 1.0],
+];
+
 /**
- * What the page shows: the tables above put through the collapse, re-pinned
- * 2026-09-20 from the two vaults that reproduce the pre-collapse tables
- * exactly. 28699's 10 stretches become 5 notes, 16745's 14 become 5.
+ * What the page shows: the tables above put through the collapse (same-way
+ * runs merge, a stretch the vault began owing nothing stands alone).
  *
- * `sets` is the MEMBERS' SUM (the header's ⚠). `ordinalSpan` is what the two
- * ends' own ordinals would say — pinned beside it, not instead of it, and the
- * two differ on the two runs that skipped a sub-threshold pair: 16745's
- * five-step run (10 against 17, the 19,214,177 → 21,139,601 gap taking the
- * fee through seven resets no member states) and 28699's two-step run (8
- * against 10).
+ * `sets` is the MEMBERS' SUM; `ordinalSpan` is what the two ends' own ordinals
+ * say. Under the old 1 pp rule they differed where a sub-threshold pair was
+ * skipped (16745's five-step run, 10 against 17). Every change is a stretch
+ * now, so a run skips nothing and the two are equal on every note here — §2f
+ * pins that, and that the page states the sum.
  */
 const MERGED_28699 = [
-  { from: 17278625, to: 19936166, fromPct: 0.75, toPct: 9.0, dpp: 8.25, steps: 3, sets: 10, ordinalSpan: 10 },
+  { from: 15310062, to: 15662568, fromPct: 0.75, toPct: 0.0, dpp: -0.75, steps: 1, sets: 1, ordinalSpan: 1 },
+  { from: 16134354, to: 19936166, fromPct: 0.0, toPct: 9.0, dpp: 9.0, steps: 5, sets: 13, ordinalSpan: 13 },
   { from: 19936166, to: 20323030, fromPct: 9.0, toPct: 8.0, dpp: -1.0, steps: 1, sets: 1, ordinalSpan: 1 },
   { from: 20394878, to: 21374251, fromPct: 8.0, toPct: 13.5, dpp: 5.5, steps: 1, sets: 4, ordinalSpan: 4 },
   { from: 21374251, to: 22158643, fromPct: 13.5, toPct: 6.75, dpp: -6.75, steps: 3, sets: 3, ordinalSpan: 3 },
-  { from: 22676311, to: 25917081, fromPct: 6.75, toPct: 10.25, dpp: 3.5, steps: 2, sets: 8, ordinalSpan: 10 },
+  { from: 22676311, to: 25917081, fromPct: 6.75, toPct: 10.25, dpp: 3.5, steps: 4, sets: 10, ordinalSpan: 10 },
 ];
 const MERGED_16745 = [
-  { from: 11642230, to: 12078235, fromPct: 2.5, toPct: 5.5, dpp: 3.0, steps: 2, sets: 3, ordinalSpan: 3 },
+  { from: 11465814, to: 12078235, fromPct: 2.0, toPct: 5.5, dpp: 3.5, steps: 3, sets: 4, ordinalSpan: 4 },
   { from: 12563830, to: 13106460, fromPct: 5.5, toPct: 2.0, dpp: -3.5, steps: 1, sets: 2, ordinalSpan: 2 },
-  { from: 15582694, to: 21391746, fromPct: 1.5, toPct: 12.75, dpp: 11.25, steps: 5, sets: 10, ordinalSpan: 17 },
+  { from: 13464687, to: 13891488, fromPct: 2.0, toPct: 2.75, dpp: 0.75, steps: 2, sets: 2, ordinalSpan: 2 },
+  { from: 14051850, to: 15534760, fromPct: 2.75, toPct: 1.5, dpp: -1.25, steps: 2, sets: 3, ordinalSpan: 3 },
+  { from: 15582694, to: 19214177, fromPct: 1.5, toPct: 6.74, dpp: 5.24, steps: 2, sets: 7, ordinalSpan: 7 },
+  { from: 19214177, to: 21036719, fromPct: 6.74, toPct: 6.25, dpp: -0.49, steps: 1, sets: 7, ordinalSpan: 7 },
+  { from: 21139601, to: 21391746, fromPct: 6.25, toPct: 12.75, dpp: 6.5, steps: 3, sets: 3, ordinalSpan: 3 },
   { from: 21588554, to: 22213537, fromPct: 12.75, toPct: 6.0, dpp: -6.75, steps: 3, sets: 3, ordinalSpan: 3 },
-  { from: 22556727, to: 25634095, fromPct: 6.0, toPct: 9.5, dpp: 3.5, steps: 3, sets: 9, ordinalSpan: 10 },
+  // The vault owed nothing at 22,556,727: this stretch stands alone, with no
+  // interest, though the stretch after it (23,105,773 on) moves the same way.
+  { from: 22556727, to: 23105751, fromPct: 6.0, toPct: 7.0, dpp: 1.0, steps: 1, sets: 4, ordinalSpan: 4, owedNothing: true },
+  { from: 23105773, to: 25634095, fromPct: 7.0, toPct: 9.5, dpp: 2.5, steps: 3, sets: 6, ordinalSpan: 6 },
 ];
 
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
@@ -398,6 +496,7 @@ const mergedMatches = (notes, want) =>
       n.toBlock === w.to &&
       n.steps === w.steps &&
       n.sets === w.sets &&
+      Boolean(n.owedNothing) === Boolean(w.owedNothing) &&
       n.members.length === w.steps &&
       n.members[0].fromBlock === w.from &&
       n.members[n.members.length - 1].toBlock === w.to &&
@@ -411,7 +510,11 @@ const showMerged = (notes) =>
     .map((n) => `${n.steps}× ${n.fromBlock}→${n.toBlock} ${ratePct(n.rateA)}→${ratePct(n.rateB)} sets=${n.sets}`)
     .join(" · ");
 
-const vaultUrl = (id) => `${BASE}/ethereum/makerdao/${id}`;
+// `?folders=0`: the flat answer. The page's notes are computed over the events
+// it holds, and the served folders (default since web f0eaf46) hold some back,
+// so a fee note on the default view can run across a folded touch and state
+// "the vault's previous event" without it.
+const vaultUrl = (id) => `${BASE}/ethereum/makerdao/${id}?folders=0`;
 
 async function open(context, url, wantNotes = 0) {
   const page = await context.newPage();
@@ -500,15 +603,20 @@ console.log(`BASE ${BASE}\n`);
 // ── 0. the proxy's own answer ──────────────────────────────────────────────
 
 const wsteth = await api("/api/makerdao/ilks/WSTETH-B/rate-log");
+// Read AS OF the pin block: a set governance adds later leaves these true.
+const wstethAtPin = wsteth.sets.filter((x) => x.block <= WSTETH_B_PIN_BLOCK);
 check(
-  "0. WSTETH-B's rate log serves 32 sets and NO artefacts (its fold series is complete)",
-  wsteth.sets.length === 32 && wsteth.artefacts.length === 0,
-  `${wsteth.sets.length} sets, ${wsteth.artefacts.length} artefacts, ${wsteth.folds} folds`,
+  `0. WSTETH-B's rate log serves ${WSTETH_B_PIN_SETS} sets up to block ${blk(WSTETH_B_PIN_BLOCK)} (one of them at 0%, server ba67ac7) and NO artefacts (its fold series is complete)`,
+  wstethAtPin.length === WSTETH_B_PIN_SETS &&
+    wsteth.sets.length >= WSTETH_B_PIN_SETS &&
+    wsteth.artefacts.length === 0 &&
+    wsteth.sets.some((x) => near(x.aprPct, 0, 1e-9)),
+  `${wstethAtPin.length} sets at the pin (${wsteth.sets.length} now), 0% set at ${wsteth.sets.find((x) => near(x.aprPct, 0, 1e-9))?.block}, ${wsteth.artefacts.length} artefacts, ${wsteth.folds} folds`,
 );
 check(
-  "0a. its last two sets are the pinned ones — 9.25 @ 25,193,461 log 809 and 10.25 @ 25,630,785 log 276",
+  "0a. its last two sets at the pin are 9.25 @ 25,193,461 log 809 and 10.25 @ 25,630,785 log 276",
   WSTETH_B_LAST_TWO.every((w, i) => {
-    const s = wsteth.sets[wsteth.sets.length - 2 + i];
+    const s = wstethAtPin[wstethAtPin.length - 2 + i];
     return (
       s &&
       s.ordinal === w.ordinal &&
@@ -517,7 +625,7 @@ check(
       near(s.aprPct, w.aprPct, 0.005)
     );
   }),
-  wsteth.sets
+  wstethAtPin
     .slice(-2)
     .map((s) => `#${s.ordinal} ${s.aprPct.toFixed(4)}@${s.block}/${s.logIndex}`)
     .join(" | "),
@@ -529,32 +637,27 @@ check(
 );
 
 const etha = await api("/api/makerdao/ilks/ETH-A/rate-log");
-const derivedCount = etha.sets.length + etha.artefacts.length;
+const ethaAtPin = etha.sets.filter((x) => x.block <= ETH_A_PIN_BLOCK);
+// Server ba2f3f1 (mig 321) filled the fold gap behind the old "51 sets and four
+// artefacts": the walk now yields 53 sets and nothing to correct.
 check(
-  "0c. ETH-A's walk yields the pinned 55 DERIVED sets",
-  derivedCount === 55,
-  `${etha.sets.length} served + ${etha.artefacts.length} artefacts = ${derivedCount}`,
+  `0c. ETH-A serves ${ETH_A_PIN_SETS} sets up to block ${blk(ETH_A_PIN_BLOCK)} and NO artefacts (server ba2f3f1: the fold gap is filled)`,
+  ethaAtPin.length === ETH_A_PIN_SETS && etha.artefacts.length === 0,
+  `${ethaAtPin.length} sets at the pin (${etha.sets.length} now), ${etha.artefacts.length} artefacts`,
 );
-// ⚠ DEPARTS FROM THE PIN (plan §1a: 53 sets, two artefacts). See the header.
+// The four blocks the old pin had to treat as artefacts are not sets any more:
+// the two the plan named (derived 0.3712 and 8.5085, each confirming 8.50) and
+// the two beyond it (§1c reads the Jug at those and finds no change).
+const FORMER_ARTEFACTS = [16976042, 16976256, 25428143, 25430354];
 check(
-  "0d. ⚠ ETH-A serves 51 sets and FOUR artefacts — the plan pins 53 and two; the artefact rule catches two more (see 1c)",
-  etha.sets.length === 51 && etha.artefacts.length === 4,
-  `${etha.sets.length} sets, artefacts at ${etha.artefacts.map((a) => a.block).join(", ")}`,
+  "0e. none of the four blocks the old pin treated as artefacts is a set — 16,976,042, 16,976,256, 25,428,143, 25,430,354",
+  FORMER_ARTEFACTS.every((b) => !etha.sets.some((x) => x.block === b)),
+  FORMER_ARTEFACTS.map((b) => `${b}: ${etha.sets.some((x) => x.block === b) ? "a set" : "absent"}`).join(", "),
 );
+const ethaLast = ethaAtPin[ethaAtPin.length - 1];
 check(
-  "0e. both artefacts the plan DOES pin are there — 25,428,143 (derived 0.3712) and 25,430,354 (derived 8.5085), each confirming 8.50",
-  [25428143, 25430354].every((b) => {
-    const a = etha.artefacts.find((x) => x.block === b);
-    return a && near(a.confirmedAprPct, 8.5, 0.01);
-  }) &&
-    near(etha.artefacts.find((a) => a.block === 25428143)?.derivedAprPct ?? 0, 0.3712, 0.01) &&
-    near(etha.artefacts.find((a) => a.block === 25430354)?.derivedAprPct ?? 0, 8.5085, 0.01),
-  etha.artefacts.map((a) => `${a.block} d=${a.derivedAprPct.toFixed(4)} c=${a.confirmedAprPct.toFixed(4)}`).join(" | "),
-);
-const ethaLast = etha.sets[etha.sets.length - 1];
-check(
-  "0f. ETH-A's newest set is 9.50 @ 25,596,295, and its DERIVED figure is the gap-inflated 9.5094",
-  ethaLast.block === 25596295 && near(ethaLast.aprPct, 9.5, 0.005) && near(ethaLast.derivedAprPct, 9.5094, 0.005),
+  `0f. ETH-A's newest set at the pin is 9.50 @ ${blk(ETH_A_PIN_BLOCK)}, and its derived figure now equals the confirmed one (the gap-inflated 9.5094 is gone)`,
+  ethaLast.block === ETH_A_PIN_BLOCK && near(ethaLast.aprPct, 9.5, 0.005) && near(ethaLast.derivedAprPct, 9.5, 0.001),
   `${ethaLast.block} confirmed ${ethaLast.aprPct.toFixed(6)} derived ${ethaLast.derivedAprPct.toFixed(4)}`,
 );
 const unknown = await fetch(`${BASE}/api/makerdao/ilks/NOPE-Z/rate-log`);
@@ -563,35 +666,47 @@ check("0g. an unknown collateral type is a 400, not an empty log", unknown.statu
 // ── 1. independent chain confirmation ──────────────────────────────────────
 // The expected values here come from the chain, not from anything above.
 
-const chain10_25 = await chainFeePct("WSTETH-B", 25630785);
-const chain9_25 = await chainFeePct("WSTETH-B", 25193461);
-const chainEthA = await chainFeePct("ETH-A", 25596295);
+const chain10_25 = await chainFeePct("WSTETH-B", WSTETH_B_LAST_TWO[1].block);
+const chain9_25 = await chainFeePct("WSTETH-B", WSTETH_B_LAST_TWO[0].block);
+const chainEthA = await chainFeePct("ETH-A", ETH_A_PIN_BLOCK);
 check(
   "1. the Jug's own duty at WSTETH-B's two newest set blocks is 10.25% and 9.25%",
   near(chain10_25, 10.25, 0.001) && near(chain9_25, 9.25, 0.001),
   `${chain10_25.toFixed(6)} @25630785, ${chain9_25.toFixed(6)} @25193461`,
 );
 check(
-  "1a. the Jug's own duty at ETH-A's newest set block (25,596,295) is 9.50% — NOT the derived 9.5094",
+  "1a. the Jug's own duty at ETH-A's newest set block at the pin (25,596,295) is 9.50%",
   near(chainEthA, 9.5, 0.001),
   `${chainEthA.toFixed(6)}`,
 );
 check(
   "1b. the route's served figures ARE those chain reads",
-  near(wsteth.sets.at(-1).aprPct, chain10_25, 1e-9) &&
-    near(wsteth.sets.at(-2).aprPct, chain9_25, 1e-9) &&
+  near(wstethAtPin.at(-1).aprPct, chain10_25, 1e-9) &&
+    near(wstethAtPin.at(-2).aprPct, chain9_25, 1e-9) &&
     near(ethaLast.aprPct, chainEthA, 1e-9),
   `route ${ethaLast.aprPct} vs chain ${chainEthA}`,
 );
-// The departure at 0d, proved from the chain: the two extra artefacts read the
-// SAME duty as the set before them, so they are not rate changes.
+// Why 0e holds, from the chain: the blocks the old pin counted as artefacts read
+// the SAME duty as the set before them, so none was ever a rate change.
 const extraA = await chainFeePct("ETH-A", 16976042);
 const extraB = await chainFeePct("ETH-A", 16976256);
 const beforeExtras = await chainFeePct("ETH-A", 16975705);
 check(
-  "1c. ⚠ the two artefacts beyond the pin are chain-confirmed non-changes — the Jug reads 1.50% at 16,975,705, 16,976,042 AND 16,976,256",
+  "1c. the two artefacts the old pin found beyond the plan's are chain-confirmed non-changes — the Jug reads 1.50% at 16,975,705, 16,976,042 AND 16,976,256",
   near(extraA, beforeExtras, 1e-9) && near(extraB, beforeExtras, 1e-9) && near(extraA, 1.5, 0.001),
   `${beforeExtras.toFixed(6)} → ${extraA.toFixed(6)} → ${extraB.toFixed(6)}`,
+);
+// The two figures the 0.01 pp rule newly states, read off the Jug: the 0% set
+// at the head of WSTETH-B's log (server ba67ac7) and the 8.75 set behind the
+// 0.25 pp step the 1 pp rule withheld (28699's 8.50 → 8.75).
+const zeroSet = wsteth.sets.find((x) => near(x.aprPct, 0, 1e-9));
+const step875 = wsteth.sets.filter((x) => x.block <= 24392332 && near(x.aprPct, 8.75, 0.005)).at(-1);
+const chainZero = zeroSet ? await chainFeePct("WSTETH-B", zeroSet.block) : NaN;
+const chain875 = step875 ? await chainFeePct("WSTETH-B", step875.block) : NaN;
+check(
+  "1d. the Jug reads 0% at WSTETH-B's 0% set and 8.75% at the set behind the 0.25 pp step (8.50 → 8.75)",
+  zeroSet != null && near(chainZero, 0, 1e-6) && step875 != null && near(chain875, 8.75, 0.001),
+  `${chainZero.toFixed(6)} @${zeroSet?.block}, ${Number.isNaN(chain875) ? "no 8.75 set" : chain875.toFixed(6)} @${step875?.block}`,
 );
 
 // ── 2. the rule, replayed over the route data ──────────────────────────────
@@ -605,27 +720,44 @@ const r16745 = computeNotes(tl16745.events, etha.sets, "ETH-A");
 const r31168 = computeNotes(tl31168.events, wsteth.sets, "WSTETH-B");
 
 check(
-  "2. vault 28699's 10 stretches match the plan's §1b table exactly (from/to/fees/Δ) — the pre-collapse table, still intact",
+  "2. vault 28699's 15 stretches match the pinned table exactly (from/to/fees/Δ) — every fee change between its touches, two of them at 0%",
   tableMatches(r28699.steps, STRETCHES_28699),
   `${r28699.steps.length} stretches: ${r28699.steps.map((n) => `${n.fromBlock}→${n.toBlock} ${n.deltaPp.toFixed(2)}`).join(", ")}`,
 );
 check(
-  "2a. vault 16745's 14 stretches match the plan's §1b table exactly, likewise",
+  "2a. vault 16745's 21 stretches match the pinned table exactly, likewise",
   tableMatches(r16745.steps, STRETCHES_16745),
   `${r16745.steps.length} stretches: ${r16745.steps.map((n) => `${n.fromBlock}→${n.toBlock} ${n.deltaPp.toFixed(2)}`).join(", ")}`,
 );
-// ── 2e/2f. the collapse, replayed over those same stretches ────────────────
-// Both tables above are the plan's, reproduced unchanged, so a count that has
-// moved here has moved BECAUSE OF THE COLLAPSE and not because the index
-// drifted under the pins. The runs, their members and their two ends are the
-// collapse's own claim and are asserted before the page is ever opened.
+// ── 2c. the old rule, on today's data ──────────────────────────────────────
+// The plan's tables (1 pp rule, 2026-09-06) are still what that rule yields,
+// so the index has not drifted under the pins: web 2ffd7b5 moved the rule.
+const old28699 = computeNotes(tl28699.events, wsteth.sets, "WSTETH-B", {
+  minPp: OLD_RATE_STEP_MIN_PP - OLD_RATE_TRUNCATION_SLACK_PP,
+});
+const old16745 = computeNotes(tl16745.events, etha.sets, "ETH-A", {
+  minPp: OLD_RATE_STEP_MIN_PP - OLD_RATE_TRUNCATION_SLACK_PP,
+});
 check(
-  "2e. 28699's 10 stretches merge into the 5 pinned runs (3, 1, 1, 3, 2 steps), each from its first member's earlier touch to its last member's later one",
+  "2c. the old 1 pp rule applied to today's data still yields the plan's 10 stretches on 28699 and 14 on 16745 — the rule moved, not the index",
+  tableMatches(old28699.steps, PLAN_STRETCHES_28699) && tableMatches(old16745.steps, PLAN_STRETCHES_16745),
+  `28699 ${old28699.steps.length}, 16745 ${old16745.steps.length}`,
+);
+const underPoint = (r) => r.steps.filter((n) => Math.abs(n.deltaPp) < 1 - OLD_RATE_TRUNCATION_SLACK_PP);
+const smallest = Math.min(...[...r28699.steps, ...r16745.steps].map((n) => Math.abs(n.deltaPp)));
+check(
+  "2c1. the 0.01 pp floor admits only governance moves — the smallest stretch on either vault is 0.25 pp, 5 on 28699 and 7 on 16745 sit under the point the old rule withheld, and none is truncation noise (~5e-7 pp)",
+  near(smallest, 0.25, 1e-3) && underPoint(r28699).length === 5 && underPoint(r16745).length === 7,
+  `smallest ${smallest.toFixed(4)} pp; under a point: ${underPoint(r28699).length} and ${underPoint(r16745).length}`,
+);
+// ── 2e/2f. the collapse, replayed over those same stretches ────────────────
+check(
+  "2e. 28699's 15 stretches merge into the 6 pinned runs (1, 5, 1, 1, 3, 4 steps), each from its first member's earlier touch to its last member's later one",
   mergedMatches(r28699.notes, MERGED_28699) && r28699.notes.reduce((n, x) => n + x.steps, 0) === STRETCHES_28699.length,
   showMerged(r28699.notes),
 );
 check(
-  "2e1. 16745's 14 stretches merge into the 5 pinned runs (2, 1, 5, 3, 3 steps) — the five-step run states 1.50% → 12.75%, +11.25 points",
+  "2e1. 16745's 21 stretches merge into the 10 pinned runs — the stretch the vault began owing nothing (22,556,727 → 23,105,751) stands alone beside a same-way neighbour",
   mergedMatches(r16745.notes, MERGED_16745) && r16745.notes.reduce((n, x) => n + x.steps, 0) === STRETCHES_16745.length,
   showMerged(r16745.notes),
 );
@@ -644,28 +776,26 @@ check(
   monotonic(r28699) && monotonic(r16745),
   `28699 ${monotonic(r28699)}, 16745 ${monotonic(r16745)}`,
 );
-// ⚠ The sum-vs-span trap, asserted as a difference rather than assumed away.
-// Every check from here reads a note out of the replica BY POSITION. A wrong
-// merge leaves those positions empty, and an empty position must go red like
-// any other wrong answer — never throw, or the run is a CRASH and the other
-// fifty checks are lost with it.
+// Every read below goes through the replica BY POSITION. A wrong merge leaves
+// those positions empty, and an empty position must go red like any other
+// wrong answer — never throw, or the run is a CRASH and the other checks are lost.
 const sumVsSpan = (notes, want) =>
+  notes.length === want.length &&
   want.every((w, i) => notes[i]?.sets === w.sets && notes[i]?.ordinalSpan === w.ordinalSpan);
-const skipped16745 = r16745.notes[2]; // the five-step run, 15,582,694 → 21,391,746
-const skipped28699 = r28699.notes[4]; // the two-step run, 22,676,311 → 25,917,081
+const allSumEqSpan = (r) => r.notes.every((n) => n.sets === n.ordinalSpan);
 check(
-  "2f. ⚠ setsBetween on a merged note is the MEMBERS' SUM, not the two ends' ordinal difference: 16745's five-step run sums 10 where its ends are 17 apart, 28699's two-step run 8 where they are 10",
+  "2f. setsBetween on a merged note is the MEMBERS' SUM, pinned beside the two ends' ordinal difference — equal on every note now, because every change is a stretch and no run skips a pair (28699's four-step run: 10 and 10; 16745's two-step run: 7 and 7)",
   sumVsSpan(r28699.notes, MERGED_28699) &&
     sumVsSpan(r16745.notes, MERGED_16745) &&
-    skipped16745?.sets === 10 &&
-    skipped16745?.ordinalSpan === 17 &&
-    skipped28699?.sets === 8 &&
-    skipped28699?.ordinalSpan === 10,
-  `16745 run×5 sum ${skipped16745?.sets} vs span ${skipped16745?.ordinalSpan}; 28699 run×2 sum ${skipped28699?.sets} vs span ${skipped28699?.ordinalSpan}`,
+    allSumEqSpan(r28699) &&
+    allSumEqSpan(r16745) &&
+    r28699.notes[5]?.sets === 10 &&
+    r16745.notes[4]?.sets === 7,
+  `28699 run×4 sum ${r28699.notes[5]?.sets} vs span ${r28699.notes[5]?.ordinalSpan}; 16745 run×2 sum ${r16745.notes[4]?.sets} vs span ${r16745.notes[4]?.ordinalSpan}`,
 );
 // The interest slice on a merged note: the FIRST member's debt, held fixed and
 // priced at the two ENDS' fees — not the last member's debt, and not a sum.
-const run28699 = r28699.notes[4]; // 22,676,311 → 25,917,081, two steps
+const run28699 = r28699.notes[5]; // 22,676,311 → 25,917,081, four steps
 const firstMember28699 = r28699.steps.find((s) => s.fromBlock === run28699?.fromBlock);
 check(
   "2g. the merged interest slice is the FIRST member's debt priced at the run's two ends (≈155.4K DAI at 6.75% → 10.25%), not the last member's",
@@ -679,7 +809,7 @@ check(
 );
 const last16745 = r16745.steps[r16745.steps.length - 1];
 check(
-  "2b. 16745's newest stretch reads 8.50% → 9.50%, Δ 1.00 points — the confirmed figures, NOT the derived 8.5085 → 9.5094 (Δ 1.0009)",
+  "2b. 16745's newest stretch reads 8.50% → 9.50%, Δ 1.00 points — the confirmed figures",
   last16745 &&
     near(last16745.rateA * 100, 8.5, 0.005) &&
     near(last16745.rateB * 100, 9.5, 0.005) &&
@@ -688,27 +818,16 @@ check(
     ? `${(last16745.rateA * 100).toFixed(4)} → ${(last16745.rateB * 100).toFixed(4)}, ${ppMagnitude(last16745.deltaPp)}`
     : "no stretch",
 );
-// ⚠ The threshold departure, proved by breaking it: a strict `≥ 1 pp` on the
-// confirmed figures drops two of the plan's own pinned stretches. Read at the
-// STRETCH level, because the collapse hides it: both dropped stretches sit
-// inside runs that survive without them, so a strict comparison yields the
-// same FIVE notes and the note count alone would never show the loss.
-const strict16745 = computeNotes(tl16745.events, etha.sets, "ETH-A", { strict: true });
-const droppedStrict = STRETCHES_16745.filter(
-  ([from, to]) => !strict16745.steps.some((n) => n.fromBlock === from && n.toBlock === to),
-).map(([from, to]) => `${from}→${to}`);
+// A vault that owed nothing at a stretch's start: that stretch is its own note
+// with no interest, and the same-way stretch after it does not join it.
+const nothing16745 = r16745.steps.filter((n) => n.owedNothing);
 check(
-  "2c. ⚠ a STRICT ≥1pp on the confirmed fees would drop exactly two pinned stretches (21219604→21339612 and 23105773→24685938) — which is why the 1e-6 pp truncation slack exists",
-  strict16745.steps.length === 12 &&
-    droppedStrict.length === 2 &&
-    droppedStrict.includes("21219604→21339612") &&
-    droppedStrict.includes("23105773→24685938"),
-  `strict yields ${strict16745.steps.length} stretches; dropped ${droppedStrict.join(", ") || "(none)"}`,
-);
-check(
-  "2c1. ⚠ and the collapse MASKS that loss — strict still merges to 5 notes, so the slack has to be asserted over stretches, never over the note count",
-  strict16745.notes.length === r16745.notes.length && strict16745.notes.length === 5,
-  `strict merges to ${strict16745.notes.length}, lenient to ${r16745.notes.length}`,
+  "2h. 16745 owed nothing at exactly one stretch's start (22,556,727), which carries no interest and merges with nothing",
+  nothing16745.length === 1 &&
+    nothing16745[0].fromBlock === 22556727 &&
+    nothing16745[0].interest == null &&
+    r16745.notes.some((n) => n.fromBlock === 22556727 && n.toBlock === 23105751 && n.steps === 1),
+  nothing16745.map((n) => n.id).join(", ") || "none",
 );
 // The row arithmetic on 16745, asserted rather than reported: 114 events, of
 // which 4 `give` rows carry no economics and are not ends, leaving 110 that
@@ -738,7 +857,14 @@ await showNoteRows(context);
 const chain28699 = await api("/api/chain/makerdao/vault/28699");
 const live28699 = chain28699.state;
 
-const page = await open(context, vaultUrl("28699"), 6);
+// Whether a live (-head) row is drawn depends on the fee now against the fee at
+// the vault's last event (10.25%): it is not while they are equal, and is the
+// moment governance moves WSTETH-B's fee. Read from the route before the page.
+const flatLive = near(live28699.stabilityFeeApr * 100, 10.25, 0.01);
+const heads28699 = flatLive ? 0 : 1;
+const notes28699 = MERGED_28699.length + heads28699;
+
+const page = await open(context, vaultUrl("28699"), notes28699);
 // 43 rows today, under the 50-row window, so this is a no-op — until the
 // vault is touched eight more times, when it would quietly stop being one.
 const expanded28699 = await showAllRows(page);
@@ -748,8 +874,8 @@ const ids28699 = await page
 const hist28699 = ids28699.filter((i) => !i.endsWith("-head"));
 const head28699 = ids28699.filter((i) => i.endsWith("-head"));
 check(
-  "3. 28699 shows the 5 pinned historical rows — its 10 stretches merged — and exactly ONE -head row, with every timeline row drawn",
-  expanded28699 && hist28699.length === MERGED_28699.length && head28699.length === 1,
+  `3. 28699 shows the ${MERGED_28699.length} pinned historical rows — its 15 stretches merged — and ${flatLive ? "no -head row (the fee is flat)" : "exactly ONE -head row"}, with every timeline row drawn`,
+  expanded28699 && hist28699.length === MERGED_28699.length && head28699.length === heads28699,
   `${hist28699.length} historical, ${head28699.length} live: ${ids28699.join(", ")}`,
 );
 check(
@@ -774,17 +900,19 @@ const headLocator = page.locator(`[data-market-note$="-head"]`).first();
 const headFlat = ((await headLocator.count()) ? ((await headLocator.textContent()) ?? "") : "").replace(/\s+/g, " ");
 // 2026-09-30 (MakerDAO newcomer r4, P5): a live note whose fee equals the fee
 // at the vault's last event states no change, so it is not drawn. 28699's fee
-// is 10.25% at its last event and now: no head row.
-const flatLive = near(live28699.stabilityFeeApr * 100, 10.25, 0.01);
+// is 10.25% at its last event; while the Jug still reads that, no head row —
+// and once governance moves it, exactly one.
 check(
-  "3c. the fee now equals the fee at the last event (10.25%, the vault route's stabilityFeeApr), so no live row is drawn",
-  flatLive && headFlat === "",
+  flatLive
+    ? "3c. the fee now equals the fee at the last event (10.25%, the vault route's stabilityFeeApr), so no live row is drawn"
+    : "3c. the fee now differs from the fee at the last event (10.25%), so exactly one live row is drawn",
+  flatLive ? headFlat === "" : headFlat !== "",
   `head row "${headFlat.slice(0, 120)}"; route stabilityFeeApr ${live28699.stabilityFeeApr}`,
 );
 const opened = await openNotesAndDerivations(page);
 check(
   "3e. every Maker note on 28699 opens and stays open across the poll",
-  opened.total === 6 && opened.open === opened.total,
+  opened.total === notes28699 && opened.open === opened.total,
   `${opened.open}/${opened.total} open`,
 );
 const openTexts = await noteTexts(page);
@@ -817,7 +945,7 @@ check(
   `Elapsed ${/Elapsed/.test(openHead)}, blockTimestamp ${live28699.blockTimestamp}`,
 );
 
-const pinned = r28699.notes[r28699.notes.length - 1]; // the merged run 22,676,311 → 25,917,081
+const pinned = r28699.notes[r28699.notes.length - 1]; // the four-step run 22,676,311 → 25,917,081
 const pinnedText = openTexts.find((t) => t.includes(blk(pinned.fromBlock)) && t.includes(blk(pinned.toBlock)));
 check(
   "3f. the merged 22,676,311 → 25,917,081 note states 6.75% → 10.25% and the interest slice its FIRST member's debt carries at those two fees (≈10,489 → 15,928 DAI on ≈155,396)",
@@ -848,39 +976,43 @@ check(
 // (web 8dc12ab4 built them for Maker): the "Stated over N" stat, the
 // derivation prose, and the receipt's step list. §3k is the receipt, asserted
 // against the export down at §7 where the clipboard text is read.
+// Web 2ffd7b5 / f32f322 renamed the stats and the prose: "Stated over N of the
+// vault's touches" is "Covers N gaps between the vault's events, as one note",
+// "Fee resets in between" is "Times governance changed the fee", and "across N
+// of the vault's touches" is "over N stretches between the vault's events".
 check(
-  `3i. the merged row carries the "Stated over" stat — ${pinned.steps} of the vault's touches`,
+  `3i. the merged row carries the "Covers" stat — ${pinned.steps} gaps between the vault's events, as one note`,
   pinnedText != null &&
-    /Stated over/.test(pinnedText) &&
-    new RegExp(`${pinned.steps} of the vault.s touches`).test(pinnedText),
-  pinnedText ? (pinnedText.match(/Stated over.{0,40}/)?.[0] ?? "no Stated over stat") : "note not found",
+    new RegExp(`Covers\\s*${pinned.steps} gaps between the vault.s events, as one note`).test(pinnedText),
+  pinnedText ? (pinnedText.match(/Covers.{0,60}/)?.[0] ?? "no Covers stat") : "note not found",
 );
 check(
-  `3i1. and its "Fee resets in between" stat states the members' SUM (${pinned.sets}), not the ${pinned.ordinalSpan} its two ends' ordinals span`,
+  `3i1. and its "Times governance changed the fee" stat states the members' SUM (${pinned.sets}); the two ends' ordinals span ${pinned.ordinalSpan}, so the two agree`,
   pinnedText != null &&
-    /Fee resets in between/.test(pinnedText) &&
-    new RegExp(`Fee resets in between\\s*${pinned.sets}(?!\\d)`).test(pinnedText.replace(/\s+/g, " ")),
-  pinnedText ? (pinnedText.match(/Fee resets in between.{0,20}/)?.[0] ?? "no resets stat") : "note not found",
+    new RegExp(`Times governance changed the fee\\s*${pinned.sets}(?!\\d)`).test(pinnedText.replace(/\s+/g, " ")) &&
+    pinned.sets === pinned.ordinalSpan,
+  pinnedText ? (pinnedText.match(/Times governance changed the fee.{0,20}/)?.[0] ?? "no changes stat") : "note not found",
 );
 check(
-  "3j. the explanation says how many of this vault's touches the merged run spans",
-  pinnedText != null && new RegExp(`across ${pinned.steps} of the vault.s touches`).test(pinnedText),
+  "3j. the explanation says how many stretches between the vault's events the merged run spans",
+  pinnedText != null &&
+    new RegExp(`over ${pinned.steps} stretches between the vault.s events, so they make one note`).test(pinnedText),
   pinnedText
-    ? (pinnedText.match(/across \d+ of the vault.s touches.{0,30}/)?.[0] ?? "no merged prose")
+    ? (pinnedText.match(/over \d+ stretches between the vault.s events.{0,30}/)?.[0] ?? "no merged prose")
     : "note not found",
 );
 // The silence on a row that merged nothing — the same surfaces must not claim
 // a span on a single stretch. 19,936,166 → 20,323,030 is one step.
-const solo = r28699.notes.find((n) => n.steps === 1);
+const solo = r28699.notes.find((n) => n.fromBlock === 19936166 && n.toBlock === 20323030);
 const soloText = solo ? openTexts.find((t) => t.includes(blk(solo.fromBlock)) && t.includes(blk(solo.toBlock))) : null;
 check(
   `3k. the unmerged ${solo ? `${blk(solo.fromBlock)} → ${blk(solo.toBlock)}` : "(none on the page)"} row claims no merged span at all`,
   solo != null &&
     soloText != null &&
-    !/Stated over/.test(soloText) &&
-    !/of (?:this|the) vault.s touches/.test(soloText),
+    !/Covers/.test(soloText) &&
+    !/stretches between the vault.s events/.test(soloText),
   soloText
-    ? (soloText.match(/Stated over.{0,40}|of th\w+ vault.s touches/)?.[0] ?? "silent, as it must be")
+    ? (soloText.match(/Covers.{0,40}|\d+ stretches between the vault.s events/)?.[0] ?? "silent, as it must be")
     : "note not found",
 );
 /** Every note the timeline places, drawn or not (`data-market-notes`; the
@@ -888,8 +1020,8 @@ check(
  *  none — a missing count is a RED check, never a thrown run. */
 const pillText = (p) => marketNoteCount(p);
 check(
-  "3h. the timeline's note count is 6 — the 5 merged rows and the live one",
-  (await pillText(page)) === 6,
+  `3h. the timeline's note count is ${notes28699} — the ${MERGED_28699.length} historical rows${heads28699 ? " and the live one" : ""}`,
+  (await pillText(page)) === notes28699,
   `${await pillText(page)}`,
 );
 
@@ -911,10 +1043,10 @@ if (offered) {
 }
 check(
   '6. Display\'s "Market-note markers" off hides every note, row and marker, and moves no event count',
-  offered && notesBefore === 6 && afterHidden === 0 && rowsBefore === rowsAfter,
+  offered && notesBefore === notes28699 && afterHidden === 0 && rowsBefore === rowsAfter,
   `${notesBefore} notes before, ${afterHidden} after, rows ${rowsBefore} → ${rowsAfter}`,
 );
-check("6a. turning it back on restores all 6", restored === 6, `${restored}`);
+check(`6a. turning it back on restores all ${notes28699}`, restored === notes28699, `${restored}`);
 const pillLeft = await page.getByRole("button", { name: /^Market notes ·/i }).count();
 check('6b. the toolbar carries no "Market notes · N" pill', pillLeft === 0, `${pillLeft} found`);
 
@@ -936,9 +1068,9 @@ try {
 }
 const tableRows = (m) => (m.match(/^\| \d+ \| /gm) ?? []).length;
 check(
-  '7. the export states "Market notes: 6", lists 6 with receipts, and adds no row to the event table',
-  /\*\*Market notes:\*\*\s*6\b/.test(md) &&
-    (md.match(/^- Receipt: rate before/gm) ?? []).length === 6 &&
+  `7. the export states "Market notes: ${notes28699}", lists ${notes28699} with receipts, and adds no row to the event table`,
+  new RegExp(`\\*\\*Market notes:\\*\\*\\s*${notes28699}\\b`).test(md) &&
+    (md.match(/^- Receipt: rate before/gm) ?? []).length === notes28699 &&
     tableRows(md) === tl28699.events.length,
   `table rows ${tableRows(md)} vs route ${tl28699.events.length}; receipts ${(md.match(/^- Receipt: rate before/gm) ?? []).length}`,
 );
@@ -977,10 +1109,15 @@ await page.close();
 // ── 4. vault 16745 — the chain-confirmation demonstration ──────────────────
 
 // 114 rows against a 50-row window, so the window is grown before anything is
-// counted: at rest the page draws only the 3 rate-step rows whose anchors fall
-// in the newest 50 rows, while the pill counts all 6. Note the order — the
-// wantNotes poll would spend its whole budget waiting for rows the window is
-// holding back.
+// counted: at rest the page draws only the rate-step rows whose anchors fall
+// in the newest 50 rows, while the pill counts all of them. Note the order —
+// the wantNotes poll would spend its whole budget waiting for rows the window
+// is holding back. The live row, as on 28699, follows the fee now against the
+// fee at the vault's last event (9.50%).
+const live16745 = (await api("/api/chain/makerdao/vault/16745")).state;
+const flatLive16745 = near(live16745.stabilityFeeApr * 100, 9.5, 0.01);
+const heads16745 = flatLive16745 ? 0 : 1;
+const notes16745 = MERGED_16745.length + heads16745;
 const page16745 = await open(context, vaultUrl("16745"), 0);
 const windowedNotes16745 = await page16745.locator("[data-market-note]").count();
 const windowedPill16745 = await pillText(page16745);
@@ -990,19 +1127,20 @@ const ids16745 = await page16745
   .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
 const hist16745 = ids16745.filter((i) => !i.endsWith("-head"));
 check(
-  "4. 16745 shows 5 historical rows — its 14 stretches merged — and one -head row, once every row of its 114 is drawn",
-  expanded16745 && hist16745.length === MERGED_16745.length && ids16745.length - hist16745.length === 1,
+  `4. 16745 shows ${MERGED_16745.length} historical rows — its 21 stretches merged — and ${flatLive16745 ? "no -head row (the fee is flat)" : "one -head row"}, once every row of its 114 is drawn`,
+  expanded16745 && hist16745.length === MERGED_16745.length && ids16745.length - hist16745.length === heads16745,
   `${hist16745.length} historical, ${ids16745.length - hist16745.length} live: ${hist16745.join(", ")}`,
 );
 check(
-  "4a1. before the window is grown the page draws only 4 of those 6 rows while the count already states 6 — the count is the timeline's, the DOM is the window's",
-  windowedNotes16745 === 4 && windowedPill16745 === 6,
+  `4a1. before the window is grown the page draws fewer than the ${notes16745} rows while the count already states ${notes16745} — the count is the timeline's, the DOM is the window's`,
+  windowedNotes16745 < notes16745 && windowedPill16745 === notes16745,
   `${windowedNotes16745} row(s) drawn against count ${windowedPill16745}`,
 );
-check("4a. its note count is 6", (await pillText(page16745)) === 6, `${await pillText(page16745)}`);
-// The 25,547,112 → 25,634,095 stretch is now the LAST member of the run that
-// ends at 25,634,095, so it is no longer a row of its own: the page states the
-// run, and the stretch has to be recoverable from it rather than visible.
+check(`4a. its note count is ${notes16745}`, (await pillText(page16745)) === notes16745, `${await pillText(page16745)}`);
+// The 25,547,112 → 25,634,095 stretch is the LAST member of the run that ends
+// at 25,634,095 (from 23,105,773, where the vault owed something again), so it
+// is no row of its own: the page states the run, and the stretch has to be
+// recoverable from it rather than visible.
 const run16745 = r16745.notes[r16745.notes.length - 1];
 const newest16745 = run16745
   ? hist16745.find((i) => i.endsWith(`${run16745.fromBlock}-${run16745.toBlock}`))
@@ -1020,24 +1158,36 @@ const newestText = run16745
   ? texts16745.find((t) => t.includes(blk(run16745.fromBlock)) && t.includes(blk(run16745.toBlock)))
   : null;
 check(
-  "4c. that row's later fee reads 9.50% on the page — the confirmed fee at its last member's touch, not the gap-inflated derived 9.5094",
-  newestText != null && newestText.includes(ratePct(0.06)) && newestText.includes(ratePct(0.095)),
+  "4c. that row reads 7.00% → 9.50% on the page — the confirmed fee at its last member's touch (the derived figure was the gap-inflated 9.5094 before server ba2f3f1)",
+  newestText != null && newestText.includes(ratePct(0.07)) && newestText.includes(ratePct(0.095)),
   newestText ? newestText.slice(0, 140) : "note not found once opened",
 );
-// The five-step run, and the trap on its own page: the stat states the
-// members' sum (10), not the 17 its two ends' ordinals span.
-const deep16745 = r16745.notes[2];
+// The two-step run 15,582,694 → 19,214,177 (1.50% → 6.74%): the stat states the
+// members' sum (7), which the ends' ordinals agree with now that every change
+// is a stretch.
+const deep16745 = r16745.notes[4];
 const deepText = deep16745
   ? texts16745.find((t) => t.includes(blk(deep16745.fromBlock)) && t.includes(blk(deep16745.toBlock)))
   : null;
 check(
-  "4d. its five-step run states 1.50% → 12.75% over 5 of the vault's touches, and 10 fee resets in between — the members' sum, not the 17 its ends span",
+  "4d. its two-step run states 1.50% → 6.74% over 2 gaps between the vault's events, and 7 changes in between — the members' sum",
   deepText != null &&
     deepText.includes(ratePct(0.015)) &&
-    deepText.includes(ratePct(0.1275)) &&
-    /5 of the vault.s touches/.test(deepText) &&
-    /Fee resets in between\s*10(?!\d)/.test(deepText.replace(/\s+/g, " ")),
-  deepText ? (deepText.match(/Stated over.{0,60}|Fee resets in between.{0,12}/g) ?? []).join(" | ") : "note not found",
+    deepText.includes(ratePct(0.0674)) &&
+    /Covers\s*2 gaps between the vault.s events/.test(deepText) &&
+    /Times governance changed the fee\s*7(?!\d)/.test(deepText.replace(/\s+/g, " ")),
+  deepText ? (deepText.match(/Covers.{0,40}|Times governance changed the fee.{0,12}/g) ?? []).join(" | ") : "note not found",
+);
+// The stretch the vault began owing nothing: its own note, no interest stat, and
+// the page says the change cost it nothing.
+const nothingText = texts16745.find((t) => t.includes(blk(22556727)) && t.includes(blk(23105751)));
+check(
+  "4e. the stretch 16745 began owing nothing (22,556,727 → 23,105,751) says the change cost it nothing, draws no interest stat, and claims no merged span",
+  nothingText != null &&
+    /owed nothing across this stretch, so the change cost it nothing/.test(nothingText) &&
+    !/Yearly interest on the debt/.test(nothingText) &&
+    !/Covers/.test(nothingText),
+  nothingText ? nothingText.slice(0, 160) : "note not found",
 );
 await page16745.close();
 
@@ -1069,16 +1219,12 @@ console.log(
     : `\nALL ${checked} CHECKS PASS — the MakerDAO rate-step note holds`,
 );
 console.log(
-  "\nTwo pins this run departs from, both proved from the chain above:\n" +
-    "  · ETH-A serves 51 sets / 4 artefacts (plan §1a pins 53 / 2) — check 1c reads the Jug at the two\n" +
-    "    extra artefact blocks and finds the same duty as the set before them. The plan's 55 DERIVED holds.\n" +
-    "  · The 1 pp threshold carries a 1e-6 pp truncation slack — check 2c shows a strict comparison drops\n" +
-    "    two of the plan's own 14 pinned stretches on 16745.",
-);
-console.log(
-  "\nAnd two things the counts here depend on, both asserted above:\n" +
-    "  · The tables are pinned TWICE — the plan's stretches (§2/§2a, unchanged since 2026-09-06) and the runs\n" +
-    "    they merge into (§2e/§2e1). A count that moves with the stretches intact moved with the collapse.\n" +
+  "\nWhat the counts here depend on, all asserted above:\n" +
+    "  · The rule moved, not the index: the old 1 pp rule over today's data still yields the plan's 10 and 14\n" +
+    "    stretches (§2c); the pinned tables are those plus every smaller governance change.\n" +
+    "  · Set counts are read up to the block the pin was taken at, so a set governance adds later moves nothing.\n" +
+    "  · Pages open with ?folders=0 (the flat answer, rails-ops decision 0021); on the default view the notes are\n" +
+    "    drawn over the ungrouped events only.\n" +
     "  · A note is drawn beside the row it anchors on, so a vault with more rows than the 50-row window\n" +
     "    (16745: 114) draws only some of its notes until the window is grown — §4 grows it first.",
 );
