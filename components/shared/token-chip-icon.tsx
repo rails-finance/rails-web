@@ -99,6 +99,9 @@ export interface TokenChipIconProps {
   size?: number;
   onClick?: () => void;
   filterable?: boolean;
+  /** No native title on the fallback glyph: the caller wraps the chip in a
+   *  RevealTip that names the token. */
+  untitled?: boolean;
 }
 
 export function TokenChipIcon({
@@ -108,6 +111,7 @@ export function TokenChipIcon({
   size = 16,
   onClick,
   filterable = true,
+  untitled = false,
 }: TokenChipIconProps) {
   const ctxFilter = useTokenFilterCtx();
   const chainId = useChainId();
@@ -196,9 +200,22 @@ export function TokenChipIcon({
 
   const chip =
     srcs.length === 0 ? (
-      <UnknownTokenSvg size={size} symbol={symbol} clickProps={clickProps} clickClass={clickClass} />
+      <UnknownTokenSvg
+        size={size}
+        symbol={symbol}
+        clickProps={clickProps}
+        clickClass={clickClass}
+        untitled={untitled}
+      />
     ) : (
-      <FallbackTokenIcon symbol={symbol} srcs={srcs} size={size} clickClass={clickClass} clickProps={clickProps} />
+      <FallbackTokenIcon
+        symbol={symbol}
+        srcs={srcs}
+        size={size}
+        clickClass={clickClass}
+        clickProps={clickProps}
+        untitled={untitled}
+      />
     );
   if (!isPt) return chip;
   return (
@@ -258,7 +275,9 @@ function FallbackTokenIcon({
   size,
   clickClass,
   clickProps,
+  untitled,
 }: {
+  untitled: boolean;
   symbol: string;
   srcs: string[];
   size: number;
@@ -268,7 +287,15 @@ function FallbackTokenIcon({
   const [idx, setIdx] = useState(0);
   const advance = () => setIdx((i) => i + 1);
   if (idx >= srcs.length) {
-    return <UnknownTokenSvg size={size} symbol={symbol} clickProps={clickProps} clickClass={clickClass} />;
+    return (
+      <UnknownTokenSvg
+        size={size}
+        symbol={symbol}
+        clickProps={clickProps}
+        clickClass={clickClass}
+        untitled={untitled}
+      />
+    );
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element

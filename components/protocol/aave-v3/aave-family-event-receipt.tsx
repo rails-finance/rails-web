@@ -45,7 +45,6 @@ import { ledgerPartProv } from "@/lib/shared/flows-timeline-provenance";
 import { accountTotalProv, heldAtEventProv, sideChangeProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { baseToUsd, big, humanOf, legChange, rawToUsd, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { ClosedSide, reserveSymbol, type Figure, type TouchedLeg } from "./aave-v3-position-state";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 /** One figure of the row under the cells. */
 export interface RiskItem {
@@ -327,12 +326,6 @@ function SideLedger({
             totalUsdProv={totalProv}
             totalUsdBeforeProv={totalBeforeProv}
             daily={model.daily}
-            subhead={
-              <>
-                <TokenChipIcon symbol={single.symbol} size={16} filterable={false} />
-                {single.symbol}
-              </>
-            }
           />
           {note}
         </>

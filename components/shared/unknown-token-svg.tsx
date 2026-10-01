@@ -17,9 +17,11 @@ export interface UnknownTokenSvgProps {
     title?: string;
   };
   clickClass?: string;
+  /** No native title (a RevealTip around the glyph names the token). */
+  untitled?: boolean;
 }
 
-export function UnknownTokenSvg({ size = 16, symbol, clickProps, clickClass }: UnknownTokenSvgProps) {
+export function UnknownTokenSvg({ size = 16, symbol, clickProps, clickClass, untitled }: UnknownTokenSvgProps) {
   // A principal token's symbol always begins "PT-", so its first letter says
   // nothing; it draws "PT". Everything else draws its first character.
   const initial = /^PT-/i.test(symbol ?? "") ? "PT" : (symbol ?? "?").slice(0, 1).toUpperCase();
@@ -34,7 +36,7 @@ export function UnknownTokenSvg({ size = 16, symbol, clickProps, clickClass }: U
       }}
       role="img"
       aria-label={label}
-      title={label}
+      title={untitled ? undefined : label}
       {...(clickProps ?? {})}
     >
       {initial}
