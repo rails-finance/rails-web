@@ -55,6 +55,15 @@ const STABLE_DENOMINATED = new Set<string>([
   "USDtb",
   "syrupUSDC",
   "syrupUSDT",
+  // The Liquity V2 forks' stables (Ebisu, Asymmetry, Basedollar) and their
+  // dollar-share collateral, for the timeline's USD rule.
+  "ebUSD",
+  "USDaf",
+  "BD",
+  "stcUSD",
+  "scrvUSD",
+  "sfrxUSD",
+  "ysyBOLD",
 ]);
 
 const STABLE_LOWER = new Set([...STABLE_DENOMINATED].map((s) => s.toLowerCase()));

@@ -56,7 +56,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import { fetchLiquityForkPosition, type LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_FORK_FOLDER_REGISTER, liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
-import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { EbisuEventCard } from "@/components/protocol/ebisu/ebisu-event-card";
@@ -73,6 +73,7 @@ import {
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { useLiquityForkFlows } from "@/hooks/useLiquityForkFlows";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { unpricedEvents } from "@/lib/shared/liquity-flows";
 import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
@@ -473,151 +474,154 @@ export default function EbisuTroveDetail({
     ) : null;
 
   return (
-    <div className="py-8 space-y-6">
-      <DetailTopRow
-        session="ebisu"
-        wallet={view?.owner ?? view?.lastOwner ?? null}
-        assets={stripAssets}
-        closed={view != null && view.status !== "open"}
-        closing={closing}
-      >
-        {view && (
-          <LiquityForkExportMenu
-            protocolLabel="Ebisu"
-            debtSymbol={DEBT_SYMBOL}
-            view={view}
-            chain={chain}
-            events={ebisuEvents}
-            csvFilename={`ebisu-${collateralType}-${troveId.slice(0, 10)}-activity.csv`}
-            // A grouped page's `events` hold only the ungrouped rows, so its
-            // CSV reads the whole history too.
-            fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-            claimRow={claimRow}
-            history={markdownHistoryScope(historyWindow, ebisuEvents, servedFolders)}
-            scopeNote={exportScopeNote(historyWindow, ebisuEvents, "this Trove's whole history", servedFolders)}
-          />
-        )}
-      </DetailTopRow>
-
-      {loading ? (
-        <DetailBodySkeleton />
-      ) : (
-        <>
+    <FlowFocusContext.Provider value={flows.focus}>
+      <div className="py-8 space-y-6">
+        <DetailTopRow
+          session="ebisu"
+          wallet={view?.owner ?? view?.lastOwner ?? null}
+          assets={stripAssets}
+          closed={view != null && view.status !== "open"}
+          closing={closing}
+        >
           {view && (
-            <EbisuPositionCard
-              v={view}
-              receipts
-              surplus={surplus}
-              viewHref={tl.viewHref}
-              live={liveRisk ? chain : undefined}
-              // The risk slot rides the card's heading-button row (the Aave V3
-              // treatment): the Display menu plus the chosen risk picture —
-              // liquidation runway (default) or the collateral-ratio card —
-              // alongside the always-on redemption runway. Whatever it draws is
-              // on the card face and in the card's receipts scope, so the
-              // Provenance list stays 1:1 with the face figures.
-              rowExtra={liveRisk ? <LiquityForkRiskSlot chain={chain} /> : undefined}
-              // The Explanation is now pure prose about those same face figures.
-              // The CR strip is absorbed into the risk slot above; the
-              // redemption card's branch-context figures live on the protocol
-              // view — the card keeps its own queue exposure (the redemption
-              // runway) and the trove's own rate (a card stat). A terminal life
-              // gets the past-tense closed narration instead — never no pane.
-              explanation={
-                terminalPane ??
-                (liveRisk ? (
-                  <LiquityForkPositionExplanation
-                    chain={chain}
-                    isBatched={view?.isBatched ?? false}
-                    redist={redistTally}
-                  />
-                ) : undefined)
-              }
+            <LiquityForkExportMenu
+              protocolLabel="Ebisu"
+              debtSymbol={DEBT_SYMBOL}
+              view={view}
+              chain={chain}
+              events={ebisuEvents}
+              csvFilename={`ebisu-${collateralType}-${troveId.slice(0, 10)}-activity.csv`}
+              // A grouped page's `events` hold only the ungrouped rows, so its
+              // CSV reads the whole history too.
+              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
+              claimRow={claimRow}
+              history={markdownHistoryScope(historyWindow, ebisuEvents, servedFolders)}
+              scopeNote={exportScopeNote(historyWindow, ebisuEvents, "this Trove's whole history", servedFolders)}
             />
           )}
-          {view &&
-            (() => {
-              const towerData = computeEbisuEconomics(view, lifetimeEvents, precomputedLifetime);
-              const forkOpts = {
-                name: "Ebisu",
-                debtSymbol: DEBT_SYMBOL,
-                docsLinks: [...EBISU_DOCS.trove, ...EBISU_DOCS.redemption],
-              };
-              return (
-                <LifetimeFlowsPanel
-                  scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-                  read={flows.read}
-                  explanation={
-                    <div className="space-y-2 text-sm text-rb-500">
-                      {liquityForkEconomicsExplanation(towerData, forkOpts)}
-                      <LiquityFlowsNote
-                        collSymbol={view.collateralType}
-                        debtSymbol={DEBT_SYMBOL}
-                        unpriced={unpricedEvents(flows.events)}
-                        lives={troveLives(flows.events)}
-                        zombie={chain?.status === "zombie"}
-                      />
-                    </div>
-                  }
-                  learnMore={liquityForkEconomicsContent(forkOpts)}
-                  rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
-                />
-              );
-            })()}
-          <ChainTruthTimeline
-            csvExportCeiling={INDEX_ROW_CEILING}
-            // Matches `EbisuEventCard`'s own `persistKey={`ebisu:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="ebisu"
-            closed={view ? view.status !== "open" : undefined}
-            tl={tl}
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={view?.status === "open" && !chainSettled}
-            runs={FORK_RUNS}
-            folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
-            readFolderMembers={readFolderMembers}
-            segments={segments}
-            // Tenure eyebrow (the V2 trove's "Opened … · tenure · ago"), read off
-            // the captured event stream — a closed or liquidated life measures
-            // its tenure to the last event instead of now.
-            toolbarLeading={
-              view ? (
-                <TimelineActivityHeader
-                  events={activityStamps}
-                  closed={view.status !== "open"}
-                  // When the Trove actually opened, not when the window does —
-                  // otherwise a long life reads as days old because its oldest
-                  // loaded card is.
-                  firstAt={opening?.firstTimestamp}
-                  tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                />
-              ) : undefined
-            }
-            renderCard={(event, meta) =>
-              isCollSurplusClaimEvent(event) ? (
-                <CollSurplusClaimCard
-                  event={event}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  eventNumber={meta.eventNumber}
-                  persistPrefix="ebisu"
-                  fork={EBISU_FORK}
-                />
-              ) : isEbisuEvent(event) ? (
-                <EbisuEventCard
-                  event={event}
-                  eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                />
-              ) : null
-            }
-          />
-          <ProvInspectorLayer />
-        </>
-      )}
-    </div>
+        </DetailTopRow>
+
+        {loading ? (
+          <DetailBodySkeleton />
+        ) : (
+          <>
+            {view && (
+              <EbisuPositionCard
+                v={view}
+                receipts
+                surplus={surplus}
+                viewHref={tl.viewHref}
+                live={liveRisk ? chain : undefined}
+                // The risk slot rides the card's heading-button row (the Aave V3
+                // treatment): the Display menu plus the chosen risk picture —
+                // liquidation runway (default) or the collateral-ratio card —
+                // alongside the always-on redemption runway. Whatever it draws is
+                // on the card face and in the card's receipts scope, so the
+                // Provenance list stays 1:1 with the face figures.
+                rowExtra={liveRisk ? <LiquityForkRiskSlot chain={chain} /> : undefined}
+                // The Explanation is now pure prose about those same face figures.
+                // The CR strip is absorbed into the risk slot above; the
+                // redemption card's branch-context figures live on the protocol
+                // view — the card keeps its own queue exposure (the redemption
+                // runway) and the trove's own rate (a card stat). A terminal life
+                // gets the past-tense closed narration instead — never no pane.
+                explanation={
+                  terminalPane ??
+                  (liveRisk ? (
+                    <LiquityForkPositionExplanation
+                      chain={chain}
+                      isBatched={view?.isBatched ?? false}
+                      redist={redistTally}
+                    />
+                  ) : undefined)
+                }
+              />
+            )}
+            {view &&
+              (() => {
+                const towerData = computeEbisuEconomics(view, lifetimeEvents, precomputedLifetime);
+                const forkOpts = {
+                  name: "Ebisu",
+                  debtSymbol: DEBT_SYMBOL,
+                  docsLinks: [...EBISU_DOCS.trove, ...EBISU_DOCS.redemption],
+                };
+                return (
+                  <LifetimeFlowsPanel
+                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                    read={flows.read}
+                    explanation={
+                      <div className="space-y-2 text-sm text-rb-500">
+                        {liquityForkEconomicsExplanation(towerData, forkOpts)}
+                        <LiquityFlowsNote
+                          collSymbol={view.collateralType}
+                          debtSymbol={DEBT_SYMBOL}
+                          unpriced={unpricedEvents(flows.events)}
+                          lives={troveLives(flows.events)}
+                          zombie={chain?.status === "zombie"}
+                        />
+                      </div>
+                    }
+                    learnMore={liquityForkEconomicsContent(forkOpts)}
+                    rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
+                  />
+                );
+              })()}
+            <ChainTruthTimeline
+              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+              csvExportCeiling={INDEX_ROW_CEILING}
+              // Matches `EbisuEventCard`'s own `persistKey={`ebisu:${event.id}`}`
+              // — lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="ebisu"
+              closed={view ? view.status !== "open" : undefined}
+              tl={tl}
+              notes={notes}
+              liveNotes={liveNotes}
+              liveNotesPending={view?.status === "open" && !chainSettled}
+              runs={FORK_RUNS}
+              folderRegister={LIQUITY_FORK_FOLDER_REGISTER}
+              readFolderMembers={readFolderMembers}
+              segments={segments}
+              // Tenure eyebrow (the V2 trove's "Opened … · tenure · ago"), read off
+              // the captured event stream — a closed or liquidated life measures
+              // its tenure to the last event instead of now.
+              toolbarLeading={
+                view ? (
+                  <TimelineActivityHeader
+                    events={activityStamps}
+                    closed={view.status !== "open"}
+                    // When the Trove actually opened, not when the window does —
+                    // otherwise a long life reads as days old because its oldest
+                    // loaded card is.
+                    firstAt={opening?.firstTimestamp}
+                    tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                  />
+                ) : undefined
+              }
+              renderCard={(event, meta) =>
+                isCollSurplusClaimEvent(event) ? (
+                  <CollSurplusClaimCard
+                    event={event}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                    eventNumber={meta.eventNumber}
+                    persistPrefix="ebisu"
+                    fork={EBISU_FORK}
+                  />
+                ) : isEbisuEvent(event) ? (
+                  <EbisuEventCard
+                    event={event}
+                    eventNumber={meta.eventNumber}
+                    isFirst={meta.isFirst}
+                    isLast={meta.isLast}
+                  />
+                ) : null
+              }
+            />
+            <ProvInspectorLayer />
+          </>
+        )}
+      </div>
+    </FlowFocusContext.Provider>
   );
 }

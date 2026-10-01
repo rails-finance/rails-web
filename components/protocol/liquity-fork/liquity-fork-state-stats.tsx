@@ -340,7 +340,8 @@ export function liquityForkStateStats(
             value: f.collUsdAfter,
             prov: p.collUsdProv(coords, { coll: ctx.collAfter, priceUsd: f.price, which: "after" }),
           },
-          usdAlways: true,
+          // The Display menu's USD switches govern it (lib/shared/usd-display.ts).
+          usdAmount: Number(ctx.collAfter),
         }
       : {}),
   });

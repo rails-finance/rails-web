@@ -126,7 +126,7 @@ export function CollSurplusClaimCard({
                       : claimPaidUsdAtBlockProv(d, price),
                   }
                 : undefined,
-            usdAlways: true,
+            usdAmount: d.paid,
             sub: others ? (
               <>
                 incl.{" "}

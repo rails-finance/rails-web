@@ -250,9 +250,9 @@ export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
 
 /** The chain-state items + the two USD switches (stablecoins, other tokens;
  *  lib/shared/usd-display.ts) — for the explorers whose index carries
- *  per-event oracle-at-block prices (Aave V3 + Spark, server mig 092): their
- *  detail grids render the after-balance USD chip, so the flags have a
- *  render path there. Order mirrors the V4 spoke menu (USD before Event
+ *  per-event oracle-at-block prices (Aave V3 + Spark, server mig 092; the
+ *  Liquity V2 forks' branch price at the block): their detail grids render
+ *  the after-balance USD chip, so the flags have a render path there. Order mirrors the V4 spoke menu (USD before Event
  *  numbers). */
 export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
@@ -263,8 +263,8 @@ export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
 ];
 
 /** The Liquity V2 trove page's own display menu — its richer grammar (change
- *  bars, balance bars, the collateral-ratio chip) on top of the chain-truth
- *  base, in the V2 menu's original order. `showCollateralRatio`'s label is
+ *  bars, balance bars, the two USD switches, the collateral-ratio chip) on
+ *  top of the chain-truth base, in the V2 menu's original order. `showCollateralRatio`'s label is
  *  resolved dynamically below (Collateral Ratio vs Loan-to-Value, the user's
  *  ratio-mode preference) — the string here is just the CR-mode fallback.
  *  Collapse-runs is NOT listed: ChainTruthTimeline appends it itself whenever
@@ -274,6 +274,8 @@ export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showChangeBars", label: "Change bars" },
   { key: "showBalanceBars", label: "Balance bars" },
+  { key: "showUsdStable", label: "USD for stablecoins" },
+  { key: "showUsdOther", label: "USD for other tokens" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
   { key: "showEventNumbers", label: "Event numbers" },
 ];

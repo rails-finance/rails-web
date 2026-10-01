@@ -6,12 +6,20 @@
 // hands them over; a windowed or folder-served page reads the flat history
 // once (the same read its CSV export makes), and a read the index's row
 // ceiling cut short is a failed read, since a replay of part of a history
-// would state the wrong lifetime.
+// would state the wrong lifetime. It also gives the page the value that ties
+// the panel to the timeline (components/shared/flow-focus-context.tsx): the
+// day's mark, Apply to timeline and each card's sum read the same replay.
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
-import { liquityFlowTimeline, liquityForkFlowEvents, type LiquityFlowEvent } from "@/lib/shared/liquity-flows";
+import {
+  liquityFlowTimeline,
+  liquityFocusEvents,
+  liquityForkFlowEvents,
+  type LiquityFlowEvent,
+} from "@/lib/shared/liquity-flows";
+import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 
@@ -34,6 +42,7 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
   timeline: FlowTimeline | null;
   read: FlowsRead;
   events: LiquityFlowEvent[];
+  focus: FlowFocusValue;
 } {
   const [fetched, setFetched] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
     events: null,
@@ -89,5 +98,10 @@ export function useLiquityForkFlows(p: LiquityForkFlowsInput): {
         : null,
     });
   }, [events, p.collSymbol, p.debtSymbol, p.surplusClaimed, now, p.open, livePrice, chain]);
-  return { timeline, read: now == null ? "reading" : p.wholeEvents != null ? "done" : fetched.read, events };
+  const focusEvents = useMemo(
+    () => (p.collSymbol ? liquityFocusEvents(events, p.collSymbol, p.debtSymbol) : []),
+    [events, p.collSymbol, p.debtSymbol],
+  );
+  const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
+  return { timeline, read: now == null ? "reading" : p.wholeEvents != null ? "done" : fetched.read, events, focus };
 }

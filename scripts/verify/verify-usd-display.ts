@@ -1,7 +1,8 @@
 // verify-usd-display — the timeline Display rule for USD values
 // (lib/shared/usd-display.ts): stablecoins off by default, other tokens on, a
 // stablecoin more than 1% off $1 at the event shown anyway, and a page
-// without the two switches following the one for other tokens.
+// without the two switches following the one for other tokens. The Liquity
+// family's stables (BOLD, ebUSD, USDaf, BD) count as stablecoins.
 // ----------------------------------------------------------------------------
 // OFFLINE.
 //
@@ -37,4 +38,13 @@ test("a page without the two switches follows the one for other tokens", () => {
   const single = { showUsdStable: false, showUsdOther: true, usdSplit: false };
   assert.equal(usdShown(single, "BOLD", 1_000, 1_000), true);
   assert.equal(usdShown({ ...single, showUsdOther: false }, "WETH", 3_900, 1), false);
+});
+
+test("the Liquity family: its stables and dollar-share collateral follow the stablecoin rule", () => {
+  for (const s of ["BOLD", "ebUSD", "USDaf", "BD"])
+    assert.equal(usdShown(DEFAULTS, s, 1_000, 1_000), false, `${s} at $1 hides its USD`);
+  assert.equal(usdShown(DEFAULTS, "sUSDS", 1_070, 1_000), true, "a dollar share above $1.01 shows it");
+  assert.equal(usdShown(DEFAULTS, "scrvUSD", 1_090, 1_000), true);
+  assert.equal(usdShown(DEFAULTS, "wstETH", 4_800, 1), true, "collateral follows USD for other tokens");
+  assert.equal(usdShown({ ...DEFAULTS, showUsdOther: false }, "weETH", 4_200, 1), false);
 });

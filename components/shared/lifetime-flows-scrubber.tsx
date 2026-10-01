@@ -8,9 +8,9 @@
 // its own hatch, named in the Key inside the panel's Explanation
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
-// them. On a page that ties the panel to its timeline (flow-focus-context.tsx,
-// the Aave family) a hover, a tap or focus on a segment names its line and
-// value under the bars; elsewhere a click opens its panel
+// them. On a page that ties the panel to its timeline (flow-focus-context.tsx:
+// the Aave and Liquity families) a click on a segment opens a short tip with
+// its line, value and share; elsewhere (Sky Savings) a click opens its panel
 // (lifetime-flows-tip.tsx): its assets, then its side's sum, one signed line
 // per component in whole dollars, landing on what is held or owed.
 //
@@ -588,10 +588,12 @@ export function LifetimeFlowsScrubber({
   // The line's series: from the family's route, or binned here from the
   // page's rows.
   const startDay = model ? model.start / DAY_MS : 0;
-  // A family with a series route (the Aave family) draws a life of up to a
-  // year by day; the rows binned here keep weeks and months.
+  // A page that ties the panel to its timeline (the Aave family from its
+  // series route, the Liquity family from its replay) draws a life of up to a
+  // year by day, so a day's mark lands on its point; the other rows binned
+  // here (Sky Savings) keep weeks and months.
   const spanDays = model ? (timeline.today ?? startDay + model.liveStop) - startDay : 0;
-  const bin: SeriesBin = model ? (series ? seriesRouteBinFor(spanDays) : lifetimeBinFor(spanDays)) : "week";
+  const bin: SeriesBin = model ? (series || focused ? seriesRouteBinFor(spanDays) : lifetimeBinFor(spanDays)) : "week";
   const binInput = useMemo(() => (series ? null : binInputFromTimeline(timeline)), [series, timeline]);
   const lined = series != null || binInput != null;
   const [lifetime, setLifetime] = useState<{ series: FlowBinSeries | null; failed: boolean } | null>(null);

@@ -347,10 +347,11 @@ export interface ChainTruthStat {
      *  3.60%"). Default: none. */
     after?: string;
   };
-  /** Show the USD chip whatever the timeline's USD-values flag says — the
-   *  Liquity V2 grid's rule for the collateral's value at the event's price,
-   *  which the fork cards follow. */
+  /** Show the USD chip whatever the timeline's USD switches say. */
   usdAlways?: boolean;
+  /** The token amount the USD chip prices, where `value` is formatted (the
+   *  stablecoin rule reads its price as usd ÷ amount). */
+  usdAmount?: number;
   /** One line under the value, in the value's tone — the Liquity V2 grid's
    *  sub-line ("incl. +0.36 interest", "12.40 USDaf / year"). Its figures carry
    *  a <Prov> each. */
@@ -869,7 +870,7 @@ export function ChainTruthDetail({
                     {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
                   </span>
                 </Prov>
-                {s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.value)) && (
+                {s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.usdAmount ?? s.value)) && (
                   // The after-balance valued at the event-block oracle price —
                   // the bordered chip the Liquity V2 / Aave V4 details use
                   // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the

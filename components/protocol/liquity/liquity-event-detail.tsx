@@ -21,6 +21,7 @@ import {
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
+import { useUsdShown } from "@/components/shared/timeline-display-context";
 import {
   streamVia,
   eventInputs,
@@ -209,13 +210,15 @@ function CollateralMetric({
   const showBefore = isClose ? before !== after : before !== 0 && before !== after;
   const changed = before !== after;
   // The opened card states the collateral's USD value at this event's oracle
-  // price whenever that price is known. It does not read the timeline's "USD
-  // values" display switch: that switch thins the spine and the snapshot rows,
-  // and with it off the grid used to drop the only USD figure the event states.
+  // price where that price is known and the Display menu's USD switches show
+  // it (lib/shared/usd-display.ts: "USD for other tokens", on by default; a
+  // dollar share follows "USD for stablecoins" and shows past 1% off $1).
   // The before amount carries one where it is reconstructed at this same block
   // (liquidation, close, redemption); an ordinary adjustment's before state
   // was priced at the previous event, so it takes none here.
-  const beforeUsdKnown = beforeKnownAtThisBlock && beforeInUsd > 0;
+  const usdShown = useUsdShown();
+  const beforeUsdKnown = beforeKnownAtThisBlock && beforeInUsd > 0 && usdShown(collateralType, beforeInUsd, before);
+  const afterUsdShown = usdShown(collateralType, afterInUsd, after);
 
   // Same arrow-as-toggle as Debt: `before →` ⟷ `+delta =` (delta in collateral
   // units). Disabled on close, where the "after" is the CLOSED label, not a
@@ -266,7 +269,7 @@ function CollateralMetric({
             </span>
           </P>
         )}
-        {!isClose && after > 0 && afterInUsd > 0 && (
+        {!isClose && after > 0 && afterInUsd > 0 && afterUsdShown && (
           <P info={usdProvAfter}>
             <ValuePill changed={changed}>{formatUsd(afterInUsd)}</ValuePill>
           </P>

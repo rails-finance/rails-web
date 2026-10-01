@@ -15,6 +15,8 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, AsymmetryContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { ReceiptCalcButton, ReceiptCalcContext, useReceiptCalc } from "@/components/shared/flow-event-sum";
+import { LiquityEventSum } from "@/components/protocol/liquity-family/liquity-event-sum";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import type { SpineValProv } from "@/components/shared/activity-timeline";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
@@ -97,6 +99,9 @@ export interface AsymmetryEventCardProps {
 }
 
 export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: AsymmetryEventCardProps) {
+  // The card's calculator (components/shared/flow-event-sum.tsx): the Trove's
+  // lifetime sum as of this event, in place of the grid.
+  const { calc, hasSum } = useReceiptCalc(event.id);
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
@@ -196,51 +201,60 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
   );
 
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      header={
-        <LiquityForkEventHeader
-          actionLabel={event.actionLabel}
-          noChange={isNoChange}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          builders={{
-            debtSymbol: DEBT_SYMBOL,
-            collDeltaProv,
-            debtDeltaProv,
-            rateAtEventProv,
-            batchManagerProv,
-            batchFeeShareProv,
-            redistProv,
-            minDebt: MIN_DEBT,
-          }}
-          flows={event.flows}
-        />
-      }
-      detail={<AsymmetryEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-      detailLabel="Trove state"
-      explainer={
-        <LiquityForkEventExplainer
-          ctx={ctx}
-          fork={ASYMMETRY_FORK}
-          builders={ASYMMETRY_EXPLAINER_PROVS}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          skipLead
-          // The owner's transactions only: a redeemer, a liquidator or a
-          // batch manager paid for theirs.
-          gas={isWarning || ctx.batchRate ? undefined : event.gas}
-        />
-      }
-      explainerLabel="Plain English"
-      explainerTeaser={liquityForkExplainerTeaser(ctx, coords, ASYMMETRY_FORK, ASYMMETRY_EXPLAINER_PROVS)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, ASYMMETRY_FORK)} />}
-      persistKey={`asymmetry:${event.id}`}
-    />
+    <ReceiptCalcContext.Provider value={calc}>
+      <EventCard
+        avatar={null}
+        infoAction={hasSum ? <ReceiptCalcButton /> : undefined}
+        iconColumn={iconSlot}
+        header={
+          <LiquityForkEventHeader
+            actionLabel={event.actionLabel}
+            noChange={isNoChange}
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            eventNumber={eventNumber}
+            builders={{
+              debtSymbol: DEBT_SYMBOL,
+              collDeltaProv,
+              debtDeltaProv,
+              rateAtEventProv,
+              batchManagerProv,
+              batchFeeShareProv,
+              redistProv,
+              minDebt: MIN_DEBT,
+            }}
+            flows={event.flows}
+          />
+        }
+        detail={
+          calc.on && hasSum ? (
+            <LiquityEventSum eventId={event.id} eventTs={event.timestamp} />
+          ) : (
+            <AsymmetryEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />
+          )
+        }
+        detailLabel="Trove state"
+        explainer={
+          <LiquityForkEventExplainer
+            ctx={ctx}
+            fork={ASYMMETRY_FORK}
+            builders={ASYMMETRY_EXPLAINER_PROVS}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            skipLead
+            // The owner's transactions only: a redeemer, a liquidator or a
+            // batch manager paid for theirs.
+            gas={isWarning || ctx.batchRate ? undefined : event.gas}
+          />
+        }
+        explainerLabel="Plain English"
+        explainerTeaser={liquityForkExplainerTeaser(ctx, coords, ASYMMETRY_FORK, ASYMMETRY_EXPLAINER_PROVS)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={liquityForkLearnMoreContent(ctx, ASYMMETRY_FORK)} />}
+        persistKey={`asymmetry:${event.id}`}
+      />
+    </ReceiptCalcContext.Provider>
   );
 }
