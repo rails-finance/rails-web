@@ -281,22 +281,23 @@ if (wants("Liquity V2")) {
   const barePills = await readPills(bare, ROWS);
   const bareChips = await readChips(bare);
 
+  // The index moves while the page loads: bracket the page's total between the
+  // API's total before and after, as the roster sections do (withinIndex).
+  const openAfterBare = (await api("/api/troves?status=active,zombie&limit=1")).pagination?.total;
   check(
     label("1. the bare directory's total is the API's open total"),
-    bareTotal.total != null && bareTotal.total === openTotal,
-    `page ${bareTotal.total} (${bareTotal.from}) vs API ${openTotal} for status=active,zombie`,
+    withinIndex(bareTotal.total, openTotal, openAfterBare),
+    `page ${bareTotal.total} (${bareTotal.from}) vs API ${openTotal}→${openAfterBare} for status=active,zombie`,
   );
   check(
     label("2. every card on the bare directory is open or zombie"),
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
-  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
-    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
-    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
+    label("3. the bare directory draws no Status chip and no Reset"),
+    bareChips.statusChip == null && !bareChips.reset,
+    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -390,10 +391,11 @@ if (wants("Liquity V2")) {
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
+  const openAfterCleared = (await api("/api/troves?status=active,zombie&limit=1")).pagination?.total;
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
+    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
+    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
 
   await bare.close();
@@ -476,22 +478,21 @@ if (wants("Polaris")) {
   const barePills = await readPills(bare, ROWS);
   const bareChips = await readChips(bare);
 
+  const openAfterBare = (await api("/api/polaris/positions?status=open&limit=1")).pagination?.total;
   check(
     label("1. the bare directory's total is the API's open total"),
-    bareTotal.total != null && bareTotal.total === openTotal,
-    `page ${bareTotal.total} (${bareTotal.from}) vs API ${openTotal} for status=open`,
+    withinIndex(bareTotal.total, openTotal, openAfterBare),
+    `page ${bareTotal.total} (${bareTotal.from}) vs API ${openTotal}→${openAfterBare} for status=open`,
   );
   check(
     label("2. every card on the bare directory is open"),
     barePills.length > 0 && barePills.every((p) => p === "OPEN"),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
-  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
-    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
-    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
+    label("3. the bare directory draws no Status chip and no Reset"),
+    bareChips.statusChip == null && !bareChips.reset,
+    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -635,10 +636,11 @@ if (wants("Polaris")) {
     !/(^|[?&])status=/.test(clearedUrl),
     `location.search "${clearedUrl}"`,
   );
+  const openAfterCleared = (await api("/api/polaris/positions?status=open&limit=1")).pagination?.total;
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip === "Status: in escrow" && clearedTotal.total === openTotal,
-    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}`,
+    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openTotal, openAfterCleared),
+    `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs API ${openTotal}→${openAfterCleared}`,
   );
 
   await bare.close();
@@ -797,12 +799,10 @@ async function runRestingViewSection(spec) {
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS_ROSTER.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );
-  // The resting view names its default in a fixed chip (lib/pwn/list-filter-dimensions.tsx
-  // `defaultChip`): no remove control, no Reset, nothing in the URL.
   check(
-    label('3. the bare directory draws the fixed "Status: in escrow" chip and no Reset'),
-    bareChips.statusChip === "Status: in escrow" && !bareChips.reset,
-    `${bareChips.statusChip ?? "no chip"}${bareChips.reset ? " + Reset" : ""}`,
+    label("3. the bare directory draws no Status chip and no Reset"),
+    bareChips.statusChip == null && !bareChips.reset,
+    bareChips.statusChip ?? (bareChips.reset ? "Reset drawn" : "neither"),
   );
   check(
     label("4. the bare directory's URL carries no status param"),
@@ -951,7 +951,7 @@ async function runRestingViewSection(spec) {
   );
   check(
     label("6e. removing the chip returns to the open resting set"),
-    clearedChips.statusChip === "Status: in escrow" && withinIndex(clearedTotal.total, openAfter, clearedIndex),
+    clearedChips.statusChip == null && withinIndex(clearedTotal.total, openAfter, clearedIndex),
     `${clearedChips.statusChip ?? "no chip"}, page ${clearedTotal.total} vs index ${openAfter}→${clearedIndex}`,
   );
   await picked.close();
