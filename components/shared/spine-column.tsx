@@ -29,7 +29,7 @@ export type SpineIcon =
   | "close" // The holder closed the position in one step with nothing left to draw (e.g. an Alchemix self-liquidation, collateral paying the debt) — lucide `log-out`, neutral ink: a holder action, never a hazard
   | "dead-end" // Debt repaid from the position's own collateral, with nothing else moved — an Alchemix V2 `Liquidate`: the account holder selling their own collateral shares to clear their own debt, never a third party (rails-ops reference/alchemix-v2-frozen-record.md) — lucide `arrow-right-to-line`, neutral ink: a holder action, never a hazard
   | "no-change" // Operation that moved nothing (zero-delta adjust) — equals-in-circle
-  | "custody" // Position moved between accounts (a receipt-token transfer run) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
+  | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
   | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour

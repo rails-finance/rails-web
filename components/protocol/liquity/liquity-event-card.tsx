@@ -174,6 +174,11 @@ export function LiquityEventCard({
       isFirst={isFirst}
       isLast={!!isLast}
     />
+  ) : ctx.operation === "transferTrove" ? (
+    // The Trove NFT changed hands; no collateral or BOLD moved. The custody
+    // plane in its neutral disc (detail-page-anatomy.md, "The custody row"),
+    // the mark Polaris's position transfer wears.
+    <SpineColumn icon="custody" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
   ) : isNoChangeAdjust(ctx) ? (
     // Zero-delta touch: no flows to draw, but an empty spine slot reads as a
     // rendering hole — mark the event with the neutral "nothing moved" glyph.
