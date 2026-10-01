@@ -21,7 +21,7 @@ import { EventCaptionContext } from "@/components/shared/mobile-spine";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtPositionAmount } from "@/components/shared/position-row";
-import { LedgerCell, LedgerTable, SIDE_HUE, dayStamp } from "@/components/shared/event-ledger";
+import { LedgerCell, LedgerTable, dayStamp } from "@/components/shared/event-ledger";
 import { dollarLedger } from "@/lib/shared/event-ledger";
 import { eventSideSum } from "@/lib/shared/flow-focus";
 import { wholeUsd, wholeUsdOrUnder } from "@/lib/shared/flows-sum";
@@ -313,12 +313,7 @@ export function FlowMomentCard({
         ledger={ledger}
         alignRight={false}
         data={{ "data-receipt-cell": side, "data-flow-moment-cell": side }}
-        label={
-          <span className="flex items-center gap-2 text-foreground">
-            <i aria-hidden className="inline-block size-2.5 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
-            {SIDE_WORD[side]}
-          </span>
-        }
+        label={SIDE_WORD[side]}
       >
         <>
           {s.assets.length === 0 ? (

@@ -1,11 +1,12 @@
 "use client";
 
 // The Aave family's open event card as a receipt (rails-ops TO-DO-ui-jobs 141,
-// 213). Two side cells: the side the event changed states its total before →
-// after, the change, and the asset it moved before → after; the other states
-// what was held or owed at this event, with its assets. Under them one plain
-// row: health factor, LTV, still borrowable (and eMode where the account
-// used one).
+// 213). Two side cells, each the grid's full width and one row closed: with
+// one asset its tokens before → after (and its dollars after a thin divider
+// where the Display switches show them), with several the side's dollars
+// before → after and the assets' icons (aave-v3-position-state.tsx
+// `ClosedSide`). Under them one plain row: health factor, LTV, still
+// borrowable (and eMode where the account used one).
 //
 // Each cell's toggle opens it into its side's ledger as of the event
 // (components/shared/event-ledger.tsx): in the asset's token where the side
@@ -19,13 +20,13 @@ import {
   DayCloseNote,
   LedgerCell,
   LedgerTable,
-  SIDE_HUE,
   SIDE_NAME,
   dayStamp,
   useEventCum,
 } from "@/components/shared/event-ledger";
 import { useUsdShown } from "@/components/shared/timeline-display-context";
-import { Prov } from "@/components/shared/provenance";
+import type { Provenance } from "@/components/shared/provenance";
+import { formatUsdValue } from "@/lib/utils/format";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -41,7 +42,7 @@ import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledg
 import { ledgerPartProv } from "@/lib/shared/flows-timeline-provenance";
 import { accountTotalProv, heldAtEventProv, sideChangeProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { baseToUsd, big, humanOf, legChange, rawToUsd, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
-import { ReserveList, TotalHeadline, reserveSymbol, type TouchedLeg } from "./aave-v3-position-state";
+import { ClosedSide, reserveSymbol, type Figure, type TouchedLeg } from "./aave-v3-position-state";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 /** One figure of the row under the cells. */
@@ -165,28 +166,19 @@ export function AaveFamilyEventReceipt({
               key={side}
               side={side}
               ledger={ledger}
-              label={
-                <span className="flex items-center gap-2 text-foreground">
-                  <i
-                    aria-hidden
-                    className="inline-block size-2.5 rounded-[2px]"
-                    style={{ background: SIDE_HUE[side] }}
-                  />
-                  {SIDE_NAME[side]}
-                </span>
-              }
+              label={SIDE_NAME[side]}
               data={{
                 "data-position-card": side,
                 "data-receipt-cell": side,
                 "data-receipt-changed": f.changed || f.touchedHere ? "true" : "false",
               }}
             >
-              <SideCell side={side} state={state} coords={coords} facts={f} />
-              <ReserveList
+              <ClosedSide
                 state={state}
                 side={f.leg as "supply" | "debt"}
                 coords={coords}
                 touched={touchedOn(f.leg as "supply" | "debt")}
+                usd={sideUsd(side, state, coords, f, eventTs)}
               />
               {side === "collateral" && state.sources.settings == null && (
                 <div className="mt-1 text-xs text-rb-500">Collateral on/off isn&rsquo;t available at this block.</div>
@@ -211,39 +203,68 @@ export function AaveFamilyEventReceipt({
   );
 }
 
-/** The closed cell: the side's total at the event, before → after where it
- *  moved, and the change with the asset it moved. */
-function SideCell({
-  side,
-  state,
-  coords,
-  facts,
-}: {
-  side: FlowSide;
-  state: AaveV3PositionState;
-  coords: V3Coords;
-  facts: ReturnType<typeof sideFacts>;
-}) {
+/** What the side's ledger closes on in dollars, with its receipts: the
+ *  Pool's account total, or where a supply has its collateral switch off,
+ *  every supplied balance (the flows count it). */
+function sideTotals(
+  side: FlowSide,
+  state: AaveV3PositionState,
+  coords: V3Coords,
+  facts: ReturnType<typeof sideFacts>,
+  at: string,
+): { afterProv: Provenance; beforeProv: Provenance } {
   const what = side === "collateral" ? "collateral" : "debt";
-  const label =
-    side === "debt" ? "Owed at this event" : facts.offSupply ? "Collateral at this event" : "Held at this event";
-  const diff = facts.before != null && facts.after != null ? facts.after - facts.before : 0;
-  return (
-    <div data-receipt-total={side}>
-      <div className="text-xs text-rb-500">{label}</div>
-      <div className="mt-0.5 text-lg">
-        <TotalHeadline state={state} what={what} coords={coords} />
-      </div>
-      {facts.changed && facts.before != null && facts.after != null && (
-        <div className="text-xs tabular-nums text-rb-500" data-receipt-change={side}>
-          <Prov info={sideChangeProv(what, coords, { before: facts.before, after: facts.after })}>
-            {`${diff < 0 ? "−" : "+"}${fmtPositionUsd(Math.abs(diff))}`}
-          </Prov>
-          {facts.moved.length > 0 && ` (${facts.moved.join(", ")})`}
-        </div>
-      )}
-    </div>
-  );
+  const name = SIDE_NAME[side];
+  const afterProv =
+    side === "collateral" && facts.offSupply && facts.held != null
+      ? heldAtEventProv(coords, { parts: facts.parts, total: facts.held })
+      : accountTotalProv(what, "after", coords, {
+          base:
+            side === "collateral"
+              ? (state.account?.after.totalCollateralBase ?? "0")
+              : (state.account?.after.totalDebtBase ?? "0"),
+          poolRevision: state.sources.poolRevision,
+        });
+  const beforeProv =
+    facts.offSupply || !state.account
+      ? ledgerPartProv(name, "USD", at, "held-before")
+      : accountTotalProv(what, "before", coords, {
+          base: side === "collateral" ? state.account.before.totalCollateralBase : state.account.before.totalDebtBase,
+          poolRevision: state.sources.poolRevision,
+        });
+  return { afterProv, beforeProv };
+}
+
+const atWords = (eventTs?: number) => (eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event");
+const usdText = (v: number) => (v < 0.005 ? "$0" : fmtPositionUsd(v));
+
+/** The closed cell's dollars before → after, as its ledger closes on them. */
+function sideUsd(
+  side: FlowSide,
+  state: AaveV3PositionState,
+  coords: V3Coords,
+  facts: ReturnType<typeof sideFacts>,
+  eventTs?: number,
+): { before: Figure | null; after: Figure; change: Figure | null } | null {
+  const after = facts.offSupply ? facts.held : facts.after;
+  const before = facts.offSupply ? facts.heldBefore : facts.before;
+  if (after == null) return null;
+  const { afterProv, beforeProv } = sideTotals(side, state, coords, facts, atWords(eventTs));
+  // The change between the Pool's two totals, behind the arrow's toggle.
+  const diff = before != null ? after - before : 0;
+  const change =
+    !facts.offSupply && facts.changed && before != null
+      ? {
+          text: `${diff < 0 ? "−" : "+"}${fmtPositionUsd(Math.abs(diff))}`,
+          value: `${diff < 0 ? "−" : "+"}${formatUsdValue(Math.abs(diff))}`,
+          prov: sideChangeProv(side === "collateral" ? "collateral" : "debt", coords, { before, after }),
+        }
+      : null;
+  return {
+    after: { text: usdText(after), value: formatUsdValue(after), prov: afterProv },
+    before: before != null ? { text: usdText(before), value: formatUsdValue(before), prov: beforeProv } : null,
+    change,
+  };
 }
 
 /** The opened cell: the side's ledger as of the event. */
@@ -274,29 +295,12 @@ function SideLedger({
         A supplied reserve has no price at this block, so the ledger is left out.
       </p>
     );
-  const what = side === "collateral" ? "collateral" : "debt";
-  const at = eventTs != null ? `this event (${dayStamp(eventTs)})` : "this event";
+  const at = atWords(eventTs);
   const ev = focus.events.find((e) => e.id === eventId) ?? null;
   const balances = sideBalances(state, side);
   const bySum = eventId ? eventAssetSum(model, focus.events, side, cum, eventId, balances) : null;
-  const totalProv =
-    side === "collateral" && facts.offSupply
-      ? heldAtEventProv(coords, { parts: facts.parts, total: facts.held })
-      : accountTotalProv(what, "after", coords, {
-          base:
-            side === "collateral"
-              ? (state.account?.after.totalCollateralBase ?? "0")
-              : (state.account?.after.totalDebtBase ?? "0"),
-          poolRevision: state.sources.poolRevision,
-        });
   const name = SIDE_NAME[side];
-  const totalBeforeProv =
-    facts.offSupply || !state.account
-      ? ledgerPartProv(name, "USD", at, "held-before")
-      : accountTotalProv(what, "before", coords, {
-          base: side === "collateral" ? state.account.before.totalCollateralBase : state.account.before.totalDebtBase,
-          poolRevision: state.sources.poolRevision,
-        });
+  const { afterProv: totalProv, beforeProv: totalBeforeProv } = sideTotals(side, state, coords, facts, at);
   const note = <DayCloseNote cum={cum} eventTs={eventTs} />;
   if (bySum) {
     const priceOf = (sym: string) => bySum.balances.find((x) => x.symbol === sym);
