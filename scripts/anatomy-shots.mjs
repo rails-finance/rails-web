@@ -311,11 +311,11 @@ const SHOTS = [
   { name: "info", path: "/ethereum/liquity-v2/info", widths: [1280, 390], codes: ["H", "I"], cropTop: 760 },
   { name: "home", path: "/", widths: [1280, 390], codes: ["S", "H"], full: true },
   {
-    // Morpho's tower went with its Lifetime flows panel (1 Oct 2026); Fluid
-    // still draws one.
+    // Morpho's tower went with its Lifetime flows panel (1 Oct 2026), and
+    // Fluid's token-pair positions' with theirs; a smart-vault position still
+    // draws one.
     name: "fluid-tower",
-    path: "/ethereum/fluid",
-    resolve: async (page) => page.locator(sel("N2")).first().getAttribute("href"),
+    path: "/ethereum/fluid/2397",
     widths: [1280],
     codes: ["F15"],
     crop: ["F15"],
