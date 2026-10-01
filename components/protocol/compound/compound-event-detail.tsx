@@ -79,6 +79,9 @@ function dustBefore(
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : compoundAmount(Number(human)));
+/** A decimal string's negation: a borrowed base balance is stated as the
+ *  amount owed, positive, as the Debt cell and its ledger state it. */
+const negated = (v: string): string => (v.startsWith("-") ? v.slice(1) : /^0(\.0*)?$/.test(v) ? v : `-${v}`);
 
 export function CompoundEventDetail({
   ctx,
@@ -162,26 +165,31 @@ export function CompoundEventDetail({
         prov: baseAfterProv(ctx.assetSymbol, coords),
         changed: false,
       });
-    else
+    else {
+      const caption = ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance";
+      // Borrowed: the amount owed, positive, and a borrow raises it. A row
+      // that crosses zero keeps the signed balance its caption names.
+      const owed = caption === "Borrowed (base)";
       stats.push({
-        label: ctx.baseAfter != null ? compoundBaseCaption(before, ctx.baseAfter) : "Base balance",
-        value: fmt(ctx.baseAfter),
+        label: caption,
+        value: fmt(owed && ctx.baseAfter != null ? negated(ctx.baseAfter) : ctx.baseAfter),
         ...(baseSide(ctx.baseAfter, before) ? { ledger: baseSide(ctx.baseAfter, before) } : {}),
         symbol: ctx.assetSymbol,
-        prov: baseAfterProv(ctx.assetSymbol, coords),
+        prov: baseAfterProv(ctx.assetSymbol, coords, owed),
         interestSincePrevious: interestSincePrevious(ctx.assetSymbol),
         transition: dustBefore(
           reconstructTransition({
-            after: ctx.baseAfter,
-            change: ctx.assetsDelta,
+            after: owed && ctx.baseAfter != null ? negated(ctx.baseAfter) : ctx.baseAfter,
+            change: owed ? negated(ctx.assetsDelta) : ctx.assetsDelta,
             changeProv,
-            beforeProv: baseBeforeProv(ctx.assetSymbol, coords),
+            beforeProv: baseBeforeProv(ctx.assetSymbol, coords, owed),
           }),
           before === "0" && decimalSub(ctx.baseAfter ?? "0", ctx.assetsDelta) !== "0",
           ctx.assetSymbol,
           m.baseDecimals,
         ),
       });
+    }
   } else {
     const collCoords: CompoundCoords = { ...coords, asset: undefined };
     const changeProv =
@@ -220,11 +228,12 @@ export function CompoundEventDetail({
       const b = Number(ctx.baseAfter);
       stats.push({
         label: b < 0 ? "Borrowed (base)" : b > 0 ? "Lent (base)" : "Base balance",
-        value: fmt(ctx.baseAfter),
+        // Borrowed: the amount owed, positive, as the Debt cell states it.
+        value: fmt(b < 0 ? negated(ctx.baseAfter) : ctx.baseAfter),
         // The lent base sits in the collateral cell's ledger.
         ...(ledgerOn && b < 0 ? { ledger: "debt" as const } : {}),
         symbol: m.baseSymbol,
-        prov: baseAfterProv(m.baseSymbol, coords),
+        prov: baseAfterProv(m.baseSymbol, coords, b < 0),
         interestSincePrevious: interestSincePrevious(m.baseSymbol),
       });
     }

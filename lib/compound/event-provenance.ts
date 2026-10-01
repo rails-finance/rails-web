@@ -333,7 +333,18 @@ export const absorbPriceProv = (
  *  balance at the event's block, presentValue(principal, index) — the block's
  *  end state less the account's later moves in the same block. Base (the
  *  sweep): Σ signed base deltas up to this block. */
-export const baseAfterProv = (sym: string, coords: CompoundCoords): Provenance =>
+export const baseAfterProv = (sym: string, coords: CompoundCoords, owed = false): Provenance =>
+  owed ? owedProv(baseAfterProv(sym, coords), sym) : baseAfterSigned(sym, coords);
+
+/** A borrowed base balance stated as the amount owed (positive), as the Debt
+ *  cell and its ledger state it: the signed receipt, its sign turned. */
+const OWED_NOTE = (sym: string) =>
+  `Stated as the ${sym} owed: the signed balance below with its sign turned, so a borrow raises it and a repayment lowers it. `;
+function owedProv(p: Provenance, sym: string): Provenance {
+  return { ...p, summary: `${OWED_NOTE(sym)}${p.summary}` };
+}
+
+const baseAfterSigned = (sym: string, coords: CompoundCoords): Provenance =>
   coords.source === "sweep"
     ? {
         kind: "chain",
@@ -384,7 +395,23 @@ export const collateralAfterProv = (sym: string, coords: CompoundCoords): Proven
  *  and the logged delta) — every leaf is on-chain, so chain-derived and it stays
  *  in the chain-state view. Same nominal-principal basis as the after (accrued
  *  interest is a separate layer). */
-export const baseBeforeProv = (sym: string, coords: CompoundCoords): Provenance => ({
+export const baseBeforeProv = (sym: string, coords: CompoundCoords, owed = false): Provenance =>
+  owed
+    ? {
+        ...owedProv(baseBeforeSigned(sym, coords), sym),
+        inputs: eventInputs(coords, [
+          { label: "after", kind: "chain", pclass: "indexed", note: `${sym} owed after this event` },
+          {
+            label: "change",
+            kind: "chain",
+            pclass: "emitted",
+            note: "this event's base amount, as it moves the amount owed",
+          },
+        ]),
+      }
+    : baseBeforeSigned(sym, coords);
+
+const baseBeforeSigned = (sym: string, coords: CompoundCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
   summary:
