@@ -42,6 +42,7 @@ import {
   debtPrincipalProv,
   lendPrincipalProv,
   lifetimeFlowProv,
+  cometContract,
   type CompoundCoords,
   type CompoundLifetimeFlow,
 } from "@/lib/compound/event-provenance";
@@ -120,7 +121,19 @@ export interface CompoundLifetimeFlows {
   withdrawn: number;
   borrowed: number;
   repaid: number;
+  /** The debt an absorb cleared: the part of `basePaidOut` that took the
+   *  base balance from negative up to zero. */
   absorbedDebt: number;
+  /** The rest of `basePaidOut`: the seized collateral's credited value past
+   *  the debt, left to the account as a lent balance. */
+  absorbCredit?: number;
+  /** `absorbedDebt` holds the credit past the debt too (see
+   *  `CompoundLifetimeRaw.absorbUnsplit`); `absorbCredit` is then absent. */
+  absorbUnsplit?: boolean;
+  /** Absorb legs valued at the absorb's prices (the events' `usdValue`),
+   *  where the walk saw them: the debt cleared, the credit past it, and each
+   *  seized collateral asset keyed by lowercase address. */
+  absorbUsd?: { debtCleared: number; credit: number; collateral: Record<string, number> };
   /** Interest the base earned (while lending) and was charged (while
    *  borrowing) between rows, Σ each row's interest since the previous one.
    *  Ethereum only (server mig 351); absent on the Base lane, whose rows carry
@@ -152,6 +165,7 @@ const BASE_LEGS = [
   "borrowed",
   "repaid",
   "absorbedDebt",
+  "absorbCredit",
   "interestEarned",
   "interestCharged",
 ] as const;
@@ -207,6 +221,40 @@ export interface CompoundLifetimeRaw {
   baseDecimals: number | null;
   /** Per collateral asset, keyed by lowercase address. */
   collateral: Record<string, CompoundCollateralFlowsRaw>;
+  /** Absorb legs at the absorb's prices, 8-decimal USD (the events'
+   *  `usdValue`): absent where no absorb row was walked. */
+  absorbUsd8?: { debtCleared: bigint; credit: bigint; collateral: Record<string, bigint> };
+  /** Set where part of `absorbedDebt` came from a server sum written before
+   *  the absorb split (an opening balance, a folder or a seed with no
+   *  `absorbCredit` leg): that part holds the whole `basePaidOut`, so the
+   *  debt cleared and the credit past it are stated as one figure. */
+  absorbUnsplit?: boolean;
+}
+
+/** Add one absorb row's own USD reckoning (8-decimal, as Comet emits it) to
+ *  the walk. A debt row's figure is split between the debt it cleared and the
+ *  credit past it, in the same proportion as its base amount. */
+export function addCompoundAbsorbUsd(
+  raw: CompoundLifetimeRaw,
+  kind: CompoundEventType,
+  usd8: bigint,
+  args: { asset?: string; before?: bigint; delta?: bigint },
+) {
+  const acc = (raw.absorbUsd8 ??= { debtCleared: ZERO, credit: ZERO, collateral: {} });
+  if (kind === "absorb_collateral" && args.asset) {
+    acc.collateral[args.asset] = (acc.collateral[args.asset] ?? ZERO) + usd8;
+  } else if (kind === "absorb_debt" && args.delta != null && args.before != null && args.delta > ZERO) {
+    const cleared = minBig(args.delta, maxBig(ZERO, -args.before));
+    const clearedUsd = (usd8 * cleared) / args.delta;
+    acc.debtCleared += clearedUsd;
+    acc.credit += usd8 - clearedUsd;
+  }
+}
+
+/** Human 8-decimal USD string ("1643.60936999") → the bigint Comet emitted. */
+export function usd8Of(s: string | undefined): bigint | null {
+  if (s == null) return null;
+  return parseUnits(s, 8);
 }
 
 export function newCompoundLifetimeRaw(baseDecimals: number | null = null): CompoundLifetimeRaw {
@@ -217,6 +265,7 @@ export function newCompoundLifetimeRaw(baseDecimals: number | null = null): Comp
       borrowed: ZERO,
       repaid: ZERO,
       absorbedDebt: ZERO,
+      absorbCredit: ZERO,
       interestEarned: ZERO,
       interestCharged: ZERO,
     },
@@ -243,7 +292,12 @@ export function splitCompoundBaseFlow(
   delta: bigint,
 ) {
   if (kind === "absorb_debt") {
-    acc.absorbedDebt += absBig(delta);
+    // basePaidOut is the debt cleared plus whatever the credited collateral
+    // value left over: the debt leg takes the first, the credit the rest.
+    const paid = absBig(delta);
+    const cleared = minBig(paid, maxBig(ZERO, -before));
+    acc.absorbedDebt += cleared;
+    acc.absorbCredit = (acc.absorbCredit ?? ZERO) + (paid - cleared);
   } else if (delta > ZERO) {
     const repay = minBig(delta, maxBig(ZERO, -before));
     acc.repaid += repay;
@@ -295,7 +349,26 @@ export function scaleCompoundLifetime(raw: CompoundLifetimeRaw): CompoundLifetim
     withdrawn: scaleUnits(raw.base.withdrawn, dec),
     borrowed: scaleUnits(raw.base.borrowed, dec),
     repaid: scaleUnits(raw.base.repaid, dec),
-    absorbedDebt: scaleUnits(raw.base.absorbedDebt, dec),
+    ...(raw.absorbUnsplit
+      ? {
+          absorbedDebt: scaleUnits(raw.base.absorbedDebt + (raw.base.absorbCredit ?? ZERO), dec),
+          absorbUnsplit: true,
+        }
+      : {
+          absorbedDebt: scaleUnits(raw.base.absorbedDebt, dec),
+          ...((raw.base.absorbCredit ?? ZERO) !== ZERO ? { absorbCredit: scaleUnits(raw.base.absorbCredit, dec) } : {}),
+        }),
+    ...(raw.absorbUsd8
+      ? {
+          absorbUsd: {
+            debtCleared: scaleUnits(raw.absorbUsd8.debtCleared, 8),
+            credit: scaleUnits(raw.absorbUsd8.credit, 8),
+            collateral: Object.fromEntries(
+              Object.entries(raw.absorbUsd8.collateral).map(([a, v]) => [a, scaleUnits(v, 8)]),
+            ),
+          },
+        }
+      : {}),
     // A raw built before the interest legs existed has none: zero.
     ...((raw.base.interestEarned ?? ZERO) !== ZERO || (raw.base.interestCharged ?? ZERO) !== ZERO
       ? {
@@ -329,6 +402,8 @@ export interface CompoundLifetimeRawWire {
   borrowed: string;
   repaid: string;
   absorbedDebt: string;
+  /** Absent on a wire written before the absorb split: read as zero. */
+  absorbCredit?: string;
   collateral: Record<string, Record<CollLeg, string>>;
 }
 
@@ -349,6 +424,7 @@ export function compoundLifetimeRawToWire(raw: CompoundLifetimeRaw): CompoundLif
     borrowed: raw.base.borrowed.toString(),
     repaid: raw.base.repaid.toString(),
     absorbedDebt: raw.base.absorbedDebt.toString(),
+    absorbCredit: (raw.base.absorbCredit ?? ZERO).toString(),
     collateral,
   };
 }
@@ -395,6 +471,8 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
       const after = ctx.baseAfter == null ? null : parseUnits(ctx.baseAfter, dec);
       if (delta == null || after == null) return null; // malformed event — don't assert flows
       splitCompoundBaseFlow(raw.base, ctx.eventType, after - delta, delta);
+      const usd8 = ctx.eventType === "absorb_debt" ? usd8Of(ctx.usdValue) : null;
+      if (usd8 != null) addCompoundAbsorbUsd(raw, "absorb_debt", usd8, { before: after - delta, delta });
       continue;
     }
 
@@ -407,8 +485,101 @@ export function replayCompoundLifetime(events: BaseActivityEvent[], market: stri
     const c = compoundCollateralFlowsOf(raw, addr, ctx.assetSymbol, flow.tokenDecimals);
     if (c.decimals !== flow.tokenDecimals) return null;
     addCompoundCollateralFlow(c, ctx.eventType, delta);
+    const usd8 = ctx.eventType === "absorb_collateral" ? usd8Of(ctx.usdValue) : null;
+    if (usd8 != null) addCompoundAbsorbUsd(raw, "absorb_collateral", usd8, { asset: addr });
   }
   return sawAny ? raw : null;
+}
+
+/** The interest inside today's debt: the debt now less what was borrowed and
+ *  repaid since the balance last stood at zero or above. Null where the
+ *  events never show the balance at zero or above (a window that starts
+ *  mid-debt), or where the figure falls outside (0, debt). `since` is the
+ *  first borrow after that point, unix seconds.
+ *
+ *  A grouped page holds some rows only as folders: each folder's base legs
+ *  join the walk at its place in time. A folder with a lent leg (deposited
+ *  or withdrawn) stood at zero or above somewhere inside, at a point the
+ *  folder does not say, so the figure is withheld unless a later row stands
+ *  at zero again. */
+export function compoundInterestInDebt(
+  events: BaseActivityEvent[],
+  market: string,
+  debtNow: number,
+  folders?: readonly ServedFolder[] | null,
+): { amount: number; since: number } | null {
+  if (!(debtNow > 0)) return null;
+  type Item =
+    | { kind: "row"; block: number; log: number; ts: number; delta: number; after: string | undefined }
+    | { kind: "folder"; block: number; log: number; ts: number; folder: ServedFolder };
+  const rows: Item[] = events
+    .filter(isCompoundEvent)
+    .filter((e) => e.context.data.market === market && e.context.data.isBase)
+    .map((e) => ({
+      kind: "row" as const,
+      block: e.blockNumber,
+      log: Number(/-(\d+)-[a-z_]+$/.exec(e.id)?.[1] ?? 0),
+      ts: e.timestamp,
+      delta: Number(e.context.data.assetsDelta),
+      after: e.context.data.baseAfter,
+    }));
+  const folderItems: Item[] = (folders ?? []).map((f) => ({
+    kind: "folder" as const,
+    block: f.firstBlock,
+    log: -1,
+    ts: f.firstAt,
+    folder: f,
+  }));
+  const items = [...rows, ...folderItems].sort((a, b) => a.block - b.block || a.log - b.log);
+  let seenZero = false;
+  let unknown = false;
+  let borrowed = 0;
+  let repaid = 0;
+  let since: number | null = null;
+  const reset = () => {
+    seenZero = true;
+    unknown = false;
+    borrowed = 0;
+    repaid = 0;
+    since = null;
+  };
+  for (const r of items) {
+    if (r.kind === "folder") {
+      const bucket = (r.folder.flows ?? []).find((b) => !b.sourceKey && b.key === market);
+      if (!bucket) continue;
+      if (bucket.decimals == null) return null;
+      const scale = 10 ** bucket.decimals;
+      const leg = (k: string) => (bucket.legs[k] != null ? Number(bucket.legs[k]) / scale : 0);
+      if (leg("deposited") > 0 || leg("withdrawn") > 0 || leg("absorbedDebt") > 0) {
+        // It stood at zero or above inside: where is not known.
+        unknown = true;
+        continue;
+      }
+      if (leg("borrowed") > 0) {
+        borrowed += leg("borrowed");
+        since ??= r.ts;
+      }
+      repaid += leg("repaid");
+      continue;
+    }
+    if (r.after == null || !Number.isFinite(r.delta)) return null;
+    const after = Number(r.after);
+    const before = after - r.delta;
+    if (before >= 0) reset();
+    if (r.delta < 0) {
+      const borrow = -r.delta - Math.max(0, before);
+      if (borrow > 0) {
+        borrowed += borrow;
+        since ??= r.ts;
+      }
+    } else if (r.delta > 0 && before < 0) {
+      repaid += Math.min(r.delta, -before);
+    }
+    if (after >= 0) reset();
+  }
+  if (!seenZero || unknown || since == null) return null;
+  const amount = debtNow - (borrowed - repaid);
+  return amount > 0 && amount < debtNow ? { amount, since } : null;
 }
 
 /**
@@ -474,6 +645,10 @@ export function compoundLifetimeWithOpening(
     // way `replayCompoundLifetime` scopes its own walk.
     if (!bucket.sourceKey) {
       if (bucket.key !== market) continue;
+      // A sum written before the absorb split carries the whole basePaidOut
+      // as absorbedDebt and no absorbCredit leg.
+      if (bucket.legs.absorbCredit === undefined && (parseUnits(bucket.legs.absorbedDebt ?? "0", 0) ?? ZERO) > ZERO)
+        merged.absorbUnsplit = true;
       for (const leg of BASE_LEGS) {
         const raw = bucket.legs[leg];
         if (raw === undefined) continue;
@@ -512,7 +687,9 @@ export function compoundLifetimeWithOpening(
     for (const leg of COLL_LEGS) c[leg] += legs[leg] ?? ZERO;
   }
 
-  return scaleCompoundLifetime(merged);
+  // Absorb prices come only from the rows walked here: an opening balance or
+  // a folder holds absorbs this walk never priced, so none are stated.
+  return scaleCompoundLifetime({ ...merged, absorbUsd8: undefined });
 }
 
 /** Chain-faithful interest on the debt leg (the Spark legInterest gates):
@@ -572,11 +749,31 @@ export function computeCompoundEconomics(
     : events && events.length > 0
       ? replayCompoundLifetime(events, view.market)
       : null;
-  const replayed = precomputedLifetime ?? (walked ? scaleCompoundLifetime(walked) : null);
+  const replayedRaw = precomputedLifetime ?? (walked ? scaleCompoundLifetime(walked) : null);
+  // Where the rows are running sums of the logged amounts rather than the
+  // chain's balance (no interest in them), the balance before an absorb is
+  // short by the interest, so the split between the debt it cleared and the
+  // credit past it cannot be trusted: the two are stated as one figure.
+  // The same where a server sum written before the split fed the figure.
+  const replayed =
+    replayedRaw && (replayedRaw.absorbUnsplit || (!vocab.baseAtLastEvent && (replayedRaw.absorbCredit ?? 0) > 0))
+      ? {
+          ...replayedRaw,
+          absorbedDebt: replayedRaw.absorbedDebt + (replayedRaw.absorbCredit ?? 0),
+          absorbCredit: 0,
+          absorbUsd: undefined,
+          absorbUnsplit: true,
+        }
+      : replayedRaw;
   // The net of the moves the events made, and the net with the interest the
   // rows accrued between them: the second is what the last row's balance is.
   const netFlow = replayed
-    ? replayed.deposited + replayed.repaid + replayed.absorbedDebt - replayed.withdrawn - replayed.borrowed
+    ? replayed.deposited +
+      replayed.repaid +
+      replayed.absorbedDebt +
+      (replayed.absorbCredit ?? 0) -
+      replayed.withdrawn -
+      replayed.borrowed
     : 0;
   const netInterest = replayed ? (replayed.interestEarned ?? 0) - (replayed.interestCharged ?? 0) : 0;
   const netBase = netFlow + netInterest;
@@ -602,6 +799,7 @@ export function computeCompoundEconomics(
       replayedKept.deposited +
         replayedKept.repaid +
         replayedKept.absorbedDebt +
+        (replayedKept.absorbCredit ?? 0) +
         replayedKept.withdrawn +
         replayedKept.borrowed +
         (replayedKept.interestEarned ?? 0) +
@@ -651,8 +849,12 @@ export function computeCompoundEconomics(
     ...collFlows.flatMap(([addr, c]) =>
       withLabel(flowLine("transferred collateral", c.symbol, addr, c.sent, `cs-${addr}`), "Transferred out"),
     ),
+    // The lent base's withdrawals are not collateral: their own row.
     ...(lifetime
-      ? flowLine("withdrawn", view.base.symbol, view.base.address, lifetime.withdrawn, "base-withdrawn")
+      ? withLabel(
+          flowLine("withdrawn", view.base.symbol, view.base.address, lifetime.withdrawn, "base-withdrawn"),
+          `Withdrawn (lent ${view.base.symbol})`,
+        )
       : []),
   ];
   // Custody received from another account — an inflow that is NOT a fresh
@@ -661,14 +863,40 @@ export function computeCompoundEconomics(
   const collReceived = collFlows.flatMap(([addr, c]) =>
     withLabel(flowLine("received collateral", c.symbol, addr, c.received, `cr-${addr}`), "Received by transfer"),
   );
+  // What an absorb took is valued at the absorb's prices (the events'
+  // usdValue) where the walk saw them, as the liquidation row values it; the
+  // price-change row below carries the difference to today's prices.
+  const absorbUsd = lifetime?.absorbUsd;
+  const atAbsorb = (lines: TowerLine[], usd: number | undefined): TowerLine[] =>
+    usd == null ? lines : lines.map((l) => ({ ...l, usd, tipLabel: "At the absorb's prices" }));
   const collLiquidated = collFlows.flatMap(([addr, c]) =>
-    flowLine("absorbed collateral", c.symbol, addr, c.absorbed, `cl-${addr}`),
+    atAbsorb(
+      flowLine("absorbed collateral", c.symbol, addr, c.absorbed, `cl-${addr}`),
+      absorbUsd?.collateral[addr.toLowerCase()],
+    ),
   );
   const debtExited = lifetime
     ? flowLine("repaid", view.base.symbol, view.base.address, lifetime.repaid, "base-repaid")
     : [];
   const debtLiquidated = lifetime
-    ? flowLine("absorbed debt", view.base.symbol, view.base.address, lifetime.absorbedDebt, "base-absorbed")
+    ? withLabel(
+        atAbsorb(
+          flowLine("absorbed debt", view.base.symbol, view.base.address, lifetime.absorbedDebt, "base-absorbed"),
+          absorbUsd?.debtCleared,
+        ),
+        // As one figure it is the whole amount the absorb credited.
+        replayed?.absorbUnsplit ? "Credited by the absorb (debt cleared and any left over)" : "Cleared by the absorb",
+      )
+    : [];
+  // The credited value past the debt: base the account was left lending.
+  const creditReceived = lifetime
+    ? withLabel(
+        atAbsorb(
+          flowLine("absorb credit", view.base.symbol, view.base.address, lifetime.absorbCredit ?? 0, "base-credit"),
+          absorbUsd?.credit,
+        ),
+        `Left over after the absorb (lent ${view.base.symbol})`,
+      )
     : [];
 
   // Collateral side: the non-earning collateral assets, exact from the event replay.
@@ -713,8 +941,16 @@ export function computeCompoundEconomics(
   // `current + interest` as the total, so when the split engages the current
   // line DROPS to the net event principal — the live borrowBalanceOf already
   // includes the interest (principal + accrued = balanceOf).
+  // Where each row carries the interest since the one before (the Ethereum
+  // index), the interest the debt or lent balance has taken since the last
+  // row joins those rows' sum, and the columns read top to bottom: borrowed +
+  // interest charged − repaid − cleared = owed now. The live split below is
+  // for the lane whose rows carry no interest.
+  const rowsCarryInterest = vocab.baseAtLastEvent;
+  const sinceLastEvent = lifetime && chain && rowsCarryInterest ? Math.abs(chain.amount) - Math.abs(netBase) : 0;
+  const accrualSince = sinceLastEvent > DUST ? sinceLastEvent : 0;
   let interest: TowerLine | null = null;
-  if (lifetime && chain && baseSide === "borrow" && debtLines.length === 1) {
+  if (lifetime && chain && !rowsCarryInterest && baseSide === "borrow" && debtLines.length === 1) {
     const netPrincipal = -netFlow; // borrower: the net of its moves is negative
     const amt = legInterest(Math.abs(chain.amount), netPrincipal, lifetime.borrowed);
     if (amt > 0) {
@@ -737,7 +973,13 @@ export function computeCompoundEconomics(
   // The lender's twin: supply interest earned over the position's life, the
   // live balance less the net of its moves, on top of that net.
   let earned: TowerLine | null = null;
-  if (lifetime && chain && baseSide === "lend" && collateralLines[0]?.key === `base:${view.base.address}`) {
+  if (
+    lifetime &&
+    chain &&
+    !rowsCarryInterest &&
+    baseSide === "lend" &&
+    collateralLines[0]?.key === `base:${view.base.address}`
+  ) {
     const amt = legInterest(chain.amount, netFlow, lifetime.deposited);
     if (amt > 0) {
       earned = {
@@ -756,6 +998,46 @@ export function computeCompoundEconomics(
     }
   }
 
+  // The interest the rows accrued between events, where no live split above
+  // already states it: the debt side's "+ Interest charged" and the lend
+  // side's "+ Interest earned", so borrowed + interest − repaid − cleared
+  // reaches what is owed on the face of the panel.
+  const debtEarned: TowerLine[] =
+    lifetime && !interest
+      ? withLabel(
+          flowLine(
+            "interest charged",
+            view.base.symbol,
+            view.base.address,
+            (lifetime.interestCharged ?? 0) + (baseSide === "borrow" ? accrualSince : 0),
+            "base-int-charged",
+          ),
+          "Interest charged",
+        )
+      : [];
+  const collEarned: TowerLine[] =
+    lifetime && !earned
+      ? withLabel(
+          flowLine(
+            "interest earned",
+            view.base.symbol,
+            view.base.address,
+            (lifetime.interestEarned ?? 0) + (baseSide === "lend" ? accrualSince : 0),
+            "base-int-earned",
+          ),
+          "Interest earned",
+        )
+      : [];
+  // The base the account lent in is not collateral either: its own row, the
+  // twin of the lent base's withdrawals.
+  const lentIn = lifetime
+    ? withLabel(
+        flowLine("deposited", view.base.symbol, view.base.address, lifetime.deposited, "base-lent"),
+        `Lent (${view.base.symbol})`,
+      )
+    : [];
+  const received = [...lentIn, ...collReceived, ...creditReceived];
+
   // Value the tower only when EVERY contributing line is oracle-priced — a strict
   // per-total guard (Aave's rule). A single unpriced leg drops it to the token
   // gated list, so a bar height is never a partial (misleading) USD figure.
@@ -763,7 +1045,9 @@ export function computeCompoundEconomics(
     ...collateralLines,
     ...debtLines,
     ...collExited,
-    ...collReceived,
+    ...received,
+    ...debtEarned,
+    ...collEarned,
     ...collLiquidated,
     ...debtExited,
     ...debtLiquidated,
@@ -776,10 +1060,7 @@ export function computeCompoundEconomics(
   // Lifetime inflow (the faded side bar) — USD when valued; a token amount is
   // only meaningful when one token flowed in, else suppressed.
   const collInflows: Array<{ addr: string; amount: number }> = lifetime
-    ? [
-        ...collFlows.map(([addr, c]) => ({ addr, amount: c.supplied })),
-        { addr: view.base.address, amount: lifetime.deposited },
-      ].filter((f) => f.amount > DUST)
+    ? collFlows.map(([addr, c]) => ({ addr, amount: c.supplied })).filter((f) => f.amount > DUST)
     : [];
   const collInflow = valued
     ? collInflows.reduce((s, f) => s + (usdOf(f.addr, f.amount) ?? 0), 0)
@@ -793,24 +1074,72 @@ export function computeCompoundEconomics(
         : lifetime.borrowed
       : 0;
 
+  // Price change: every flow is valued at today's price except what an absorb
+  // took, which carries the absorb's own. The row is the difference, so each
+  // column reaches what is held (or owed) on the face of the panel. Stated
+  // only when valued, and only past half a dollar.
+  const usdSum = (lines: (TowerLine | null)[]): number => lines.reduce((t, l) => t + (l?.usd ?? 0), 0);
+  const priceChange = (
+    held: number,
+    inflow: number,
+    outflow: number,
+    side: "collateral" | "debt",
+  ): TowerLine | null => {
+    if (!valued || !lifetime) return null;
+    const change = held - (inflow - outflow);
+    // Below a thousandth of the side's flows it is a stablecoin's drift from
+    // a dollar, not a price move worth a row.
+    if (Math.abs(change) < Math.max(0.5, (inflow + outflow) * 0.001)) return null;
+    return {
+      key: `${side}-price-change`,
+      symbol: "",
+      amount: change,
+      usd: change,
+      prov: absorbPriceChangeProv(side, coords),
+      flowLabel: "Price change since the absorb",
+    };
+  };
+  const hasAbsorbUsd = absorbUsd != null && (collLiquidated.length > 0 || debtLiquidated.length > 0);
+  const collPriceChange = hasAbsorbUsd
+    ? priceChange(
+        usdSum([...collateralLines, earned]),
+        collInflow + usdSum(received) + usdSum(collEarned),
+        usdSum(collExited) + usdSum(collLiquidated),
+        "collateral",
+      )
+    : null;
+  const debtPriceChange = hasAbsorbUsd
+    ? priceChange(
+        usdSum([...debtLines, interest]),
+        debtInflow + usdSum(debtEarned),
+        usdSum(debtExited) + usdSum(debtLiquidated),
+        "debt",
+      )
+    : null;
+
   return {
     valued,
     // On-chain oracle price → chain-derived, so the USD bars survive On-chain-values.
     priceKind: valued ? "chain-derived" : undefined,
+    wrapFlowLabels: true,
     collateral: {
       current: collateralLines,
       interest: earned,
+      ...(collEarned.length > 0 ? { earned: collEarned } : {}),
       exited: collExited,
-      received: collReceived,
+      received,
       liquidated: collLiquidated,
       lifetimeInflow: collInflow,
+      priceChange: collPriceChange,
     },
     debt: {
       current: debtLines,
       interest,
+      ...(debtEarned.length > 0 ? { earned: debtEarned } : {}),
       exited: debtExited,
       liquidated: debtLiquidated,
       lifetimeInflow: debtInflow,
+      priceChange: debtPriceChange,
     },
     // Gated-list headers reflect whether the amount is the current value (chain
     // overlay) or bare principal.
@@ -832,6 +1161,21 @@ export function computeCompoundEconomics(
             ? "Base amounts are the balance at the position's last event, interest to then included; interest since then isn't. Collateral does not accrue, so it is exact."
             : "Base amounts are principal only — interest that has built up since each supply or borrow isn't included here. Collateral does not accrue, so it is exact.",
     ...(notLoaded.length > 0 ? { notLoaded } : {}),
+  };
+}
+
+/** The price-change row's receipt: the absorb's legs carry its own prices,
+ *  every other flow and the held figure today's. */
+function absorbPriceChangeProv(side: "collateral" | "debt", coords: CompoundCoords): Provenance {
+  return {
+    kind: "chain-derived",
+    summary: `Price change — what an absorb took is valued at the absorb's prices (the usdValue its events emitted), every other ${side === "collateral" ? "supply, withdrawal and holding" : "borrow, repayment and balance"} at the price Comet's oracle gives today. This row is the difference, so the column adds up in dollars; in tokens it adds up without it.`,
+    formula: side === "collateral" ? "held now − (in − out)" : "owed now − (in − out)",
+    contract: cometContract(coords),
+    inputs: [
+      { label: "absorb legs", kind: "chain-derived", pclass: "oracle", note: "at the absorb's prices" },
+      { label: "other flows and holdings", kind: "chain-derived", pclass: "oracle", note: "at today's oracle price" },
+    ],
   };
 }
 

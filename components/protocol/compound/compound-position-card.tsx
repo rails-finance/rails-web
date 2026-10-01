@@ -32,7 +32,7 @@ import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { WalletPill } from "@/components/shared/wallet-pill";
-import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
+import { formatUnitsExact, formatCompact, formatExactDecimal } from "@/lib/utils/format";
 import {
   compoundUsdProvOnchain,
   peakBaseProv,
@@ -79,6 +79,8 @@ export interface CompoundPositionView {
   peak: CompoundPeak;
   everLiquidated: boolean;
   liquidationCount: number;
+  /** Unix seconds of the last absorb, where known. */
+  lastLiquidationAt?: number | null;
   /** Non-liquidation transaction count (activity-meta). */
   txCount: number;
   /** Unix seconds of the most recent event (activity-meta). */
@@ -88,6 +90,10 @@ export interface CompoundPositionView {
    *  the detail page (the shared `/api/prices` cache). Feeds the valued economics
    *  tower; absent on the listing (the card itself shows no USD). */
   priceByAddress?: Record<string, number>;
+  /** Set when the account still holds balances but every one is worth under
+   *  a cent at the oracle and nothing is borrowed: the card reads it as
+   *  closed, and these are the amounts left behind. */
+  dustLeft?: { symbol: string; amount: number }[];
 }
 
 /** The base figure to display: the live CURRENT value (incl. interest) when the
@@ -381,6 +387,10 @@ function CompoundIdentity({ v, session }: { v: CompoundPositionView; session: Se
   );
 }
 
+/** What the card's count counts, beside the timeline's event count. */
+const COUNT_TIP =
+  "Every transaction on this position except absorbs, which another account sends. The timeline counts events, and one transaction can write two or more: an absorb writes one for each seized asset and one for the debt, and one transaction can add collateral and borrow.";
+
 export function CompoundPositionCard({
   v,
   receipts = false,
@@ -443,18 +453,18 @@ export function CompoundPositionCard({
       <div className="text-xs mt-0.5 text-rb-500">principal only — accrued interest not included</div>
     );
     const supplyLines: ReactNode[] = [];
-    if (v.peak.lentBase > 0) {
-      supplyLines.push(
+    // A wallet that only ever lent the base posted no collateral — label its peak
+    // "supply", not "collateral" (the Aave V4 spoke-card grammar).
+    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
+    const lentLine =
+      v.peak.lentBase > 0 ? (
         <StatValue key="lent-base">
           <Prov info={peakBaseProv(v.base.symbol, "lend", { ...peakCoords, asset: v.base.address })}>
             <AssetAmount value={v.peak.lentBase} symbol={v.base.symbol} />
           </Prov>
-        </StatValue>,
-      );
-    }
-    // A wallet that only ever lent the base posted no collateral — label its peak
-    // "supply", not "collateral" (the Aave V4 spoke-card grammar).
-    const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;
+        </StatValue>
+      ) : null;
+    if (supplyOnly && lentLine) supplyLines.push(lentLine);
     for (const c of v.peak.collateral) {
       supplyLines.push(
         <StatValue key={c.address}>
@@ -466,6 +476,15 @@ export function CompoundPositionCard({
             )}
           </Prov>
         </StatValue>,
+      );
+    }
+    // The lent base is not collateral: under its own caption.
+    if (!supplyOnly && lentLine) {
+      supplyLines.push(
+        <div key="lent-caption" className="mt-1 text-xs text-rb-500">
+          Highest lent {v.base.symbol} (earns interest)
+        </div>,
+        lentLine,
       );
     }
     return (
@@ -482,11 +501,13 @@ export function CompoundPositionCard({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt ?? undefined}
               eventCount={v.txCount}
+              countTip={COUNT_TIP}
               liquidationCount={v.liquidationCount}
               liquidated={v.everLiquidated}
             />
           }
           closedAt={v.lastActivityAt ?? undefined}
+          outcomeDates={outcomeDates(v)}
           collateralLabel={supplyOnly ? CARD_VOCAB.peakSupply : CARD_VOCAB.peakCollateral}
           collateral={supplyLines.length > 0 ? <div className="flex flex-col gap-1">{supplyLines}</div> : <StatDash />}
           collateralFootnote={noPeaksNote}
@@ -509,9 +530,12 @@ export function CompoundPositionCard({
   }
   // Footnote: chain value already includes interest; without it, Ethereum
   // shows the balance at the last event and Base the replayed principal.
-  const lentNote = eff.isChain ? "incl. interest" : "earns supply rate";
+  // A live balance ticks with interest between loads: the block it was read
+  // at is stated once, on the base's footnote.
+  const liveAt = eff.isChain && v.current?.block ? ` · live at block ${v.current.block.toLocaleString("en-US")}` : "";
+  const lentNote = eff.isChain ? `incl. interest${liveAt}` : "earns supply rate";
   const borrowNote = eff.isChain
-    ? "incl. interest"
+    ? `incl. interest${liveAt}`
     : vocab.baseAtLastEvent
       ? "at the last event"
       : "principal (ex-interest)";
@@ -538,9 +562,8 @@ export function CompoundPositionCard({
     asset: v.base.address,
     blockNumber: v.atBlock,
   };
-  const baseExact = formatUnitsExact(eff.isChain ? v.current!.amountRaw : v.base.amountRaw, v.base.decimals).replace(
-    /^-/,
-    "",
+  const baseExact = formatExactDecimal(
+    formatUnitsExact(eff.isChain ? v.current!.amountRaw : v.base.amountRaw, v.base.decimals).replace(/^-/, ""),
   );
   // Dust lines (under a cent) leave the icon stack and its "+N"; the lines
   // put them behind the "N dust reserves hidden" control.
@@ -575,6 +598,7 @@ export function CompoundPositionCard({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            countTip={COUNT_TIP}
             liquidationCount={v.liquidationCount}
             liquidated={v.everLiquidated}
           />
@@ -589,7 +613,11 @@ export function CompoundPositionCard({
             // Supply side: "Lent" when the base sits here (net lender), else the
             // borrower's posted "Collateral".
             label: eff.side === "lend" ? "Lent" : "Collateral",
-            assetIcons: supplySymbols.length > 0 ? <InlineAssetCluster symbols={supplySymbols} /> : undefined,
+            // The token stack below draws its own icons: the cluster only rides a dollar headline.
+            assetIcons:
+              supplyUsd != null && supplySymbols.length > 0 ? (
+                <InlineAssetCluster symbols={supplySymbols} />
+              ) : undefined,
             value:
               supplyUsd != null ? (
                 <UsdHeadline
@@ -617,7 +645,8 @@ export function CompoundPositionCard({
           },
           {
             label: CARD_VOCAB.debt,
-            assetIcons: eff.side === "borrow" ? <InlineAssetCluster symbols={[v.base.symbol]} /> : undefined,
+            assetIcons:
+              borrowUsd != null && eff.side === "borrow" ? <InlineAssetCluster symbols={[v.base.symbol]} /> : undefined,
             value:
               borrowUsd != null ? (
                 <UsdHeadline usd={borrowUsd} info={compoundUsdProvOnchain("Borrowed base", coords)} />
@@ -647,6 +676,19 @@ export function CompoundPositionCard({
 }
 
 /** Build a card view from the listing summary row. */
+/** A liquidated card's dates: the last absorb, then the closing when it
+ *  falls on a different day. */
+function outcomeDates(v: CompoundPositionView): { label: string; at: number }[] | undefined {
+  const last = v.lastLiquidationAt;
+  if (v.status !== "liquidated" || last == null) return undefined;
+  if (v.lastActivityAt == null) return [{ label: "Liquidated", at: last }];
+  if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  return [
+    { label: "Liquidated", at: last },
+    { label: "Closed", at: v.lastActivityAt },
+  ];
+}
+
 export function viewFromSummary(s: CompoundPositionSummary): CompoundPositionView {
   return {
     market: s.market,
@@ -661,6 +703,7 @@ export function viewFromSummary(s: CompoundPositionSummary): CompoundPositionVie
     peak: { collateral: s.peak.collateral, lentBase: s.peak.lentBase, borrowedBase: s.peak.borrowedBase },
     everLiquidated: s.everLiquidated,
     liquidationCount: s.liquidationCount,
+    lastLiquidationAt: s.lastLiquidationAt,
     txCount: s.txCount,
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,

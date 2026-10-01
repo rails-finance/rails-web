@@ -145,6 +145,8 @@ export interface PriceRunwayProps {
   /** Replaces the safe-side figure's wording (e.g. a runway read against the
    *  debt asset, or "At the liquidation line"). */
   label?: string;
+  /** Let a long `label` wrap on a phone, as the price-fall wording does. */
+  wrapLabel?: boolean;
   /** Compact only: draw the bar alone, the figure kept for screen readers —
    *  for a host line that states the same figure beside it (the Aave V3
    *  card's "Liquidates on a 77% drop"). */
@@ -159,6 +161,7 @@ export function PriceRunway({
   compact,
   asset,
   label,
+  wrapLabel,
   barOnly,
 }: PriceRunwayProps) {
   const hasLiq = liqPrice != null && liqPrice > 0;
@@ -257,7 +260,7 @@ export function PriceRunway({
           className={
             barOnly && !underwater
               ? "sr-only"
-              : `text-[11px] tabular-nums text-rb-500 ${asset ? "min-w-0" : "shrink-0 whitespace-nowrap"}`
+              : `text-[11px] tabular-nums text-rb-500 ${asset || wrapLabel ? "min-w-0" : "shrink-0 whitespace-nowrap"}`
           }
         >
           {underwater ? (

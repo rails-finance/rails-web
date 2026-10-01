@@ -29,18 +29,18 @@ export function compoundPositionContent(opts: {
   const marketNote: { bold: string; text: string } = onBase
     ? {
         bold: "A separate deployment",
-        text: "Compound V3 on Base runs its own Comet markets, independent of Compound V3 on Ethereum — a position on one says nothing about the other.",
+        text: "Compound V3 on Base runs separate markets (each market is a contract Compound calls a Comet), separate from Compound V3 on Ethereum: a position on one says nothing about the other.",
       }
     : {
         bold: "One market per base asset",
-        text: "each Comet deployment lends and borrows exactly one base asset — this card's market is one of several Ethereum Comets, each fully independent.",
+        text: "each market (a contract Compound calls a Comet) lends and borrows one base asset. This card's market is one of several on Ethereum, and they share nothing.",
       };
 
   if (opts.status === "liquidated") {
     return {
       title: "About This Position",
       intro:
-        "This position was absorbed when its debt outgrew its collateral's liquidation value. The panel above reconstructs its final state — the highest recorded base and collateral it ever held.",
+        "This position was absorbed (Compound V3's word for liquidated) when its debt outgrew its liquidation line, and nothing is borrowed or posted now. The panel above shows the most it ever held and owed.",
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -61,15 +61,15 @@ export function compoundPositionContent(opts: {
     return {
       title: "About This Position",
       intro:
-        "This position has unwound to zero — its debt repaid and its collateral withdrawn. The panel above shows its lifetime peaks: the highest base and collateral it ever held.",
+        "This position has unwound: its debt is repaid and its collateral withdrawn, with at most dust worth under a cent left. The panel above shows the most it ever held and owed.",
       detailsHeading: "Key concepts:",
       details: [
         {
           bold: "Highest recorded",
           text:
             opts.deployment === "compound-base"
-              ? "each peak is the maximum of its running balance, replayed from the position's own events — a principal figure, not the interest-bearing current value."
-              : "each peak is the highest balance the position held at any of its events, each the chain's balance at that block, interest included.",
+              ? "each peak is the highest balance the position held just before or just after any of its events, read from the chain at that block where the block was read, interest included."
+              : "each peak is the highest balance the position held just before or just after any of its events, each the chain's balance at that block, interest included.",
         },
         {
           bold: "One signed base balance",
@@ -93,7 +93,7 @@ export function compoundPositionContent(opts: {
     opts.side === "borrow"
       ? {
           bold: "Absorb liquidation",
-          text: "past the liquidate collateral factor the protocol itself absorbs the account — seizing the collateral and clearing the whole base debt in one step, crediting back the difference minus a penalty.",
+          text: "past the liquidate collateral factor the protocol absorbs the account — seizing the collateral and clearing the whole base debt in one step, crediting each asset at its liquidation factor, a share of its value; the protocol keeps the rest.",
         }
       : {
           bold: "No borrowing, no liquidation risk",
@@ -105,7 +105,7 @@ export function compoundPositionContent(opts: {
   return {
     title: "About This Position",
     intro:
-      "This panel explains the position's live state in plain language — the signed base balance it holds, the collateral backing any borrowing, and what triggers an absorb, all read from this market's own Comet contract at the block this card names.",
+      "This panel explains the position's live state in plain language: the base balance it holds, the collateral backing any borrowing, and what would trigger an absorb (Compound V3's word for a liquidation), all read from this market's contract at the block this card names.",
     detailsHeading: "Key concepts:",
     details,
     links: LINKS,

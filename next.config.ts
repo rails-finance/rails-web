@@ -246,6 +246,14 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // Compound V3's Ethereum markets page is /markets; Base's is /market
+      // (the Base roster's own tab). The plural lands on it rather than on the
+      // wallet route, which would read "markets" as an address.
+      {
+        source: "/base/compound-v3/markets",
+        destination: "/base/compound-v3/market",
+        permanent: false,
+      },
       // An f(x) position sits at /ethereum/fx/<pool>-<id>; a /positions/
       // segment in front of the slug (the shape other explorers use) lands
       // on it.

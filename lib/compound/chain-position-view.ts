@@ -118,12 +118,36 @@ export function cometViewFromChain(
     live != null && (live.supplyBalanceRaw !== "0" || live.borrowBalanceRaw !== "0" || live.collateral.length > 0);
   const everLiquidated = replay?.everLiquidated ?? false;
 
+  // Balances every one worth under a cent at the oracle, with nothing
+  // borrowed: what a closed position leaves behind (a supply's rounding, the
+  // last units of a withdrawal). The card reads it as closed and names the
+  // dust; an unpriced balance is never called dust.
+  const usdOf = (address: string, amount: number): number | null => {
+    const p = prices?.[address.toLowerCase()];
+    return typeof p === "number" && p > 0 ? amount * p : null;
+  };
+  const dustLeft: { symbol: string; amount: number }[] = [];
+  let dustOnly = holds && live != null && live.borrowBalanceRaw === "0";
+  if (dustOnly && current && current.amount > 0) {
+    const usd = usdOf(baseToken, current.amount);
+    if (usd == null || usd >= 0.01) dustOnly = false;
+    else dustLeft.push({ symbol: market.baseSymbol, amount: current.amount });
+  }
+  for (const c of collateral) {
+    if (!dustOnly) break;
+    const usd = usdOf(c.address, c.amount);
+    if (usd == null || usd >= 0.01) dustOnly = false;
+    else dustLeft.push({ symbol: c.symbol, amount: c.amount });
+  }
+  const open = holds && !dustOnly;
+
   return {
     market: market.key,
     marketLabel: market.label,
     comet: market.comet,
     account: wallet,
-    status: holds ? "open" : everLiquidated ? "liquidated" : "closed",
+    status: open ? "open" : everLiquidated ? "liquidated" : "closed",
+    ...(holds && !open ? { dustLeft } : {}),
     base: {
       symbol: market.baseSymbol,
       address: baseToken,
@@ -144,6 +168,7 @@ export function cometViewFromChain(
     // not the rest of its life was read — the same stance the Aave family's
     // view takes, counting liquidations off the events it holds.
     liquidationCount: replay?.liquidationCount ?? 0,
+    lastLiquidationAt: replay?.lastLiquidationAt ?? null,
     txCount: lifeReplay?.txCount ?? 0,
     lastActivityAt: lifeReplay?.lastActivityAt ?? null,
     atBlock: live?.blockNumber,

@@ -17,15 +17,25 @@ const intro = (
       markets — and nothing shared with the Ethereum markets of the same names.
     </p>
     <p>
-      Each row of the listing is one wallet&apos;s account in one market: base supplied or borrowed and collateral
-      posted, every figure read from that Comet itself at the block the row names, with dollar values from the feeds the
-      market liquidates with. Opening a row shows the wallet across every market at once, with its whole history. Or{" "}
+      Each row of the listing is one position: one wallet&apos;s account in one market (Compound calls each market a
+      Comet), with base supplied or borrowed and collateral posted, every figure read from that market&rsquo;s contract
+      at the block the row names, with dollar values from the feeds the market liquidates with. Opening a row shows the
+      wallet across every market at once, with its whole history. Or{" "}
       <Link href="/base/compound-v3/market" className="text-blue-500 hover:underline">
         see each market and how heavily it is lent out
       </Link>
       .
     </p>
-    <BaseLendingCoverageNote route="/api/compound-base/coverage" unreadListed={false} />
+    <BaseLendingCoverageNote
+      route="/api/compound-base/coverage"
+      unreadListed={false}
+      subject="these five markets"
+      subjectPossessive="the earliest market’s"
+      noun="position"
+    />
+    <p>
+      The listing&rsquo;s filters narrow that count; its footer states how many positions the current filters match.
+    </p>
   </>
 );
 

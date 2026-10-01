@@ -10,7 +10,12 @@
 // CompoundPositionSummary. Chain-direct amounts only — no HF, no USD (layers).
 
 import { resolveErc20Meta, scaleRaw, decimalsUnreadFlag, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { resolveCometPrices, cometPriceOf, type CometPriceRequest } from "@/lib/sources/chain/compound-prices";
+import {
+  cometRosterOf,
+  resolveCometPrices,
+  cometPriceOf,
+  type CometPriceRequest,
+} from "@/lib/sources/chain/compound-prices";
 import { marketOf, COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 
 /** "unread" is a row whose account has not been read from the chain yet — no
@@ -88,6 +93,8 @@ export interface CompoundPositionSummary {
   };
   everLiquidated: boolean;
   liquidationCount: number;
+  /** Unix seconds of the last absorb; null where none, or not served. */
+  lastLiquidationAt: number | null;
   lastActivityAt: number | null;
   lastBlockNumber: number;
   lastTxHash: string | null;
@@ -181,7 +188,16 @@ export async function buildCompoundPositionRows(
   // the chain-state view. Degrades to an empty map (token-only) if RPC is down.
   const priceReqs: CometPriceRequest[] = raw.map((p) => {
     const m = market(p.market);
-    return { comet: m.comet, baseToken: m.baseToken, collateral: p.collateral.map((c) => c.asset) };
+    // The peaks too: a closed position's only collateral lives there, and its
+    // lifetime flows are valued at these prices.
+    return {
+      comet: m.comet,
+      baseToken: m.baseToken,
+      collateral: [...p.collateral.map((c) => c.asset), ...(p.peakCollateral ?? []).map((c) => c.asset)],
+      // One wallet's rows: every listed asset, since its lifetime flows can
+      // name collateral it no longer holds and has no peak row for.
+      wholeRoster: raw.length <= 8,
+    };
   });
   const cometPrices = await resolveCometPrices(priceReqs, deployment);
 
@@ -269,6 +285,7 @@ export async function buildCompoundPositionRows(
     // asset that ever flowed has a nonzero peak. The card's peak rows stay
     // token-only regardless.
     for (const c of peakCollateral) putPrice(c.address);
+    if (raw.length <= 8) for (const token of cometRosterOf(m.comet)) putPrice(token);
 
     return {
       market: p.market,
@@ -297,6 +314,7 @@ export async function buildCompoundPositionRows(
       },
       everLiquidated: p.everLiquidated,
       liquidationCount: p.liquidationCount,
+      lastLiquidationAt: p.lastLiquidationAt ?? null,
       lastActivityAt: p.lastActivityAt,
       lastBlockNumber: p.lastBlockNumber,
       lastTxHash: p.lastTxHash,

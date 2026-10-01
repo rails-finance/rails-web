@@ -1644,11 +1644,25 @@ export interface CompoundContext {
    *  (8-dec USD on chain; human-readable string here). The one USD figure at
    *  this tier — it is a chain field, not a layer. */
   usdValue?: string;
+  /** absorb_* in an ETH-quoted market (cWETHv3) only. Comet emits `usdValue`
+   *  in the market's quote unit, which there is WETH (the base feed is a
+   *  constant 1). `quoteValue` is that emitted figure; `quoteUsd` is Comet's
+   *  WETH/USD price at the absorb block (a USD-quoted Comet's WETH feed), and
+   *  `usdValue` above is their product. Without a `quoteUsd` read, `usdValue`
+   *  is absent. */
+  quoteValue?: string;
+  quoteUsd?: string;
+  /** The row came from a live sweep of the Comet's logs, which carry the
+   *  amounts moved but not the interest between them: `baseAfter` is their
+   *  running sum, which the lifetime walk reads and the row does not show
+   *  (Base lane only). */
+  baseUnsettled?: boolean;
   /** absorb_debt only — the same-transaction AbsorbCollateral legs (Comet
    *  absorbs the whole account: one debt clear + every collateral seized).
    *  Per asset: the seized amount and the log's own usdValue, both
-   *  human-readable. Lets the debt card state the full absorption. */
-  absorbedCollateral?: { symbol: string; amount: string; usdValue: string }[];
+   *  human-readable (in dollars; `quoteValue` is the emitted figure in an
+   *  ETH-quoted market). Lets the debt card state the full absorption. */
+  absorbedCollateral?: { symbol: string; address?: string; amount: string; usdValue: string; quoteValue?: string }[];
 }
 
 // ───────────────────────── PWN (P2P fixed-term loans) detail types ─────────────────────────

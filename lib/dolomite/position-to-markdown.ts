@@ -90,7 +90,9 @@ export function dolomitePositionToMarkdown(args: DolomitePositionMarkdownArgs): 
   if (view.liquidationCount > 0) {
     lines.push(
       `- **Liquidations:** ${view.liquidationCount}` +
-        (view.status === "open" ? " — the account remains open: Dolomite liquidations are partial and repeatable" : ""),
+        (view.status === "open"
+          ? " — the account remains open: a liquidation repays half or all of the debt, and the collateral left over stays in the account"
+          : ""),
     );
   }
   lines.push("");

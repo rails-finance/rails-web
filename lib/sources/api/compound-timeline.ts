@@ -9,14 +9,17 @@
 // events. The replay lives server-side in the MV; only chain-direct presentation
 // lives here. No health factor and no derived USD — those are layers, absent
 // from baseline. The one USD that DOES ship is the absorb events' own emitted
-// usdValue (a chain field, not a layer): the liquidation forensics legs.
+// usdValue (a chain field, not a layer): the liquidation forensics legs. In
+// cWETHv3 that field is in WETH, and it is converted at Comet's own WETH/USD
+// at the absorb block (lib/sources/chain/compound-prices.ts).
 //
 // SERVER-ONLY — imported from the /api/compound/* route handlers.
 
 import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
 import type { BaseActivityEvent, AssetFlow, CompoundContext, CompoundEventType } from "@/lib/shared/types/event-shape";
 import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { marketOf } from "@/lib/compound/asset-catalog";
+import { COMPOUND_DEPLOYMENT, marketOf } from "@/lib/compound/asset-catalog";
+import { cometEthUsdAtBlocks } from "@/lib/sources/chain/compound-prices";
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -169,8 +172,28 @@ export async function buildCompoundTimeline(
     list.push(r);
     absorbCollByTx.set(r.tx_hash, list);
   }
-  /** The event's own usdValue (8-dec USD on chain) → human string. */
-  const usdOf = (raw: string | null): string | undefined => (raw == null ? undefined : fmtUnits(bigintOf(raw), 8));
+  // An ETH-quoted market's absorb emits its value in WETH: the dollar figure
+  // is that times Comet's WETH/USD at the absorb block (one read per block).
+  const ethAbsorbBlocks = rows
+    .filter(
+      (r) => (r.action === "absorb_debt" || r.action === "absorb_collateral") && marketOf(r.market).quoteUnit === "ETH",
+    )
+    .map((r) => Number(r.block_number));
+  const ethUsd = ethAbsorbBlocks.length > 0 ? await cometEthUsdAtBlocks(COMPOUND_DEPLOYMENT, ethAbsorbBlocks) : null;
+  /** The event's own usdValue (8 decimals, in the market's quote unit) → dollars as a human string; absent where an
+   *  ETH-quoted market's WETH/USD read did not answer. */
+  const usdOf = (raw: string | null, market: string, block: number): string | undefined => {
+    if (raw == null) return undefined;
+    if (marketOf(market).quoteUnit !== "ETH") return fmtUnits(bigintOf(raw), 8);
+    const px = ethUsd?.get(block);
+    return px == null ? undefined : fmtUnits((bigintOf(raw) * px) / BigInt(1e8), 8);
+  };
+  /** The emitted figure in an ETH-quoted market (WETH), and the WETH/USD it was converted at. */
+  const quoteOf = (raw: string | null, market: string, block: number): { quoteValue?: string; quoteUsd?: string } => {
+    if (raw == null || marketOf(market).quoteUnit !== "ETH") return {};
+    const px = ethUsd?.get(block);
+    return { quoteValue: fmtUnits(bigintOf(raw), 8), ...(px != null ? { quoteUsd: fmtUnits(px, 8) } : {}) };
+  };
 
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
@@ -223,15 +246,26 @@ export async function buildCompoundTimeline(
       // reckoning at absorption, emitted on chain); the debt leg also gets
       // its same-tx seized-collateral legs so its card can state the full
       // absorption.
-      ...(kind === "absorb_debt" || kind === "absorb_collateral" ? { usdValue: usdOf(r.usd_value) } : {}),
+      ...(kind === "absorb_debt" || kind === "absorb_collateral"
+        ? { usdValue: usdOf(r.usd_value, r.market, block), ...quoteOf(r.usd_value, r.market, block) }
+        : {}),
       ...(kind === "absorb_debt"
         ? {
             absorbedCollateral: (absorbCollByTx.get(r.tx_hash) ?? []).flatMap((s) => {
               const sMeta = metas.get((s.asset ?? "").toLowerCase()) ?? fallback((s.asset ?? "").toLowerCase());
-              const sUsd = usdOf(s.usd_value);
+              const sUsd = usdOf(s.usd_value, s.market, Number(s.block_number));
               if (sUsd == null) return [];
+              const sQuote = quoteOf(s.usd_value, s.market, Number(s.block_number)).quoteValue;
               const seized = -bigintOf(s.coll_delta); // coll_delta is negative on a seize
-              return [{ symbol: sMeta.symbol, amount: fmtUnits(seized, sMeta.decimals), usdValue: sUsd }];
+              return [
+                {
+                  symbol: sMeta.symbol,
+                  address: (s.asset ?? "").toLowerCase(),
+                  amount: fmtUnits(seized, sMeta.decimals),
+                  usdValue: sUsd,
+                  ...(sQuote != null ? { quoteValue: sQuote } : {}),
+                },
+              ];
             }),
           }
         : {}),

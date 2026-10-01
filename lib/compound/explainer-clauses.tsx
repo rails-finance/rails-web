@@ -51,14 +51,19 @@ import {
   movedDeltaProv,
   baseAfterProv,
   collateralAfterProv,
-  absorbDebtUsdProv,
   absorbSeizedUsdProv,
-  absorbMarginProv,
+  absorbDebtClearedProv,
+  absorbCreditProv,
+  absorbCreditedUsdProv,
+  absorbKeptProv,
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
 import { marketOf, type CometMarket } from "@/lib/compound/asset-catalog";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { decimalSub, formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { compoundAbsorbSplit, compoundAmount, compoundBaseBefore } from "@/lib/compound/row-facts";
 import { AmountText } from "@/components/shared/amount-text";
+import { externalActor } from "@/lib/shared/external-actor";
+import { CompoundTxSenderNote } from "@/components/protocol/compound/compound-tx-sender-note";
 
 /** Below this magnitude a leg reads as zero — the sub-precision residual a
  *  crossed base balance or a fully spent balance leaves behind. */
@@ -121,34 +126,24 @@ function Fig({
  *  explorer: adding value needs no permission at all, and removing it needs a
  *  manager authorisation that is a single all-or-nothing boolean — no
  *  per-asset and no per-amount cap, unlike Aave's capped delegation. */
-function fundedByOtherMechanic(ctx: CompoundContext): ClauseInput[] {
-  if (!ctx.txFrom || !ctx.funder) return [];
+function fundedByOtherMechanic(ctx: CompoundContext, owner: string, coords: CompoundCoords): ClauseInput[] {
   const isBaseSupply = ctx.eventType === "supply";
   if (!isBaseSupply && ctx.eventType !== "supply_collateral") return [];
+  // Only where the owner neither signed the transaction nor provided the
+  // tokens: a wallet that supplies for itself (directly, or through a router
+  // that names it as the funder) is its own actor.
+  const actor = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.funder }, owner);
+  if (!actor) return [];
   return [
     clause(
-      isBaseSupply ? (
-        <>
-          Another account executed this on the owner&rsquo;s behalf, and the tokens came from that account rather than
-          this one. Comet asks the owner for nothing before value is added to their position — a supply names the
-          account it credits, and on the base asset that same path is how a debt gets repaid, so anyone can pay down
-          anyone&rsquo;s borrowing.
-        </>
-      ) : (
-        <>
-          Another account executed this on the owner&rsquo;s behalf, and the tokens came from that account rather than
-          this one. Comet asks the owner for nothing before collateral is added to their position — a supply names the
-          account it credits, and no consent from that account is checked.
-        </>
-      ),
-    ),
-    clause(
-      <>
-        Taking value back out is the opposite. The owner must first authorise the other account as a manager of theirs,
-        and that authorisation is one all-or-nothing switch — every asset, withdrawals and transfers alike, with no
-        amount cap. Because a base withdrawal past the account&rsquo;s own balance is the borrow itself, the same switch
-        is also what would let another account borrow against this collateral.
-      </>,
+      <CompoundTxSenderNote
+        txHash={coords.txHash}
+        account={owner}
+        actor={actor}
+        funder={ctx.funder!}
+        chainId={coords.chainId}
+        isBaseSupply={isBaseSupply}
+      />,
     ),
   ];
 }
@@ -161,7 +156,7 @@ export function compoundEventSlots(
   market: CometMarket = marketOf(ctx.market),
 ): EventProseSlots {
   const slots = compoundEventSlotsBase(ctx, coords, siblings, self, market);
-  const funded = fundedByOtherMechanic(ctx);
+  const funded = fundedByOtherMechanic(ctx, self.wallet, coords);
   if (funded.length === 0) return slots;
   return { ...slots, meansNow: [...(slots.meansNow ?? []), ...funded] };
 }
@@ -177,7 +172,7 @@ function compoundEventSlotsBase(
   const market = ctx.marketLabel;
   const raw = Number(ctx.assetsDelta);
   const signedDelta = Number.isFinite(raw) ? raw : 0;
-  const amt = formatNumber(Math.abs(signedDelta));
+  const amt = compoundAmount(Math.abs(signedDelta));
 
   // The moved delta — the header's own change receipt (same prov / value /
   // symbol → same entry key), so this bold figure maps to the amount above it.
@@ -211,6 +206,7 @@ function compoundEventSlotsBase(
   // The resulting base state, stated plainly (the never-empty floor drops it
   // when the after-balance is absent).
   const baseAfterClause = (): ClauseInput => {
+    if (ctx.baseUnsettled) return clause(<>The balance after it, with interest, is still being read.</>);
     if (ctx.baseAfter == null) return null;
     const a = Number(ctx.baseAfter);
     if (a > COMPOUND_EPS) return clause(<>The account now lends {baseAfterFig()}.</>);
@@ -223,7 +219,7 @@ function compoundEventSlotsBase(
   // (base) panel, sharing its receipt.
   const collAfterClause = (): ClauseInput => {
     if (ctx.collateralAfter == null) return null;
-    const base = ctx.baseAfter != null ? Number(ctx.baseAfter) : null;
+    const base = ctx.baseAfter != null && !ctx.baseUnsettled ? Number(ctx.baseAfter) : null;
     if (base != null && base < -COMPOUND_EPS) {
       const baseSym = cometMarket.baseSymbol;
       return clause(
@@ -239,76 +235,89 @@ function compoundEventSlotsBase(
     return clause(<>The account now holds {collAfterFig()} as collateral.</>);
   };
 
-  // The absorption's valued two-leg breakdown — the AbsorbDebt card's own
-  // forensics (seized vs cleared, at the protocol's absorption-time valuations),
-  // echoed onto the same receipts. Gated exactly as the detail's forensics
-  // build, so a leg it can't value never registers here as a stray primary.
-  const absorbValued = (): ClauseInput[] => {
-    const legs = ctx.absorbedCollateral;
-    const clearedUsd = Number(ctx.usdValue);
-    const clearedAmt = Number(ctx.assetsDelta);
-    if (!legs?.length || !Number.isFinite(clearedUsd) || clearedUsd <= 0) return [];
-    const seizedUsd = legs.reduce((s, l) => s + Number(l.usdValue), 0);
-    if (!Number.isFinite(seizedUsd)) return [];
-    const margin = seizedUsd / clearedUsd - 1;
-    const marginPct = `${margin >= 0 ? "+" : "−"}${(Math.abs(margin) * 100).toFixed(2)}%`;
-    const seizedFig = (
+  // The absorb's debt row, in the breakdown's own figures: the debt it
+  // cleared, the credit it left past the debt, and the seized value against
+  // what the account was credited for it (the difference is what the
+  // protocol kept). Every figure echoes a receipt the row's breakdown owns.
+  const split = compoundAbsorbSplit(ctx);
+  const clearedFig = () =>
+    split ? (
       <Fig
         echo
-        info={absorbSeizedUsdProv(coords, legs)}
-        value={formatUsdValue(seizedUsd)}
-        symbol={legs.length === 1 ? legs[0].symbol : undefined}
+        info={absorbDebtClearedProv(sym, coords, {
+          paidOut: formatExactDecimal(split.paidOut),
+          before: formatExactDecimal(split.before),
+        })}
+        value={split.cleared}
+        symbol={sym}
       >
+        {compoundAmount(Number(split.cleared))} {sym}
+      </Fig>
+    ) : (
+      deltaFig
+    );
+  const creditFig = () =>
+    split ? (
+      <Fig
+        echo
+        info={absorbCreditProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
+        value={split.credit}
+        symbol={sym}
+      >
+        {compoundAmount(Number(split.credit))} {sym}
+      </Fig>
+    ) : null;
+  const absorbValued = (): ClauseInput[] => {
+    const legs = ctx.absorbedCollateral;
+    const creditedUsd = Number(ctx.usdValue);
+    if (!split || !legs?.length || !Number.isFinite(creditedUsd) || creditedUsd <= 0) return [];
+    const seizedUsd = legs.reduce((s, l) => s + Number(l.usdValue), 0);
+    if (!Number.isFinite(seizedUsd)) return [];
+    const kept = seizedUsd - creditedUsd;
+    const seizedFig = (
+      <Fig echo info={absorbSeizedUsdProv(coords, legs)} value={formatUsdValue(seizedUsd)}>
         {formatUsdValue(seizedUsd)}
       </Fig>
     );
-    const clearedFig = (
+    const creditedFig = (
       <Fig
         echo
-        info={absorbDebtUsdProv(sym, coords, { amount: `${Math.abs(clearedAmt)} ${sym}` })}
-        value={formatUsdValue(clearedUsd)}
-        symbol={sym}
+        info={absorbCreditedUsdProv(sym, coords, { paidOut: formatExactDecimal(split.paidOut) })}
+        value={formatUsdValue(creditedUsd)}
       >
-        {formatUsdValue(clearedUsd)}
+        {formatUsdValue(creditedUsd)}
       </Fig>
     );
-    const marginFig = (
+    const keptFig = (
       <Fig
         echo
-        info={absorbMarginProv(coords, {
+        info={absorbKeptProv(coords, {
           seizedUsd: formatUsdValue(seizedUsd),
-          clearedUsd: formatUsdValue(clearedUsd),
+          creditedUsd: formatUsdValue(creditedUsd),
         })}
-        value={marginPct}
+        value={formatUsdValue(Math.abs(kept))}
       >
-        {marginPct}
+        {formatUsdValue(Math.abs(kept))}
       </Fig>
     );
-    return margin >= 0
+    return kept >= 0
       ? [
           clause(
             <>
-              At the protocol&rsquo;s own absorption-time valuations, the seized collateral was worth {seizedFig}{" "}
-              against {clearedFig} of debt cleared.
+              At the absorb&rsquo;s prices the seized collateral was worth {seizedFig}, and the account was credited{" "}
+              {creditedFig} for it: each asset at its liquidation factor, a share of its value.
             </>,
           ),
-          clause(
-            <>
-              That leaves a {marginFig} margin, kept in the protocol&rsquo;s reserves and resold to liquidators at a
-              discount.
-            </>,
-          ),
+          clause(<>The protocol kept the other {keptFig}, which is what the absorb cost the account.</>),
         ]
       : [
           clause(
             <>
-              At the protocol&rsquo;s own absorption-time valuations, the seized collateral was worth only {seizedFig}{" "}
-              against {clearedFig} of debt cleared.
+              At the absorb&rsquo;s prices the seized collateral was worth only {seizedFig} against a debt worth{" "}
+              {creditedFig}.
             </>,
           ),
-          clause(
-            <>The account was absorbed {marginFig} under water, and the gap fell to the protocol&rsquo;s reserves.</>,
-          ),
+          clause(<>The protocol&rsquo;s reserves covered the {keptFig} difference.</>),
         ];
   };
 
@@ -320,27 +329,71 @@ function compoundEventSlotsBase(
     const sib = siblings.find((s) => s !== self && s.context.data.eventType === "absorb_debt");
     if (sib) {
       const sc = sib.context.data;
-      const cleared = formatNumber(Math.abs(Number(sc.assetsDelta)));
+      const sibSplit = compoundAbsorbSplit(sc);
+      const cleared = compoundAmount(Number(sibSplit?.cleared ?? Math.abs(Number(sc.assetsDelta))));
       return clause(
         <>
-          In the same transaction, the protocol cleared the account&rsquo;s entire base debt of {cleared}{" "}
-          {sc.assetSymbol} in one absorption — Comet absorbs whole accounts, not slices.
+          In the same transaction the protocol cleared the account&rsquo;s whole debt, {cleared} {sc.assetSymbol}: an
+          absorb takes the whole account at once.
         </>,
       );
     }
     return clause(
       <>
-        In the same transaction, the protocol cleared the account&rsquo;s entire base debt in one absorption — Comet
-        absorbs whole accounts, not slices.
+        In the same transaction the protocol cleared the account&rsquo;s whole debt: an absorb takes the whole account
+        at once.
       </>,
     );
   };
 
+  // A call for nothing moves nothing.
+  if ((ctx.eventType === "supply" || ctx.eventType === "withdraw") && /^-?0(\.0*)?$/.test(ctx.assetsDelta)) {
+    return {
+      happened: [
+        clause(
+          <>
+            A {ctx.eventType} call for 0 {sym} on the {market} market: nothing moved, and the balance did not change.
+          </>,
+        ),
+      ],
+      changed: [],
+    };
+  }
+
+  // A swept row has no balance before it, so whether a supply repaid or lent,
+  // or a withdrawal drew savings or borrowed, is not known yet.
+  if (ctx.baseUnsettled && (ctx.eventType === "supply" || ctx.eventType === "withdraw"))
+    return {
+      happened: [
+        clause(
+          ctx.eventType === "supply" ? (
+            <>
+              Supplied {deltaFig} to the {market} market.
+            </>
+          ) : (
+            <>
+              Withdrew {deltaFig} from the {market} market.
+            </>
+          ),
+        ),
+      ],
+      changed: [],
+      meansNow: [baseAfterClause()],
+    };
+
   switch (ctx.eventType) {
     case "supply": {
-      const before = ctx.baseAfter != null ? Number(ctx.baseAfter) - signedDelta : null;
+      // The balance before, exact, with Comet's one-unit rounding read as zero.
+      const beforeStr = compoundBaseBefore(ctx, cometMarket.baseDecimals);
+      const before = beforeStr != null ? Number(beforeStr) : null;
       const repay = before != null && signedDelta > 0 ? Math.min(signedDelta, Math.max(0, -before)) : 0;
       const lent = signedDelta - repay;
+      const repayText =
+        beforeStr != null && beforeStr.startsWith("-") ? compoundAmount(Number(beforeStr.slice(1))) : "0";
+      const lentText =
+        beforeStr != null && beforeStr.startsWith("-")
+          ? compoundAmount(Number(decimalSub(ctx.assetsDelta, beforeStr.slice(1)) ?? lent))
+          : compoundAmount(lent);
       const happened =
         repay > COMPOUND_EPS && lent > COMPOUND_EPS
           ? clause(
@@ -363,8 +416,8 @@ function compoundEventSlotsBase(
         repay > COMPOUND_EPS && lent > COMPOUND_EPS
           ? clause(
               <>
-                <AmountText value={repay} /> {sym} cleared the outstanding base debt, and the remaining{" "}
-                <AmountText value={lent} /> {sym} is lent out to earn the supply rate.
+                {repayText} {sym} cleared the outstanding base debt, and the remaining {lentText} {sym} is lent out to
+                earn the supply rate.
               </>,
             )
           : repay > COMPOUND_EPS
@@ -375,7 +428,8 @@ function compoundEventSlotsBase(
 
     case "withdraw": {
       const mag = Math.abs(signedDelta);
-      const before = ctx.baseAfter != null ? Number(ctx.baseAfter) - signedDelta : null;
+      const wBefore = compoundBaseBefore(ctx, cometMarket.baseDecimals);
+      const before = wBefore != null ? Number(wBefore) : null;
       const fromSavings = before != null ? Math.min(mag, Math.max(0, before)) : mag;
       const borrowed = mag - fromSavings;
       const happened =
@@ -437,42 +491,51 @@ function compoundEventSlotsBase(
         meansNow: [collAfterClause()],
       };
 
-    case "absorb_debt":
+    case "absorb_debt": {
+      const credit = split ? Number(split.credit) : 0;
       return {
         happened: [
           clause(
-            <>The account&rsquo;s debt passed its liquidation line, so the protocol absorbed the whole account.</>,
-          ),
-        ],
-        changed: [
-          clause(
-            <>It cleared {deltaFig} of base debt in one step — Compound V3 liquidates whole accounts, not slices.</>,
-          ),
-          clause(
             <>
-              The account is credited its seized collateral&rsquo;s value minus each asset&rsquo;s liquidation penalty,
-              in {sym}.
+              The account&rsquo;s debt passed its liquidation line, so the protocol absorbed it: Compound V3&rsquo;s
+              liquidation, which takes the whole account at once.
             </>,
           ),
         ],
+        changed: [
+          credit > COMPOUND_EPS
+            ? clause(
+                <>
+                  It cleared {clearedFig()} of debt, and {creditFig()} was left over after the debt, which stays in the
+                  account as a lent balance.
+                </>,
+              )
+            : clause(<>It cleared {clearedFig()} of debt.</>),
+        ],
         meansNow: absorbValued(),
       };
+    }
 
     case "absorb_collateral": {
       const usd = Number(ctx.usdValue);
       const seize =
         ctx.usdValue != null && Number.isFinite(usd) ? (
           <>
-            In this liquidation, the protocol seized {deltaFig} of collateral, worth {formatUsdValue(usd)} at its
-            absorption-time valuation.
+            In this liquidation the protocol seized {deltaFig} of collateral, worth {formatUsdValue(usd)} at the
+            absorb&rsquo;s prices.
           </>
         ) : (
-          <>In this liquidation, the protocol seized {deltaFig} of collateral.</>
+          <>In this liquidation the protocol seized {deltaFig} of collateral.</>
         );
       return {
         happened: [clause(seize)],
         changed: [
-          clause(<>The protocol keeps it to resell to liquidators at a discount, recapitalising its reserves.</>),
+          clause(
+            <>
+              The protocol keeps it and later sells it at a discount to anyone paying in the base asset; the proceeds go
+              to its reserves.
+            </>,
+          ),
         ],
         meansNow: [absorbCollateralCrossRef()],
       };

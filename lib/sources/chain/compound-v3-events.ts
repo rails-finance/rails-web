@@ -67,6 +67,7 @@ import { chainBatchClient, chainLogsClient } from "./rpc";
 import { addressTopic, splitCoverage, sweepLogs, type BlockRange, type RawLog } from "./log-sweep";
 import { inPacedGroups, resolveBlockTimestamps, resolveTxSenders } from "./sweep-metadata";
 import { resolveErc20Meta, scaleRaw, type Erc20Meta } from "./erc20-meta";
+import { cometEthUsdAtBlocks } from "./compound-prices";
 import { bucketsOf, type BoundaryStateLine, type TimelineCutSummary } from "@/lib/shared/timeline-boundary";
 import { COMPOUND_EVENT_LABELS, fmtUnits } from "@/lib/sources/api/compound-timeline";
 import type { CometDeployment, CometMarket } from "@/lib/compound/asset-catalog";
@@ -77,6 +78,7 @@ import {
   newCompoundLifetimeRaw,
   scaleCompoundLifetime,
   splitCompoundBaseFlow,
+  addCompoundAbsorbUsd,
   type CompoundLifetimeFlows,
   type CompoundLifetimeRaw,
   type CompoundLifetimeRawWire,
@@ -196,6 +198,9 @@ export interface CometMarketReplay {
   };
   /** Absorptions (one AbsorbDebt per absorption). */
   liquidationCount: number;
+  /** Unix seconds of the last absorption this walk saw; null where none was
+   *  seen (or its block could not be dated). */
+  lastLiquidationAt: number | null;
   everLiquidated: boolean;
   /** Distinct transactions of the account's own — the absorb legs, done TO the
    *  account, are excluded. */
@@ -241,12 +246,45 @@ export interface CometDecodedRow {
   /** The MV's counterparty column: the funder on a supply, the recipient on a
    *  withdraw, the absorber on an absorb, the other account on a transfer. */
   counterparty: string;
-  /** Absorbs only — the event's own oracle reckoning, 8-dec USD. */
+  /** Absorbs only — the event's own oracle reckoning, 8 decimals in the
+   *  market's quote unit (WETH in an ETH-quoted market). */
   usdValue?: bigint;
+  /** Absorbs in an ETH-quoted market only — Comet's WETH/USD at the block
+   *  (8 decimals), set by `attachCometEthUsd`; what turns `usdValue` into
+   *  dollars there. */
+  quoteUsd8?: bigint;
   /** A base Transfer leg with the zero address on its other side: a mint or a
    *  burn, which keepCometTransferLegs keeps (a transfer) or drops (the
    *  companion of a Supply / Withdraw / AbsorbDebt row). */
   zeroLeg?: "mint" | "burn";
+}
+
+const PRICE_ONE = BigInt(1e8);
+
+/** An absorb row's value in dollars, 8 decimals: the emitted figure in a
+ *  USD-quoted market, times WETH/USD at the block in an ETH-quoted one.
+ *  Undefined where the row carries no value or the WETH/USD read is missing. */
+export function cometAbsorbUsd8(d: CometDecodedRow): bigint | undefined {
+  if (d.usdValue == null) return undefined;
+  if (d.market.quoteUnit !== "ETH") return d.usdValue;
+  return d.quoteUsd8 == null ? undefined : (d.usdValue * d.quoteUsd8) / PRICE_ONE;
+}
+
+/** Read Comet's WETH/USD at the block of every absorb row in an ETH-quoted
+ *  market and set it on the row. A failed read leaves the row without one. */
+export async function attachCometEthUsd(rows: CometDecodedRow[], deployment: CometDeployment): Promise<void> {
+  const need = rows.filter(
+    (d) => (d.kind === "absorb_debt" || d.kind === "absorb_collateral") && d.market.quoteUnit === "ETH",
+  );
+  if (need.length === 0) return;
+  const px = await cometEthUsdAtBlocks(
+    deployment,
+    need.map((d) => d.blockNumber),
+  ).catch(() => new Map<number, bigint>());
+  for (const d of need) {
+    const p = px.get(d.blockNumber);
+    if (p != null) d.quoteUsd8 = p;
+  }
 }
 
 /** Raw log → the MV row(s) it stands for, for THIS wallet. A peer-to-peer
@@ -608,6 +646,7 @@ export async function loadCometEventsFromChain(p: LoadCometChainEventsParams): P
     resolveTxSenders(stateClient, funderTxs),
   ]);
 
+  await attachCometEthUsd(rows, p.deployment);
   return replayCometRows({
     wallet,
     chainId,
@@ -758,6 +797,8 @@ export interface CometReplaySeed {
     borrowed: bigint;
     repaid: bigint;
     absorbedDebt: bigint;
+    /** Absent on a seed written before the absorb split. */
+    absorbCredit?: bigint;
     collateral: Record<
       string,
       { supplied: bigint; withdrawn: bigint; absorbed: bigint; received: bigint; sent: bigint }
@@ -806,6 +847,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     peakBorrow: bigint;
     peakColl: Map<string, bigint>;
     absorbs: number;
+    lastAbsorb: CometDecodedRow | null;
     /** The own transactions THIS walk saw. A seeded market's count is this
      *  set's size plus `seededTxs`: the cut is a transaction boundary, so no
      *  member of the seed's set can reappear here. */
@@ -845,6 +887,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         peakBorrow: ZERO,
         peakColl: new Map(),
         absorbs: 0,
+        lastAbsorb: null,
         txs: new Set(),
         seededTxs: 0,
         first: null,
@@ -919,6 +962,9 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     s.lifetime.base.borrowed = lt.borrowed;
     s.lifetime.base.repaid = lt.repaid;
     s.lifetime.base.absorbedDebt = lt.absorbedDebt;
+    s.lifetime.base.absorbCredit = lt.absorbCredit ?? ZERO;
+    // A seed without the split holds each absorb's whole basePaidOut.
+    if (lt.absorbCredit == null && lt.absorbedDebt > ZERO) s.lifetime.absorbUnsplit = true;
     for (const [addr, c] of Object.entries(lt.collateral)) {
       const meta = metas.get(addr) ?? fallback(addr);
       const acc = compoundCollateralFlowsOf(s.lifetime, addr, meta.symbol, meta.decimals);
@@ -1045,8 +1091,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         ? cometPresentValue(s.prevPrincipal, at.supplyIndex, at.borrowIndex) - s.prevAfter
         : null;
     const off = gap - (pure ?? ZERO);
-    const baseInterest =
-      off >= -TWO && off <= TWO ? gap : pure != null ? pure : s.prevAfter == null ? ZERO : gap;
+    const baseInterest = off >= -TWO && off <= TWO ? gap : pure != null ? pure : s.prevAfter == null ? ZERO : gap;
     const baseUnlogged = gap - baseInterest;
     s.prevAfter = baseAfter;
     s.prevRead = at != null;
@@ -1068,6 +1113,8 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       // economics.ts runs over the rendered events on Ethereum, here over
       // every row.
       splitCompoundBaseFlow(s.lifetime.base, d.kind, before, d.delta);
+      const usd8 = d.kind === "absorb_debt" ? cometAbsorbUsd8(d) : undefined;
+      if (usd8 != null) addCompoundAbsorbUsd(s.lifetime, d.kind, usd8, { before, delta: d.delta });
     } else {
       const before = s.coll.get(d.asset) ?? ZERO;
       const raw = before + d.delta;
@@ -1078,12 +1125,21 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         d.kind,
         d.delta,
       );
+      const usd8 = d.kind === "absorb_collateral" ? cometAbsorbUsd8(d) : undefined;
+      if (usd8 != null) addCompoundAbsorbUsd(s.lifetime, d.kind, usd8, { asset: d.asset });
       const peak = s.peakColl.get(d.asset) ?? ZERO;
       if (collAfter > peak) s.peakColl.set(d.asset, collAfter);
     }
-    if (baseAfter > s.peakLend) s.peakLend = baseAfter;
-    if (-baseAfter > s.peakBorrow) s.peakBorrow = -baseAfter;
-    if (d.kind === "absorb_debt") s.absorbs++;
+    // Each row's balance before it counts as well as after: the interest a
+    // debt accrued up to a repayment is part of the most the account owed.
+    for (const b of [baseBefore, baseAfter]) {
+      if (b > s.peakLend) s.peakLend = b;
+      if (-b > s.peakBorrow) s.peakBorrow = -b;
+    }
+    if (d.kind === "absorb_debt") {
+      s.absorbs++;
+      s.lastAbsorb = d;
+    }
     if (d.kind !== "absorb_debt" && d.kind !== "absorb_collateral") s.txs.add(d.txHash);
     if (!s.first) s.first = d;
     s.last = d;
@@ -1116,6 +1172,10 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       baseAfter: fmtUnits(baseAfter, m.baseDecimals),
       ...(baseInterest !== ZERO ? { baseInterest: fmtUnits(baseInterest, m.baseDecimals) } : {}),
       ...(baseUnlogged !== ZERO ? { baseUnlogged: fmtUnits(baseUnlogged, m.baseDecimals) } : {}),
+      // Without the chain's block state (the sweep) that balance is the logged
+      // amounts alone, short of every interest accrual: the lifetime walk
+      // still reads it, and the row says the balance is unread instead.
+      ...(p.blockState == null ? { baseUnsettled: true } : {}),
       ...(collAfter != null ? { collateralAfter: fmtUnits(collAfter, meta.decimals) } : {}),
       // The wallet's opening row. With a seed the opening row sits before
       // the cut, and no row of the tail is it.
@@ -1127,14 +1187,29 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
       d.kind === "transfer_collateral_out"
         ? { counterparty: d.counterparty }
         : {}),
-      ...(d.kind === "absorb_debt" || d.kind === "absorb_collateral" ? { usdValue: usdOf(d.usdValue) } : {}),
+      ...(d.kind === "absorb_debt" || d.kind === "absorb_collateral"
+        ? {
+            usdValue: usdOf(cometAbsorbUsd8(d)),
+            ...(m.quoteUnit === "ETH" && d.usdValue != null
+              ? { quoteValue: usdOf(d.usdValue), ...(d.quoteUsd8 != null ? { quoteUsd: usdOf(d.quoteUsd8) } : {}) }
+              : {}),
+          }
+        : {}),
       ...(d.kind === "absorb_debt"
         ? {
             absorbedCollateral: (absorbCollByTx.get(`${m.key}:${d.txHash}`) ?? []).flatMap((leg) => {
               const legMeta = metaOf(leg);
-              const legUsd = usdOf(leg.usdValue);
+              const legUsd = usdOf(cometAbsorbUsd8(leg));
               if (legUsd == null) return [];
-              return [{ symbol: legMeta.symbol, amount: fmtUnits(-leg.delta, legMeta.decimals), usdValue: legUsd }];
+              return [
+                {
+                  symbol: legMeta.symbol,
+                  address: leg.asset,
+                  amount: fmtUnits(-leg.delta, legMeta.decimals),
+                  usdValue: legUsd,
+                  ...(m.quoteUnit === "ETH" && leg.usdValue != null ? { quoteValue: usdOf(leg.usdValue) } : {}),
+                },
+              ];
             }),
           }
         : {}),
@@ -1245,6 +1320,7 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
             : [...s.peakColl.entries()].filter(([, v]) => v > ZERO).map(([a, v]) => assetLine(a, v)),
         },
         liquidationCount: s.absorbs,
+        lastLiquidationAt: s.lastAbsorb ? (tsOf.get(s.lastAbsorb.blockNumber) ?? null) : null,
         everLiquidated: s.absorbs > 0,
         txCount: s.seededTxs + s.txs.size,
         // The position's own first and last event. A seed carries both from
@@ -1253,7 +1329,9 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
         lastActivityAt: s.last ? (tsOf.get(s.last.blockNumber) ?? null) : (s.seed?.lastTimestamp ?? null),
         // Scaled ONCE here, at the edge; the raw twin is the exact total.
         lifetime: (() => {
-          const scaled = scaleCompoundLifetime(s.lifetime);
+          // A seed carries no absorb prices, so a seeded market's absorbs
+          // are not all priced: it states none rather than a part.
+          const scaled = scaleCompoundLifetime(s.seed ? { ...s.lifetime, absorbUsd8: undefined } : s.lifetime);
           for (const [addr, c] of Object.entries(scaled.collateral)) if (collUnread(addr)) c.decimalsUnread = true;
           return scaled;
         })(),

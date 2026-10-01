@@ -38,7 +38,11 @@ import {
   fetchCompoundGroupedTimeline,
   type CompoundGroupedTimelineResult,
 } from "@/lib/api/fetch-compound-timeline";
-import { fetchCompoundPosition, type CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
+import {
+  fetchCompoundPosition,
+  scaleCompoundChainBalance,
+  type CompoundMarketChainResponse,
+} from "@/lib/api/fetch-compound-position";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
   lifetimeFiguresKnown,
@@ -53,6 +57,7 @@ import { interleaveRowPlan, servedFoldersEnabled, type ServedFolder } from "@/li
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
+import { previousEventById, previousEventByTx, previousPastFolders } from "@/lib/compound/row-facts";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
@@ -74,7 +79,11 @@ import {
 } from "@/components/protocol/compound/compound-position-explanation";
 import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
-import { computeCompoundEconomics, compoundLifetimeWithOpening } from "@/lib/compound/economics";
+import {
+  computeCompoundEconomics,
+  compoundInterestInDebt,
+  compoundLifetimeWithOpening,
+} from "@/lib/compound/economics";
 import { compoundEconomicsExplanation, compoundEconomicsContent } from "@/lib/compound/economics-explanation";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
@@ -90,7 +99,7 @@ const CompoundExportMenu = dynamic(
  *  surfaces for that market (when its chain read landed), and the chain-state
  *  economics tower with the lifetime layer from the market's own events. */
 function Position({
-  view,
+  view: indexView,
   events,
   chain,
   historyWindow,
@@ -111,6 +120,26 @@ function Position({
   /** Copy-this-view control — the page's `useTimelineEvents().viewHref`. */
   viewHref?: () => string;
 }) {
+  // One live read for the whole card: where the Comet read at head has landed,
+  // its balance is the card's, the tower's and the pane's, so the three
+  // cannot disagree in the last digits (interest ticks between two reads).
+  const view = useMemo<CompoundPositionView>(() => {
+    if (!chain || indexView.status !== "open") return indexView;
+    const borrowRaw = BigInt(chain.borrowBalanceRaw || "0");
+    const supplyRaw = BigInt(chain.supplyBalanceRaw || "0");
+    const borrowing = borrowRaw > BigInt(0);
+    const raw = borrowing ? borrowRaw : supplyRaw;
+    const amount = scaleCompoundChainBalance(raw.toString(), chain.baseDecimals);
+    return {
+      ...indexView,
+      current: {
+        amount: borrowing ? -amount : amount,
+        amountRaw: borrowing ? `-${raw.toString()}` : raw.toString(),
+        side: borrowing ? "borrow" : raw > BigInt(0) ? "lend" : "flat",
+        block: chain.blockNumber,
+      },
+    };
+  }, [indexView, chain]);
   const sideUsd = cardSideUsd(view);
   const opening = historyWindow.opening;
   // ⚠️ On a windowed page the tower must read the MERGED lifetime, not the
@@ -193,7 +222,13 @@ function Position({
       />
       <ChainTruthTower
         data={towerData}
-        explanation={compoundEconomicsExplanation(towerData)}
+        explanation={compoundEconomicsExplanation(towerData, {
+          todayPrice: (a) => view.priceByAddress?.[a.toLowerCase()] ?? null,
+          interestInDebt:
+            lifetimeEvents && view.current?.side === "borrow"
+              ? compoundInterestInDebt(lifetimeEvents, view.market, Math.abs(view.current.amount), folders)
+              : null,
+        })}
         learnMore={compoundEconomicsContent()}
       />
     </div>
@@ -379,6 +414,10 @@ export default function CompoundPositionView({
   // The tx-sibling seam: each card reaches its same-tx peers so an AbsorbCollateral
   // leg can cross-reference the AbsorbDebt narrator (the whole-account absorption).
   const siblingsByTx = useMemo(() => groupEventsByTx(compoundEvents), [compoundEvents]);
+  // Each row's previous row in this market: the interest line's yearly rate
+  // and the absorb's "what moved" read from them.
+  const previousById = useMemo(() => previousEventById(compoundEvents), [compoundEvents]);
+  const previousByTx = useMemo(() => previousEventByTx(compoundEvents), [compoundEvents]);
   // The served list as ROWS, from the same answer as `compoundEvents`.
   const servedRows = useMemo(
     () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, compoundEvents) : undefined),
@@ -515,6 +554,7 @@ export default function CompoundPositionView({
                 // because its oldest loaded card is.
                 firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                 tenurePending={!lifetimeFiguresKnown(historyWindow)}
+                labelLastActivity
               />
             }
             renderCard={(event, meta) =>
@@ -525,6 +565,8 @@ export default function CompoundPositionView({
                   isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   siblings={siblingsByTx.get(event.txHash) ?? [event]}
+                  previous={previousPastFolders(event, previousById.get(event.id), servedFolders)}
+                  previousTx={previousPastFolders(event, previousByTx.get(event.txHash), servedFolders)}
                 />
               ) : null
             }

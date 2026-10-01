@@ -29,6 +29,9 @@ export interface PositionCardMetaProps {
   /** The position's events, where they differ from the count: the tip then
    *  gives both ("104 transactions · 167 events"), the timeline's figure too. */
   eventTotal?: number | null;
+  /** A sentence after the count in its tip: what the count leaves out, where
+   *  it differs from the timeline's event count. */
+  countTip?: string;
   /** Exact liquidation count, when known (Aave, Compound). */
   liquidationCount?: number | null;
   /** Boolean-only liquidation history, when no count exists (Morpho, MakerDAO). */
@@ -64,6 +67,7 @@ export function PositionCardMeta({
   eventCount,
   eventCountNoun = "transaction",
   eventTotal,
+  countTip,
   liquidationCount,
   liquidated,
   redemptionCount,
@@ -109,7 +113,12 @@ export function PositionCardMeta({
               : "") +
             (countRule ? `. ${countRule}` : "");
           return (
-            <RevealTip tip={label} label={label} focusable className="focus-ring rounded-sm">
+            <RevealTip
+              tip={countTip ? `${label}. ${countTip}` : label}
+              label={label}
+              focusable
+              className="focus-ring rounded-sm"
+            >
               <Icon name="arrow-left-right" size={12} />
               <span className="ml-1">
                 {n.toLocaleString("en-US")}

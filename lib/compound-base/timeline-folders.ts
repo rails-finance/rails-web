@@ -33,6 +33,7 @@
 // that block states what sits below. A month is read one market at a time
 // (`&market=`), trimmed to the same cap.
 
+import { compoundAbsorbSplit } from "@/lib/compound/row-facts";
 import type { BaseActivityEvent, CompoundContext } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { ServedTimelineRow, TimelineRowPlanEntry } from "@/lib/shared/timeline-folder";
@@ -113,11 +114,20 @@ export function compoundBaseFolderSpecs(
   /** A base leg is keyed by the Comet slug (the base asset IS the market) and
    *  a collateral leg by its token, as the index keys them. A token whose
    *  decimals did not load has no figure to state; its pair is dropped. */
-  const leg = (verb: string, e: BaseActivityEvent, provWhat: string): GroupingLegEntry[] => {
+  const clearedRaw = (e: BaseActivityEvent): bigint | undefined => {
+    const d = dataOf(e);
+    const r = rowOf(e);
+    const split = d ? compoundAbsorbSplit(d) : null;
+    if (!split || !r) return undefined;
+    const [i, f = ""] = split.cleared.split(".");
+    const dec = r.market.baseDecimals;
+    return BigInt(i + f.slice(0, dec).padEnd(dec, "0"));
+  };
+  const leg = (verb: string, e: BaseActivityEvent, provWhat: string, override?: bigint): GroupingLegEntry[] => {
     const d = dataOf(e);
     const r = rowOf(e);
     if (!d || !r) return [];
-    const amount = (r.delta < BigInt(0) ? -r.delta : r.delta).toString();
+    const amount = (override ?? (r.delta < BigInt(0) ? -r.delta : r.delta)).toString();
     if (d.isBase) {
       const m: CometMarket = r.market;
       return [
@@ -169,9 +179,12 @@ export function compoundBaseFolderSpecs(
       min: MIN_LIQUIDATION_RUN,
       kindOf: (e) => dataOf(e)?.eventType ?? "unknown",
       countKinds: ["absorb_debt", "absorb_collateral"],
+      // The debt row states the debt the absorb cleared, not basePaidOut
+      // (which adds any credit past the debt): the folder's header then reads
+      // the same figure as the row's own.
       legsOf: (e) =>
         dataOf(e)?.eventType === "absorb_debt"
-          ? leg("Absorbed", e, "Debt absorbed")
+          ? leg("Debt cleared", e, "Debt cleared", clearedRaw(e))
           : leg("Seized", e, "Collateral seized"),
       actorOf,
       cellOf,

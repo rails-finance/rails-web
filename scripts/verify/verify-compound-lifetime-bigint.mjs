@@ -459,7 +459,15 @@ function seedOf(rows) {
   let peakLend = 0n;
   let peakBorrow = 0n;
   const coll = new Map(); // asset → { bal, peak }
-  const lt = { deposited: 0n, withdrawn: 0n, borrowed: 0n, repaid: 0n, absorbedDebt: 0n, collateral: {} };
+  const lt = {
+    deposited: 0n,
+    withdrawn: 0n,
+    borrowed: 0n,
+    repaid: 0n,
+    absorbedDebt: 0n,
+    absorbCredit: 0n,
+    collateral: {},
+  };
   let absorbs = 0;
   const txs = new Set();
   for (const d of rows) {
@@ -469,7 +477,11 @@ function seedOf(rows) {
       if (base > peakLend) peakLend = base;
       if (-base > peakBorrow) peakBorrow = -base;
       if (d.kind === "absorb_debt") {
-        lt.absorbedDebt += abs(d.delta);
+        // The debt it cleared, and the credit past the debt.
+        const owed = before < 0n ? -before : 0n;
+        const cleared = abs(d.delta) < owed ? abs(d.delta) : owed;
+        lt.absorbedDebt += cleared;
+        lt.absorbCredit += abs(d.delta) - cleared;
         absorbs++;
       } else if (d.delta > 0n) {
         const repay = d.delta < -before ? d.delta : -before > 0n ? -before : 0n;
@@ -561,7 +573,41 @@ function checkSeededReplay(name, rows) {
     JSON.stringify(m.lifetimeRaw.collateral) === JSON.stringify(w.lifetimeRaw.collateral),
     "every collateral lifetime leg, raw ===",
   );
-  assert(JSON.stringify(m.lifetime) === JSON.stringify(w.lifetime), "the scaled lifetime, bit for bit");
+  assert(m.lifetimeRaw.absorbCredit === w.lifetimeRaw.absorbCredit, "absorbCredit, raw ===");
+  // A seed written before the absorb split (no absorbCredit, the whole
+  // basePaidOut in absorbedDebt) states the two as one figure.
+  if (!PERTURB && BigInt(seed.lifetime.absorbedDebt + seed.lifetime.absorbCredit) > 0n) {
+    const { absorbCredit, ...oldLt } = seed.lifetime;
+    const oldSeed = { ...seed, lifetime: { ...oldLt, absorbedDebt: oldLt.absorbedDebt + absorbCredit } };
+    const o = replayCometRows({
+      wallet: WALLET,
+      chainId: 1,
+      deployment,
+      rows: tail,
+      metas,
+      timestamps,
+      senders: new Map(),
+      maxRendered: tail.length,
+      seeds: [oldSeed],
+      coverage: { fromBlock: 0, toBlock: block, fromDeployment: true, gaps: [], deployBlock: 0, source: "index" },
+    }).markets[0];
+    assert(
+      o.lifetime.absorbUnsplit === true &&
+        o.lifetime.absorbCredit === undefined &&
+        BigInt(o.lifetimeRaw.absorbedDebt) + BigInt(o.lifetimeRaw.absorbCredit) ===
+          BigInt(w.lifetimeRaw.absorbedDebt) + BigInt(w.lifetimeRaw.absorbCredit),
+      "a seed without the split: debt cleared and credit as one figure, the same total",
+    );
+  }
+  // Absorb prices (`absorbUsd`) ride only rows the replay walks: a seed
+  // carries none, so a seeded market states none and the whole list does.
+  // Every flow compares bit for bit without them.
+  const noAbsorbUsd = (lt) => ({ ...lt, absorbUsd: undefined });
+  assert(m.lifetime.absorbUsd === undefined, "a seeded market states no absorb prices");
+  assert(
+    JSON.stringify(noAbsorbUsd(m.lifetime)) === JSON.stringify(noAbsorbUsd(w.lifetime)),
+    "the scaled lifetime, bit for bit",
+  );
   // The two per-asset lists are Map insertion order — the whole walk lists a
   // peak from the first row that lifted the balance above zero, a seed from
   // the asset's first touch — so they are compared by address; every figure
@@ -576,11 +622,24 @@ function checkSeededReplay(name, rows) {
   // the rest of `summary` (stateAtCut, firstAt, lastAt) still compare exactly.
   const withheldHistogram = (summary) =>
     summary && typeof summary === "object" ? { ...summary, byType: undefined, byAsset: undefined } : summary;
+  // A seed carries no timestamp for its last absorb, so a seeded replay whose
+  // last absorb is before the cut states none (the card then prints the
+  // closing date alone): it must agree with the whole walk or be null.
+  assert(
+    m.lastLiquidationAt == null || m.lastLiquidationAt === w.lastLiquidationAt,
+    "the last absorb's date agrees with the whole walk, or is withheld",
+  );
   const normalised = (pos) => ({
     ...pos,
+    lastLiquidationAt: undefined,
+    lifetime: noAbsorbUsd(pos.lifetime),
     collateral: JSON.parse(byAddr(pos.collateral)),
     peak: { ...pos.peak, collateral: JSON.parse(byAddr(pos.peak.collateral)) },
-    ...(pos.omitted ? { omitted: { ...pos.omitted, summary: withheldHistogram(pos.omitted.summary) } } : {}),
+    // `anchoredComplete` is false on a seeded replay by design (the seed
+    // carries no senders, so the anchored set is the tail's alone).
+    ...(pos.omitted
+      ? { omitted: { ...pos.omitted, anchoredComplete: undefined, summary: withheldHistogram(pos.omitted.summary) } }
+      : {}),
   });
   assert(
     JSON.stringify(normalised(m)) === JSON.stringify(normalised(w)),

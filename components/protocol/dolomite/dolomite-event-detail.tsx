@@ -19,7 +19,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { otherAccountName } from "@/lib/dolomite/asset-catalog";
+import { formatDolomitePrice, otherAccountName } from "@/lib/dolomite/asset-catalog";
+import { DolomiteAccountLabel } from "@/components/protocol/dolomite/dolomite-position-card";
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
 import {
   ChainTruthDetail,
@@ -171,7 +172,7 @@ function buildDolomiteLiqForensics(
       usd: seizedUsd,
       usdProv: dolomiteLiqLegValueProv("seized collateral", held.marketSymbol, coords, {
         amount: `${fmt(held.weiDelta)} ${held.marketSymbol}`,
-        price: formatNumber(heldPrice),
+        price: formatDolomitePrice(heldPrice),
       }),
     },
     cleared: {
@@ -179,10 +180,11 @@ function buildDolomiteLiqForensics(
       usd: clearedUsd,
       usdProv: dolomiteLiqLegValueProv("cleared debt", owed.marketSymbol, coords, {
         amount: `${fmt(owed.weiDelta)} ${owed.marketSymbol}`,
-        price: formatNumber(owedPrice),
+        price: formatDolomitePrice(owedPrice),
       }),
     },
     premium: seizedUsd / clearedUsd - 1,
+    premiumLabel: "Seized over cleared",
     premiumProv: dolomiteLiqPremiumProv(coords, {
       seizedUsd: formatUsdValue(seizedUsd),
       clearedUsd: formatUsdValue(clearedUsd),
@@ -213,6 +215,7 @@ function buildDolomiteLiqForensics(
         note: "oracle at block",
       },
     ],
+    format: { value: formatUsdValue, price: formatDolomitePrice },
   };
 }
 
@@ -239,8 +242,8 @@ function liquidationNotes(
     );
   } else if (spread != null && base != null && hp != null && op != null) {
     const parts = [
-      hp > 0 ? `(1 + ${pctText(hp)} ${held.marketSymbol} premium)` : null,
-      op > 0 ? `(1 + ${pctText(op)} ${owed.marketSymbol} premium)` : null,
+      hp > 0 ? `(1 + ${pctText(hp)} ${held.marketSymbol} spread premium)` : null,
+      op > 0 ? `(1 + ${pctText(op)} ${owed.marketSymbol} spread premium)` : null,
     ].filter(Boolean);
     out.push(
       parts.length > 0
@@ -345,12 +348,16 @@ export function DolomiteEventDetail({
   const beforeRaw = onChain ? ctx.balanceBefore : ctx.parBefore;
   const beforeN = beforeRaw != null ? Number(beforeRaw) : null;
   if ((onChain || ctx.parAfter != null) && beforeN != null && Number.isFinite(afterN) && Number.isFinite(beforeN)) {
-    const changeN = afterN - beforeN;
+    // A debt stays below zero on both ends: the lane states magnitudes, so the
+    // before reads as the after does and a debt that rose changes by "+".
+    const owed = beforeN <= 0 && afterN <= 0 && (beforeN < 0 || afterN < 0);
+    const b = owed ? Math.abs(beforeN) : beforeN;
+    const changeN = owed ? Math.abs(afterN) - b : afterN - beforeN;
     if (changeN !== 0) {
       const sign = changeN >= 0 ? "+" : "−";
       transition = {
-        before: formatCompact(beforeN),
-        beforeExact: formatExact(beforeN),
+        before: formatCompact(b),
+        beforeExact: formatExact(b),
         beforeProv: onChain ? balanceBeforeProv(sym, coords) : parBeforeProv(sym, coords, ctx.raw?.parBefore),
         change: `${sign}${formatCompact(Math.abs(changeN))}`,
         changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
@@ -392,15 +399,11 @@ export function DolomiteEventDetail({
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
           {ctx.eventType === "transfer_in" ? "Came from" : "Went to"}{" "}
-          <Link
-            href={`/ethereum/dolomite/${other.owner}/${other.number}`}
-            className="font-medium text-foreground underline decoration-dotted underline-offset-2"
-          >
-            {sameWallet
-              ? `${otherAccountName(other.number)} of this wallet`
-              : `${otherAccountName(other.number)} of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`}
+          <Link href={`/ethereum/dolomite/${other.owner}/${other.number}`} className="font-medium text-foreground">
+            <DolomiteAccountLabel text={otherAccountName(other.number)} accountNumber={other.number} />
           </Link>
-          , inside Dolomite: no tokens left the protocol.
+          {sameWallet ? " of this wallet" : ` of ${other.owner.slice(0, 6)}…${other.owner.slice(-4)}`}, inside Dolomite:
+          no tokens left the protocol.
         </p>
       )}
       {forensics && <LiquidationForensics {...forensics} />}

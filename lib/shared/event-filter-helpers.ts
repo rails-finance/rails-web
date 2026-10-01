@@ -418,8 +418,10 @@ const AAVE_V3_OP_LABELS: Record<string, string> = {
 };
 
 const COMPOUND_OP_LABELS: Record<string, string> = {
-  supply: "Supply",
-  withdraw: "Withdraw",
+  // Comet has no borrow or repay call: a supply into debt is the repayment
+  // and a withdrawal past zero is the borrow, so each chip names both.
+  supply: "Supply or repay",
+  withdraw: "Withdraw or borrow",
   supply_collateral: "Add Collateral",
   withdraw_collateral: "Withdraw Collateral",
   absorb_debt: "Liquidated (debt)",

@@ -56,7 +56,7 @@ import type {
   DolomitePeakAmount,
 } from "@/lib/sources/api/dolomite-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
-import { TipLabel } from "@/components/shared/tip-label";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { accountLabelTip } from "@/lib/dolomite/asset-catalog";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
@@ -75,7 +75,12 @@ export interface DolomitePositionView {
   peakSupplies: DolomitePeakAmount[];
   peakBorrows: DolomitePeakAmount[];
   liquidationCount: number;
+  /** The owner's transactions (the index leaves out each liquidation, which is
+   *  the liquidator's transaction). */
   txCount: number;
+  /** The account's rows on the timeline, when the page knows the whole
+   *  history: the count's tip gives both figures. */
+  eventTotal?: number;
   lastActivityAt: number;
   /** The core's own oracle USD per whole token, keyed by MARKET ID string. */
   priceByMarket?: Record<string, number>;
@@ -221,6 +226,23 @@ function PeakStack({ lines, side }: { lines: DolomitePeakAmount[]; side: "supply
   );
 }
 
+/** An account's name that explains the account number on hover or tap: the
+ *  card header and a transfer row's other account carry the same tip. The
+ *  tip is a paragraph, so it wraps at a fixed width. */
+export function DolomiteAccountLabel({ text, accountNumber }: { text: string; accountNumber: string }) {
+  const tip = accountLabelTip(accountNumber);
+  return (
+    <RevealTip
+      tip={<span className="block w-72 whitespace-normal text-left font-normal normal-nums leading-snug">{tip}</span>}
+      label={`${text}: ${tip}`}
+      focusable
+      className="focus-ring rounded-sm"
+    >
+      <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">{text}</span>
+    </RevealTip>
+  );
+}
+
 /** The account-grain identity: the owner (address) + which of its accounts
  *  this is, in Dolomite's own vocabulary. On the detail page the label
  *  explains itself on hover or tap (the listing card sits inside a link). */
@@ -229,7 +251,7 @@ function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean })
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />
       <span className="text-xs text-rb-500">
-        <TipLabel text={v.accountLabel} tip={tip ? accountLabelTip(v.accountNumber) : undefined} />
+        {tip ? <DolomiteAccountLabel text={v.accountLabel} accountNumber={v.accountNumber} /> : v.accountLabel}
       </span>
     </span>
   );
@@ -288,6 +310,8 @@ export function DolomitePositionCard({
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
               eventCount={v.txCount}
+              eventTotal={v.eventTotal}
+              countNote={dolomiteCountNote(v.liquidationCount)}
               liquidationCount={v.liquidationCount}
             />
           }
@@ -333,6 +357,8 @@ export function DolomitePositionCard({
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}
             eventCount={v.txCount}
+            eventTotal={v.eventTotal}
+            countNote={dolomiteCountNote(v.liquidationCount)}
             liquidationCount={v.liquidationCount}
           />
         }
@@ -377,6 +403,17 @@ export function DolomitePositionCard({
       />
     </PositionCardShell>
   );
+}
+
+/** Why the transaction count and the event count differ. The index counts
+ *  the account's transactions with its liquidations left out (each is the
+ *  liquidator's transaction; the triangle counts them). */
+function dolomiteCountNote(liquidations: number): string {
+  if (liquidations === 1)
+    return "the count leaves out the liquidation (the triangle counts it), which writes two rows here";
+  return liquidations > 1
+    ? `the count leaves out the ${liquidations} liquidations (the triangle counts them), and each writes two rows here`
+    : "one transaction can write a row per market it moves";
 }
 
 /** A liquidated card's two dates: the last liquidation, then the closing,

@@ -6,10 +6,12 @@
 // spec; traces via <Prov>. No health factor, no USD — those are layers, absent.
 
 import type { AssetFlow, CompoundContext } from "@/lib/shared/types/event-shape";
+import { isCompoundBulker } from "@/lib/compound/bulkers";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import {
   movedDeltaProv,
+  absorbDebtClearedProv,
   externalActorProv,
   transferCounterpartyProv,
   type CompoundCoords,
@@ -17,6 +19,8 @@ import {
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
+import { compoundAbsorbSplit } from "@/lib/compound/row-facts";
+import { formatExactDecimal } from "@/lib/utils/format";
 
 export interface CompoundEventHeaderProps {
   actionLabel: string;
@@ -57,15 +61,39 @@ export function CompoundEventHeader({
     blockNumber,
     chainId: useChainId(),
     source: useCaptureSource(),
+    ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
   const critical = ctx.eventType === "absorb_debt" || ctx.eventType === "absorb_collateral";
   const deltas: ChainTruthDelta[] = [];
 
-  const d = Number(ctx.assetsDelta) || 0;
+  // An absorb's debt row states the debt it cleared, as a fall in the debt,
+  // with the same sign as the collateral it seized: both are what the absorb
+  // took off the account. Its credit past the debt is in the row's detail.
+  const split = compoundAbsorbSplit(ctx);
+  const d = split ? -Number(split.cleared) : Number(ctx.assetsDelta) || 0;
   if (d !== 0) {
-    const prov = movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
+    const prov = split
+      ? absorbDebtClearedProv(ctx.assetSymbol, coords, {
+          paidOut: formatExactDecimal(split.paidOut),
+          before: formatExactDecimal(split.before),
+        })
+      : movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
     if (prov)
-      deltas.push({ value: d, symbol: ctx.assetSymbol, address: soleFlowAddress(flows, ctx.assetSymbol), prov });
+      deltas.push({
+        value: d,
+        symbol: ctx.assetSymbol,
+        address: soleFlowAddress(flows, ctx.assetSymbol),
+        prov,
+        suffix: ctx.assetSymbol,
+        // The spine's flank direction (compound-event-card DIRECTION): a
+        // supply leaves the wallet, a withdraw arrives in it.
+        phoneArrow:
+          ctx.eventType === "supply" || ctx.eventType === "supply_collateral"
+            ? "out"
+            : ctx.eventType === "withdraw" || ctx.eventType === "withdraw_collateral"
+              ? "in"
+              : undefined,
+      });
   }
 
   // Position transfers carry a true counterparty (the other account) — the
@@ -93,6 +121,9 @@ export function CompoundEventHeader({
         // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
         // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
         custody: transferOut || transferIn,
+        // The verb carries the direction at every width (the SparkLend rule,
+        // TO-DO 184); an absorb keeps its signs.
+        unsignedDeltas: !critical,
         deltas,
         party,
         externalActor:
@@ -103,6 +134,11 @@ export function CompoundEventHeader({
                   { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, funder: ctx.funder },
                   coords,
                 ),
+                ...(isCompoundBulker(ctx.funder, coords.chainId)
+                  ? {
+                      tip: "This account sent the transaction, and the tokens came through Compound's Bulker. Open the row to see whether the wallet acted.",
+                    }
+                  : {}),
               }
             : undefined,
       }}

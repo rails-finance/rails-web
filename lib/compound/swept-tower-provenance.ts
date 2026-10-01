@@ -48,7 +48,12 @@ const FLOW_STORY: Record<CompoundLifetimeFlow, string> = {
   withdrawn: "the lent base withdrawn back out (withdrawals down to a zero balance)",
   borrowed: "the base drawn below zero — Comet's borrow is a withdrawal past the account's own balance",
   repaid: "the base supplied back against a negative balance — Comet's repay is a supply that clears debt first",
-  "absorbed debt": "the negative base the protocol cleared for this account in liquidations (AbsorbDebt)",
+  "absorbed debt":
+    "the debt the protocol cleared for this account in liquidations: the part of each AbsorbDebt's basePaidOut that took the base balance from negative up to zero",
+  "absorb credit":
+    "the rest of each AbsorbDebt's basePaidOut: the seized collateral's credited value past the debt, left to the account as a lent balance",
+  "interest earned": "the interest the lent base earned between the account's events, row by row",
+  "interest charged": "the interest the borrowed base was charged between the account's events, row by row",
   "supplied collateral": "every collateral amount this account supplied",
   "withdrawn collateral": "every collateral amount this account withdrew back out",
   "absorbed collateral": "the collateral the protocol seized in liquidations (AbsorbCollateral)",

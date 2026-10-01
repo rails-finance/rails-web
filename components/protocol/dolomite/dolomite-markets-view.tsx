@@ -46,7 +46,7 @@ import { formatTinyNonZero } from "@/lib/utils/format";
 import { useMemo, useState } from "react";
 import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { shortAddress, DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
+import { shortAddress, DOLOMITE_ADDRESSES, formatDolomitePrice } from "@/lib/dolomite/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
@@ -82,11 +82,11 @@ const tokenAmount = (v: number, symbol: string): string => {
   return `${n} ${symbol}`;
 };
 
-// Oracle price — same register as the Aave-family table: the full figure
-// above $1k (prices read as exact quotes, not sizes), two decimals below.
+// Oracle price — the full figure above $1k (prices read as exact quotes, not
+// sizes), two decimals from $1, four significant digits below it.
 function fmtPrice(n: number): string {
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${formatDolomitePrice(n)}`;
 }
 
 // A compact fill bar — the utilisation column's grammar (h-1 w-10), reused
@@ -172,9 +172,9 @@ function MarketRow({ m, axisMax, block }: { m: DolomiteMarketRow; axisMax: numbe
             />
             <span className="whitespace-nowrap text-[10px] font-normal text-rb-500">
               {m.marginPremium > 0 ? (
-                <Prov info={dolMarginPremiumProv(coords)}>{pctText(m.marginPremium, 1)} premium</Prov>
+                <Prov info={dolMarginPremiumProv(coords)}>{pctText(m.marginPremium, 1)} margin premium</Prov>
               ) : (
-                "no premium"
+                "no margin premium"
               )}
             </span>
           </div>
@@ -220,7 +220,7 @@ function MarketRow({ m, axisMax, block }: { m: DolomiteMarketRow; axisMax: numbe
         </td>
         <td
           className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
-          title="The collateral premium a liquidator earns seizing this market"
+          title="The liquidation spread when this market is seized: the collateral a liquidator takes is worth the debt it repays plus this bonus"
         >
           <Prov info={dolMarketSpreadProv(coords)}>{pctText(m.liquidationSpread, 1)}</Prov>
         </td>
@@ -415,7 +415,7 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
               {th("Supplied", "supplied", "right")}
               {th("Borrowed", "borrowed", "right")}
               {th("Borrow rate", "borrowRate", "right")}
-              {th("Supply APY", "supplyApy", "right")}
+              {th("Supply APR", "supplyApy", "right")}
               {th("Spread", "spread", "right")}
               {th("Utilisation", "util")}
             </tr>

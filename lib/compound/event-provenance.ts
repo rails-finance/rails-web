@@ -48,15 +48,25 @@ export interface CompoundCoords {
   asset?: string;
   /** Position owner. */
   account?: string;
+  /** An ETH-quoted market's absorb only: Comet's WETH/USD at the absorb block,
+   *  which turned the emitted WETH figure into dollars. */
+  quoteUsd?: string;
 }
 
-const cometContract = (coords?: CompoundCoords) => ({
+export const cometContract = (coords?: CompoundCoords) => ({
   name: coords?.marketLabel ? `Comet (${coords.marketLabel})` : "Comet",
   address: coords?.comet ?? "0x0000000000000000000000000000000000000000",
 });
 
 const atBlock = (coords?: CompoundCoords): string =>
   coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
+
+/** The sentence an ETH-quoted market's dollar figure adds: the log's value is
+ *  in WETH, converted at Comet's WETH/USD at the absorb block. */
+const quoteNote = (coords?: CompoundCoords): string =>
+  coords?.quoteUsd != null
+    ? ` This market prices everything in WETH (its base feed is a constant 1), so the log's usdValue is in WETH; the dollar figure multiplies it by Comet's WETH/USD at the same block, $${coords.quoteUsd}, read from a USD market's WETH feed (getAssetInfoByAddress(WETH).priceFeed → getPrice).`
+    : "";
 
 /** Block-explorer tx-logs link for an emitted event field — zero-RPC, link
  *  only. Etherscan on Ethereum, Basescan on Base: a link a reader can follow
@@ -272,17 +282,6 @@ export const movedDeltaProv = (
 // leg is the same-tx AbsorbCollateral usdValues summed (chain-derived only
 // through addition).
 
-/** The cleared-debt leg — AbsorbDebt's own usdValue, verbatim. */
-export const absorbDebtUsdProv = (sym: string, coords: CompoundCoords, vals: { amount: string }): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  verify: txVerify(coords),
-  summary: `What the cleared ${sym} debt was worth at the moment the protocol absorbed it — the AbsorbDebt event's own usdValue param, the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}. Not a later price applied to the amount: the chain states this figure.`,
-  contract: cometContract(coords),
-  via: `${captureVia(coords)} · AbsorbDebt log · usdValue`,
-  inputs: eventInputs(coords, [{ label: "debt cleared", value: vals.amount, kind: "chain", note: "basePaidOut" }]),
-});
-
 /** The seized-collateral leg — Σ same-tx AbsorbCollateral usdValues. */
 export const absorbSeizedUsdProv = (
   coords: CompoundCoords,
@@ -294,8 +293,8 @@ export const absorbSeizedUsdProv = (
   verify: txVerify(coords),
   summary:
     legs.length > 1
-      ? `What the seized collateral was worth at absorption — the sum of each AbsorbCollateral event's own usdValue in this transaction (Comet absorbs the whole account: every collateral asset is seized in one call). Each addend is the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.`
-      : `What the seized collateral was worth at the moment the protocol absorbed it — the AbsorbCollateral event's own usdValue param, the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.`,
+      ? `What the seized collateral was worth at absorption — the sum of each AbsorbCollateral event's own usdValue in this transaction (Comet absorbs the whole account: every collateral asset is seized in one call). Each addend is the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.${quoteNote(coords)}`
+      : `What the seized collateral was worth at the moment the protocol absorbed it — the AbsorbCollateral event's own usdValue param, the Comet's oracle reckoning emitted in the log itself${atBlock(coords)}.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · AbsorbCollateral log${legs.length > 1 ? "s" : ""} · usdValue`,
   inputs: eventInputs(
@@ -319,30 +318,12 @@ export const absorbPriceProv = (
   pclass: "emitted",
   formula: "usdValue ÷ amount",
   verify: txVerify(coords),
-  summary: `The price the protocol carried ${sym} at when it absorbed this account — the absorb event's own usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's oracle at absorption time, recovered from the event's own two params.`,
+  summary: `The price the protocol carried ${sym} at when it absorbed this account — the absorb event's own usdValue divided by the amount it moved, both emitted in the same log${atBlock(coords)}. This is the Comet's oracle at absorption time, recovered from the event's own two params.${quoteNote(coords)}`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · absorb log · usdValue ÷ amount`,
   inputs: eventInputs(coords, [
     { label: "amount", value: `${vals.amount} ${sym}`, kind: "chain", note: "emitted" },
     { label: "usdValue", value: `$${vals.usdValue}`, kind: "chain", note: "emitted" },
-  ]),
-});
-
-/** The absorption margin — seized ÷ cleared − 1 over the two legs. */
-export const absorbMarginProv = (
-  coords: CompoundCoords,
-  vals: { seizedUsd: string; clearedUsd: string },
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "emitted",
-  formula: "seized ÷ cleared − 1",
-  verify: txVerify(coords),
-  summary: `The margin the protocol absorbed with this account — seized collateral value over cleared debt value, minus one, both legs the absorb events' own usdValue figures${atBlock(coords)}. Positive: the account still had a cushion, which the protocol keeps and resells to liquidators at a discount (buyCollateral). Negative: the account was absorbed under water — the seized collateral no longer covered the debt, and the gap fell to the protocol's reserves.`,
-  contract: cometContract(coords),
-  via: "seized ÷ cleared − 1 · both legs emitted usdValue",
-  inputs: eventInputs(coords, [
-    { label: "seized", value: vals.seizedUsd, kind: "chain", note: "Σ AbsorbCollateral usdValue" },
-    { label: "cleared", value: vals.clearedUsd, kind: "chain", note: "AbsorbDebt usdValue" },
   ]),
 });
 
@@ -556,6 +537,9 @@ export type CompoundLifetimeFlow =
   | "borrowed"
   | "repaid"
   | "absorbed debt"
+  | "absorb credit"
+  | "interest earned"
+  | "interest charged"
   | "supplied collateral"
   | "withdrawn collateral"
   | "absorbed collateral"
@@ -567,7 +551,12 @@ const FLOW_STORY: Record<CompoundLifetimeFlow, string> = {
   withdrawn: "the lent base withdrawn back out (withdrawals down to a zero balance)",
   borrowed: "the base drawn below zero — Comet's borrow is a withdrawal past the account's own balance",
   repaid: "the base supplied back against a negative balance — Comet's repay is a supply that clears debt first",
-  "absorbed debt": "the negative base the protocol cleared for this account in liquidations (AbsorbDebt)",
+  "absorbed debt":
+    "the debt the protocol cleared for this account in liquidations: the part of each AbsorbDebt's basePaidOut that took the base balance from negative up to zero",
+  "absorb credit":
+    "the rest of each AbsorbDebt's basePaidOut: the seized collateral's credited value past the debt, left to the account as a lent balance",
+  "interest earned": "the interest the lent base earned between the position's events, row by row",
+  "interest charged": "the interest the borrowed base was charged between the position's events, row by row",
   "supplied collateral": "every collateral amount this position supplied",
   "withdrawn collateral": "every collateral amount this position withdrew back out",
   "absorbed collateral": "the collateral the protocol seized in liquidations (AbsorbCollateral)",
@@ -612,5 +601,110 @@ export const debtPrincipalProv = (sym: string, coords: CompoundCoords): Provenan
   summary: `Borrowed ${sym} PRINCIPAL — the net of every draw, repayment and liquidation absorption the position's own events moved, across its whole captured history. Principal only — the interest accrued since each draw is the separate accrued segment above it (principal + interest = the live Comet borrowBalanceOf).`,
   contract: cometContract(coords),
   via: `${captureVia(coords)} · Σ (borrowed − repaid − absorbed) · genesis → head`,
+  inputs: eventInputs(coords),
+});
+
+// ── the absorb, split into what it cleared and what it credited ─────────────
+// Comet's AbsorbDebt emits one figure, basePaidOut: the new base balance less
+// the old. The debt the absorb cleared is the part of it that took a negative
+// balance up to zero; the rest is credit left to the account as a lent balance.
+
+/** The debt the absorb cleared: min(basePaidOut, −balance before). */
+export const absorbDebtClearedProv = (
+  sym: string,
+  coords: CompoundCoords,
+  vals: { paidOut: string; before: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  formula: "min(basePaidOut, −balance before)",
+  verify: txVerify(coords),
+  summary: `Debt cleared (${sym}) — the part of the AbsorbDebt event's basePaidOut that took the account's base balance from negative up to zero${atBlock(coords)}.`,
+  contract: cometContract(coords),
+  via: `${captureVia(coords)} · AbsorbDebt log · basePaidOut, less any credit past zero`,
+  inputs: eventInputs(coords, [
+    { label: "basePaidOut", value: vals.paidOut, kind: "chain", note: "AbsorbDebt" },
+    { label: "balance before", value: vals.before, kind: "chain-derived", note: "balance after − basePaidOut" },
+  ]),
+});
+
+/** The credit past the debt: basePaidOut − debt cleared, left as a lent balance. */
+export const absorbCreditProv = (sym: string, coords: CompoundCoords, vals: { paidOut: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  formula: "basePaidOut − debt cleared",
+  verify: txVerify(coords),
+  summary: `Credit past the debt (${sym}) — the seized collateral's credited value was larger than the debt${atBlock(coords)}, and the difference stays with the account as a lent balance that earns interest and can be withdrawn.`,
+  contract: cometContract(coords),
+  via: `${captureVia(coords)} · AbsorbDebt log · basePaidOut − debt cleared`,
+  inputs: eventInputs(coords, [{ label: "basePaidOut", value: vals.paidOut, kind: "chain", note: "AbsorbDebt" }]),
+});
+
+/** The total credited, in dollars: the AbsorbDebt event's usdValue. */
+export const absorbCreditedUsdProv = (sym: string, coords: CompoundCoords, vals: { paidOut: string }): Provenance => ({
+  kind: "chain",
+  pclass: "emitted",
+  verify: txVerify(coords),
+  summary: `What the account was credited for its seized collateral, in dollars: the AbsorbDebt event's usdValue${atBlock(coords)}, which is basePaidOut valued at the ${sym} oracle price. Comet computes it as each seized asset's value times that asset's liquidation factor, added up.${quoteNote(coords)}`,
+  contract: cometContract(coords),
+  via: `${captureVia(coords)} · AbsorbDebt log · usdValue`,
+  inputs: eventInputs(coords, [{ label: "basePaidOut", value: vals.paidOut, kind: "chain", note: "AbsorbDebt" }]),
+});
+
+/** What the protocol kept: seized value − credited value, both emitted. */
+export const absorbKeptProv = (
+  coords: CompoundCoords,
+  vals: { seizedUsd: string; creditedUsd: string },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  formula: "seized value − credited value",
+  verify: txVerify(coords),
+  summary: `The part of the seized collateral's value the account was not credited, which stays with the protocol${atBlock(coords)}. It is also what the absorb cost the account: collateral worth the seized value went out, and debt plus credit worth the credited value came back.`,
+  contract: cometContract(coords),
+  via: "Σ AbsorbCollateral usdValue − AbsorbDebt usdValue",
+  inputs: eventInputs(coords, [
+    { label: "seized", value: vals.seizedUsd, kind: "chain", note: "Σ AbsorbCollateral usdValue" },
+    { label: "credited", value: vals.creditedUsd, kind: "chain", note: "AbsorbDebt usdValue" },
+  ]),
+});
+
+/** A collateral asset's factors, read from the Comet one block before the absorb. */
+export const absorbFactorProv = (
+  sym: string,
+  which: "liquidate factor" | "liquidation factor",
+  coords: CompoundCoords,
+  vals: { value: string; readBlock: number },
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  verify: stateVerify("getAssetInfoByAddress", vals.readBlock),
+  summary: `${sym}'s ${which} in this market, ${vals.value}, read from the Comet's asset settings at block ${vals.readBlock}, the block before the absorb. ${which === "liquidate factor" ? "The share of the asset's value that counts toward the liquidation line." : "The share of the asset's value the account is credited when it is absorbed."}`,
+  contract: cometContract(coords),
+  via: `Comet.getAssetInfoByAddress(${sym}) · block ${vals.readBlock}`,
+  inputs: eventInputs(coords),
+});
+
+/** The liquidation line at the absorb: Σ seized value × liquidate factor. */
+export const absorbLineProv = (coords: CompoundCoords, vals: { terms: string; readBlock: number }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  formula: "Σ collateral value × liquidate factor",
+  verify: txVerify(coords),
+  summary: `The account's liquidation line at the absorb: each collateral asset's value at the absorb's prices (its AbsorbCollateral usdValue) times its liquidate factor, read at block ${vals.readBlock}, added up. Debt worth more than this is what lets anyone trigger an absorb.`,
+  contract: cometContract(coords),
+  via: `${vals.terms}`,
+  inputs: eventInputs(coords),
+});
+
+/** The debt in dollars at the absorb: debt cleared × the base oracle price. */
+export const absorbDebtUsdAtLineProv = (sym: string, coords: CompoundCoords, vals: { debt: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "emitted",
+  formula: "debt × base price",
+  verify: txVerify(coords),
+  summary: `Debt at the absorb, in dollars (${sym}) — the debt the absorb cleared times the ${sym} price the AbsorbDebt event carries (its usdValue over basePaidOut)${atBlock(coords)}, as Comet compares it with the liquidation line.${quoteNote(coords)}`,
+  contract: cometContract(coords),
+  via: `debt ${vals.debt} ${sym} × AbsorbDebt usdValue ÷ basePaidOut`,
   inputs: eventInputs(coords),
 });
