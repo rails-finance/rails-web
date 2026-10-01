@@ -82,7 +82,9 @@ function LiquityForkDetailsBand({
           {debtSym}
           {chain.trovesAhead != null && (
             <span className="ml-1.5 inline-flex items-center rounded-full bg-rb-200 dark:bg-rb-700 px-1.5 py-px text-[0.7rem] font-semibold text-rb-500 align-middle">
-              {chain.trovesAhead}
+              <Prov info={vocab.trovesAheadProv(chain.symbol)} value={String(chain.trovesAhead)}>
+                {chain.trovesAhead}
+              </Prov>
             </span>
           )}
           {/* Nothing sits at a lower or equal rate: this Trove is the head of

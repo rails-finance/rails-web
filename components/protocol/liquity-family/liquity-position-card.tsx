@@ -783,9 +783,6 @@ export function LiquityPositionCard({
                     </HighlightableValue>
                   </Prov>{" "}
                   interest rate
-                  {/* The live read's debt includes interest to the head block,
-                    so the figure grows while the page is open. */}
-                  {lv && debt > 0 && <div>Live, accrues every second</div>}
                 </div>
                 {disclosing && debtDetail}
               </Detail>

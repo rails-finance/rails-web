@@ -402,6 +402,12 @@ function buildOpenItems({
         )}
       </span>,
     );
+    items.push(
+      <span key="debt-live" className="text-rb-500">
+        That debt includes interest up to the latest block and keeps growing at the trove&apos;s rate while the trove
+        is open
+      </span>,
+    );
   }
 
   if (hasLiveData && currentPrice && collateralUsd) {
