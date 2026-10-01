@@ -614,14 +614,26 @@ function narrowing(
     return { verb: "Hiding", names: [`all ${noun}`], more: 0, title: `Hiding all ${noun}`, every: true };
   const only = kept.length < hidden.length;
   const shown = only ? kept : hidden;
-  const side = shown.map(name);
+  // Two options that read as one name (a plain and a compound menu item) are
+  // named once; the tooltip lists every menu label under it.
+  const groups = new Map<string, FilterOption[]>();
+  for (const o of shown) {
+    const n = name(o);
+    groups.set(n, [...(groups.get(n) ?? []), o]);
+  }
+  const side = [...groups.keys()];
   const verb = only ? "Only" : "Hiding";
   const names = side.length > 3 ? side.slice(0, 2) : side;
+  const tips = [...groups].map(([n, os]) => {
+    if (os.length === 1) return tip(os[0]);
+    const labels = [...new Set(os.map((o) => o.label))].filter((l) => l !== n);
+    return labels.length ? `${n} (${labels.join(", ")})` : n;
+  });
   return {
     verb,
     names,
     more: side.length - names.length,
-    title: `${verb} ${shown.map(tip).join(", ")}`,
+    title: `${verb} ${tips.join(", ")}`,
     every: false,
   };
 }
