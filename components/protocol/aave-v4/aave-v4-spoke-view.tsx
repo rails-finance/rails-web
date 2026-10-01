@@ -109,7 +109,6 @@ import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices
 import { useAaveV4OraclePrices, type OraclePriceMap } from "@/lib/aave-v4/use-oracle-prices";
 import { listSymbols } from "@/lib/aave-v4/unpriced";
 import { computeOnchainUsd } from "@/lib/aave-v4/onchain-usd";
-import { AaveV4BarsProvider } from "@/lib/aave-v4/use-position-bars";
 import { priceKeyFor } from "@/lib/aave/prices";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { AaveV4BaseReserveNotice } from "@/components/protocol/aave-v4/aave-v4-base-reserve-notice";
@@ -880,47 +879,41 @@ function AaveV4SpokePageInner({
           />
         ) : null}
 
-        {/* AaveV4BarsProvider sits OUTSIDE ChainTruthTimeline (which mounts its
-            own TimelineDisplayProvider) — the change/balance bars derive from
-            the full spoke-scoped event set, not the filtered/windowed slice
-            the timeline currently renders. */}
-        <AaveV4BarsProvider events={spokeScopedEvents}>
-          <ChainTruthTimeline
-            // Matches `AaveV4EventCard`'s own `persistKey={`aave-v4:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="aave-v4"
-            closed={positionClosed}
-            tl={tl}
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={hasLiveDebt && liveOraclePending}
-            runs={AAVE_V4_TIMELINE_RUNS}
-            displayItems={AAVE_V4_DISPLAY_ITEMS}
-            emptyLabel={`No activity on the ${spokeName} spoke for this wallet.`}
-            toolbarLeading={
-              spokeScopedEvents.length > 0 ? (
-                <TimelineActivityHeader events={spokeScopedEvents} closed={positionClosed} />
-              ) : (
-                <h2 className="text-sm font-semibold text-foreground">Activity</h2>
-              )
-            }
-            renderCard={(event, meta) =>
-              isAaveV4Event(event) ? (
-                <AaveV4EventCard
-                  event={event}
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  txGroup={txGroups.get(event.id)}
-                  siblings={txSiblings.get(event.txHash ?? "")}
-                  previousRate={previousRates.get(event.id)}
-                  debtLifeInterest={olderCount === 0 ? debtLifeInterest.get(event.id) : undefined}
-                  eventNumber={meta.eventNumber}
-                />
-              ) : null
-            }
-          />
-        </AaveV4BarsProvider>
+        <ChainTruthTimeline
+          // Matches `AaveV4EventCard`'s own `persistKey={`aave-v4:${event.id}`}`
+          // — lets pinned mode (the per-event share route) force a landed
+          // card's detail panel open on its first mount.
+          persistKeyPrefix="aave-v4"
+          closed={positionClosed}
+          tl={tl}
+          notes={notes}
+          liveNotes={liveNotes}
+          liveNotesPending={hasLiveDebt && liveOraclePending}
+          runs={AAVE_V4_TIMELINE_RUNS}
+          displayItems={AAVE_V4_DISPLAY_ITEMS}
+          emptyLabel={`No activity on the ${spokeName} spoke for this wallet.`}
+          toolbarLeading={
+            spokeScopedEvents.length > 0 ? (
+              <TimelineActivityHeader events={spokeScopedEvents} closed={positionClosed} />
+            ) : (
+              <h2 className="text-sm font-semibold text-foreground">Activity</h2>
+            )
+          }
+          renderCard={(event, meta) =>
+            isAaveV4Event(event) ? (
+              <AaveV4EventCard
+                event={event}
+                isFirst={meta.isFirst}
+                isLast={meta.isLast}
+                txGroup={txGroups.get(event.id)}
+                siblings={txSiblings.get(event.txHash ?? "")}
+                previousRate={previousRates.get(event.id)}
+                debtLifeInterest={olderCount === 0 ? debtLifeInterest.get(event.id) : undefined}
+                eventNumber={meta.eventNumber}
+              />
+            ) : null
+          }
+        />
       </div>
       <ProvInspectorLayer />
     </FlowFocusContext.Provider>

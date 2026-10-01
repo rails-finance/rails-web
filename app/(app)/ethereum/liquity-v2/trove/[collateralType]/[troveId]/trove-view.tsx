@@ -64,7 +64,6 @@ const TroveExportMenu = dynamic(() => import("@/components/trove/TroveExportMenu
   loading: () => null,
 });
 import { closingPricesAt, DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { LiquityTroveBarsProvider } from "@/lib/liquity/use-trove-bars";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -301,9 +300,7 @@ export default function TroveView({
   // blockNumber/timestamp, then by log_index (parsed from the event id, which
   // is always `${txHash}_${logIndex}`) — essential when a single tx emits
   // multiple TroveUpdated logs at the same block: without it the within-tx
-  // order is whatever the API returned (DESC), and LiquityTroveBarsProvider's
-  // running-state walk would process the later log first and compute the
-  // earlier event's delta as the wrong sign. useTimelineEvents() below
+  // order is whatever the API returned (DESC). useTimelineEvents() below
   // re-sorts by timestamp alone, but Array.prototype.sort is stable — pre-
   // ordering here means its resort preserves this log_index tie-break rather
   // than losing it.
@@ -664,62 +661,60 @@ export default function TroveView({
           );
         })()}
 
-        <LiquityTroveBarsProvider events={tl.sortedEvents}>
-          <CollSurplusCtx.Provider value={surplusState}>
-            <ChainTruthTimeline
-              // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
-              // — lets pinned mode (the per-event share route) force a landed
-              // card's detail panel open on its first mount.
-              persistKeyPrefix="liquity-v2"
-              closed={troveData.status !== "open"}
-              tl={tlWithGlyph}
-              boundary={boundary}
-              notes={notes}
-              liveNotes={liveNotes}
-              liveNotesPending={isOpen && !!branch && liveOraclePending}
-              runs={LIQUITY_TIMELINE_RUNS}
-              displayItems={LIQUITY_DISPLAY_ITEMS}
-              mobileSpine={LIQUITY_MOBILE_SPINE}
-              emptyLabel="No transaction history available"
-              toolbarLeading={
-                <TimelineActivityHeader
-                  events={liquityEvents}
-                  closed={troveData.status !== "open"}
-                  firstAt={troveData.activity?.createdAt}
-                />
-              }
-              renderCard={(event, meta) => {
-                if (isCollSurplusClaimEvent(event))
-                  return (
-                    <CollSurplusClaimCard
-                      event={event}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                      eventNumber={meta.eventNumber}
-                      persistPrefix="liquity-v2"
-                    />
-                  );
-                if (!isLiquityEvent(event)) return null;
-                // previousEvent is always the temporally-older event, regardless
-                // of display order, so explainer deltas (interest accrued,
-                // time-since-last) stay correct.
-                const idx = sortedIndex.get(event.id);
-                const previousEvent = idx != null && idx > 0 ? tl.sortedEvents[idx - 1] : undefined;
+        <CollSurplusCtx.Provider value={surplusState}>
+          <ChainTruthTimeline
+            // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
+            // — lets pinned mode (the per-event share route) force a landed
+            // card's detail panel open on its first mount.
+            persistKeyPrefix="liquity-v2"
+            closed={troveData.status !== "open"}
+            tl={tlWithGlyph}
+            boundary={boundary}
+            notes={notes}
+            liveNotes={liveNotes}
+            liveNotesPending={isOpen && !!branch && liveOraclePending}
+            runs={LIQUITY_TIMELINE_RUNS}
+            displayItems={LIQUITY_DISPLAY_ITEMS}
+            mobileSpine={LIQUITY_MOBILE_SPINE}
+            emptyLabel="No transaction history available"
+            toolbarLeading={
+              <TimelineActivityHeader
+                events={liquityEvents}
+                closed={troveData.status !== "open"}
+                firstAt={troveData.activity?.createdAt}
+              />
+            }
+            renderCard={(event, meta) => {
+              if (isCollSurplusClaimEvent(event))
                 return (
-                  <LiquityEventCard
+                  <CollSurplusClaimCard
                     event={event}
-                    addressDisplay="hidden"
                     isFirst={meta.isFirst}
                     isLast={meta.isLast}
-                    previousEvent={previousEvent}
                     eventNumber={meta.eventNumber}
-                    currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
+                    persistPrefix="liquity-v2"
                   />
                 );
-              }}
-            />
-          </CollSurplusCtx.Provider>
-        </LiquityTroveBarsProvider>
+              if (!isLiquityEvent(event)) return null;
+              // previousEvent is always the temporally-older event, regardless
+              // of display order, so explainer deltas (interest accrued,
+              // time-since-last) stay correct.
+              const idx = sortedIndex.get(event.id);
+              const previousEvent = idx != null && idx > 0 ? tl.sortedEvents[idx - 1] : undefined;
+              return (
+                <LiquityEventCard
+                  event={event}
+                  addressDisplay="hidden"
+                  isFirst={meta.isFirst}
+                  isLast={meta.isLast}
+                  previousEvent={previousEvent}
+                  eventNumber={meta.eventNumber}
+                  currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
+                />
+              );
+            }}
+          />
+        </CollSurplusCtx.Provider>
       </div>
       <ProvInspectorLayer />
     </FlowFocusContext.Provider>

@@ -1,9 +1,7 @@
 "use client";
 
 // Composer: wires the Aave V4 header / detail / explainer into the universal
-// EventCard shell. Mirrors LiquityEventCard's pattern. Bars slot is rendered
-// via EventCard's `headerBars` so the change-bar / balance-bar pair sits
-// inside the header panel directly under the action row.
+// EventCard shell. Mirrors LiquityEventCard's pattern.
 //
 // SpineColumn shares the universal event-card API, so the icon-column logic is
 // identical across protocols.
@@ -16,7 +14,6 @@ import { AaveV4EventHeader, aaveV4AmountProv, type AaveV4TxGroup } from "./aave-
 import { AaveV4EventDetail } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { AaveV4BarsSlot } from "./aave-v4-bars-slot";
 import { aaveV4ExplainerTeaser, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
 
 export interface AaveV4EventCardProps {
@@ -143,7 +140,6 @@ export function AaveV4EventCard({
           externalBy={extBy ?? undefined}
         />
       }
-      headerBars={<AaveV4BarsSlot eventId={event.id} />}
       detail={
         <AaveV4EventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
       }

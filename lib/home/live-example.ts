@@ -23,9 +23,8 @@ export const LIVE_EXAMPLE_TROVE_PATH = `/ethereum/liquity-v2/trove/${LIVE_EXAMPL
 export const LIVE_EXAMPLE_HIDDEN_OPS = ["redeemCollateral", "setBatchManagerAnnualInterestRate"];
 
 /** Projection of a timeline event carrying ONLY the fields the lifetime-flows
- *  tower (`TroveEconomicsSummary`), the bars provider
- *  (`LiquityTroveBarsProvider`), and the interest-between-events calculation
- *  read — the full event is ~3.7KB (stateBefore, blockGrouping, flows, …) and
+ *  tower (`TroveEconomicsSummary`) and the
+ *  interest-between-events calculation read — the full event is ~3.7KB (stateBefore, blockGrouping, flows, …) and
  *  the hero ships all ~150 of them in the page payload, so the projection is
  *  what keeps the home page light. If a component consumed by the hero grows a
  *  new field access on non-visible events, add the field here. */
