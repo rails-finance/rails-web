@@ -416,18 +416,6 @@ export const giveOwnerProv = (coords: MakerCoords): Provenance => ({
   inputs: eventInputs(coords),
 });
 
-/** The ilk's OSM price itself (live) — inverted from the Vat spot and the
- *  Spotter mat, exactly reversing Spotter.poke's write. Chain-derived: both
- *  operands are live chain reads and the algebra is Maker's own. */
-export const osmPriceProv = (collSym: string, ilk: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `The ${collSym} price Maker itself acts on for ${ilk} — the OSM (Oracle Security Module) price, recovered by inverting Spotter.poke: price = spot × par × mat ÷ RAY². The OSM delays feeds by one hour by design, so this is the protocol's operative price, not the spot market's.`,
-  contract: { name: "Spotter", address: MAKER_ADDRESSES.SPOTTER },
-  via: "Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY²",
-  formula: "spot × par × mat ÷ RAY²",
-});
-
 /** The collateral price at which the Vat's own safety line is crossed —
  *  liqPrice = DAI debt × mat ÷ ink. Algebraically EQUIVALENT to the Vat
  *  predicate ink·spot ≥ art·rate (equivalence machine-verified in
@@ -467,25 +455,6 @@ export const stabilityFeeAprProv = (ilk: string): Provenance => ({
   contract: { name: "Jug", address: MAKER_ADDRESSES.JUG },
   via: "Jug.base + Jug.ilks(ilk).duty · compounded",
   formula: "((base + duty) ÷ RAY) ^ 31,536,000 − 1",
-});
-
-/** The ilk's minimum vault debt (`dust`). RAD-scaled slot (1e45). */
-export const dustProv = (ilk: string): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  summary: `The minimum debt an ${ilk} vault may carry — the Vat's dust parameter. A vault cannot wipe to a remainder below it (only to exactly zero). Live chain read; rad ÷ 10^45 for the DAI figure.`,
-  contract: VAT,
-  via: "Vat.ilks(ilk).dust · rad ÷10^45",
-});
-
-/** The ilk's debt ceiling utilization — total ilk debt (Art × rate) vs line. */
-export const ilkCeilingProv = (ilk: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `How much of the ${ilk} debt ceiling is drawn — the ilk's total debt (Vat.ilks(ilk).Art × rate) against its ceiling (line). All three are live Vat reads.`,
-  contract: VAT,
-  via: "Vat.ilks(ilk) · Art × rate vs line",
-  formula: "Art × rate ÷ 10^27 vs line ÷ 10^45",
 });
 
 /** Borrow headroom to the mat line — how much more DAI the vault could draw
@@ -550,26 +519,6 @@ export const peakDebtProv = (symbol: string, coords?: MakerCoords): Provenance =
 // One definition for the card, the flows panel and every row
 // (lib/makerdao/vault-history.tsx): the fee is the debt less the DAI drawn net
 // of repayments since the vault last owed nothing.
-
-/** The stability fee inside the vault's debt now. */
-export const feeInDebtProv = (vals: { debt: string; drawn: string; since?: string }): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `Stability fee in the debt — the debt owed now less the DAI drawn, net of repayments, since the vault last owed nothing${vals.since ? ` (${vals.since})` : ""}. A repayment is counted against the drawn DAI first.`,
-  contract: VAT,
-  via: "art × rate (live) − Σ (dart × rate@block) since the debt was last zero",
-  formula: "debt now − DAI drawn since zero debt",
-  inputs: [
-    { label: "debt now", value: vals.debt, kind: "chain-derived", pclass: "state", note: "art × rate (Vat)" },
-    {
-      label: "DAI drawn",
-      value: vals.drawn,
-      kind: "chain-derived",
-      pclass: "indexed",
-      note: "each draw and repayment at its block's rate",
-    },
-  ],
-});
 
 // ── The ilk at an event's block (T2 of a row) ────────────────────────────────
 
