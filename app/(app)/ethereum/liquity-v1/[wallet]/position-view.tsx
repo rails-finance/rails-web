@@ -613,6 +613,7 @@ export default function LiquityV1TroveView({
                       feesUnread={flowMapped.feesUnread}
                       redistributions={flowMapped.redistributions}
                       life={lifeNo}
+                      gas={flowReads != null ? flowMapped.gas : undefined}
                     />
                   </div>
                 }

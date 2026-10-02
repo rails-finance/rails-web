@@ -55,6 +55,8 @@ import {
   debtChangeProv,
   rateAfterProv,
   upfrontFeeProv,
+  liquityRedistOnAdjust,
+  redistArrivalProv,
   type EventCoords,
   type ChangeProv,
   type FigureProv,
@@ -475,7 +477,44 @@ function adjustTroveSlots(
       ),
     );
   }
-  if (debtChange > 0 && (adjustFee > 0 || totalAccruedFees > 0.01)) {
+  // A liquidated neighbour's redistribution this touch applied: what arrived,
+  // then the debt's balance check with it as its own term.
+  const redist = liquityRedistOnAdjust(ctx);
+  if (redist) {
+    const legs: ReactNode[] = [];
+    if (redist.debt >= 0.01)
+      legs.push(<>{fig(redistArrivalProv(ctx, "debt", coords), fmtCurrency(redist.debt, debtSym))} of debt</>);
+    if (redist.coll > 1e-9)
+      legs.push(
+        <>{fig(redistArrivalProv(ctx, "coll", coords), `${fmtColl(redist.coll)} ${collateralType}`)} of collateral</>,
+      );
+    changed.push(
+      clause(
+        <>
+          Liquidations on the {collateralType} branch passed this trove {legs[0]}
+          {legs[1] ? <> and {legs[1]}</> : null} since its last change, applied at this touch.
+        </>,
+      ),
+    );
+    if (redist.debt >= 0.01)
+      changed.push(
+        clause(
+          <>
+            Debt: {fmtDebt(stateBefore.debt)} before
+            {Math.abs(debtChange) >= TROVE_DELTA_EPSILON ? (
+              <>
+                {" "}
+                {debtChange < 0 ? "−" : "+"} {fmtDebt(Math.abs(debtChange))} {debtChange < 0 ? "repaid" : "borrowed"}
+              </>
+            ) : null}
+            {adjustFee > 0 ? <> + {fmtDebt(adjustFee)} fee</> : null} + {fmtDebt(redist.debt)} from the liquidation
+            {totalAccruedFees > 0.01 ? <> + {fmtAccrued(totalAccruedFees)} interest</> : null} ={" "}
+            {fmtCurrency(stateAfter.debt, debtSym)}.
+          </>,
+        ),
+      );
+  }
+  if (!redist && debtChange > 0 && (adjustFee > 0 || totalAccruedFees > 0.01)) {
     const totalIncrease = stateAfter.debt - stateBefore.debt;
     changed.push(
       clause(

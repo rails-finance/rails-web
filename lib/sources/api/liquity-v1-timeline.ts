@@ -61,6 +61,11 @@ export interface MvRow {
   // raw 1e18; "0" where none was charged. NULL or absent where the index
   // cannot place it: the row then states the debt added.
   borrowing_fee?: string | null;
+  // The transaction's gas used and effective gas price (wei). The capture
+  // carries them from block 24,781,782; older rows hold 0, and the card reads
+  // the receipt instead.
+  tx_gas_used?: string | null;
+  tx_gas_price?: string | null;
 }
 
 const LABELS: Record<LiquityV1EventType, string> = {
@@ -108,6 +113,15 @@ function priceOf(
   return Number.isFinite(n) && n > 0 ? { usd: n, source } : undefined;
 }
 
+/** The transaction's gas in ETH, where the row carries it. The USD leg stays 0:
+ *  owner rows carry no ETH price, and the explainer states the ETH figure. */
+function gasOf(r: MvRow): { gasUsed: number; gasCostEth: number; gasCostUsd: number } | undefined {
+  const used = r.tx_gas_used != null ? Number(r.tx_gas_used) : NaN;
+  const price = r.tx_gas_price != null ? Number(r.tx_gas_price) : NaN;
+  if (!Number.isFinite(used) || !Number.isFinite(price) || used <= 0 || price <= 0) return undefined;
+  return { gasUsed: used, gasCostEth: (used * price) / 1e18, gasCostUsd: 0 };
+}
+
 function flowFor(token: string, symbol: string, raw: bigint, direction: "in" | "out"): AssetFlow {
   const mag = raw < ZERO ? -raw : raw;
   return {
@@ -143,6 +157,7 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
     const received = fee != null ? debtDelta - fee - (isOpen ? RESERVE : ZERO) : null;
     const draw = received != null && received >= ZERO && fee != null ? { fee, received } : null;
 
+    const gas = gasOf(r);
     const ctx: LiquityV1Context = {
       eventType: kind,
       collDelta: fmtUnits(collDelta),
@@ -205,6 +220,7 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
           ? (forkAdjustLabel(classifyTroveAdjust({ collDelta, debtDelta })) ?? LABELS[kind] ?? kind)
           : (LABELS[kind] ?? kind),
       flows,
+      ...(gas ? { gas } : {}),
       context: { protocol: "liquity-v1", data: ctx },
     };
   });

@@ -176,6 +176,7 @@ export function LiquityV1EventCard({
             wallet={event.wallet}
             currentPrice={currentPrice}
             ownerOutcome={isLiq ? ownerOutcome : null}
+            gas={event.gas}
             skipLead
           />
         }

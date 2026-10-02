@@ -17,7 +17,13 @@ import { Prov } from "@/components/shared/provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { formatDate } from "@/lib/date";
 import { formatUsd } from "@/lib/shared/format-event";
-import { collChangeProv, debtChangeProv, rateAfterProv } from "@/lib/liquity/event-provenance";
+import {
+  collChangeProv,
+  debtChangeProv,
+  rateAfterProv,
+  liquityRedistOnAdjust,
+  redistArrivalProv,
+} from "@/lib/liquity/event-provenance";
 // The rate pills live in the shared module now (the two Liquity forks render the
 // identical pill through the chain-state row's rate-pill seam). Re-export
 // UsersGlyph — the V2 trove page imports it from HERE (page.tsx), and that
@@ -207,6 +213,9 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
   const rateP = rateAfterProv(ctx, coords);
   const debtChange = debtCp?.change ?? 0;
   const collChange = collCp?.change ?? 0;
+  const redist = liquityRedistOnAdjust(ctx);
+  const redistDebtCp = redist && redist.debt >= 0.01 ? redistArrivalProv(ctx, "debt", coords) : undefined;
+  const redistCollCp = redist && redist.coll > 1e-9 ? redistArrivalProv(ctx, "coll", coords) : undefined;
 
   const hasDebtChange = Math.abs(debtChange) >= 0.01;
   const hasCollChange = Math.abs(collChange) >= 0.01;
@@ -534,6 +543,44 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 <TokenChipIcon symbol={ctx.collateralType} size={16} />
               </span>
             )}
+
+          {/* A liquidated neighbour's redistribution this adjust applied: its own
+              part of the row in the caution tone, so inherited debt never reads
+              as part of a repayment or a borrow. No token moved for it. */}
+          {redist && (
+            <span className="inline-flex items-center gap-1.5 text-sm">
+              <span className="text-caution-600 dark:text-caution-400">From a liquidation</span>
+              {redistDebtCp && (
+                <>
+                  <Prov value={redistDebtCp.value} symbol={redistDebtCp.symbol} info={redistDebtCp.info}>
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(redistDebtCp.change, ctx.assetType ?? "BOLD")}
+                        exact={redistDebtCp.value}
+                        symbol={ctx.assetType ?? "BOLD"}
+                      />
+                    </span>
+                  </Prov>
+                  <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
+                </>
+              )}
+              {redistDebtCp && redistCollCp && <span className="text-caution-600 dark:text-caution-400">and</span>}
+              {redistCollCp && (
+                <>
+                  <Prov value={redistCollCp.value} symbol={redistCollCp.symbol} info={redistCollCp.info}>
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(redistCollCp.change, ctx.collateralType)}
+                        exact={redistCollCp.value}
+                        symbol={ctx.collateralType}
+                      />
+                    </span>
+                  </Prov>
+                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
+                </>
+              )}
+            </span>
+          )}
 
           {/* Claimable collateral surplus — on a liquidation where the trove's
               collateral value exceeded its debt, the remainder is returned to

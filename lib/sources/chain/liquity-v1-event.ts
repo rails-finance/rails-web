@@ -94,6 +94,9 @@ export interface LiquityV1EventRead {
   /** The transaction's sender — who paid its gas and, on a liquidation, who
    *  called it. */
   sender: string;
+  /** The transaction's gas, paid by the sender: gas used × the effective gas
+   *  price, in ETH. Absent on an answer cached before it was added. */
+  gas?: { gasUsed: number; gasCostEth: number } | null;
   /** LUSDBorrowingFeePaid for this borrower; null when the event is absent
    *  (no draw in this transaction). */
   borrowingFee: string | null;
@@ -345,6 +348,13 @@ export async function readLiquityV1Event(txHash: string, wallet: string): Promis
     blockNumber: Number(block),
     priceUsd: priceRaw != null ? Number(units(priceRaw)) : null,
     sender: tx.from.toLowerCase(),
+    gas:
+      receipt.effectiveGasPrice != null
+        ? {
+            gasUsed: Number(receipt.gasUsed),
+            gasCostEth: Number(units(receipt.gasUsed * receipt.effectiveGasPrice)),
+          }
+        : null,
     borrowingFee: fees.length > 0 ? units(fees.reduce((s, d) => s + (d.args._LUSDFee as bigint), ZERO)) : null,
     lusdMintedToOwner: units(sum(lusdTransfer(ZERO_ADDR, wallet), "value")),
     lusdBurnedFromOwner: units(sum(lusdTransfer(wallet, ZERO_ADDR), "value")),

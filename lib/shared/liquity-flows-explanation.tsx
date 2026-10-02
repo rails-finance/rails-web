@@ -85,7 +85,11 @@ export interface LiquityV1FlowsNoteProps {
   redistributions: number;
   /** This life's number and the wallet's lives. */
   life: { n: number; of: number } | null;
+  /** The gas the owner's own transactions paid (lib/liquity-v1/flows.ts). */
+  gas?: { eth: number; txs: number; unread: number };
 }
+
+const fmtGasEth = (eth: number): string => (eth < 0.001 ? eth.toFixed(6) : eth.toFixed(4));
 
 /** The Explanation lines for a Liquity V1 Trove life (lib/liquity-v1/flows.ts). */
 export function LiquityV1FlowsNote({
@@ -94,6 +98,7 @@ export function LiquityV1FlowsNote({
   feesUnread,
   redistributions,
   life,
+  gas,
 }: LiquityV1FlowsNoteProps): ReactNode {
   const n = (k: number, one: string, many: string) => (k === 1 ? one : `${k.toLocaleString("en-US")} ${many}`);
   return (
@@ -138,6 +143,13 @@ export function LiquityV1FlowsNote({
         {life && life.of > 1 ? ` (life ${life.n} of ${life.of} for this wallet; each has its own page)` : ""}. A
         liquidated or closed life&apos;s slider stops the day after its last event.
       </p>
+      {gas && gas.txs > 0 && (
+        <p data-liquity-v1-flows-gas="">
+          {gas.unread === 0
+            ? `The owner's ${n(gas.txs, "transaction", "transactions")} on this life paid ${fmtGasEth(gas.eth)} ETH in gas. A redemption's or a liquidation's gas is paid by its caller.`
+            : `Each of the owner's transactions states its gas on its card. ${n(gas.unread, "One", "of them")} could not be read, so no total is given here.`}
+        </p>
+      )}
     </div>
   );
 }

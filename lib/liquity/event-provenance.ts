@@ -254,13 +254,65 @@ export function eventPriceProv(ctx: LiquityContext, coords?: EventCoords): Figur
   };
 }
 
+/** A liquidated neighbour's redistribution that an adjust applied: the
+ *  TroveOperation's `_debtIncreaseFromRedist` / `_collIncreaseFromRedist`.
+ *  Null on every other operation and where neither leg is above dust. */
+export function liquityRedistOnAdjust(ctx: LiquityContext): { debt: number; coll: number } | null {
+  const op = ctx.troveOperation;
+  if (ctx.operation !== "adjustTrove" || !op) return null;
+  const debt = op.debtIncreaseFromRedist > 0 ? op.debtIncreaseFromRedist : 0;
+  const coll = op.collIncreaseFromRedist > 0 ? op.collIncreaseFromRedist : 0;
+  return debt >= 0.01 || coll > 1e-9 ? { debt, coll } : null;
+}
+
+/** The receipt for one leg of a redistribution an adjust applied. */
+export function redistArrivalProv(
+  ctx: LiquityContext,
+  leg: "debt" | "coll",
+  coords?: EventCoords,
+): ChangeProv | undefined {
+  const arr = liquityRedistOnAdjust(ctx);
+  const op = ctx.troveOperation;
+  if (!arr || !op) return undefined;
+  const sym = leg === "debt" ? (ctx.assetType ?? "BOLD") : (ctx.collateralType ?? "collateral");
+  const change = leg === "debt" ? arr.debt : arr.coll;
+  const f = leg === "debt" ? "_debtIncreaseFromRedist" : "_collIncreaseFromRedist";
+  return {
+    change,
+    value: formatExact(change),
+    symbol: sym,
+    info: {
+      kind: "chain",
+      verify: changeVerify(coords),
+      summary:
+        leg === "debt"
+          ? `Debt (${sym}) passed to this trove from a liquidated trove on the branch, applied at this touch.`
+          : `Collateral (${sym}) passed to this trove with that debt, applied at this touch.`,
+      contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
+      via: `${streamVia()} · ${originSumSeg(
+        {
+          o: leg === "debt" ? op.origin?.debtIncreaseFromRedist : op.origin?.collIncreaseFromRedist,
+          f,
+          raw: leg === "debt" ? op.raw?.debtIncreaseFromRedist : op.raw?.collIncreaseFromRedist,
+        },
+        [],
+        { event: "TroveOperation", scale: 18 },
+      )}`,
+      inputs: eventInputs({ ...coords, asset: sym }),
+    },
+  };
+}
+
 /** The header's collateral-change receipt identity. */
 export function collChangeProv(ctx: LiquityContext, coords?: EventCoords): ChangeProv | undefined {
   const { troveOperation, stateAfter, stateBefore } = ctx;
   if (!stateAfter || !stateBefore) return undefined;
   const collSym = ctx.collateralType ?? "collateral";
+  // On an adjust, a redistribution the touch applied is its own figure
+  // (redistArrivalProv), so the change is the owner's act.
+  const actOnly = liquityRedistOnAdjust(ctx) != null;
   const change = troveOperation
-    ? troveOperation.collChangeFromOperation + troveOperation.collIncreaseFromRedist
+    ? troveOperation.collChangeFromOperation + (actOnly ? 0 : troveOperation.collIncreaseFromRedist)
     : stateAfter.coll - stateBefore.coll;
   return {
     change,
@@ -273,7 +325,9 @@ export function collChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
       kind: troveOperation ? "chain" : "chain-derived",
       verify: changeVerify(coords),
       summary: troveOperation
-        ? `Collateral (${collSym}) moved by this operation — the amount this operation added or took out, plus any share of a liquidated trove's collateral passed to this trove.`
+        ? actOnly
+          ? `Collateral (${collSym}) the owner added or took out in this operation.`
+          : `Collateral (${collSym}) moved by this operation — the amount this operation added or took out, plus any share of a liquidated trove's collateral passed to this trove.`
         : `Collateral (${collSym}) moved by this operation — the balance the contract logged after this event, minus the balance it logged at the trove's previous change.`,
       contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
       via: troveOperation
@@ -283,13 +337,15 @@ export function collChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
               f: "_collChangeFromOperation",
               raw: troveOperation.raw?.collChangeFromOperation,
             },
-            [
-              {
-                o: troveOperation.origin?.collIncreaseFromRedist,
-                f: "_collIncreaseFromRedist",
-                raw: troveOperation.raw?.collIncreaseFromRedist,
-              },
-            ],
+            actOnly
+              ? []
+              : [
+                  {
+                    o: troveOperation.origin?.collIncreaseFromRedist,
+                    f: "_collIncreaseFromRedist",
+                    raw: troveOperation.raw?.collIncreaseFromRedist,
+                  },
+                ],
             { event: "TroveOperation", scale: 18 },
           )}`
         : `${streamVia()} · TroveUpdated log · Δ_coll · ÷10^18`,
@@ -303,9 +359,10 @@ export function debtChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
   const { troveOperation, stateAfter, stateBefore } = ctx;
   if (!stateAfter || !stateBefore) return undefined;
   const debtSym = ctx.assetType ?? "BOLD";
+  const actOnly = liquityRedistOnAdjust(ctx) != null;
   const change = troveOperation
     ? troveOperation.debtChangeFromOperation +
-      troveOperation.debtIncreaseFromRedist +
+      (actOnly ? 0 : troveOperation.debtIncreaseFromRedist) +
       troveOperation.debtIncreaseFromUpfrontFee
     : stateAfter.debt - stateBefore.debt;
   return {
@@ -316,7 +373,9 @@ export function debtChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
       kind: troveOperation ? "chain" : "chain-derived",
       verify: changeVerify(coords),
       summary: troveOperation
-        ? `Debt (${debtSym}) change from this operation — the amount borrowed or repaid, plus any share of a liquidated trove's debt passed to this trove and any upfront fee.`
+        ? actOnly
+          ? `Debt (${debtSym}) change from the owner's act in this operation — the amount borrowed or repaid, plus any upfront fee.`
+          : `Debt (${debtSym}) change from this operation — the amount borrowed or repaid, plus any share of a liquidated trove's debt passed to this trove and any upfront fee.`
         : `Debt (${debtSym}) change from this operation — the debt the contract logged after this event, minus the debt it logged at the trove's previous change.`,
       contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
       via: troveOperation
@@ -327,11 +386,15 @@ export function debtChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
               raw: troveOperation.raw?.debtChangeFromOperation,
             },
             [
-              {
-                o: troveOperation.origin?.debtIncreaseFromRedist,
-                f: "_debtIncreaseFromRedist",
-                raw: troveOperation.raw?.debtIncreaseFromRedist,
-              },
+              ...(actOnly
+                ? []
+                : [
+                    {
+                      o: troveOperation.origin?.debtIncreaseFromRedist,
+                      f: "_debtIncreaseFromRedist",
+                      raw: troveOperation.raw?.debtIncreaseFromRedist,
+                    },
+                  ]),
               {
                 o: troveOperation.origin?.debtIncreaseFromUpfrontFee,
                 f: "_debtIncreaseFromUpfrontFee",

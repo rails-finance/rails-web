@@ -47,6 +47,8 @@ export interface LiquityV1FlowRead {
   priceUsd: number | null;
   /** LUSDBorrowingFeePaid for the owner; null where the transaction drew none. */
   borrowingFee: string | null;
+  /** The transaction's gas in ETH. */
+  gas?: { gasCostEth: number } | null;
 }
 
 export interface LiquityV1FlowInput {
@@ -69,6 +71,9 @@ export interface LiquityV1FlowEvents {
   feesUnread: number;
   /** Rows that applied redistribution gains. */
   redistributions: number;
+  /** The gas the owner's own transactions paid, in ETH, from the index or the
+   *  receipt read; `unread` counts transactions with neither. */
+  gas: { eth: number; txs: number; unread: number };
 }
 
 const num = (s: string | undefined | null): number => {
@@ -100,6 +105,8 @@ export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEve
   const prices = { block: 0, dayClose: 0, nearest: 0 };
   let feesUnread = 0;
   let redistributions = 0;
+  const gas = { eth: 0, txs: 0, unread: 0 };
+  const gasSeen = new Set<string>();
   const out: LiquityFlowEvent[] = [];
   // The balances the last mapped event left, and the redistribution an
   // applyPendingRewards row has applied since.
@@ -121,6 +128,13 @@ export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEve
     const read = input.reads?.get(tx) ?? null;
     const kind: LiquityFlowEvent["kind"] =
       c.eventType === "redemption" ? "redemption" : c.eventType === "liquidation" ? "liquidation" : "owner";
+    if (kind === "owner" && tx && !gasSeen.has(tx)) {
+      gasSeen.add(tx);
+      gas.txs++;
+      const paid = e.gas?.gasCostEth ?? read?.gas?.gasCostEth ?? null;
+      if (paid != null && paid > 0) gas.eth += paid;
+      else gas.unread++;
+    }
     const own = c.priceAtBlock?.usd ?? read?.priceUsd ?? null;
     const dayClose = daily.get(Math.floor(e.timestamp / DAY_S)) ?? null;
     const price = own != null && own > 0 ? own : dayClose;
@@ -176,5 +190,5 @@ export function liquityV1FlowEvents(input: LiquityV1FlowInput): LiquityV1FlowEve
     debt = debtAfter;
     gain = { coll: 0, debt: 0 };
   }
-  return { events: out, prices, feesUnread, redistributions };
+  return { events: out, prices, feesUnread, redistributions, gas };
 }
