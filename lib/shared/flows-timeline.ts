@@ -351,6 +351,10 @@ export interface FlowWords {
   linePrices?: string;
   /** The timeline's card for a moment between events (lib/shared/flow-moment.ts). */
   moment?: FlowMomentWords;
+  /** The Explanation's words for a mark under the line, where a family's
+   *  event of that kind has its own name (Frankencoin's sales, PWN's default
+   *  claim under the red triangle). */
+  marks?: Partial<Record<FlowTick, string>>;
 }
 
 /** A family's words for the card that states the position at a moment

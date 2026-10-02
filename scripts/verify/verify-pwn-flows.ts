@@ -202,6 +202,14 @@ test("each flow row is the loan's: creation, then a repayment or a default claim
   assert.equal(fx("repaid-fixed-extended").events.filter((e) => ctxOf(e).eventType === "extended").length, 4);
 });
 
+test("a default claim's day draws the red liquidation triangle", () => {
+  for (const name of ["defaulted-accruing", "defaulted-fixed-erc20"]) {
+    const m = model(fx(name));
+    assert.equal(m.ticks[m.ticks.length - 1].tick, "liquidation", `${name}: the claim's day is red`);
+  }
+  assert.ok(!model(fx("repaid-accruing")).ticks.some((t) => t.tick === "liquidation"), "a repaid loan has no red mark");
+});
+
 for (const name of NAMES) {
   test(`${name}: at every day and the live stop each side's printed lines add, in its own token`, () => {
     const f = fx(name);

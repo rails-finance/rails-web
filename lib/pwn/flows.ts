@@ -441,6 +441,7 @@ export function pwnFlowWords(
         : `the ${creditSymbol} owed after the loan's last event. The terms fix the repay total at creation, so nothing accrues.`,
     },
     linePrices: `with the collateral in ${collSymbol} and the debt in ${creditSymbol}, each on its own scale`,
+    marks: { liquidation: "a red triangle for the lender's default claim" },
     moment: {
       // An accruing debt's figure between rows is the model's: the recorded
       // debt grown by the contract's sum to that moment.

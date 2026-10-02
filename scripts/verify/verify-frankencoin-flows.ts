@@ -216,8 +216,22 @@ test("a sale row's falls are its sale's lines", () => {
   assert.ok(near(legsOf("forced-sale", FC.soldForced), 2.026324290678777));
   assert.ok(near(legsOf("forced-sale", FC.clearedForced), 1300));
   assert.equal(legsOf("forced-sale", FC.soldChallenge), 0);
-  const facts = frankencoinFlowFacts(frankencoinFlowReplay(rows(fx("challenge-sales")), opts(fx("challenge-sales"))), null, false);
+  const facts = frankencoinFlowFacts(
+    frankencoinFlowReplay(rows(fx("challenge-sales")), opts(fx("challenge-sales"))),
+    null,
+    false,
+  );
   assert.equal(facts.challengeSales, 3);
+});
+
+test("a sale day draws the red liquidation triangle; other days a side's dot", () => {
+  for (const name of ["challenge-sales", "challenge-no-debt", "forced-sale"]) {
+    const m = model(fx(name));
+    const marks = new Set(m.ticks.map((t) => t.tick));
+    assert.ok(marks.has("liquidation"), `${name}: a sale day is red`);
+    assert.ok(!marks.has("caution") && !marks.has("redemption"), `${name}: no orange mark`);
+  }
+  assert.ok(!model(fx("open-minted")).ticks.some((t) => t.tick === "liquidation"), "no sale, no red mark");
 });
 
 test("the opening deposit no MintingUpdate records is counted from the receipt", () => {
@@ -298,7 +312,11 @@ for (const name of NAMES) {
       assert.ok(cum.exact, `${name} ${fe.id}: the legs add to the day row's move`);
       for (const side of ["collateral", "debt"] as const) {
         const usd = eventSideSum(m, side, cum, fe.sides![side].after);
-        assert.equal(usd.lines.reduce((a, l) => a + l.dollars, 0), usd.total.dollars, `${name} ${fe.id} ${side}`);
+        assert.equal(
+          usd.lines.reduce((a, l) => a + l.dollars, 0),
+          usd.total.dollars,
+          `${name} ${fe.id} ${side}`,
+        );
         const sum = eventTokenSum(m, focus, side, cum, fe.id);
         assert.ok(sum, `${name} ${fe.id} ${side}: a token sum`);
         const scale = 10 ** sum.decimals;
@@ -371,12 +389,19 @@ test("with no receipt read the rows stay whole and still add", () => {
     const rp = frankencoinFlowReplay(rows(f, false), opts(f));
     const facts = frankencoinFlowFacts(rp, null, false);
     assert.equal(facts.splitMints + facts.splitRepays, 0);
-    assert.equal(facts.unsplitMints + facts.unsplitRepays, Object.keys(f.reads).length, `${name}: one whole line a read`);
+    assert.equal(
+      facts.unsplitMints + facts.unsplitRepays,
+      Object.keys(f.reads).length,
+      `${name}: one whole line a read`,
+    );
     const m = model(f, false);
     const end = stateAt(m, m.liveStop);
     for (const side of ["collateral", "debt"] as const) {
       const r = sideSumRows(end[side], unitOf(m, side));
-      assert.equal(r.lines.reduce((a, l) => a + l.dollars, 0), r.total.dollars);
+      assert.equal(
+        r.lines.reduce((a, l) => a + l.dollars, 0),
+        r.total.dollars,
+      );
     }
   }
 });

@@ -463,9 +463,11 @@ export function frankencoinFlowTimeline(
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
-      // A sale is a change the owner did not make: Frankencoin has no
-      // liquidation, so its day reads as caution, not as one.
-      tick: sale ? "caution" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
+      // A challenge sale or a sale at expiry takes collateral from the
+      // position to clear its debt without the owner's act: the red
+      // liquidation triangle (rails-ops reference/lifetime-flows-scrubber.md,
+      // "The contract (web)", the markers).
+      tick: sale ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       legs: r.legs.map((l) =>
         COLL_KEYS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * G.collateral, symbol: o.collSymbol }
@@ -557,6 +559,7 @@ export function frankencoinFlowWords(collSymbol: string): NonNullable<FlowTimeli
       debt: "the ZCHF owed after the last ledger row. Interest is paid at each mint, so nothing accrues between rows.",
     },
     linePrices: `with the collateral in ${collSymbol} and the debt in ZCHF, each on its own scale`,
+    marks: { liquidation: "a red triangle for a challenge sale or a sale at expiry" },
     moment: {
       tokensOnly: ["collateral", "debt"],
       notes: [
