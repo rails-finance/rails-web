@@ -156,7 +156,7 @@ function timelineTable(events: BaseActivityEvent[], sym: string, history: Markdo
   out.push(heading);
   out.push("");
   if (rows.length === 0) {
-    out.push("_No captured history yet — the indexed backend for this explorer is still being filled._");
+    out.push("_No captured history yet — the indexed backend for this explorer is still being built._");
     return out;
   }
   out.push(`| # | Date | Action | Collateral (${sym}) | Minted (ZCHF) | Liq. price | Transaction |`);
