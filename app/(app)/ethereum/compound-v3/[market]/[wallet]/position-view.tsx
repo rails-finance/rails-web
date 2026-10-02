@@ -71,13 +71,14 @@ import {
   cardSideUsd,
   viewFromSummary,
   type CompoundPositionView,
+  compoundBorrowing,
 } from "@/components/protocol/compound/compound-position-card";
 import { CompoundEventCard } from "@/components/protocol/compound/compound-event-card";
 import {
   CompoundPositionExplanation,
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
-import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
+import { CompoundBorrowRoom, compoundRiskColumn } from "@/components/protocol/compound/compound-risk-slot";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
@@ -175,16 +176,12 @@ function Position({
         v={view}
         receipts
         viewHref={viewHref}
-        // The risk slot rides the card's heading-button row (the Aave V3
-        // treatment): the always-on liquidation runway with the stated
-        // borrow-capacity lines beneath it. Whatever it draws is on the card
-        // face and in the card's receipts scope, so the Provenance list stays
-        // 1:1 with the face figures.
-        rowExtra={
-          chain && view.status === "open" && chain.healthFactor != null && chain.healthFactor > 0 ? (
-            <CompoundRiskSlot chain={chain} />
-          ) : undefined
-        }
+        // Closed by default, remembered per viewer and position (ui-jobs 209).
+        // The borrowing-limit headline, the room left to borrow and the
+        // distance bar come from the live Comet read.
+        disclosureKey={`compound:${view.market}:${view.account.toLowerCase()}`}
+        risk={view.status === "open" ? compoundRiskColumn(chain ?? null, compoundBorrowing(view)) : null}
+        debtDetail={chain ? <CompoundBorrowRoom chain={chain} /> : undefined}
         // The Explanation is now pure layman prose about those same face
         // figures — no secondary figure-strips. The borrow-capacity strip is
         // absorbed into the risk slot above; the market rates live on the

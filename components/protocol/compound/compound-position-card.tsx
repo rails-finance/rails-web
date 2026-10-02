@@ -21,7 +21,7 @@
 // So a borrower's debt is always the right column and a lender's stake the left,
 // exactly as Spark / Aave / Morpho read — never the same slot.
 
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -31,6 +31,8 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
+import { ShareLine, ShareLines } from "@/components/shared/share-bar";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact, formatExactDecimal } from "@/lib/utils/format";
 import {
@@ -104,6 +106,11 @@ interface EffectiveBase {
   side: "lend" | "borrow" | "flat";
   isChain: boolean;
   block: number | null;
+}
+
+/** Whether the position borrows the base now (the side the card reads). */
+export function compoundBorrowing(v: CompoundPositionView): boolean {
+  return effectiveBase(v).side === "borrow";
 }
 
 function effectiveBase(v: CompoundPositionView): EffectiveBase {
@@ -302,6 +309,7 @@ function SuppliedFootnoteLines({
   lane,
   coords,
   baseExact,
+  total,
 }: {
   v: CompoundPositionView;
   eff: EffectiveBase;
@@ -309,38 +317,41 @@ function SuppliedFootnoteLines({
   lane: CompoundCardLane;
   coords: CompoundCoords;
   baseExact: string;
+  /** The side's priced total: each line then carries its share bar (the
+   *  opened card, ui-jobs 209). */
+  total?: number;
 }) {
-  const { lines, control } = useDustLines(supplyLegs(v, eff), legUsdOf(v));
+  const usdOf = legUsdOf(v);
+  const { lines, control } = useDustLines(supplyLegs(v, eff), usdOf);
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <ShareLines total={total} control={control}>
       {lines.map((l) => {
         const c = l.collateral;
-        if (!c)
-          return (
-            <LegFootnoteLine
-              key={l.key}
-              symbol={l.symbol}
-              amount={l.amount}
-              exact={baseExact}
-              info={baseProv(v, eff, "lend", vocab, lane)}
-            />
-          );
-        return c.decimalsUnread ? (
-          <div key={l.key}>
-            <TokenAmountNotLoaded address={c.address} label={c.symbol} />
-          </div>
+        const share = total ? (usdOf(l) ?? 0) / total : null;
+        const line = !c ? (
+          <LegFootnoteLine
+            symbol={l.symbol}
+            amount={l.amount}
+            exact={baseExact}
+            info={baseProv(v, eff, "lend", vocab, lane)}
+          />
+        ) : c.decimalsUnread ? (
+          <TokenAmountNotLoaded address={c.address} label={c.symbol} />
         ) : (
           <LegFootnoteLine
-            key={l.key}
             symbol={c.symbol}
             amount={c.amount}
             exact={formatUnitsExact(c.amountRaw, c.decimals)}
             info={vocab.positionCollateral(c.symbol, { ...coords, asset: c.address })}
           />
         );
+        return (
+          <ShareLine key={l.key} share={share} side="collateral">
+            {line}
+          </ShareLine>
+        );
       })}
-      {control}
-    </div>
+    </ShareLines>
   );
 }
 
@@ -413,8 +424,19 @@ export function CompoundPositionCard({
   session = "compound",
   lane = {},
   peaks = true,
+  disclosureKey,
+  risk,
+  debtDetail,
 }: {
   v: CompoundPositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. */
+  disclosureKey?: string;
+  /** The risk headline from the page's Comet read, with its opened layer
+   *  (compoundRiskColumn). */
+  risk?: CardRiskColumn | null;
+  /** Opened-layer lines under Debt from the same read (the room to borrow). */
+  debtDetail?: React.ReactNode;
   receipts?: boolean;
   /** The receipts behind the base and collateral figures. The default names
    *  the rails-server index and its replay; the Base explorer passes the
@@ -443,6 +465,9 @@ export function CompoundPositionCard({
   viewHref?: () => string;
 }) {
   const eff = effectiveBase(v);
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // The "?" cell every state panel owns — the same content function serves
   // Compound V3 on Ethereum and on Base; only the deployment named by the
   // card's own session changes the prose.
@@ -505,8 +530,12 @@ export function CompoundPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={<CompoundIdentity v={v} session={session} wallet={!receipts} />}
           identity={
@@ -556,6 +585,8 @@ export function CompoundPositionCard({
   // base (net lender) plus the collateral assets; debt side = the borrowed base.
   // Strict per-total guard: a partial total omits rather than mislead.
   const { supplyUsd, borrowUsd } = cardSideUsd(v);
+  // Every line under a headline is the opened layer's on a disclosing card.
+  const Detail = disclosing ? PositionCardDetail : Fragment;
 
   // Detail render (receipts): the V4 spoke-card header grammar — a neutral
   // mode-word pill (what the position is doing NOW, not a lifecycle word).
@@ -590,8 +621,10 @@ export function CompoundPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment, side: eff.side })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -640,7 +673,7 @@ export function CompoundPositionCard({
                 <SuppliedStack v={v} eff={eff} vocab={vocab} lane={lane} />
               ),
             footnote: (
-              <>
+              <Detail>
                 {supplyUsd != null && (
                   <SuppliedFootnoteLines
                     v={v}
@@ -649,10 +682,11 @@ export function CompoundPositionCard({
                     lane={lane}
                     coords={coords}
                     baseExact={baseExact}
+                    total={disclosing ? supplyUsd : undefined}
                   />
                 )}
                 {eff.side === "lend" && <StatFootnote>{lentNote}</StatFootnote>}
-              </>
+              </Detail>
             ),
           },
           {
@@ -666,7 +700,7 @@ export function CompoundPositionCard({
                 <BorrowedValue v={v} eff={eff} vocab={vocab} lane={lane} />
               ),
             footnote: (
-              <>
+              <Detail>
                 {borrowUsd != null && (
                   <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
                     <LegFootnoteLine
@@ -678,9 +712,11 @@ export function CompoundPositionCard({
                   </div>
                 )}
                 {eff.side === "borrow" && <StatFootnote>{borrowNote}</StatFootnote>}
-              </>
+                {disclosing && debtDetail}
+              </Detail>
             ),
           },
+          ...riskColumns(risk, disclosing),
         ]}
       />
     </PositionCardShell>

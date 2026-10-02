@@ -39,13 +39,14 @@ import {
   CompoundPositionCard,
   cardSideUsd,
   type CompoundPositionView,
+  compoundBorrowing,
 } from "@/components/protocol/compound/compound-position-card";
 import { CompoundEventCard } from "@/components/protocol/compound/compound-event-card";
 import {
   CompoundPositionExplanation,
   CompoundClosedPositionExplanation,
 } from "@/components/protocol/compound/compound-position-explanation";
-import { CompoundRiskSlot } from "@/components/protocol/compound/compound-risk-slot";
+import { CompoundBorrowRoom, compoundRiskColumn } from "@/components/protocol/compound/compound-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -316,11 +317,14 @@ function MarketSection({
             viewHref={tl.viewHref}
             vocab={vocab}
             session="compound-base"
-            rowExtra={
-              live && view.status === "open" && live.healthFactor != null && live.healthFactor > 0 ? (
-                <CompoundRiskSlot chain={live} />
-              ) : undefined
+            // Closed by default, remembered per viewer and position (ui-jobs
+            // 209); the risk headline and the room to borrow from the Comet read.
+            disclosureKey={`compound-base:${market.key}:${view.account.toLowerCase()}`}
+            risk={
+              // A stale read states no figure, so it draws no risk column.
+              view.status === "open" && !(chain && !live) ? compoundRiskColumn(live, compoundBorrowing(view)) : null
             }
+            debtDetail={live ? <CompoundBorrowRoom chain={live} /> : undefined}
             explanation={
               view.status !== "open" ? (
                 <CompoundClosedPositionExplanation v={view} principalOnly={!replay?.baseAtChain} />
