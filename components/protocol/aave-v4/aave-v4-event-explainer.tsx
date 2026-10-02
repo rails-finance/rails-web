@@ -31,7 +31,7 @@ import {
   type ClauseInput,
 } from "@/lib/shared/explainer-prose";
 import { aaveV4EventSlots, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
-import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
+import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
 
 export interface AaveV4EventExplainerProps {
   ctx: AaveV4Context;
@@ -100,6 +100,7 @@ export function AaveV4EventExplainer({
           collateral: hfRead.collateral,
           collateralFactor: hfRead.after.collateralFactor ?? hfRead.before.collateralFactor ?? null,
           collateralCount: hfRead.after.collateralCount ?? hfRead.before.collateralCount,
+          premiumAfter: premiumAt(hfRead, "after"),
         }
       : undefined;
   const clauses = eventClauses(

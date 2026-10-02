@@ -262,22 +262,51 @@ export function snapshotProv(what: string, detail?: EventProvDetail, side?: "sup
   };
 }
 
+/** The position's premium at the block a debt balance is read at
+ *  (lib/aave-v4/use-health-factor-around.ts `premiumAt`): its risk premium in
+ *  basis points, and its premium debt on the reserve in token units (null when
+ *  the reserve was not found on the spoke). */
+export interface AaveV4PremiumAt {
+  /** The block whose end the premium was read at. */
+  block: number;
+  riskPremiumBps: number;
+  premiumDebt: string | null;
+}
+
+/** The sentence a debt receipt closes on: the premium debt the spoke charges on
+ *  top of the drawn debt, as read at the block. */
+function premiumSentence(premium: AaveV4PremiumAt | undefined, asset: string | undefined): string {
+  if (!premium)
+    return " The spoke also charges premium debt, set by the position's risk premium; its read at this block has not loaded.";
+  const pct = `${(premium.riskPremiumBps / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+  const debt = premium.premiumDebt != null ? Number(premium.premiumDebt) : null;
+  if (debt === 0 || (debt == null && premium.riskPremiumBps === 0))
+    return ` At the end of block ${premium.block} the position's risk premium was ${pct} (getUserAccountData), and it owed no premium debt on this reserve.`;
+  const owed =
+    debt != null
+      ? `${debt.toLocaleString("en-US", { maximumFractionDigits: 6 })}${asset ? ` ${asset}` : ""} of premium debt (getUserDebt's second figure)`
+      : "premium debt";
+  return ` At the end of block ${premium.block} the position's risk premium was ${pct} (getUserAccountData), and it owed ${owed} on this reserve on top of this figure.`;
+}
+
 /** A balance the chain held at this event (server migration 347): the spoke's
  *  running shares for the position, valued at the hub's state at the end of
- *  this block — the figure getUserSuppliedAssets / getUserDebt answered there,
- *  interest included. `raw` carries the integer, the shares and the hub state. */
+ *  this block — the figure getUserSuppliedAssets / getUserDebt's drawn debt
+ *  answered there, interest included. `raw` carries the integer, the shares and
+ *  the hub state; `premium` the position's premium at that block (debt only). */
 export function chainBalanceProv(
   what: string,
   detail: EventProvDetail | undefined,
   side: "supply" | "debt",
   raw?: { value?: string | null; shares?: string | null; a?: string | null; b?: string | null },
+  premium?: AaveV4PremiumAt,
 ): Provenance {
   const asset = detail?.asset ? ` (${detail.asset})` : "";
   const block = detail?.blockNumber != null ? ` at block ${detail.blockNumber}` : "";
   const summary =
     side === "supply"
       ? `${what}${asset} — what the spoke held for this position on this reserve${block}: its supplied shares (the running sum of the shares its Supply, Withdraw and LiquidationCall logs moved) valued at the hub's share price there, interest included. It equals the spoke's getUserSuppliedAssets read at the block.`
-      : `${what}${asset} — what the position owed on this reserve${block}: its drawn shares (the running sum of the shares its Borrow, Repay and LiquidationCall logs moved) times the hub's drawn index there, interest included. It equals the spoke's getUserDebt read at the block; the premium debt is zero, since the risk premium is zero across the protocol.`;
+      : `${what}${asset} — what the position owed on this reserve${block}: its drawn shares (the running sum of the shares its Borrow, Repay and LiquidationCall logs moved) times the hub's drawn index there, interest included. It equals the drawn debt the spoke's getUserDebt answered at the block.${premiumSentence(premium, detail?.asset)}`;
   const via =
     side === "supply"
       ? `shares × (hub addedAssets + 10^6) ÷ (addedShares + 10^6), rounded down${raw?.shares ? ` · ${raw.shares} shares` : ""}${raw?.a && raw?.b ? ` × (${raw.a} + 10^6) ÷ (${raw.b} + 10^6)` : ""}${raw?.value ? ` = ${raw.value}` : ""}`

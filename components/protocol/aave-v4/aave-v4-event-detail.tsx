@@ -28,6 +28,7 @@ import {
   heldDebtRateProv,
   snapshotProv,
   chainBalanceProv,
+  type AaveV4PremiumAt,
   interestSincePreviousProv,
   deltaProv,
   pricePillProv,
@@ -35,7 +36,7 @@ import {
   type EventProvDetail,
 } from "@/lib/aave-v4/position-provenance";
 import { ExactTip } from "@/components/shared/amount-text";
-import { useHealthFactorAround, hfOf } from "@/lib/aave-v4/use-health-factor-around";
+import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
 
 const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
   amountLabel: "balance after event",
@@ -155,7 +156,15 @@ function V4PositionRow({
   rawAfter?: string | null;
   /** The changed row's balances are chain figures (ctx.balanceBasis): the
    *  shares and hub state behind them ride the receipt. */
-  chain?: { sharesBefore?: string; sharesAfter?: string; a?: string; b?: string };
+  chain?: {
+    sharesBefore?: string;
+    sharesAfter?: string;
+    a?: string;
+    b?: string;
+    /** The position's premium either side of the block (debt rows). */
+    premiumBefore?: AaveV4PremiumAt;
+    premiumAfter?: AaveV4PremiumAt;
+  };
   /** Interest since the position's previous event on this reserve. */
   interest?: string;
 }) {
@@ -175,22 +184,24 @@ function V4PositionRow({
       isChanged={isChanged}
       afterProv={
         chain
-          ? chainBalanceProv("Balance after this event", detail, side, {
-              value: rawAfter,
-              shares: chain.sharesAfter,
-              a: chain.a,
-              b: chain.b,
-            })
+          ? chainBalanceProv(
+              "Balance after this event",
+              detail,
+              side,
+              { value: rawAfter, shares: chain.sharesAfter, a: chain.a, b: chain.b },
+              chain.premiumAfter,
+            )
           : snapshotProv("Balance after this event", { ...detail, raw: rawAfter }, side)
       }
       beforeProv={
         chain
-          ? chainBalanceProv("Balance before this event", detail, side, {
-              value: rawBefore,
-              shares: chain.sharesBefore,
-              a: chain.a,
-              b: chain.b,
-            })
+          ? chainBalanceProv(
+              "Balance before this event",
+              detail,
+              side,
+              { value: rawBefore, shares: chain.sharesBefore, a: chain.a, b: chain.b },
+              chain.premiumBefore,
+            )
           : snapshotProv("Balance before this event", { ...detail, raw: rawBefore }, side)
       }
       deltaProv={deltaProv(detail)}
@@ -419,6 +430,8 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
                         sharesBefore: ctx.raw?.drawnSharesBefore,
                         sharesAfter: ctx.raw?.drawnSharesAfter,
                         a: ctx.raw?.hubDrawnIndex,
+                        premiumBefore: premiumAt(hfAround, "before"),
+                        premiumAfter: premiumAt(hfAround, "after"),
                       }
                     : undefined
                 }

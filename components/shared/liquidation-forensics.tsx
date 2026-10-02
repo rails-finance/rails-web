@@ -23,6 +23,7 @@
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { decimalsTitle } from "@/lib/shared/decimals-unread";
+import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { StatCard, StateTransition } from "@/components/shared/state-transition";
@@ -205,6 +206,16 @@ function LegStat({
   );
 }
 
+/** The forensics block where a token's decimals did not load: its figures are
+ *  amounts scaled by those decimals, so it states none of them. */
+export function LiquidationFiguresNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
+  return (
+    <div className="px-5 pb-2 text-sm text-rb-500" data-not-loaded="" data-liquidation-figures="">
+      Liquidation figures: <NotLoaded inline title={decimalsTitle(tokens)} />
+    </div>
+  );
+}
+
 export function LiquidationForensics({
   seized,
   cleared,
@@ -224,12 +235,7 @@ export function LiquidationForensics({
   // Every figure here is an amount scaled by a token's decimals (or a price
   // converted with them): with any token in scope unread, none is stated.
   const unread = useUnreadTokens();
-  if (unread)
-    return (
-      <div className="px-5 pb-2 text-sm text-rb-500" data-not-loaded="">
-        Liquidation figures: <NotLoaded inline title={decimalsTitle(unread)} />
-      </div>
-    );
+  if (unread) return <LiquidationFiguresNotLoaded tokens={unread} />;
   const sign = premium >= 0 ? "+" : "−";
   const premiumPct = premiumAsRatio
     ? `${((1 + premium) * 100).toFixed(2)}%`

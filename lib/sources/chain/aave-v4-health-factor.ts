@@ -3,7 +3,7 @@
 // The liquidation card's before → after health factor (rails-ops TO-DO-ui-jobs
 // §100). SERVER-ONLY.
 
-import { getAddress, parseAbi } from "viem";
+import { formatUnits, getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { SPOKE_ADDRESS_BY_KEY, BASE_SPOKE_ADDRESSES, chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 import { TOKEN_ADDR } from "@/lib/aave/prices";
@@ -13,11 +13,12 @@ const ABI = parseAbi([
   "function getReserveCount() view returns (uint256)",
   "function getReserve(uint256 id) view returns ((address underlying, address hub, uint256 assetId, uint256 decimals, uint256 collateralRisk, uint256 flags, uint32 dynamicConfigKey))",
   "function getUserReserveStatus(uint256 id, address user) view returns (bool isCollateral, bool hasBorrow)",
+  "function getUserDebt(uint256 id, address user) view returns (uint256 drawnDebt, uint256 premiumDebt)",
 ]);
 
-// (spoke, underlying) → reserve id. A spoke's reserve list only grows, so an id
-// once found never changes.
-const reserveIds = new Map<string, number>();
+// (spoke, underlying) → reserve id and token decimals. A spoke's reserve list
+// only grows, so an id once found never changes.
+const reserveIds = new Map<string, { id: number; decimals: number }>();
 
 // getUserAccountData answers type(uint256).max when the account has no debt.
 const UINT_MAX = (BigInt(1) << BigInt(256)) - BigInt(1);
@@ -41,6 +42,9 @@ export interface AaveV4HealthFactorAt {
   collateralFactor?: number | null;
   /** How many reserves counted as collateral (activeCollateralCount). */
   collateralCount?: number;
+  /** getUserAccountData.riskPremium, in basis points: the position's risk
+   *  premium at that block. */
+  riskPremiumBps?: number;
 }
 
 export interface AaveV4HealthFactorResponse {
@@ -52,6 +56,10 @@ export interface AaveV4HealthFactorResponse {
    *  end of block N−1 and of block N (getUserReserveStatus). Absent when no
    *  `asset` was asked for or its reserve could not be found on the spoke. */
   collateral?: { before: boolean; after: boolean };
+  /** The premium debt on the asked-for reserve at the end of block N−1 and of
+   *  block N, in token units (getUserDebt's second figure). Absent where
+   *  `collateral` is. */
+  premiumDebt?: { before: string; after: string };
 }
 
 export async function loadAaveV4HealthFactorAround(
@@ -71,15 +79,16 @@ export async function loadAaveV4HealthFactorAround(
       args: [wallet],
       blockNumber: BigInt(at),
     })) as readonly bigint[];
-    const [, avgCollateralFactor, healthFactor, , , activeCollateralCount, borrowCount] = data;
+    const [riskPremium, avgCollateralFactor, healthFactor, , , activeCollateralCount, borrowCount] = data;
     return {
       block: at,
       wad: borrowCount === BigInt(0) || healthFactor >= UINT_MAX ? null : healthFactor.toString(),
       collateralFactor: activeCollateralCount === BigInt(0) ? null : Number(avgCollateralFactor) / 1e18,
       collateralCount: Number(activeCollateralCount),
+      riskPremiumBps: Number(riskPremium),
     };
   };
-  const findReserve = async (): Promise<number | null> => {
+  const findReserve = async (): Promise<{ id: number; decimals: number } | null> => {
     const underlying = assetSymbol ? TOKEN_ADDR[assetSymbol]?.toLowerCase() : undefined;
     if (!underlying) return null;
     const key = `${address}:${underlying}`;
@@ -95,30 +104,45 @@ export async function loadAaveV4HealthFactorAround(
         { length: count },
         (_, i) => ({ address, abi: ABI, functionName: "getReserve", args: [BigInt(i)] }) as const,
       ),
-    })) as { underlying: string }[];
+    })) as { underlying: string; decimals: bigint }[];
     const id = reserves.findIndex((r) => r.underlying.toLowerCase() === underlying);
     if (id < 0) return null;
-    reserveIds.set(key, id);
-    return id;
+    const found = { id, decimals: Number(reserves[id].decimals) };
+    reserveIds.set(key, found);
+    return found;
   };
-  const readCollateral = async (): Promise<AaveV4HealthFactorResponse["collateral"]> => {
-    const id = await findReserve();
-    if (id == null) return undefined;
-    const status = (at: number) =>
-      client.readContract({
-        address,
-        abi: ABI,
-        functionName: "getUserReserveStatus",
-        args: [BigInt(id), wallet],
-        blockNumber: BigInt(at),
-      }) as Promise<readonly [boolean, boolean]>;
-    const [b, a] = await Promise.all([status(block - 1), status(block)]);
-    return { before: b[0], after: a[0] };
+  // The reserve's collateral flag and premium debt either side of the block.
+  const readReserve = async (): Promise<Pick<AaveV4HealthFactorResponse, "collateral" | "premiumDebt"> | undefined> => {
+    const reserve = await findReserve();
+    if (reserve == null) return undefined;
+    const id = BigInt(reserve.id);
+    const at = (n: number) =>
+      Promise.all([
+        client.readContract({
+          address,
+          abi: ABI,
+          functionName: "getUserReserveStatus",
+          args: [id, wallet],
+          blockNumber: BigInt(n),
+        }) as Promise<readonly [boolean, boolean]>,
+        client.readContract({
+          address,
+          abi: ABI,
+          functionName: "getUserDebt",
+          args: [id, wallet],
+          blockNumber: BigInt(n),
+        }) as Promise<readonly [bigint, bigint]>,
+      ]);
+    const [[sb, db], [sa, da]] = await Promise.all([at(block - 1), at(block)]);
+    return {
+      collateral: { before: sb[0], after: sa[0] },
+      premiumDebt: { before: formatUnits(db[1], reserve.decimals), after: formatUnits(da[1], reserve.decimals) },
+    };
   };
-  const [before, after, collateral] = await Promise.all([
+  const [before, after, reserve] = await Promise.all([
     read(block - 1),
     read(block),
-    readCollateral().catch(() => undefined),
+    readReserve().catch(() => undefined),
   ]);
-  return collateral ? { spoke: address, wallet, before, after, collateral } : { spoke: address, wallet, before, after };
+  return { spoke: address, wallet, before, after, ...reserve };
 }

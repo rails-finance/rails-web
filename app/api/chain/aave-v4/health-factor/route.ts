@@ -6,7 +6,9 @@ import { isKnownAaveV4Spoke, loadAaveV4HealthFactorAround } from "@/lib/sources/
 // read from the spoke's getUserAccountData — the liquidation card's before →
 // after figure. `?spoke=` is the spoke contract (one this explorer knows),
 // `?wallet=`, `?block=`, and optionally `?asset=` (a reserve symbol) to read
-// whether that reserve counted as collateral either side of the block. A past block never changes, so the answer is cached.
+// whether that reserve counted as collateral either side of the block and its
+// premium debt there. The position's risk premium rides each end. A past block
+// never changes, so the answer is cached.
 
 export const runtime = "nodejs";
 

@@ -68,6 +68,7 @@ import {
 import { Prov } from "@/components/shared/provenance";
 import { StatSubline } from "@/components/shared/state-transition";
 import {
+  LiquidationFiguresNotLoaded,
   LiquidationForensics,
   buildLiquidationForensics,
   AtBlockPriceFootnote,
@@ -88,6 +89,7 @@ import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
+import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import {
   findReserve,
   groupExact,
@@ -210,6 +212,9 @@ export function AaveV3CtEventDetail({
     txHash: previous?.txHash,
   });
   const prevReady = prevState?.status === "ready" ? prevState.data : undefined;
+  // A token in scope whose decimals did not load: the event's amounts carry the
+  // 18-decimal stand-in, so no line below states or derives a figure from them.
+  const unread = useUnreadTokens();
   // The position-state receipts also name the owner.
   // The Base lane's reads are chain reads at the block, and say so.
   const stateCoords: V3Coords = {
@@ -604,9 +609,11 @@ export function AaveV3CtEventDetail({
   }
 
   // Liquidations gain the valued two-leg forensics beneath the snapshot grid,
-  // once the oracle-price walk has priced both legs at this block.
+  // once the oracle-price walk has priced both legs at this block. With a token
+  // unread the block states "not loaded" (LiquidationFiguresNotLoaded) and no premium
+  // is computed.
   const built =
-    ctx.eventType === "liquidation"
+    ctx.eventType === "liquidation" && !unread
       ? buildLiquidationForensics(ctx, coords, { atBlockPriceProv, liqLegUsdProv, liqPremiumProv })
       : undefined;
   // The Base index lanes carry the seized reserve's bonus at the block; the
@@ -755,7 +762,8 @@ export function AaveV3CtEventDetail({
         />
       )}
       {forensics && <LiquidationForensics {...forensics} rowCells />}
-      {fee && ctx.collateralSymbol && (
+      {ctx.eventType === "liquidation" && unread && <LiquidationFiguresNotLoaded tokens={unread} />}
+      {fee && ctx.collateralSymbol && !unread && (
         <div className="px-5 pb-2 text-xs text-rb-500">
           {fmt2(ctx.liquidatedCollateralAmount)} {ctx.collateralSymbol} to the liquidator + {fmt2(fee.amount)}{" "}
           {ctx.collateralSymbol} to the Aave treasury ={" "}
@@ -764,7 +772,7 @@ export function AaveV3CtEventDetail({
           protocol fee, a separate row in the timeline.
         </div>
       )}
-      {ctx.eventType === "transfer_out" && !feeOf && ctx.price && ctx.reserveSymbol && (
+      {ctx.eventType === "transfer_out" && !feeOf && !unread && ctx.price && ctx.reserveSymbol && (
         <div className="px-5 pb-2 text-xs text-rb-500">
           The {fmt(ctx.amount)} {ctx.reserveSymbol} sent was worth{" "}
           {formatUsdValue(Math.abs(Number(ctx.amount)) * ctx.price.usd)} at the block&rsquo;s oracle price.

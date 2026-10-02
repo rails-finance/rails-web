@@ -54,6 +54,7 @@ import {
 } from "@/lib/shared/explainer-prose";
 import {
   chainBalanceProv,
+  type AaveV4PremiumAt,
   eventLogProv,
   snapshotProv,
   heldDebtRateProv,
@@ -231,7 +232,12 @@ function amountFig(ctx: AaveV4Context, coord: EventProvDetail, own: boolean): Re
 /** A running after-balance — echoes the detail grid's after-value receipt.
  *  Symbol is intentionally omitted (the grid's after Prov carries only an icon),
  *  so the entry key matches. */
-function afterFig(coord: EventProvDetail, side: "supply" | "debt", ctx: AaveV4Context): ReactNode {
+function afterFig(
+  coord: EventProvDetail,
+  side: "supply" | "debt",
+  ctx: AaveV4Context,
+  premium?: AaveV4PremiumAt,
+): ReactNode {
   const asset = ctx.reserveSymbol;
   const after = side === "supply" ? ctx.supplyAfter : ctx.debtAfter;
   const raw = side === "supply" ? ctx.raw?.supplyAfter : ctx.raw?.debtAfter;
@@ -249,6 +255,7 @@ function afterFig(coord: EventProvDetail, side: "supply" | "debt", ctx: AaveV4Co
           side === "supply"
             ? { value: raw, shares: ctx.raw?.supplySharesAfter, a: ctx.raw?.hubAddedAssets, b: ctx.raw?.hubAddedShares }
             : { value: raw, shares: ctx.raw?.drawnSharesAfter, a: ctx.raw?.hubDrawnIndex },
+          side === "debt" ? premium : undefined,
         )
       : snapshotProv("Balance after this event", detail, side);
   return (
@@ -330,6 +337,9 @@ export interface AaveV4HfPair {
    *  collateral), and how many reserves counted as collateral. */
   collateralFactor?: number | null;
   collateralCount?: number;
+  /** The position's premium at the end of the event's block, for the debt
+   *  receipt. */
+  premiumAfter?: AaveV4PremiumAt;
 }
 
 export function aaveV4EventSlots(
@@ -445,10 +455,10 @@ function aaveV4EventSlotsBase(
         ? clause(
             rs.firstBorrow ? (
               <>
-                Outstanding {token} debt is now {afterFig(coord, "debt", ctx)}.
+                Outstanding {token} debt is now {afterFig(coord, "debt", ctx, hf?.premiumAfter)}.
               </>
             ) : (
-              <>{reconcile(ctx, coord, "debt")}</>
+              <>{reconcile(ctx, coord, "debt", hf?.premiumAfter)}</>
             ),
           )
         : null;
@@ -481,7 +491,9 @@ function aaveV4EventSlotsBase(
           ? cont(<>, a dust amount that leaves the debt where it was.</>)
           : cont(<>.</>);
       const changed: ClauseInput =
-        !rs.debtCleared && !dust && rs.debtAfter != null ? clause(<>{reconcile(ctx, coord, "debt")}</>) : null;
+        !rs.debtCleared && !dust && rs.debtAfter != null
+          ? clause(<>{reconcile(ctx, coord, "debt", hf?.premiumAfter)}</>)
+          : null;
       const repayRate = rateFig(ctx, coord);
       const otherDebts = (ctx.allDebts ?? []).filter(
         (d) => d.symbol !== ctx.reserveSymbol && (num(d.amount) ?? 0) > EPS,
@@ -562,11 +574,16 @@ function aaveV4EventSlotsBase(
 
 /** The figures reconciled, Liquity-style: the balance at the previous event,
  *  the interest since, the amount this event moved, and the balance after. */
-function reconcile(ctx: AaveV4Context, coord: EventProvDetail, side: "supply" | "debt"): ReactNode {
+function reconcile(
+  ctx: AaveV4Context,
+  coord: EventProvDetail,
+  side: "supply" | "debt",
+  premium?: AaveV4PremiumAt,
+): ReactNode {
   const before = num(side === "supply" ? ctx.supplyBefore : ctx.debtBefore);
   const interest = num(side === "supply" ? ctx.supplyInterestSincePrevious : ctx.debtInterestSincePrevious) ?? 0;
   const amount = num(ctx.amount) ?? 0;
-  const after = afterFig(coord, side, ctx);
+  const after = afterFig(coord, side, ctx, premium);
   const label = side === "supply" ? "Supply" : "Debt";
   const verb = { supply: "supplied", withdraw: "withdrawn", borrow: "borrowed", repay: "repaid" }[
     ctx.eventType as string
