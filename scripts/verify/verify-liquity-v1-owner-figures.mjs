@@ -16,13 +16,14 @@
 // A and C need the api deployed with mig 375 and the listing field; before
 // that they FAIL naming the missing field.
 //
-// Usage: BASE=http://localhost:3000 node scripts/verify/verify-liquity-v1-owner-figures.mjs
+// Usage (requests to BASE carry the Vercel bypass header through lib/host.mjs):
+//   BASE=https://dev.rails.finance node --env-file=.env.local scripts/verify/verify-liquity-v1-owner-figures.mjs
 
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, hostFetch } from "./lib/host.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 let failures = 0;
@@ -35,7 +36,7 @@ function assert(cond, msg) {
 const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
 
 async function json(path) {
-  const r = await fetch(BASE + path);
+  const r = await hostFetch(BASE + path);
   if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
   return r.json();
 }
