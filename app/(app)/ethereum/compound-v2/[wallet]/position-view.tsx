@@ -57,7 +57,7 @@ import {
   CompoundV2PositionExplanation,
   CompoundV2ClosedPositionExplanation,
 } from "@/components/protocol/compound-v2/compound-v2-position-explanation";
-import { CompoundV2RiskSlot } from "@/components/protocol/compound-v2/compound-v2-risk-slot";
+import { CompoundV2BorrowRoom, compoundV2RiskColumn } from "@/components/protocol/compound-v2/compound-v2-risk-slot";
 import { compoundV2LifetimeWithOpening, computeCompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -489,18 +489,15 @@ export default function CompoundV2PositionView({
                   receipts
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the Aave V3
-                  // treatment): the Display menu plus the chosen risk picture — the
-                  // health-REPLICA runway (1.0 = the Comptroller's shortfall line —
-                  // the verdict itself is stated in the Explanation below) or the
-                  // borrow-capacity bar. Whatever it draws is on the card face and
-                  // in the card's receipts scope, so the Provenance list stays 1:1
-                  // with the face figures.
-                  rowExtra={
-                    chain && liveView.status === "open" && chain.healthReplica != null && chain.healthReplica > 0 ? (
-                      <CompoundV2RiskSlot chain={chain} />
-                    ) : undefined
+                  // Closed by default, remembered per viewer and position (ui-jobs
+                  // 209). The risk headline, the room left to borrow and the
+                  // distance bar come from the live Comptroller read, inside the
+                  // card's receipts scope.
+                  disclosureKey={`compound-v2:${wallet.toLowerCase()}`}
+                  risk={
+                    liveView.status === "open" ? compoundV2RiskColumn(chain ?? null, cardView.borrows.length > 0) : null
                   }
+                  debtDetail={chain ? <CompoundV2BorrowRoom chain={chain} /> : undefined}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The borrow-capacity strip
                   // is absorbed into the risk slot above; the market rates live on
