@@ -418,9 +418,9 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
       {/* The two per-market premiums, named together: the reader otherwise
           meets one under Min collateralisation and the other under Spread. */}
       <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-dolomite-premiums="">
-        Each market can carry two premiums. Its margin premium raises the collateralisation required on it, the
-        global <Prov info={dolGlobalMinProv(summaryCoords)}>{pctText(baseline, 2)}</Prov> × (1 + margin premium); its
-        spread premium raises the bonus a liquidator takes on it, the global{" "}
+        Each market can carry two premiums. Its margin premium raises the collateralisation required on it, the global{" "}
+        <Prov info={dolGlobalMinProv(summaryCoords)}>{pctText(baseline, 2)}</Prov> × (1 + margin premium); its spread
+        premium raises the bonus a liquidator takes on it, the global{" "}
         <Prov info={dolGlobalSpreadProv(summaryCoords)}>{pctText(data.risk.liquidationSpread, 0)}</Prov> spread × (1 +
         spread premium).
       </p>

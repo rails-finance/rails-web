@@ -20,18 +20,21 @@ import { PriceRunway } from "@/components/shared/price-runway";
  * Hidden when there's no debt (ratio null / nothing to liquidate).
  *
  * `compact` is the stat-line shorthand: the "% from liquidation" figure with
- * the inline bar, for riding the position card's heading-button row.
+ * the inline bar; with `barOnly`, the bar alone under the card's margin ratio.
  */
 export function DolomiteRunway({
   collateralization,
   requiredCollateralization,
   overrideActive,
   compact,
+  barOnly,
 }: {
   collateralization: number | null;
   requiredCollateralization: number;
   overrideActive?: boolean;
   compact?: boolean;
+  /** Compact only: the bar without its visible figure (PriceRunway `barOnly`). */
+  barOnly?: boolean;
 }) {
   if (collateralization == null || collateralization <= 0 || requiredCollateralization <= 0) return null;
 
@@ -39,6 +42,7 @@ export function DolomiteRunway({
   const bar = (
     <PriceRunway
       compact={compact}
+      barOnly={barOnly}
       currentPrice={collateralization}
       liqPrice={requiredCollateralization}
       liqCaption={`liquidation · ${line}${overrideActive ? " (account risk override)" : " (the account's own requirement)"}`}

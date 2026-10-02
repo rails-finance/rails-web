@@ -31,22 +31,6 @@ const recompute = (method: string): ProvVerify => ({
   text: `Re-run the DolomiteMargin.${method} eth_call against any node`,
 });
 
-/** The premium-adjusted aggregation — getAdjustedAccountValues. */
-export function dolomiteAdjustedValuesProv(what: string, overrideActive: boolean): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("getAdjustedAccountValues"),
-    summary: `${what} — the core's own \`getAdjustedAccountValues\` at the latest block: the raw account values with each market's margin premium applied BY THE CORE, multiplicatively (supply ÷ (1 + premium), borrow × (1 + premium) — dYdX Solo semantics, reproduced wei-exact on 103/107 accounts). ${
-      overrideActive
-        ? "⚠️ THIS account carries the risk override (the e-mode-like carve-out), so the premiums are SKIPPED — adjusted equals raw exactly, and the account is judged against the override's own threshold instead."
-        : "The gap between this figure and the raw value beside it is the protocol's own per-account statement of what the premiums cost this position."
-    }`,
-    contract: MARGIN,
-    via: `${LANE_VIA} · getAdjustedAccountValues @ head`,
-  };
-}
-
 /** The account's effective margin ratio — the core's own choice of
  *  override-else-global (getMarginRatioForAccount). */
 export function dolomiteRequirementProv(): Provenance {
@@ -79,29 +63,6 @@ export function dolomiteCollateralizationProv(): Provenance {
     inputs: [
       { label: "adjusted supply", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
       { label: "adjusted borrow", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
-    ],
-  };
-}
-
-/** A borrow-capacity figure — adjusted supply ÷ the account's own
- *  requirement, or the debt's share of that line. Derived over the core's own
- *  figures; Dolomite has ONE requirement per account, so the borrow limit and
- *  the liquidation line coincide. */
-export function dolomiteCapacityProv(what: string, formula: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: {
-      kind: "recompute",
-      text: "Re-run the DolomiteMargin.getAdjustedAccountValues and getMarginRatioForAccount eth_calls and combine — every input is the core's own figure; only the arithmetic is ours.",
-    },
-    summary: `${what} — derived from the core's own adjusted values and the account's own margin requirement (1 + getMarginRatioForAccount): the capacity line is the adjusted debt level at which adjusted collateral exactly meets the minimum. Dolomite has ONE margin requirement per account, so the borrow limit and the liquidation line coincide. Every input is a same-block slot read; the arithmetic is ours and says so.`,
-    contract: MARGIN,
-    via: `${LANE_VIA} · derived over getAdjustedAccountValues + getMarginRatioForAccount`,
-    formula,
-    inputs: [
-      { label: "adjusted values", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
-      { label: "requirement", kind: "chain", pclass: "state", note: "1 + getMarginRatioForAccount @ head" },
     ],
   };
 }

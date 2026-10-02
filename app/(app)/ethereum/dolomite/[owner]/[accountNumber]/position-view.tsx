@@ -56,7 +56,12 @@ import {
   DolomiteClosedPositionExplanation,
 } from "@/components/protocol/dolomite/dolomite-position-explanation";
 import { dolomiteLiquidationStories, withTokenPeaks } from "@/lib/dolomite/closed-record";
-import { DolomiteRiskSlot } from "@/components/protocol/dolomite/dolomite-risk-slot";
+import {
+  DolomiteRiskDetail,
+  DolomiteRiskHeadline,
+  dolomiteHasRisk,
+} from "@/components/protocol/dolomite/dolomite-risk-slot";
+import { StatValue } from "@/components/shared/stat-value";
 import { computeDolomiteCardCaptions } from "@/lib/dolomite/economics";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -394,23 +399,26 @@ export default function DolomitePositionView({
                   receipts
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the Aave
-                  // V3 treatment): the Display menu plus the chosen risk picture
-                  // — liquidation runway (ratio = the core's own adjusted supply
-                  // ÷ adjusted borrow, line = the ACCOUNT's own requirement, the
-                  // risk override where one is set) or the margin-ratio view
-                  // (the same requirement read as a capacity bar). Whatever it
-                  // draws is on the card face and in the card's receipts scope,
-                  // so the Provenance list stays 1:1 with the face figures.
-                  rowExtra={
-                    chain && liveView.status === "open" && chain.collateralization != null ? (
-                      <DolomiteRiskSlot chain={chain} />
-                    ) : undefined
+                  // Closed by default, remembered per viewer and account (ui-jobs
+                  // 209). The margin ratio from the core read is the third
+                  // headline; its line and distance bar sit in the opened layer,
+                  // inside the card's receipts scope.
+                  disclosureKey={`dolomite:${owner.toLowerCase()}:${accountNumber}`}
+                  risk={
+                    chain && liveView.status === "open"
+                      ? dolomiteHasRisk(chain)
+                        ? {
+                            value: <DolomiteRiskHeadline chain={chain} />,
+                            detail: <DolomiteRiskDetail chain={chain} />,
+                          }
+                        : !chain.chainStale && cardView.borrows.length === 0
+                          ? { value: <StatValue color="text-rb-400">No debt</StatValue> }
+                          : undefined
+                      : undefined
                   }
-                  // The Explanation is now pure layman prose about those same
-                  // face figures — no secondary figure-strips. The margin card
-                  // is absorbed into the risk slot above; the per-market rate
-                  // rows it used to carry live on the market view.
+                  // The Explanation is layman prose about the face figures; it
+                  // states the adjusted debt and the borrow capacity. The
+                  // per-market rates live on the market view.
                   // Passed whatever the status and before the chain read lands:
                   // the pane, and the copy-view link at its foot, mount with the
                   // card. A closed account, or an open one whose read is pending,
