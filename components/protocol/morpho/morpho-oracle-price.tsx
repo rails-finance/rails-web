@@ -106,12 +106,3 @@ export function MorphoOraclePrice({
     </>
   );
 }
-
-export function MorphoOraclePriceFigure({ chain }: { chain: MorphoChainPositionResponse }) {
-  if (chain.chainStale || chain.oraclePrice <= 0) return null;
-  return (
-    <RiskFigure label="Oracle price">
-      <MorphoOraclePrice chain={chain} />
-    </RiskFigure>
-  );
-}

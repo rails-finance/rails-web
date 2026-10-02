@@ -10,6 +10,7 @@
 // reads both sides); on the detail page it is upgraded to the head-block read
 // from the chain lane when that agrees with the index wei-exact.
 
+import { Fragment } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -18,6 +19,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { MorphoMarketPair } from "@/components/protocol/morpho/morpho-market-link";
 import {
@@ -144,8 +146,19 @@ export function MorphoPositionCard({
   viewHref,
   session = "morpho",
   listedReceipts,
+  disclosureKey,
+  risk,
+  debtDetail,
 }: {
   v: MorphoPositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. */
+  disclosureKey?: string;
+  /** The LTV headline from the page's live market read, with its opened
+   *  layer (morphoRiskColumn). */
+  risk?: CardRiskColumn | null;
+  /** Opened-layer lines under Debt from the same read (the room to borrow). */
+  debtDetail?: React.ReactNode;
   receipts?: boolean;
   /** The receipts a LISTED row's figures cite (lib/morpho/listed-card-
    *  provenance.ts) — required alongside `v.listed` for the listed render;
@@ -168,6 +181,10 @@ export function MorphoPositionCard({
   // receipts must name the sweep and link to Basescan, not the index and
   // Etherscan. Read from context, as the event cards do.
   const coords: MorphoCoords = { marketId: v.marketId, chainId: useChainId(), source: useCaptureSource() };
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
   const hasColl = v.collateral > 0;
   const collSym = v.collateralSymbol ?? "—";
   // A token whose decimals did not load has no known scale: its figures name
@@ -191,13 +208,15 @@ export function MorphoPositionCard({
 
   const leadingIdentity = (
     <span className="contents text-xs font-semibold text-rb-500">
-      <WalletPill
-        wallet={v.owner}
-        ensName={null}
-        filterProtocol={session}
-        bookmarkProtocol={session}
-        vault={v.vaultOwner}
-      />
+      {!receipts && (
+        <WalletPill
+          wallet={v.owner}
+          ensName={null}
+          filterProtocol={session}
+          bookmarkProtocol={session}
+          vault={v.vaultOwner}
+        />
+      )}
       <span>
         <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />
         {v.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(v.lltv * 100).toFixed(1)}%</span>}
@@ -226,8 +245,10 @@ export function MorphoPositionCard({
             deployment: positionDeployment,
             peakDebt: "unrecorded",
           })}
+          disclosureKey={disclosureKey}
         >
           <ClosedPositionStats
+            detailGate={disclosing ? PositionCardDetail : undefined}
             outcome={v.status}
             leadingIdentity={leadingIdentity}
             identity={
@@ -267,8 +288,10 @@ export function MorphoPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={morphoPositionContent({ status: v.status, deployment: positionDeployment, hasDebt })}
+        disclosureKey={disclosureKey}
       >
         <OpenPositionStats
+          stackOnPhone={disclosing}
           statusPill={
             receipts ? (
               <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -297,16 +320,19 @@ export function MorphoPositionCard({
               ) : (
                 <StatDash />
               ),
-              footnote:
-                hasColl && L.collateralValue != null && !v.loanDecimalsUnread ? (
-                  <StatFootnote>
-                    <Prov info={R.collateralValue(collSym, v.loanSymbol, L.block)}>
-                      worth <AmountText value={L.collateralValue} /> {v.loanSymbol} at the market&rsquo;s oracle
-                    </Prov>
-                  </StatFootnote>
-                ) : hasColl ? (
-                  <StatFootnote>the market&rsquo;s oracle gave no price at that block</StatFootnote>
-                ) : undefined,
+              footnote: (
+                <Detail>
+                  {hasColl && L.collateralValue != null && !v.loanDecimalsUnread ? (
+                    <StatFootnote>
+                      <Prov info={R.collateralValue(collSym, v.loanSymbol, L.block)}>
+                        worth <AmountText value={L.collateralValue} /> {v.loanSymbol} at the market&rsquo;s oracle
+                      </Prov>
+                    </StatFootnote>
+                  ) : hasColl ? (
+                    <StatFootnote>the market&rsquo;s oracle gave no price at that block</StatFootnote>
+                  ) : null}
+                </Detail>
+              ),
             },
             {
               label: CARD_VOCAB.debt,
@@ -327,12 +353,18 @@ export function MorphoPositionCard({
               ) : (
                 <StatDash />
               ),
-              footnote: hasDebt ? (
-                <StatFootnote>
-                  interest included, to <BlockRef block={L.block} />
-                </StatFootnote>
-              ) : undefined,
+              footnote: (
+                <Detail>
+                  {hasDebt && (
+                    <StatFootnote>
+                      interest included, to <BlockRef block={L.block} />
+                    </StatFootnote>
+                  )}
+                  {disclosing && debtDetail}
+                </Detail>
+              ),
             },
+            ...riskColumns(risk, disclosing),
           ]}
         />
       </PositionCardShell>
@@ -356,8 +388,12 @@ export function MorphoPositionCard({
           deployment: positionDeployment,
           peakDebt: v.peaksPartial ? "unrecorded" : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? "owed" : "principal",
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
             <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
@@ -438,8 +474,10 @@ export function MorphoPositionCard({
         deployment: positionDeployment,
         hasDebt: morphoHasDebt(v.borrowSharesRaw),
       })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         // Detail render (receipts): the V4 spoke-card header grammar — a
         // neutral mode-word pill (what the position is doing NOW, not a
         // lifecycle word) plus the wallet pill (facehash + copyable address).
@@ -523,40 +561,64 @@ export function MorphoPositionCard({
             ) : (
               <StatDash />
             ),
-            footnote:
-              v.currentDebt && !v.loanDecimalsUnread ? (
-                <StatFootnote>
-                  <Prov info={morphoAccruedProv(v.loanSymbol)}>
-                    includes <AmountText value={v.currentDebt.accruedAmount} /> interest accrued over its life
-                  </Prov>
-                  {v.currentDebt.index?.stale && (
-                    <div>
-                      interest to {formatDate(v.currentDebt.index.readAt)} (
-                      <BlockRef block={v.currentDebt.index.block} />)
-                    </div>
-                  )}
-                </StatFootnote>
-              ) : morphoHasDebt(v.borrowSharesRaw) ? (
-                <StatFootnote>borrowed less repaid; interest not read</StatFootnote>
-              ) : undefined,
+            footnote: disclosing ? (
+              // The opened layer: the borrow rate and its yearly cost (the
+              // card's separate Borrow rate column until ui-jobs 209), the
+              // interest's basis where the index read is stale, and the room
+              // left to borrow. The interest accrued is the flows panel's.
+              <PositionCardDetail>
+                {v.borrowApr != null && v.currentDebt && !v.loanDecimalsUnread && (
+                  <StatFootnote>
+                    <Prov info={morphoBorrowRateNowProv(v.borrowApr)}>{(v.borrowApr * 100).toFixed(2)}% APR</Prov>{" "}
+                    borrow rate · ~<AmountText value={v.currentDebt.amount * v.borrowApr} /> {v.loanSymbol} a year
+                  </StatFootnote>
+                )}
+                {v.currentDebt?.index?.stale && (
+                  <StatFootnote>
+                    interest to {formatDate(v.currentDebt.index.readAt)} (<BlockRef block={v.currentDebt.index.block} />
+                    )
+                  </StatFootnote>
+                )}
+                {!v.currentDebt && morphoHasDebt(v.borrowSharesRaw) && (
+                  <StatFootnote>borrowed less repaid; interest not read</StatFootnote>
+                )}
+                {debtDetail}
+              </PositionCardDetail>
+            ) : v.currentDebt && !v.loanDecimalsUnread ? (
+              <StatFootnote>
+                <Prov info={morphoAccruedProv(v.loanSymbol)}>
+                  includes <AmountText value={v.currentDebt.accruedAmount} /> interest accrued over its life
+                </Prov>
+                {v.currentDebt.index?.stale && (
+                  <div>
+                    interest to {formatDate(v.currentDebt.index.readAt)} (
+                    <BlockRef block={v.currentDebt.index.block} />)
+                  </div>
+                )}
+              </StatFootnote>
+            ) : morphoHasDebt(v.borrowSharesRaw) ? (
+              <StatFootnote>borrowed less repaid; interest not read</StatFootnote>
+            ) : undefined,
           },
-          ...(v.borrowApr != null && v.currentDebt && !v.loanDecimalsUnread
-            ? [
-                {
-                  label: "Borrow rate",
-                  value: (
-                    <StatValue>
-                      <Prov info={morphoBorrowRateNowProv(v.borrowApr)}>{(v.borrowApr * 100).toFixed(2)}% APR</Prov>
-                    </StatValue>
-                  ),
-                  footnote: (
-                    <StatFootnote>
-                      ~<AmountText value={v.currentDebt.amount * v.borrowApr} /> {v.loanSymbol} / year at this rate
-                    </StatFootnote>
-                  ),
-                },
-              ]
-            : []),
+          ...(disclosing
+            ? riskColumns(risk, disclosing)
+            : v.borrowApr != null && v.currentDebt && !v.loanDecimalsUnread
+              ? [
+                  {
+                    label: "Borrow rate",
+                    value: (
+                      <StatValue>
+                        <Prov info={morphoBorrowRateNowProv(v.borrowApr)}>{(v.borrowApr * 100).toFixed(2)}% APR</Prov>
+                      </StatValue>
+                    ),
+                    footnote: (
+                      <StatFootnote>
+                        ~<AmountText value={v.currentDebt.amount * v.borrowApr} /> {v.loanSymbol} / year at this rate
+                      </StatFootnote>
+                    ),
+                  },
+                ]
+              : []),
         ]}
       />
     </PositionCardShell>

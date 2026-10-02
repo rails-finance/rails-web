@@ -59,7 +59,8 @@ import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morpho/morpho-flows-note";
 import { useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
+import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
+import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import {
   MorphoPositionExplanation,
   MorphoClosedPositionExplanation,
@@ -468,17 +469,16 @@ export default function MorphoPositionView({
                 }
                 receipts
                 viewHref={tl.viewHref}
-                // The risk slot rides the card's heading-button row (the Aave V3
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway or the borrow-capacity bar (the market's one
-                // LLTV line + "available to borrow"). Whatever it draws is on the
-                // card face and in the card's receipts scope, so the Provenance
-                // list stays 1:1 with the face figures.
-                rowExtra={
-                  chain && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                    <MorphoRiskSlot chain={chain} />
-                  ) : undefined
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The LTV, the room left to borrow and the distance bar
+                // come from the live market read.
+                disclosureKey={`morpho:${positionId.toLowerCase()}`}
+                risk={
+                  liveView.status === "open"
+                    ? morphoRiskColumn(chain ?? null, morphoHasDebt(liveView.borrowSharesRaw))
+                    : null
                 }
+                debtDetail={chain ? <MorphoBorrowRoom chain={chain} /> : undefined}
                 // The Explanation is now pure layman prose about those same face
                 // figures — no secondary figure-strips. The borrow-capacity strip
                 // is absorbed into the risk slot above; the market rates live on

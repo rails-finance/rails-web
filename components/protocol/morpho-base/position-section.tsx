@@ -17,6 +17,8 @@
 // borrow-shares slot equals the replayed one exactly, which is the proof the
 // sweep read every row; otherwise the interest split is gated with its reason.
 
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { useCallback, useMemo } from "react";
 
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
@@ -25,7 +27,7 @@ import {
   MorphoClosedPositionExplanation,
   MorphoPositionExplanation,
 } from "@/components/protocol/morpho/morpho-position-explanation";
-import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
+import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
@@ -248,9 +250,20 @@ export function MorphoBasePositionSection({
         {sweptClean &&
           !borrowerSide &&
           (live ? (
-            <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} />
+            <MorphoLenderOpenCard
+              p={live}
+              receipts
+              vault={vaultOwner}
+              disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
+            />
           ) : (
-            <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} />
+            <LenderClosedCard
+              pos={pos}
+              wallet={wallet}
+              receipts
+              vault={vaultOwner}
+              disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
+            />
           ))}
         {sweptClean && borrowerSide && (
           <MorphoPositionCard
@@ -258,11 +271,11 @@ export function MorphoBasePositionSection({
             receipts
             viewHref={tl.viewHref}
             session="morpho-base"
-            rowExtra={
-              view.status === "open" && live && live.healthFactor != null && live.healthFactor > 0 ? (
-                <MorphoRiskSlot chain={live} />
-              ) : undefined
-            }
+            // Closed by default, remembered per viewer and position (ui-jobs
+            // 209); the LTV and the room to borrow from the live market read.
+            disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
+            risk={view.status === "open" ? morphoRiskColumn(live, morphoHasDebt(view.borrowSharesRaw)) : null}
+            debtDetail={live ? <MorphoBorrowRoom chain={live} /> : undefined}
             explanation={
               view.status !== "open" ? (
                 <MorphoClosedPositionExplanation
@@ -380,16 +393,21 @@ export function MorphoLenderOpenCard({
   p,
   receipts = false,
   vault = null,
+  disclosureKey,
 }: {
   p: MorphoChainPositionResponse;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209): the supply rate is the
+   *  opened layer. */
+  disclosureKey?: string;
   /** Set when `p.user` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
 }) {
   return (
-    <PositionCardShell receipts={receipts}>
+    <PositionCardShell receipts={receipts} disclosureKey={disclosureKey}>
       <OpenPositionStats
+        stackOnPhone={receipts && !!disclosureKey}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -429,7 +447,11 @@ export function MorphoLenderOpenCard({
                 <AssetAmount value={p.currentSupply} symbol={p.loanSymbol} address={p.loanToken} />
               </StatValue>
             ),
-            footnote: <StatFootnote>earning {lenderPct(p.supplyApr)}</StatFootnote>,
+            footnote: (
+              <PositionCardDetail>
+                <StatFootnote>earning {lenderPct(p.supplyApr)}</StatFootnote>
+              </PositionCardDetail>
+            ),
           },
         ]}
       />
@@ -447,18 +469,22 @@ export function LenderClosedCard({
   wallet,
   receipts = false,
   vault = null,
+  disclosureKey,
 }: {
   pos: MorphoSweptPosition;
   wallet: string;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209). */
+  disclosureKey?: string;
   /** Set when `wallet` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
 }) {
   const note = <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("wallet")}</div>;
   return (
-    <PositionCardShell receipts={receipts}>
+    <PositionCardShell receipts={receipts} disclosureKey={disclosureKey}>
       <ClosedPositionStats
+        detailGate={receipts && disclosureKey ? PositionCardDetail : undefined}
         outcome="closed"
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">

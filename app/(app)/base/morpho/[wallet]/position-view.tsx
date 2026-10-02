@@ -23,7 +23,6 @@ import { useMemo } from "react";
 import Link from "next/link";
 
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
-import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
 import { LenderClosedCard, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { VaultHoldingsNote } from "@/components/protocol/morpho-base/vault-holdings-note";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -325,15 +324,7 @@ function SummaryRow({
           <LenderClosedCard pos={pos} wallet={wallet} vault={vault} />
         )
       ) : (
-        <MorphoPositionCard
-          v={view}
-          session="morpho-base"
-          rowExtra={
-            view.status === "open" && live && live.healthFactor != null && live.healthFactor > 0 ? (
-              <MorphoRiskSlot chain={live} />
-            ) : undefined
-          }
-        />
+        <MorphoPositionCard v={view} session="morpho-base" />
       )}
     </Link>
   );
@@ -392,7 +383,6 @@ function LiveMarketRows({
                 v={{ ...morphoListedViewFromLive(p, wallet), vaultOwner: vault }}
                 session="morpho-base"
                 listedReceipts={LIVE_RECEIPTS}
-                rowExtra={hf != null && hf > 0 ? <MorphoRiskSlot chain={p} /> : undefined}
               />
             ) : (
               <MorphoLenderOpenCard p={p} vault={vault} />

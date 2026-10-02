@@ -18,7 +18,7 @@ import { useParams } from "next/navigation";
 
 import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
-import { MorphoRiskSlot } from "@/components/protocol/morpho/morpho-risk-slot";
+import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -110,7 +110,15 @@ export default function MorphoBasePositionView({
   const liveCard = useMemo(() => {
     if (!liveClean) return null;
     const borrowerSide = morphoHasCollateralRaw(liveClean.collateralRaw) || morphoHasDebt(liveClean.borrowSharesRaw);
-    if (!borrowerSide) return <MorphoLenderOpenCard p={liveClean} receipts vault={vaultOwner} />;
+    if (!borrowerSide)
+      return (
+        <MorphoLenderOpenCard
+          p={liveClean}
+          receipts
+          vault={vaultOwner}
+          disclosureKey={`morpho-base:${market}:${wallet.toLowerCase()}`}
+        />
+      );
     const v = { ...morphoListedViewFromLive(liveClean, wallet), vaultOwner };
     return (
       <MorphoPositionCard
@@ -118,14 +126,14 @@ export default function MorphoBasePositionView({
         receipts
         session="morpho-base"
         listedReceipts={LIVE_RECEIPTS}
-        rowExtra={
-          liveClean.healthFactor != null && liveClean.healthFactor > 0 ? (
-            <MorphoRiskSlot chain={liveClean} />
-          ) : undefined
-        }
+        // The same key as the swept card, so the opened state carries over
+        // when the history lands (ui-jobs 209).
+        disclosureKey={`morpho-base:${market}:${wallet.toLowerCase()}`}
+        risk={v.status === "open" ? morphoRiskColumn(liveClean, morphoHasDebt(liveClean.borrowSharesRaw)) : null}
+        debtDetail={<MorphoBorrowRoom chain={liveClean} />}
       />
     );
-  }, [liveClean, wallet, vaultOwner]);
+  }, [liveClean, wallet, vaultOwner, market]);
 
   // The export rides the same rule as the card and the flows panel: only a sweep
   // that read every block yields a view whose principal and lifetime figures
