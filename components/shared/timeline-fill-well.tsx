@@ -17,6 +17,7 @@
 // Same panel as the listing's "still being assembled" banner
 // (base-lending-coverage-banner.tsx).
 
+import { CARD_PAD_X } from "@/lib/shared/ui-grammar";
 import type { TimelineFillState } from "@/lib/api/fetch-chain-timeline";
 import { FILL_ETA_OVERRIDES } from "@/lib/shared/fill-eta-overrides";
 import { formatDateLong } from "@/lib/date";
@@ -66,7 +67,8 @@ export function TimelineFillWell({ fill }: { fill: TimelineFillState | undefined
   if (!s || !fill) return null;
   return (
     <div
-      className="mb-3 rounded-xl bg-raised p-4 text-[13px] leading-relaxed"
+      // The cards' horizontal padding, so its text starts on their content line.
+      className={`mb-3 rounded-xl bg-raised ${CARD_PAD_X} py-4 text-[13px] leading-relaxed`}
       data-fill-well={fill.lane}
       data-fill-eta-source={s.source ?? "none"}
     >

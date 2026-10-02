@@ -29,7 +29,15 @@ import {
   type TimelineDisplayState,
 } from "@/components/shared/timeline-display-context";
 import { useTimelineValuesDisabled } from "@/lib/shared/header-values";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, ctrlWaking } from "@/lib/shared/ui-grammar";
+import {
+  CARD_INSET_START,
+  CTRL_GHOST,
+  CTRL_OFF,
+  CTRL_ON,
+  CTRL_ON_ACCENT,
+  CTRL_ON_HOVER,
+  ctrlWaking,
+} from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDayMonth, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
@@ -834,7 +842,9 @@ export function TimelineToolbar({
   return (
     <div ref={stripRef} className="relative space-y-3" data-anatomy="L1" {...ctrlWaking(hydrated)}>
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="min-w-0" data-anatomy="L1.1">
+        {/* Inset to the cards' content line (CARD_INSET_START); the controls
+            stay on the page edge. */}
+        <div className={`min-w-0 ${CARD_INSET_START}`} data-anatomy="L1.1">
           {leading}
         </div>
         {/* Below sm the count takes a row of its own above the controls — on a

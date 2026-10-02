@@ -11,6 +11,7 @@
 // view that never resolves; the wallet joins it when the page knows it (an
 // id-keyed page learns its owner from the position read).
 
+import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import type { ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ToolsMenu } from "@/components/shared/tools-menu";
@@ -65,7 +66,13 @@ export function PositionWalletRow({
   ) : null;
   return (
     // One line at every width: the pill does not wrap, Tools keeps its size.
-    <div className="flex min-h-7 items-center justify-between gap-2" data-position-wallet-row="" data-anatomy="H13">
+    // The wallet starts on the card content's line (CARD_INSET_START); Tools
+    // stays at the page edge.
+    <div
+      className={`flex min-h-7 items-center justify-between gap-2 ${CARD_INSET_START}`}
+      data-position-wallet-row=""
+      data-anatomy="H13"
+    >
       <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
         {pill && owner.prefix}
         {pill && (owner.wrap ? owner.wrap(pill) : pill)}

@@ -22,7 +22,7 @@ import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/prove
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
   COLLAPSED_ATTR,
@@ -103,7 +103,7 @@ export function LifetimeFlowsPanel({
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
         suppressHydrationWarning
-        className="rounded-2xl bg-raised px-5 py-4"
+        className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
       >
         {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
         <div

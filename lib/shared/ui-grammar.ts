@@ -182,3 +182,15 @@ export const PILL_META =
  */
 export const COUNT_BADGE =
   "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-rb-400 dark:bg-rb-500 text-foreground text-[10px] font-semibold";
+
+/**
+ * The detail page's box padding and the inset of the bare text around the
+ * boxes (rails-ops standards/detail-page-anatomy.md, "The wallet row"). The
+ * position card, the Lifetime flows panel and the timeline's fill well pad
+ * their content by CARD_PAD_X; the wallet row and the timeline's heading
+ * start CARD_INSET_START in, so the avatar, "Opened" and the boxes' content
+ * share one left line while the boxes keep their edge on the page edge. The
+ * two change together.
+ */
+export const CARD_PAD_X = "px-5";
+export const CARD_INSET_START = "pl-5";
