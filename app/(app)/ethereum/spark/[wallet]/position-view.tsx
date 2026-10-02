@@ -316,6 +316,11 @@ export default function SparkPositionDetail({
     }
     return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "spark", MAINNET_CHAIN_ID);
   }, [switches, groupedTail, sparkEvents, wallet, cutoffBlock]);
+  // Every change of the life, for a month read to draw those in its span.
+  const allEmodeRows = useMemo(
+    () => (switches ? emodeSwitchEvents(wallet, switches.emode, "spark", MAINNET_CHAIN_ID) : []),
+    [switches, wallet],
+  );
   const timelineEvents = useMemo(() => withEmodeRows(sparkEvents, emodeRows), [sparkEvents, emodeRows]);
   // Each row's same-transaction rows (a liquidation and its fee transfer) and
   // the previous transaction, for the account read at blocks N−1 and N; a
@@ -484,6 +489,7 @@ export default function SparkPositionDetail({
   const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
     events: timelineEvents,
+    extraRows: allEmodeRows,
     groupedTail,
     servedRows,
     servedFolders,

@@ -301,6 +301,12 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
       isAaveV3Event,
     );
   }, [switches, timeline, aaveEvents, wallet]);
+  // Every change of the life, for a month read to draw those in its span.
+  const allEmodeRows = useMemo(
+    () =>
+      switches ? emodeSwitchEvents(wallet, switches.emode, "aave-v3", SEAMLESS_CHAIN_ID).filter(isAaveV3Event) : [],
+    [switches, wallet],
+  );
   const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
   // Each card's same-transaction rows and the transaction before it: the open
   // card reads the account at blocks N−1 and N (/api/chain/seamless/
@@ -441,6 +447,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   const segmentReads = useMemo(() => replaySegmentReads(TIMELINE_ROUTE, wallet), [wallet]);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
     events: timelineEvents,
+    extraRows: allEmodeRows,
     groupedTail,
     servedRows,
     servedFolders,

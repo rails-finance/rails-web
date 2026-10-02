@@ -323,6 +323,12 @@ export default function AaveV3PositionDetail({
       isAaveV3Event,
     );
   }, [switches, groupedTail, aaveEvents, wallet, cutoffBlock]);
+  // Every change of the life, for a month read to draw those in its span.
+  const allEmodeRows = useMemo(
+    () =>
+      switches ? emodeSwitchEvents(wallet, switches.emode, "aave-v3", MAINNET_CHAIN_ID).filter(isAaveV3Event) : [],
+    [switches, wallet],
+  );
   const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
   // Each card's same-transaction rows and the transaction before it (the
   // liquidation fee's pairing, the health factor's move between events).
@@ -487,6 +493,7 @@ export default function AaveV3PositionDetail({
   const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
     events: timelineEvents,
+    extraRows: allEmodeRows,
     groupedTail,
     servedRows,
     servedFolders,

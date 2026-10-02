@@ -28,6 +28,7 @@ import {
 import { lifeDayCounts, lifeExtent, planSegmentAsk, segmentSpan, trimToNewest } from "@/lib/shared/timeline-segments";
 import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
+import { withEmodeRows, withEmodeServedRows } from "@/lib/aave-v3/account-switches";
 import type { TimelineSegments } from "@/components/shared/chain-truth-timeline";
 
 /** A grouped answer as the hook reads it: the family's fetch result, which
@@ -79,6 +80,10 @@ export interface TimelineSegmentOptions {
   /** False on a page tied to its Lifetime flows chart: no date range
    *  (`useTimelineEvents`'s `dates`). */
   dates?: boolean;
+  /** Rows the page adds that no served read carries (an account's e-mode
+   *  changes), the whole life of them: a month read draws those inside its
+   *  span among its own rows. */
+  extraRows?: readonly BaseActivityEvent[];
 }
 
 export function useTimelineSegment(o: TimelineSegmentOptions) {
@@ -157,10 +162,23 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     },
     [lifeDays, preloadCap],
   );
-  const segmentEvents = useMemo(() => (segment ? segment.events.filter(isEvent) : null), [segment, isEvent]);
+  const { extraRows } = o;
+  const segmentExtra = useMemo(() => {
+    if (!segment || !extraRows?.length) return [];
+    const from = segment.cutAt ?? segment.asked.from;
+    return extraRows.filter((e) => isEvent(e) && e.timestamp >= from && e.timestamp <= segment.asked.to);
+  }, [segment, extraRows, isEvent]);
+  const segmentServed = useMemo(() => (segment ? segment.events.filter(isEvent) : null), [segment, isEvent]);
+  const segmentEvents = useMemo(
+    () => (segmentServed ? withEmodeRows(segmentServed, segmentExtra) : null),
+    [segmentServed, segmentExtra],
+  );
   const segmentRows = useMemo(
-    () => (segment?.grouped && segmentEvents ? interleaveRowPlan(segment.grouped.rowPlan, segmentEvents) : undefined),
-    [segment, segmentEvents],
+    () =>
+      segment?.grouped && segmentServed
+        ? withEmodeServedRows(interleaveRowPlan(segment.grouped.rowPlan, segmentServed), segmentExtra)
+        : undefined,
+    [segment, segmentServed, segmentExtra],
   );
   const segmentWindow = useMemo<TimelineWindow | null>(() => {
     if (!segment) return null;

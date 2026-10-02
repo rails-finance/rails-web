@@ -278,6 +278,12 @@ export default function AaveV3BasePositionView({
       isAaveV3Event,
     );
   }, [switches, timeline, aaveEvents, wallet]);
+  // Every change of the life, for a month read to draw those in its span.
+  const allEmodeRows = useMemo(
+    () =>
+      switches ? emodeSwitchEvents(wallet, switches.emode, "aave-v3", AAVE_V3_BASE_CHAIN_ID).filter(isAaveV3Event) : [],
+    [switches, wallet],
+  );
   const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
   // Each card's same-transaction rows and the transaction before it: the open
   // card reads the account at blocks N−1 and N (the Base lane's position
@@ -425,6 +431,7 @@ export default function AaveV3BasePositionView({
   const segmentReads = useMemo(() => replaySegmentReads(TIMELINE_ROUTE, wallet), [wallet]);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
     events: timelineEvents,
+    extraRows: allEmodeRows,
     groupedTail,
     servedRows,
     servedFolders,
