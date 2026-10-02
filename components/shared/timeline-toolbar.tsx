@@ -15,7 +15,7 @@
 // in `provenance-info-tabs.tsx`.
 
 import { Fragment, useEffect, useRef } from "react";
-import { CalendarRange, Clock, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
+import { CalendarRange, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { actionNoun } from "@/lib/shared/event-action-nouns";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -29,15 +29,7 @@ import {
   type TimelineDisplayState,
 } from "@/components/shared/timeline-display-context";
 import { useTimelineValuesDisabled } from "@/lib/shared/header-values";
-import {
-  CTRL_GHOST,
-  CTRL_OFF,
-  CTRL_ON,
-  CTRL_ON_ACCENT,
-  CTRL_ON_HOVER,
-  PILL_META,
-  ctrlWaking,
-} from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, CTRL_ON_ACCENT, CTRL_ON_HOVER, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDayMonth, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
@@ -47,8 +39,12 @@ import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/sh
 import { useHydrated } from "@/hooks/useHydrated";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
+/** The age and the freshness on the heading line: muted text after a middle
+ *  dot, so only the filters below read as controls (rails-ops ui-jobs 227). */
+const HEAD_META = "whitespace-nowrap text-rb-500";
+
 /** Tenure-first activity eyebrow for a position timeline (the V4 spoke
- *  treatment): "Active since {date} · {tenure} · {since last activity} ago" —
+ *  treatment): "Active since {date} · {tenure} · updated {since last activity} ago" —
  *  when the position started, how long it has run, how fresh the latest
  *  activity is, read off the captured event stream (any order — first/last are
  *  scanned, not assumed). A closed position reads "Opened" and measures tenure
@@ -142,7 +138,7 @@ export function TimelineActivityHeader({
       .join("; ");
     return (
       <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+        className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm"
         data-timeline-lives={lives.length}
         title={clock == null ? undefined : `${lives.length} stretches, each starting from an empty account: ${all}`}
       >
@@ -151,25 +147,24 @@ export function TimelineActivityHeader({
           const when =
             l.to == null ? `since ${formatDate(l.from)}` : sameDay ? formatDate(l.from) : formatDateRange(l.from, l.to);
           return (
-            <span key={l.from} className="inline-flex items-center gap-2">
+            <span key={l.from} className="inline-flex items-baseline gap-1">
               <span className="text-foreground">
                 {i > 0 ? "again " : l.to == null ? "Active " : ""}
                 {i === 0 && l.to != null ? when.charAt(0).toUpperCase() + when.slice(1) : when}
               </span>
-              <span className={PILL_META} data-prov-exempt="">
-                {dur(l.from, l.to)}
+              <span className={HEAD_META} data-prov-exempt="">
+                · {dur(l.from, l.to)}
               </span>
               {i === 0 && between > 0 && (
-                <span className="text-rb-500">
-                  {between} more {between === 1 ? "stretch" : "stretches"}
+                <span className={HEAD_META}>
+                  · {between} more {between === 1 ? "stretch" : "stretches"}
                 </span>
               )}
             </span>
           );
         })}
-        <span className={PILL_META}>
-          <Clock size={12} />
-          {labelLastActivity ? "last activity " : ""}
+        <span className={HEAD_META}>
+          · {labelLastActivity ? "last activity " : "updated "}
           {ago}
         </span>
       </div>
@@ -177,22 +172,21 @@ export function TimelineActivityHeader({
   }
   if (!tenurePending && !closed && reopenedAt != null && reopenedAt > first) {
     return (
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm">
         <span className="text-foreground">Open again since {formatDate(reopenedAt)}</span>
-        <span className={PILL_META} data-prov-exempt="">
-          {dur(reopenedAt, null)}
+        <span className={HEAD_META} data-prov-exempt="">
+          · {dur(reopenedAt, null)}
         </span>
-        <span className={PILL_META}>
-          <Clock size={12} />
-          {labelLastActivity ? "last activity " : ""}
+        <span className={HEAD_META}>
+          · {labelLastActivity ? "last activity " : "updated "}
           {ago}
         </span>
-        <span className="text-muted-foreground">first opened {formatDate(first)}</span>
+        <span className={HEAD_META}>· first opened {formatDate(first)}</span>
       </div>
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
+    <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm" data-timeline-activity-head="">
       {tenurePending ? (
         <span className="text-muted-foreground">{closed ? "Opened" : "Active since"} —</span>
       ) : (
@@ -203,18 +197,17 @@ export function TimelineActivityHeader({
           {/* data-prov-exempt: a span between two event timestamps ("40 days"),
               timeline chrome the coverage tripwire reads as a figure. */}
           <span
-            className={PILL_META}
+            className={HEAD_META}
             data-prov-exempt=""
             title={`${closed ? "Open from" : "Active from"} ${formatDate(first)} to ${closed ? formatDate(last) : "today"}`}
           >
-            {labelTenure ? (typeof labelTenure === "string" ? `${labelTenure} ` : closed ? "open " : "active ") : ""}
+            · {labelTenure ? (typeof labelTenure === "string" ? `${labelTenure} ` : closed ? "open " : "active ") : ""}
             {dur(first, closed ? last : null)}
           </span>
         </>
       )}
-      <span className={PILL_META} title={`Last activity ${formatDate(last)}`}>
-        <Clock size={12} />
-        {labelLastActivity ? "last activity " : ""}
+      <span className={HEAD_META} title={`Last activity ${formatDate(last)}`}>
+        · {labelLastActivity ? "last activity " : "updated "}
         {ago}
       </span>
     </div>

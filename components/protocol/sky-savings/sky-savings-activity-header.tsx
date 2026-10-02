@@ -5,10 +5,8 @@
 // today; a closed one from its first event to the event that emptied it.
 
 import { useMountedNow } from "@/hooks/useMountedNow";
-import { Clock } from "lucide-react";
 import { formatDate, formatDuration } from "@/lib/date";
 import { MountedAge } from "@/components/shared/mounted-age";
-import { PILL_META } from "@/lib/shared/ui-grammar";
 
 const DAY = 86_400;
 
@@ -52,6 +50,8 @@ export function SkySavingsActivityHeader({
   return <SkySavingsHeaderBody lo={lo} hi={hi} events={events} complete={complete} closed={closed} />;
 }
 
+const META = "whitespace-nowrap text-rb-500";
+
 function SkySavingsHeaderBody({
   lo,
   hi,
@@ -70,21 +70,22 @@ function SkySavingsHeaderBody({
   const spanDays = Math.floor((end - lo) / DAY);
   const heldDays = complete && (closed || now != null) ? daysHeld(events, end) : null;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
+    // The spans as muted text on the heading line, the timeline header's rule
+    // (rails-ops ui-jobs 227): only the filters below read as controls.
+    <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm">
       <span className="text-foreground">
         {closed ? `Held ${formatDate(lo)} to ${formatDate(hi)}` : `Holding since ${formatDate(lo)}`}
       </span>
-      <span className={PILL_META} data-prov-exempt="">
-        {closed ? `${formatDuration(lo, hi)} held` : <MountedAge from={lo} suffix=" to date" />}
+      <span className={META} data-prov-exempt="">
+        · {closed ? `${formatDuration(lo, hi)} held` : <MountedAge from={lo} suffix=" to date" />}
       </span>
       {heldDays != null && heldDays < spanDays && (
-        <span className={PILL_META} data-prov-exempt="">
-          held on {heldDays.toLocaleString("en-US")} of {spanDays.toLocaleString("en-US")} days
+        <span className={META} data-prov-exempt="">
+          · held on {heldDays.toLocaleString("en-US")} of {spanDays.toLocaleString("en-US")} days
         </span>
       )}
-      <span className={PILL_META} data-prov-exempt="">
-        <Clock size={12} />
-        last event <MountedAge from={hi} suffix=" ago" />
+      <span className={META} data-prov-exempt="">
+        · last event <MountedAge from={hi} suffix=" ago" />
       </span>
     </div>
   );

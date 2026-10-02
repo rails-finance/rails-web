@@ -1841,10 +1841,12 @@ function ChainTruthTimelineBody({
                   type="button"
                   onClick={() => focusStore?.set({ go: focusStore.get().go + 1 })}
                   title={`Bring the last event of ${rewind.word} into view`}
-                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-l-full py-1 pl-2.5 pr-1.5 text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0 dark:text-blue-300"
+                  // The neutral filter-pill style (ui-jobs 227): the glyph muted,
+                  // the words in the text colour, as TimelineFilterPill draws them.
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-l-full py-1 pl-2.5 pr-1.5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-0"
                   data-flow-rewind-go=""
                 >
-                  <ListEnd size={13} aria-hidden />
+                  <ListEnd size={13} aria-hidden className="text-rb-500" />
                   Timeline to {rewind.word}
                 </button>
                 <button
