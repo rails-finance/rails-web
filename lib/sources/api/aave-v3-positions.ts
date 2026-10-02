@@ -15,7 +15,7 @@
 // BalanceTransfers, × the reserve's current index — the current rebased
 // balance, interest included, `balanceOf` at the indexed head.
 
-import { resolveV3Tokens } from "@/lib/sources/chain/aave-v3-tokens";
+import { resolveV3Tokens, scaleV3 } from "@/lib/sources/chain/aave-v3-tokens";
 import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { AAVE_V3_ORACLE, POOL_BY_MARKET, AAVE_V3_POOL } from "@/lib/aave-v3/asset-catalog";
@@ -85,6 +85,27 @@ function bigintOf(raw: string | null): bigint {
   }
 }
 
+/** One held reserve on one side of a row, as the dominant pick compares it. */
+interface Candidate {
+  sym: string;
+  addr: string;
+  /** Balance in whole tokens (raw ÷ 10^decimals). */
+  scaled: number;
+  /** Oracle USD per whole token, null when the oracle did not answer. */
+  price: number | null;
+}
+
+/** The side's dominant reserve: the largest by oracle USD when every candidate
+ *  is priced, else the largest by whole-token amount. Raw units are never
+ *  compared across reserves (18 decimals would outrank 6 or 8 whatever the
+ *  amounts are worth). */
+function dominant(cs: Candidate[]): Candidate | null {
+  if (cs.length === 0) return null;
+  const allPriced = cs.every((c) => c.price != null);
+  const value = (c: Candidate) => (allPriced ? c.scaled * (c.price as number) : c.scaled);
+  return cs.reduce((best, c) => (value(c) > value(best) ? c : best));
+}
+
 /** Assemble the listing rows from the rails route's raw page slice. Filtering,
  *  sorting and pagination already happened server-side, so this only resolves
  *  metadata and shapes the rows — order is preserved. */
@@ -129,12 +150,12 @@ export async function buildAaveV3PositionRows(
     ),
   );
 
+  const priceOf = (addr: string) => aaveOraclePriceOf(oraclePrices, deployment.oracle, addr);
+
   return raw.map((w) => {
-    const reserves: (AaveV3ReserveSummary & { _rank: bigint })[] = [];
-    let supplyCount = 0;
-    let debtCount = 0;
-    let domSupply: { sym: string; addr: string; v: bigint } | null = null;
-    let domDebt: { sym: string; addr: string; v: bigint } | null = null;
+    const reserves: (AaveV3ReserveSummary & { _scaled: number })[] = [];
+    const supplies: Candidate[] = [];
+    const debts: Candidate[] = [];
 
     for (const r of w.reserves) {
       const addr = r.reserve.toLowerCase();
@@ -147,36 +168,37 @@ export async function buildAaveV3PositionRows(
       if (!hasSupply && !hasDebt) continue;
       const meta = metas.get(addr);
       const symbol = meta?.symbol ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+      const decimals = meta?.decimals ?? 18;
+      const price = priceOf(addr) ?? null;
       reserves.push({
         symbol,
         address: addr,
-        decimals: meta?.decimals ?? 18,
+        decimals,
         supplyBalanceRaw: supplyRaw.toString(),
         debtBalanceRaw: debtRaw.toString(),
-        // The chain detail page corrects collateral-enabled per asset; the
-        // listing assumes the supply default.
-        isCollateral: true,
+        // isCollateral is left off: the listing does not read the account's
+        // configuration; the position page does (getUserConfiguration).
         lt: meta?.lt ?? null,
         usdPrice: null,
         // A Base lender's balance is a balanceOf at the row's chainBlock, not
         // the index's reduction — the row says which.
         balanceSource: w.chainBlock != null ? "chain" : "reduced",
         ...(meta == null || meta.unresolved ? { decimalsUnread: true as const } : {}),
-        _rank: supplyRaw + debtRaw,
+        _scaled: scaleV3(supplyRaw + debtRaw, decimals),
       });
-      if (hasSupply) {
-        supplyCount++;
-        if (!domSupply || supplyRaw > domSupply.v) domSupply = { sym: symbol, addr, v: supplyRaw };
-      }
-      if (hasDebt) {
-        debtCount++;
-        if (!domDebt || debtRaw > domDebt.v) domDebt = { sym: symbol, addr, v: debtRaw };
-      }
+      if (hasSupply) supplies.push({ sym: symbol, addr, scaled: scaleV3(supplyRaw, decimals), price });
+      if (hasDebt) debts.push({ sym: symbol, addr, scaled: scaleV3(debtRaw, decimals), price });
     }
+    const domSupply = dominant(supplies);
+    const domDebt = dominant(debts);
 
-    reserves.sort((x, y) => (y._rank > x._rank ? 1 : y._rank < x._rank ? -1 : 0));
-    const cleanReserves: AaveV3ReserveSummary[] = reserves.map(({ _rank, ...r }) => {
-      void _rank;
+    // Same measure for the row's reserve order: USD when every reserve is priced.
+    const allPriced = reserves.every((r) => priceOf(r.address) != null);
+    const rank = (r: { address: string; _scaled: number }) =>
+      allPriced ? r._scaled * (priceOf(r.address) as number) : r._scaled;
+    reserves.sort((x, y) => rank(y) - rank(x));
+    const cleanReserves: AaveV3ReserveSummary[] = reserves.map(({ _scaled, ...r }) => {
+      void _scaled;
       return r;
     });
 
@@ -184,31 +206,31 @@ export async function buildAaveV3PositionRows(
     // peak supply in supplyBalanceRaw, peak debt in debtBalanceRaw. Only closed /
     // liquidated accounts carry them; the card renders them on its closed branch as
     // token amounts only (no USD — the Tier-3 rule), so no oracle price is attached.
-    const peakReserves: (AaveV3ReserveSummary & { _rank: bigint })[] = [];
+    const peakReserves: (AaveV3ReserveSummary & { _scaled: number })[] = [];
     for (const r of w.peakReserves ?? []) {
       const addr = r.reserve.toLowerCase();
       const supplyRaw = bigintOf(r.peakSupplyRaw);
       const debtRaw = bigintOf(r.peakDebtRaw);
       if (supplyRaw <= ZERO && debtRaw <= ZERO) continue;
       const meta = metas.get(addr);
+      const decimals = meta?.decimals ?? 18;
       peakReserves.push({
         symbol: meta?.symbol ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`,
         address: addr,
-        decimals: meta?.decimals ?? 18,
+        decimals,
         supplyBalanceRaw: r.peakSupplyRaw,
         debtBalanceRaw: r.peakDebtRaw,
         // Peak values are event-replay maxima, not reduced current balances.
         balanceSource: "replayed",
-        isCollateral: true,
         lt: meta?.lt ?? null,
         usdPrice: null,
         ...(meta == null || meta.unresolved ? { decimalsUnread: true as const } : {}),
-        _rank: supplyRaw + debtRaw,
+        _scaled: scaleV3(supplyRaw > debtRaw ? supplyRaw : debtRaw, decimals),
       });
     }
-    peakReserves.sort((x, y) => (y._rank > x._rank ? 1 : y._rank < x._rank ? -1 : 0));
-    const cleanPeakReserves: AaveV3ReserveSummary[] = peakReserves.map(({ _rank, ...r }) => {
-      void _rank;
+    peakReserves.sort((x, y) => y._scaled - x._scaled);
+    const cleanPeakReserves: AaveV3ReserveSummary[] = peakReserves.map(({ _scaled, ...r }) => {
+      void _scaled;
       return r;
     });
 
@@ -236,8 +258,8 @@ export async function buildAaveV3PositionRows(
       // The route's coverage flag, passed straight through; stale when the
       // periodic snapshot hasn't covered this wallet.
       chainHfStale: w.chainHfStale ?? true,
-      supplyAssetCount: supplyCount,
-      debtAssetCount: debtCount,
+      supplyAssetCount: supplies.length,
+      debtAssetCount: debts.length,
       dominantSupplySymbol: domSupply?.sym ?? null,
       dominantSupplyAddress: domSupply?.addr ?? null,
       dominantDebtSymbol: domDebt?.sym ?? null,

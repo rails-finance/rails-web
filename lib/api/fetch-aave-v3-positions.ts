@@ -17,7 +17,9 @@ export interface AaveV3ReserveSummary {
   decimals: number;
   supplyBalanceRaw: string;
   debtBalanceRaw: string;
-  isCollateral: boolean;
+  /** Collateral-enabled, from the account's configuration. Absent on listing
+   *  rows, which do not read it. */
+  isCollateral?: boolean;
   lt: number | null;
   usdPrice: number | null;
   /** How the balances were obtained. `"reduced"` — the index's scaled-balance

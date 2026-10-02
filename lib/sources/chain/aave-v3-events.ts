@@ -62,6 +62,9 @@ import { AAVE_V3_SWAP_LABELS } from "@/lib/aave-v3/swap-kinds";
 import type { AaveV3Context, AaveV3EventType, AaveV3PriceSource } from "@/lib/shared/types/protocols/aave-v3";
 import { ChainLanes, type HalfUpThrough, type LaneMove } from "@/lib/aave-v3/chain-lanes";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
+import { aaveV3EventLegs, type FlowLeg } from "@/lib/aave-v3/chain-truth-tower";
+import { liquidationTransferRole } from "@/lib/aave-v3-base/flows";
+import { isAaveV3Event } from "@/lib/shared/types/event-shape";
 
 const POOL_EVENTS_ABI = parseAbi([
   "event Supply(address indexed reserve, address user, address indexed onBehalfOf, uint256 amount, uint16 indexed referralCode)",
@@ -174,10 +177,9 @@ export interface ChainTimelineCoverage {
  *  Computed here rather than in the browser because the browser only has the
  *  rendered slice. A wallet with 13,000 Pool events shows the most recent 500,
  *  and reducing those into a bar labelled "Deposited (all time)" would state a
- *  recent window as a lifetime. Same rules as the client-side reducer: Pool
- *  flows only — aToken transfers move custody without a Pool flow, so they are
- *  neither a deposit nor a withdrawal and a transfer-fed reserve fails the
- *  tower's conservation gates rather than being guessed at. */
+ *  recent window as a lifetime. The six lanes are the Pool rows' sums; a
+ *  swap's rows and an aToken transfer are counted by the Ethereum route's
+ *  classifier, into the legs it gives them. */
 export interface ChainLifetimeFlows {
   symbol: string;
   address?: string;
@@ -192,6 +194,19 @@ export interface ChainLifetimeFlows {
    *  sweep, which does not read that topic: a stated zero, not a claim that
    *  none happened. The Ethereum index lane carries the real figure. */
   writtenOff: number;
+  /** The legs the Ethereum route's classifier gives a swap's rows and an
+   *  aToken transfer (lib/aave-v3/chain-truth-tower `ReserveFlows`). A swap's
+   *  Pool rows are counted here and not in the lanes above. Over the rows the
+   *  replay walked: a seed carries the six lanes only. */
+  soldToRepay?: number;
+  withdrawnSwapped?: number;
+  swappedOut?: number;
+  transferredIn?: number;
+  transferredOut?: number;
+  swappedIn?: number;
+  repaidBySwap?: number;
+  /** Of `liquidatedCollateral`, the liquidation fee sent to the Aave treasury. */
+  treasuryFee?: number;
   /** Set when the token's `decimals` did not load: every figure on this entry
    *  is scaled by the 18 stand-in and is not stated. */
   decimalsUnread?: true;
@@ -215,6 +230,16 @@ export interface AaveV3LifetimeRaw {
   liquidatedCollateral: bigint;
   liquidatedDebt: bigint;
 }
+
+const EXTRA_LEGS = [
+  "soldToRepay",
+  "withdrawnSwapped",
+  "swappedOut",
+  "transferredIn",
+  "transferredOut",
+  "swappedIn",
+  "repaidBySwap",
+] as const satisfies readonly FlowLeg[];
 
 const LIFETIME_LANES = [
   "supplied",
@@ -923,7 +948,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
   const swapEventOf = (g: ParaswapSwapGroup): BaseActivityEvent | null => {
     const given = swapWalked.get(g.given);
     const received = swapWalked.get(g.received);
-    if (!given?.render || !received) return null;
+    if (!given || !received) return null;
     const legRows = (leg: "given" | "received") =>
       g.rows.filter(
         (i) =>
@@ -1022,6 +1047,24 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       context: { protocol: "aave-v3" as const, data: ctx },
     };
   };
+
+  // ── The legs a Pool lane does not hold (TO-DO-ui-jobs §134) ──────────────
+  // The six lanes above are the Pool rows' sums. A swap's rows and an aToken
+  // transfer are counted instead by the Ethereum route's classifier
+  // (`aaveV3EventLegs`), as the Ethereum page's lifetime counts them: every
+  // swap and every transfer the walk passes is kept here, drawn or not, and
+  // the swap rows' Pool sums are kept apart so the edge can replace them.
+  const classifyLater: BaseActivityEvent[] = [];
+  const swapRaw = new Map<string, AaveV3LifetimeRaw>();
+  const liqOf = new Map<string, { coll: Set<string>; liquidators: Set<string> }>();
+  for (const d of rows) {
+    if (d.kind !== "liquidation") continue;
+    const t = d.txHash.toLowerCase();
+    const e = liqOf.get(t) ?? { coll: new Set<string>(), liquidators: new Set<string>() };
+    if (d.collateralAsset) e.coll.add(d.collateralAsset.toLowerCase());
+    if (d.liquidator) e.liquidators.add(d.liquidator.toLowerCase());
+    liqOf.set(t, e);
+  }
 
   let undated = 0;
   // The render cut's ledger. Below the cut, a wallet-signed row is anchored
@@ -1200,17 +1243,23 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     // supply lane falls by the same amount. The row draws its debt lane, as
     // the Ethereum route's repay does.
     if (d.kind === "repay" && d.useATokens) bump(supplyRaw, d.reserve, -d.amount);
-    // Pool flows only — a transfer is a custody move, deliberately neither a
-    // deposit nor a withdrawal (the tower's provenance says so, and a
-    // transfer-fed reserve then fails its conservation gates rather than
-    // silently absorbing the inflow as a supply).
-    // (A reserve a transfer alone touched still gets its zero entry, so
-    // `lifetimeRaw` names every reserve the wallet ever moved.)
+    // The raw lanes are Pool flows only: a transfer adds to none of them, and
+    // its leg is the classifier's (below the walk). A reserve a transfer
+    // alone touched still gets its zero entry, so `lifetimeRaw` names every
+    // reserve the wallet ever moved.
     const lt = rawFlowsOf(d.reserve);
     if (d.kind === "supply") lt.supplied += d.amount;
     else if (d.kind === "withdraw") lt.withdrawn += d.amount;
     else if (d.kind === "borrow") lt.borrowed += d.amount;
     else if (d.kind === "repay") lt.repaid += d.amount;
+    if (swaps.has(i)) {
+      let sr = swapRaw.get(d.reserve);
+      if (!sr) swapRaw.set(d.reserve, (sr = newLifetimeRaw()));
+      if (d.kind === "supply") sr.supplied += d.amount;
+      else if (d.kind === "withdraw") sr.withdrawn += d.amount;
+      else if (d.kind === "borrow") sr.borrowed += d.amount;
+      else if (d.kind === "repay") sr.repaid += d.amount;
+    }
     // "in" = toward the wallet, "out" = toward the protocol.
     const dir: "in" | "out" = d.kind === "supply" || d.kind === "repay" || d.kind === "transfer_out" ? "out" : "in";
     const flows = rMeta
@@ -1263,20 +1312,50 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       swapWalked.set(i, { d, meta: rMeta, before: fig.before, after: fig.after, chain: mv != null, render, base });
       if (i === swap.rows[swap.rows.length - 1]) {
         const e = swapEventOf(swap);
-        if (e) events.push(e);
+        if (e) {
+          classifyLater.push(e);
+          if (swapWalked.get(swap.given)?.render) events.push(e);
+        }
       }
       return;
     }
-    if (render)
-      events.push({
-        ...base,
-        ...unreadOf(rMeta),
-        actionType: d.kind,
-        actionLabel: LABELS[d.kind],
-        flows,
-        context: { protocol: "aave-v3" as const, data: ctx },
-      });
+    const ev: BaseActivityEvent = {
+      ...base,
+      ...unreadOf(rMeta),
+      actionType: d.kind,
+      actionLabel: LABELS[d.kind],
+      flows,
+      context: { protocol: "aave-v3" as const, data: ctx },
+    };
+    if (isTransfer) classifyLater.push(ev);
+    if (render) events.push(ev);
   });
+
+  // The classifier's legs over the kept events, per symbol. Base's two
+  // liquidation transfers follow lib/aave-v3-base/flows.ts: the seizure paid
+  // in aTokens adds nothing (the liquidation row counts it), the transfer
+  // beside it is the protocol's fee, counted as Liquidated.
+  const liqTxs = new Set<string | undefined>(liqOf.keys());
+  const classified = new Map<string, Partial<Record<FlowLeg, number>> & { treasuryFee?: number; address?: string }>();
+  for (const ev of classifyLater) {
+    if (!isAaveV3Event(ev)) continue;
+    const c = ev.context.data;
+    const own = (c.reserve ?? ev.flows[0]?.token)?.toLowerCase();
+    const role =
+      c.eventType === "transfer_out"
+        ? liquidationTransferRole(own, c.counterparty, liqOf.get(ev.txHash?.toLowerCase() ?? ""))
+        : null;
+    if (role === "seizure") continue;
+    for (const l of aaveV3EventLegs(ev, liqTxs)) {
+      const leg: FlowLeg | null = role === "fee" ? "liquidatedCollateral" : l.leg;
+      if (!leg || !(l.amount > 0) || !Number.isFinite(l.amount)) continue;
+      const cur = classified.get(l.symbol) ?? {};
+      cur[leg] = (cur[leg] ?? 0) + l.amount;
+      if (role === "fee" || l.treasuryFee) cur.treasuryFee = (cur.treasuryFee ?? 0) + l.amount;
+      if (!cur.address && l.address) cur.address = l.address.toLowerCase();
+      classified.set(l.symbol, cur);
+    }
+  }
 
   // ── The edge: scale ONCE ──────────────────────────────────────────────────
   // Each symbol's six lanes are the raw sums of the reserves that carry that
@@ -1292,7 +1371,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
   const lifetimeRaw: AaveV3ReserveLifetimeRaw[] = [];
   const bySymbol = new Map<
     string,
-    { decimals: Set<number>; reserves: { raw: AaveV3LifetimeRaw; decimals: number }[] }
+    { decimals: Set<number>; reserves: { reserve: string; raw: AaveV3LifetimeRaw; decimals: number }[] }
   >();
   for (const [reserve, raw] of rawFlows) {
     const m = meta(reserve);
@@ -1313,19 +1392,31 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       bySymbol.set(m.symbol, group);
     }
     group.decimals.add(m.decimals);
-    group.reserves.push({ raw, decimals: m.decimals });
+    group.reserves.push({ reserve, raw, decimals: m.decimals });
   }
+  // A symbol only the classifier names (a reserve a transfer alone touched
+  // whose rows carried no symbol entry yet) gets one.
+  for (const [symbol, c] of classified) flowsFor(symbol, c.address);
   for (const f of lifetime.values()) {
     const group = bySymbol.get(f.symbol);
-    if (!group) continue;
-    for (const lane of LIFETIME_LANES) {
-      if (group.decimals.size === 1) {
-        const sum = group.reserves.reduce((acc, r) => acc + r.raw[lane], ZERO);
-        f[lane] = scaleV3(sum, group.reserves[0].decimals);
-      } else {
-        f[lane] = group.reserves.reduce((acc, r) => acc + scaleV3(r.raw[lane], r.decimals), 0);
+    const c = classified.get(f.symbol);
+    if (group) {
+      // The Pool sums less the swap rows', which the classifier counts below.
+      const net = (r: { reserve: string; raw: AaveV3LifetimeRaw }, lane: (typeof LIFETIME_LANES)[number]) =>
+        r.raw[lane] - (swapRaw.get(r.reserve)?.[lane] ?? ZERO);
+      for (const lane of LIFETIME_LANES) {
+        if (group.decimals.size === 1) {
+          const sum = group.reserves.reduce((acc, r) => acc + net(r, lane), ZERO);
+          f[lane] = scaleV3(sum, group.reserves[0].decimals);
+        } else {
+          f[lane] = group.reserves.reduce((acc, r) => acc + scaleV3(net(r, lane), r.decimals), 0);
+        }
       }
     }
+    if (!c) continue;
+    for (const lane of LIFETIME_LANES) if (c[lane]) f[lane] += c[lane] as number;
+    for (const leg of EXTRA_LEGS) if (c[leg]) f[leg] = c[leg];
+    if (c.treasuryFee) f.treasuryFee = c.treasuryFee;
   }
 
   // Every seeded row is omitted from the drawn list — it was replayed into

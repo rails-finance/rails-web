@@ -619,7 +619,102 @@ function checkMixedDecimals() {
   );
 }
 
+// ── The legs a Pool lane does not hold (TO-DO-ui-jobs §134) ─────────────────
+// A swap's rows and an aToken transfer are counted by the Ethereum route's
+// classifier: a transfer is "Received by transfer" / "Sent to another
+// account", a ParaSwap collateral swap is "Swapped to another asset" and
+// "Swapped in" (not Withdrawn and Deposited), a debt swap's repay is "Repaid
+// by a debt swap" (not Repaid), a liquidation's aTokens to the liquidator add
+// nothing, and the transfer beside them is the treasury fee, counted as
+// Liquidated. Every row sits below the render cut, so the legs come from the
+// walk and not from the drawn events.
+function checkClassifiedLegs() {
+  console.log("\nlegs the classifier counts (swaps, transfers, the treasury fee)");
+  const SWAP_ADAPTER = "0x2e549104c516b8657a7d888494dfbabd7c70b464";
+  const DEBT_ADAPTER = "0xb12e82df057bf16ecfa89d7d089dc7e5c1dc057b";
+  const TREASURY = "0x000000000000000000000000000000000000c011";
+  let b = 0;
+  const row = (kind, reserve, human, extra = {}) => {
+    b += 1;
+    return {
+      blockNumber: 100 + b,
+      txIndex: 0,
+      logIndex: 1,
+      txHash: `0x${(extra.tx ?? b).toString(16).padStart(64, "0")}`,
+      kind,
+      reserve,
+      amount: units(human, decOf(reserve)),
+      ...extra,
+    };
+  };
+  const LIQ = 50;
+  const SWAP = 60;
+  const DEBT = 70;
+  const rows = [
+    row("supply", WETH, "10", { poolCaller: WALLET }),
+    row("transfer_in", WETH, "1", { counterparty: OTHER }),
+    row("transfer_out", WETH, "0.5", { counterparty: OTHER }),
+    row("borrow", USDC, "5000", { poolCaller: WALLET, interestRateMode: 2 }),
+    row("liquidation", USDC, "1000", {
+      tx: LIQ,
+      collateralAsset: WETH,
+      liquidatedCollateralAmount: units("0.4", 18),
+      liquidator: LIQUIDATOR,
+      receiveAToken: true,
+    }),
+    row("transfer_out", WETH, "0.4", { tx: LIQ, counterparty: LIQUIDATOR }),
+    row("transfer_out", WETH, "0.01", { tx: LIQ, counterparty: TREASURY }),
+    row("transfer_out", WETH, "2", { tx: SWAP, counterparty: SWAP_ADAPTER }),
+    row("supply", CBETH, "1.9", { tx: SWAP, poolCaller: SWAP_ADAPTER }),
+    row("borrow", USDC2, "3000", { tx: DEBT, poolCaller: DEBT_ADAPTER, interestRateMode: 2 }),
+    row("repay", USDC, "2990", { tx: DEBT, poolCaller: DEBT_ADAPTER, useATokens: false }),
+  ];
+  const r = replayAaveV3Rows({
+    wallet: WALLET,
+    chainId: 8453,
+    rows,
+    metas,
+    timestamps: new Map(rows.map((x) => [x.blockNumber, x.blockNumber])),
+    senders: new Map(),
+    maxRendered: 1,
+    anchorWalletRows: false,
+    coverage: { fromBlock: 0, toBlock: 200, fromDeployment: true, deployBlock: 0, gaps: [], source: "index" },
+  });
+  const of = (s) => r.lifetime.find((f) => f.symbol === s) ?? {};
+  const weth = of("WETH");
+  const cbeth = of("cbETH");
+  const usdc = of("USDC");
+  const near = (a, x) => typeof a === "number" && Math.abs(a - x) < 1e-9;
+  assert(near(weth.supplied, 10), `WETH Deposited is the wallet's own supply (${weth.supplied})`);
+  assert(near(weth.transferredIn, 1), `WETH Received by transfer (${weth.transferredIn})`);
+  assert(
+    near(weth.transferredOut, 0.5),
+    `WETH Sent to another account, the liquidator's aTokens left out (${weth.transferredOut})`,
+  );
+  assert(
+    near(weth.liquidatedCollateral, 0.41),
+    `WETH Liquidated is the seizure plus the treasury fee (${weth.liquidatedCollateral})`,
+  );
+  assert(near(weth.treasuryFee, 0.01), `WETH treasury fee (${weth.treasuryFee})`);
+  assert(
+    near(weth.swappedOut, 2) && near(weth.withdrawn, 0),
+    `WETH Swapped to another asset (${weth.swappedOut}), not Withdrawn`,
+  );
+  assert(
+    near(cbeth.swappedIn, 1.9) && near(cbeth.supplied, 0),
+    `cbETH Swapped in (${cbeth.swappedIn}), not Deposited (${cbeth.supplied})`,
+  );
+  assert(
+    near(usdc.repaidBySwap, 2990) && near(usdc.repaid, 0),
+    `USDC Repaid by a debt swap (${usdc.repaidBySwap}), not Repaid (${usdc.repaid})`,
+  );
+  assert(near(usdc.borrowed, 8000), `USDC Borrowed holds both borrows (${usdc.borrowed})`);
+  const raw = r.lifetimeRaw.find((x) => x.reserve === CBETH);
+  assert(raw?.supplied === units("1.9", 18).toString(), "lifetimeRaw stays the Pool rows' sums");
+}
+
 assert(transfersWithRemainder > 0, `${transfersWithRemainder} transfers whose value × index ÷ 1e27 has a remainder`);
+checkClassifiedLegs();
 const wholeHand = checkHistory("hand-built history", hand, { absolute: 1e-9 });
 const wholeRandom = checkHistory("pseudo-random history", random, { relative: 1e-9 });
 checkMixedDecimals();

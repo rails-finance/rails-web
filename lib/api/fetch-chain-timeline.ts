@@ -139,6 +139,17 @@ export interface ChainLifetimeFlows {
   /** Debt the Pool burned as bad debt (DeficitCreated). The Base sweep does
    *  not read that topic and states 0; the Ethereum index lane carries it. */
   writtenOff: number;
+  /** A swap's and an aToken transfer's legs, as the Ethereum route's
+   *  classifier counts them (lib/sources/chain/aave-v3-events.ts). */
+  soldToRepay?: number;
+  withdrawnSwapped?: number;
+  swappedOut?: number;
+  transferredIn?: number;
+  transferredOut?: number;
+  swappedIn?: number;
+  repaidBySwap?: number;
+  /** Of `liquidatedCollateral`, the liquidation fee sent to the Aave treasury. */
+  treasuryFee?: number;
   /** Set when the token's `decimals` did not load: every figure on this entry
    *  is scaled by the 18 stand-in and is not stated. */
   decimalsUnread?: true;

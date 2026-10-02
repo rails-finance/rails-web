@@ -311,6 +311,21 @@ export interface AaveBaseReplay {
   lastLiquidationBlock: number | null;
 }
 
+/** What an aToken transfer out of a liquidation's collateral reserve is, in
+ *  that liquidation's transaction: the seizure itself when it goes to the
+ *  liquidator (the liquidation row counts it), else the protocol's fee.
+ *  Null for any other transfer. The timeline route's lifetime legs
+ *  (lib/sources/chain/aave-v3-events.ts) read the same rule. */
+export function liquidationTransferRole(
+  ownAsset: string | undefined,
+  counterparty: string | undefined,
+  liq: { coll: Set<string>; liquidators: Set<string> } | undefined,
+): "seizure" | "fee" | null {
+  if (!liq || !ownAsset || !liq.coll.has(ownAsset.toLowerCase())) return null;
+  const to = counterparty?.toLowerCase();
+  return to && liq.liquidators.has(to) ? "seizure" : "fee";
+}
+
 export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBaseFlowOptions): AaveBaseReplay {
   const ordered = orderedAaveEvents(events);
   const book = addressBook(ordered);
@@ -384,21 +399,9 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
     const own = rowPrices[i];
     const liq = liqOf.get(t);
     const ownAsset = (c.reserve ?? ev.flows[0]?.token)?.toLowerCase();
-    const counterparty = c.counterparty?.toLowerCase();
-    const seizureTransfer =
-      c.eventType === "transfer_out" &&
-      !!liq &&
-      !!ownAsset &&
-      liq.coll.has(ownAsset) &&
-      !!counterparty &&
-      liq.liquidators.has(counterparty);
-    const treasuryFee =
-      c.eventType === "transfer_out" &&
-      !!liq &&
-      !!ownAsset &&
-      liq.coll.has(ownAsset) &&
-      !seizureTransfer &&
-      liqTxs.has(t);
+    const role = c.eventType === "transfer_out" ? liquidationTransferRole(ownAsset, c.counterparty, liq) : null;
+    const seizureTransfer = role === "seizure";
+    const treasuryFee = role === "fee" && liqTxs.has(t);
     // The classifier's legs; a treasury fee is the liquidation's collateral.
     let classified = withATokenRepayLeg(ev, aaveV3EventLegs(ev, liqTxs));
     if (seizureTransfer && ownAsset) seizedByTransfer.add(`${t}:${ownAsset}`);
