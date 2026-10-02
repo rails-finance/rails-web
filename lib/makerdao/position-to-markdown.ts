@@ -107,10 +107,14 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
     );
     if (view.debtDai != null && view.debtDai > 0) {
       lines.push(`- **Debt:** ${num(view.debtDai, 2)} ${dsym} (normalized art ${amt(view.art)} × the ilk's rate)`);
-      const accruedFee = Math.max(0, view.debtDai - view.art);
-      if (accruedFee > 0.005) {
+      // The same split the card's Explanation states: fee = debt − principal,
+      // where principal is what was drawn less repaid since the vault last
+      // owed nothing (lib/makerdao/vault-history.tsx). Stated only where the
+      // page holds that start; art × rate − art is not the fee.
+      if (view.drawnDai != null) {
+        const accruedFee = Math.max(0, view.debtDai - view.drawnDai);
         lines.push(
-          `- **Accrued stability fee (in the debt figure):** ${num(accruedFee, 2)} ${dsym} (art × rate − art)`,
+          `- **Stability fee in the debt figure:** ${num(accruedFee, 2)} ${dsym} (debt − principal; principal ${num(view.drawnDai, 2)} ${dsym} is drawn less repaid)`,
         );
       }
     } else {

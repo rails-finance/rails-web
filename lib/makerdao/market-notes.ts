@@ -55,6 +55,35 @@ export interface MakerLiveRate {
   debtNow?: number | null;
 }
 
+/** A folder the page holds in place of its members (lib/shared/timeline-folder.ts
+ *  `ServedFolder`): the span of blocks it stands for and how many events. The
+ *  members' rows are not on the page, so a note whose two ends enclose a folder
+ *  says so instead of being cut at the members. */
+export interface MakerNoteFolder {
+  firstBlock: number;
+  lastBlock: number;
+  count: number;
+}
+
+/** The folders a stretch encloses, as the note states them. Undefined where
+ *  none does, so a flat page's notes are byte-for-byte what they were. */
+function groupedBetween(
+  folders: readonly MakerNoteFolder[] | undefined,
+  fromBlock: number,
+  toBlock: number,
+): RateStepNote["grouped"] {
+  if (!folders?.length) return undefined;
+  let n = 0;
+  let events = 0;
+  for (const f of folders) {
+    if (f.firstBlock >= fromBlock && f.lastBlock <= toBlock) {
+      n += 1;
+      events += f.count;
+    }
+  }
+  return n > 0 ? { folders: n, events } : undefined;
+}
+
 /** MakerDAO's context on an event, or null — the same spelled-out narrowing
  *  lib/shared/market-note.ts uses for its own three protocols, so nothing here
  *  drags a type guard's runtime import into a module the pure verifier loads. */
@@ -267,11 +296,17 @@ const unitLabel = "% per year";
  * out of the ilk's own log. So the note's two receipts name the two DRIPS the
  * fees were evidenced by, not the vault's rows, and `setsBetween` counts the
  * resets the ilk made while this vault did nothing.
+ *
+ * `folders` are the folders the page holds in place of their members (a
+ * grouped page, decision 0021). `events` then holds the ungrouped rows only,
+ * so a stretch can run across a folder's members; such a note carries
+ * `grouped` and its faces say so (TO-DO-ui-jobs 218).
  */
 export function makerRateStepNotesFor(
   events: readonly BaseActivityEvent[],
   log: MakerRateLogResponse | null,
   market: MakerRateStepMarket,
+  folders?: readonly MakerNoteFolder[],
 ): RateStepNote[] {
   if (!log || log.sets.length === 0) return [];
   const rated = ratedRows(events, log.sets);
@@ -352,10 +387,12 @@ export function makerRateStepNotesFor(
     const path = pathOf(log.sets, n);
     const last = n.steps != null ? byTo.get(n.to.block) : undefined;
     const lastPath = last ? pathOf(log.sets, last) : undefined;
+    const grouped = groupedBetween(folders, n.from.block, n.to.block);
     return {
       ...n,
       ...(path ? { path } : {}),
       ...(last && lastPath ? { lastPath: { from: last.from.timestamp, ...lastPath } } : {}),
+      ...(grouped ? { grouped } : {}),
     };
   });
 }
@@ -379,6 +416,7 @@ export function liveMakerRateStepNote(
   log: MakerRateLogResponse | null,
   market: MakerRateStepMarket,
   live: MakerLiveRate,
+  folders?: readonly MakerNoteFolder[],
 ): RateStepNote | null {
   if (!log || log.sets.length === 0) return null;
   if (!Number.isFinite(live.aprPct) || live.aprPct < 0) return null;
@@ -431,5 +469,8 @@ export function liveMakerRateStepNote(
     live: true,
   };
   const path = pathOf(log.sets, { ...note, to: { ...note.to, logIndex: Number.MAX_SAFE_INTEGER } });
-  return path ? { ...note, path } : note;
+  // Folders newer than the newest ungrouped row: the vault's last events are
+  // grouped, so "since the vault's last event" would name the wrong row.
+  const grouped = groupedBetween(folders, a.e.blockNumber, live.block);
+  return { ...note, ...(path ? { path } : {}), ...(grouped ? { grouped } : {}) };
 }

@@ -42,6 +42,7 @@ import { MAKERDAO_FOLDER_REGISTER, MAKERDAO_LIQUIDATION_RUNS } from "@/lib/maker
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
+import { usdPrice } from "@/lib/makerdao/price-format";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MakerDAOEventCard } from "@/components/protocol/makerdao/makerdao-event-card";
 import {
@@ -454,7 +455,12 @@ export default function MakerVaultDetailView({
   // rows do not hold is read from the index as its segment
   // (hooks/useTimelineSegment.ts). The preload stays the page's whole-history
   // record; the timeline alone swaps.
-  const { tl, segments, readFolderMembers } = useTimelineSegment({
+  const {
+    tl,
+    segments,
+    readFolderMembers,
+    rows: timelineRows,
+  } = useTimelineSegment({
     events: makerEvents,
     groupedTail,
     servedRows,
@@ -554,12 +560,29 @@ export default function MakerVaultDetailView({
   // the ilk's stability fee moved at least a percentage point. Both ends are
   // this vault's own rows, but the fee is NOT on them — it is the ilk's last
   // confirmed rate set at or before each, out of the rate log above.
+  //
+  // On a grouped page `tl.sortedEvents` holds the ungrouped rows only, so the
+  // folders the timeline draws are handed over too: a note whose ends enclose
+  // one says it spans grouped events (TO-DO-ui-jobs 218).
+  const noteFolders = useMemo(
+    () =>
+      timelineRows
+        ? timelineRows.flatMap((row) =>
+            row.kind === "folder"
+              ? [{ firstBlock: row.folder.firstBlock, lastBlock: row.folder.lastBlock, count: row.folder.count }]
+              : [],
+          )
+        : undefined,
+    [timelineRows],
+  );
   const notes = useMemo<MarketNote[]>(
     () =>
       market
-        ? [...makerRateStepNotesFor(tl.sortedEvents, rateLog, market)].sort((a, b) => a.to.block - b.to.block)
+        ? [...makerRateStepNotesFor(tl.sortedEvents, rateLog, market, noteFolders)].sort(
+            (a, b) => a.to.block - b.to.block,
+          )
         : [],
-    [tl.sortedEvents, rateLog, market],
+    [tl.sortedEvents, rateLog, market, noteFolders],
   );
 
   // The live note: this vault's own newest rated row against the Jug's own fee
@@ -571,14 +594,20 @@ export default function MakerVaultDetailView({
   const liveNotes = useMemo<MarketNote[]>(() => {
     if (!market || !vaultOpen) return [];
     if (!chainState || chainState.stabilityFeeApr == null || !(chainState.atBlock > 0)) return [];
-    const note = liveMakerRateStepNote(tl.sortedEvents, rateLog, market, {
-      aprPct: chainState.stabilityFeeApr,
-      block: chainState.atBlock,
-      timestamp: chainState.blockTimestamp,
-      debtNow: chainState.debtDai,
-    });
+    const note = liveMakerRateStepNote(
+      tl.sortedEvents,
+      rateLog,
+      market,
+      {
+        aprPct: chainState.stabilityFeeApr,
+        block: chainState.atBlock,
+        timestamp: chainState.blockTimestamp,
+        debtNow: chainState.debtDai,
+      },
+      noteFolders,
+    );
     return note ? [note] : [];
-  }, [market, vaultOpen, chainState, tl.sortedEvents, rateLog]);
+  }, [market, vaultOpen, chainState, tl.sortedEvents, rateLog, noteFolders]);
 
   // While the vault is open and either the chain read or the rate log is still
   // in flight, the timeline holds the live slot rather than settling without
@@ -605,7 +634,19 @@ export default function MakerVaultDetailView({
           owner={{ wallet: cardView?.owner ?? view?.owner }}
           assets={
             view && view.priceUsd != null && view.priceUsd > 0
-              ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
+              ? [
+                  {
+                    symbol: view.collateralSymbol,
+                    price: view.priceUsd,
+                    // LockStake's feed is capped: the figure is the lower of
+                    // the cap and the oracle, so "oracle price" would misname it.
+                    ...(view.priceCap
+                      ? {
+                          tip: `Maker's price for ${view.collateralSymbol} at the latest block: the oracle's, capped by governance at ${usdPrice(view.priceCap.capUsd)}${view.priceCap.oracleUsd != null ? ` (the oracle reads ${usdPrice(view.priceCap.oracleUsd)})` : ""}.`,
+                        }
+                      : {}),
+                  },
+                ]
               : []
           }
           closed={view != null && view.status !== "open"}
@@ -613,7 +654,8 @@ export default function MakerVaultDetailView({
         >
           {view && (
             <MakerdaoExportMenu
-              view={view}
+              // The card's view: it carries the principal the fee split needs.
+              view={cardView ?? view}
               events={makerEvents}
               notes={notes}
               liveNotes={liveNotes}

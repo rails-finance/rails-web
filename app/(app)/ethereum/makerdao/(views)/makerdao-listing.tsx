@@ -22,6 +22,7 @@ import { fetchMakerIlkRoster } from "@/lib/api/fetch-makerdao-ilk-roster";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { MakerVaultCard, viewFromSummary } from "@/components/protocol/makerdao/makerdao-vault-card";
 import { fetchMakerVaultPage } from "@/lib/makerdao/list-fetch";
+import { useMakerIlkTerms } from "@/lib/makerdao/use-chain-history";
 import {
   makerListDimensions,
   makerSelectionNeedsRoster,
@@ -76,6 +77,15 @@ function useMakerRoster(): MakerRosterState {
   return state;
 }
 
+/** One listing card. A LockStake row's index figures are at the ilk's capped
+ *  price, and its auctions may be switched off; the card says both from one
+ *  head read per ilk (`/api/chain/makerdao/ilk-terms`, TO-DO-ui-jobs 189). */
+function MakerListingCard({ s }: { s: MakerVaultSummary }) {
+  const terms = useMakerIlkTerms(s.lse ? s.ilk : null);
+  const v = viewFromSummary(s);
+  return <MakerVaultCard v={terms ? { ...v, priceCap: terms.priceCap, auction: terms.auction } : v} />;
+}
+
 export function MakerDAOListing({ initialItems, initialTotal, initialKey, initialSearch }: MakerDAOListingProps) {
   // The live selection, mirrored out of the driver so the header can state what
   // this view could not carry.
@@ -108,7 +118,7 @@ export function MakerDAOListing({ initialItems, initialTotal, initialKey, initia
       defaults={MAKER_LIST_DEFAULTS}
       sortOptions={MAKER_SORT_OPTIONS}
       searchPlaceholder="Search wallet, vault #, or collateral type"
-      renderCard={(v) => <MakerVaultCard v={viewFromSummary(v)} />}
+      renderCard={(v) => <MakerListingCard s={v} />}
       hrefFor={(v) => `/ethereum/makerdao/${v.cdpId ?? v.urn}`}
       keyFor={(v) => v.urn}
       strategy={serverStrategy<MakerVaultSummary, MakerListFilters, MakerRosterState>({

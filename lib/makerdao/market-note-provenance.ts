@@ -1,13 +1,13 @@
 // Receipts for a MakerDAO rate-step market note — the ilk's stability fee
-// between two of a vault's own touches, and the yearly interest the earlier
-// touch's own debt would cost at each end's fee.
+// between two of a vault's own events, and the yearly interest the earlier
+// event's own debt would cost at each end's fee.
 // ----------------------------------------------------------------------------
 // Shaped after lib/polaris/market-note-provenance.ts (the rate-step precedent):
 // one builder per figure family, each returning the same Provenance shape
 // whichever face of the sentence it backs. What the receipts have to answer is
 // different in one important way, and every leaf below turns on it:
 //
-//   MAKER STATES NO RATE ANYWHERE A ROW CAN CARRY IT. A polaris touch carries
+//   MAKER STATES NO RATE ANYWHERE A ROW CAN CARRY IT. A polaris event carries
 //   `primaryRate` and its receipt only has to name which PrimaryRateSet the
 //   figure came from. A Maker frob carries no fee at all: governance files a
 //   `duty` on the Jug, the spell's own block is not indexed, and the only
@@ -56,7 +56,7 @@ const observedOf = (note: RateStepNote, which: "earlier" | "later"): RateSetLog 
 const pointOf = (note: RateStepNote, which: "earlier" | "later"): MarketNotePoint =>
   which === "earlier" ? note.from : note.to;
 
-/** One end of the step in prose: which of the vault's own touches it is. */
+/** One end of the step in prose: which of the vault's own events it is. */
 const touchClause = (point: MarketNotePoint): string =>
   `this vault's ${makerRateEndLabel(point)} at block ${point.block}`;
 
@@ -75,7 +75,7 @@ const rateLeafNote = (note: RateStepNote, which: "earlier" | "later"): string =>
   const observed = observedOf(note, which);
   const clause = touchClause(pointOf(note, which));
   if (!observed) {
-    return `${clause} — the ilk's last confirmed rate set at or before this touch's block`;
+    return `${clause} — the ilk's last confirmed rate set at or before this event's block`;
   }
   return (
     `${clause} — the fee in force there is the ilk's last rate set at or before it: the Jug.drip at block ` +
@@ -105,56 +105,62 @@ const rateLeaf = (note: RateStepNote, which: "earlier" | "later") => ({
 
 /**
  * The step itself: the two fees, the percentage-point move between them, the
- * two blocks, the elapsed time, or how many times governance reset the fee in
+ * two blocks, the elapsed time, or how many times governance changed the fee in
  * between. One builder, five faces, because the sentence states one fact in
  * several places and a reader who opens any of them should land on the same
  * two drips.
  */
 export const makerRateStepProv = (
   note: RateStepNote,
-  part: "rate" | "delta" | "blocks" | "elapsed" | "sets" | "steps",
+  part: "rate" | "delta" | "blocks" | "elapsed" | "sets" | "steps" | "grouped",
 ): Provenance => {
   if (part === "elapsed") return elapsedProv(note);
   if (part === "sets") return setsProv(note);
   if (part === "steps") return stepsProv(note);
+  if (part === "grouped") return groupedProv(note);
   const ilk = ilkOf(note);
+  // On a grouped page the stretch can enclose events the page holds as
+  // folders; the sentence that says nothing sits between the ends gives way.
+  const between = note.grouped
+    ? ` ${groupedSentence(note)}`
+    : note.live
+      ? ` Nothing between the two is drawn, because this vault has transacted nothing since its own last event.`
+      : ` Nothing between the two events is drawn, because this vault transacted nothing between them.`;
   const summaryBase = note.live
     ? part === "rate"
       ? `The ${ilk} stability fee at each end of the stretch — the same quantity reached two ways. The earlier one ` +
-        `is the fee in force at this vault's own last touch: the ilk's last rate set at or before it, derived from ` +
+        `is the fee in force at this vault's own last event: the ilk's last rate set at or before it, derived from ` +
         `the Vat's own fold series and confirmed against the Jug at that set's block. The later one is the Jug's ` +
         `base + duty read LIVE at the chain head and compounded over a year. Governance sets the duty; nobody ` +
-        `borrowing in this ilk chooses it. Nothing between the two is drawn, because this vault has transacted ` +
-        `nothing since its own last touch.`
+        `borrowing in this ilk chooses it.${between}`
       : part === "delta"
-        ? `How far the ${ilk} stability fee has moved since this vault's own last touch — the fee in force there ` +
+        ? `How far the ${ilk} stability fee has moved since this vault's own last event — the fee in force there ` +
           `against the Jug's own rate read live just now. It is the move in the fee alone: nothing about this ` +
           `vault's own collateral or debt enters it.`
-        : `The block the stretch runs from, and the chain head it runs TO — this vault's own last touch, and the ` +
+        : `The block the stretch runs from, and the chain head it runs TO — this vault's own last event, and the ` +
           `block the live Jug read answered at. The later block is not one the vault transacted in; it is simply ` +
           `the latest one Rails read the fee against.`
     : part === "rate"
       ? `The ${ilk} stability fee at each end of the stretch. MakerDAO indexes no fee — governance files a duty on ` +
-        `the Jug and the spell's own block is not indexed — so the fee in force at a touch is the ilk's last RATE ` +
+        `the Jug and the spell's own block is not indexed — so the fee in force at an event is the ilk's last RATE ` +
         `SET at or before it, and a set is the first Jug.drip that compounded at a new duty. Each set's figure is ` +
         `derived from that drip's own delta on the Vat's rate accumulator and then CONFIRMED by reading the Jug at ` +
-        `the drip's block; the confirmed figure is what is stated here. Nothing between the two touches is drawn, ` +
-        `because this vault transacted nothing between them.`
+        `the drip's block; the confirmed figure is what is stated here.${between}`
       : part === "delta"
         ? `How far the ${ilk} stability fee moved across the stretch — the later reading against the earlier one, ` +
           `both confirmed at the Jug at their own blocks. It is the move in the fee alone: nothing about this ` +
           `vault's own collateral or debt enters it.`
         : `The two blocks the stretch runs between — this vault's own ${makerRateEndLabel(note.from)} and ` +
           `${makerRateEndLabel(note.to)}. The stretch is bounded by the vault's own activity, not by a window: ` +
-          `the fee is known at these two blocks because the vault was touched at each, and Rails states nothing ` +
-          `about the fee's path in between beyond how many times it was reset.`;
-  // A merged note's every face says so: the two ends are two touches with more
-  // of this vault's own touches between them, and the receipt names each
+          `the fee is known at these two blocks because the vault had an event at each, and Rails states nothing ` +
+          `about the fee's path in between beyond how many times it was changed.`;
+  // A merged note's every face says so: the two ends are two events with more
+  // of this vault's own events between them, and the receipt names each
   // stretch rather than leaving the reader to take the run on trust.
   const merged =
     note.members && note.members.length > 1
       ? ` This note states ${note.members.length.toLocaleString("en-US")} consecutive stretches that all moved the ` +
-        `fee the same way as one, running from the first's earlier touch to the last's later one — ` +
+        `fee the same way as one, running from the first's earlier event to the last's later one — ` +
         `${memberStretches(note)}.`
       : "";
   const summary = `${summaryBase}${merged}`;
@@ -170,7 +176,7 @@ export const makerRateStepProv = (
     summary,
     ...jugContract(note),
     via: note.live
-      ? `${rateLogRoute(note)} · sets[].aprPct as-of the touch · Jug.base() + Jug.ilks(ilk).duty read live`
+      ? `${rateLogRoute(note)} · sets[].aprPct as-of the event · Jug.base() + Jug.ilks(ilk).duty read live`
       : `${rateLogRoute(note)} · sets[].aprPct, confirmed at each set's own block`,
     ...(part === "delta" ? { formula: "(rate after − rate before) × 100" } : {}),
     verify: {
@@ -192,8 +198,57 @@ export const makerRateStepProv = (
         kind: "chain",
         pclass: "emitted",
         note: note.live
-          ? `this vault's own last touch (${note.from.block}) and the block the live Jug read answered at (${note.to.block})`
-          : `this vault's own two touches — ${note.from.block} and ${note.to.block}`,
+          ? `this vault's own last event (${note.from.block}) and the block the live Jug read answered at (${note.to.block})`
+          : `this vault's own two events — ${note.from.block} and ${note.to.block}`,
+      },
+    ],
+  };
+};
+
+/** The grouped events a stretch encloses, in one sentence. */
+const groupedSentence = (note: RateStepNote): string => {
+  const g = note.grouped!;
+  const folders = g.folders === 1 ? "one folder" : `${g.folders.toLocaleString("en-US")} folders`;
+  return (
+    `${g.events.toLocaleString("en-US")} of this vault's own events sit between the two ends, held in ${folders} on ` +
+    `this page rather than drawn as rows; the ends are the two events drawn as rows, and the fee's path across the ` +
+    `stretch is read from the ilk's rate log.`
+  );
+};
+
+/**
+ * A grouped page's stretch: how many of the vault's own events it encloses
+ * that the page holds as folders. The flat page (`?folders=0`) would cut the
+ * stretch at each of them and state a note wherever the fee moved between two
+ * neighbours; here the two ends are the rows drawn, and the folder's span
+ * (first and last block) places it inside.
+ */
+const groupedProv = (note: RateStepNote): Provenance => {
+  const g = note.grouped;
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary:
+      `How many of the vault's events this stretch holds as grouped rows. The page holds a repetitive ` +
+      `run of events as one folder (rails-ops decision 0021) and this note is drawn between the two events that ` +
+      `stand as rows, so the folder's members are inside it. ${groupedSentence(note)} The flat view ` +
+      `(?folders=0) draws the same history as rows and cuts the stretch at each of them.`,
+    ...jugContract(note),
+    via: "the folders the grouped timeline served, by their first and last block",
+    formula: "Σ folder.count over folders with from.block ≤ firstBlock and lastBlock ≤ to.block",
+    verify: {
+      kind: "recompute",
+      text:
+        `Open this vault with ?folders=0: the events between blocks ${note.from.block} and ${note.to.block} are the ` +
+        `${g?.events ?? 0} this figure counts, and the notes between them are the pieces of this stretch.`,
+    },
+    inputs: [
+      {
+        label: "events grouped",
+        value: String(g?.events ?? 0),
+        kind: "derived",
+        pclass: "indexed",
+        note: `in ${g?.folders ?? 0} folder${g?.folders === 1 ? "" : "s"} between blocks ${note.from.block} and ${note.to.block}`,
       },
     ],
   };
@@ -229,17 +284,17 @@ const stepsProv = (note: RateStepNote): Provenance => {
     summary:
       `How many of this vault's own stretches this note states as one. Each of them moved the ${ilk} stability fee ` +
       `at least a percentage point the same way, one after another, so they are one run: the note runs from the ` +
-      `first stretch's earlier touch to the last stretch's later one, and the fees it states are the confirmed fees ` +
+      `first stretch's earlier event to the last stretch's later one, and the fees it states are the confirmed fees ` +
       `at those two ends. A stretch that moved the fee the other way ends the run and begins the next note; a move ` +
       `too small to be stated at all never breaks one. The steps themselves are listed below.`,
     ...jugContract(note),
-    via: "consecutive same-direction stretches between this vault's own touches",
+    via: "consecutive same-direction stretches between this vault's own events",
     formula: "one note per run of stretches whose move shares a sign",
     verify: {
       kind: "recompute",
       text:
         `Open ${rateLogRoute(note)}, take the ilk's last confirmed rate set at or before each of this vault's own ` +
-        `touches in block order, and mark every consecutive pair whose fee moved at least one percentage point; the ` +
+        `events in block order, and mark every consecutive pair whose fee moved at least one percentage point; the ` +
         `${note.steps ?? 0} marked pairs listed below run ${note.deltaPp < 0 ? "down" : "up"} without interruption, ` +
         `and this note is that run.`,
     },
@@ -256,14 +311,14 @@ const stepsProv = (note: RateStepNote): Provenance => {
         value: memberStretches(note) || undefined,
         kind: "chain",
         pclass: "state",
-        note: "each stretch's own two touches and the fee confirmed at the Jug for each",
+        note: "each stretch's own two events and the fee confirmed at the Jug for each",
       },
     ],
   };
 };
 
 /**
- * How many times governance reset the fee between the vault's two touches —
+ * How many times governance changed the fee between the vault's two events —
  * the difference of each end's rate set's own ordinal in the ilk's confirmed
  * log. Only CONFIRMED sets are counted: a derived set the Jug says was never a
  * change (the fold series has a gap on the busy ilks) is listed as an artefact
@@ -277,20 +332,20 @@ const setsProv = (note: RateStepNote): Provenance => {
     kind: "derived",
     pclass: "indexed",
     summary:
-      `How many times governance reset the ${ilk} stability fee between this vault's two touches — the difference ` +
+      `How many times governance changed the ${ilk} stability fee between this vault's two events — the difference ` +
       `of each end's rate set's own ordinal in the ilk's log. Only sets the Jug CONFIRMED as a change are counted: ` +
       `the Vat's fold series has a gap on the busy ilks, and a derived set the Jug says never moved the duty is ` +
-      `listed as an artefact by the route. Nothing about any of those resets is drawn on ` +
+      `listed as an artefact by the route. Nothing about any of those changes is drawn on ` +
       `this page; only their number is stated.`,
     ...jugContract(note),
-    via: "ordinal(rate set at the later touch) − ordinal(rate set at the earlier touch)",
+    via: "ordinal(rate set at the later event) − ordinal(rate set at the earlier event)",
     formula: "to.ordinal − from.ordinal",
     verify: {
       kind: "recompute",
       text:
         from && to
           ? `Open ${rateLogRoute(note)} and count the sets strictly after block ${from.block} log ${from.logIndex} and at or before block ${to.block} log ${to.logIndex} — the count is this figure.`
-          : `Open ${rateLogRoute(note)} and count the sets between the fees in force at this vault's two touches.`,
+          : `Open ${rateLogRoute(note)} and count the sets between the fees in force at this vault's two events.`,
     },
     inputs: [
       {
@@ -312,8 +367,8 @@ const setsProv = (note: RateStepNote): Provenance => {
 };
 
 /**
- * The time between the two touches: the difference of the two events' block
- * timestamps, each the header of the block the touch sits in. Exact — not a
+ * The time between the two events: the difference of the two events' block
+ * timestamps, each the header of the block the event sits in. Exact — not a
  * block count times an assumed block time — and silent about where inside the
  * stretch the fee actually moved.
  */
@@ -321,21 +376,21 @@ const elapsedProv = (note: RateStepNote): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   summary: note.live
-    ? `The time since the earlier touch — the block the live Jug read answered at, less the block header of this ` +
-      `vault's last touch. Exact. It grows on every reload.`
-    : `The time between the two touches — the later block's timestamp less the earlier's, both read from the ` +
-      `headers of the blocks this vault's two touches sit in. Exact. It bounds ` +
+    ? `The time since the earlier event — the block the live Jug read answered at, less the block header of this ` +
+      `vault's last event. Exact. It grows on every reload.`
+    : `The time between the two events — the later block's timestamp less the earlier's, both read from the ` +
+      `headers of the blocks this vault's two events sit in. Exact. It bounds ` +
       `when the fee moved and says nothing about where inside the stretch it did.`,
   ...jugContract(note),
   via: note.live
     ? "this vault's own block header · the head block's timestamp at read time"
-    : "block headers · timestamp at each touch",
+    : "block headers · timestamp at each event",
   formula: "timestamp after − timestamp before",
   verify: {
     kind: "recompute",
     text: note.live
-      ? `Open this vault's own last touch on this page for block ${note.from.block}'s timestamp, and read the head block's at read time; subtract the two.`
-      : `Open each block on the chain's explorer — ${note.from.block} and ${note.to.block} — and subtract the two timestamps; or read the two touches' own dates on this page.`,
+      ? `Open this vault's own last event on this page for block ${note.from.block}'s timestamp, and read the head block's at read time; subtract the two.`
+      : `Open each block on the chain's explorer — ${note.from.block} and ${note.to.block} — and subtract the two timestamps; or read the two events' own dates on this page.`,
   },
   inputs: [
     {
@@ -350,10 +405,10 @@ const elapsedProv = (note: RateStepNote): Provenance => ({
 
 /**
  * What the fee move meant for this vault: the yearly interest its own debt at
- * the earlier touch would cost at each end's fee. `before`/`after` are the one
+ * the earlier event would cost at each end's fee. `before`/`after` are the one
  * pair of figures here the chain never stated — they hold that debt fixed and
  * move only the fee. Interest actually charged is carried in the ilk's rate
- * accumulator and lands on the vault's own next touch; this figure is silent
+ * accumulator and lands on the vault's own next event; this figure is silent
  * about it.
  */
 export const makerRateStepInterestProv = (note: RateStepNote, part: "debt" | "before" | "after"): Provenance => {
@@ -392,15 +447,15 @@ export const makerRateStepInterestProv = (note: RateStepNote, part: "debt" | "be
   }
   const summary =
     part === "debt"
-      ? `The ${sym} debt this vault recorded at the earlier touch (block ${note.from.block}) — its own normalized ` +
+      ? `The ${sym} debt this vault recorded at the earlier event (block ${note.from.block}) — its own normalized ` +
         `art at that row multiplied by the Vat rate accumulator in force at that block, both on the row. That is ` +
         `the DAI the vault actually owed then, not a head-rate approximation. Held fixed across the stretch: the ` +
         `interest figures beside it move only the fee.`
       : `The yearly interest this vault's debt at block ${note.from.block} would cost at the ` +
         `${part === "before" ? "earlier" : "later"} fee (${pct(rate)} per year) — debt × fee. The chain never stated ` +
-        `this figure: it holds the earlier touch's own debt fixed and moves only the fee. Interest actually charged ` +
+        `this figure: it holds the earlier event's own debt fixed and moves only the fee. Interest actually charged ` +
         `is compounded continuously into the ilk's rate accumulator and settles on ${
-          part === "after" && note.live ? "this vault's own next touch, once it happens" : "the vault's own next touch"
+          part === "after" && note.live ? "this vault's own next event, once it happens" : "the vault's own next event"
         }.`;
   return {
     kind: derived ? "chain-derived" : "chain",
@@ -414,8 +469,8 @@ export const makerRateStepInterestProv = (note: RateStepNote, part: "debt" | "be
       kind: "recompute",
       text:
         part === "debt"
-          ? `Open this vault's own touch at block ${note.from.block} on this page: its normalized art times the rate accumulator at that block is the figure the interest leaves are built from.`
-          : `Take the debt this vault's touch at block ${note.from.block} states, multiply by ${pct(rate)}. The chain never asked this question; the vault's own next touch is what actually happened.`,
+          ? `Open this vault's own event at block ${note.from.block} on this page: its normalized art times the rate accumulator at that block is the figure the interest leaves are built from.`
+          : `Take the debt this vault's event at block ${note.from.block} states, multiply by ${pct(rate)}. The chain never asked this question; the vault's own next event is what actually happened.`,
     },
     inputs: [
       {

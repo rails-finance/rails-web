@@ -36,7 +36,7 @@ import {
   auctionProv,
   type MakerCoords,
 } from "@/lib/makerdao/event-provenance";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatExactDecimal, formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { useMakerVaultHistory } from "@/lib/makerdao/vault-history";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -171,7 +171,10 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
   const stats: ChainTruthStat[] = [
     {
       label: "Collateral",
-      value: fmtAfter(ctx.inkAfter),
+      // The exact decimal the row carries (0.2500008), so the hover and the
+      // receipt state what the face (collAmount, four significant digits)
+      // rounds; `fmt` would round it a second time (TO-DO-ui-jobs 186).
+      value: ctx.inkAfter != null ? formatExactDecimal(ctx.inkAfter) : fmtAfter(ctx.inkAfter),
       ...(ctx.inkAfter != null ? { display: collAmount(Number(ctx.inkAfter)) } : {}),
       symbol: collSym,
       prov: inkAfterProv(collSym, coords),

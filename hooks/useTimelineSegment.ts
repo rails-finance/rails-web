@@ -250,5 +250,9 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     [groupedTail, hasLife, lifeDays, segment, segmentLoading, pickMonth, resetSegment],
   );
 
-  return { tl, segments, readFolderMembers };
+  // The rows `tl` was built over, folders included and unfiltered — the month's
+  // when one is read, else the preload's — for a reduction that has to know
+  // which of the position's events sit inside a folder (MakerDAO's fee notes).
+  const rows = segment ? segmentRows : servedRows;
+  return { tl, segments, readFolderMembers, rows };
 }

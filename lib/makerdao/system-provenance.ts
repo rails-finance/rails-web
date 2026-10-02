@@ -335,6 +335,24 @@ export const systemChopProv = (ilk: string): Provenance => ({
   verify: STATE_VERIFY,
 });
 
+export const systemPriceCapProv = (ilk: string, collSym: string): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `${ilk}'s price feed is a capped wrapper, not a plain OSM: Spotter.ilks(ilk).pip answers the lower of a cap governance sets (cap()) and the ${collSym} OSM behind it (osm().peek()). While the cap sits under the oracle, every ${ilk} vault is valued at the cap — the price above, the vault list's ratios and its liquidation prices.`,
+  contract: SPOTTER,
+  via: `${SYSTEM_VIA} · pip.cap() · pip.osm().peek() @ head`,
+  verify: STATE_VERIFY,
+});
+
+export const systemAuctionStopProv = (ilk: string, stopped: number): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  summary: `${ilk}'s auction contract (Dog.ilks(ilk).clip) has its breaker set to ${stopped}: 1 refuses new auctions, 2 also refuses restarts, 3 also refuses purchases. While it stands, a ${ilk} vault under the minimum ratio is not sold.`,
+  contract: DOG,
+  via: `${SYSTEM_VIA} · Clipper.stopped() @ head`,
+  verify: STATE_VERIFY,
+});
+
 export const systemOsmPriceProv = (ilk: string, collSym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",

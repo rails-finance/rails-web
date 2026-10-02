@@ -2041,6 +2041,17 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       figure: { text: f.sets, prov: makerRateStepProv(note, "sets"), exact: String(note.setsBetween) },
     });
   }
+  if (note.grouped) {
+    const g = note.grouped;
+    stats.push({
+      label: "Grouped events inside",
+      figure: {
+        text: `${g.events.toLocaleString("en-US")} in ${g.folders === 1 ? "one folder" : `${g.folders.toLocaleString("en-US")} folders`}`,
+        prov: makerRateStepProv(note, "grouped"),
+        exact: String(g.events),
+      },
+    });
+  }
   if (note.interest && f.debt && f.before && f.after) {
     const interest = note.interest;
     stats.push({
@@ -2086,7 +2097,9 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     ...lifted,
     intro: {
       ...lifted.intro,
-      lead: `Governance ${note.setsBetween != null && note.setsBetween > 1 ? `changed ${ilk}'s fee ${f.sets} times` : `changed ${ilk}'s fee`} since ${note.steps != null ? `the vault's event on ${formatDate(note.from.timestamp)}` : `the vault's ${note.live ? "last event" : "previous event"}`}`,
+      // A merged or grouped-page note names its earlier end by date: "previous
+      // event" would name a row inside a folder.
+      lead: `Governance ${note.setsBetween != null && note.setsBetween > 1 ? `changed ${ilk}'s fee ${f.sets} times` : `changed ${ilk}'s fee`} since ${note.steps != null || note.grouped ? `the vault's event on ${formatDate(note.from.timestamp)}` : `the vault's ${note.live ? "last event" : "previous event"}`}`,
     },
     learnMore: marketNoteRateStepContent("makerdao"),
     // T3 in plain words. How the fee at each touch is found (the Jug.drip
@@ -2137,6 +2150,14 @@ function makerRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
           <>
             The fee moved the same way over {f.steps} stretches between the vault&rsquo;s events, so they make one
             note.{" "}
+          </>
+        )}
+        {note.grouped && (
+          <>
+            {note.grouped.events.toLocaleString("en-US")} of the vault&rsquo;s events sit inside this stretch, held in{" "}
+            {note.grouped.folders === 1 ? "one folder" : `${note.grouped.folders.toLocaleString("en-US")} folders`} on
+            this page, so the note runs between the two events drawn as rows. The flat view (
+            <code className="text-xs">?folders=0</code>) cuts the stretch at those events.{" "}
           </>
         )}
         {note.live

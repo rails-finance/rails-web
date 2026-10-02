@@ -118,6 +118,18 @@ const LOCKSTAKE_TIP =
 const DIRECT_TIP =
   "Opened on the Vat, Maker's core accounting contract, without the CDP manager, so it has no vault number; its address is its owner.";
 
+/** The capped feed in one sentence (lib/sources/chain/makerdao-lse-oracle.ts). */
+const capTip = (v: MakerVaultView): string =>
+  `Governance caps the price Maker uses for ${v.ilk} at ${usdPrice(v.priceCap!.capUsd)}` +
+  (v.priceCap!.oracleUsd != null
+    ? `; the oracle reads ${v.collateralSymbol} at ${usdPrice(v.priceCap!.oracleUsd)}, so the vault is valued at the cap.`
+    : ".");
+
+/** The Clipper's breaker in one sentence. */
+const auctionsOffTip = (v: MakerVaultView): string =>
+  `Governance has switched ${v.ilk}'s auctions off: its auction contract refuses new auctions` +
+  `${(v.auction?.stopped ?? 0) >= 3 ? " and bids" : ""}, so for now a vault under the minimum is not sold.`;
+
 /** The vault's number-or-address identity: CdpManager vaults have the friendly
  *  cdp id; LockStake urns and direct-Vat urns have only their urn address
  *  (there is no global LSE ordinal — Open.index is owner-scoped). */
@@ -159,6 +171,8 @@ export function MakerVaultCard({
   // different join mints the token (asset-catalog).
   const debtSym = ilkDebtSymbol(v.ilk);
   const ratio = v.debtDai && v.collateralUsd != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
+  // A capped feed valued at its cap: the oracle reads above it.
+  const capBinds = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
   const disclosing = receipts && !!disclosureKey;
@@ -357,6 +371,23 @@ export function MakerVaultCard({
                     <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
                       {formatUsd(v.collateralUsd)}
                     </Prov>
+                    {capBinds && v.priceCap ? (
+                      // The feed is capped under the oracle, so the value is at
+                      // the cap (TO-DO-ui-jobs 189).
+                      <>
+                        {" "}
+                        <RevealTip
+                          tip={capTip(v)}
+                          label={`Capped price: ${capTip(v)}`}
+                          focusable
+                          className="focus-ring rounded-sm"
+                        >
+                          <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+                            at the {usdPrice(v.priceCap.capUsd)} cap
+                          </span>
+                        </RevealTip>
+                      </>
+                    ) : null}
                   </StatFootnote>
                 </Detail>
               ) : undefined,
@@ -422,6 +453,23 @@ export function MakerVaultCard({
                     >
                       {usdPrice(v.liquidationPriceUsd, formatUsd)}
                     </Prov>
+                    {v.auction != null && v.auction.stopped > 0 ? (
+                      // The breaker is on: a vault under the minimum is not
+                      // sold while it stands (TO-DO-ui-jobs 189).
+                      <>
+                        {" · "}
+                        <RevealTip
+                          tip={auctionsOffTip(v)}
+                          label={`Auctions off: ${auctionsOffTip(v)}`}
+                          focusable
+                          className="focus-ring rounded-sm"
+                        >
+                          <span className="underline decoration-dotted decoration-rb-400 underline-offset-2">
+                            auctions off
+                          </span>
+                        </RevealTip>
+                      </>
+                    ) : null}
                   </StatFootnote>
                 ) : null}
                 {disclosing && riskDetail}

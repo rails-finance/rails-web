@@ -46,11 +46,13 @@
 
 import { parseAbi, getAddress, stringToHex } from "viem";
 import { alchemyClient } from "./rpc";
+import { readPriceCap, type MakerPriceCap } from "./makerdao-lse-oracle";
 import {
   MAKER_ADDRESSES,
   UNLISTED_ILKS,
   ilkToCollateralSymbol,
   ilkGroup,
+  isLseIlk,
   isUserVaultIlk,
   type MakerIlkGroup,
 } from "@/lib/makerdao/asset-catalog";
@@ -90,6 +92,8 @@ const DOG_ABI = parseAbi([
 const AUTO_LINE_ABI = parseAbi([
   "function ilks(bytes32) view returns (uint256 line, uint256 gap, uint48 ttl, uint48 last, uint48 lastInc)",
 ]);
+
+const CLIP_ABI = parseAbi(["function stopped() view returns (uint256)"]);
 
 const ZERO = BigInt(0);
 const RAY = BigInt(10) ** BigInt(27);
@@ -165,6 +169,14 @@ export interface MakerIlkRow {
   priceUsd: number | null;
   /** The price feed the Spotter reads for this ilk. */
   pip: string | null;
+  /** A capped feed (LockStake): the governance cap and the OSM price behind
+   *  it; `priceUsd` is the lower (lib/sources/chain/makerdao-lse-oracle.ts).
+   *  Null on an ordinary OSM. */
+  priceCap: MakerPriceCap | null;
+  /** The ilk's Clipper breaker: 0 running, 1 no new auctions, 2 also no
+   *  restarts, 3 also no purchases. Null where the ilk has no Clipper or the
+   *  read failed. */
+  auctionStopped: number | null;
 }
 
 /** Σ debt for one group — the "what mints the DAI" split. */
@@ -327,6 +339,35 @@ export async function loadMakerSystemFromChain(): Promise<MakerSystemChainRespon
     const ok = <T>(r: { status: string; result?: unknown } | undefined): T | null =>
       r?.status === "success" ? (r.result as T) : null;
 
+    // Phase 2b — what the Dog and Spotter answers point at: each Clipper's
+    // breaker in one multicall, and the cap behind a capped feed (LockStake's
+    // pip is a wrapper, not an OSM; TO-DO-ui-jobs 189).
+    const clips = dogIlks.map((r) => {
+      const d = ok<readonly [string, bigint, bigint, bigint]>(r);
+      return d && d[0] !== ZERO_ADDR ? (d[0] as `0x${string}`) : null;
+    });
+    const clipIdx = clips.flatMap((c, i) => (c ? [i] : []));
+    const headBlock = BigInt(blockNumber);
+    const [stoppedReads, caps] = await Promise.all([
+      client.multicall({
+        allowFailure: true,
+        contracts: clipIdx.map((i) => ({ address: clips[i]!, abi: CLIP_ABI, functionName: "stopped" }) as const),
+      }),
+      Promise.all(
+        roster.map((r, i) => {
+          const sp = ok<readonly [string, bigint]>(spotIlks[i]);
+          return isLseIlk(r.ilk) && sp && sp[0] !== ZERO_ADDR
+            ? readPriceCap(client, sp[0] as `0x${string}`, headBlock)
+            : Promise.resolve(null);
+        }),
+      ),
+    ]);
+    const stoppedAt = new Map<number, number>();
+    clipIdx.forEach((i, j) => {
+      const s = ok<bigint>(stoppedReads[j]);
+      if (s != null) stoppedAt.set(i, Number(s));
+    });
+
     // Phase 3 — build the rows, summing the debt in EXACT rad as we go. The
     // float `debtDai` is for display; `sumRad` is what the identity is checked
     // against, so it never touches a Number.
@@ -397,6 +438,8 @@ export async function loadMakerSystemFromChain(): Promise<MakerSystemChainRespon
         // lane does it: price = spot × par × mat ÷ RAY².
         priceUsd: mat > ZERO ? Number(((spot * par) / RAY) * mat) / 1e27 / 1e27 : null,
         pip,
+        priceCap: caps[i],
+        auctionStopped: stoppedAt.get(i) ?? null,
       });
     }
 

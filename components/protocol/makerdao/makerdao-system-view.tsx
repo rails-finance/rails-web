@@ -58,6 +58,8 @@ import {
   systemDustProv,
   systemChopProv,
   systemOsmPriceProv,
+  systemPriceCapProv,
+  systemAuctionStopProv,
 } from "@/lib/makerdao/system-provenance";
 import { Stat } from "@/components/shared/stat";
 import type { MakerIlkGroup } from "@/lib/makerdao/asset-catalog";
@@ -338,6 +340,17 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
             <Prov info={systemOsmPriceProv(row.ilk, row.collateralSymbol)} value={formatExact(row.priceUsd as number)}>
               {priceUsd(row.priceUsd as number)}
             </Prov>
+            {row.priceCap && (
+              <>
+                {" "}
+                <Prov info={systemPriceCapProv(row.ilk, row.collateralSymbol)} value={formatExact(row.priceCap.capUsd)}>
+                  <span>
+                    capped at {priceUsd(row.priceCap.capUsd)} by governance
+                    {row.priceCap.oracleUsd != null ? <>; oracle {priceUsd(row.priceCap.oracleUsd)}</> : null}
+                  </span>
+                </Prov>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -409,6 +422,13 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
               +{feePct(row.chop - 1)}
             </Prov>{" "}
             penalty
+          </div>
+        )}
+        {row.auctionStopped != null && row.auctionStopped > 0 && (
+          <div className="mt-0.5 text-[11px] text-rb-500">
+            <Prov info={systemAuctionStopProv(row.ilk, row.auctionStopped)} value={String(row.auctionStopped)}>
+              auctions off
+            </Prov>
           </div>
         )}
         {row.dustDai > 0 && (

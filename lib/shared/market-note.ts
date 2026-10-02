@@ -1590,6 +1590,13 @@ export interface RateStepNote extends MarketNoteBase {
    *  stretch since the vault's previous event, which is what that row's
    *  "fee since previous event" accrued at. */
   lastPath?: { from: number; min: number; max: number; average: number };
+  /** MakerDAO only, on a grouped page: the vault's events between the two
+   *  ends that the page holds as folders rather than rows — how many folders,
+   *  and how many events they stand for. The ends are ungrouped rows, so a
+   *  stretch the flat page would cut at a folder member is one stretch here;
+   *  the fee's path across it is `path`. Absent where no folder sits between
+   *  the ends. */
+  grouped?: { folders: number; events: number };
 }
 
 /** One stretch inside a merged run, as it was selected before the run took
@@ -2756,6 +2763,19 @@ const mergedStepsClause = (note: RateStepNote): string => {
   );
 };
 
+/** The folders a Maker note's stretch encloses on a grouped page — the events
+ *  between its two ends that the page holds grouped, so the stretch is not
+ *  cut at them. Empty on a flat page or a stretch with none. */
+const groupedClause = (note: RateStepNote): string => {
+  const g = note.grouped;
+  if (!g) return "";
+  return (
+    ` The stretch spans ${g.events.toLocaleString("en-US")} of the vault's events the page holds grouped in ` +
+    `${g.folders === 1 ? "one folder" : `${g.folders.toLocaleString("en-US")} folders`}; the fee's path across ` +
+    `them is from the ilk's rate log.`
+  );
+};
+
 export function marketNoteReceiptLine(note: MarketNote): string {
   if (note.kind === "vault-terms")
     return (
@@ -2839,7 +2859,7 @@ export function marketNoteReceiptLine(note: MarketNote): string {
               `drip at that fee), confirmed by the Jug's duty read at that block`
           : `this vault's ${makerRateEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
       };
-      return `- Receipt: rate before — ${namedMaker("from")}; rate after — ${namedMaker("to")}.${mergedStepsClause(note)}`;
+      return `- Receipt: rate before — ${namedMaker("from")}; rate after — ${namedMaker("to")}.${mergedStepsClause(note)}${groupedClause(note)}`;
     }
     if (isAaveFamily(note)) {
       // Both ends are the reserve's OWN ReserveDataUpdated — the Pool emits

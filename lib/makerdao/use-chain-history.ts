@@ -248,3 +248,35 @@ export function useMakerMatChanges(
 }
 
 const EMPTY_MAT = new Map<string, MakerMatChangesResponse>();
+
+/** One ilk's price cap and auction breaker at head
+ *  (`/api/chain/makerdao/ilk-terms`, lib/sources/chain/makerdao-lse-oracle.ts). */
+export interface MakerIlkTerms {
+  ilk: string;
+  atBlock: number;
+  priceCap: { capUsd: number; oracleUsd: number | null } | null;
+  auction: { stopped: number; chop: number } | null;
+}
+
+const ilkTermsCache = new Map<string, Promise<MakerIlkTerms | null>>();
+const isIlkTerms = (d: unknown): d is MakerIlkTerms => d != null && typeof d === "object" && "atBlock" in d;
+
+/** The ilk's cap and breaker, shared by every card on the page that asks for
+ *  the same ilk — one head read per ilk per page life. Null while loading,
+ *  after a failed read, or with no ilk. */
+export function useMakerIlkTerms(ilk: string | null | undefined): MakerIlkTerms | null {
+  const [state, setState] = useState<MakerIlkTerms | null>(null);
+  useEffect(() => {
+    if (!ilk) return;
+    let live = true;
+    cached(ilkTermsCache, ilk, () =>
+      fetchJson(`/api/chain/makerdao/ilk-terms?${new URLSearchParams({ ilk }).toString()}`, isIlkTerms),
+    ).then((got) => {
+      if (live) setState(got);
+    });
+    return () => {
+      live = false;
+    };
+  }, [ilk]);
+  return ilk && state?.ilk === ilk ? state : null;
+}
