@@ -64,9 +64,10 @@ export function PositionCardShell({
    *  through, for a surface that persists that state. */
   onExplanationToggle?: (open: boolean) => void;
   /** Opt in to progressive disclosure (ui-jobs 209): one stable key per
-   *  position. The card then draws closed by default, a chevron in the
-   *  header's activity meta opens it, and the Explanation row shows only
-   *  while it is open (components/shared/position-card-disclosure.tsx). Both
+   *  position. The card then draws closed by default and a chevron in the
+   *  header's activity meta opens it; the Explanation row shows in both
+   *  states, `rowExtra` only while open
+   *  (components/shared/position-card-disclosure.tsx). Both
    *  the card's state and its Explanation's are remembered under the key, so
    *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
    *  Only meaningful with `receipts`: a listing row never discloses. */
@@ -88,10 +89,13 @@ export function PositionCardShell({
       className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500"
     >
       {children}
-      {receipts && (!disclosure || disclosure.open) && (
+      {/* The (i) Explanation row draws in both states (Miles, 2 Oct): the
+          chevron tucks away the small print and the per-asset lines, never
+          the (i). Inline row content belongs to the opened layer. */}
+      {receipts && (
         <ProvenanceInfoTabs
           className="mt-3"
-          rowExtra={rowExtra}
+          rowExtra={disclosure && !disclosure.open ? undefined : rowExtra}
           explanation={explanation}
           learnMore={learnMore}
           viewHref={viewHref}
