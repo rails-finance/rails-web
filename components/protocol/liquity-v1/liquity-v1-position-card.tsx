@@ -17,6 +17,7 @@ import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-valu
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import {
   positionCollateralProv,
@@ -27,11 +28,11 @@ import {
 import { entireCollateralProv, entireDebtProv } from "@/lib/liquity-v1/position-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { liquityV1PositionContent, type LiquityV1EndedBy } from "@/lib/liquity-v1/position-content";
-import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
-import { CLAIMABLE_WHERE } from "@/lib/shared/liquity-coll-surplus-provenance";
+import { CLAIMABLE_BY_OWNER, CLAIMABLE_WHERE } from "@/lib/shared/liquity-coll-surplus-provenance";
 import { surplusClaimableProv, surplusUsdProv } from "@/lib/liquity-v1/event-provenance";
 import { formatUsdValue } from "@/lib/utils/format";
 import { fmtEth, fmtLusd } from "@/lib/liquity-v1/event-figures";
@@ -68,8 +69,17 @@ export function LiquityV1PositionCard({
   priceUsd,
   endedBy,
   lives,
+  disclosureKey,
+  risk,
 }: {
   v: LiquityV1PositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** The third headline from the page's live read: the collateral ratio and
+   *  its opened-layer lines. Omitted until the read lands, and on a listing. */
+  risk?: { value: React.ReactNode; detail?: React.ReactNode };
   /** The line naming the wallet's other Trove lives, under the stats. */
   lives?: React.ReactNode;
   receipts?: boolean;
@@ -98,6 +108,9 @@ export function LiquityV1PositionCard({
    *  redemption cancelled the last of its debt. Unset reads as an owner close. */
   endedBy?: LiquityV1EndedBy | null;
 }) {
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
   // it lives safely inside the listing card's <Link>).
@@ -123,23 +136,48 @@ export function LiquityV1PositionCard({
   if (v.status === "closed" || v.status === "liquidated") {
     const claimable = surplus && surplus.claimable > 1e-9 ? surplus : null;
     const claimableUsd = claimable && priceUsd != null && priceUsd > 0 ? claimable.claimable * priceUsd : null;
+    // Unclaimed ETH leads a listing card in place of the peaks. A disclosing
+    // card keeps the peaks as its opened headlines and states the claim under
+    // Outcome, in view while closed.
+    const claimableLeads = !!claimable && !disclosing;
+    const claimableLine = claimable ? (
+      <div className="text-xs mt-0.5 text-rb-500">
+        <Prov info={surplusClaimableProv(claimable)}>
+          <span className="font-semibold text-foreground/80 tabular-nums">{fmtEth(claimable.claimable)}</span>
+        </Prov>{" "}
+        {COLLATERAL_SYMBOL}
+        {claimableUsd != null && (
+          <>
+            {" "}
+            (<Prov info={surplusUsdProv(claimable.claimable, priceUsd as number)}>{formatUsdValue(claimableUsd)}</Prov>)
+          </>
+        )}{" "}
+        {CLAIMABLE_BY_OWNER}
+      </div>
+    ) : undefined;
     return (
       <PositionCardShell
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
         learnMore={liquityV1PositionContent({ status: v.status, endedBy })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header, the outcome and any
+          // claimable surplus (under Outcome, as on Liquity V2); the life's
+          // highest balances open.
+          detailGate={disclosing ? PositionCardDetail : undefined}
+          outcomeFootnote={disclosing && claimable ? claimableLine : undefined}
           outcome={v.status}
           outcomeLabel={v.status === "closed" && endedBy === "redemption" ? "Fully redeemed" : undefined}
           leadingIdentity={walletId}
           identity={meta}
           closedAt={v.lastActivityAt}
-          collateralLabel={claimable ? "Claimable collateral" : undefined}
-          outcomeFollows={!!claimable}
+          collateralLabel={claimableLeads ? "Claimable collateral" : undefined}
+          outcomeFollows={claimableLeads}
           collateralFootnote={
-            claimable ? (
+            claimableLeads && claimable ? (
               <>
                 {claimableUsd != null && (
                   <div className="text-xs mt-0.5 min-h-[1rem]">
@@ -155,7 +193,7 @@ export function LiquityV1PositionCard({
             ) : undefined
           }
           collateral={
-            claimable ? (
+            claimableLeads && claimable ? (
               <StatValue>
                 <Prov info={surplusClaimableProv(claimable)}>
                   <AssetAmount
@@ -176,7 +214,7 @@ export function LiquityV1PositionCard({
             )
           }
           debt={
-            claimable ? undefined : v.peakDebt > 0 ? (
+            claimableLeads ? undefined : v.peakDebt > 0 ? (
               <StatValue>
                 <Prov info={peakDebtProv()}>
                   <AssetAmount value={v.peakDebt} symbol={DEBT_SYMBOL} exact={fmtLusd(v.peakDebt)} />
@@ -199,8 +237,10 @@ export function LiquityV1PositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={liquityV1PositionContent({ status: v.status })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         // Detail render (receipts): the V4 spoke-card header grammar — a
         // neutral mode-word pill (an open Trove always carries debt). The
         // LISTING render keeps the lifecycle pill; the wallet pill renders on
@@ -242,8 +282,31 @@ export function LiquityV1PositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote: v.debt > 0 ? <StatFootnote>interest-free · exact</StatFootnote> : undefined,
+            footnote:
+              v.debt > 0 ? (
+                disclosing ? (
+                  <PositionCardDetail>
+                    <StatFootnote>interest-free · exact</StatFootnote>
+                  </PositionCardDetail>
+                ) : (
+                  <StatFootnote>interest-free · exact</StatFootnote>
+                )
+              ) : undefined,
           },
+          // The collateral ratio rides the detail page's live read; the
+          // listing carries none, so a listing card has two headlines. The
+          // page's card holds the third slot empty until the read lands.
+          ...(disclosing || risk
+            ? [
+                risk
+                  ? {
+                      label: ratioLabel("cdp"),
+                      value: risk.value,
+                      footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
+                    }
+                  : null,
+              ]
+            : []),
         ]}
       />
       {lives}

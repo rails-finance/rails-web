@@ -49,7 +49,11 @@ import {
   LiquityV1ClosedEpochExplanation,
   LiquityV1SupersededExplanation,
 } from "@/components/protocol/liquity-v1/liquity-v1-position-explanation";
-import { LiquityV1RiskSlot } from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
+import {
+  LiquityV1RiskDetail,
+  LiquityV1RiskHeadline,
+  liquityV1HasRisk,
+} from "@/components/protocol/liquity-v1/liquity-v1-risk-slot";
 import { LifetimeFlowsPanel, type FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
@@ -544,24 +548,21 @@ export default function LiquityV1TroveView({
                     <LiquityV1LivesLine wallet={wallet} lives={lives} epoch={selectedEpoch} />
                   ) : undefined
                 }
-                // The risk slot rides the card's heading-button row (the Aave V3
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway (default) or the collateral-ratio card —
-                // alongside the always-on redemption runway. Whatever it draws is
-                // on the card face and in the card's receipts scope, so the
-                // Provenance list stays 1:1 with the face figures. Mounts only for
-                // the open life with the live read landed (it describes the
-                // CURRENT on-chain Trove).
-                rowExtra={
-                  chain && view.status === "open" && chain.troveStatus === "active" ? (
-                    <LiquityV1RiskSlot chain={chain} />
-                  ) : undefined
+                // Closed by default, remembered per viewer and Trove (ui-jobs
+                // 209). The collateral ratio from the live read is the third
+                // headline; the liquidation price, its bar, the redemption queue,
+                // the room to borrow and the system ratio sit in the opened
+                // layer, inside the card's receipts scope. Only for the open
+                // life with the read landed: they describe the CURRENT Trove.
+                disclosureKey={`liquity-v1:${wallet.toLowerCase()}`}
+                risk={
+                  chain && view.status === "open" && liquityV1HasRisk(chain)
+                    ? { value: <LiquityV1RiskHeadline chain={chain} />, detail: <LiquityV1RiskDetail chain={chain} /> }
+                    : undefined
                 }
-                // The Explanation is now pure prose about those same face figures
-                // (the 3-section page anatomy: card → economics → timeline). The
-                // CR strip is absorbed into the risk slot above; the redemption
-                // card's protocol-wide figures (fees, absolute debt-in-front) live
-                // on the system view — the card keeps its own queue exposure.
+                // The Explanation is prose about the face figures; the
+                // redemption card's protocol-wide figures (fees, absolute
+                // debt-in-front) live on the system view.
                 explanation={
                   chain && view.status === "open" && chain.troveStatus === "active" ? (
                     <LiquityV1PositionExplanation chain={chain} />

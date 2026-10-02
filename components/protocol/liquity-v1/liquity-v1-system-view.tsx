@@ -39,7 +39,7 @@
 // depth, its front ratio and how many Troves sit below the 110% minimum are
 // aggregates, stated in the card below; a single Trove's own ratio and the debt
 // redeemed before it need the price this listing tier does not read, and both
-// already live on that Trove's page (its CR card and RedemptionRunway).
+// already live on that Trove's page (its card's collateral ratio and redemption queue).
 //
 // Framing follows the V4 hub view and the fork branches view: present, don't
 // rank. No score, no risk valence — the only chroma is the app's interaction
