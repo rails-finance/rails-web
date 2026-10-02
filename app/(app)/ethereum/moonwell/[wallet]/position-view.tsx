@@ -52,7 +52,7 @@ import {
   MoonwellPositionExplanation,
   MoonwellClosedPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
-import { MoonwellRiskSlot } from "@/components/protocol/moonwell/moonwell-risk-slot";
+import { MoonwellBorrowRoom, moonwellRiskColumn } from "@/components/protocol/moonwell/moonwell-risk-slot";
 import { computeMoonwellCardCaptions, moonwellLifetimeWithOpening } from "@/lib/moonwell/economics";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -516,17 +516,15 @@ export default function MoonwellPositionView({
                   receipts
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // The risk slot rides the card's heading-button row (the Aave V3
-                  // treatment): the Display menu plus the chosen risk picture — HF
-                  // runway (1.0 exactly the Comptroller's shortfall line) or the
-                  // borrow-capacity bar. Whatever it draws is on the card face and
-                  // in the card's receipts scope, so the Provenance list stays 1:1
-                  // with the face figures.
-                  rowExtra={
-                    chain && liveView.status === "open" && chain.healthFactor != null && chain.healthFactor > 0 ? (
-                      <MoonwellRiskSlot chain={chain} />
-                    ) : undefined
+                  // Closed by default, remembered per viewer and position (ui-jobs
+                  // 209). The health factor, the room left to borrow and the
+                  // distance bar come from the live Comptroller read, inside the
+                  // card's receipts scope.
+                  disclosureKey={`moonwell:${wallet.toLowerCase()}`}
+                  risk={
+                    liveView.status === "open" ? moonwellRiskColumn(chain ?? null, cardView.borrows.length > 0) : null
                   }
+                  debtDetail={chain ? <MoonwellBorrowRoom chain={chain} /> : undefined}
                   // The Explanation is now pure layman prose about those same face
                   // figures — no secondary figure-strips. The borrow-capacity strip
                   // is absorbed into the risk slot above; the market rates live on

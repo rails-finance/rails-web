@@ -31,7 +31,6 @@ import { MOONWELL_ADDRESSES, MOONWELL_MARKET_BY_KEY } from "./asset-catalog";
 import {
   avgBorrowRateProv,
   borrowRateProv,
-  moonwellInterestCaptionProv,
   moonwellUsdProvOnchain,
   peakDebtProv,
   peakSupplyProv,
@@ -51,7 +50,6 @@ export interface MoonwellCardReceipts {
   supply: (r: MoonwellSupplyAmount, market: MoonwellMarketIdentity) => Provenance;
   debt: (r: MoonwellBorrowAmount, market: MoonwellMarketIdentity) => Provenance;
   usd: (what: string) => Provenance;
-  interest: (side: "supply" | "debt", live?: boolean) => Provenance;
   borrowRate: (symbol?: string) => Provenance;
   avgBorrowRate: () => Provenance;
   peakSupply: (symbol: string) => Provenance;
@@ -100,7 +98,6 @@ export const MOONWELL_ETHEREUM_IDENTITY: MoonwellDeploymentIdentity = {
       r.current != null ? positionSupplyCurrentProv(r.symbol, m.mSymbol) : positionSupplyPrincipalProv(r.symbol),
     debt: (r, m) => (r.live ? moonwellLiveDebtProv(r.symbol, m.mSymbol, m.mtoken) : positionDebtProv(r.symbol)),
     usd: moonwellUsdProvOnchain,
-    interest: moonwellInterestCaptionProv,
     borrowRate: borrowRateProv,
     avgBorrowRate: avgBorrowRateProv,
     peakSupply: peakSupplyProv,

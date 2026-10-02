@@ -453,42 +453,6 @@ export const moonwellUsdProvOnchain = (what: string): Provenance => ({
   ],
 });
 
-/** The card's "incl. $X interest" stat caption. `live` when the debt side's
- *  current figure is the borrowBalanceStored read at head. */
-export const moonwellInterestCaptionProv = (side: "supply" | "debt", live?: boolean): Provenance => ({
-  kind: "chain-derived",
-  pclass: side === "supply" || live ? "state" : "indexed",
-  summary:
-    side === "supply"
-      ? "Accrued supply interest included in the collateral value above — per market, the current value (exact mToken balance × the exchange rate read at head, = balanceOfUnderlying) minus the net principal replayed from the position's own Mint/Redeem events, valued at Moonwell's own on-chain oracle price. Interest grew the claim, so it is part of the headline figure, not a separate holding."
-      : live
-        ? "Accrued borrow interest included in the debt above — per market, the live debt (borrowBalanceStored read at head) minus the net principal replayed from the position's own Borrow/RepayBorrow events, valued at Moonwell's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid."
-        : "Accrued borrow interest included in the debt above — per market, the debt at the last borrow/repay event (its emitted accountBorrows) minus the net principal replayed from the position's own Borrow/RepayBorrow events, valued at Moonwell's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
-  contract: { name: "mToken", address: "" },
-  via:
-    side === "supply"
-      ? "(mTokens × exchange rate − Σ net event principal) × oracle getUnderlyingPrice, per market"
-      : live
-        ? "(borrowBalanceStored @ head − Σ net event principal) × oracle getUnderlyingPrice, per market"
-        : "(last emitted accountBorrows − Σ net event principal) × oracle getUnderlyingPrice, per market",
-  formula: "(current − net principal) × oracle price",
-  inputs: [
-    {
-      label: "current",
-      kind: "chain-derived",
-      pclass: side === "supply" || live ? "state" : "emitted",
-      note:
-        side === "supply"
-          ? "mTokens × exchangeRateStored (interest included)"
-          : live
-            ? "borrowBalanceStored at head"
-            : "the last event's accountBorrows",
-    },
-    { label: "net principal", kind: "chain-derived", pclass: "indexed", note: "Σ signed event amounts" },
-    { label: "oracle price", kind: "chain", pclass: "oracle", note: "oracle getUnderlyingPrice" },
-  ],
-});
-
 /** The live per-timestamp borrow rate on one market, annualized. */
 export const borrowRateProv = (sym?: string): Provenance => ({
   kind: "chain-derived",

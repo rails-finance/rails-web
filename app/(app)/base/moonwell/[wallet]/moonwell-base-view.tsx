@@ -49,7 +49,7 @@ import {
   MoonwellClosedPositionExplanation,
   MoonwellPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
-import { MoonwellRiskSlot } from "@/components/protocol/moonwell/moonwell-risk-slot";
+import { MoonwellBorrowRoom, moonwellRiskColumn } from "@/components/protocol/moonwell/moonwell-risk-slot";
 import { MoonwellEventCard } from "@/components/protocol/moonwell/moonwell-event-card";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -630,15 +630,12 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                       receipts
                       viewHref={tl.viewHref}
                       captions={captions ?? undefined}
-                      // The risk slot rides the card's heading-button row (the L1
-                      // treatment): the HF runway (1.0 exactly the Comptroller's
-                      // shortfall line) and the borrow-capacity lines, every
-                      // figure the Comptroller's own. Shown only with debt.
-                      rowExtra={
-                        view.status === "open" && data.healthFactor != null && data.healthFactor > 0 ? (
-                          <MoonwellRiskSlot chain={data} />
-                        ) : undefined
-                      }
+                      // Closed by default, remembered per viewer and position
+                      // (ui-jobs 209). The health factor, the room left to borrow
+                      // and the distance bar come from the Comptroller read.
+                      disclosureKey={`moonwell:base:${wallet.toLowerCase()}`}
+                      risk={view.status === "open" ? moonwellRiskColumn(data, view.borrows.length > 0) : null}
+                      debtDetail={<MoonwellBorrowRoom chain={data} />}
                       // The Explanation is layman prose about those same face
                       // figures. A terminal account narrates from the sweep alone
                       // (peaks, closure); an open one from the Comptroller read.
