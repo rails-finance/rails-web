@@ -49,7 +49,7 @@
 import { chromium } from "playwright";
 import { PRESS_SHOW_MORE } from "../lib/timeline-draw.mjs";
 
-const BASE = process.env.BASE || "http://localhost:3000";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 const COW_ICON = "/icons/protocols/cow.png";
 const COW_VENUE = { text: "via CoW Protocol", icon: COW_ICON };
 const PARASWAP_VENUE = { text: "via ParaSwap", icon: "/icons/protocols/paraswap.png" };
@@ -123,12 +123,13 @@ const FIXTURES = [
     kind: "Debt swap",
     axis: "debt",
     venue: PARASWAP_VENUE,
-    // D4: the open card reads the debt balance ending at the net 18,76x (the
-    // gross borrow alone would end at 18.8K), the Borrow row at its gross, and the
-    // leftover as its own "Repaid back unused" row. The balance is the exact one read when
-    // the card opens (rails-ops TO-DO-ui-jobs §19) and is stated by the position
-    // block's Debt cell alone (§47, §213), so the account beneath it shows too.
-    readsWhenOpen: [/Debt .*\b0 18,76\d\b/, "Borrow 18.8K", "Repaid back unused 37.528", "Health factor"],
+    // D4: the open card reads the debt ending at the net $18,762 (the gross
+    // borrow alone would end at $18.8K) in the position block's Debt cell, which
+    // states it in dollars across EURC and USDC, the borrow row at its gross
+    // ("Borrowed to fund the swap"), and the leftover as its own "Returned
+    // unused" row. The balances are the exact ones read when the card opens
+    // (rails-ops TO-DO-ui-jobs §19), so the account beneath them shows too.
+    readsWhenOpen: [/Debt \$18,773 \$18,762\b/, "Borrowed to fund the swap 18,802", "Returned unused 37.528", "Health factor"],
   },
   {
     label: "aave-v3 core 0xf0838f (ParaSwap repay with collateral, leftover supplied back)",
@@ -157,11 +158,12 @@ const FIXTURES = [
     mark: "flow",
     // The bought WETH has no position row: it reads from the adapter's Swapped log,
     // so it keeps its grid cell. The WBTC it sold is stated by the position block's
-    // Collateral cell (§47, §213), exact, interest to the block included: 0.00913
-    // down to 0, after the cell's total and, the switch having gone off with the
-    // balance, the "Supplied, not collateral" line. The LTV cell's borrowable
-    // line shows the account figures drew.
-    readsWhenOpen: [/Collateral\b.{0,200}?\b0\.00913 0\b/, "Bought 0.339", "Still borrowable"],
+    // Collateral cell (§47, §213), exact, interest to the block included. The
+    // closed cell is its ledger's closing line, in dollars where the side holds
+    // more than one asset ($586 → $38, the 0.00913 → 0 WBTC being in the opened
+    // ledger), with the switch gone off with the balance noted under it. The LTV
+    // cell's borrowable line shows the account figures drew.
+    readsWhenOpen: [/Collateral\b.{0,200}?\$586 \$38\b/, "Bought 0.339", "Still borrowable"],
   },
 ];
 
@@ -208,7 +210,7 @@ const bad = (msg) => {
 };
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
+const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1440, height: 1100 } });
 
 for (const fx of FIXTURES) {
   if (only && !only.test(fx.label)) continue;
@@ -225,7 +227,7 @@ for (const fx of FIXTURES) {
     else ok(`${fx.label}: ${fx.tx}… is drawn (${presses} press${presses === 1 ? "" : "es"})`);
     await page.waitForTimeout(500);
     read = await page.evaluate(
-      ({ swapNode, kindLabel, neverNamed }) => {
+      ({ swapNode, kindLabel, neverNamed, tx }) => {
         const chipsIn = (root) =>
           [...root.querySelectorAll("span.text-rb-500")]
             .filter((s) => /^(to|from|via|by)$/.test((s.textContent || "").trim()))
@@ -235,6 +237,7 @@ for (const fx of FIXTURES) {
               return {
                 prefix: (p.textContent || "").trim(),
                 text: (chip.textContent || "").replace(/\s+/g, " ").trim(),
+                eventId: chip.closest("[data-event-id]")?.getAttribute("data-event-id") ?? "",
                 icon: icon ? new URL(icon.getAttribute("src"), location.href).pathname : null,
               };
             });
@@ -262,7 +265,12 @@ for (const fx of FIXTURES) {
         const pageChips = chipsIn(document);
         return {
           cards,
+          // The fixture's own transaction: the wallets are live, and a later
+          // transaction of theirs that the merge does not pair (2026-10-02: five
+          // small ParaSwap rows beside a supply by the adapter) is a different
+          // finding from "this fixture's legs still draw their own rows".
           cowTransferChips: pageChips
+            .filter((c) => c.eventId.includes(tx))
             .filter((c) => /^(to|from)\s*(CoW Protocol|ParaSwap .*adapter)$/.test(c.text))
             .map((c) => c.text),
           // Rendered text only: the page's serialized payload (a <script>) carries
@@ -270,7 +278,7 @@ for (const fx of FIXTURES) {
           named: neverNamed ? (document.body.innerText || "").toLowerCase().includes(neverNamed) : false,
         };
       },
-      { swapNode: SWAP_NODE, kindLabel: KIND_LABEL.source, neverNamed: fx.neverNamed ?? null },
+      { swapNode: SWAP_NODE, kindLabel: KIND_LABEL.source, neverNamed: fx.neverNamed ?? null, tx: fx.tx },
     );
   } catch (err) {
     bad(`${fx.label}: threw during the run — ${err && err.message}`);

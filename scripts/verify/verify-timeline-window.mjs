@@ -33,10 +33,14 @@ import { chromium } from "@playwright/test";
 import { countLineText, parseCountLine, NAMES_THE_CAP } from "../lib/timeline-draw.mjs";
 import { enGb } from "./lib/date.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 const WALLET = (process.env.WALLET ?? "0xee7ca610d896c53ffe716b801c05748efd902954").toLowerCase();
 const MARKET = process.env.MARKET ?? "core";
-const RECENT = Number(process.env.RECENT ?? 1000);
+// The window the page itself loads: TIMELINE_WINDOW_ROWS in
+// lib/shared/timeline-opening-balance.ts, 2,500 since the preload raise of
+// 2026-09-27 (1,000 before it). The count line's span is the page's window, so
+// the rows read here must be the same window or the two spans cannot agree.
+const RECENT = Number(process.env.RECENT ?? 2500);
 
 // The three protocol-specific strings, defaulting to the pilot.
 const PROTO = process.env.PROTO ?? "aave-v3";
@@ -64,7 +68,7 @@ const assert = (ok, label, detail) => {
 };
 
 async function api(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await hostFetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`${path} → ${res.status} ${res.statusText}`);
   const json = await res.json();
   if (json && json.error) throw new Error(`${path} → ${json.error}`);
@@ -123,7 +127,7 @@ async function main() {
   // ── The page ─────────────────────────────────────────────────────────────
   const browser = await chromium.launch({ channel: "chrome" });
   try {
-    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, extraHTTPHeaders: bypassHeaders() });
     const url = `${BASE}${PAGE_PATH}`;
     // Turn the chronological badge on before the page mounts — it is a display
     // preference, off by default, and the numbering is one of the things under

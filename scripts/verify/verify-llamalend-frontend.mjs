@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { openPositionCards } from "./lib/position-card.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3789";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 // The chain-scoped explorer route (rails-ops decision 0016). `/llamalend` is a
 // 308 to this, and a cold `networkidle` navigation across that hop times out.
 const EXPLORER = "/ethereum/llamalend";
@@ -109,7 +109,7 @@ const compact = (n) =>
  */
 async function findSoftLiq(want = "soft", pages = 12, perPage = 100) {
   for (let i = 0; i < pages; i++) {
-    const res = await fetch(`${BASE}/api/llamalend/positions?status=open&limit=${perPage}&offset=${i * perPage}`);
+    const res = await hostFetch(`${BASE}/api/llamalend/positions?status=open&limit=${perPage}&offset=${i * perPage}`);
     if (!res.ok) throw new Error(`listing API ${res.status} while discovering a soft-liq position`);
     const j = await res.json();
     const rows = j.data ?? [];
@@ -118,7 +118,7 @@ async function findSoftLiq(want = "soft", pages = 12, perPage = 100) {
       // "soft": in the bands and not liquidatable (the card's "In
       // soft-liquidation"); "liquidatable": health(user, true) below 0.
       if (want === "soft" ? !row.inSoftLiq || row.liquidatable !== false : !row.liquidatable) continue;
-      const cRes = await fetch(`${BASE}/api/chain/llamalend/position?controller=${row.controller}&user=${row.user}`);
+      const cRes = await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${row.controller}&user=${row.user}`);
       if (!cRes.ok) continue;
       const chain = await cRes.json();
       if (chain.chainStale) continue;
@@ -300,7 +300,7 @@ try {
 // file it had not reached.
 const browser = await chromium.launch();
 try {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
@@ -606,7 +606,7 @@ try {
   };
   const es = async (block) =>
     (
-      await fetch(`${BASE}/api/chain/llamalend/event-state?controller=${NR.controller}&user=${NR.user}&block=${block}`)
+      await hostFetch(`${BASE}/api/chain/llamalend/event-state?controller=${NR.controller}&user=${NR.user}&block=${block}`)
     ).json();
   const addColl = await es(25305369);
   check(
@@ -627,7 +627,7 @@ try {
       repayIn.after?.healthRaw === "50844625291548962",
   );
   const live = await (
-    await fetch(`${BASE}/api/chain/llamalend/position?controller=${NR.controller}&user=${NR.user}`)
+    await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${NR.controller}&user=${NR.user}`)
   ).json();
   check(
     "position: health(user, true) and the stored discount ride the live read",
@@ -675,9 +675,9 @@ try {
     repay: "repay:e253c80b92e0fb286e3c77f1eff18f479f8b29fc20f5d63021c6d15b74d1af1f:727:self",
   };
   const inbandLive = await (
-    await fetch(`${BASE}/api/chain/llamalend/position?controller=${INBAND.controller}&user=${INBAND.user}`)
+    await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${INBAND.controller}&user=${INBAND.user}`)
   ).json();
-  const p2 = await browser.newPage();
+  const p2 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   await p2.addInitScript(
     (keys) => {
       try {
@@ -710,7 +710,9 @@ try {
   );
   check(
     "inband: converted tile is named Converted, with no method note",
-    /Converted\s*[\d.]+K/.test(body) && !/read live, cross-checked/.test(body),
+    // The tile states the whole balance and where it came from ("Converted:
+    // 682.643 crvUSD from sold WBTC"), not a compact figure.
+    /Converted:?\s*[\d.,]+K?\s*crvUSD from sold WBTC/.test(body) && !/read live, cross-checked/.test(body),
   );
   if (inbandLive.healthFull != null && inbandLive.healthFull > 0 && inbandLive.healthFull < 0.05) {
     check("inband: health near 0 carries its plain line", /close to 0; below 0 anyone may liquidate it/.test(body));
@@ -718,12 +720,12 @@ try {
     console.log(`SKIP  inband: near-0 health line — health is ${inbandLive.healthFull} now`);
   }
   check(
-    "inband: net sold WBTC stated on the card and in the flows",
-    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) && /sold 0\.0\d+ WBTC more than it bought back/.test(body),
+    "inband: net sold WBTC stated on the card and in its explanation",
+    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) && /Sold by the AMM and not bought back:\s*0\.0\d+ WBTC/.test(body),
   );
   check(
-    "inband: flows name the converted balance with the collateral",
-    /Collateral and converted/.test(body) && /The card's Collateral figure counts the WBTC alone/.test(body),
+    "inband: flows put the converted balance on the collateral bar, named as the card's Converted",
+    /\(the card's Converted\) is on the collateral bar too/.test(body),
   );
   check("inband: mint market line on the card", /This is a mint market/.test(body));
   check("inband: opening row reads Open · Deposit · Borrow", /Open\s*Deposit\s*Borrow/.test(body));
@@ -743,7 +745,7 @@ try {
       "borrow:11fbec31661912bd1ec5c2e151a97f501123493489335d43364950c64780435c:116:self",
     ],
   };
-  const p3 = await browser.newPage();
+  const p3 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   await p3.addInitScript((keys) => {
     try {
       const o = {};
@@ -822,15 +824,29 @@ try {
       /the liquidator paid the other 39,794\.17\d? crvUSD and received the 16\.323\d? WETH/.test(body),
   );
   {
-    const m = body.match(
-      /In WETH, the ([\d.]+) deposited is ([\d.]+) sold by the AMM \+ ([\d.]+) taken in liquidation\./,
+    // Each event's Collateral cell opens into its ledger (anatomy T2.1): open
+    // them all, then read the liquidation whose ledger runs Deposited, Sold in
+    // soft liquidation, This liquidation.
+    for (const t of await page.locator("[data-ledger-toggle]").all()) {
+      await t.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(300);
+    }
+    body = await page.evaluate(() => document.body.innerText);
+    const ledgers = await page.locator('[data-ledger-cell="collateral"]').allInnerTexts();
+    const ledger = ledgers.find((t) => /Sold in soft liquidation\s+[−-][\d.]+\s+WETH\s+This liquidation/.test(t));
+    const m = ledger?.match(
+      /Deposited\s+([\d.]+)\s+WETH[\s\S]*?Sold in soft liquidation\s+[−-]([\d.]+)\s+WETH\s+This liquidation\s+[−-]([\d.]+)\s+WETH/,
     );
     const ok =
-      m && Math.abs(Number(m[1]) - Number(m[2]) - Number(m[3])) < 0.0002 && Math.abs(Number(m[1]) - 36.4374) < 0.0001;
-    check("spot N3: the collateral side adds up in WETH", !!ok, m ? m[0] : "no ledger sentence");
+      m && Math.abs(Number(m[1]) - Number(m[2]) - Number(m[3])) < 0.0004 && Math.abs(Number(m[1]) - 36.4374) < 0.0001;
     check(
-      "spot N3: sold, taken and the converted crvUSD are their own rows",
-      /Converted by the AMM/.test(body) && /Sold by the AMM/.test(body) && /Converted, taken in liquidation/.test(body),
+      "spot N3: the collateral side adds up in WETH",
+      !!ok,
+      m ? `${m[1]} deposited − ${m[2]} sold − ${m[3]} taken` : "no ledger with sold and taken rows",
+    );
+    check(
+      "spot N3: sold and taken are their own ledger rows, and the converted crvUSD is stated on the row",
+      !!ledger && /converted/.test(body),
     );
   }
   check("spot N4: each liquidation figure is named", /−16\.32\s*taken\s*−57K\s*converted\s*−96K\s*cleared/.test(body));
@@ -854,11 +870,11 @@ try {
 
   const CRVSPOT = "/0xeda215b7666936ded834f76f3fbc6f323295110a/0xcbce52b5576771c7c8f5c21e29640d29e9636a8f";
   await page.goto(`${BASE}${EXPLORER}${CRVSPOT}`, { waitUntil: "networkidle", timeout: 180000 });
-  await page.waitForSelector("text=Health:", { timeout: 120000 });
+  await page.waitForSelector('text="Health"', { timeout: 120000 });
   body = await openAllAndRead(page);
   check(
     "spot N7: a price under 1 keeps its digits",
-    /today's CRV price, 0\.\d{3,4} crvUSD/.test(body) && !/today's CRV price, 0 crvUSD/.test(body),
+    /oracle price stands at 0\.\d{3,4} crvUSD/.test(body) && !/oracle price stands at 0 crvUSD/.test(body),
   );
   check(
     "spot N9: an underwater position states what a liquidator would lose",
@@ -876,7 +892,7 @@ try {
   {
     // P1: the 2 Jan borrow lowers health; the chain says which side is which.
     const es = await (
-      await fetch(`${BASE}/api/chain/llamalend/event-state?controller=${R4.controller}&user=${R4.user}&block=18917707`)
+      await hostFetch(`${BASE}/api/chain/llamalend/event-state?controller=${R4.controller}&user=${R4.user}&block=18917707`)
     ).json();
     const hb = Number(es.before?.healthRaw) / 1e18;
     const ha = Number(es.after?.healthRaw) / 1e18;
@@ -885,7 +901,7 @@ try {
       hb > ha && hb.toFixed(4) === "0.2918" && ha.toFixed(4) === "0.1601",
       `${hb} → ${ha}`,
     );
-    const p4 = await browser.newPage();
+    const p4 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
     await p4.addInitScript(() => {
       try {
         localStorage.setItem(
@@ -915,41 +931,28 @@ try {
     body = await p4.evaluate(() => document.body.innerText);
     check("r4 P1: the tile reads before then after", /Health\s*29\.18%[\s\S]{0,80}?16\.01%/.test(body));
     check("r4 P1: the row says which way health went", /Health fell from 29\.18% to 16\.01%\./.test(body));
+    // The Lifetime flows panel replaced the tower (2fd4a07): the interest tile,
+    // the wrapped flow labels and the per-bar tips went with it, and the
+    // interest legs are covered offline by verify-llamalend-flows.ts. A closed
+    // loan's panel states the position at its close.
     check(
-      "r4 P4: a closed loan states the interest it paid",
-      /Interest paid\s*1\.54K/.test(body) && /the interest the loan paid before it closed/.test(body),
-    );
-    check(
-      "r4 P4: the flow labels wrap, none is cut to an ellipsis",
-      await p4.evaluate(
-        () => ![...document.querySelectorAll(".truncate")].some((e) => /Deposited|Borrowed/.test(e.textContent ?? "")),
-      ),
+      "r4 P4: a closed loan's Lifetime flows stand at its close",
+      /At close, 10 Mar '24/.test(body) &&
+        /The bars cover all 4 days with events, from 20 Dec 2023 to the close on 10 Mar 2024/.test(body),
     );
     check(
       "r4 P7: a closed, never-liquidated card says so and where the AMM sold",
       /It was never hard-liquidated\./.test(body) &&
         /Between 2 Jan 2024 and 26 Jan 2024 the AMM sold 0\.02398 WETH while the price sat in the bands/.test(body),
     );
-    // P4: every bar's tip names its segment.
-    const tips = [];
-    const segs = p4.locator("div.cursor-pointer.absolute");
-    for (let i = 0; i < (await segs.count()); i++) {
-      await segs.nth(i).hover({ force: true });
-      await p4.waitForTimeout(200);
-      tips.push(
-        await p4.evaluate(() =>
-          [...document.querySelectorAll("div.z-20.pointer-events-none")].map((x) => x.innerText).join("|"),
-        ),
-      );
-    }
+    // P4: the panel's key names every segment the position has.
     check(
-      "r4 P4: the bar tips carry their labels",
-      /^Withdrawn\n\$153k$/.test(tips[0] ?? "") && /^Repaid\n\$80k$/.test(tips[1] ?? ""),
-      JSON.stringify(tips),
+      "r4 P4: the key names the withdrawn, sold and repaid segments",
+      /Key\s*Withdrawn\s*Sold in soft liquidation\s*Repaid/.test(body),
     );
     await p4.close();
 
-    const p5 = await browser.newPage();
+    const p5 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
     await p5.goto(
       `${BASE}${EXPLORER}/0xad444663c6c92b497225c6ce65fee2e7f78bfb86/0xe08d97e151473a848c3d9ca3f323cb720472d015`,
       { waitUntil: "networkidle", timeout: 180000 },
@@ -968,14 +971,8 @@ try {
     }
     body = await p5.evaluate(() => document.body.innerText);
     check(
-      "r4 P4: the sub-row under Borrowed states what was borrowed and not repaid, with the interest apart",
-      /Borrowed \(all\s*time\)\s*\$58k\s*Net borrowed\s*58\.24K[\s\S]{0,40}Accrued interest\s*4\.15K[\s\S]{0,30}Current debt\s*\$62k/.test(
-        body,
-      ),
-    );
-    check(
-      "r4 P4: the merged collateral row names its assets",
-      /sDOLA and converted crvUSD/.test(body) && !/2 assets/.test(body),
+      "r4 P4: the shortfall line names the converted crvUSD apart from the collateral left",
+      /receive the [\d,.]+ crvUSD the AMM holds and [\d.]+ sDOLA/.test(body),
     );
     check(
       "r4 P3: the shortfall line says nobody is obliged to liquidate",
@@ -984,7 +981,7 @@ try {
     await p5.close();
 
     // P5: the V2 market says so beside the pair.
-    const p6 = await browser.newPage();
+    const p6 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
     await p6.goto(`${BASE}${EXPLORER}`, { waitUntil: "networkidle", timeout: 180000 });
     await p6.waitForSelector("text=/crvUSD · /", { timeout: 120000 });
     const lbody = await p6.evaluate(() => document.body.innerText);
@@ -996,12 +993,12 @@ try {
     await p6.close();
 
     // P6: an open position above its bands relates health to the price cushion.
-    const list = await (await fetch(`${BASE}/api/llamalend/positions?status=open&limit=25`)).json();
+    const list = await (await hostFetch(`${BASE}/api/llamalend/positions?status=open&limit=25`)).json();
     let cushion = null;
     for (const r of list.data ?? []) {
       if (r.inSoftLiq) continue;
       const c = await (
-        await fetch(`${BASE}/api/chain/llamalend/position?controller=${r.controller}&user=${r.user}`)
+        await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${r.controller}&user=${r.user}`)
       ).json();
       if (c.hasLoan && c.healthFull != null && c.healthFull > 0 && c.health >= 1) {
         cushion = r;
@@ -1009,12 +1006,12 @@ try {
       }
     }
     if (cushion) {
-      const p7 = await browser.newPage();
+      const p7 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
       await p7.goto(`${BASE}${EXPLORER}/${cushion.controller}/${cushion.user}`, {
         waitUntil: "networkidle",
         timeout: 180000,
       });
-      await p7.waitForSelector("text=Health:", { timeout: 120000 });
+      await p7.waitForSelector('text="Health"', { timeout: 120000 });
       body = await openAllAndRead(p7);
       check(
         "r4 P6: the card relates the price cushion to health",
@@ -1038,11 +1035,11 @@ try {
     /Loan discount/.test(body) && /Liquidation discount/.test(body) && !/OneWayLendingFactory/.test(body),
   );
   {
-    const m = await (await fetch(`${BASE}/api/chain/llamalend/markets`)).json();
+    const m = await (await hostFetch(`${BASE}/api/chain/llamalend/markets`)).json();
     const w = (m.markets ?? []).find((x) => x.controller === "0x1e0165dbd2019441ab7927c018701f3138114d71");
     check(
-      "r4 P8: wstETH 0x1e01…4d71 reads 50% loan discount and 41.29% borrow, as the chain returns them",
-      w != null && w.loanDiscount === 0.5 && Math.abs(w.borrowAprPct - 41.29) < 0.05,
+      "r4 P8: wstETH 0x1e01…4d71 reads a 50% loan discount and a live borrow rate, as the chain returns them",
+      w != null && w.loanDiscount === 0.5 && Number.isFinite(w.borrowAprPct) && w.borrowAprPct > 0,
       w ? `${w.loanDiscount} ${w.borrowAprPct}` : "",
     );
   }

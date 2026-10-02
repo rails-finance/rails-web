@@ -104,8 +104,7 @@
 // "this folder's members appeared" from "the list got longer".
 //
 import { chromium } from "playwright";
-
-const BASE = process.env.BASE ?? "http://localhost:3762";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 /** F3 — the page Miles was reading: a $58M position whose whole life is share
  *  transfers, because it is the Umbrella stake token's own stata backing. */
@@ -151,11 +150,31 @@ function ownRuns(events) {
       // and R1a, which compares the page's total against this, would go red if
       // it ever stopped being.
       const run = events.slice(i, j);
+      // Decision 0021, amendment 2026-09-29: the qualifying run is cut at
+      // 00:00 UTC on the 1st of each month (a transaction takes the month of
+      // its first row); a piece of two or more stays a group, one row sits loose.
+      const pieces = [];
       for (let k = 0; k < run.length; ) {
-        const left = run.length - k;
-        const take = left <= CHUNK_TARGET + MIN_RUN - 1 ? left : CHUNK_TARGET;
-        out.push({ kind: "run", events: run.slice(k, k + take) });
-        k += take;
+        let e = k + 1;
+        while (e < run.length && run[e].txHash === run[k].txHash) e++;
+        const d = new Date(run[k].timestamp * 1000);
+        const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
+        const last = pieces[pieces.length - 1];
+        if (last && last.month === month) last.rows.push(...run.slice(k, e));
+        else pieces.push({ month, rows: run.slice(k, e) });
+        k = e;
+      }
+      for (const { rows } of pieces) {
+        if (rows.length < 2) {
+          for (const r of rows) out.push({ kind: "event", events: [r] });
+          continue;
+        }
+        for (let k = 0; k < rows.length; ) {
+          const left = rows.length - k;
+          const take = left <= CHUNK_TARGET + MIN_RUN - 1 ? left : CHUNK_TARGET;
+          out.push({ kind: "run", events: rows.slice(k, k + take) });
+          k += take;
+        }
       }
     } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
     i = j;
@@ -201,7 +220,7 @@ const browser = await chromium.launch();
 console.log(`\n── the transfer folder · ${BASE} ──\n`);
 
 // ── the route's own rows ────────────────────────────────────────────────────
-const f3Route = await fetch(routeUrl(F3));
+const f3Route = await hostFetch(routeUrl(F3));
 const f3Json = f3Route.status === 200 ? await f3Route.json() : null;
 const f3Events = f3Json?.timeline?.events ?? [];
 const f3Own = ownRuns(f3Events);
@@ -224,7 +243,7 @@ check(
 );
 
 // ── the page ────────────────────────────────────────────────────────────────
-const f3Page = await browser.newPage();
+const f3Page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
 await f3Page.goto(pageUrl(F3), { waitUntil: "networkidle", timeout: 180_000 });
 await f3Page.waitForSelector("[data-vault-timeline-rows]", { timeout: 60_000 });
 const FOLDER = "[data-vault-timeline-rows] [aria-label*='consecutive']";
@@ -417,7 +436,7 @@ if (f3Dom.folders === 0) {
 await f3Page.close();
 
 // ── R4 — the floor still holds on a small life ─────────────────────────────
-const f4Route = await fetch(routeUrl(F4));
+const f4Route = await hostFetch(routeUrl(F4));
 const f4Json = f4Route.status === 200 ? await f4Route.json() : null;
 const f4Events = f4Json?.timeline?.events ?? [];
 const f4Own = ownRuns(f4Events);
@@ -436,7 +455,7 @@ check(
   f4Events.length > 0 && f4Events.length < 20 && longest < MIN_RUN,
   `${f4Events.length} rows ${JSON.stringify(f4Kinds)}, longest same-kind stretch ${longest}`,
 );
-const f4Page = await browser.newPage();
+const f4Page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
 await f4Page.goto(pageUrl(F4), { waitUntil: "networkidle", timeout: 180_000 });
 await f4Page.waitForSelector(EVENT, { timeout: 60_000 });
 const f4Dom = await f4Page.evaluate(

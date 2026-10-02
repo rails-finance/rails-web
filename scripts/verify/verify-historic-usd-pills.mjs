@@ -28,7 +28,7 @@ async function openInfo(card) {
   }
 }
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
 const check = (name, cond, detail = "") => {
@@ -91,7 +91,7 @@ const SPARK_WALLET = "0xf2b07a31316ee4eca5c14c5f237a9903b4806236";
 async function api(path, tries = 5) {
   let last;
   for (let i = 0; i < tries; i += 1) {
-    const res = await fetch(`${BASE}${path}`).catch((e) => {
+    const res = await hostFetch(`${BASE}${path}`).catch((e) => {
       last = e;
       return null;
     });
@@ -114,20 +114,31 @@ const findEvent = (events, { block, eventType, symbol }) =>
     );
   });
 
-/** The chip an Aave V3 Ethereum card draws for one exact balance, restated from
- *  the position-state answer the card reads: raw × price ÷ 10^(decimals + 8), in
- *  whole dollars. A served event carries its tx hash as the third `:` segment of
- *  its id. Null when there is no answer, or it is unpriced. */
-async function exactChipText(wallet, market, event, symbol, side) {
+/** The figure an Aave-family card's Collateral cell closes on: the side's total
+ *  after the transaction, Σ exact balance × price ÷ 10^decimals over the
+ *  reserves whose collateral switch is on, restated from the position-state
+ *  answer the card reads, in whole dollars (the cell rounds the same sum, and
+ *  an asset's own dollars are apportioned to it, so a caller compares within
+ *  a dollar). A served event carries its tx hash as the third `:` segment of
+ *  its id. Null when there is no answer, or a reserve is unpriced. */
+async function collateralAfterUsd(wallet, market, event, path) {
   if (!event) return null;
-  const tx = event.txHash ?? String(event.id).split(":")[2];
+  const tx = event.txHash ?? String(event.id).match(/0x[0-9a-f]{64}/i)?.[0];
   const qs = new URLSearchParams({ wallet, market, block: String(event.blockNumber), tx });
-  const state = await api(`/api/aave-v3/timeline/position-state?${qs}`, 2).catch(() => null);
-  const r = state?.reserves?.find((x) => x.symbol === symbol);
-  if (!r?.priceBase || r.decimals == null) return null;
-  const usd = Number((BigInt(r[side].after) * BigInt(r.priceBase)) / BigInt(10) ** BigInt(r.decimals + 4)) / 1e4;
-  return usd < 1 ? `$${usd.toFixed(2)}` : "$" + usd.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const state = await api(`${path}?${qs}`, 2).catch(() => null);
+  if (!state?.reserves) return null;
+  let sum = 0n;
+  for (const r of state.reserves) {
+    if (!r.collateral?.after || BigInt(r.supply.after) === 0n) continue;
+    if (!r.priceBase || r.decimals == null) return null;
+    sum += (BigInt(r.supply.after) * BigInt(r.priceBase)) / 10n ** BigInt(r.decimals + 4);
+  }
+  return Number(sum) / 1e4;
 }
+
+const usdText = (n) => "$" + Math.round(n).toLocaleString("en-US");
+/** "$14,395" -> 14395; NaN where the text is no dollar figure. */
+const usdOf = (text) => Number(text.replace(/[^0-9.]/g, ""));
 
 const timelinePath = (proto, wallet) =>
   proto === "aave-v3"
@@ -240,7 +251,12 @@ async function expandCard(page, n) {
   await page.waitForTimeout(200);
 }
 
-const usdChipSel = "span.border-l-2.border-r-2.border-rb-500";
+// Since the event card's ledger cells (4494fc8, 46c1397) the dollars sit on the
+// closed Collateral and Debt cells: before → after on the cell's one line, the
+// last figure being the side's total after the transaction.
+const closedUsd = (side) =>
+  `[data-ledger-cell="${side}"] [data-ledger-row="closed"] span.prov-locate-box:has-text("$")`;
+const usdChipSel = closedUsd("collateral");
 
 /** An Aave V3 Ethereum card reads its balances when it opens (rails-ops
  *  TO-DO-ui-jobs §19), and its USD chips arrive with that answer: wait for it
@@ -294,7 +310,7 @@ const pageErrors = [];
 /** Open a wallet's position page with event numbers and both USD switches on, every
  *  event painted. */
 async function openTimeline(proto, wallet) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   page.on("pageerror", (e) => pageErrors.push(`${proto}/${wallet}: ${e}`));
   await page.goto(`${BASE}/ethereum/${proto}/${wallet}`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page
@@ -317,16 +333,20 @@ async function runProtocol(proto, wallet, cases) {
   // `resolveEventNumber`; driving the DOM with a null would only add a
   // locator timeout on top of the finding.
   if (cases.pricedOrdinary?.num != null) {
-    const { num, symbol, priceText, chipText, block } = cases.pricedOrdinary;
+    const { num, symbol, priceText, expectedUsd, block } = cases.pricedOrdinary;
     await expandCard(page, num);
     const card = cardFor(page, num);
     await positionStateSettled(proto, card);
 
-    const chip = card.locator(usdChipSel).first();
+    const chip = card.locator(usdChipSel).last();
     check(`${proto}: priced ordinary (#${num}, block ${block}) USD chip renders`, (await chip.count()) > 0);
-    if ((await chip.count()) > 0) {
-      const text = await chip.innerText();
-      check(`${proto}: priced ordinary chip amount ≈ expected`, text.includes(chipText), text);
+    const text = (await chip.count()) > 0 ? (await chip.innerText()).trim() : "";
+    if (text) {
+      check(
+        `${proto}: priced ordinary chip amount ≈ expected`,
+        expectedUsd != null && Math.abs(usdOf(text) - expectedUsd) <= 1,
+        `${text} against ${expectedUsd == null ? "(no position state)" : usdText(expectedUsd)}`,
+      );
     }
 
     await openInfo(card);
@@ -342,22 +362,31 @@ async function runProtocol(proto, wallet, cases) {
     }
 
     // Receipt: formula + valued operands, no "Untraced input" anywhere.
-    const panelText = await openReceiptFor(page, card, chipText);
+    const panelText = text ? await openReceiptFor(page, card, text) : null;
     check(
-      `${proto}: USD chip receipt shows "after × price at block" formula`,
-      !!panelText && panelText.includes("after × price at block"),
+      `${proto}: USD chip receipt states the total collateral after, valued at the oracle's price at this block`,
+      !!panelText &&
+        panelText.includes("Total collateral after this transaction") &&
+        panelText.includes("price at this block"),
     );
     check(`${proto}: card has no "Untraced input" caution`, !(await card.innerText()).includes("Untraced input"));
 
-    // Toggle-off: chip disappears.
+    // The Display switches. A side's total is stated in dollars only (the
+    // assets add only there), so the Collateral cell's total stays with both
+    // switches off; the dollars after a single asset's tokens (the divider
+    // component, `data-ledger-closed-usd`) leave and return.
+    const asset = card.locator("[data-ledger-closed-usd]");
+    const assetOn = await asset.count();
     await setDisplayFlag(page, "USD for stablecoins", false);
     await setDisplayFlag(page, "USD for other tokens", false);
-    const chipOff = card.locator(usdChipSel);
-    check(`${proto}: USD chip disappears with both USD switches off`, (await chipOff.count()) === 0);
+    check(
+      `${proto}: asset dollars disappear with both USD switches off; the side's total stays`,
+      (await asset.count()) === 0 && (await card.locator(usdChipSel).count()) > 0,
+      `${assetOn} asset figure(s) with the switches on`,
+    );
     await setDisplayFlag(page, "USD for stablecoins", true);
     await setDisplayFlag(page, "USD for other tokens", true);
-    const chipBackOn = card.locator(usdChipSel);
-    check(`${proto}: USD chip returns with both USD switches back on`, (await chipBackOn.count()) > 0);
+    check(`${proto}: asset dollars return with both USD switches back on`, (await asset.count()) === assetOn);
   }
 
   // ── Priced liquidation: both legs + forensics ───────────────────────
@@ -368,11 +397,12 @@ async function runProtocol(proto, wallet, cases) {
     const card = cardFor(page, num);
     await positionStateSettled(proto, card);
 
-    const chips = card.locator(usdChipSel);
+    const legs = [];
+    for (const side of ["collateral", "debt"]) if ((await card.locator(closedUsd(side)).count()) > 0) legs.push(side);
     check(
-      `${proto}: liquidation (#${num}, block ${block}) has chips on BOTH legs`,
-      (await chips.count()) >= 2,
-      `${await chips.count()} chip(s)`,
+      `${proto}: liquidation (#${num}, block ${block}) has dollars on BOTH legs' cells`,
+      legs.length === 2,
+      `${legs.join(" + ") || "none"}`,
     );
 
     // LiquidationForensics draws the three captions its adapter passes
@@ -423,14 +453,27 @@ const sparkEvents = (await api(timelinePath("spark", SPARK_WALLET))).events ?? [
 check(`aave-v3: fixture timeline is non-empty`, aaveEvents.length > 0, `${aaveEvents.length} events`);
 check(`spark: fixture timeline is non-empty`, sparkEvents.length > 0, `${sparkEvents.length} events`);
 
-// The Ethereum card's chip is the EXACT after-balance × the oracle price read at
-// the block (rails-ops TO-DO-ui-jobs §19), no longer the replayed principal × the
-// captured price — $13,320 when it was (121.0796 AAVE × 110.008). The figure is
-// re-derived at run time from the position-state answer for that event, the
-// answer the card itself reads, and not pinned.
+// The Collateral cell closes on the side's total after the transaction, the
+// EXACT balances × the oracle prices read at the block (rails-ops
+// TO-DO-ui-jobs §19). The figure is re-derived at run time from the
+// position-state answer for that event, the answer the card itself reads, and
+// not pinned.
 const AAVE_SUPPLY = { block: 24655255, eventType: "supply", symbol: "AAVE" };
-const aaveChip = await exactChipText(AAVE_V3_WALLET, "core", findEvent(aaveEvents, AAVE_SUPPLY), "AAVE", "supply");
-check(`aave-v3: the position state prices the AAVE supply at block ${AAVE_SUPPLY.block}`, aaveChip != null);
+const SPARK_SUPPLY = { block: 21319438, eventType: "supply", symbol: "WETH" };
+const aaveTotal = await collateralAfterUsd(
+  AAVE_V3_WALLET,
+  "core",
+  findEvent(aaveEvents, AAVE_SUPPLY),
+  "/api/aave-v3/timeline/position-state",
+);
+check(`aave-v3: the position state prices the collateral at block ${AAVE_SUPPLY.block}`, aaveTotal != null);
+const sparkTotal = await collateralAfterUsd(
+  SPARK_WALLET,
+  "spark",
+  findEvent(sparkEvents, SPARK_SUPPLY),
+  "/api/chain/spark/position-state",
+);
+check(`spark: the position state prices the collateral at block ${SPARK_SUPPLY.block}`, sparkTotal != null);
 
 console.log(`\n=== Aave V3 — ${AAVE_V3_WALLET} ===`);
 await runProtocol("aave-v3", AAVE_V3_WALLET, {
@@ -439,7 +482,7 @@ await runProtocol("aave-v3", AAVE_V3_WALLET, {
     block: AAVE_SUPPLY.block,
     symbol: "AAVE",
     priceText: "110.01",
-    chipText: aaveChip ?? "(no position state)",
+    expectedUsd: aaveTotal,
   },
   liquidation: {
     num: resolveEventNumber(aaveEvents, { block: 21919039, eventType: "liquidation" }, "aave-v3"),
@@ -468,7 +511,7 @@ await runProtocol("spark", SPARK_WALLET, {
     block: 21319438,
     symbol: "WETH",
     priceText: "3,651.25",
-    chipText: "$335",
+    expectedUsd: sparkTotal,
   },
   liquidation: {
     num: resolveEventNumber(sparkEvents, { block: 21615423, eventType: "liquidation" }, "spark"),

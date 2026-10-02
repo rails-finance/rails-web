@@ -175,14 +175,14 @@ console.log(`Market notes — against ${BASE}\n`);
 
   // Every event type filtered out.
   const countBefore = (await page.locator("[data-event-id]").count()) > 0;
-  await page.getByRole("button", { name: "Types of event" }).click();
+  await page.getByRole("button", { name: "Types of event", exact: true }).click();
   const options = page.locator("button.overlay-item");
   const k = await options.count();
   for (let i = 0; i < k; i++) {
     await options.nth(i).click();
     await page.waitForTimeout(150);
   }
-  await page.getByRole("button", { name: "Types of event" }).click();
+  await page.getByRole("button", { name: "Types of event", exact: true }).click();
   await page.waitForTimeout(800);
   const left = await closedMarkers(page).count();
   check(

@@ -238,7 +238,7 @@ import { enGb } from "./lib/date.mjs";
 import { showNoteRows } from "./lib/market-notes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE_URL = process.env.BASE ?? "http://localhost:3761";
+import { BASE as BASE_URL, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const env = Object.fromEntries(
   fs
@@ -669,7 +669,7 @@ async function createdBlockOf(vault, head) {
 // ── the page and the route ──────────────────────────────────────────────────
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 2000 } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 2000 }, extraHTTPHeaders: bypassHeaders() });
 // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
 await showNoteRows(context);
 
@@ -693,6 +693,23 @@ await showNoteRows(context);
  *  comes due (TO-DO-ui-jobs §38). */
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
 const MIN_RUN = 3;
+/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
+ *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
+ *  first row; a piece of two or more rows stays a group, one row sits loose. */
+function monthPieces(run) {
+  const pieces = [];
+  for (let k = 0; k < run.length; ) {
+    let e = k + 1;
+    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
+    const d = new Date(run[k].timestamp * 1000);
+    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    const last = pieces[pieces.length - 1];
+    if (last && last.month === month) last.rows.push(...run.slice(k, e));
+    else pieces.push({ month, rows: run.slice(k, e) });
+    k = e;
+  }
+  return pieces.map((p) => p.rows);
+}
 function ownRuns(events) {
   const out = [];
   let i = 0;
@@ -704,8 +721,12 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) out.push({ kind: "run", events: events.slice(i, j) });
-    else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    if (j - i >= MIN_RUN) {
+      for (const piece of monthPieces(events.slice(i, j))) {
+        if (piece.length >= 2) out.push({ kind: "run", events: piece });
+        else out.push({ kind: "event", events: piece });
+      }
+    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
     i = j;
   }
   return out;
@@ -876,7 +897,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
 }
 
 async function readRoute(vault, holder) {
-  const res = await fetch(`${BASE_URL}/api/chain/morpho-base/vault?vault=${vault}&holder=${holder}`);
+  const res = await hostFetch(`${BASE_URL}/api/chain/morpho-base/vault?vault=${vault}&holder=${holder}`);
   if (res.status !== 200) return { status: res.status };
   const json = await res.json();
   return { status: 200, ...json };

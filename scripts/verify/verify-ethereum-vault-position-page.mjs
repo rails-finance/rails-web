@@ -263,7 +263,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE = process.env.BASE ?? "http://localhost:3762";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const env = Object.fromEntries(
   fs
@@ -367,6 +367,23 @@ const MIN_RUN = 3;
  *  the rule stay in step on the day a fixture does have such a stretch. The
  *  folder's own checks live in verify-vault-transfer-folders.mjs. */
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
+/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
+ *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
+ *  first row; a piece of two or more rows stays a group, one row sits loose. */
+function monthPieces(run) {
+  const pieces = [];
+  for (let k = 0; k < run.length; ) {
+    let e = k + 1;
+    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
+    const d = new Date(run[k].timestamp * 1000);
+    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    const last = pieces[pieces.length - 1];
+    if (last && last.month === month) last.rows.push(...run.slice(k, e));
+    else pieces.push({ month, rows: run.slice(k, e) });
+    k = e;
+  }
+  return pieces.map((p) => p.rows);
+}
 function ownRuns(events) {
   const out = [];
   let i = 0;
@@ -378,8 +395,12 @@ function ownRuns(events) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) out.push({ kind: "run", events: events.slice(i, j) });
-    else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    if (j - i >= MIN_RUN) {
+      for (const piece of monthPieces(events.slice(i, j))) {
+        if (piece.length >= 2) out.push({ kind: "run", events: piece });
+        else out.push({ kind: "event", events: piece });
+      }
+    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
     i = j;
   }
   return out;
@@ -608,13 +629,13 @@ const tailUrl = (f) =>
 const NULL_TIMELINE_WAIT_MS = 10_000;
 async function readRoute(url) {
   const started = Date.now();
-  let res = await fetch(url);
+  let res = await hostFetch(url);
   let json = res.status === 200 ? await res.json() : null;
   const ms = Date.now() - started;
   if (json && json.timeline == null) {
     console.log(`      · timeline: null on ${url.replace(BASE, "")} — waiting 10 s and reading once more`);
     await new Promise((r) => setTimeout(r, NULL_TIMELINE_WAIT_MS));
-    res = await fetch(url);
+    res = await hostFetch(url);
     json = res.status === 200 ? await res.json() : null;
   }
   return { status: res.status, json, ms };
@@ -633,11 +654,11 @@ function timelineOf(r, section) {
   return t;
 }
 const readTail = async (f) => {
-  const res = await fetch(tailUrl(f));
+  const res = await hostFetch(tailUrl(f));
   return { status: res.status, json: res.status === 200 ? await res.json() : null };
 };
 const putTail = async (f, body) => {
-  const res = await fetch(tailUrl(f), {
+  const res = await hostFetch(tailUrl(f), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -649,7 +670,7 @@ const putTail = async (f, body) => {
  *  payload and never `body.textContent` — a `hidden` drawer's prose is not on
  *  the face, and the payload made an earlier vault check vacuous. */
 async function pageText(browser, url) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   const out = await page.evaluate(() => {
     const drawer = document.querySelector("[data-intro-drawer]");
@@ -1431,7 +1452,7 @@ check(
 );
 check(
   "T6d …and the drawer's statements are in the initial HTML, not only once opened",
-  /How an Umbrella stake token works/.test(await (await fetch(`${BASE}/ethereum/aave/vaults/${F2.vault}`)).text()),
+  /How an Umbrella stake token works/.test(await (await hostFetch(`${BASE}/ethereum/aave/vaults/${F2.vault}`)).text()),
   "the drawer stays mounted and hidden",
 );
 check(
@@ -1662,7 +1683,7 @@ check(
 // same click a reader makes — and the three figures are read off the OPEN
 // panel. Every expectation is the route's own integers.
 async function openRowDetail(url, id) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   await page.waitForSelector("[data-vault-timeline-rows] [data-event-id]", { timeout: 60_000 });
   const wrapper = page.locator(`[data-vault-timeline-rows] [data-event-id="${id}"]`);
@@ -1739,7 +1760,7 @@ check(
 );
 
 // ═══ T13 — the phone ══════════════════════════════════════════════════════
-const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, extraHTTPHeaders: bypassHeaders() });
 const phonePage = await phone.newPage();
 await phonePage.goto(pageUrl(F7), { waitUntil: "networkidle", timeout: 120_000 });
 const phoneWidth = await phonePage.evaluate(() => ({

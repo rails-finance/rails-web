@@ -261,9 +261,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { enGb } from "./lib/date.mjs";
 import { showNoteRows } from "./lib/market-notes.mjs";
+import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE = process.env.BASE ?? "http://localhost:3741";
 // The lane the timeline's sweeps are EXPECTED to name — the env var's name,
 // never its value. Pinned here, not read from chains.ts: the file under test is
 // not a source of expectations. Moving chain 1 onto ETHEREUM_LOGS_RPC_URL was
@@ -693,7 +693,7 @@ async function ownTimeline(vault, holder, blockNumber) {
 // ── the page and the route ──────────────────────────────────────────────────
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 2000 } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 2000 }, extraHTTPHeaders: bypassHeaders() });
 // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
 await showNoteRows(context);
 
@@ -834,7 +834,7 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
 }
 
 async function readRoute(vault, holder) {
-  const res = await fetch(`${BASE}/api/chain/aave-vaults/vault?vault=${vault}&holder=${holder}`);
+  const res = await hostFetch(`${BASE}/api/chain/aave-vaults/vault?vault=${vault}&holder=${holder}`);
   if (res.status !== 200) return { status: res.status };
   const json = await res.json();
   return { status: 200, ...json };
@@ -861,6 +861,23 @@ const MIN_RUN = 3;
 // direction to a folder. Re-pinned 2026-09-19 from the page as served: the
 // Safe fixture's 23 consecutive sends paint as one row, 8 rows over 34 logs.
 const RUN_KINDS = new Set(["deposit", "withdrawal", "transfer-in", "transfer-out"]);
+/** A qualifying run, cut at 00:00 UTC on the 1st of each month (rails-ops
+ *  decision 0021, amendment 2026-09-29). A transaction takes the month of its
+ *  first row; a piece of two or more rows stays a group, one row sits loose. */
+function monthPieces(run) {
+  const pieces = [];
+  for (let k = 0; k < run.length; ) {
+    let e = k + 1;
+    while (e < run.length && run[e].txHash === run[k].txHash) e += 1;
+    const d = new Date(run[k].timestamp * 1000);
+    const month = d.getUTCFullYear() * 12 + d.getUTCMonth();
+    const last = pieces[pieces.length - 1];
+    if (last && last.month === month) last.rows.push(...run.slice(k, e));
+    else pieces.push({ month, rows: run.slice(k, e) });
+    k = e;
+  }
+  return pieces.map((p) => p.rows);
+}
 /** This script's own log list, grouped the way the page draws it. */
 function ownRows(key) {
   const events = OWN.get(key).rows;
@@ -874,8 +891,12 @@ function ownRows(key) {
     }
     let j = i + 1;
     while (j < events.length && events[j].kind === events[i].kind) j += 1;
-    if (j - i >= MIN_RUN) out.push({ kind: "run", events: events.slice(i, j) });
-    else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
+    if (j - i >= MIN_RUN) {
+      for (const piece of monthPieces(events.slice(i, j))) {
+        if (piece.length >= 2) out.push({ kind: "run", events: piece });
+        else out.push({ kind: "event", events: piece });
+      }
+    } else for (let k = i; k < j; k++) out.push({ kind: "event", events: [events[k]] });
     i = j;
   }
   return out;
