@@ -193,13 +193,13 @@ export function morphoHealthMove(
   };
 }
 
-/** The oracle price a liquidation ran on. The index stores the price at the end
- *  of the liquidation's block; when the oracle updated later in that block the
- *  liquidation ran on the one before. Of the two reads, the one that reproduces
- *  seized = repaid × incentive ÷ price is the price the contract used. Where
- *  neither does (a liquidation that also wrote off bad debt seizes all the
- *  collateral, so the relation does not hold) the end-of-block read stands, and
- *  where the read failed the index's figure does, at the event's block. */
+/** The oracle price a liquidation ran on. Of the reads at the ends of blocks
+ *  N − 1 and N, the one that reproduces seized = repaid × incentive ÷ price is
+ *  the price the contract used; an oracle update later in block N moves the
+ *  end-of-block read off it. Where neither does (a liquidation that also wrote
+ *  off bad debt seizes all the collateral, so the relation does not hold) the
+ *  end-of-block read stands, and where the read failed the index's figure does
+ *  — settled the same way on the server (mig 378), at the block it names. */
 export function morphoLiquidationPrice(
   ctx: MorphoContext,
   read: MorphoAtBlock,
@@ -218,11 +218,17 @@ export function morphoLiquidationPrice(
   }
   const stored = ctx.oraclePriceAtBlock?.loanPerCollateral;
   if (read.status === "loading") return null;
+  const storedBlock = ctx.oraclePriceAtBlock?.block ?? eventBlock;
   return stored
     ? {
         price: stored,
-        block: eventBlock,
-        time: read.status === "ok" && read.at.block === eventBlock ? read.at.timestamp : undefined,
+        block: storedBlock,
+        time:
+          read.status === "ok" && read.at.block === storedBlock
+            ? read.at.timestamp
+            : read.status === "ok" && read.prev.block === storedBlock
+              ? read.prev.timestamp
+              : undefined,
         lif: read.status === "ok" ? read.lif : null,
       }
     : null;

@@ -348,7 +348,10 @@ for (const s of seededResult.positions) {
   // seeded side can only draw FEWER (a position whose newest rows sit before
   // the cut), never a row the whole-history replay left out.
   eq(`${id} every seeded drawn row is in the full replay`, shared, s.events.length);
-  check(`${id} the seed marks the peaks partial`, s.peaksPartial === true);
+  // The seed carries the peaks (a window over the elided rows, rails-server
+  // api/src/routes/baseMorpho.ts), so the seeded position states them and
+  // the `eq` above holds them to the full replay's.
+  check(`${id} the seed carries the peaks`, s.peaksPartial !== true);
 }
 
 if (drawnDelta.length) {

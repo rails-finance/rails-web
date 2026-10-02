@@ -896,12 +896,15 @@ export interface MorphoContext {
    *  |borr_delta| = repaidAssets + any bad debt socialized (human-readable
    *  loan token). The seized side is `assetsDelta` (side = "collateral"). */
   loanRepaid?: string;
-  /** liquidation rows only — the market's OWN oracle at this event's block
-   *  (mig 112 capture): loan token per 1 collateral token, human units. The
-   *  figure the LLTV test and incentive math acted on. Morpho prices in the
-   *  loan token by design — never USD. Absent until the filler prices the
-   *  block; the forensics stay token-only meanwhile. */
-  oraclePriceAtBlock?: { loanPerCollateral: number; source: "morpho-oracle" };
+  /** liquidation rows only — the market's OWN oracle the liquidation ran on
+   *  (mig 112 capture, settled by mig 378): loan token per 1 collateral token,
+   *  human units. The figure the LLTV test and incentive math acted on. Morpho
+   *  prices in the loan token by design — never USD. `block` is the block
+   *  whose end the price was read at: the event's, or the one before it where
+   *  that read is the one the call saw; absent on a row the filler has not
+   *  settled. Absent until the filler prices the block; the forensics stay
+   *  token-only meanwhile. */
+  oraclePriceAtBlock?: { loanPerCollateral: number; source: "morpho-oracle"; block?: number };
 }
 
 // ───────────────────────── Spark (SparkLend) detail types ─────────────────────────

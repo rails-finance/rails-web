@@ -72,7 +72,13 @@ import { morphoBorrowAssetsUp, morphoSupplyAssetsDown, type MorphoMarketTotals }
 import { marketLabel } from "@/lib/morpho/asset-catalog";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { ChainTimelineCoverage } from "@/lib/api/fetch-chain-timeline";
-import type { AssetFlow, BaseActivityEvent, MorphoContext, MorphoEventType } from "@/lib/shared/types/event-shape";
+import type {
+  AssetFlow,
+  BaseActivityEvent,
+  GasCost,
+  MorphoContext,
+  MorphoEventType,
+} from "@/lib/shared/types/event-shape";
 
 const BLUE_EVENTS_ABI = parseAbi([
   "event Supply(bytes32 indexed id, address indexed caller, address indexed onBehalf, uint256 assets, uint256 shares)",
@@ -236,10 +242,9 @@ export interface MorphoSweptPosition {
   undated?: number;
   /** Set when this position's replay STARTED from a seed (the index sent the
    *  wallet's newest rows plus the running state behind them, because the
-   *  whole list is a hundred megabytes). The state is exact — shares and
-   *  collateral are sums — but a running PEAK is a property of the walk, not
-   *  of its total, so the peaks below are a floor, not the lifetime highs,
-   *  and the card states them as not recorded on this lane. */
+   *  whole list is a hundred megabytes) and the seed carried no peaks, so the
+   *  peaks below are a floor, not the lifetime highs, and the card states them
+   *  as not recorded on this lane. */
   peaksPartial?: boolean;
 }
 
@@ -280,7 +285,13 @@ export interface MorphoReplaySeed {
     supplied: bigint;
     withdrawn: bigint;
   };
-  /** Whether the peaks are unknown before the cut. Always true today; the
+  /** The running peaks over the elided rows, RAW: the highest clamped
+   *  collateral and the highest borrowed principal after any row, taken by a
+   *  window over the rows in the walk's order. Absent on an answer from a
+   *  server that sent plain sums; `peaksPartial` is then true. */
+  peakCollateral?: bigint;
+  peakBorrowed?: bigint;
+  /** Whether the peaks are unknown before the cut: the seed carried none. The
    *  replay reads the reason off the seed rather than off the caller. */
   peaksPartial: boolean;
   /** The market's totals just after the wallet's last row before the cut
@@ -325,6 +336,9 @@ export interface MorphoDecodedRow {
    *  index, rails-server mig 357). With them the row states the chain debt and
    *  supply; the sweep has none and states principal. */
   totals?: { before: MorphoMarketTotals; after: MorphoMarketTotals };
+  /** The transaction's gas (the index's Sieve context columns); the sweep
+   *  carries none. */
+  gas?: GasCost;
 }
 
 function decodeBlueLog(log: RawLog, wallet: string): MorphoDecodedRow | null {
@@ -839,8 +853,9 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
   // Seeded markets open with the state the elided rows left, BEFORE the walk —
   // so a market whose whole history sits before the cut still becomes a
   // position, and the first row of the tail is not mistaken for the position's
-  // opening one (`isOpen` reads `n === 0`). The peaks start at the seeded
-  // balances: a floor, and `peaksPartial` says so.
+  // opening one (`isOpen` reads `n === 0`). The peaks start at the seed's,
+  // where it carries them; at the seeded balances otherwise, a floor
+  // `peaksPartial` says so.
   for (const s of seedOf.values()) {
     const m = markets.get(s.marketId);
     const loanDec = m?.loan.decimals ?? 18;
@@ -851,8 +866,8 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
     r.bsh = s.borrowShares;
     r.ssh = s.supplyShares;
     r.sup = s.supplied;
-    r.peakColl = r.coll;
-    r.peakBorr = r.borr > ZERO ? r.borr : ZERO;
+    r.peakColl = s.peakCollateral != null && s.peakCollateral > r.coll ? s.peakCollateral : r.coll;
+    r.peakBorr = s.peakBorrowed != null && s.peakBorrowed > r.borr ? s.peakBorrowed : r.borr > ZERO ? r.borr : ZERO;
     r.badDebt = s.badDebt;
     r.liq = s.liquidations;
     r.n = s.events;
@@ -1137,6 +1152,7 @@ export async function replayMorphoRows(p: MorphoReplayInput): Promise<MorphoChai
       flows,
       etherscanUrl: explorerUrl(chainId, "tx-logs", d.txHash),
       context: { protocol: "morpho", data: ctx },
+      ...(d.gas ? { gas: d.gas } : {}),
     });
   });
 

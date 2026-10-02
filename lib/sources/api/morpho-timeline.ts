@@ -65,11 +65,18 @@ export interface RawMorphoTimelineRow {
    *  on_behalf differs from BOTH; NULL otherwise (see the route). */
   tx_from: string | null;
   caller: string | null;
-  /** The market's own oracle at this event's block (morpho_historic_prices,
-   *  mig 112): IOracle.price() verbatim, raw 1e36 (loan units per collateral
-   *  unit) — non-NULL only on priced liquidation blocks. */
+  /** The market's own oracle the liquidation ran on (morpho_historic_prices,
+   *  mig 112, settled by mig 378): IOracle.price() verbatim, raw 1e36 (loan
+   *  units per collateral unit) — non-NULL only on priced liquidation blocks.
+   *  `price_block` is the block whose end it was read at; NULL on a row the
+   *  filler has not settled, and absent from a route that predates it. */
   price_raw?: string | null;
   price_source?: string | null;
+  price_block?: string | null;
+  /** The transaction's gas (the event table's mig 044 columns); NULL where the
+   *  ingest did not carry it, absent from a route that predates them. */
+  tx_gas_used?: string | null;
+  tx_gas_price?: string | null;
   /** On a grouped or span answer: whether this is the position's first row.
    *  The route states it, since a grouped answer's first event row need not be. */
   is_open?: boolean;
@@ -158,14 +165,28 @@ export async function resolveMarketMeta(marketId: string, marketParams: string |
 function oraclePriceOf(
   raw: string | null | undefined,
   source: string | null | undefined,
+  block: string | null | undefined,
   collDec: number,
   loanDec: number,
-): { loanPerCollateral: number; source: "morpho-oracle" } | undefined {
+): MorphoContext["oraclePriceAtBlock"] {
   if (raw == null || source !== "morpho-oracle") return undefined;
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return undefined;
   const human = (n * Math.pow(10, collDec - loanDec)) / 1e36;
-  return Number.isFinite(human) && human > 0 ? { loanPerCollateral: human, source } : undefined;
+  if (!Number.isFinite(human) || human <= 0) return undefined;
+  const b = block != null ? Number(block) : NaN;
+  return { loanPerCollateral: human, source, ...(Number.isFinite(b) ? { block: b } : {}) };
+}
+
+/** The transaction's gas in ETH. The USD leg stays 0: the index carries no
+ *  ETH price at the block, and the explainer states the ETH figure alone. */
+export function morphoGasOf(
+  r: Pick<RawMorphoTimelineRow, "tx_gas_used" | "tx_gas_price">,
+): { gasUsed: number; gasCostEth: number; gasCostUsd: number } | undefined {
+  const used = r.tx_gas_used != null ? Number(r.tx_gas_used) : NaN;
+  const price = r.tx_gas_price != null ? Number(r.tx_gas_price) : NaN;
+  if (!Number.isFinite(used) || !Number.isFinite(price) || used <= 0 || price <= 0) return undefined;
+  return { gasUsed: used, gasCostEth: (used * price) / 1e18, gasCostUsd: 0 };
 }
 
 /** The chain debt on a row: before, after, the exact change between them and
@@ -244,11 +265,12 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       ...(isLiq
         ? {
             loanRepaid: fmtUnits(borr < ZERO ? -borr : borr, loanDec),
-            oraclePriceAtBlock: oraclePriceOf(r.price_raw, r.price_source, collDec, loanDec),
+            oraclePriceAtBlock: oraclePriceOf(r.price_raw, r.price_source, r.price_block, collDec, loanDec),
           }
         : {}),
     };
 
+    const gas = morphoGasOf(r);
     return {
       id: `${r.tx}:${r.log_index}`,
       txHash: r.tx,
@@ -260,6 +282,7 @@ export async function buildMorphoTimeline(resp: RawMorphoTimelineResponse): Prom
       flows: flowsFor(eventType, coll, borr, collDec, loanDec, collSym, loanSym, meta),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", r.tx),
       context: { protocol: "morpho", data: ctx },
+      ...(gas ? { gas } : {}),
       ...unread,
     };
   });

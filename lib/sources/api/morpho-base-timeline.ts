@@ -47,6 +47,7 @@ import {
   type MorphoReplaySeed,
 } from "@/lib/sources/chain/morpho-blue-events";
 import { morphoTotalsOf } from "@/lib/morpho/market-totals";
+import { morphoGasOf } from "@/lib/sources/api/morpho-timeline";
 import type { MorphoDeployment } from "@/lib/sources/chain/morpho-deployments";
 
 /** One row as rails-server's /api/morpho-base/timeline returns it (api/src/
@@ -60,6 +61,10 @@ interface IndexRow {
   tx_hash: string;
   block_timestamp: string;
   tx_from: string;
+  /** The transaction's gas (Sieve's context columns); absent from a route
+   *  that predates them. */
+  tx_gas_used?: string | null;
+  tx_gas_price?: string | null;
   market: string;
   caller: string;
   /** A collateral move's collateral; a loan-side move's assets; a
@@ -102,6 +107,10 @@ interface IndexSeed {
     supplied: string;
     withdrawn: string;
   };
+  /** The running peaks over the elided rows, RAW (api/src/routes/baseMorpho.ts
+   *  TimelineSeed); absent from a route that sent plain sums. */
+  peakCollateral?: string | null;
+  peakBorrowed?: string | null;
   peaksPartial: boolean;
   /** The market's totals after the wallet's last row before the cut. */
   totalsAtLast?: string[] | null;
@@ -210,6 +219,7 @@ export async function readMorphoIndex(
     const txHash = r.tx_hash.toLowerCase();
     timestamps.set(blockNumber, Number(r.block_timestamp));
     senders.set(txHash, r.tx_from.toLowerCase());
+    const gas = morphoGasOf(r);
     const base = {
       blockNumber,
       txIndex: r.tx_index,
@@ -220,6 +230,7 @@ export async function readMorphoIndex(
       ...(r.totals
         ? { totals: { before: morphoTotalsOf(r.totals.before), after: morphoTotalsOf(r.totals.after) } }
         : {}),
+      ...(gas ? { gas } : {}),
     };
     const caller = r.caller ? r.caller.toLowerCase() : undefined;
     switch (r.kind) {
@@ -283,7 +294,10 @@ export async function readMorphoIndex(
       supplied: BigInt(s.lifetime.supplied),
       withdrawn: BigInt(s.lifetime.withdrawn),
     },
-    peaksPartial: s.peaksPartial,
+    ...(s.peakCollateral != null ? { peakCollateral: BigInt(s.peakCollateral) } : {}),
+    ...(s.peakBorrowed != null ? { peakBorrowed: BigInt(s.peakBorrowed) } : {}),
+    // A seed without peaks states the absence whatever the route said.
+    peaksPartial: s.peaksPartial || s.peakCollateral == null || s.peakBorrowed == null,
     ...(s.totalsAtLast ? { totalsAtLast: morphoTotalsOf(s.totalsAtLast) } : {}),
   }));
 

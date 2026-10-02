@@ -142,6 +142,9 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
             txHash={event.txHash}
             blockNumber={event.blockNumber}
             eventId={event.id}
+            // The liquidator pays a liquidation's gas and a third party pays
+            // an acted row's: neither is the owner's cost, so neither is stated.
+            gas={isLiq || extBy ? undefined : event.gas}
             skipLead
           />
         }

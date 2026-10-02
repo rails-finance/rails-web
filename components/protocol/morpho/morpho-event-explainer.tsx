@@ -8,15 +8,16 @@
 // value, Prov-traced (an echo of the header delta, the detail grid's after-
 // balances, or the liquidation forensics legs).
 
-import type { MorphoContext } from "@/lib/shared/types/event-shape";
+import type { GasCost, MorphoContext } from "@/lib/shared/types/event-shape";
 import type { MorphoCoords } from "@/lib/morpho/event-provenance";
+import { formatGasCost } from "@/lib/shared/format-event";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   morphoMarketContent,
   morphoLiquidationContent,
   morphoEventFallbackContent,
 } from "@/lib/shared/learn-more-content";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
+import { clause, composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { morphoEventSlots } from "@/lib/morpho/explainer-clauses";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
@@ -32,6 +33,11 @@ export interface MorphoEventExplainerProps {
   skipLead?: boolean;
   /** The event's id, to find its neighbours (lib/morpho/timeline-neighbours). */
   eventId?: string;
+  /** This transaction's gas — the pane's last clause, as on Liquity V2. Passed
+   *  only where the owner paid it (a liquidation's gas is the liquidator's, a
+   *  third-party-acted row's the actor's), and stated once per transaction: on
+   *  its first event, the one with nothing earlier in the transaction. */
+  gas?: GasCost;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -65,7 +71,7 @@ export function morphoLearnMoreContent(ctx: MorphoContext): LearnMoreContent {
   }
 }
 
-export function MorphoEventExplainer({ ctx, txHash, blockNumber, skipLead, eventId }: MorphoEventExplainerProps) {
+export function MorphoEventExplainer({ ctx, txHash, blockNumber, skipLead, eventId, gas }: MorphoEventExplainerProps) {
   const chainId = useChainId();
   const coords: MorphoCoords = {
     txHash,
@@ -89,7 +95,16 @@ export function MorphoEventExplainer({ ctx, txHash, blockNumber, skipLead, event
       prevEvent: neighbours?.prev,
     }),
   );
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
+  // Gas rides last, after the arc — never the lead, so skipLead removes the
+  // teaser sentence alone and the gas clause always survives into the pane. A
+  // transaction carrying several events (Add Collateral and Borrow) states it
+  // on the first of them.
+  const firstInTx = (neighbours?.earlierInTx.length ?? 0) === 0;
+  const withGas =
+    gas && gas.gasCostEth > 0 && firstInTx
+      ? [...clauses, clause(<>Gas for this transaction: {formatGasCost(gas)}.</>)]
+      : clauses;
+  const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
 
   return <ProseExplainer items={items} />;
 }
