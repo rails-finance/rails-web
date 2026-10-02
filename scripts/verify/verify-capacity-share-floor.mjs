@@ -29,12 +29,12 @@
 // Checks:
 //   0. Precondition — EXPLOITER's debt ÷ capacity is above the ceiling; the
 //      queried CONTROL's sits between 0 and the ceiling.
-//   1. EXPLOITER page — the strip reads "Borrow capacity: over 1,000× the
-//      liquidation line".
+//   1. EXPLOITER page — the opened card reads "over 1,000× the liquidation
+//      line" under Health factor.
 //   2. EXPLOITER page — no seven-digit-plus percentage anywhere in the
 //      document (the Explanation stays mounted while hidden, so this
 //      covers its sentence too).
-//   3. CONTROL page — the strip still reads "N.N% of the liquidation line".
+//   3. CONTROL page — the opened card still reads "N.N% of the liquidation line".
 //
 // Proved it can fail 2026-09-03: against the deployed site before the fix
 // (BASE=https://rails-web-onboarding.vercel.app), checks 1 and 2 FAIL while
@@ -44,6 +44,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-capacity-share-floor.mjs
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -51,8 +52,10 @@ const STRIP_TIMEOUT_MS = 240000;
 const CEILING = 1000;
 
 const EXPLOITER = "0x719eae70d4a83f35bf82a2740699f5db84be919d";
-const FLOOR_TEXT = "Borrow capacity: over 1,000× the liquidation line";
-const SHARE_RE = /Borrow capacity: \d+\.\d% of the liquidation line/;
+// The line under the card's Health factor in its opened layer (ui-jobs 209;
+// the heading-row strip read "Borrow capacity: …" until 2 Oct 2026).
+const FLOOR_TEXT = "over 1,000× the liquidation line";
+const SHARE_RE = /\d+\.\d% of the liquidation line/;
 const GIANT_PCT_RE = /\d{7,}\.\d%/;
 
 let failures = 0;
@@ -124,7 +127,13 @@ async function stripText(wallet) {
   await page.goto(`${BASE}/base/moonwell/${wallet}`, NAV);
   let strip = "";
   try {
-    const el = page.getByText("Borrow capacity:", { exact: false }).first();
+    // The card draws the line once opened; the stats grid holds it.
+    await page.locator('[data-anatomy^="P1"]').first().waitFor({ timeout: STRIP_TIMEOUT_MS });
+    await openPositionCards(page);
+    const el = page
+      .locator('[data-anatomy="C10"]')
+      .getByText(/the liquidation line/)
+      .first();
     await el.waitFor({ timeout: STRIP_TIMEOUT_MS });
     strip = (await el.textContent()) ?? "";
   } catch {

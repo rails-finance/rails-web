@@ -66,17 +66,17 @@ const borrowsDebt = (r) => (r.borrows ?? []).reduce((s, x) => s + Number(x.amoun
 const LANES = [
   { api: "aave-v3-base", line: "Health factor", debt: aaveDebt, path: (r) => `/base/aave-v3/${r.wallet}` },
   { api: "seamless", line: "Health factor", debt: aaveDebt, path: (r) => `/base/seamless/${r.wallet}` },
-  { api: "moonwell-base", line: "Borrow capacity", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
+  // The opened card's risk headline and the line under it (ui-jobs 209).
+  { api: "moonwell-base", line: "Health factor", debt: borrowsDebt, path: (r) => `/base/moonwell/${r.wallet}` },
   {
     api: "compound-base",
-    line: "Borrowing limit",
-    runway: "before absorb",
+    line: "Borrowing limit used",
     debt: (r) => Math.max(0, -Number(r.base?.amount ?? 0)),
     path: (r) => `/base/compound-v3/${r.account}`,
   },
   {
     api: "morpho-base",
-    line: "Borrow capacity",
+    line: "of the LLTV",
     runway: "before liquidation",
     debt: (r) => Number(r.borrowed?.amount ?? 0),
     path: (r) => `/base/morpho/${r.owner}/${r.marketId}`,
