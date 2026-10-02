@@ -40,7 +40,8 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ChartBarBig, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -226,7 +227,7 @@ export function ChainTruthTower({
             >
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <ChartBarBig size={14} aria-hidden />
+                  <LifetimeFlowsIcon size={14} />
                   <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
                 </span>
                 <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />

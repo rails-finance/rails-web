@@ -13,7 +13,7 @@
 // is frozen on that day. The day's other events state their time only.
 
 import { useEffect, useState } from "react";
-import { ChartBarBig } from "lucide-react";
+import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 
@@ -79,7 +79,7 @@ export function FlowDayMark({ ts, flash = false }: { ts: number; flash?: boolean
           }}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          <ChartBarBig size={14} aria-hidden />
+          <LifetimeFlowsIcon size={14} />
         </button>
       )}
       <span className="text-xs" data-flow-day-date="">
