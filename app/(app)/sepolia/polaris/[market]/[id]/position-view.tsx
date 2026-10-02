@@ -30,6 +30,7 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PolarisEventCard } from "@/components/protocol/polaris/polaris-event-card";
 import {
   PolarisPositionCard,
+  polarisOwnerWrap,
   viewFromChain,
   mergeChainAndSummary,
   viewFromSummary,
@@ -500,6 +501,7 @@ export default function PolarisPositionView({
         <DetailTopRow
           session="polaris"
           wallet={view?.owner ?? null}
+          owner={{ wallet: view?.owner ?? null, wrap: view ? polarisOwnerWrap(view) : undefined }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}

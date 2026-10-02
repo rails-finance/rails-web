@@ -300,7 +300,9 @@ export function MaplePositionCard({
         <ClosedPositionStats
           outcome="closed"
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
+            receipts ? undefined : (
+              <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
+            )
           }
           identity={<PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} />}
           closedAt={v.lastActivityAt}
@@ -351,7 +353,9 @@ export function MaplePositionCard({
           )
         }
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="maple" bookmarkProtocol="maple" />
+          )
         }
         identity={
           <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} countNounVisible={receipts} />

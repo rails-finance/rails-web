@@ -395,7 +395,14 @@ export function CompoundV2PositionCard({
         <ClosedPositionStats
           outcome={v.status}
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+            receipts ? undefined : (
+              <WalletPill
+                wallet={v.wallet}
+                ensName={null}
+                filterProtocol="compound-v2"
+                bookmarkProtocol="compound-v2"
+              />
+            )
           }
           identity={
             <PositionCardMeta
@@ -442,7 +449,9 @@ export function CompoundV2PositionCard({
           )
         }
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+          )
         }
         identity={
           <PositionCardMeta

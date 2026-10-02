@@ -759,6 +759,7 @@ export default function CompoundBaseWalletView({
             <DetailTopRow
               session="compound-base"
               wallet={wallet}
+              owner={{ wallet }}
               assets={stripAssets}
               closed={views.length > 0 && views.every((v) => v.status !== "open")}
             >

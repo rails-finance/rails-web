@@ -113,8 +113,9 @@ export function LiquityV1PositionCard({
   const disclosing = receipts && !!disclosureKey;
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
-  // it lives safely inside the listing card's <Link>).
-  const walletId = (
+  // it lives safely inside the listing card's <Link>). The detail page draws
+  // it on the wallet row above the card (ui-jobs 228).
+  const walletId = receipts ? undefined : (
     <WalletPill wallet={v.wallet} ensName={null} filterProtocol="liquity-v1" bookmarkProtocol="liquity-v1" />
   );
   // Right-hand activity-meta cluster: time-ago, transaction count, the caution

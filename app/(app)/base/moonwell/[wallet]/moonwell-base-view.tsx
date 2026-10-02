@@ -575,6 +575,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
               <DetailTopRow
                 session="moonwell-base"
                 wallet={wallet}
+                owner={{ wallet }}
                 assets={stripAssets}
                 closed={view != null && view.status !== "open"}
               >

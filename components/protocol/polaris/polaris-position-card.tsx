@@ -30,7 +30,7 @@
 // overlay — the cdpManager's own entire figures at head, the primary truth on
 // the detail page).
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
@@ -300,9 +300,10 @@ function MetaCluster({ v }: { v: PolarisPositionView }) {
 }
 
 /** The card's identity lead: the holder's wallet pill (the bookmark keys off
- *  the holder), then the CDP's own identity. */
-function IdentityLead({ v }: { v: PolarisPositionView }) {
-  if (!v.owner) return <CdpIdentity v={v} />;
+ *  the holder), then the CDP's own identity. The detail page draws the holder
+ *  on the wallet row above the card (ui-jobs 228, `polarisOwnerWrap`). */
+function IdentityLead({ v, wallet = true }: { v: PolarisPositionView; wallet?: boolean }) {
+  if (!v.owner || !wallet) return <CdpIdentity v={v} />;
   const pill = <WalletPill wallet={v.owner} ensName={null} filterProtocol="polaris" bookmarkProtocol="polaris" />;
   return (
     <span className="flex items-center gap-2">
@@ -318,6 +319,18 @@ function IdentityLead({ v }: { v: PolarisPositionView }) {
       )}
       <CdpIdentity v={v} />
     </span>
+  );
+}
+
+/** The holder's receipt on the page's wallet row: on the chain lane the
+ *  holder is the NFT's ownerOf at head. */
+export function polarisOwnerWrap(v: PolarisPositionView): ((pill: ReactNode) => ReactNode) | undefined {
+  if (v.basis !== "chain" || !v.owner) return undefined;
+  const owner = v.owner;
+  return (pill) => (
+    <Prov info={liveOwnerProv(v.market)} value={owner}>
+      {pill}
+    </Prov>
   );
 }
 
@@ -364,7 +377,7 @@ export function PolarisPositionCard({
       >
         <ClosedPositionStats
           outcome={v.status}
-          leadingIdentity={<IdentityLead v={v} />}
+          leadingIdentity={<IdentityLead v={v} wallet={!receipts} />}
           identity={<MetaCluster v={v} />}
           closedAt={v.lastActivityAt ?? undefined}
           collateral={
@@ -456,7 +469,7 @@ export function PolarisPositionCard({
             <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
           )
         }
-        leadingIdentity={<IdentityLead v={v} />}
+        leadingIdentity={<IdentityLead v={v} wallet={!receipts} />}
         identity={<MetaCluster v={v} />}
         columns={[
           {

@@ -371,17 +371,29 @@ function BorrowedValue({
  *  layouts. The pill links to the session's wallet-filtered listing only where
  *  the session HAS a listing — the Base explorer opens on a wallet and has no
  *  list to filter, and a link there would land on a page that ignores it. */
-function CompoundIdentity({ v, session }: { v: CompoundPositionView; session: SessionProtocol }) {
+function CompoundIdentity({
+  v,
+  session,
+  wallet = true,
+}: {
+  v: CompoundPositionView;
+  session: SessionProtocol;
+  /** False on the detail page, whose wallet row above the card names the
+   *  owner (ui-jobs 228). */
+  wallet?: boolean;
+}) {
   const entry = protocolForSession(session);
   const hasListing = entry != null && !EXPLORERS_WITHOUT_LISTING.has(entry.id);
   return (
     <span className="flex items-center gap-2">
-      <WalletPill
-        wallet={v.account}
-        ensName={null}
-        filterProtocol={hasListing ? session : undefined}
-        bookmarkProtocol={session}
-      />
+      {wallet && (
+        <WalletPill
+          wallet={v.account}
+          ensName={null}
+          filterProtocol={hasListing ? session : undefined}
+          bookmarkProtocol={session}
+        />
+      )}
       <span className="text-xs font-semibold text-rb-500">{v.marketLabel}</span>
     </span>
   );
@@ -496,7 +508,7 @@ export function CompoundPositionCard({
       >
         <ClosedPositionStats
           outcome={v.status}
-          leadingIdentity={<CompoundIdentity v={v} session={session} />}
+          leadingIdentity={<CompoundIdentity v={v} session={session} wallet={!receipts} />}
           identity={
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt ?? undefined}
@@ -591,7 +603,7 @@ export function CompoundPositionCard({
         }
         // The protocol name is redundant inside the Compound explorer, so the
         // market label leads, the owner wallet pill alongside.
-        leadingIdentity={<CompoundIdentity v={v} session={session} />}
+        leadingIdentity={<CompoundIdentity v={v} session={session} wallet={!receipts} />}
         // Right-hand activity-meta cluster: time-ago, transaction count, and the
         // liquidation triangle (Comet has no redemption concept).
         identity={

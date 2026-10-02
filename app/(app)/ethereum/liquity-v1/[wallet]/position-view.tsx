@@ -486,6 +486,7 @@ export default function LiquityV1TroveView({
         <DetailTopRow
           session="liquity-v1"
           wallet={wallet}
+          owner={{ wallet }}
           assets={
             chain && view?.status === "open" && chain.price > 0
               ? [{ symbol: "ETH", price: chain.price, info: protocolPriceProv() }]

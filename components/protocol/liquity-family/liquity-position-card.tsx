@@ -639,6 +639,7 @@ export function LiquityPositionCard({
                 // bullet to hand it to.
                 nftUrl={v.nftUrl}
                 shortId={ops.shortId}
+                showOwner={!receipts}
               />
             </>
           }
@@ -703,6 +704,7 @@ export function LiquityPositionCard({
               // the header chip as the only way to reach the NFT.
               showNftLink={!receipts || protocol !== "liquity-v2"}
               shortId={ops.shortId}
+              showOwner={!receipts}
             />
             {/* Delegate marker — name lives in the row below the card, the
                 pink icon here is just a status flag (pink = external party). */}

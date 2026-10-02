@@ -223,10 +223,11 @@ export function FluidPositionCard({
 
   // The owner pill (facehash + copy + bookmark) leads; the pair rides
   // alongside with the NFT id + vault kind, on both surfaces (buttons, not
-  // anchors, so it lives safely inside the listing card's <Link>).
+  // anchors, so it lives safely inside the listing card's <Link>). The detail
+  // page draws the owner on the wallet row above the card (ui-jobs 228).
   const leadingIdentity = (
     <span className="contents text-xs font-semibold text-rb-500">
-      {v.owner ? (
+      {receipts ? null : v.owner ? (
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="fluid" bookmarkProtocol="fluid" />
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>

@@ -803,7 +803,7 @@ function AaveV4SpokePageInner({
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
-        <DetailTopRow session={session} wallet={wallet} assets={stripAssets} closed={positionClosed}>
+        <DetailTopRow session={session} wallet={wallet} owner={{ wallet }} assets={stripAssets} closed={positionClosed}>
           {activeCard && (
             <AaveV4ExportMenu
               spokeName={spokeName}
@@ -838,7 +838,8 @@ function AaveV4SpokePageInner({
                 spokes={[activeCard]}
                 selected={spokeName}
                 onSelect={() => {}}
-                wallet={wallet}
+                // No wallet: the page's wallet row above the card names it
+                // (ui-jobs 228); the spoke name stays with the card.
                 externalActivity={externalActivity}
                 rowExtra={
                   activeCard.totalDebtUsd > 0 && activeCard.healthFactor != null ? (

@@ -25,7 +25,6 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline, type TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -139,7 +138,12 @@ export function TransmuterPositionView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={holder} closed={p.status === "claimed"} />
+        <DetailTopRow
+          session={deployment.session}
+          wallet={holder}
+          owner={{ wallet: holder, prefix: p.owner ? undefined : <span>Claimed by</span> }}
+          closed={p.status === "claimed"}
+        />
 
         {/* ── The position card ──────────────────────────────────────────── */}
         <PositionCardShell receipts>
@@ -154,17 +158,6 @@ export function TransmuterPositionView({
                 <span className="text-xs font-bold tracking-wide text-foreground/80">{name}</span>
                 <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
                   <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-                  {holder ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      {p.owner ? "held now by" : "claimed by"}
-                      <WalletPill
-                        wallet={holder}
-                        ensName={null}
-                        filterProtocol={deployment.session}
-                        bookmarkProtocol={deployment.session}
-                      />
-                    </span>
-                  ) : null}
                 </span>
               </>
             }

@@ -434,6 +434,7 @@ export default function MorphoPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="morpho"
+          owner={{ wallet: liveView?.owner, vault: liveView?.vaultOwner }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.morpho}
           closed={liveView != null && liveView.status !== "open"}

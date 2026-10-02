@@ -495,6 +495,7 @@ export default function CompoundPositionView({
           <DetailTopRow
             session="compound"
             wallet={wallet}
+            owner={{ wallet }}
             assets={stripAssets}
             closed={view != null && view.status !== "open"}
           >

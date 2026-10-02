@@ -172,7 +172,7 @@ export function MakerVaultCard({
   if (v.status === "closed" || v.status === "liquidated") {
     const identity = (
       <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-        {v.owner ? (
+        {receipts ? null : v.owner ? (
           <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
         ) : (
           <span className="font-normal tabular-nums text-rb-400">—</span>
@@ -288,7 +288,7 @@ export function MakerVaultCard({
         // pill's buttons (not anchors) live safely inside the listing card's <Link>.
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            {v.owner ? (
+            {receipts ? null : v.owner ? (
               <WalletPill wallet={v.owner} ensName={null} filterProtocol="makerdao" bookmarkProtocol="makerdao" />
             ) : (
               <span className="font-normal tabular-nums text-rb-400">—</span>

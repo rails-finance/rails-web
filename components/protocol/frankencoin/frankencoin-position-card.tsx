@@ -218,9 +218,18 @@ function MetaCluster({ v, closedBySale = false }: { v: FrankencoinPositionView; 
 /** The card's identity lead, one node for open and closed cards: the owner
  *  wallet pill (facehash + copy + bookmark — the bookmark keys off the owner
  *  wallet, so the address is its home) when the owner is known, then the
- *  position's own identity (contract address · hub · clone). */
-function IdentityLead({ v, cloneParent }: { v: FrankencoinPositionView; cloneParent?: string | null }) {
-  if (!v.owner) return <PositionIdentity v={v} cloneParent={cloneParent} />;
+ *  position's own identity (contract address · hub · clone). The detail page
+ *  draws the owner on the wallet row above the card (ui-jobs 228). */
+function IdentityLead({
+  v,
+  cloneParent,
+  wallet = true,
+}: {
+  v: FrankencoinPositionView;
+  cloneParent?: string | null;
+  wallet?: boolean;
+}) {
+  if (!v.owner || !wallet) return <PositionIdentity v={v} cloneParent={cloneParent} />;
   return (
     <span className="flex items-center gap-2">
       <WalletPill wallet={v.owner} ensName={null} filterProtocol="frankencoin" bookmarkProtocol="frankencoin" />
@@ -387,7 +396,7 @@ export function FrankencoinPositionCard({
           outcome={v.status}
           outcomeLabel={outcomeLabel}
           extra={extra}
-          leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
+          leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} wallet={!receipts} />}
           identity={<MetaCluster v={v} closedBySale={v.status === "closed" && ending?.closedByChallenge === true} />}
           closedAt={closedAt ?? undefined}
           collateral={
@@ -465,7 +474,7 @@ export function FrankencoinPositionCard({
             <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${st.cls}`}>{st.label}</span>
           )
         }
-        leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} />}
+        leadingIdentity={<IdentityLead v={v} cloneParent={cloneParent} wallet={!receipts} />}
         identity={<MetaCluster v={v} />}
         columns={[
           {

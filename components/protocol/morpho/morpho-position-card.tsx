@@ -361,13 +361,15 @@ export function MorphoPositionCard({
           outcome={v.status}
           leadingIdentity={
             <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-              <WalletPill
-                wallet={v.owner}
-                ensName={null}
-                filterProtocol={session}
-                bookmarkProtocol={session}
-                vault={v.vaultOwner}
-              />
+              {!receipts && (
+                <WalletPill
+                  wallet={v.owner}
+                  ensName={null}
+                  filterProtocol={session}
+                  bookmarkProtocol={session}
+                  vault={v.vaultOwner}
+                />
+              )}
               <span>
                 <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />
                 {v.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(v.lltv * 100).toFixed(1)}%</span>}
@@ -457,13 +459,15 @@ export function MorphoPositionCard({
         // card's <Link>).
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            <WalletPill
-              wallet={v.owner}
-              ensName={null}
-              filterProtocol={session}
-              bookmarkProtocol={session}
-              vault={v.vaultOwner}
-            />
+            {!receipts && (
+              <WalletPill
+                wallet={v.owner}
+                ensName={null}
+                filterProtocol={session}
+                bookmarkProtocol={session}
+                vault={v.vaultOwner}
+              />
+            )}
             <span>
               <MorphoMarketPair label={v.marketLabel} marketId={v.marketId} loanToken={v.loanToken} />
               {v.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(v.lltv * 100).toFixed(1)}%</span>}

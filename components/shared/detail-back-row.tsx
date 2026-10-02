@@ -19,6 +19,7 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { PositionWalletRow, type PositionOwner } from "@/components/shared/position-wallet-row";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
  *  + "Back". Smart-back: returns to the listing the viewer actually came from
@@ -112,7 +113,11 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *  sentence, which the dropdown shows in place of the generic "not yet";
  *  `ORACLE_USD_REASON` in lib/shared/oracle-usd-reasons.ts holds them, and the
  *  coverage matrix's `oracleUsd: { why }` cell reads the same string. A view
- *  that has simply not been wired passes neither and keeps the generic line. */
+ *  that has simply not been wired passes neither and keeps the generic line.
+ *
+ *  `owner` draws the wallet row under it (ui-jobs 228): the wallet the page
+ *  belongs to, with Tools moved to that row's right. The row sits nearer the
+ *  card than the back row; the card then leaves the wallet out of its header. */
 export function DetailTopRow({
   session,
   wallet,
@@ -121,6 +126,7 @@ export function DetailTopRow({
   priceReason,
   closed = false,
   closing,
+  owner,
   children,
 }: {
   session: SessionProtocol;
@@ -134,6 +140,8 @@ export function DetailTopRow({
   closed?: boolean;
   /** The prices at the closing row's block (`closingPricesAt`). */
   closing?: ClosingPrices;
+  /** The wallet row (PositionWalletRow); omitted, Tools stays on this row. */
+  owner?: PositionOwner;
   children?: ReactNode;
 }) {
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
@@ -143,7 +151,10 @@ export function DetailTopRow({
   // provenance-receipts-grammar.md §7, the unscoped-sibling gap).
   const registry = useReceiptRegistry();
   return (
-    <div>
+    // With the wallet row, the gap to the card (16px, in place of the page's
+    // space-y-6 margin) is smaller than the gap above the row (24px), so the
+    // row reads with the card.
+    <div className={owner ? "mb-4" : undefined}>
       <div className="mb-2.5">
         <RailHeader session={session} venue="position" />
       </div>
@@ -171,8 +182,16 @@ export function DetailTopRow({
             be reachable before then and on a view that never resolves — which
             is what the dock used to guarantee. A bare menu carries the
             inspector alone until the shapes arrive. */}
-        {children || <ToolsMenu />}
+        {!owner && (children || <ToolsMenu />)}
       </div>
+      {owner && (
+        <div className="mt-6">
+          {/* In the row's scope: a holder can carry a receipt (Polaris). */}
+          <ProvReceiptsScope registry={registry}>
+            <PositionWalletRow owner={owner} session={session} tools={children} />
+          </ProvReceiptsScope>
+        </div>
+      )}
     </div>
   );
 }
