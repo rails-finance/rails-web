@@ -345,3 +345,119 @@ test("between events the debt grows by its interest and the collateral keeps its
   }
   assert.ok(checked >= 5, `${checked} quiet stretches`);
 });
+
+// A redistribution, written into real rows: none of the 17 Sepolia
+// liquidations by 2 Oct 2026 passed anything on, so the fixtures' rows are
+// edited the way one would read. The liquidated CDP's Liquidation log moves
+// part of its seizure and its cleared debt from the pool's share to
+// `_collRedistributed` / `_debtRedistributed`; a receiving CDP's next touch
+// states an after-image past its legs by what it received.
+test("a redistribution takes its own lines, on the liquidated CDP and on a receiving one, and they add", () => {
+  const big = (s: string | null) => BigInt(s ?? "0");
+  const linesAdd = (f: Fixture, what: string) => {
+    const m = model(f);
+    for (let stop = 0; stop <= m.liveStop; stop++) {
+      const st = stateAt(m, stop);
+      for (const side of ["collateral", "debt"] as const) {
+        const r = sideSumRows(st[side], m.unit);
+        assert.equal(
+          r.lines.reduce((a, l) => a + l.dollars, 0),
+          r.total.dollars,
+          `${what} ${side} at stop ${stop}: lines add`,
+        );
+      }
+    }
+    return m;
+  };
+  const chainsAndBalances = (rp: PolarisReplay, what: string) => {
+    assert.deepEqual(rp.unchained, [], `${what}: rows chain`);
+    assert.deepEqual(rp.unbalanced, [], `${what}: rows balance`);
+    let coll = 0;
+    let debt = 0;
+    for (const r of rp.replayed) {
+      for (const l of r.legs) {
+        assert.ok(l.amount > 0, `${what} ${l.bucket}: positive`);
+        const s = PL_OUT_KEYS.has(l.bucket) ? -1 : 1;
+        if (PL_COLL_KEYS.has(l.bucket)) coll += s * l.amount;
+        else debt += s * l.amount;
+      }
+      assert.ok(near(coll, r.coll), `${what} ${r.row.id}: collateral`);
+      assert.ok(near(debt, r.debt), `${what} ${r.row.id}: debt`);
+    }
+  };
+
+  // The liquidated CDP: two fifths of the pool's share passed on instead.
+  const base = fx("liquidated");
+  const liqAt = base.rows.findIndex((r) => r.coll_liquidated != null);
+  const liq = base.rows[liqAt];
+  const rColl = (big(liq.coll_liquidated) * BigInt(2)) / BigInt(5);
+  const rDebt = (big(liq.debt_liquidated) * BigInt(2)) / BigInt(5);
+  const passed: Fixture = {
+    ...base,
+    name: "liquidated-redistributed",
+    rows: base.rows.map((r, i) =>
+      i !== liqAt
+        ? r
+        : {
+            ...r,
+            coll_liquidated: String(big(r.coll_liquidated) - rColl),
+            debt_liquidated: String(big(r.debt_liquidated) - rDebt),
+            coll_redistributed: String(rColl),
+            debt_redistributed: String(rDebt),
+          },
+    ),
+  };
+  const rp = replay(passed);
+  chainsAndBalances(rp, "liquidated");
+  assert.ok(near(total(rp, PF.collRedistOut), Number(rColl) / 1e18, 1e-12), "collateral passed on");
+  assert.ok(near(total(rp, PF.debtRedistOut), Number(rDebt) / 1e18, 1e-12), "debt passed on");
+  // The seizure is unchanged: what the pool took, what it passed on and the surplus.
+  const before = replay(base);
+  assert.ok(
+    near(
+      total(rp, PF.collLiquidated) + total(rp, PF.collRedistOut) + total(rp, PF.surplus),
+      total(before, PF.collLiquidated) + total(before, PF.surplus),
+      1e-12,
+    ),
+  );
+  assert.ok(near(total(rp, PF.debtLiquidated) + total(rp, PF.debtRedistOut), total(before, PF.debtLiquidated), 1e-12));
+  const m1 = linesAdd(passed, "liquidated");
+  const labels1 = m1.buckets.map((b) => b.label);
+  assert.equal(labels1.filter((l) => l === "Redistributed to other CDPs").length, 2, "a line on each side");
+
+  // A receiving CDP: 1.5 pETH and 300 USDp arrive at its 20th touch.
+  const host = fx("open-interest");
+  const k = 19;
+  const gColl = BigInt("1500000000000000000");
+  const gDebt = BigInt("300000000000000000000");
+  const plus = (s: string | null, g: bigint) => String(big(s) + g);
+  const received: Fixture = {
+    ...host,
+    name: "open-received",
+    rows: host.rows.map((r, i) =>
+      i < k || r.new_coll == null
+        ? r
+        : {
+            ...r,
+            new_coll: plus(r.new_coll, gColl),
+            new_debt: plus(r.new_debt, gDebt),
+            ...(i > k ? { coll_before: plus(r.coll_before, gColl), debt_before: plus(r.debt_before, gDebt) } : {}),
+          },
+    ),
+  };
+  const rp2 = replay(received);
+  chainsAndBalances(rp2, "receiving");
+  assert.ok(near(total(rp2, PF.collRedistIn), 1.5, 1e-12), "Redistribution gains");
+  assert.ok(near(total(rp2, PF.debtRedistIn), 300, 1e-12), "Redistributed debt");
+  const at = rp2.replayed.find((r) => r.legs.some((l) => l.bucket === PF.collRedistIn))!;
+  assert.equal(at.row.id, polarisFlowRows(events(received))[k].id, "on the touch that wrote it in");
+  const m2 = linesAdd(received, "receiving");
+  const labels2 = m2.buckets.map((b) => b.label);
+  assert.ok(labels2.includes("Redistribution gains") && labels2.includes("Redistributed debt"));
+  // Nothing passed on to the fixtures as read.
+  for (const f of ALL) {
+    const r = replay(f);
+    for (const key of [PF.collRedistIn, PF.debtRedistIn, PF.collRedistOut, PF.debtRedistOut])
+      assert.equal(total(r, key), 0, `${f.name}: ${key}`);
+  }
+});

@@ -24,6 +24,11 @@
 // PSM's net shares, and the stables minted to settle a debt the shares took
 // below zero.
 //
+// Redistribution (none on Sepolia by 2 Oct 2026). A liquidation's part the
+// pool does not absorb (`_collRedistributed`, `_debtRedistributed`) takes
+// its own lines on the liquidated CDP; what a receiving CDP's touch states
+// past its legs is its Redistribution gains and Redistributed debt.
+//
 // Between rows. Interest accrues on the recorded debt at the market's rate
 // (primary + secondary, the secondary on no row), so the debt grows between
 // two rows by the next row's interest, in a straight line over the time
@@ -56,6 +61,8 @@ export const PF = {
   withdrawn: "pl-withdrawn",
   psmCollOut: "pl-psm-coll-out",
   collLiquidated: "pl-coll-liquidated",
+  collRedistOut: "pl-coll-redist-out",
+  collRedistIn: "pl-coll-redist-in",
   surplus: "pl-surplus",
   borrowed: "pl-borrowed",
   interest: "pl-interest",
@@ -65,6 +72,8 @@ export const PF = {
   stability: "pl-stability",
   psmDebtOut: "pl-psm-debt-out",
   debtLiquidated: "pl-debt-liquidated",
+  debtRedistOut: "pl-debt-redist-out",
+  debtRedistIn: "pl-debt-redist-in",
 } as const;
 
 export const PL_COLL_KEYS = new Set<string>([
@@ -74,17 +83,21 @@ export const PL_COLL_KEYS = new Set<string>([
   PF.withdrawn,
   PF.psmCollOut,
   PF.collLiquidated,
+  PF.collRedistOut,
+  PF.collRedistIn,
   PF.surplus,
 ]);
 export const PL_OUT_KEYS = new Set<string>([
   PF.withdrawn,
   PF.psmCollOut,
   PF.collLiquidated,
+  PF.collRedistOut,
   PF.surplus,
   PF.repaid,
   PF.stability,
   PF.psmDebtOut,
   PF.debtLiquidated,
+  PF.debtRedistOut,
 ]);
 /** The legs that built up since the CDP's last touch and were written in at
  *  this one: not the event's act. */
@@ -97,6 +110,8 @@ export const PL_ACCRUAL_KEYS = new Set<string>([
   PF.settled,
   PF.stability,
   PF.psmDebtOut,
+  PF.collRedistIn,
+  PF.debtRedistIn,
 ]);
 
 /** Every bucket, in drawing order: each side's in-lines, then its out-lines.
@@ -113,6 +128,16 @@ const ALL_BUCKETS: FlowBucket[] = [
     dir: "in",
     hatch: "checker",
     link: "polaris-psm-added",
+  },
+  // Another CDP's liquidation passed on to this one (none on Sepolia by 2 Oct 2026).
+  {
+    key: PF.collRedistIn,
+    label: "Redistribution gains",
+    event: "Redistribution",
+    side: "collateral",
+    dir: "in",
+    hatch: "grid",
+    link: "polaris-redistribution",
   },
   { key: PF.withdrawn, label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out" },
   {
@@ -136,6 +161,17 @@ const ALL_BUCKETS: FlowBucket[] = [
     hatch: "forward",
     link: "liquidation",
   },
+  // A liquidation's part the pool did not absorb, passed on to the other CDPs.
+  {
+    key: PF.collRedistOut,
+    label: "Redistributed to other CDPs",
+    event: "Liquidation",
+    side: "collateral",
+    dir: "out",
+    tone: "liquidation",
+    hatch: "cross",
+    link: "liquidation",
+  },
   { key: PF.surplus, label: "Surplus to claim", event: "Liquidation", side: "collateral", dir: "out", hatch: "dots" },
   { key: PF.borrowed, label: "Borrowed", event: "Borrow", side: "debt", dir: "in" },
   { key: PF.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
@@ -149,6 +185,15 @@ const ALL_BUCKETS: FlowBucket[] = [
     link: "polaris-psm-added",
   },
   { key: PF.settled, label: "Settled to zero", event: "", side: "debt", dir: "in", hatch: "grid" },
+  {
+    key: PF.debtRedistIn,
+    label: "Redistributed debt",
+    event: "Redistribution",
+    side: "debt",
+    dir: "in",
+    hatch: "dots",
+    link: "polaris-redistribution",
+  },
   { key: PF.repaid, label: "Repaid", event: "Repay", side: "debt", dir: "out" },
   // Vertical lines, as Frankencoin's Reserve share returned: the debt's
   // dashes are Interest's.
@@ -172,6 +217,16 @@ const ALL_BUCKETS: FlowBucket[] = [
     dir: "out",
     tone: "liquidation",
     hatch: "forward",
+    link: "liquidation",
+  },
+  {
+    key: PF.debtRedistOut,
+    label: "Redistributed to other CDPs",
+    event: "Liquidation",
+    side: "debt",
+    dir: "out",
+    tone: "liquidation",
+    hatch: "cross",
     link: "liquidation",
   },
 ];
@@ -205,6 +260,10 @@ export interface PolarisFlowRow {
   newDebt: bigint;
   /** A liquidation's collateral left for the owner to claim. */
   surplus: bigint;
+  /** A liquidation's collateral and debt passed on to the other CDPs
+   *  (`_collRedistributed`, `_debtRedistributed`). */
+  redistColl: bigint;
+  redistDebt: bigint;
   /** pETH in the market's stablecoin at the row's block, where the lane
    *  priced it. */
   price: number | null;
@@ -258,6 +317,8 @@ export function polarisFlowRows(events: BaseActivityEvent[]): PolarisFlowRow[] {
       newColl: wei(r.newColl, c.newColl),
       newDebt: wei(r.newDebt, c.newDebt),
       surplus: c.eventType === "liquidate" ? wei(r.collSurplus, c.collSurplus) : ZERO,
+      redistColl: c.eventType === "liquidate" ? wei(r.collRedistributed, c.collRedistributed) : ZERO,
+      redistDebt: c.eventType === "liquidate" ? wei(r.debtRedistributed, c.debtRedistributed) : ZERO,
       price: price != null && price > 0 ? price : null,
     });
   }
@@ -354,13 +415,22 @@ export function replayPolaris(rows: PolarisFlowRow[], live: PolarisLive | null, 
       else if (v < ZERO) add(outKey, -v);
     };
     if (r.kind === "liquidation") {
+      // What the pool absorbed is Liquidated; what it passed on to the
+      // other CDPs, its own line; the surplus the owner's to claim.
       const taken = r.collChange < ZERO ? -r.collChange : ZERO;
       const surplus = r.surplus > taken ? taken : r.surplus > ZERO ? r.surplus : ZERO;
-      add(PF.collLiquidated, taken - surplus);
+      const left = taken - surplus;
+      const redistColl = r.redistColl > left ? left : r.redistColl > ZERO ? r.redistColl : ZERO;
+      add(PF.collLiquidated, left - redistColl);
+      add(PF.collRedistOut, redistColl);
       add(PF.surplus, surplus);
       if (r.collChange > ZERO) add(PF.deposited, r.collChange);
-      if (r.debtChange < ZERO) add(PF.debtLiquidated, -r.debtChange);
-      else add(PF.borrowed, r.debtChange);
+      if (r.debtChange < ZERO) {
+        const cleared = -r.debtChange;
+        const redistDebt = r.redistDebt > cleared ? cleared : r.redistDebt > ZERO ? r.redistDebt : ZERO;
+        add(PF.debtLiquidated, cleared - redistDebt);
+        add(PF.debtRedistOut, redistDebt);
+      } else add(PF.borrowed, r.debtChange);
     } else {
       signed(r.collChange, PF.deposited, PF.withdrawn);
       signed(r.debtChange, PF.borrowed, PF.repaid);
@@ -373,7 +443,13 @@ export function replayPolaris(rows: PolarisFlowRow[], live: PolarisLive | null, 
     add(PF.settled, r.settled);
     const collSum = prevColl + r.collChange + r.mintRedeemCollGain + r.bcTokenGain;
     const debtSum = prevDebt + r.debtChange + r.accruedInterest + r.mintRedeemDebtGain - r.stableGain + r.settled;
-    if (collSum !== r.newColl || debtSum !== r.newDebt) unbalanced.push(r.id);
+    // Another CDP's liquidation passed on to this one arrives with no leg of
+    // its own: what the after-image holds past the legs, on an owner's row.
+    const gainColl = r.kind === "owner" && r.newColl > collSum ? r.newColl - collSum : ZERO;
+    const gainDebt = r.kind === "owner" && r.newDebt > debtSum ? r.newDebt - debtSum : ZERO;
+    add(PF.collRedistIn, gainColl);
+    add(PF.debtRedistIn, gainDebt);
+    if (collSum + gainColl !== r.newColl || debtSum + gainDebt !== r.newDebt) unbalanced.push(r.id);
     out.push({
       row: r,
       legs,
