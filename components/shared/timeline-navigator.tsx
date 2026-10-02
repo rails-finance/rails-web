@@ -86,9 +86,7 @@
 // is one grid and one editable spread.
 //
 // This was the third revision of the same model in a day, which is the point of
-// a flag. It is NOT rot: the absence of a day tier is a decision, and
-// `verify-timeline-navigator.mjs` says so in its own header so the missing
-// checks do not read later as checks that quietly stopped running.
+// a flag. It is NOT rot: the absence of a day tier is a decision.
 //
 // ── WHY A DROPDOWN, AND WHY IT DOES NOT RESTATE THE COUNT
 //

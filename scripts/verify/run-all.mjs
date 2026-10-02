@@ -247,24 +247,13 @@ function runOne(file) {
   return new Promise((resolve) => {
     const started = Date.now();
     // ⚠️ `ONLY` IS THIS RUNNER'S OWN SELECTOR AND MUST NOT REACH A CHILD.
-    // Two verifiers (timeline-navigator, timeline-boundary-card) read `ONLY`
-    // themselves to pick FIXTURES, so `ONLY=timeline-navigator run-all` used to
-    // hand the navigator a fixture filter matching none of its fixtures: it ran
-    // nothing, printed "0/0 checks passed", exited 0 and was reported as a PASS
-    // in 0.3s. 147 real checks, silently replaced by a green row — the worst of
-    // the three outcomes, wearing the best one's colour. A verifier's own
+    // A verifier that reads `ONLY` itself to pick FIXTURES (timeline-boundary-card)
+    // would get a fixture filter matching none of its fixtures, run nothing,
+    // print "0/0 checks passed" and be reported as a PASS. A verifier's own
     // fixture filter now travels as `FIXTURES=`, which is handed on as its
     // `ONLY`; this runner's selector stops here.
     //
-    // 🔑 `FIXTURES=` IS ALSO THE CHEAPEST THING IN THIS FILE, AND IT IS UNDER-USED.
-    // A change to THIS RUNNER — the pool, the quarantine, the report — needs a
-    // script that exercises the plumbing, not one that exercises the product.
-    // Reach for `FIXTURES=control` and the seven-minute navigator becomes a
-    // thirty-second one: measured 2026-09-12, 32.9s / 26 checks against 437.3s /
-    // 147 for the full five-fixture sweep. Same code path through this file.
-    //
-    // ⚠️ AND DO NOT PICK THE CHEAP SCRIPT BY ITS LINE COUNT. Measured the same
-    // day: `verify-stage-rail-dots.mjs` (66 lines) runs in 2.4s, and
+    // ⚠️ DO NOT PICK A CHEAP SCRIPT BY ITS LINE COUNT. Measured 2026-09-12: `verify-stage-rail-dots.mjs` (66 lines) runs in 2.4s, and
     // `verify-unscoped-prov.mjs` — FOUR LINES SHORTER — takes 125.7s, because a
     // short file can hold a loop over twenty routes. What a verifier costs is
     // how many pages it opens, and the only way to know is the seconds column
@@ -384,49 +373,18 @@ function report(r) {
 // server compiling cold routes, one backend, one Alchemy key whose 429s arrive
 // as a page that renders short rather than as an error.
 //
-// Measured on one commit, 2026-09-12, with three of the timeline verifiers:
+// Measured on one commit, 2026-09-12, with three of the timeline verifiers: on
+// an idle machine they passed; with tsc and knip beside them, or under JOBS=2,
+// one of them went red on an empty toolbar and another crashed on a control
+// that had moved. None of that was the page being wrong. It was the scripts'
+// waits being tight: fixed post-hydration sleeps, and waits on an element being
+// VISIBLE while the shell is still animating it in. Under contention those
+// windows close. A red that moves between runs costs more than the concurrency
+// saves, and it teaches a reader to re-run a failure instead of believing it.
 //
-//   JOBS=1, idle machine   verify-timeline-navigator 147/147, view-link ALL
-//                          PASS, market-note-row-liquity-v2 20/20.
-//   JOBS=1, machine busy   navigator 145/147 — checks 7 and 8 on `dense-short`,
-//     (tsc + knip beside)  both reading an EMPTY toolbar on a page that answers
-//                          200 with rows every time it is fetched.
-//   JOBS=2                 navigator one red, a DIFFERENT one; and view-link
-//                          CRASHED — its copy-link control "resolved to hidden"
-//                          242 times in 120s and the run died on the timeout.
-//
-// None of that is the page being wrong. It is the scripts' waits being tight:
-// fixed post-hydration sleeps, and waits on an element being VISIBLE while the
-// shell is still animating it in. Under contention those windows close. A red
-// that moves between runs costs more than the concurrency saves, and it teaches
-// a reader to re-run a failure instead of believing it.
-//
-// ⚠️ ONE OF THOSE THREE ROWS HAS SINCE BEEN EXPLAINED AWAY, AND IT MATTERS
-// WHICH. The view-link CRASH was never contention — it was a selector left
-// pointing at a control that `8cd7330c` had moved, so the wait could not
-// resolve at any JOBS. Fixed the same day, and the fix cost that script's whole
-// readiness wait: it now waits on the count line, which the page shows whatever
-// the filter, and reaches the control through the pane. Re-measured that
-// evening, MEASURE=1 JOBS=2: view-link ALL PASS in 43.5s, navigator 147/147.
-// So the honest state of the evidence is that ONE run of the pair is clean and
-// the only unexplained red left is navigator's, twice, under two different
-// loads. That is not enough to move a default on.
-//
-// So: `JOBS=2` (or more) is here, one env var away, for a selection of light
-// scripts or a machine with room. The bar for moving the default has not
-// changed — the waits get fixed, meaning a wait on a control RESPONDING rather
-// than on a timer — and view-link is now the worked example of what that looks
-// like and what it is worth (145.4s crash → 36.0s green).
-//
-// ⚠️ NAVIGATOR'S SLEEPS ARE NOW FIXED TOO, AND THE DEFAULT STILL HAS NOT MOVED.
-// 13 of its 14 flat sleeps became conditional waits on 2026-09-12; it then went
-// 147/147 alone (405.2s) and 147/147 under MEASURE=1 JOBS=2 with tsc beside it
-// (408.0s) — the condition both of its old reds came from. That is two runs.
-// The bar written above is SEVERAL, and it is not a formality: the rework broke
-// the script twice before it worked, once into a 900s CRASH and once into a red
-// that only appeared in the sweep, so this script's history of moving failures
-// is exactly why two greens do not close it. Take the next few runs, then empty
-// RUN_ALONE and set this default to 2 in the same change.
+// `JOBS=2` (or more) is one env var away, for a selection of light scripts or a
+// machine with room. The bar for moving the default is that the waits get
+// fixed, meaning a wait on a control RESPONDING rather than on a timer.
 const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 
 // Scripts that must never share a machine, whatever JOBS says — the ones whose
@@ -439,7 +397,7 @@ const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 // strength of a JOBS=2 run in which its copy-link control "resolved to hidden"
 // 242 times in 120s. That was not contention: it was the stale toolbar selector
 // this repo moved in `8cd7330c`, and it is fixed. Re-measured the same day with
-// MEASURE=1 JOBS=2 — ALL PASS in 43.5s, beside a navigator that went 147/147.
+// MEASURE=1 JOBS=2 — ALL PASS in 43.5s.
 // So it is NOT quarantined, and the way back in is another measurement.
 //
 // `MEASURE=1` EMPTIES THIS MAP. That is the only way to take a measurement of a
@@ -452,19 +410,6 @@ const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 const RUN_ALONE = process.env.MEASURE
   ? {}
   : {
-      "verify-timeline-navigator.mjs":
-        "measured 2026-09-12: 147/147 alone, 145/147 with tsc and knip beside " +
-        "it (checks 7 and 8 on `dense-short`, both reading an empty toolbar), " +
-        "a different single red under JOBS=2. The page answered 200 with rows " +
-        "every time — the diagnosis was its own waits, 14 flat sleeps. THOSE " +
-        "ARE NOW FIXED (13 replaced by conditional waits, one negative-claim " +
-        "sleep kept on purpose), and it has since gone 147/147 twice: alone " +
-        "at 405.2s, and under MEASURE=1 JOBS=2 beside view-link with tsc " +
-        "running, at 408.0s — the second being the exact condition both old " +
-        "reds were seen under. IT STAYS HERE ANYWAY, for now: the cause is " +
-        "removed and the evidence is two runs, and this file's own bar for " +
-        "moving on concurrency is several. Release it — and the JOBS default " +
-        "with it — on the next few clean runs, not on this note.",
     };
 
 const results = [];

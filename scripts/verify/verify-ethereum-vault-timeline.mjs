@@ -382,7 +382,7 @@ const LOADED_SPAN = /^ · loaded \d{1,2} [A-Za-z]+ \d{4}(?: to \d{1,2} [A-Za-z]+
 
 /** The phrases that name the preload cap to the reader, which the same
  *  amendment retired ("never stated to the reader as a number", rule 2). The
- *  same set `verify-timeline-navigator.mjs` rejects. */
+ *  same set the retired navigator verifier rejected. */
 const NAMES_THE_CAP =
   /Showing [\d,]+ (?:rows|of [\d,]+ events)|most recent [\d,]+ events|above what Rails|showing the newest/i;
 

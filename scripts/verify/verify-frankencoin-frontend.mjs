@@ -300,6 +300,7 @@ const noDollar = (name, text) => {
     "system: the capital's two accounts + the pool render",
     /Equity \(FPS holders\)/.test(t) && /Borrowers' reserve/.test(t) && /Reserve pool, total/.test(t),
   );
+  check("system: FCS wrapping FPS one to one is stated", /FCS, the share token in Frankencoin's docs, wraps FPS one to one/.test(t));
   check("system: FPS price renders in ZCHF (never USD)", /FPS price\s*\n\s*[\d.,]+ ZCHF/.test(t));
   check("system: the Leadrate renders as a percent", /Base rate \(Leadrate\)\s*\n\s*[\d.]+%/.test(t));
   check(

@@ -79,6 +79,10 @@ function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {
       </div>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
+        FCS, the share token in Frankencoin&rsquo;s docs, wraps FPS one to one.
+      </p>
+
+      <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         ZCHF is a Swiss-franc stablecoin with more than one minter — the hubs below, a bridge, and the savings
         module&rsquo;s interest all mint it — so the supply is the franc count itself, stated beside the hub book rather
         than equated with it. The FPS price is the Equity contract&rsquo;s own issuance rule (3 × equity ÷ FPS supply),

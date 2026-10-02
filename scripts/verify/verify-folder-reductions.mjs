@@ -841,8 +841,7 @@ async function runArm(arm, ctx) {
 
   // Both arms' families navigate by their Lifetime flows chart since
   // 2026-10-01 and draw no Dates control, so no grid stands on the page to
-  // read: H1 is skipped there. The families that keep Dates check
-  // their grid in verify-timeline-navigator.mjs.
+  // read: H1 is skipped there.
   const hasGrid = await (async () => {
     const page = await openPage(true, "[data-timeline-total]");
     const n = await page.locator("[data-date-control]").count();

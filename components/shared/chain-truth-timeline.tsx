@@ -1587,9 +1587,8 @@ function ChainTruthTimelineBody({
 
   const windowed = hasMore ? rows.slice(0, windowSize) : rows;
 
-  // Each drawn row stamps its own moment as `data-row-at`, which is how
-  // `verify-timeline-navigator.mjs` asserts that every row of a loaded
-  // segment falls inside its month.
+  // Each drawn row stamps its own moment as `data-row-at`, which lets a
+  // check assert that every row of a loaded segment falls inside its month.
 
   // Every card carries its date. Grouping by day (the date on the newest, then
   // the newest and oldest card of each day) left the middle cards of a busy

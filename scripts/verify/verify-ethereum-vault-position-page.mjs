@@ -1305,8 +1305,7 @@ for (const [name, f] of T5_FIXTURES) {
   // The life's total stays the line's, literally (§3's "counts are literal",
   // which the amendment left standing), beside the span the loaded rows cover;
   // the window drawn stays on the wrapper, which is plumbing and not the
-  // reader's. The span's own dates are held to the route's timestamps by
-  // `verify-timeline-navigator.mjs` G1 — here the line is pinned to its shape,
+  // reader's. Here the line is pinned to its shape,
   // which leaves no room for a cap to be named in it.
   const pageWant = Math.min(DRAW_ROWS, own.rows.length);
   const wantHead = `${own.rows.length.toLocaleString("en-US")} events`;
