@@ -16,7 +16,11 @@
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
-import { frankencoinZchfSplit, useFrankencoinEventRead } from "@/lib/frankencoin/use-event-read";
+import {
+  frankencoinChargedTerm,
+  frankencoinZchfSplit,
+  useFrankencoinEventRead,
+} from "@/lib/frankencoin/use-event-read";
 import { termText } from "@/lib/frankencoin/figures";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { dateTimeText, phaseText, spanText } from "@/lib/frankencoin/figures";
@@ -86,22 +90,35 @@ export function FrankencoinPositionExplanation({
   );
   const lastSplit =
     lastMintCtx && lastMintRead
-      ? frankencoinZchfSplit(lastMintRead, Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0))
+      ? frankencoinZchfSplit(
+          lastMintRead,
+          Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0),
+          chain.hub,
+        )
       : null;
   const lastGross = lastMintCtx ? Number(lastMintCtx.minted ?? 0) - Number(lastMintCtx.mintedBefore ?? 0) : 0;
   // What a mint made now gives up as interest: the annual rate for the years
-  // left to expiry (PositionV2.calculateFee).
+  // left to expiry (PositionV2.calculateFee), at least 4 weeks on V1
+  // (PositionV1.calculateCurrentFee).
   const feeFrom = chain.start != null ? Math.max(now, chain.start) : now;
+  const todayTerm =
+    chain.expiration != null && chain.expiration > feeFrom
+      ? frankencoinChargedTerm(chain.hub, chain.expiration, feeFrom)
+      : null;
   const todayFeePct =
-    chain.annualInterestPPM != null && chain.expiration != null && chain.expiration > feeFrom && !chain.isClosed
-      ? Math.min(100, (chain.annualInterestPPM / 10_000) * ((chain.expiration - feeFrom) / (365 * 86400)))
+    chain.annualInterestPPM != null && todayTerm != null && !chain.isClosed
+      ? Math.min(100, (chain.annualInterestPPM / 10_000) * (todayTerm.days / 365))
       : null;
   const lastMintRate =
     lastMint && lastSplit?.ratePct != null ? (
       <>
         {" "}
         Its last mint, on {dateOf(lastMint.timestamp)}, paid <H>{lastSplit.ratePct.toFixed(2)}%</H> a year
-        {lastSplit.termDays != null ? <> for the {termText(lastSplit.termDays)} left to expiry</> : null}
+        {lastSplit.minimumTerm ? (
+          <> for 28 days, the Hub V1 minimum</>
+        ) : lastSplit.termDays != null ? (
+          <> for the {termText(lastSplit.termDays)} left to expiry</>
+        ) : null}
         {lastSplit.interest != null && lastGross > 0 ? (
           <>, {((lastSplit.interest / lastGross) * 100).toFixed(2)}% of the amount</>
         ) : null}
@@ -220,9 +237,12 @@ export function FrankencoinPositionExplanation({
             (the system base rate, set by governance, plus this position&rsquo;s{" "}
             {ppmToPct(chain.riskPremiumPPM).toFixed(2)}% risk premium)
           </>
+        ) : chain.hub === "v1" ? (
+          <>, fixed when the position opened</>
         ) : null}
-        , charged <H>at the mint</H> for the time left to expiry and taken from the minted amount: the rate times the
-        years left
+        , charged <H>at the mint</H> for the time left to expiry
+        {chain.hub === "v1" ? <> and at least 4 weeks</> : null} and taken from the minted amount: the rate times the
+        years charged
         {todayFeePct != null ? (
           <>
             , so a mint today gives up <H>{todayFeePct.toFixed(2)}%</H> of the amount
@@ -235,7 +255,9 @@ export function FrankencoinPositionExplanation({
   } else if (chain.isClosed && lastMintRate) {
     bullets.push(
       <span key="interest">
-        Interest was charged at each mint for the time left to expiry, at the rate in force then.
+        {chain.hub === "v1"
+          ? "Interest was charged at each mint for the time left to expiry and at least 4 weeks, at the rate fixed when the position opened."
+          : "Interest was charged at each mint for the time left to expiry, at the rate in force then."}
         {lastMintRate}
       </span>,
     );

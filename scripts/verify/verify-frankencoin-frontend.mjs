@@ -295,7 +295,7 @@ const noDollar = (name, text) => {
 // ── Section 3 — the system view ───────────────────────────────────────────────
 {
   const t = await textOf(`${EXPLORER}/system`, "text=The franc");
-  check("system: the franc renders (supply in ZCHF)", /ZCHF in existence\s*\n\s*[\d.,]+[KMB]? ZCHF/.test(t));
+  check("system: the franc renders (supply in ZCHF)", /ZCHF on Ethereum\s*\n\s*[\d.,]+[KMB]? ZCHF/.test(t));
   check(
     "system: the capital's two accounts + the pool render",
     /Equity \(FPS holders\)/.test(t) && /Borrowers' reserve/.test(t) && /Reserve pool, total/.test(t),

@@ -525,7 +525,7 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
           changed: ctx.minted !== ctx.mintedBefore,
           ...debtLedger,
           sub:
-            zchfSplitLine(read ? frankencoinZchfSplit(read, dMint) : null, coords, sym) ??
+            zchfSplitLine(read ? frankencoinZchfSplit(read, dMint, ctx.hub) : null, coords, sym) ??
             (pending ? <span className="text-rb-400">reading the receipt…</span> : undefined),
         });
       }
@@ -594,7 +594,14 @@ function zchfSplitLine(
             >
               <span className="tabular-nums">{split.ratePct.toFixed(2)}% a year</span>
             </Prov>
-            {split.termDays != null && <> for {termText(split.termDays)}</>})
+            {split.termDays != null && (
+              <>
+                {" "}
+                for {termText(split.termDays)}
+                {split.minimumTerm ? ", the V1 minimum" : ""}
+              </>
+            )}
+            )
           </>
         )}
       </>

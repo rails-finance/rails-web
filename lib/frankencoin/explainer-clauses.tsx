@@ -283,7 +283,11 @@ export function frankencoinEventSlots(
                 {split.ratePct != null ? (
                   <>
                     : {split.ratePct.toFixed(2)}% a year, the rate in force at this block
-                    {split.termDays != null ? <>, for the {termText(split.termDays)} left to expiry</> : null}
+                    {split.minimumTerm ? (
+                      <>, for 28 days: Hub V1 charges at least 4 weeks, and fewer were left to expiry</>
+                    ) : split.termDays != null ? (
+                      <>, for the {termText(split.termDays)} left to expiry</>
+                    ) : null}
                     {mintGross > 0 ? <>, {((split.interest / mintGross) * 100).toFixed(2)}% of the mint</> : null}
                   </>
                 ) : (

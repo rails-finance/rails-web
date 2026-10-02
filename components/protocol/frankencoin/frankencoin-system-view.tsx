@@ -61,7 +61,7 @@ function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {
       <div className="text-xs font-semibold text-foreground">The franc</div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-        <Stat label="ZCHF in existence">
+        <Stat label="ZCHF on Ethereum">
           <Prov info={zchfSupplyProv()} value={formatExact(data.zchfSupply)}>
             <AmountText value={data.zchfSupply} format="compact" /> ZCHF
           </Prov>
@@ -237,10 +237,14 @@ function BookCard({ book, supply }: { book: FrankencoinBook; supply: number }) {
 
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
             Minted by the open book is what the open positions owe, gross: each mint counted in full, including the
-            reserve share and the interest that went to the reserve. ZCHF in existence is the token&rsquo;s supply, from
-            every minter.
+            reserve share and the interest that went to the reserve. ZCHF on Ethereum is the token&rsquo;s supply here,
+            from every minter; ZCHF sent to another chain through Chainlink CCIP is burned on Ethereum.
             {overSupply > 0.005 && (
-              <> On this page&rsquo;s figures the open book owes {fmtZchf(overSupply)} ZCHF more than the supply.</>
+              <>
+                {" "}
+                On this page&rsquo;s figures the open book owes {fmtZchf(overSupply)} ZCHF more than that supply: more
+                ZCHF has left for other chains than the bridges and other minters have added.
+              </>
             )}
           </p>
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">

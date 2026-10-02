@@ -3849,8 +3849,14 @@ const FC_PAGE = {
 /** One source per claim, each labelled by what it backs up. */
 const fcSource = (label: string, page: keyof typeof FC_PAGE): LearnMoreLink => ({ label, url: FC_PAGE[page] });
 
-/** Mint, repay, a combined adjust, a close — the ZCHF side of a position. */
-export function frankencoinMintingContent(): LearnMoreContent {
+/** Mint, repay, a combined adjust, a close — the ZCHF side of a position. The
+ *  interest rule differs by hub: V1's rate is fixed at opening with a 4-week
+ *  minimum (PositionV1.calculateCurrentFee), V2's follows the base rate. */
+export function frankencoinMintingContent(hub?: "v1" | "v2"): LearnMoreContent {
+  const interest =
+    hub === "v1"
+      ? "the position's annual rate, fixed when it opened, is charged for the time left to expiry and for at least 4 weeks: a mint in the last 28 days before expiry pays 28 days of interest. It is not returned, and goes to the system reserve as equity, owned by FPS holders. Nothing accrues afterwards, so the debt changes only when the owner mints or repays."
+      : "the annual rate in force when the mint is made (the system base rate plus the position's risk premium) is charged for the time left to expiry, and is not returned. It goes to the system reserve as equity, owned by FPS holders. Nothing accrues afterwards, so the debt changes only when the owner mints or repays. The base rate moves with governance, so two mints on one position can pay different rates.";
   return {
     title: "How Minting and Repaying Work",
     intro:
@@ -3864,7 +3870,7 @@ export function frankencoinMintingContent(): LearnMoreContent {
       },
       {
         bold: "Interest up front",
-        text: "the annual rate in force when the mint is made (the system base rate plus the position's risk premium) is charged for the time left to expiry, and is not returned. It goes to the system reserve as equity, owned by FPS holders. Nothing accrues afterwards, so the debt changes only when the owner mints or repays. The base rate moves with governance, so two mints on one position can pay different rates.",
+        text: interest,
         sources: [fcSource("interest on positions", "positions")],
       },
       {

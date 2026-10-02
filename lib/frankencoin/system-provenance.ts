@@ -28,13 +28,13 @@ const headCall = (method: string) => ({
   text: `Re-run ${method} against any node at the stamped block — the figure is the contract's own slot.`,
 });
 
-/** ZCHF in existence — totalSupply(). */
+/** ZCHF on Ethereum — totalSupply(). */
 export const zchfSupplyProv = (): Provenance => ({
   kind: "chain",
   pclass: "state",
   verify: headCall("Frankencoin.totalSupply()"),
   summary:
-    "Every ZCHF in existence — the Frankencoin token's own totalSupply() at the stamped block. The minting hubs are not its only minters (the bridge and savings interest also mint), so this is the franc count itself, never asserted equal to the hub book below.",
+    "Every ZCHF on Ethereum — the Frankencoin token's totalSupply() at the stamped block. ZCHF sent to another chain through Chainlink CCIP is burned here by the multichain token pool and minted on the other chain, so it is not in this count. The minting hubs are not its only minters (the stablecoin bridges, the Uniswap amplifier and savings interest also mint), so this figure is never asserted equal to the hub book below.",
   contract: zchfContract,
   via: "eth_call · totalSupply() @ head",
 });

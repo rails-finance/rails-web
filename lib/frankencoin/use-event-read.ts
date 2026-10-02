@@ -148,13 +148,34 @@ export interface FrankencoinZchfSplit {
    *  term it was charged for. */
   ratePct: number | null;
   termDays: number | null;
+  /** Mint: V1 charged its 4-week minimum because less time was left to expiry. */
+  minimumTerm: boolean;
   /** Repayment: what the payer paid net, the reserve share returned. */
   paid: number | null;
   payer: string | null;
   reserveReturned: number | null;
 }
 
-export function frankencoinZchfSplit(read: FrankencoinEventRead | null, dMint: number): FrankencoinZchfSplit | null {
+/** PositionV1.MIN_INTEREST_DURATION: a V1 mint pays at least 4 weeks of
+ *  interest (calculateCurrentFee). V2 has no minimum. */
+export const FC_V1_MIN_INTEREST_DAYS = 28;
+
+/** The term a mint made at `from` is charged interest for, in days. */
+export function frankencoinChargedTerm(
+  hub: "v1" | "v2" | undefined,
+  expiration: number,
+  from: number,
+): { days: number; minimum: boolean } | null {
+  const left = (expiration - from) / 86400;
+  if (hub === "v1" && left < FC_V1_MIN_INTEREST_DAYS) return { days: FC_V1_MIN_INTEREST_DAYS, minimum: true };
+  return left > 0 ? { days: left, minimum: false } : null;
+}
+
+export function frankencoinZchfSplit(
+  read: FrankencoinEventRead | null,
+  dMint: number,
+  hub?: "v1" | "v2",
+): FrankencoinZchfSplit | null {
   if (!read) return null;
   const n = (s: string | null) => (s == null || s === "" ? null : Number(s));
   if (dMint > 0) {
@@ -164,13 +185,15 @@ export function frankencoinZchfSplit(read: FrankencoinEventRead | null, dMint: n
     if (received == null || received <= 0) return null;
     const rate = read.rate;
     const from = rate && read.blockTimestamp != null ? Math.max(read.blockTimestamp, rate.start) : null;
+    const term = rate && from != null ? frankencoinChargedTerm(hub, rate.expiration, from) : null;
     return {
       received,
       receivedBy: read.mintedOutTo,
       reserveShare: toReserve != null && interest != null ? toReserve - interest : null,
       interest,
       ratePct: rate ? rate.annualInterestPPM / 10_000 : null,
-      termDays: rate && from != null && rate.expiration > from ? (rate.expiration - from) / 86400 : null,
+      termDays: term?.days ?? null,
+      minimumTerm: term?.minimum ?? false,
       paid: null,
       payer: null,
       reserveReturned: null,
@@ -186,6 +209,7 @@ export function frankencoinZchfSplit(read: FrankencoinEventRead | null, dMint: n
     interest: null,
     ratePct: null,
     termDays: null,
+    minimumTerm: false,
     paid: burned - back,
     payer: read.payer,
     reserveReturned: back + (n(read.burnedFromReserve) ?? 0),

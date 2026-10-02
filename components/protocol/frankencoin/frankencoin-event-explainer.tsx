@@ -65,12 +65,12 @@ export function frankencoinLearnMoreContent(
     case "ownership_transferred":
       return ctx.initialization ? frankencoinCreationContent("handover") : frankencoinOwnershipContent();
     case "adjust":
-      return priceMoved ? frankencoinPriceContent() : frankencoinMintingContent();
+      return priceMoved ? frankencoinPriceContent() : frankencoinMintingContent(ctx.hub);
     case "mint":
     case "repay":
     case "add_collateral":
     case "withdraw_collateral":
-      return frankencoinMintingContent();
+      return frankencoinMintingContent(ctx.hub);
     case "adjust_price":
       return frankencoinPriceContent();
     case "challenge_started":
@@ -105,7 +105,7 @@ export function FrankencoinEventExplainer({
   const { read } = useFrankencoinEventRead(ctx, txHash, eventId);
   const facts = useFrankencoinPageFacts();
   const dMint = ctx.minted != null && ctx.mintedBefore != null ? Number(ctx.minted) - Number(ctx.mintedBefore) : 0;
-  const split = frankencoinZchfSplit(read, dMint);
+  const split = frankencoinZchfSplit(read, dMint, ctx.hub);
   const clauses = eventClauses(frankencoinEventSlots(ctx, coords, { split, read, facts, timestamp, txHash }));
   const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
