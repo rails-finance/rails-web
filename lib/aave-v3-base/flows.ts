@@ -49,6 +49,7 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import {
   daysFromEvents,
   type FlowBucket,
+  type FlowDayRow,
   type FlowEvent,
   type FlowIndexes,
   type FlowLive,
@@ -304,6 +305,10 @@ export interface AaveBaseReplay {
   last: Map<string, { amount: number; index: number; ts: number }>;
   /** Debt the Pool wrote off that no row states, per reserve, in tokens. */
   writtenOff: { asset: string; symbol: string; amount: number }[];
+  /** The knots the rows set, before today's: `knots` less the Pool's. */
+  rowKnots: Map<string, [number, number][]>;
+  /** The block of the newest liquidation, for the write-off rule. */
+  lastLiquidationBlock: number | null;
 }
 
 export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBaseFlowOptions): AaveBaseReplay {
@@ -517,14 +522,38 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
     });
   });
 
-  // Now: each side's index grown to the Pool's balance, where the Pool holds
-  // the reserve; debt the Pool no longer holds after a liquidation since the
-  // first write-off is the Pool's write-off.
+  let lastLiquidationBlock: number | null = null;
+  for (const e of ordered)
+    if (e.context.data.eventType === "liquidation")
+      lastLiquidationBlock = Math.max(lastLiquidationBlock ?? 0, e.blockNumber);
+  const rowKnots = new Map([...knots].map(([k, list]) => [k, [...list]]));
+  const tail = liveTail(running, knots, symbols, lastLiquidationBlock, o);
+  return {
+    replayed,
+    knots,
+    borrower,
+    symbols,
+    last: running,
+    writtenOff: tail.writtenOff,
+    rowKnots,
+    lastLiquidationBlock,
+  };
+}
+
+/** Now: each side's index grown to the Pool's balance, where the Pool holds
+ *  the reserve (a knot added to `knots`); debt the Pool no longer holds after
+ *  a liquidation since the first write-off is the Pool's write-off. */
+function liveTail(
+  last: Map<string, { amount: number; index: number; ts: number }>,
+  knots: Map<string, [number, number][]>,
+  symbols: Map<string, string>,
+  lastLiquidationBlock: number | null,
+  o: AaveBaseFlowOptions,
+): { writtenOff: AaveBaseReplay["writtenOff"] } {
   const writtenOff: AaveBaseReplay["writtenOff"] = [];
   const liquidatedSince =
-    o.writeOffFrom != null &&
-    ordered.some((e) => e.context.data.eventType === "liquidation" && e.blockNumber >= (o.writeOffFrom as number));
-  for (const [key, r] of running) {
+    o.writeOffFrom != null && lastLiquidationBlock != null && lastLiquidationBlock >= o.writeOffFrom;
+  for (const [key, r] of last) {
     const side = key.slice(0, key.indexOf(":")) as FlowSide;
     const asset = key.slice(key.indexOf(":") + 1);
     const l = o.live?.[asset];
@@ -537,7 +566,7 @@ export function aaveBaseReplay(events: readonly BaseActivityEvent[], o: AaveBase
     if (side === "debt" && liquidatedSince && o.live && r.amount > DUST && (liveAmt ?? 0) <= 0)
       writtenOff.push({ asset, symbol: symbols.get(asset) ?? asset.slice(0, 8), amount: r.amount });
   }
-  return { replayed, knots, borrower, symbols, last: running, writtenOff };
+  return { writtenOff };
 }
 
 /** A side's index at `ts`: a straight line between the knots, flat before the
@@ -559,9 +588,18 @@ function indexAt(knots: [number, number][] | undefined, ts: number): number | nu
   return t1 > t0 ? i0 + ((i1 - i0) * (ts - t0)) / (t1 - t0) : i1;
 }
 
+/** The index state a balance is grown by: the knots, what each side's last
+ *  row left, and each reserve's symbol. A replay is one; so is a summary's
+ *  (`aaveBaseTimelineFromSummary`). */
+interface AaveBaseIndexState {
+  knots: Map<string, [number, number][]>;
+  last: Map<string, { amount: number; index: number; ts: number }>;
+  symbols: Map<string, string>;
+}
+
 /** A balance a row recorded with `anchor`, grown by its side's index to `ts`. */
 export function aaveBaseGrownAt(
-  rp: AaveBaseReplay,
+  rp: Pick<AaveBaseIndexState, "knots">,
   side: FlowSide,
   asset: string,
   recorded: number,
@@ -575,7 +613,7 @@ export function aaveBaseGrownAt(
 
 /** What is held and owed now per reserve: the Pool's balance where the read
  *  landed, else the last row's grown by the index. */
-function nowBalances(rp: AaveBaseReplay, o: AaveBaseFlowOptions) {
+function nowBalances(rp: AaveBaseIndexState, o: AaveBaseFlowOptions) {
   const out = new Map<string, { asset: string; symbol: string; supply: number; debt: number }>();
   const get = (asset: string) => {
     let r = out.get(asset);
@@ -602,66 +640,168 @@ function nowBalances(rp: AaveBaseReplay, o: AaveBaseFlowOptions) {
   return [...out.values()];
 }
 
-/** The account's rows as the Lifetime flows panel's timeline, in USD. Null
- *  with no rows. */
-export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions): FlowTimeline | null {
+/** What the panel needs of a replay before today's Pool read, as JSON: the
+ *  day rows, each reserve's first day and first price, the index knots the
+ *  rows set (only those a day's close reads) and what each side's last row
+ *  left. rails-server's `/api/{aave-v3-base,seamless}/flows/daily` serves
+ *  this shape for a history the page does not hold (services/
+ *  aave-base-flow-series.ts), so one function draws either. */
+export interface AaveBaseSummary {
+  /** The lines the history fills, the write-off aside, in drawing order. */
+  buckets: string[];
+  /** Day rows; each `cum` is keyed by `buckets`. */
+  days: FlowDayRow[];
+  borrower: boolean;
+  totalEvents: number;
+  /** Unix seconds of the last event. */
+  lastTs: number;
+  /** Each reserve in the order the rows name it: the day it first moved or
+   *  was stated (null where only a price names it) and its first price. */
+  assets: { asset: string; firstDay: number | null; firstPrice: number | null }[];
+  symbols: Record<string, string>;
+  /** Per `${side}:${asset}`: the knots [ts, index] the rows set, thinned to
+   *  the first, the last and the two either side of each day's close. */
+  knots: Record<string, [number, number][]>;
+  /** Per `${side}:${asset}`: [amount, index, ts] after its last row. */
+  last: Record<string, [number, number, number]>;
+  lastLiquidationBlock: number | null;
+}
+
+/** The knots a day's close reads: the first, the last, and either side of
+ *  every change of `ceil(ts / 1 day)`, the day boundary at or after the knot.
+ *  `indexAt` at any day's close, or after the last knot, reads the same
+ *  figure from these as from all of them. */
+export function thinKnots(list: readonly [number, number][]): [number, number][] {
+  if (list.length <= 2) return list.map((k) => [k[0], k[1]]);
+  const keep = new Set<number>([0, list.length - 1]);
+  for (let i = 0; i + 1 < list.length; i++)
+    if (Math.ceil(list[i][0] / DAY_S) !== Math.ceil(list[i + 1][0] / DAY_S)) {
+      keep.add(i);
+      keep.add(i + 1);
+    }
+  return [...keep].sort((a, b) => a - b).map((i) => [list[i][0], list[i][1]]);
+}
+
+/** The replay as its summary. */
+export function aaveBaseSummary(rp: AaveBaseReplay, o: Partial<AaveBaseFlowOptions> = {}): AaveBaseSummary {
   const { replayed } = rp;
-  if (replayed.length === 0) return null;
   const used = new Set(replayed.flatMap((r) => r.legs.map((l) => l.bucket)));
-  if (rp.writtenOff.length > 0) used.add("writtenOff");
   // The supply lines always; the debt's where the account borrowed; every
   // other line where a row filled it.
   const base = new Set<string>(["deposited", "withdrawn", INTEREST_EARNED]);
   if (rp.borrower) for (const k of ["borrowed", INTEREST_ACCRUED, "repaid"]) base.add(k);
-  const buckets = AAVE_V3_BASE_FLOW_BUCKETS.filter((b) => base.has(b.key) || used.has(b.key));
+  const buckets = AAVE_V3_BASE_FLOW_BUCKETS.filter((b) => base.has(b.key) || used.has(b.key)).map((b) => b.key);
   const notCounted = o.notCounted ?? AAVE_V3_NOT_COUNTED;
+  const flowEvents = replayed.map((r) => aaveBaseFlowEvent(r, notCounted));
+  const days = daysFromEvents(buckets, flowEvents);
 
-  const flowEvents: FlowEvent[] = replayed.map((r) => {
-    const moved = new Set<FlowSide>();
-    for (const l of r.legs) if (!ACCRUAL_KEYS.has(l.bucket)) moved.add(l.side);
-    const liq = r.legs.some((l) => l.bucket === "liquidatedCollateral" || l.bucket === "liquidatedDebt");
-    // A leg valued without the oracle's price at its block.
-    const unsure: FlowUnsure[] = [];
-    for (const l of r.legs) {
-      const why = UNSURE_WHY[l.basis];
-      if (why && !unsure.some((u) => u.side === l.side && u.why === why && u.symbol === l.symbol))
-        unsure.push({ side: l.side, why, symbol: l.symbol, ...(l.basis !== "day" ? { held: true } : {}) });
+  const assets: AaveBaseSummary["assets"] = [];
+  const seen = new Map<string, AaveBaseSummary["assets"][number]>();
+  const entry = (a: string) => {
+    let e = seen.get(a);
+    if (!e) {
+      e = { asset: a, firstDay: null, firstPrice: null };
+      seen.set(a, e);
+      assets.push(e);
     }
-    return {
-      id: r.ev.id,
-      ts: r.ev.timestamp,
-      block: r.ev.blockNumber,
-      ...(unsure.length ? { unsure } : {}),
-      tick:
-        liq || r.seizureTransfer
-          ? "liquidation"
-          : moved.size === 2
-            ? "both"
-            : moved.has("debt")
-              ? "debt"
-              : "collateral",
-      legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * l.price, symbol: l.symbol })),
-      tx: r.tx,
-      countsTx: countsTx(r.ev, notCounted),
-      balances: r.after.map((b) => ({
-        asset: b.asset,
-        symbol: b.symbol,
-        side: b.side,
-        amount: Math.max(0, b.amount),
-        index: b.index,
-      })),
-      prices: r.prices,
-    };
-  });
-  const days = daysFromEvents(
-    buckets.map((b) => b.key),
-    flowEvents,
-  );
+    return e;
+  };
+  for (const r of replayed) {
+    const d = Math.floor(r.ev.timestamp / DAY_S);
+    for (const a of new Set([...r.legs.map((l) => l.asset), ...r.after.map((b) => b.asset)])) {
+      const e = entry(a);
+      if (e.firstDay == null) e.firstDay = d;
+    }
+    for (const l of r.legs) if (l.price > 0 && entry(l.asset).firstPrice == null) entry(l.asset).firstPrice = l.price;
+    for (const p of r.prices) {
+      const e = entry(p.asset);
+      if (e.firstPrice == null) e.firstPrice = p.usd;
+    }
+  }
+  return {
+    buckets,
+    days,
+    borrower: rp.borrower,
+    totalEvents: replayed.length,
+    lastTs: replayed.length > 0 ? replayed[replayed.length - 1].ev.timestamp : 0,
+    assets,
+    symbols: Object.fromEntries(rp.symbols),
+    knots: Object.fromEntries([...rp.rowKnots].map(([k, list]) => [k, thinKnots(list)])),
+    last: Object.fromEntries([...rp.last].map(([k, r]) => [k, [r.amount, r.index, r.ts]])),
+    lastLiquidationBlock: rp.lastLiquidationBlock,
+  };
+}
+
+/** One replayed row as the panel's event. */
+function aaveBaseFlowEvent(r: AaveBaseReplayed, notCounted: readonly string[]): FlowEvent {
+  const moved = new Set<FlowSide>();
+  for (const l of r.legs) if (!ACCRUAL_KEYS.has(l.bucket)) moved.add(l.side);
+  const liq = r.legs.some((l) => l.bucket === "liquidatedCollateral" || l.bucket === "liquidatedDebt");
+  // A leg valued without the oracle's price at its block.
+  const unsure: FlowUnsure[] = [];
+  for (const l of r.legs) {
+    const why = UNSURE_WHY[l.basis];
+    if (why && !unsure.some((u) => u.side === l.side && u.why === why && u.symbol === l.symbol))
+      unsure.push({ side: l.side, why, symbol: l.symbol, ...(l.basis !== "day" ? { held: true } : {}) });
+  }
+  return {
+    id: r.ev.id,
+    ts: r.ev.timestamp,
+    block: r.ev.blockNumber,
+    ...(unsure.length ? { unsure } : {}),
+    tick:
+      liq || r.seizureTransfer ? "liquidation" : moved.size === 2 ? "both" : moved.has("debt") ? "debt" : "collateral",
+    legs: r.legs.map((l) => ({ bucket: l.bucket, usd: l.amount * l.price, symbol: l.symbol })),
+    tx: r.tx,
+    countsTx: countsTx(r.ev, notCounted),
+    balances: r.after.map((b) => ({
+      asset: b.asset,
+      symbol: b.symbol,
+      side: b.side,
+      amount: Math.max(0, b.amount),
+      index: b.index,
+    })),
+    prices: r.prices,
+  };
+}
+
+/** The account's rows as the Lifetime flows panel's timeline, in USD. Null
+ *  with no rows. */
+export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions): FlowTimeline | null {
+  return aaveBaseTimelineFromSummary(aaveBaseSummary(rp, o), o);
+}
+
+/** Debt the Pool wrote off that no row states, from a summary and today's
+ *  Pool read. */
+export function aaveBaseWrittenOff(s: AaveBaseSummary, o: AaveBaseFlowOptions): AaveBaseReplay["writtenOff"] {
+  return liveTail(lastOf(s), new Map(), new Map(Object.entries(s.symbols)), s.lastLiquidationBlock, o).writtenOff;
+}
+
+const lastOf = (s: AaveBaseSummary) =>
+  new Map(Object.entries(s.last).map(([k, [amount, index, ts]]) => [k, { amount, index, ts }]));
+
+/** A summary as the Lifetime flows panel's timeline: today's Pool read and
+ *  prices added. Null with no rows. */
+export function aaveBaseTimelineFromSummary(s: AaveBaseSummary, o: AaveBaseFlowOptions): FlowTimeline | null {
+  if (s.totalEvents === 0 || s.days.length === 0) return null;
+  const st: AaveBaseIndexState = {
+    knots: new Map(Object.entries(s.knots).map(([k, list]) => [k, list.map((x) => [x[0], x[1]] as [number, number])])),
+    last: lastOf(s),
+    symbols: new Map(Object.entries(s.symbols)),
+  };
+  const { writtenOff } = liveTail(st.last, st.knots, st.symbols, s.lastLiquidationBlock, o);
+  const keys = new Set(s.buckets);
+  if (writtenOff.length > 0) keys.add("writtenOff");
+  const buckets = AAVE_V3_BASE_FLOW_BUCKETS.filter((b) => keys.has(b.key));
+  const days: FlowDayRow[] = s.days.map((d) => ({
+    ...d,
+    cum: Object.fromEntries(buckets.map((b) => [b.key, d.cum[b.key] ?? 0])),
+  }));
 
   const today = Math.floor(o.now / DAY_S);
-  const held = nowBalances(rp, o);
+  const held = nowBalances(st, o);
   const open = held.some((h) => h.supply > DUST || h.debt > DUST);
-  const lastTs = replayed[replayed.length - 1].ev.timestamp;
+  const lastTs = s.lastTs;
   const endDay = open ? Math.max(today, Math.floor(lastTs / DAY_S) + 1) : Math.floor(lastTs / DAY_S) + 1;
 
   // Prices by day: each reserve's at-block prices (the day's last), the
@@ -671,29 +811,17 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
     return p != null && p > 0 ? p : null;
   };
   const byAsset = new Map<string, Map<number, number>>();
-  const firstDayOf = new Map<string, number>();
-  const firstPriceOf = new Map<string, number>();
-  for (const r of replayed) {
-    const d = Math.floor(r.ev.timestamp / DAY_S);
-    for (const a of new Set([...r.legs.map((l) => l.asset), ...r.after.map((b) => b.asset)])) {
-      if (!byAsset.has(a)) byAsset.set(a, new Map());
-      if (!firstDayOf.has(a)) firstDayOf.set(a, d);
-    }
-    for (const l of r.legs) if (l.price > 0 && !firstPriceOf.has(l.asset)) firstPriceOf.set(l.asset, l.price);
-    for (const p of r.prices) {
-      const obs = byAsset.get(p.asset) ?? new Map<number, number>();
-      obs.set(d, p.usd);
-      byAsset.set(p.asset, obs);
-      if (!firstPriceOf.has(p.asset)) firstPriceOf.set(p.asset, p.usd);
-    }
-  }
-  for (const [a, obs] of byAsset) {
-    const d0 = firstDayOf.get(a)!;
+  for (const a of s.assets) byAsset.set(a.asset, new Map());
+  for (const d of s.days) for (const p of d.prices) byAsset.get(p.asset)?.set(d.day, p.usd);
+  const firstDayOf = new Map(s.assets.flatMap((a) => (a.firstDay != null ? [[a.asset, a.firstDay] as const] : [])));
+  for (const a of s.assets) {
+    const obs = byAsset.get(a.asset)!;
+    const d0 = firstDayOf.get(a.asset)!;
     const rowDays = new Set(obs.keys());
-    for (const [d, p] of o.dailyPrices?.[a] ?? []) if (p > 0 && !rowDays.has(d) && d < today) obs.set(d, p);
-    const p0 = firstPriceOf.get(a);
+    for (const [d, p] of o.dailyPrices?.[a.asset] ?? []) if (p > 0 && !rowDays.has(d) && d < today) obs.set(d, p);
+    const p0 = a.firstPrice;
     if (p0 != null && ![...obs.keys()].some((d) => d <= d0)) obs.set(d0, p0);
-    const p = todayPrice(a);
+    const p = todayPrice(a.asset);
     if (open && p != null) obs.set(today, p);
   }
   const dailyPrices: Record<string, [number, number][]> = {};
@@ -702,8 +830,8 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
   // Each reserve's indexes at each day's close, from its first row to the end.
   const indexes: FlowIndexes = { basis: "aave-rows", assets: {} };
   for (const a of byAsset.keys()) {
-    const sKnots = rp.knots.get(`collateral:${a}`);
-    const dKnots = rp.knots.get(`debt:${a}`);
+    const sKnots = st.knots.get(`collateral:${a}`);
+    const dKnots = st.knots.get(`debt:${a}`);
     if (!sKnots && !dKnots) continue;
     const list: [number, number | null, number | null][] = [];
     for (let d = firstDayOf.get(a)!; d <= endDay; d++) {
@@ -727,7 +855,7 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
       debtUsd += h.debt * p;
     }
   }
-  const pending = rp.writtenOff.map((w) => ({
+  const pending = writtenOff.map((w) => ({
     bucket: "writtenOff",
     symbol: w.symbol,
     usd: w.amount * (todayPrice(w.asset) ?? dailyPrices[w.asset]?.at(-1)?.[1] ?? 0),
@@ -756,8 +884,8 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
     ),
     indexes,
     today: open ? today : endDay,
-    totalEvents: replayed.length,
-    words: aaveBaseFlowWords(o.brand, rp.borrower),
+    totalEvents: s.totalEvents,
+    words: aaveBaseFlowWords(o.brand, s.borrower),
   };
 }
 

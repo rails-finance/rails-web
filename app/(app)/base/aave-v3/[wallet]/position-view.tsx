@@ -479,8 +479,10 @@ export default function AaveV3BasePositionView({
 
   // The Lifetime flows panel replays the account's whole history
   // (lib/aave-v3-base/flows.ts): the page's rows where they are all of it,
-  // else the flat history read once; a read that is not the whole life (a
-  // heavy wallet's elided rows, a holed or horizoned sweep) is a failed read.
+  // else the flat history read once. Where the page's history is elided (a
+  // heavy wallet's seed and tail, rows past the draw cut) or the flat read
+  // comes back short, the server's replay of every row answers; where that
+  // fails too, the read failed.
   const wholeRows = sweptClean && (servedFolders?.length ?? 0) === 0 && (timeline?.coverage.omitted?.count ?? 0) === 0;
   const fetchFlatHistory = useCallback(async () => {
     const flat = await fetchChainTimeline<BaseTimeline>({ wallet, route: TIMELINE_ROUTE, mark: "aave-v3-base-flows" });
@@ -492,6 +494,8 @@ export default function AaveV3BasePositionView({
   }, [wallet]);
   const flows = useAaveV3BaseFlows({
     family: "aave-v3-base",
+    wallet,
+    elided: (timeline?.coverage.omitted?.count ?? 0) > 0,
     brand: "Aave",
     writeOffFrom: AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK,
     pending: timelineState === "loading",

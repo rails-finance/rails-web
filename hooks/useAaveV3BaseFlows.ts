@@ -4,13 +4,16 @@
 // Base, Seamless): the account's whole history replayed by
 // lib/aave-v3-base/flows.ts. A page that holds the whole history as events
 // hands them over; a folder-served page reads the flat history once (the read
-// its CSV export makes), and a read short of the whole history (a heavy
-// wallet's elided rows, a holed or horizoned sweep) is a failed read, since a
-// replay of part of a history would state the wrong lifetime. Between events
-// each reserve takes its day's price from the shared daily price store
-// (/api/prices/daily); where that read fails the last event's price is
-// carried. It also gives the page the value that ties the panel to the
-// timeline (components/shared/flow-focus-context.tsx).
+// its CSV export makes). Where the page's history is elided (a heavy wallet's
+// seed and tail, or more rows than the page draws), or the flat read comes
+// back short, the server's replay of every row answers instead
+// (/api/{aave-v3-base,seamless}/flows, lib/api/fetch-aave-base-flows.ts); a
+// read that neither gives is a failed read, since a replay of part of a
+// history would state the wrong lifetime. Between events each reserve takes
+// its day's price from the shared daily price store (/api/prices/daily);
+// where that read fails the last event's price is carried. It also gives the
+// page the value that ties the panel to the timeline
+// (components/shared/flow-focus-context.tsx).
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
@@ -23,17 +26,27 @@ import {
   aaveBaseFlowTimeline,
   aaveBaseFocusEvents,
   aaveBaseReplay,
+  aaveBaseTimelineFromSummary,
+  aaveBaseWrittenOff,
   isAaveBaseInterest,
   type AaveBaseFlowOptions,
   type AaveBaseLiveReserve,
 } from "@/lib/aave-v3-base/flows";
+import { fetchAaveBaseFlows, isAaveBaseSummaryAnswer, type AaveBaseFlowAnswer } from "@/lib/api/fetch-aave-base-flows";
+import type { FocusEvent } from "@/lib/shared/flow-focus";
+
+type RouteSummary = Extract<AaveBaseFlowAnswer, { days: unknown }>;
 
 const DAY_S = 86_400;
 const BASE_CHAIN_ID = 8453;
 
 export interface AaveV3BaseFlowsInput {
-  /** The daily store's family: "aave-v3-base" or "seamless". */
-  family: string;
+  /** The daily store's family, and the flows route's lane. */
+  family: "aave-v3-base" | "seamless";
+  wallet: string;
+  /** The page's history is elided (`coverage.omitted`): the server's replay
+   *  answers without a flat read first. */
+  elided: boolean;
   /** The Pool's brand: "Aave" or "Seamless". */
   brand: string;
   /** The block of the Pool's first DeficitCreated (Aave V3 on Base); null
@@ -72,6 +85,10 @@ export interface AaveV3BaseFlowsFacts {
   between: "store" | "carried";
   /** Debt the Pool wrote off that no row states. */
   writtenOff: { symbol: string; amount: number }[];
+  /** "route": the server replayed every row the Base box holds, `events` of
+   *  them; "page": the page's rows. */
+  source: "page" | "route";
+  events: number;
 }
 
 export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
@@ -80,37 +97,52 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
   focus: FlowFocusValue;
   facts: AaveV3BaseFlowsFacts | null;
 } {
-  const [fetched, setFetched] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
-    events: null,
-    read: "reading",
-  });
+  const [fetched, setFetched] = useState<{
+    events: BaseActivityEvent[] | null;
+    route: RouteSummary | null;
+    read: FlowsRead;
+  }>({ events: null, route: null, read: "reading" });
   const needRead = p.wholeEvents == null && !p.pending;
-  const { fetchAll } = p;
+  const { fetchAll, family, wallet, elided } = p;
   useEffect(() => {
     if (!needRead) return;
-    if (!fetchAll) {
-      setFetched({ events: null, read: "failed" });
-      return;
-    }
     let cancelled = false;
-    setFetched({ events: null, read: "reading" });
-    fetchAll()
-      .then(({ events, missing }) => {
-        if (!cancelled) setFetched(missing > 0 ? { events: null, read: "failed" } : { events, read: "done" });
-      })
-      .catch((err) => {
-        console.warn("Lifetime flows history not read:", err);
-        if (!cancelled) setFetched({ events: null, read: "failed" });
-      });
+    const failed = (err?: unknown) => {
+      if (err) console.warn("Lifetime flows history not read:", err);
+      if (!cancelled) setFetched({ events: null, route: null, read: "failed" });
+    };
+    // The server's replay of every row.
+    const viaRoute = () =>
+      fetchAaveBaseFlows(family, wallet).then((a) => {
+        if (cancelled) return;
+        if (isAaveBaseSummaryAnswer(a)) setFetched({ events: null, route: a, read: "done" });
+        else failed(`the flows route refused (${a.refused})`);
+      }, failed);
+    setFetched({ events: null, route: null, read: "reading" });
+    if (elided || !fetchAll) void viaRoute();
+    else
+      fetchAll()
+        .then(({ events, missing }) => {
+          if (cancelled) return;
+          if (missing > 0) void viaRoute();
+          else setFetched({ events, route: null, read: "done" });
+        })
+        .catch(() => void viaRoute());
     return () => {
       cancelled = true;
     };
-  }, [needRead, fetchAll]);
+  }, [needRead, fetchAll, family, wallet, elided]);
 
   const source = p.pending ? null : (p.wholeEvents ?? fetched.events);
+  const route = p.pending || p.wholeEvents ? null : fetched.route;
 
   // The reserves the history names, and its first day, for the store's read.
   const want = useMemo(() => {
+    if (route) {
+      if (route.days.length === 0) return null;
+      const list = route.assets.map((a) => a.asset).sort();
+      return { reserves: list, from: route.days[0].day, key: list.join(",") };
+    }
     if (!source || source.length === 0) return null;
     const reserves = new Set<string>();
     let first = Infinity;
@@ -123,9 +155,8 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     }
     const list = [...reserves].sort();
     return { reserves: list, from: Math.floor(first / DAY_S), key: list.join(",") };
-  }, [source]);
+  }, [source, route]);
   const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
-  const { family } = p;
   useEffect(() => {
     if (!want) return;
     const ac = new AbortController();
@@ -187,10 +218,32 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     () => (source && opts && (dailySettled || source.length === 0) ? aaveBaseReplay(source, opts) : null),
     [source, opts, dailySettled],
   );
-  const timeline = useMemo(() => (replay && opts ? aaveBaseFlowTimeline(replay, opts) : null), [replay, opts]);
-  const focusEvents = useMemo(() => (replay ? aaveBaseFocusEvents(replay) : []), [replay]);
+  const routeReady = route != null && opts != null && (dailySettled || route.days.length === 0);
+  const timeline = useMemo(
+    () =>
+      replay && opts
+        ? aaveBaseFlowTimeline(replay, opts)
+        : routeReady && route && opts
+          ? aaveBaseTimelineFromSummary(route, opts)
+          : null,
+    [replay, opts, route, routeReady],
+  );
+  const focusEvents = useMemo<FocusEvent[]>(
+    () => (replay ? aaveBaseFocusEvents(replay) : route ? route.events : []),
+    [replay, route],
+  );
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo<AaveV3BaseFlowsFacts | null>(() => {
+    if (!replay && routeReady && route && opts)
+      return {
+        borrower: route.borrower,
+        ...route.facts,
+        live: live != null,
+        between: dailyPrices ? "store" : "carried",
+        writtenOff: aaveBaseWrittenOff(route, opts).map((w) => ({ symbol: w.symbol, amount: w.amount })),
+        source: "route",
+        events: route.totalEvents,
+      };
     if (!replay) return null;
     const priced = { block: 0, day: 0, nearest: 0, today: 0 };
     for (const r of replay.replayed)
@@ -214,13 +267,17 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
       live: live != null,
       between: dailyPrices ? "store" : "carried",
       writtenOff: replay.writtenOff.map((w) => ({ symbol: w.symbol, amount: w.amount })),
+      source: "page",
+      events: replay.replayed.length,
     };
-  }, [replay, live, dailyPrices]);
+  }, [replay, live, dailyPrices, route, routeReady, opts]);
   const state: FlowsRead = p.pending
     ? "reading"
     : p.wholeEvents == null && fetched.read !== "done"
       ? fetched.read
-      : now == null || (source != null && source.length > 0 && !dailySettled)
+      : now == null ||
+          (source != null && source.length > 0 && !dailySettled) ||
+          (route != null && route.days.length > 0 && !dailySettled)
         ? "reading"
         : "done";
   return { timeline, read: state, focus, facts };

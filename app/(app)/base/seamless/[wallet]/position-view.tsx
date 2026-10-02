@@ -565,8 +565,10 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
 
   // The Lifetime flows panel replays the account's whole history
   // (lib/aave-v3-base/flows.ts): the page's rows where they are all of it,
-  // else the flat history read once; a read that is not the whole life (a
-  // heavy wallet's elided rows, a holed or horizoned sweep) is a failed read.
+  // else the flat history read once. Where the page's history is elided (a
+  // heavy wallet's seed and tail, rows past the draw cut) or the flat read
+  // comes back short, the server's replay of every row answers; where that
+  // fails too, the read failed.
   // The write-off rule is the Aave Pool's (lib/aave-v3-base/write-off-gap.ts);
   // it is not applied here.
   const fetchFlatHistory = useCallback(async () => {
@@ -579,6 +581,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   }, [wallet]);
   const flows = useAaveV3BaseFlows({
     family: "seamless",
+    wallet,
+    elided: (timeline?.coverage.omitted?.count ?? 0) > 0,
     brand: "Seamless",
     writeOffFrom: null,
     pending: timelineState === "loading",
