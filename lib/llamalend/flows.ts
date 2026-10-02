@@ -44,7 +44,11 @@
 // token: what it took in for its sales since the row before is Received in
 // soft liquidation, what it spent buying back is Spent in soft liquidation,
 // what a hard liquidation took with the collateral is Seized, and what a
-// close handed back is Withdrawn. With nothing stored, the bars count the
+// close handed back is Withdrawn. A repay that closes the position logs the
+// collateral it handed back and not the borrowed token: the server stores the
+// position one block before the repay, and that balance is what the close
+// handed back; where it has not, the AMM's trades since the row before are
+// valued at the row's price. With nothing stored, the bars count the
 // collateral token alone, as before the store.
 //
 // Prices. The rows carry none: each row's block is priced at the AMM's
@@ -227,6 +231,10 @@ export interface LlamalendFlowEvent {
   /** The server stored the position's state at the row's block (rails-server
    *  mig 373). */
   stored: boolean;
+  /** A repay that closes the position: the server's stored state at the end
+   *  of the block before (collateral and borrowed token in the bands, base
+   *  units), where the filler has read it; else null. */
+  before: { coll: bigint; conv: bigint } | null;
 }
 
 const big = (v: string | undefined | null): bigint | null => {
@@ -283,6 +291,8 @@ export function llamalendFlowEvents(
         : { coll: ZERO, debt: ZERO }
       : null;
     const st = unstated && lastInBlock ? (storedState ?? states?.get(e.blockNumber)) : undefined;
+    const bColl = big(c.raw?.stateCollateralBefore);
+    const bConv = big(c.raw?.stateBorrowedBefore);
     return {
       id: e.id,
       ts: e.timestamp,
@@ -301,6 +311,7 @@ export function llamalendFlowEvents(
       price: p != null && p > 0 ? p : null,
       convAfter: stored && lastInBlock ? (sDebt > ZERO ? sConv : ZERO) : null,
       stored,
+      before: bColl != null && bConv != null ? { coll: bColl, conv: bConv } : null,
     };
   });
 }
@@ -366,8 +377,9 @@ export interface LlamalendReplayed {
    *  stored row settles it. */
   convUnread: boolean;
   /** The row closed the position by a repay after the AMM traded since the
-   *  row before: what it took in for those trades is valued at the row's
-   *  price, and the rest of what it held is Withdrawn. */
+   *  row before, and the server has not stored the position a block before
+   *  it: what it took in for those trades is valued at the row's price, and
+   *  the rest of what it held is Withdrawn. */
   convEstimated: boolean;
 }
 
@@ -469,7 +481,8 @@ export function replayLlamalend(
     // since the row before less the row's act is what the AMM took in for its
     // sales (above zero) or spent on its buy-backs (below). A liquidation
     // takes what its log states (`convertedTaken`); a repay that closes the
-    // position hands back what was there, which no log states.
+    // position hands back what was there, which no log states: the server's
+    // state a block before the repay, else an estimate.
     let convAfter = conv;
     let convUnread = false;
     let convEstimated = false;
@@ -482,9 +495,26 @@ export function replayLlamalend(
         let handed: bigint;
         if (closes && !liq) {
           // The trades since the row before: none where the collateral did
-          // not move, else the collateral's trade at the row's price.
+          // not move. Else, where the server stored the position at the end
+          // of the block before the repay (and no row of the position lies
+          // in the repay's block before it), the borrowed token in the bands
+          // there is what the repay handed back, and its move since the row
+          // before is the trades. A trade inside the repay's block, before
+          // it, shows as the collateral handed back differing from that
+          // state's; it is valued at the row's price. With no such state,
+          // the collateral's whole trade is valued at the row's price.
           trades = ZERO;
-          if (collGap !== ZERO && p.price > 0) {
+          const pre = ev.before != null && events[i - 1]?.block !== ev.block ? ev.before : null;
+          if (collGap !== ZERO && pre != null) {
+            trades = pre.conv - conv;
+            const late = pre.coll - (collAfter - ev.collDelta);
+            const tol = BigInt(1000) > pre.coll / BigInt(1_000_000) ? BigInt(1000) : pre.coll / BigInt(1_000_000);
+            if ((late < -tol || late > tol) && p.price > 0) {
+              convEstimated = true;
+              trades += BigInt(Math.round(human(late, cd) * p.price * 10 ** dd));
+            }
+            if (conv + trades < ZERO) trades = -conv;
+          } else if (collGap !== ZERO && p.price > 0) {
             convEstimated = true;
             trades = BigInt(Math.round(-human(collGap, cd) * p.price * 10 ** dd));
             if (conv + trades < ZERO) trades = -conv;
@@ -668,7 +698,9 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
     if (r.convEstimated)
       unsure.push({
         side: "collateral",
-        why: `The ${o.debtSymbol} the AMM took in for its trades since the row before is valued at this row's oracle price: the repay closed the position, and no balance is stored between.`,
+        why: r.ev.before
+          ? `The ${o.debtSymbol} the AMM took in for its trades in this row's block, before the repay, is valued at this row's oracle price: the repay closed the position, and the balance is stored at the end of the block before.`
+          : `The ${o.debtSymbol} the AMM took in for its trades since the row before is valued at this row's oracle price: the repay closed the position, and no balance is stored between.`,
       });
     return {
       id: r.ev.id,

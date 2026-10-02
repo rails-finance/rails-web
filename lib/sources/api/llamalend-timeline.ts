@@ -105,6 +105,12 @@ export interface LlamalendMvRow {
   state_collateral_at?: string | null;
   state_borrowed_at?: string | null;
   state_debt_at?: string | null;
+  /** On a repay that closes the position only: its user_state at the end of
+   *  the block before (the same filler; absent before the api deploy, NULL
+   *  until the filler reaches it). */
+  state_collateral_before?: string | null;
+  state_borrowed_before?: string | null;
+  state_debt_before?: string | null;
 }
 
 const LABELS: Record<LlamalendEventType, string> = {
@@ -271,6 +277,9 @@ export function buildLlamalendTimeline(
         stateCollateralAtBlock: rawVal(bigintOf(r.state_collateral_at ?? null)),
         stateBorrowedAtBlock: rawVal(bigintOf(r.state_borrowed_at ?? null)),
         stateDebtAtBlock: rawVal(bigintOf(r.state_debt_at ?? null)),
+        stateCollateralBefore: rawVal(bigintOf(r.state_collateral_before ?? null)),
+        stateBorrowedBefore: rawVal(bigintOf(r.state_borrowed_before ?? null)),
+        stateDebtBefore: rawVal(bigintOf(r.state_debt_before ?? null)),
       },
       isOpen: idx === 0,
     };

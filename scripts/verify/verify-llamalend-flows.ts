@@ -33,7 +33,10 @@
 // view. The stored price and state are the archive's reads to the bit, so the
 // figures are the archive's; the borrowed token the AMM holds in the bands
 // is then on the collateral bar, and its lines meet the stored balance at
-// every stored row.
+// every stored row. `<name>+pre+stored` adds the server's state one block
+// before each repay that closes the position (the same file's `before`):
+// the borrowed token the close handed back, read at block − 1, which equals
+// the repay's Transfer out of the AMM to the unit.
 //
 // Held: the replay meets every row's stated balances to the base unit and
 // moves an unstated row by its amounts; the debt's interest is the row's
@@ -92,20 +95,24 @@ const ALL = (JSON.parse(readFileSync(FIX, "utf8")) as { fixtures: Fixture[] }).f
 /** The filler's read at every fixture row's block: price_oracle raw (1e18)
  *  and user_state's collateral, borrowed and debt, base units. */
 type Stored = Record<string, { price: string | null; coll: string; borrowed: string; debt: string }>;
-const STORED = (
-  JSON.parse(readFileSync(join(__dirname, "fixtures", "llamalend-stored.json"), "utf8")) as {
-    fixtures: Record<string, Stored>;
-  }
-).fixtures;
+const STORED_FILE = JSON.parse(readFileSync(join(__dirname, "fixtures", "llamalend-stored.json"), "utf8")) as {
+  fixtures: Record<string, Stored>;
+  /** Per fixture, per closing repay's block: the read at block − 1. */
+  before: Record<string, Record<string, { coll: string; borrowed: string; debt: string }>>;
+};
+const STORED = STORED_FILE.fixtures;
+const BEFORE = STORED_FILE.before;
 
 /** The fixture's rows as the timeline route serves them once the filler has
  *  stored the blocks `keep` passes: each row carries its block's values. */
-function storedEvents(f: Fixture, keep: (block: number) => boolean): BaseActivityEvent[] {
+function storedEvents(f: Fixture, keep: (block: number) => boolean, pre = false): BaseActivityEvent[] {
   const st = STORED[f.name];
   return f.events.map((e) => {
     const v = st[String(e.blockNumber)];
     if (!v || !keep(e.blockNumber) || !e.context) return e;
     const c = e.context.data as LlamalendContext;
+    // As the route serves it: on a closing repay's row only.
+    const b = pre && c.eventType === "repay" && c.raw?.debtAfter === "0" ? BEFORE[f.name]?.[String(e.blockNumber)] : undefined;
     return {
       ...e,
       context: {
@@ -118,6 +125,7 @@ function storedEvents(f: Fixture, keep: (block: number) => boolean): BaseActivit
             stateCollateralAtBlock: v.coll,
             stateBorrowedAtBlock: v.borrowed,
             stateDebtAtBlock: v.debt,
+            ...(b ? { stateCollateralBefore: b.coll, stateBorrowedBefore: b.borrowed, stateDebtBefore: b.debt } : {}),
           },
         },
       },
@@ -138,6 +146,13 @@ const MODES: Fixture[] = [
   ...ALL,
   ...ALL.map((f) => ({ ...f, name: `${f.name}+unread`, states: {} })),
   ...ALL.map((f) => ({ ...f, name: `${f.name}+stored`, events: storedEvents(f, () => true), prices: {}, states: {} })),
+  ...ALL.map((f) => ({
+    ...f,
+    name: `${f.name}+pre+stored`,
+    events: storedEvents(f, () => true, true),
+    prices: {},
+    states: {},
+  })),
   ...ALL.map((f) => {
     const mid = midBlock(f);
     const newer = (b: string) => Number(b) >= mid;
@@ -659,6 +674,49 @@ test("stored rows need no per-view read, carry no dotted stretch, and the half n
     assert.deepEqual(llamalendPriceBlocks(hev).sort(), newer.sort(), `${name}: the newer half's prices are read`);
     for (const b of llamalendStateBlocks(hev)) assert.ok(b >= mid, `${name}: a state read in the newer half`);
   }
+});
+
+test("a closing repay with the state a block before: the close's amounts, no estimate, every other row unchanged", () => {
+  const leg = (r: { legs: { bucket: string; amount: number; conv?: true }[] }, k: string) =>
+    r.legs.filter((l) => l.bucket === k && l.conv).reduce((a, l) => a + l.amount, 0);
+  for (const name of NAMES) {
+    const s = fx(`${name}+stored`);
+    const p = fx(`${name}+pre+stored`);
+    const a = llamalendFlowReplay(rows(s), opts(s)).replayed;
+    const b = llamalendFlowReplay(rows(p), opts(p)).replayed;
+    const t = llamalendFlowTimeline(rows(p), opts(p))!;
+    assert.equal(llamalendFlowFacts(llamalendFlowReplay(rows(p), opts(p)), t).convEstimatedRows, 0, `${name}: no estimate`);
+    assert.deepEqual(t.days.flatMap((d) => d.unsure ?? []), [], `${name}: nothing dotted but the days between`);
+    b.forEach((r, i) => {
+      // Rows that were not estimated keep every figure.
+      if (!a[i].convEstimated) {
+        assert.deepEqual(r.legs, a[i].legs, `${name} ${r.ev.id}: the legs`);
+        assert.equal(r.conv, a[i].conv, `${name} ${r.ev.id}: in the bands`);
+        return;
+      }
+      // The estimated close: what it handed back from the bands is the read
+      // at block − 1, and its trades since the row before are that less the
+      // row before's balance.
+      const pre = BEFORE[name][String(r.ev.block)];
+      const dd = r.ev.debtDecimals;
+      assert.ok(near(leg(r, LL.collOut), human(BigInt(pre.borrowed), dd)), `${name} ${r.ev.id}: handed back`);
+      const trades = leg(r, LL.softReceived) - leg(r, LL.softSpent);
+      assert.ok(near(trades, human(BigInt(pre.borrowed), dd) - b[i - 1].conv), `${name} ${r.ev.id}: the trades`);
+      assert.equal(r.conv, 0);
+    });
+  }
+  // bought-back 21,452,491: the AMM held 9,869.28 crvUSD in the bands, all
+  // handed back; partial-last 20,464,262: 0.0599 WETH sold since the row
+  // before and nothing held (lost in its round trips), where the estimate put
+  // the sale's proceeds at the row's price on Received and Withdrawn.
+  const at = (name: string, block: number) => {
+    const p = fx(name);
+    return llamalendFlowReplay(rows(p), opts(p)).replayed.find((r) => r.ev.block === block)!;
+  };
+  assert.ok(near(leg(at("bought-back+pre+stored", 21452491), LL.collOut), 9869.281839110802908411));
+  const pl = at("partial-last+pre+stored", 20464262);
+  assert.equal(leg(pl, LL.softReceived) + leg(pl, LL.collOut), 0, "nothing in the bands to hand back");
+  assert.ok(leg(at("partial-last+stored", 20464262), LL.softReceived) > 100, "the estimate put it at the row's price");
 });
 
 test("the borrowed token in the bands: the AMM's sales and buy-backs on the collateral bar", () => {

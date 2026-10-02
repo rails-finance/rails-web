@@ -2522,6 +2522,13 @@ export interface LlamalendContextRaw {
   stateCollateralAtBlock?: string;
   stateBorrowedAtBlock?: string;
   stateDebtAtBlock?: string;
+  /** A repay that closes the position: its user_state at the end of the
+   *  block before (rails-server, the same store), where the filler has read
+   *  it. The close hands back what the bands held then, and its log states
+   *  the collateral alone. */
+  stateCollateralBefore?: string;
+  stateBorrowedBefore?: string;
+  stateDebtBefore?: string;
 }
 
 export interface LlamalendContext {
