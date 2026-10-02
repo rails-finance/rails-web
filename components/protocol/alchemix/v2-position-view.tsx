@@ -25,7 +25,6 @@ import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -111,7 +110,7 @@ export function AlchemixV2PositionView({
   return (
     <ProvReceiptsScope registry={registry}>
       <div className="space-y-6 py-8">
-        <DetailTopRow session={deployment.session} wallet={p.account} closed />
+        <DetailTopRow session={deployment.session} wallet={p.account} owner={{ wallet: p.account }} closed />
 
         {/* ── The position card ──────────────────────────────────────────── */}
         <PositionCardShell receipts>
@@ -124,12 +123,6 @@ export function AlchemixV2PositionView({
                 </span>
                 <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
                   <span>{p.chainName ?? `chain ${p.chainId}`}</span>
-                  <WalletPill
-                    wallet={p.account}
-                    ensName={null}
-                    filterProtocol={deployment.session}
-                    bookmarkProtocol={deployment.session}
-                  />
                 </span>
               </>
             }

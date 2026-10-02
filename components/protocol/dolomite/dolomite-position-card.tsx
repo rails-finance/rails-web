@@ -278,11 +278,12 @@ export function DolomiteAccountLabel({ text, accountNumber }: { text: string; ac
 
 /** The account-grain identity: the owner (address) + which of its accounts
  *  this is, in Dolomite's own vocabulary. On the detail page the label
- *  explains itself on hover or tap (the listing card sits inside a link). */
+ *  explains itself on hover or tap (the listing card sits inside a link), and
+ *  the owner is on the page's wallet row above the card (ui-jobs 228). */
 function AccountIdentity({ v, tip }: { v: DolomitePositionView; tip?: boolean }) {
   return (
     <span className="flex items-center gap-2">
-      <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />
+      {!tip && <WalletPill wallet={v.owner} ensName={null} filterProtocol="dolomite" bookmarkProtocol="dolomite" />}
       <span className="text-xs text-rb-500">
         {tip ? <DolomiteAccountLabel text={v.accountLabel} accountNumber={v.accountNumber} /> : v.accountLabel}
       </span>

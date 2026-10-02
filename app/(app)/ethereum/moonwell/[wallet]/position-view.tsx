@@ -486,6 +486,7 @@ export default function MoonwellPositionView({
           <DetailTopRow
             session="moonwell"
             wallet={wallet}
+            owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
           >

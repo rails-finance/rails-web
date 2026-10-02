@@ -594,6 +594,16 @@ export default function TroveView({
         <DetailTopRow
           session="liquity-v2"
           wallet={effectiveOwner}
+          owner={{
+            wallet: effectiveOwner,
+            ensName: troveData?.ownerEns ?? null,
+            prefix:
+              effectiveOwner && effectiveOwner !== troveData?.owner ? (
+                <span className="text-rb-400" title="Last owner (trove closed)">
+                  last owner
+                </span>
+              ) : undefined,
+          }}
           assets={stripAssets}
           closed={troveData.status !== "open"}
           closing={closing}

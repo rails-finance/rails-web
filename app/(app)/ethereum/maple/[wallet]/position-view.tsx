@@ -510,6 +510,7 @@ export default function MaplePositionView({
           <DetailTopRow
             session="maple"
             wallet={wallet}
+            owner={{ wallet }}
             assets={stripAssets}
             priceReason={ORACLE_USD_REASON.maple}
             closed={view != null && view.status !== "open"}

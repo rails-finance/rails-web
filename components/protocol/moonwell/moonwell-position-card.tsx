@@ -401,7 +401,9 @@ export function MoonwellPositionCard({
         <ClosedPositionStats
           outcome={v.status}
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+            receipts ? undefined : (
+              <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+            )
           }
           identity={
             <PositionCardMeta
@@ -469,7 +471,9 @@ export function MoonwellPositionCard({
           )
         }
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          )
         }
         identity={
           <PositionCardMeta

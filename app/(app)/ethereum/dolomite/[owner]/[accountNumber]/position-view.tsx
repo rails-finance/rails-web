@@ -371,6 +371,7 @@ export default function DolomitePositionView({
           <DetailTopRow
             session="dolomite"
             wallet={owner}
+            owner={{ wallet: owner }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
           >

@@ -357,34 +357,38 @@ export function PwnPositionCard({
   // bookmark star rides the borrower pill. On the listing the whole card is
   // already a <Link>, so it keeps compact text (a nested anchor is invalid
   // HTML) with the standalone star.
+  // The party the page is read from is on the wallet row above the card
+  // (ui-jobs 228), so the card names the other party.
+  const showLender = v.lender != null && !(side === "lender");
+  const showBorrower = v.borrower != null && !(side === "borrower");
   const partiesIdentity =
     receipts && (v.lender || v.borrower) ? (
       <span className="flex flex-wrap items-center gap-1.5 text-xs text-rb-500">
-        {v.lender && (
+        {showLender && v.lender && (
           <>
             {role("Lender")}
             <WalletPill
               wallet={v.lender}
               ensName={null}
               filterProtocol="pwn"
-              bookmarkProtocol={v.borrower ? undefined : "pwn"}
+              bookmarkProtocol={v.borrower || side ? undefined : "pwn"}
               {...sideHref(v.lender)}
             />
           </>
         )}
-        {v.lender && v.borrower && (
+        {showLender && showBorrower && (
           <span aria-hidden className="text-rb-500">
             →
           </span>
         )}
-        {v.borrower && (
+        {showBorrower && v.borrower && (
           <>
             {role("Borrower")}
             <WalletPill
               wallet={v.borrower}
               ensName={null}
               filterProtocol="pwn"
-              bookmarkProtocol="pwn"
+              bookmarkProtocol={side ? undefined : "pwn"}
               {...sideHref(v.borrower)}
             />
           </>

@@ -671,6 +671,7 @@ export default function AaveV3PositionDetail({
           <DetailTopRow
             session="aave-v3"
             wallet={wallet}
+            owner={{ wallet }}
             assets={stripAssets}
             closed={view != null && view.status !== "open"}
           >

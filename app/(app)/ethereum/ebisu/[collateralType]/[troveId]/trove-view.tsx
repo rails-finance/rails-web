@@ -484,6 +484,15 @@ export default function EbisuTroveDetail({
         <DetailTopRow
           session="ebisu"
           wallet={view?.owner ?? view?.lastOwner ?? null}
+          owner={{
+            wallet: view?.owner ?? view?.lastOwner ?? null,
+            prefix:
+              !view?.owner && view?.lastOwner ? (
+                <span className="text-rb-400" title="Last owner (trove closed)">
+                  last owner
+                </span>
+              ) : undefined,
+          }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}

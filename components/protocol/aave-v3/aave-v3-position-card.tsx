@@ -579,12 +579,16 @@ function AaveV3PositionCardBody({
           outcome={v.status}
           leadingIdentity={
             <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-              <WalletPill
-                wallet={v.wallet}
-                ensName={null}
-                filterProtocol={dep.session}
-                bookmarkProtocol={dep.session}
-              />
+              {/* The detail page draws the wallet on its own row above the card
+                  (ui-jobs 228); the listing card keeps it. */}
+              {!receipts && (
+                <WalletPill
+                  wallet={v.wallet}
+                  ensName={null}
+                  filterProtocol={dep.session}
+                  bookmarkProtocol={dep.session}
+                />
+              )}
               {marketLabel}
             </span>
           }
@@ -658,7 +662,14 @@ function AaveV3PositionCardBody({
         // pill — it bookmarks the wallet, so the address row is its accurate home.
         leadingIdentity={
           <span className="flex items-center gap-2">
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={dep.session} bookmarkProtocol={dep.session} />
+            {!receipts && (
+              <WalletPill
+                wallet={v.wallet}
+                ensName={null}
+                filterProtocol={dep.session}
+                bookmarkProtocol={dep.session}
+              />
+            )}
             {marketLabel && (
               <span
                 className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"

@@ -379,6 +379,7 @@ export default function LlamalendPositionView({
         <DetailTopRow
           session="llamalend"
           wallet={user}
+          owner={{ wallet: user }}
           assets={stripAssets}
           closed={liveView != null && liveView.status !== "open"}
         >

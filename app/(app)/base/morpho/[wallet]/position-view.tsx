@@ -153,6 +153,7 @@ export default function MorphoBaseWalletView({
         <DetailTopRow
           session="morpho-base"
           wallet={wallet}
+          owner={{ wallet, vault: vaultNote }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON["morpho-base"]}
         />
