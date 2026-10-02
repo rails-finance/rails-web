@@ -361,8 +361,9 @@ export interface LlamalendReplayed {
    *  the stored state, else carried from the row before less what the row
    *  took (0 where nothing is stored for the position). */
   conv: number;
-  /** The row's converted balance is carried, not stored, while the AMM was
-   *  trading the bands: the next stored row settles it. */
+  /** The store has not reached the row while the AMM was trading the bands:
+   *  its converted balance is carried from the row before, and the next
+   *  stored row settles it. */
   convUnread: boolean;
   /** The row closed the position by a repay after the AMM traded since the
    *  row before: what it took in for those trades is valued at the row's
