@@ -30,6 +30,7 @@ export function TroveIdentityRow({
   shortId = (id: string) => `${id.slice(0, 6)}…${id.slice(-4)}`,
   showBookmark = true,
   showNftLink = true,
+  showOwner = true,
 }: {
   protocol: LiquityFamilyId;
   troveId?: string;
@@ -52,12 +53,15 @@ export function TroveIdentityRow({
    *  link in plain language, so the header chip would be a redundant second
    *  copy. */
   showNftLink?: boolean;
+  /** The owner's pill. The detail card passes false: the page's wallet row
+   *  above the card names the owner (ui-jobs 228). */
+  showOwner?: boolean;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
   const troveLabel = troveId ? shortId(troveId) : null;
 
   // Current owner when open; the preserved last owner once closed/liquidated.
-  const ownerAddress = owner ?? lastOwner ?? null;
+  const ownerAddress = showOwner ? (owner ?? lastOwner ?? null) : null;
   const isLastOwner = !owner && !!lastOwner;
 
   if (!troveLabel && !nftUrl && !ownerAddress) return null;

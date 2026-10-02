@@ -183,7 +183,9 @@ export function SkySavingsPositionCard({
     >
       <OpenPositionStats
         statusPill={statusPill}
-        leadingIdentity={<Identity p={p} />}
+        // The detail page draws the holder on the wallet row above the card
+        // (ui-jobs 228).
+        leadingIdentity={detail ? undefined : <Identity p={p} />}
         identity={<Meta p={p} />}
         columns={columns}
       />

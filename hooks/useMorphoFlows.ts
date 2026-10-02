@@ -43,6 +43,9 @@ export interface MorphoFlowsInput {
   chainId: number;
   loanSymbol: string | null;
   collSymbol: string | null;
+  /** The tokens' addresses, for the ledgers' icons (a Pendle PT's mark). */
+  loanAddress?: string | null;
+  collAddress?: string | null;
   lltv: number | null;
   open: boolean;
   /** The page's live read of the position, where it has one. */
@@ -138,12 +141,14 @@ export function useMorphoFlows(p: MorphoFlowsInput): {
         ? {
             loanSymbol: p.loanSymbol,
             collSymbol: p.collSymbol ?? "collateral",
+            loanAddress: p.loanAddress ?? null,
+            collAddress: p.collSymbol ? (p.collAddress ?? null) : null,
             lltv: p.lltv,
             now,
             live: p.open ? p.live : null,
           }
         : null,
-    [now, p.loanSymbol, p.collSymbol, p.lltv, p.open, p.live],
+    [now, p.loanSymbol, p.collSymbol, p.loanAddress, p.collAddress, p.lltv, p.open, p.live],
   );
   const replay = useMemo(() => (rows && opts && rows.length > 0 ? morphoFlowReplay(rows, opts) : null), [rows, opts]);
   const timeline = useMemo(() => (rows && opts ? morphoFlowTimeline(rows, opts) : null), [rows, opts]);

@@ -71,7 +71,7 @@ export function TimelineFillWell({ fill }: { fill: TimelineFillState | undefined
       data-fill-eta-source={s.source ?? "none"}
     >
       <p className="font-medium text-foreground">
-        USD values for part of this position&rsquo;s history are still being filled in.
+        USD values for part of this position&rsquo;s history are still being added.
       </p>
       <p className="mt-1 text-rb-500">
         Rails is processing them{s.expectedBy ? <>; expected by {longDate(s.expectedBy)}.</> : "."}

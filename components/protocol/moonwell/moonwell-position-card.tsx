@@ -45,6 +45,8 @@ import type {
 } from "@/lib/sources/api/moonwell-positions";
 import { ExactSpan } from "@/components/shared/amount-text";
 import { TipLabel } from "@/components/shared/tip-label";
+import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
+import { ShareLine, ShareLines } from "@/components/shared/share-bar";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
 
@@ -131,72 +133,50 @@ function useLineReceipts() {
  *  strict chain reads (each line traced, exact figure on hover). The exact hover
  *  figure is the lane the line's provenance asserts: the raw mToken balance on
  *  a current-value line, the raw principal on a principal line. */
-function SupplyFootnoteLines({ v }: { v: MoonwellPositionView }) {
+function SupplyFootnoteLines({ v, total }: { v: MoonwellPositionView; total?: number }) {
   const { supplyProv, mSymbolOf } = useLineReceipts();
-  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
+  const usdOf = supplyLineUsd(v);
+  const { lines, control } = useDustLines(v.supplies, usdOf);
   if (v.supplies.length === 0) return null;
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <ShareLines total={total} control={control}>
       {lines.map((r) => {
         const exact =
           r.current != null ? `${formatUnitsExact(r.mTokensRaw, 8)} ${mSymbolOf(r)}` : `${r.principal} ${r.symbol}`;
         return (
-          <div key={r.address}>
+          <ShareLine key={r.address} share={total ? (usdOf(r) ?? 0) / total : null} side="collateral">
             <Prov info={supplyProv(r)}>
               <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(supplyAmount(r))} {r.symbol}
               </ExactSpan>
             </Prov>
-          </div>
+          </ShareLine>
         );
       })}
-      {control}
-    </div>
+    </ShareLines>
   );
 }
 
-function BorrowFootnoteLines({ v }: { v: MoonwellPositionView }) {
+function BorrowFootnoteLines({ v, total }: { v: MoonwellPositionView; total?: number }) {
   const { borrowProv } = useLineReceipts();
-  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
+  const usdOf = borrowLineUsd(v);
+  const { lines, control } = useDustLines(v.borrows, usdOf);
   if (v.borrows.length === 0) return null;
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <ShareLines total={total} control={control}>
       {lines.map((r) => {
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
-          <div key={r.address}>
+          <ShareLine key={r.address} share={total ? (usdOf(r) ?? 0) / total : null} side="debt">
             <Prov info={borrowProv(r)}>
               <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
               </ExactSpan>
             </Prov>
-          </div>
+          </ShareLine>
         );
       })}
-      {control}
-    </div>
-  );
-}
-
-/** "incl. $X interest" — accrued interest already included in the column's
- *  figure above (it grew it), computed with the strict attribution gates
- *  (computeMoonwellCardCaptions). Hidden below a cent. */
-function InterestCaption({
-  side,
-  usd,
-  live,
-}: {
-  side: "supply" | "debt";
-  usd: number | null | undefined;
-  /** Debt side only: the current figure is the live borrowBalanceStored. */
-  live?: boolean;
-}) {
-  const dep = useMoonwellDeployment();
-  if (usd == null || usd < 0.01) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={dep.card.interest(side, live)}>{formatUsd(usd)}</Prov> interest
-    </div>
+    </ShareLines>
   );
 }
 
@@ -321,8 +301,19 @@ export function MoonwellPositionCard({
   viewHref,
   captions,
   peaks = true,
+  disclosureKey,
+  risk,
+  debtDetail,
 }: {
   v: MoonwellPositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. */
+  disclosureKey?: string;
+  /** The risk headline from the page's Comptroller read, with its opened
+   *  layer (moonwellRiskColumn). */
+  risk?: CardRiskColumn | null;
+  /** Opened-layer lines under Debt from the same read (the room to borrow). */
+  debtDetail?: React.ReactNode;
   receipts?: boolean;
   /** Whether the row carries highest-recorded amounts (the index's replay and
    *  a whole sweep do; the Base listing, a chain read at a block with no
@@ -370,6 +361,10 @@ export function MoonwellPositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
+  // The closed/opened card (ui-jobs 209): the per-side market chevrons give
+  // way to the card's one header chevron, and every line under a headline
+  // moves into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // Dust lines (under a cent) leave the icon stack, its "+N" and the list
   // count; the lines put them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
@@ -397,11 +392,17 @@ export function MoonwellPositionCard({
           liquidations: v.liquidations,
           liquidationCount: v.liquidationCount,
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+            receipts ? undefined : (
+              <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+            )
           }
           identity={
             <PositionCardMeta
@@ -442,6 +443,23 @@ export function MoonwellPositionCard({
   // doing NOW), plus the wallet pill. The LISTING render keeps the lifecycle
   // pill; the wallet pill (facehash + copy + bookmark) renders on both surfaces.
   const modeWord = v.borrows.length > 0 ? "Borrowing" : "Supply only";
+  // Supplied but never entered as collateral: listed apart beneath Collateral
+  // (in the opened layer on a disclosing card).
+  const notCollateral =
+    vo.supplies.length > 0 ? (
+      <NotCollateralBlock>
+        {otherUsd != null ? (
+          <>
+            <div className="text-sm font-semibold tabular-nums">
+              <Prov info={dep.card.usd("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
+            </div>
+            {isDetail && <SupplyFootnoteLines v={vo} />}
+          </>
+        ) : (
+          <SupplyStack v={vo} />
+        )}
+      </NotCollateralBlock>
+    ) : null;
   // `isDetail` (== `receipts`) doubles as the surface discriminator: the
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
@@ -457,8 +475,10 @@ export function MoonwellPositionCard({
         deployment: positionDeployment,
         hasDebt: v.borrows.length > 0,
       })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -469,7 +489,9 @@ export function MoonwellPositionCard({
           )
         }
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol={session} bookmarkProtocol={session} />
+          )
         }
         identity={
           <PositionCardMeta
@@ -491,16 +513,24 @@ export function MoonwellPositionCard({
               vc.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd} info={dep.card.usd("Collateral")} />
-              ) : supplyDisclosure.collapsible ? null : (
+              ) : supplyDisclosure.collapsible && !disclosing ? null : (
                 <SupplyStack v={vc} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {collUsd != null && <SupplyFootnoteLines v={vc} total={collUsd} />}
+                <FactorCaption v={v} addresses={vc.supplies.map((r) => r.address)} />
+                {notCollateral}
+              </PositionCardDetail>
+            ) : (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
@@ -512,22 +542,8 @@ export function MoonwellPositionCard({
                     <SupplyFootnoteLines v={vc} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
                 {isDetail && <FactorCaption v={v} addresses={vc.supplies.map((r) => r.address)} />}
-                {vo.supplies.length > 0 && (
-                  <NotCollateralBlock>
-                    {otherUsd != null ? (
-                      <>
-                        <div className="text-sm font-semibold tabular-nums">
-                          <Prov info={dep.card.usd("Supplied, not collateral")}>{formatUsd(otherUsd)}</Prov>
-                        </div>
-                        {isDetail && <SupplyFootnoteLines v={vo} />}
-                      </>
-                    ) : (
-                      <SupplyStack v={vo} />
-                    )}
-                  </NotCollateralBlock>
-                )}
+                {notCollateral}
               </>
             ),
           },
@@ -537,16 +553,24 @@ export function MoonwellPositionCard({
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd} info={dep.card.usd("Borrowed")} />
-              ) : debtDisclosure.collapsible ? null : (
+              ) : debtDisclosure.collapsible && !disclosing ? null : (
                 <BorrowStack v={v} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {debtUsd != null && <BorrowFootnoteLines v={v} total={debtUsd} />}
+                <BorrowRateCaption rate={captions?.borrowRate} />
+                {debtDetail}
+              </PositionCardDetail>
+            ) : (
               <>
                 {debtUsd == null && debtDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
@@ -559,18 +583,13 @@ export function MoonwellPositionCard({
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} />
-                <InterestCaption
-                  side="debt"
-                  usd={captions?.debtInterestUsd}
-                  live={v.borrows.length > 0 && v.borrows.every((b) => b.live)}
-                />
               </>
             ),
           },
-          // No health-factor column on the CARD: the health layer rides the
-          // detail page's live Comptroller read (runway + capacity + verdict);
-          // the listing snapshot carries no HF, so listing cards simply don't
-          // assert the layer (never dashed, never staled).
+          // The health factor rides the detail page's live Comptroller read
+          // (moonwellRiskColumn); the listing snapshot carries none, so a
+          // listing card asserts no risk column (never dashed, never staled).
+          ...riskColumns(risk, disclosing),
         ]}
       />
     </PositionCardShell>

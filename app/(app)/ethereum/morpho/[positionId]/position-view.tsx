@@ -378,6 +378,8 @@ export default function MorphoPositionView({
     chainId: MAINNET_CHAIN_ID,
     loanSymbol: view && !view.loanDecimalsUnread ? view.loanSymbol : null,
     collSymbol: view && !view.collateralDecimalsUnread ? view.collateralSymbol : null,
+    loanAddress: view?.loanToken ?? null,
+    collAddress: view?.collateralToken ?? null,
     lltv: view?.lltv ?? null,
     open: view?.status === "open",
     live: flowLive,
@@ -434,6 +436,7 @@ export default function MorphoPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="morpho"
+          owner={{ wallet: liveView?.owner, vault: liveView?.vaultOwner }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.morpho}
           closed={liveView != null && liveView.status !== "open"}

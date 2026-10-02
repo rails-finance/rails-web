@@ -97,37 +97,6 @@ export function makeSweptMoonwellIdentity(id: SweptMoonwellIdentityArgs): Moonwe
           { label: "oracle price", kind: "chain", pclass: "oracle", note: "oracle getUnderlyingPrice" },
         ],
       }),
-      // `live` is Ethereum's emitted-vs-live debt switch; a swept lane's debt
-      // is always the live read, so the receipt reads the same either way.
-      interest: (side): Provenance => ({
-        kind: "chain-derived",
-        pclass: "state",
-        summary:
-          side === "supply"
-            ? "Accrued supply interest included in the collateral value above — per market, the current value (mToken balance × the exchange rate, both read at the card's block, = balanceOfUnderlying) minus the net principal the live sweep replayed from the position's own Mint/Redeem events, valued at the Comptroller's own on-chain oracle price. Interest grew the claim, so it is part of the headline figure, not a separate holding."
-            : "Accrued borrow interest included in the debt above — per market, the live debt (borrowBalanceStored read at the card's block) minus the net principal the live sweep replayed from the position's own Borrow/RepayBorrow events, valued at the Comptroller's own on-chain oracle price. Interest grew the debt, so it is part of the headline figure, not an amount repaid.",
-        contract: id.comptroller,
-        via:
-          side === "supply"
-            ? `(mTokens × exchange rate − Σ net event principal) × oracle getUnderlyingPrice, per market · ${sweepVia}`
-            : `(borrowBalanceStored − Σ net event principal) × oracle getUnderlyingPrice, per market · ${sweepVia}`,
-        formula: "(current − net principal) × oracle price",
-        inputs: [
-          {
-            label: "current",
-            kind: "chain",
-            pclass: "state",
-            note: side === "supply" ? "mTokens × exchangeRateStored (interest included)" : "borrowBalanceStored",
-          },
-          {
-            label: "net principal",
-            kind: "chain-derived",
-            pclass: "state",
-            note: "Σ signed event amounts, live sweep",
-          },
-          { label: "oracle price", kind: "chain", pclass: "oracle", note: "oracle getUnderlyingPrice" },
-        ],
-      }),
       // The rate receipts name no deployment: the mToken's own per-timestamp
       // rate, annualized, wherever the market is deployed.
       borrowRate: borrowRateProv,

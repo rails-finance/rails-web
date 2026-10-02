@@ -334,6 +334,9 @@ export interface FlowTimeline {
   labels?: { collateral: string; debt: string };
   /** A family's own words for the one-sided bar; each unset one keeps the default. */
   words?: FlowWords;
+  /** Token addresses by symbol, for an icon a symbol alone does not resolve
+   *  (a Pendle PT, whose mark is read through its address). */
+  addresses?: Record<string, string>;
   /** The daily series holds prices only on the days a price was recorded (a
    *  family with no daily price lane builds it from its events): a day or a
    *  line's bin between keeps the last one, and a price older than
@@ -477,6 +480,8 @@ export interface FlowModel {
   /** The headline words. */
   labels: { collateral: string; debt: string };
   words: FlowWords;
+  /** Token addresses by symbol, for icons (`FlowTimeline.addresses`). */
+  addresses?: Record<string, string>;
   /** Each asset held and owed at the end of each stop before the live one,
    *  and at the live stop. */
   heldAt: FlowAssetHeld[][];
@@ -936,6 +941,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     totalTxs: t.totalTxs ?? last.txs ?? null,
     labels: t.labels ?? { collateral: "Collateral", debt: "Debt" },
     words: t.words ?? {},
+    ...(t.addresses ? { addresses: t.addresses } : {}),
     heldAt,
     liveHeld: t.live.assets ?? liveHeldFromBalances(held, t.todayPrices, heldAt[heldAt.length - 1] ?? []),
     axis: axisFor(peak),

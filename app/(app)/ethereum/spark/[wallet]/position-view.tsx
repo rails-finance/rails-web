@@ -753,6 +753,7 @@ export default function SparkPositionDetail({
         <DetailTopRow
           session="spark"
           wallet={wallet}
+          owner={{ wallet }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
         >

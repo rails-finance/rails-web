@@ -179,6 +179,7 @@ export default function SkySavingsPositionView({
       <DetailTopRow
         session="sky-savings"
         wallet={position.holder}
+        owner={{ wallet: position.holder }}
         assets={priceAssets}
         priceReason={ORACLE_USD_REASON["sky-savings"]}
       />

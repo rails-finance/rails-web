@@ -608,9 +608,11 @@ export function FxPositionCard({
         }
       : null;
 
+  // The detail page draws the owner on the wallet row above the card
+  // (ui-jobs 228); the listing card keeps it.
   const identityLead = (
     <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-      {v.owner ? (
+      {receipts ? null : v.owner ? (
         <WalletPill wallet={v.owner} ensName={null} filterProtocol="fx" bookmarkProtocol="fx" />
       ) : (
         <span className="font-normal tabular-nums text-rb-400">{short(v.owner)}</span>

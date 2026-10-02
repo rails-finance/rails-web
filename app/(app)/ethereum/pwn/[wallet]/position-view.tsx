@@ -443,6 +443,14 @@ export default function PwnLoanView({
         <DetailTopRow
           session="pwn"
           wallet={wallet}
+          owner={{
+            wallet,
+            // The side the page reads the loan from.
+            prefix:
+              view && (wallet === view.lender || wallet === view.borrower) ? (
+                <span className="text-rb-500">{wallet === view.lender ? "Lender" : "Borrower"}</span>
+              ) : undefined,
+          }}
           showStamp={false}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.pwn}

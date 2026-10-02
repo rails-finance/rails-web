@@ -222,6 +222,7 @@ export default function MorphoBasePositionView({
         <DetailTopRow
           session="morpho-base"
           wallet={wallet}
+          owner={{ wallet, vault: vaultOwner }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON["morpho-base"]}
           closed={closed}

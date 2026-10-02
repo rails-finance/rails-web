@@ -96,6 +96,30 @@ export function PositionCardDisclosureToggle() {
   );
 }
 
+/** A card's risk headline drawn from the page's live read (Compound V2,
+ *  Moonwell, Compound V3): the label, the figure, and the opened layer
+ *  beneath it. */
+export interface CardRiskColumn {
+  label: string;
+  labelTip?: string;
+  value: ReactNode;
+  detail?: ReactNode;
+}
+
+/** The risk headline as an `OpenPositionStats` column, its detail in the
+ *  opened layer; none where the card does not disclose or has no risk. */
+export function riskColumns(risk: CardRiskColumn | null | undefined, disclosing: boolean) {
+  if (!disclosing || !risk) return [];
+  return [
+    {
+      label: risk.label,
+      labelTip: risk.labelTip,
+      value: risk.value,
+      footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
+    },
+  ];
+}
+
 /** The opened layer beneath a headline: drawn while the card is open, and
  *  always on a card that has not opted in. */
 export function PositionCardDetail({ children }: { children: ReactNode }) {

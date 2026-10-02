@@ -102,12 +102,14 @@ const stateProv = (v: LlamalendPositionView, sym: string, which: "collateral" | 
  *  or lend (borrowed from lenders' deposits); a V2 market says V2. */
 const MARKET_KIND: Partial<Record<LlamalendFactoryKind, string>> = { crvusd: "mint market", oneway: "lend market" };
 
-/** The position + market identity: whose position, in which isolated market. */
-function PositionIdentity({ v }: { v: LlamalendPositionView }) {
+/** The position + market identity: whose position, in which isolated market.
+ *  The detail page draws the owner on the wallet row above the card
+ *  (ui-jobs 228). */
+function PositionIdentity({ v, wallet = true }: { v: LlamalendPositionView; wallet?: boolean }) {
   const kind = v.factory ? MARKET_KIND[v.factory] : undefined;
   return (
     <span className="flex items-center gap-2">
-      <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />
+      {wallet && <WalletPill wallet={v.user} ensName={null} filterProtocol="llamalend" bookmarkProtocol="llamalend" />}
       <span className="text-xs text-rb-500">
         {v.marketLabel}
         {kind && <span data-llamalend-market-kind=""> · {kind}</span>}
@@ -181,7 +183,7 @@ export function LlamalendPositionCard({
           // the final balances are its opened layer.
           detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
-          leadingIdentity={<PositionIdentity v={v} />}
+          leadingIdentity={<PositionIdentity v={v} wallet={!receipts} />}
           identity={
             <PositionCardMeta
               lastActivityAt={v.lastActivityAt}
@@ -397,7 +399,7 @@ export function LlamalendPositionCard({
             <LifecyclePill status={v.status} />
           )
         }
-        leadingIdentity={<PositionIdentity v={v} />}
+        leadingIdentity={<PositionIdentity v={v} wallet={!receipts} />}
         identity={
           <PositionCardMeta
             lastActivityAt={v.lastActivityAt}

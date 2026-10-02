@@ -508,7 +508,9 @@ export function SparkPositionCard({
           detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
+            receipts ? undefined : (
+              <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
+            )
           }
           identity={
             <PositionCardMeta
@@ -610,7 +612,9 @@ export function SparkPositionCard({
         // not anchors, so it lives safely inside the listing card's <Link>),
         // stays copy-selectable).
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="spark" bookmarkProtocol="spark" />
+          )
         }
         // Right-hand activity-meta cluster: time-ago, transaction count, liquidation.
         identity={

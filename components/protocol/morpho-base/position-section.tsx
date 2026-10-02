@@ -180,6 +180,8 @@ export function MorphoBasePositionSection({
     chainId: MORPHO_BASE_CHAIN_ID,
     loanSymbol: flowsOn && !pos.loanDecimalsUnread ? pos.loanSymbol : null,
     collSymbol: pos.collateralDecimalsUnread ? null : pos.collateralSymbol,
+    loanAddress: pos.loanToken,
+    collAddress: pos.collateralToken,
     lltv: pos.lltv,
     open: morphoViewFromSweep(pos, wallet, chain).status === "open",
     live: flowLive,
@@ -399,13 +401,15 @@ export function MorphoLenderOpenCard({
         }
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            <WalletPill
-              wallet={p.user}
-              ensName={null}
-              filterProtocol="morpho-base"
-              bookmarkProtocol="morpho-base"
-              vault={vault}
-            />
+            {!receipts && (
+              <WalletPill
+                wallet={p.user}
+                ensName={null}
+                filterProtocol="morpho-base"
+                bookmarkProtocol="morpho-base"
+                vault={vault}
+              />
+            )}
             <span>
               {marketLabel(p.loanSymbol, p.collateralSymbol, p.lltv === 0)}
               {p.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(p.lltv * 100).toFixed(1)}%</span>}
@@ -458,13 +462,15 @@ export function LenderClosedCard({
         outcome="closed"
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">
-            <WalletPill
-              wallet={wallet}
-              ensName={null}
-              filterProtocol="morpho-base"
-              bookmarkProtocol="morpho-base"
-              vault={vault}
-            />
+            {!receipts && (
+              <WalletPill
+                wallet={wallet}
+                ensName={null}
+                filterProtocol="morpho-base"
+                bookmarkProtocol="morpho-base"
+                vault={vault}
+              />
+            )}
             <span>
               {pos.marketLabel}
               {pos.lltv > 0 && <span className="ml-2 text-rb-400">LLTV {(pos.lltv * 100).toFixed(1)}%</span>}

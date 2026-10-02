@@ -58,7 +58,6 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
 import { StatFootnote, StatValue } from "@/components/shared/stat-value";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { WalletPill } from "@/components/shared/wallet-pill";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { ProvReceiptsScope, useReceiptRegistry, Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -737,6 +736,24 @@ export function AlchemistPositionView({
         <DetailTopRow
           session={deployment.session}
           wallet={position.owner}
+          // The holder, and its V2 account beside it (the Explanation pane says
+          // what that is), on the wallet row above the card (ui-jobs 228).
+          owner={{
+            wallet: position.owner,
+            extra:
+              v2History && v2History.links.length > 0
+                ? v2History.links.map((l) => (
+                    <Link
+                      key={`${l.lineKey}:${l.account}`}
+                      href={v2PositionPath(deployment, l.lineKey, l.account)}
+                      className="link"
+                      title={alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
+                    >
+                      V2 history →
+                    </Link>
+                  ))
+                : null,
+          }}
           assets={priceAssets}
           priceReason={priceReason}
           closed={position.status === "closed"}
@@ -761,30 +778,6 @@ export function AlchemistPositionView({
                 </span>
                 <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-rb-500">
                   <span>{position.chainName ?? `chain ${chainId}`}</span>
-                  {position.owner ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      held now by
-                      <WalletPill
-                        wallet={position.owner}
-                        ensName={null}
-                        filterProtocol={deployment.session}
-                        bookmarkProtocol={deployment.session}
-                      />
-                    </span>
-                  ) : null}
-                  {/* The holder's V2 account: the Explanation pane says what it is. */}
-                  {v2History && v2History.links.length > 0
-                    ? v2History.links.map((l) => (
-                        <Link
-                          key={`${l.lineKey}:${l.account}`}
-                          href={v2PositionPath(deployment, l.lineKey, l.account)}
-                          className="link"
-                          title={alchemixV2PositionName(l.syntheticSymbol ?? sym, l.account)}
-                        >
-                          V2 history →
-                        </Link>
-                      ))
-                    : null}
                 </span>
               </>
             }

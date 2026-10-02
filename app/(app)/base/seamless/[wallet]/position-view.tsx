@@ -600,6 +600,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
             <DetailTopRow
               session="seamless"
               wallet={wallet}
+              owner={{ wallet }}
               assets={stripAssets}
               closed={view != null && view.status !== "open"}
             >

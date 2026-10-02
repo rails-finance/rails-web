@@ -48,7 +48,6 @@ import {
   positionSupplyPrincipalProv,
   positionDebtProv,
   compoundV2UsdProvOnchain,
-  compoundV2InterestCaptionProv,
   fixedPriceLineProv,
   borrowRateProv,
   avgBorrowRateProv,
@@ -59,7 +58,6 @@ import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2PositionContent } from "@/lib/compound-v2/position-content";
-import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import {
@@ -76,6 +74,8 @@ import type {
 import { ExactSpan } from "@/components/shared/amount-text";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
+import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
+import { ShareLine, ShareLines } from "@/components/shared/share-bar";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -176,71 +176,50 @@ function FixedPriceFlag({ symbol }: { symbol: string }) {
  *  figure is the lane the line's provenance asserts: the raw cToken balance on
  *  a current-value line, the raw principal on a principal line. Lines are
  *  keyed by MARKET (two markets share WBTC's underlying address). */
-function SupplyFootnoteLines({ v }: { v: CompoundV2PositionView }) {
+function SupplyFootnoteLines({ v, total }: { v: CompoundV2PositionView; total?: number }) {
   const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
   if (v.supplies.length === 0) return null;
+  const usdOf = supplyLineUsd(v);
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <ShareLines total={total} control={control}>
       {lines.map((r) => {
         const exact =
           r.current != null ? `${formatUnitsExact(r.cTokensRaw, 8)} ${r.cSymbol}` : `${r.principal} ${r.symbol}`;
         return (
-          <div key={r.market}>
+          <ShareLine key={r.market} share={total ? (usdOf(r) ?? 0) / total : null} side="collateral">
             <Prov info={supplyProv(r)}>
               <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(supplyAmount(r))} {r.symbol}
               </ExactSpan>
             </Prov>
             {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-          </div>
+          </ShareLine>
         );
       })}
-      {control}
-    </div>
+    </ShareLines>
   );
 }
 
-function BorrowFootnoteLines({ v }: { v: CompoundV2PositionView }) {
+function BorrowFootnoteLines({ v, total }: { v: CompoundV2PositionView; total?: number }) {
   const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
   if (v.borrows.length === 0) return null;
+  const usdOf = borrowLineUsd(v);
   return (
-    <div className="text-xs mt-0.5 text-rb-500 tabular-nums space-y-0.5">
+    <ShareLines total={total} control={control}>
       {lines.map((r) => {
         const exact = formatUnitsExact(r.amountRaw, r.decimals);
         return (
-          <div key={r.market}>
+          <ShareLine key={r.market} share={total ? (usdOf(r) ?? 0) / total : null} side="debt">
             <Prov info={borrowProv(r)}>
               <ExactSpan exact={exact} symbol={r.symbol}>
                 {formatCompact(r.amount)} {r.symbol}
               </ExactSpan>
             </Prov>
             {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-          </div>
+          </ShareLine>
         );
       })}
-      {control}
-    </div>
-  );
-}
-
-/** "incl. $X interest" — accrued interest already included in the column's
- *  figure above (it grew it), computed with the strict attribution gates
- *  (computeCompoundV2CardCaptions). Hidden below a cent. */
-function InterestCaption({
-  side,
-  usd,
-  live,
-}: {
-  side: "supply" | "debt";
-  usd: number | null | undefined;
-  /** Debt side only: the current figure is the live borrowBalanceStored. */
-  live?: boolean;
-}) {
-  if (usd == null || usd < 0.01) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      incl. <Prov info={compoundV2InterestCaptionProv(side, live)}>{formatUsd(usd)}</Prov> interest
-    </div>
+    </ShareLines>
   );
 }
 
@@ -336,8 +315,19 @@ export function CompoundV2PositionCard({
   explanation,
   viewHref,
   captions,
+  disclosureKey,
+  risk,
+  debtDetail,
 }: {
   v: CompoundV2PositionView;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. */
+  disclosureKey?: string;
+  /** The risk headline from the page's Comptroller read, with its opened
+   *  layer (compoundV2RiskColumn). */
+  risk?: CardRiskColumn | null;
+  /** Opened-layer lines under Debt from the same read (the room to borrow). */
+  debtDetail?: React.ReactNode;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
@@ -366,6 +356,10 @@ export function CompoundV2PositionCard({
   // detail page (the footnote lines); an unpriced side's list is the
   // headline itself and collapses on every surface.
   const isDetail = receipts;
+  // The closed/opened card (ui-jobs 209): the per-side market chevrons give
+  // way to the card's one header chevron, and every line under a headline
+  // moves into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
   // Dust lines (under a cent) leave the icon stack, its "+N" and the list
   // count; the lines put them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
@@ -391,11 +385,22 @@ export function CompoundV2PositionCard({
           liquidations: v.liquidations,
           liquidationCount: v.liquidationCount,
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+            receipts ? undefined : (
+              <WalletPill
+                wallet={v.wallet}
+                ensName={null}
+                filterProtocol="compound-v2"
+                bookmarkProtocol="compound-v2"
+              />
+            )
           }
           identity={
             <PositionCardMeta
@@ -430,8 +435,10 @@ export function CompoundV2PositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={compoundV2PositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -442,7 +449,9 @@ export function CompoundV2PositionCard({
           )
         }
         leadingIdentity={
-          <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+          receipts ? undefined : (
+            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+          )
         }
         identity={
           <PositionCardMeta
@@ -464,16 +473,22 @@ export function CompoundV2PositionCard({
               v.supplies.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               collUsd != null ? (
                 <UsdHeadline usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
-              ) : supplyDisclosure.collapsible ? null : (
+              ) : supplyDisclosure.collapsible && !disclosing ? null : (
                 <SupplyStack v={v} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {collUsd != null && <SupplyFootnoteLines v={v} total={collUsd.usd} />}
+              </PositionCardDetail>
+            ) : (
               <>
                 {collUsd == null && supplyDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={supplyDisclosure}>
@@ -485,7 +500,6 @@ export function CompoundV2PositionCard({
                     <SupplyFootnoteLines v={v} />
                   </ReserveDisclosureList>
                 )}
-                <InterestCaption side="supply" usd={captions?.supplyInterestUsd} />
               </>
             ),
           },
@@ -495,16 +509,28 @@ export function CompoundV2PositionCard({
               v.borrows.length > 0 ? (
                 <span className="inline-flex items-center gap-1">
                   <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
-                  <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  {disclosing ? null : (
+                    <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
+                  )}
                 </span>
               ) : undefined,
             value:
               debtUsd != null ? (
                 <UsdHeadline usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
-              ) : debtDisclosure.collapsible ? null : (
+              ) : debtDisclosure.collapsible && !disclosing ? null : (
                 <BorrowStack v={v} />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <>
+                <PositionCardDetail>
+                  {debtUsd != null && <BorrowFootnoteLines v={v} total={debtUsd.usd} />}
+                  <BorrowRateCaption rate={captions?.borrowRate} />
+                  {debtDetail}
+                </PositionCardDetail>
+                {/* A state the owner must act on stays in view. */}
+                <DeprecatedBorrowNote v={v} />
+              </>
+            ) : (
               <>
                 {debtUsd == null && debtDisclosure.collapsible && (
                   <ReserveDisclosureList disclosure={debtDisclosure}>
@@ -517,19 +543,14 @@ export function CompoundV2PositionCard({
                   </ReserveDisclosureList>
                 )}
                 <BorrowRateCaption rate={captions?.borrowRate} />
-                <InterestCaption
-                  side="debt"
-                  usd={captions?.debtInterestUsd}
-                  live={v.borrows.length > 0 && v.borrows.every((b) => b.live)}
-                />
                 <DeprecatedBorrowNote v={v} />
               </>
             ),
           },
-          // No health column on the CARD: the risk layer rides the detail
-          // page's live Comptroller read (runway + capacity + verdict); the
-          // listing snapshot carries none, so listing cards simply don't
-          // assert the layer (never dashed, never staled).
+          // The risk headline rides the detail page's live Comptroller read
+          // (compoundV2RiskColumn); the listing snapshot carries none, so a
+          // listing card asserts no risk column (never dashed, never staled).
+          ...riskColumns(risk, disclosing),
         ]}
       />
     </PositionCardShell>

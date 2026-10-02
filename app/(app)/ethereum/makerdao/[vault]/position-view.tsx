@@ -602,6 +602,7 @@ export default function MakerVaultDetailView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="makerdao"
+          owner={{ wallet: cardView?.owner ?? view?.owner }}
           assets={
             view && view.priceUsd != null && view.priceUsd > 0
               ? [{ symbol: view.collateralSymbol, price: view.priceUsd }]
