@@ -484,11 +484,20 @@ for (const proto of PROTOCOLS) {
         `${figures.txCount} (seed ${j.heavy.seed.wallet.txCount})`,
       );
       check(`${id} the last-activity stamp is served`, figures.lastActivityAt > 0, `${figures.lastActivityAt}`);
-      check(
-        `${id} the peaks are served`,
-        figures.peakSupplies.length + figures.peakBorrows.length > 0,
-        `${figures.peakSupplies.length} supply / ${figures.peakBorrows.length} borrow`,
-      );
+      // A wallet the server names as plumbing (a WETH gateway, a router)
+      // states no peak (rails-ops decision 0024); any other is served one.
+      if (j.peakWithheld === "plumbing")
+        check(
+          `${id} the peaks are withheld (plumbing)`,
+          figures.peakSupplies.length + figures.peakBorrows.length === 0,
+          `${figures.peakSupplies.length} supply / ${figures.peakBorrows.length} borrow`,
+        );
+      else
+        check(
+          `${id} the peaks are served`,
+          figures.peakSupplies.length + figures.peakBorrows.length > 0,
+          `${figures.peakSupplies.length} supply / ${figures.peakBorrows.length} borrow`,
+        );
       check(
         `${id} coverage.omitted counts the seeded rows`,
         (read.result.coverage.omitted?.count ?? 0) >= j.heavy.seed.wallet.events,

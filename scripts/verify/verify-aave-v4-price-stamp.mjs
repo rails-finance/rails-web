@@ -24,7 +24,8 @@
 // change, P1's `block` field is absent (red) and P5 reads 21,344.52 against
 // 25,122.55 (red). After the change every line is green or a stated SKIP.
 //
-//   BASE=https://rails-web.vercel.app node scripts/verify/verify-aave-v4-price-stamp.mjs
+//   node scripts/verify/verify-aave-v4-price-stamp.mjs            (dev.rails.finance)
+//   BASE=http://localhost:3801 node scripts/verify/verify-aave-v4-price-stamp.mjs
 //
 // Needs ALCHEMY_URL in .env.local (archive reads at blocks days old). Prints
 // lane NAMES only, never a URL.
@@ -34,9 +35,9 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { BASE, hostFetch } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE = process.env.BASE ?? "http://localhost:3801";
 const env = Object.fromEntries(
   fs
     .readFileSync(path.join(ROOT, ".env.local"), "utf8")
@@ -164,7 +165,7 @@ const skip = (name, why) => {
 const n = (v) => Number(v).toLocaleString("en-US");
 
 async function getJson(url) {
-  const res = await fetch(url, { headers: { accept: "application/json" } });
+  const res = await hostFetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url.replace(BASE, "")}`);
   return res.json();
 }
