@@ -23,6 +23,7 @@
 // the latest MintingUpdate absolutes) or `viewFromChain` (the live overlay —
 // the position's own slots at head, the primary truth on the detail page).
 
+import { Fragment } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -34,6 +35,7 @@ import { Icon } from "@/components/icons/icon";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import {
   soldPeakProv,
@@ -283,7 +285,24 @@ export function FrankencoinPositionCard({
   cloneParent,
   ending,
   lifetimeDebt,
+  disclosureKey,
+  challengeAlert,
+  collateralDetail,
+  debtDetail,
 }: {
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and its
+   *  headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** A running challenge, from the live read: drawn under Collateral (Outcome
+   *  on a terminal card) in both states. Only on a disclosing card. */
+  challengeAlert?: React.ReactNode;
+  /** Opened-layer lines under Collateral from the live read (the challenge
+   *  tally and phase length). Only drawn on a disclosing card. */
+  collateralDetail?: React.ReactNode;
+  /** Opened-layer lines under Debt from the live read (the minting
+   *  cooldown). Only drawn on a disclosing card. */
+  debtDetail?: React.ReactNode;
   /** The debt's lifetime totals, for a closed card's lifetime line. */
   lifetimeDebt?: FrankencoinLifetimeDebt | null;
   /** How a terminal position ended, where the timeline says. */
@@ -307,6 +326,11 @@ export function FrankencoinPositionCard({
   surface?: "listing" | "detail";
 }) {
   const st = STATUS[v.status] ?? STATUS.open;
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>); a running challenge stays
+  // in view.
+  const disclosing = receipts && !!disclosureKey;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
 
   // Terminal states — closed, DENIED (the challenge that never became a
   // position), or EXPIRED (past its deadline, unclaimed) — all draw the
@@ -352,8 +376,14 @@ export function FrankencoinPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={frankencoinPositionContent({ status: v.status, forcedSale: forcedAt != null })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome
+          // (with any running challenge); the highest recorded balances and
+          // the challenge count are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
+          outcomeFootnote={disclosing ? challengeAlert : undefined}
           outcome={v.status}
           outcomeLabel={outcomeLabel}
           extra={extra}
@@ -415,8 +445,10 @@ export function FrankencoinPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={frankencoinPositionContent({ status: "open" })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           surface === "detail" && v.status === "open" ? (
             <RevealTip
@@ -460,23 +492,32 @@ export function FrankencoinPositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote:
-              v.liqPrice != null && v.liqPrice > 0 ? (
-                <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-                  <Prov info={liqPriceProv(v)}>
-                    <span>
-                      liq. price <AmountText value={v.liqPrice} /> ZCHF/{v.collateralSymbol}
-                    </span>
-                  </Prov>{" "}
-                  <span className="text-rb-400">(owner-declared)</span>
-                  {surface === "detail" && v.collateral != null && v.collateral * v.liqPrice - v.minted > -0.005 && (
-                    <div className="mt-0.5">
-                      headroom <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF at this
-                      price
+            footnote: (
+              <>
+                {disclosing && challengeAlert}
+                <Detail>
+                  {v.liqPrice != null && v.liqPrice > 0 ? (
+                    <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+                      <Prov info={liqPriceProv(v)}>
+                        <span>
+                          liq. price <AmountText value={v.liqPrice} /> ZCHF/{v.collateralSymbol}
+                        </span>
+                      </Prov>{" "}
+                      <span className="text-rb-400">(owner-declared)</span>
+                      {surface === "detail" &&
+                        v.collateral != null &&
+                        v.collateral * v.liqPrice - v.minted > -0.005 && (
+                          <div className="mt-0.5">
+                            headroom <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} /> ZCHF at
+                            this price
+                          </div>
+                        )}
                     </div>
-                  )}
-                </div>
-              ) : undefined,
+                  ) : null}
+                  {disclosing && collateralDetail}
+                </Detail>
+              </>
+            ),
           },
           {
             label: CARD_VOCAB.debt,
@@ -495,7 +536,7 @@ export function FrankencoinPositionCard({
                 <StatDash />
               ),
             footnote: (
-              <>
+              <Detail>
                 <StatFootnote>minted ZCHF</StatFootnote>
                 {v.annualInterestPPM != null && (
                   <div className="text-xs mt-0.5 text-rb-500">
@@ -511,12 +552,13 @@ export function FrankencoinPositionCard({
                   </div>
                 )}
                 {expiry && <div className="text-xs mt-0.5 text-rb-500">{expiry}</div>}
-              </>
+                {disclosing && debtDetail}
+              </Detail>
             ),
           },
           // No health column BY DESIGN: Frankencoin has no health factor, and
-          // none is synthesized — the detail page's live strips carry the
-          // challenge / declared-price / expiry / cooldown risk grammar.
+          // none is synthesized — the declared price, the challenges, the
+          // expiry and the cooldown carry the risk, under the two headlines.
         ]}
       />
     </PositionCardShell>

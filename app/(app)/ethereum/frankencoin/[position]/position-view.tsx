@@ -70,7 +70,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import { RiskFooterStrip, RiskFigure } from "@/components/shared/risk-footer-strip";
+import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { formatDayMonth } from "@/lib/date";
 import { phaseText } from "@/lib/frankencoin/figures";
@@ -454,38 +454,41 @@ export default function FrankencoinPositionView({
                 lifetimeDebt={lifetimeDebt}
                 receipts
                 viewHref={tl.viewHref}
-                // The context strip riding the heading-button row: the live
-                // challenge state and the cooldown — the risk grammar's own
-                // surfaces, from the position's slots at head.
-                rowExtra={
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). A running challenge stays in view; the challenge tally,
+                // the phase length and the minting cooldown, from the
+                // position's slots at head, sit in the opened layer.
+                disclosureKey={`frankencoin:${view.position.toLowerCase()}`}
+                challengeAlert={
+                  chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
+                    <RiskFigure alignStart caution>
+                      Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
+                    </RiskFigure>
+                  ) : undefined
+                }
+                collateralDetail={
                   chain && view.status === "open" ? (
-                    <RiskFooterStrip>
-                      {(chain.challengedAmount ?? 0) > 0 ? (
-                        <RiskFigure caution>
-                          Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                        </RiskFigure>
-                      ) : summary ? (
-                        <RiskFigure>
+                    <>
+                      {(chain.challengedAmount ?? 0) > 0 ? null : summary ? (
+                        <RiskFigure alignStart>
                           {summary.challengeCount === 0
                             ? "never challenged"
                             : `challenged ${summary.challengeCount}×, none running`}
                         </RiskFigure>
                       ) : null}
                       {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
-                        <RiskFigure>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
+                        <RiskFigure alignStart>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
                       ) : null}
-                      {chain.cooldownActive && chain.cooldownUntil != null ? (
-                        <RiskFigure>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
-                      ) : !chain.mintingDisabledForGood ? (
-                        <RiskFigure>no minting cooldown</RiskFigure>
-                      ) : null}
-                    </RiskFooterStrip>
-                  ) : chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
-                    <RiskFooterStrip>
-                      <RiskFigure caution>
-                        Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                      </RiskFigure>
-                    </RiskFooterStrip>
+                    </>
+                  ) : undefined
+                }
+                debtDetail={
+                  chain && view.status === "open" ? (
+                    chain.cooldownActive && chain.cooldownUntil != null ? (
+                      <RiskFigure alignStart>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
+                    ) : !chain.mintingDisabledForGood ? (
+                      <RiskFigure alignStart>no minting cooldown</RiskFigure>
+                    ) : undefined
                   ) : undefined
                 }
                 // Everything describing the CURRENT on-chain position lives on

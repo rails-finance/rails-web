@@ -51,6 +51,7 @@
 //     non-stale, non-zero position before any render assertion is believed.
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const PORT = process.argv[2] ?? "3457";
 // A real open V2 position: 150 cbBTC (8 decimals), several million ZCHF minted.
@@ -99,6 +100,8 @@ async function textOf(path, waitFor, { expectPath = path.split("?")[0] } = {}) {
   const landed = new URL(page.url()).pathname;
   check(`route: ${path} is served at ${expectPath}`, landed === expectPath, `landed on ${landed}`);
   if (waitFor) await page.waitForSelector(waitFor, { timeout: 30000 }).catch(() => {});
+  // A position card draws closed (ui-jobs 209); its lines are in the opened layer.
+  await openPositionCards(page);
   return page.evaluate(() => document.body.innerText);
 }
 
