@@ -40,7 +40,7 @@ export async function fetchAccountSwitches(
   wallet: string,
   signal?: AbortSignal,
 ): Promise<AaveFamilyAccountSwitches> {
-  const res = await fetch(`${route}?wallet=${encodeURIComponent(wallet)}`, { signal });
+  const res = await fetch(`${route}${route.includes("?") ? "&" : "?"}wallet=${encodeURIComponent(wallet)}`, { signal });
   if (!res.ok) throw new Error(`account-switches ${res.status}`);
   return (await res.json()) as AaveFamilyAccountSwitches;
 }
