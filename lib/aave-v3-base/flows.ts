@@ -6,7 +6,7 @@
 // The legs are the Ethereum explorer's (`aaveV3FlowLegs`, its buckets), so a
 // Base page draws the lines an Ethereum page draws. Two things are Base's:
 //
-// - INTEREST AS ITS OWN LINES. Every row states its reserve's balance just
+// - INTEREST AS SEPARATE LINES. Every row states its reserve's balance just
 //   before and after it, as the aToken and the variable debt token held it
 //   (`balanceBasis: "chain"`: the scaled balance × the reserve's index at the
 //   block). So per reserve and side the replay splits every move:
@@ -164,7 +164,7 @@ export interface AaveBaseFlowOptions {
   todayPrices: Record<string, number>;
   /** The daily store's series by lowercase reserve, where it answered. */
   dailyPrices?: Record<string, [number, number][]>;
-  /** The Pool's own words: "Aave" or "Seamless". */
+  /** The Pool's brand: "Aave" or "Seamless". */
   brand: string;
   /** The block of the Pool's first DeficitCreated, where the Pool writes off
    *  debt the history does not read (Aave V3 on Base); null where it does not. */

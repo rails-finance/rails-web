@@ -34,13 +34,13 @@ const BASE_CHAIN_ID = 8453;
 export interface AaveV3BaseFlowsInput {
   /** The daily store's family: "aave-v3-base" or "seamless". */
   family: string;
-  /** The Pool's own words: "Aave" or "Seamless". */
+  /** The Pool's brand: "Aave" or "Seamless". */
   brand: string;
   /** The block of the Pool's first DeficitCreated (Aave V3 on Base); null
    *  where the Pool writes nothing off unseen. */
   writeOffFrom: number | null;
   notCounted?: readonly string[];
-  /** The page's own history read is still on its way: wait for it. */
+  /** The page's history read is still on its way: wait for it. */
   pending?: boolean;
   /** The page's events, when they are the whole history; null otherwise. */
   wholeEvents: BaseActivityEvent[] | null;

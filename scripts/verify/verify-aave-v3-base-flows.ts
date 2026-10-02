@@ -2,7 +2,7 @@
 // Base: Aave V3 on Base and Seamless (lib/aave-v3-base/flows.ts; rails-ops
 // reference/lifetime-flows-scrubber.md, "Aave V3 on Base and Seamless").
 // ----------------------------------------------------------------------------
-// OFFLINE. Fixtures read on 2 Oct 2026 from the pages' own routes
+// OFFLINE. Fixtures read on 2 Oct 2026 from the pages' routes
 // (scripts/verify/fixtures/aave-v3-base-flows.json): each account's flat
 // history (/api/chain/{aave-v3-base,seamless}/timeline, every row's balances
 // as the aToken and the debt token held them), the Pool read
