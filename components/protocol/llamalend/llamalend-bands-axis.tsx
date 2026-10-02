@@ -84,7 +84,15 @@ const rampAt = (t: number, alpha: number): string => {
   return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
 };
 
-export function LlamalendBandsAxis({ chain }: { chain: LlamalendChainResponse }) {
+export function LlamalendBandsAxis({
+  chain,
+  alignStart = false,
+}: {
+  chain: LlamalendChainResponse;
+  /** The caption left-aligned, under Health in the card's opened layer
+   *  (ui-jobs 209). Right-aligned under the bar by default. */
+  alignStart?: boolean;
+}) {
   if (
     chain.chainStale ||
     !chain.hasLoan ||
@@ -218,7 +226,9 @@ export function LlamalendBandsAxis({ chain }: { chain: LlamalendChainResponse })
           lives, and it reads as what the range IS. The unit is the bare symbol
           (the ~$1 gloss is in the bar's tooltip) — at this width it cost a
           whole extra caption line. */}
-      <div className="mt-1.5 flex flex-wrap items-baseline justify-end gap-x-2 text-[11px] tabular-nums text-rb-500">
+      <div
+        className={`mt-1.5 flex flex-wrap items-baseline ${alignStart ? "justify-start" : "justify-end"} gap-x-2 text-[11px] tabular-nums text-rb-500`}
+      >
         <span>
           <Prov info={llamalendBandCountProv(chain.controller)}>
             {chain.bands} band{chain.bands === 1 ? "" : "s"}

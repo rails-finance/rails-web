@@ -50,7 +50,12 @@ import {
   type LlamalendPositionView,
 } from "@/components/protocol/llamalend/llamalend-position-card";
 import { LlamalendPositionExplanation } from "@/components/protocol/llamalend/llamalend-position-explanation";
-import { LlamalendRiskSlot } from "@/components/protocol/llamalend/llamalend-risk-slot";
+import {
+  LlamalendConvertedDetail,
+  LlamalendRiskDetail,
+  LlamalendRiskHeadline,
+  llamalendHasRisk,
+} from "@/components/protocol/llamalend/llamalend-risk-slot";
 import {
   llamalendLifetimeWithOpening,
   llamalendLostToSoftLiq,
@@ -401,19 +406,23 @@ export default function LlamalendPositionView({
                 bands={chain?.hasLoan ? chain.bands : null}
                 receipts
                 viewHref={tl.viewHref}
-                // ⇒ THE DISTINCTIVE SURFACE rides the heading-button row, the
-                // same slot a Trove's risk strip uses: health, the converted
-                // amount and the band meter — visible without a click, and inside
-                // the card's receipts scope, which is what makes those figures
-                // inspectable at all. It was a full-width body block while the
-                // band axis was section-sized; at the shared runway's compact
-                // size it belongs on the row with every sibling's. Mounted only
-                // while the loan is live and the chain read landed. The
-                // Explanation heading-button narrates the same figures.
-                rowExtra={
-                  chain && chain.hasLoan && liveView.status === "open" ? (
-                    <LlamalendRiskSlot chain={chain} lost={lost} sold={soldInBands} />
-                  ) : undefined
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The health from the live read is the third headline;
+                // the soft-liquidation multiple, what the AMM sold and the band
+                // axis sit under it in the opened layer, the converted amount
+                // under Collateral, all inside the card's receipts scope.
+                // Mounted only while the loan is live and the read landed.
+                disclosureKey={`llamalend:${controller.toLowerCase()}:${user.toLowerCase()}`}
+                risk={
+                  chain && liveView.status === "open" && llamalendHasRisk(chain)
+                    ? {
+                        value: <LlamalendRiskHeadline chain={chain} />,
+                        detail: <LlamalendRiskDetail chain={chain} lost={lost} sold={soldInBands} />,
+                      }
+                    : undefined
+                }
+                collateralDetail={
+                  chain && liveView.status === "open" ? <LlamalendConvertedDetail chain={chain} /> : undefined
                 }
                 // Passed whatever the status and before the chain read lands:
                 // the pane, and the copy-view link at its foot, mount with the

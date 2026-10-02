@@ -14,6 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3789";
 // The chain-scoped explorer route (rails-ops decision 0016). `/llamalend` is a
@@ -395,6 +396,9 @@ try {
   // begins" — which survives only inside the closed Learn-More modal, so the
   // locator resolved forever to a hidden span). Gate on chrome labels, not
   // explanatory prose.
+  // The card draws closed (ui-jobs 209); the risk lines and the converted
+  // figure are in its opened layer.
+  await openPositionCards(page);
   await page.waitForSelector("text=Soft-liquidation:", { timeout: 120000 });
   body = await page.textContent("body");
   check(
