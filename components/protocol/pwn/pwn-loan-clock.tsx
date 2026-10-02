@@ -19,6 +19,8 @@
 
 import type { ReactNode } from "react";
 import { Clock } from "lucide-react";
+import { useMountedNow } from "@/hooks/useMountedNow";
+import { MountedAge } from "@/components/shared/mounted-age";
 import { NoteRowShell } from "@/components/shared/note-row-shell";
 import { SpineTipContext } from "@/components/shared/spine-column";
 import { Prov } from "@/components/shared/provenance";
@@ -60,17 +62,19 @@ export function PwnLoanTenure({
   /** Drawn where the loan's figures do not resolve a span. */
   fallback?: ReactNode;
 }) {
-  const now = Math.floor(Date.now() / 1000);
+  // The clock arrives after mount (hooks/useMountedNow): a page's server render
+  // and a browser an hour or a day apart would otherwise draw different ages.
+  const now = useMountedNow();
   const ago = (
     <span className={PILL_META} title={`Last activity ${formatDate(lastAt)}`}>
       <Clock size={12} />
-      {formatDuration(lastAt, now)} ago
+      <MountedAge from={lastAt} suffix=" ago" />
     </span>
   );
   const term = deadline != null ? deadline - createdAt : null;
 
   if (state === "unclaimed" && deadline != null) {
-    const openDays = Math.floor((now - createdAt) / 86400);
+    const openDays = now == null ? null : Math.floor((now - createdAt) / 86400);
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm" data-pwn-tenure="unclaimed">
         <span className="text-foreground">
@@ -85,7 +89,13 @@ export function PwnLoanTenure({
           data-prov-exempt=""
           title={`Open since ${formatDate(createdAt)}: the collateral stays in escrow until the lender claims it`}
         >
-          open {openDays.toLocaleString("en-US")} {openDays === 1 ? "day" : "days"}
+          {openDays == null ? (
+            <span className="invisible">open 0,000 days</span>
+          ) : (
+            <>
+              open {openDays.toLocaleString("en-US")} {openDays === 1 ? "day" : "days"}
+            </>
+          )}
         </span>
         {ago}
       </div>
@@ -146,7 +156,7 @@ export function PwnDeadlinePassedRow({
   collateral: string;
   isFirst?: boolean;
 }) {
-  const now = Math.floor(Date.now() / 1000);
+  const now = useMountedNow();
   const prov = extended ? extendedDeadlineProv({ loanId, version }) : bookDueProv(dueKind);
   // The head slot hands this row the live tip's pulsing dot; a defaulted loan
   // is not live, so the row declines it.
@@ -164,7 +174,8 @@ export function PwnDeadlinePassedRow({
               <span title={utcMinuteText(deadline)}>
                 <Prov info={prov}>{formatDate(deadline)}</Prov>
               </span>{" "}
-              · {daysAgoText(deadline, now)} · from the clock, no event
+              · {now == null ? <span className="invisible">0,000 days ago</span> : daysAgoText(deadline, now)} · from
+              the clock, no event
             </span>
           </>
         }

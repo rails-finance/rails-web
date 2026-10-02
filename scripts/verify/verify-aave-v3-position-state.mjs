@@ -693,13 +693,19 @@ for (const fx of FIXTURES) {
   }
 }
 
-// ── 3. A Base card never asks ───────────────────────────────────────────────
+// ── 3. A Base card asks its own route, never the Ethereum index's ───────────
+// Base draws the position state at the block (ec0a255): the card reads
+// /api/chain/aave-v3-base/position-state. The Ethereum route is the index's
+// and a Base card must not call it.
+const BASE_ROUTE = "/api/chain/aave-v3-base/position-state";
 if (!only || only.test("base")) {
   console.log(`\n=== Base ===`);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, extraHTTPHeaders: bypassHeaders() });
   const asks = [];
+  const baseAsks = [];
   page.on("request", (r) => {
     if (r.url().includes(ROUTE)) asks.push(r.url());
+    if (r.url().includes(BASE_ROUTE)) baseAsks.push(r.url());
   });
   try {
     await page.goto(`${BASE}${BASE_PAGE}`, { waitUntil: "domcontentloaded", timeout: 240000 });
@@ -707,11 +713,19 @@ if (!only || only.test("base")) {
     // Base reads its history by a live sweep of the chain's logs, which is slow on a cold route.
     await first.waitFor({ timeout: 300000 });
     await first.locator('[role="button"]').first().click();
-    await page.waitForTimeout(4000);
-    check("base: an open Aave V3 Base card makes no position-state request", asks.length === 0, `${asks.length}`);
+    await first
+      .locator('[data-position-state="ready"]')
+      .waitFor({ timeout: 60000 })
+      .catch(() => {});
     check(
-      "base: an open Aave V3 Base card draws no position-state block",
-      (await first.locator("[data-position-state]").count()) === 0,
+      "base: an open Aave V3 Base card makes no request to the Ethereum index's position-state route",
+      asks.length === 0,
+      `${asks.length}`,
+    );
+    check("base: and asks the Base position-state route", baseAsks.length > 0, `${baseAsks.length}`);
+    check(
+      "base: an open Aave V3 Base card draws its position-state block",
+      (await first.locator('[data-position-state="ready"]').count()) === 1,
     );
   } catch (err) {
     check("base: ran without throwing", false, err && err.message);

@@ -207,3 +207,15 @@ export const formatExactDecimal = (s: string): string => {
   const [int, frac] = (neg ? s.slice(1) : s).split(".");
   return `${neg ? "-" : ""}${BigInt(int).toLocaleString("en-US")}${frac ? `.${frac}` : ""}`;
 };
+
+/** The exact figure for a value that arrives as a decimal string: the string's
+ *  own digits when it is a plain decimal (trailing zeros dropped), else the
+ *  float's. A float cannot hold what an 18-decimal token carries, so the string
+ *  is the source wherever there is one. */
+export const formatExactFromString = (s: string | null | undefined, fallback: number): string => {
+  if (s == null || !PLAIN_DECIMAL.test(s)) return formatExact(fallback);
+  const [int, frac = ""] = s.split(".");
+  const trimmed = frac.replace(/0+$/, "");
+  const out = formatExactDecimal(trimmed ? `${int}.${trimmed}` : int);
+  return out === "-0" ? "0" : out;
+};

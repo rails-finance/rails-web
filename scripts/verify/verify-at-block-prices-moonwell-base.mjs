@@ -51,8 +51,12 @@ const EXPLORERS = {
     // ~1,800 ordinary rows, all on blocks the liquidation-first pass priced, so
     // both the priced arms have specimens; the unpriced arm is discovered.
     wallet: "0x719eae70d4a83f35bf82a2740699f5db84be919d",
-    // The historic walk is paced; older rows are token-only until it reaches them.
-    complete: false,
+    // The walk reached the deployment block: the timeline's `coverage.fill` reads
+    // `complete: true, remainingEventBlocks: 0, unpricedRowsBelowFrontier: 0`
+    // (2026-10-02), so no ordinary row is token-only and the lane is held to the
+    // stronger claim, as Ethereum is. Were the filler to fall behind, the check
+    // below goes red on the unpriced rows and says how many.
+    complete: true,
   },
   moonwell: {
     page: (w) => `/ethereum/moonwell/${w}`,
@@ -224,12 +228,12 @@ async function expandCard(page, n) {
   await page.waitForTimeout(250);
 }
 
-async function openReceiptFor(page, card, valueText) {
+async function openReceiptFor(page, card, valueText, scope = card) {
   // The toggle rides in the Tools menu on a position view and in the dock on
   // a Market-type page; armInspector reads either, and is a no-op once armed
   // (the tool is STICKY — a blind second click would put it down).
   if (!(await armInspector(page))) return null;
-  const target = card.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
+  const target = scope.locator("span.prov-locate-box").filter({ hasText: valueText }).first();
   if ((await target.count()) === 0) return null;
   await target.scrollIntoViewIfNeeded();
   await target.click();
@@ -407,7 +411,13 @@ if (pricedLiq) {
     (await pills.count()) === 2,
     `${await pills.count()} pill(s)`,
   );
-  const receipt = await openReceiptFor(page, card, "$");
+  // The seized leg's own stat card: the card's other receipts that carry a "$"
+  // (the collateral held before the event) come first in document order.
+  const seizedStat = card
+    .getByText("Seized, at liquidation")
+    .first()
+    .locator("xpath=ancestor::*[.//span[contains(@class,'prov-locate-box')]][1]");
+  const receipt = await openReceiptFor(page, card, "$", seizedStat);
   check(
     `liquidation #${n}: a leg's receipt derives from exchangeRateStored and getUnderlyingPrice at the block`,
     !!receipt &&

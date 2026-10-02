@@ -345,9 +345,12 @@ async function main() {
       url: `${BASE}/frankencoin/0x6377a63b2a8caa1db4190a5419d2dc9215d74a3f`,
     },
     {
-      label: "compound-v2: cToken lane (transfer_in wallet)",
+      // The wallet's cToken transfer-in card is a custody row: it sits on neither
+      // flank by design (standards/detail-page-anatomy.md, "The custody row"), so
+      // it is no longer a fixture for a flank echo. The wallet's mints and
+      // redemptions are.
+      label: "compound-v2: cToken lane",
       url: `${BASE}/compound-v2/0x1a6bae20f70691ce1755a003c4560879b7798910`,
-      mustInclude: /received/i,
       maxCards: 7,
     },
     {
@@ -363,7 +366,9 @@ async function main() {
       url: `${BASE}/morpho/a4774e3e693fff2ebd1dcbbd69b1b0a5b9bb0ccc753bfda5dd07bdac97c4818a-0x3b3bdaa4462851621818d2cebc835e077587147a`,
     },
     { label: "fx", url: `${BASE}/fx/wbtc-811` },
-    { label: "maple", url: `${BASE}/maple/0x9ec2d8dd95ee25975ba2a5bb4e9d50dd57b7c87a` },
+    // A wallet with deposits and withdrawals; the single-event wallet this pointed
+    // at holds one custody row (shares received), which draws no flank.
+    { label: "maple", url: `${BASE}/maple/0x68230e37b83fd2b586b51f3e58f6ed4a0689a4af` },
     { label: "makerdao", url: `${BASE}/makerdao/31731` },
     {
       label: "dolomite",

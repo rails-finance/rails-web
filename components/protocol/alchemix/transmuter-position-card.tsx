@@ -25,6 +25,7 @@
 
 import type { ReactNode } from "react";
 import { Clock } from "lucide-react";
+import { useMountedNow } from "@/hooks/useMountedNow";
 import { OpenPositionStats, type OpenPositionStatsColumn } from "@/components/shared/open-position-stats";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -127,15 +128,27 @@ export function stakedColumn(p: AlchemixTransmuterPositionSummary, prov?: Proven
 }
 
 /** The date a maturing position is estimated to mature, from the blocks still
- *  to go at the chain's block time, counted from now. Null once matured or
- *  claimed, or on a chain with no block time here. */
-export function transmuterMaturityEstimate(p: AlchemixTransmuterPositionSummary): TransmuterMaturityEstimate | null {
+ *  to go at the chain's block time, counted from `nowMs`. Null once matured or
+ *  claimed, on a chain with no block time here, or before the browser's clock
+ *  has arrived (`nowMs` null): a server render and a browser an hour apart
+ *  would otherwise draw two dates. */
+export function transmuterMaturityEstimate(
+  p: AlchemixTransmuterPositionSummary,
+  nowMs: number | null,
+): TransmuterMaturityEstimate | null {
   const m = p.maturity;
   const spb = SECONDS_PER_BLOCK[p.chainId];
-  if (p.status === "claimed" || m.matured !== false || m.referenceBlock == null || m.blocksRemaining == null || !spb) {
+  if (
+    nowMs == null ||
+    p.status === "claimed" ||
+    m.matured !== false ||
+    m.referenceBlock == null ||
+    m.blocksRemaining == null ||
+    !spb
+  ) {
     return null;
   }
-  const fromMs = Date.now();
+  const fromMs = nowMs;
   return {
     referenceBlock: m.referenceBlock,
     blocksRemaining: m.blocksRemaining,
@@ -148,7 +161,7 @@ export function transmuterMaturityEstimate(p: AlchemixTransmuterPositionSummary)
 export function maturityColumn(
   p: AlchemixTransmuterPositionSummary,
   prov?: Provenance,
-  estimate: TransmuterMaturityEstimate | null = transmuterMaturityEstimate(p),
+  estimate: TransmuterMaturityEstimate | null = null,
 ): OpenPositionStatsColumn {
   const m = p.maturity;
   let figure: ReactNode = <BlockRef block={m.maturationBlock} size={20} />;
@@ -260,6 +273,8 @@ export function TransmuterPositionCard({
   session: SessionProtocol;
 }) {
   const holder = p.owner ?? p.claim?.claimer ?? null;
+  const now = useMountedNow();
+  const estimate = transmuterMaturityEstimate(p, now == null ? null : now * 1000);
   return (
     <PositionCardShell>
       <OpenPositionStats
@@ -280,7 +295,7 @@ export function TransmuterPositionCard({
             </span>
           </>
         }
-        columns={[stakedColumn(p), maturityColumn(p), claimColumn(p)]}
+        columns={[stakedColumn(p), maturityColumn(p, undefined, estimate), claimColumn(p)]}
       />
     </PositionCardShell>
   );

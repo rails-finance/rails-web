@@ -20,6 +20,7 @@
 //    who claimed rather than a holder.
 
 import { useEffect, useMemo } from "react";
+import { useMountedNow } from "@/hooks/useMountedNow";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { ChainTruthTimeline, type TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
@@ -67,7 +68,8 @@ export function TransmuterPositionView({
   const mytSymbol = p.claim?.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
   const state = transmuterState(p);
   const holder = p.owner ?? p.claim?.claimer ?? null;
-  const maturity = transmuterMaturityEstimate(p);
+  const now = useMountedNow();
+  const maturity = transmuterMaturityEstimate(p, now == null ? null : now * 1000);
 
   const { setWallets } = useWalletContext();
   useEffect(() => {

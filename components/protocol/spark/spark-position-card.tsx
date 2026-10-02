@@ -15,6 +15,7 @@
 
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { formatDate, formatDateRange, formatDuration } from "@/lib/date";
+import { useMountedNow } from "@/hooks/useMountedNow";
 import { TipLabel } from "@/components/shared/tip-label";
 import type { SparkLife } from "@/lib/spark/lives";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
@@ -112,7 +113,9 @@ const PEAK_NOT_COLLATERAL_TIP =
 
 /** "24 days · 7 Oct - 31 Oct 2025", one line per life. */
 function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
-  const now = Math.floor(Date.now() / 1000);
+  // An open life's length is read from the browser's clock once it arrives
+  // (hooks/useMountedNow); the server render leaves it a placeholder.
+  const now = useMountedNow();
   return (
     <div className="flex flex-col gap-0.5 text-xs text-rb-500" data-spark-card-lives={lives.length}>
       {(lives.length > 3 ? [lives[0], lives[lives.length - 1]] : lives).map((l, i) => {
@@ -127,7 +130,7 @@ function LivesLines({ lives }: { lives: readonly SparkLife[] }) {
           <div key={l.from}>
             {i === 1 && lives.length > 3 && <div>{lives.length - 2} more between</div>}
             <span className="text-sm font-semibold text-foreground" data-prov-exempt="">
-              {formatDuration(l.from, end)}
+              {end == null ? <span className="invisible">000 days</span> : formatDuration(l.from, end)}
             </span>{" "}
             {when}
           </div>

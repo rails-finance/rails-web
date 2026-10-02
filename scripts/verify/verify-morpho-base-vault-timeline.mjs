@@ -423,7 +423,11 @@ const shareText = (raw, decimals) => {
   return value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? exactUnits(raw, decimals) : text;
 };
 /** …`pctText` from the same file. */
-const pctText = (fraction) => `${(fraction * 100).toPrecision(4)}%`;
+const pctText = (fraction) => {
+  const p = fraction * 100;
+  // Below 0.000001% toPrecision would print an exponent; the page prints the floor.
+  return p !== 0 && Math.abs(p) < 1e-6 ? "<0.000001%" : `${p.toPrecision(4)}%`;
+};
 /** …`lib/shared/format-event.ts` shortDate + shortDateYear: en-GB, UTC. */
 const dayPrefix = (unix) =>
   `${enGb(new Date(unix * 1000), { timeZone: "UTC", month: "short", day: "numeric" })} '${String(

@@ -38,6 +38,10 @@ import { fileURLToPath } from "node:url";
 import { BASE, hostFetch } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+<<<<<<< HEAD
+=======
+import { BASE, hostFetch } from "./lib/host.mjs";
+>>>>>>> 0c43769 (Verifiers re-pinned to the current site; clock reads in five components wait for the browser; exact tile figures from decimal strings)
 const env = Object.fromEntries(
   fs
     .readFileSync(path.join(ROOT, ".env.local"), "utf8")
@@ -65,6 +69,8 @@ const client = createPublicClient({
   chain: mainnet,
   transport: http(env.ALCHEMY_URL, { batch: false, retryCount: 3, timeout: 90_000 }),
 });
+const ETHERFI_SPOKE = "0xbf10bdfe177de0336afd7fccf80a904e15386219";
+const SPOKE_SUPPLY_ABI = parseAbi(["function getUserSuppliedAssets(uint256 id, address user) view returns (uint256)"]);
 const V4_ORACLE_ABI = parseAbi(["function getReservePrice(uint256 reserveId) view returns (uint256)"]);
 
 // ── The V4 oracle reads — a FIXTURE of this script (hand-copied from the registry) ──
@@ -410,13 +416,24 @@ async function p45() {
     Math.abs(rowL.peakDebtUsd - peakD) <= 0.01,
     `listing ${rowL.peakDebtUsd} vs replay ${peakD.toFixed(2)}`,
   );
-  // 25,134.99 = the peak balance (25,122.55 / 2,744.25657624, the composed
-  // weETH/ETH × ETH/USD the lane stored until migration 314) × the V4
-  // oracle's weETH at the block, 2,745.61521913.
+  // The peak supply is this script's own two chain reads at the peak block: the
+  // EtherFi spoke's getUserSuppliedAssets for weETH (reserve 0 of that spoke)
+  // times the V4 oracle's weETH. On 2 Oct 2026 the chain gave 9.970425243645194794
+  // weETH at 25,929,791 (2.9997 the block before, a second supply in the block),
+  // which is 27,374.95 at 2,745.61521913. The earlier pin of 25,134.99 had taken the
+  // balance from the first of that block's two supply rows.
+  const peakBal = await client.readContract({
+    address: ETHERFI_SPOKE,
+    abi: SPOKE_SUPPLY_ABI,
+    functionName: "getUserSuppliedAssets",
+    args: [BigInt(0), F.F5.wallet],
+    blockNumber: BigInt(F.F5.peakBlock),
+  });
+  const ownPeak = (Number(peakBal) / 1e18) * own.usd;
   check(
-    "P5d the peak supply is the oracle's weETH at the peak block × the peak balance",
-    Math.abs(peakS - 25_134.99) <= 0.5,
-    `replay ${peakS.toFixed(2)} (the old view stated 21,344.52; the Chainlink composition 25,122.55)`,
+    "P5d the peak supply is the oracle's weETH at the peak block × the spoke's own balance read at that block",
+    Math.abs(peakS - ownPeak) <= 0.5,
+    `replay ${peakS.toFixed(2)} vs own ${ownPeak.toFixed(2)} (${Number(peakBal) / 1e18} weETH)`,
   );
 }
 

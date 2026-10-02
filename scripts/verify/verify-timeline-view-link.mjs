@@ -29,9 +29,12 @@
 //      dead one is swept out of the address bar on the first toggle rather
 //      than riding along claiming a view the page cannot be in.
 //
-// Subject: the Moonwell Base wallet Miles reads the timeline on. Nothing here
-// pins a count — the wallet is live — only that the same view yields the same
-// line on both sides of the link.
+// Subject: a Sky Savings holder. The Dates control is gone from every page tied
+// to its Lifetime flows chart (Moonwell Base among them; a `?to=` cut replaces
+// it), and Sky Savings is one that still draws it. It has no Assets or
+// Addresses control, so those steps report SKIP. Nothing here pins a count —
+// the holder is live — only that the same view yields the same line on both
+// sides of the link.
 //
 // Run:
 //   BASE=http://localhost:3100 node scripts/verify/verify-timeline-view-link.mjs
@@ -39,7 +42,7 @@
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const PAGE = process.env.PAGE ?? "/base/moonwell/0x719eae70d4a83f35bf82a2740699f5db84be919d";
+const PAGE = process.env.PAGE ?? "/ethereum/sky-savings/0xef42cf85be6adf3081ada73af87e27996046fe63";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 
 let failures = 0;
@@ -182,11 +185,12 @@ async function hideFirstOption(page, label) {
 
   // Date: open the heatmap and press the last selectable month cell.
   await dateButton(page).click();
-  const cell = page.locator("div.cursor-pointer.h-5").last();
+  // The navigator panel draws one button per month (`data-cell-at`), disabled
+  // where the month holds no event.
+  const cell = page.locator("[data-timeline-navigator] button[data-cell-at]:not([disabled])").last();
   await cell.waitFor({ timeout: 10000 });
-  await cell.dispatchEvent("mousedown");
-  await page.mouse.up();
-  await page.waitForTimeout(200);
+  await cell.click();
+  await page.waitForTimeout(400);
   p = await params(page);
   check(
     "selecting a month writes ?from=&to=",
@@ -252,7 +256,7 @@ async function hideFirstOption(page, label) {
   const c = await open(1280, `${BASE}${PAGE}?from=2025-01-01&to=2025-01-31`);
   check(
     "valid pair → range applied",
-    (await dateButton(c.page).innerText()) === "1 Jan – 31 Jan",
+    (await dateButton(c.page).innerText()) === "Jan 2025",
     await dateButton(c.page).innerText(),
   );
   await c.ctx.close();

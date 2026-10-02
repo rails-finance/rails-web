@@ -189,8 +189,16 @@ if (env.RAILS_API_URL && env.API_BEARER_TOKEN) {
     return (await res.json()).positions ?? [];
   };
   for (const key of Object.keys(POOLS)) {
-    const got = await fetchRows(`status=open&pools=${key}&sortBy=debt&sortOrder=desc&limit=4`);
-    rows.push(...got.filter((r) => r.pool_key === key));
+    // Subjects are CHOSEN here: the eventless-mutation proof needs positions with
+    // no event inside the lookback window, and the largest open positions are the
+    // ones traded most. Take the quiet ones first (largest debt among them), and
+    // fill up to four with the largest of the rest, which the other checks still use.
+    const got = (await fetchRows(`status=open&pools=${key}&sortBy=debt&sortOrder=desc&limit=100`)).filter(
+      (r) => r.pool_key === key,
+    );
+    const quiet = (r) => r.last_event_block != null && BigInt(r.last_event_block) < head - LOOKBACK;
+    const picked = [...got.filter(quiet).slice(0, 4), ...got.filter((r) => !quiet(r))].slice(0, 4);
+    rows.push(...picked);
   }
   info(`index sampled: ${rows.map((r) => `${r.pool_key}#${r.position}`).join(", ") || "none"}`);
 } else {

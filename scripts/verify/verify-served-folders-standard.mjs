@@ -28,8 +28,8 @@
 //   E1  SparkLend 0xb137…ece5, every event inside a folder: folder rows drawn,
 //       no empty label
 //   E2  Moonwell Base 0x11a0…520a, the same shape: the same
-//   E3  SparkLend 0x0000…8a90 with ?hide=supply, which hides its one loose
-//       event and no folder: no loose card, folder rows drawn, no "filtered
+//   E3  SparkLend 0x0000…8a90 with ?hide=supply, which hides its loose supply
+//       event and no folder: no loose supply card, folder rows drawn, no "filtered
 //       out" label
 //   E4  E1's wallet cut at 2023-05-17 (`?to=`, the Lifetime flows chart's
 //       "Show timeline to {date}" button), a day inside its OLDEST folder: the list's ends read the
@@ -108,8 +108,15 @@ const CLIENT = { id: "client", path: "/base/aave-v3/0xbb8fb8fe5198f25d117c0e7b1b
 const NEVER_EMPTY = [
   { id: "empty-spark", path: "/ethereum/spark/0xb137e7d16564c81ae2b0c8ee6b55de81dd46ece5", loose: null },
   { id: "empty-moonwell-base", path: "/base/moonwell/0x11a020d80b0a4468bf45888a0ab33cf4169f520a", loose: null },
-  // Its one loose event is a supply; its five folders hold transfers only.
-  { id: "filter-spark", path: "/ethereum/spark/0x000000000004444c5dc75cb358380d2e3de08a90?hide=supply", loose: 0 },
+  // It once held one loose event, a supply; its folders hold transfers. Its
+  // newest transfers arrive as loose cards before a folder takes them (3 on
+  // 2 Oct 2026), so the pin is that no supply stays drawn, not a count of zero.
+  {
+    id: "filter-spark",
+    path: "/ethereum/spark/0x000000000004444c5dc75cb358380d2e3de08a90?hide=supply",
+    loose: null,
+    looseNot: "supply",
+  },
   // 28 folders, oldest 2023-04-04 → 2024-06-29 holding one event on 2023-05-17
   // (its `byDay`, read 2026-09-13); the newest folder ends 2026-08-31.
   {
@@ -352,7 +359,10 @@ async function runNeverEmpty(f, name) {
   const text = await page.evaluate(() => document.body.innerText);
   const said = EMPTY_LABELS.filter((l) => text.includes(l));
   const loose = await page.locator("[data-event-id]").count();
-  const looseOk = f.loose == null || loose === f.loose;
+  const looseKinds = f.looseNot
+    ? await page.locator("[data-event-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-event-id") ?? ""))
+    : [];
+  const looseOk = (f.loose == null || loose === f.loose) && !looseKinds.some((k) => k.startsWith(`${f.looseNot}:`));
   check(
     `${name} [${f.id}]`,
     folders > 0 && said.length === 0 && looseOk,

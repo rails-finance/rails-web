@@ -32,6 +32,7 @@ import {
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { MAPLE_FOLDER_REGISTER, MAPLE_QUEUE_FILL_RUNS } from "@/lib/maple/timeline-runs";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
+import { useMountedNow } from "@/hooks/useMountedNow";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { MapleEventCard } from "@/components/protocol/maple/maple-event-card";
@@ -113,6 +114,8 @@ export default function MaplePositionView({
   initialOpening,
   initialGrouped,
 }: MaplePositionViewProps) {
+  // The clock arrives after mount, so the server render and a browser at another time draw one text.
+  const mountedNow = useMountedNow();
   // Keyed on the timeline, not the row: a wallet with no Maple position is a
   // real answer the server can seed, and its `initialPosition` is null.
   const seeded = initialEvents != null;
@@ -633,13 +636,7 @@ export default function MaplePositionView({
                 segments={segments}
                 liveWindow={
                   sinceLast.length > 0
-                    ? ({ isFirst }) => (
-                        <MapleSinceLastEventRow
-                          lines={sinceLast}
-                          isFirst={isFirst}
-                          now={Math.floor(Date.now() / 1000)}
-                        />
-                      )
+                    ? ({ isFirst }) => <MapleSinceLastEventRow lines={sinceLast} isFirst={isFirst} now={mountedNow} />
                     : undefined
                 }
                 renderCard={(event, meta) =>

@@ -60,13 +60,14 @@ export function MapleSinceLastEventRow({
 }: {
   lines: MapleSinceLastEvent[];
   isFirst?: boolean;
-  /** Unix seconds the page counts the stretch to. */
-  now: number;
+  /** Unix seconds the page counts the stretch to; null until the browser's clock
+   *  has arrived (hooks/useMountedNow), when the length is left out. */
+  now: number | null;
 }) {
   if (lines.length === 0) return null;
   const multi = lines.length > 1;
   const newest = Math.max(...lines.map((l) => l.lastAt));
-  const period = `since ${formatDayMonth(newest)}, ${formatDuration(newest, now)}`;
+  const period = `since ${formatDayMonth(newest)}${now == null ? "" : `, ${formatDuration(newest, now)}`}`;
   // The figure is live: the claim is read at the head block, and the pool's
   // rate rises on it every block.
   const blockNow = Math.max(...lines.map((l) => l.blockNow));

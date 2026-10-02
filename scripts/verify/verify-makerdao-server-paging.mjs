@@ -26,10 +26,15 @@ import { chromium } from "playwright";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const LIST = "/ethereum/makerdao";
+/** The bare directory rests on the open vaults (lib/makerdao/listing-visibility.ts),
+ *  while the Collateral menu counts every status. The whole-index checks open the
+ *  listing with every status chosen so both count the same set. */
+const ALL_STATUS = "status=open,closed,liquidated";
+const LIST_ALL = `${LIST}?${ALL_STATUS}`;
 
 /** Its vault count on 2026-08-28. The index only grows, so this is a floor. */
 const FLOOR = 31750;
-/** Collateral types the index holds. */
+/** Collateral types the index held on 2026-08-28; the index only grows, so a floor. */
 const ILK_COUNT = 42;
 
 /** The 13 the retired 500-row slice could reach — every other collateral type
@@ -130,7 +135,7 @@ async function main() {
   page.on("pageerror", (e) => errors.push(String(e)));
 
   // ---- 1. the page pages ---------------------------------------------------
-  await page.goto(BASE + LIST, { waitUntil: "networkidle" });
+  await page.goto(BASE + LIST_ALL, { waitUntil: "networkidle" });
   await page.locator('a[class*="listing-row"]').first().waitFor({ timeout: 20000 });
 
   const n = await rowCount(page);
@@ -144,9 +149,9 @@ async function main() {
   const opts = await panelOptions(page);
   const labels = opts.map((o) => o.label);
   check(
-    labels.length === ILK_COUNT,
+    labels.length >= ILK_COUNT,
     "facet: every collateral type in the index is offered",
-    `${labels.length} of ${ILK_COUNT}`,
+    `${labels.length}, floor ${ILK_COUNT}`,
   );
 
   const missingOld = SLICE_13.filter((i) => !labels.includes(i));
@@ -230,7 +235,7 @@ async function main() {
 
   // A typed name reaches every vault of every collateral type it names — both
   // wstETH ilks, not whichever one the old slice happened to carry.
-  await page.goto(`${BASE}${LIST}?q=wsteth`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}${LIST}?q=wsteth&${ALL_STATUS}`, { waitUntil: "networkidle" });
   await page.locator('a[class*="listing-row"]').first().waitFor({ timeout: 20000 });
   const wstethTotal = await total(page);
   const wstethExpected =

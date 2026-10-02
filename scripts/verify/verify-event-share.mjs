@@ -1165,7 +1165,8 @@ await verifyFamily("seamless", {
 });
 await verifyFamily("compound-v3-base", {
   listingPath: "/base/compound-v3",
-  rowHrefRe: /^\/base\/compound-v3\/0x[0-9a-fA-F]{40}$/,
+  // A row's link carries its market as a fragment (`#market-usdc`).
+  rowHrefRe: /^\/base\/compound-v3\/0x[0-9a-fA-F]{40}(#[\w-]+)?$/,
 });
 
 // ── sweep batch d ──────────────────────────────────────────────────────────

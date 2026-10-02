@@ -50,6 +50,7 @@ import {
   formatCompact,
   formatExact,
   formatExactDecimal,
+  formatExactFromString,
   formatNumber,
   formatUsdValue,
 } from "@/lib/utils/format";
@@ -464,17 +465,21 @@ export function reconstructTransition(args: {
   const beforeN = beforeStr != null ? Number(beforeStr) : afterN - changeN;
   const beforeExact = beforeStr != null ? formatExactDecimal(beforeStr) : formatExact(beforeN);
   const sign = changeN >= 0 ? "+" : "−";
+  // Each exact figure comes from its decimal string, where it is a plain
+  // decimal: a float prints digits an 18-decimal token never had.
+  const afterExact = formatExactFromString(after, afterN);
+  const changeAbsExact = formatExactFromString(change.replace(/^[-+]/, ""), Math.abs(changeN));
   const vals = {
-    after: formatExact(afterN),
+    after: afterExact,
     before: beforeExact,
-    change: `${sign}${formatExact(Math.abs(changeN))}`,
+    change: `${sign}${changeAbsExact}`,
   };
   return {
     before: formatCompact(beforeN),
     beforeExact,
     beforeProv: opening ? openingBeforeProv(beforeProv) : fillFormulaOperands(beforeProv, vals),
     change: `${sign}${formatCompact(Math.abs(changeN))}`,
-    changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
+    changeExact: `${sign}${changeAbsExact}`,
     changeProv: fillFormulaOperands(changeProv, vals),
   };
 }
