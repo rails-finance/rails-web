@@ -14,6 +14,7 @@
 // legs have no ERC20 symbol (the "token" is a Fluid DEX pool) — they render
 // as shares; no USD is asserted at this depth.
 
+import { Fragment } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -22,6 +23,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { settledNowProv, positionSigmaProv, peakLegProv, accruedInterestProv } from "@/lib/fluid/event-provenance";
 import { fluidLegHolds } from "@/lib/fluid/explainer-clauses";
 import { fluidRatioProv, liveSettledProv, vaultConfigProv } from "@/lib/fluid/live-provenance";
@@ -187,9 +189,18 @@ export function FluidPositionCard({
   explanation,
   viewHref,
   chain,
+  disclosureKey,
+  debtDetail,
 }: {
   v: FluidPositionView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** Opened-layer lines under Debt from the live read (the borrow rate, the
+   *  room to the borrow limit). Only drawn on a disclosing card. */
+  debtDetail?: React.ReactNode;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
@@ -202,6 +213,10 @@ export function FluidPositionCard({
   chain?: FluidPositionChainResponse | null;
 }) {
   const pairText = fluidPairText(v, chain);
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>). The events-plus-interest
+  // footnotes leave it: the flows panel counts the interest.
+  const disclosing = receipts && !!disclosureKey;
   const identityMeta = (
     <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidationCount={v.liquidationCount} />
   );
@@ -246,8 +261,12 @@ export function FluidPositionCard({
           wasLiquidated: v.wasLiquidated,
           peakBasis: v.peakBasis,
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.wasLiquidated ? "liquidated" : "closed"}
           leadingIdentity={leadingIdentity}
           identity={identityMeta}
@@ -288,6 +307,7 @@ export function FluidPositionCard({
   // doing NOW); the LISTING render keeps the lifecycle pill. The liquidated
   // badge is orthogonal history (two-axis model) and rides both.
   const live = chain && chain.found && !chain.chainStale ? chain : null;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
   // One rule with the pane below (fluidLegHolds): ε on the Σ replay, `> 0` on a
   // chain figure, so the pill and the prose can never disagree about the debt.
   const hasDebt =
@@ -321,7 +341,7 @@ export function FluidPositionCard({
             </StatValue>
           ),
           footnote: (
-            <>
+            <Detail>
               <StatFootnote>
                 liquidates above{" "}
                 <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", live.vault, pairText)}>
@@ -331,7 +351,7 @@ export function FluidPositionCard({
               <div className="mt-2 w-64 max-w-full">
                 <FluidRunway compact chain={live} />
               </div>
-            </>
+            </Detail>
           ),
         }
       : null;
@@ -343,8 +363,10 @@ export function FluidPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={fluidPositionContent({ status: "open", hasDebt })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           <span className="flex items-center gap-1.5">
             {receipts ? (
@@ -362,17 +384,24 @@ export function FluidPositionCard({
           {
             label: "Collateral",
             value: <LegValue v={v} side="supply" chain={chain} />,
-            footnote: <SigmaFootnote v={v} side="supply" chain={chain} />,
+            footnote: disclosing ? undefined : <SigmaFootnote v={v} side="supply" chain={chain} />,
           },
           {
             label: "Debt",
             value: <LegValue v={v} side="borrow" chain={chain} />,
-            footnote: <SigmaFootnote v={v} side="borrow" chain={chain} />,
+            footnote: disclosing ? (
+              debtDetail ? (
+                <PositionCardDetail>{debtDetail}</PositionCardDetail>
+              ) : undefined
+            ) : (
+              <SigmaFootnote v={v} side="borrow" chain={chain} />
+            ),
           },
           // The third column, on the live read only (Liquity V2's ratio
           // column is the model): the position ratio, the vault's
           // liquidation line under it, and the runway to it.
-          ...(ratioColumn ? [ratioColumn] : []),
+          // A disclosing card holds the slot empty until the read lands.
+          ...(ratioColumn ? [ratioColumn] : disclosing ? [null] : []),
         ]}
       />
     </PositionCardShell>
