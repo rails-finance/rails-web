@@ -59,7 +59,7 @@ export interface HubAssetAgg {
    *  name (no contract address); `address` is looked up from
    *  SPOKE_ADDRESS_BY_KEY (a stable on-chain constant, not indexer output) and
    *  is undefined for a spoke with no deployed address on record (Treasury). */
-  spokeLeaves: { slug: string; name: string; lt: number | null; address?: string }[];
+  spokeLeaves: { slug: string; name: string; lt: number | null; ltBlock?: number; address?: string }[];
   /** The spoke whose line supplied borrowApr / liquidityFee (the non-null seen
    *  in the group). The rate is presented as the hub's, on the assumption the
    *  group's spokes agree; this names which line it was actually lifted from.
@@ -163,7 +163,10 @@ function buildHubView(
     // One leaf per spoke that lists this asset (deduped by slug), carrying the
     // LT it contributed. Keyed by slug so a spoke appearing twice is one leaf,
     // keeping the leaf count equal to spokeCount.
-    const leafMap = new Map<string, { slug: string; name: string; lt: number | null; address?: string }>();
+    const leafMap = new Map<
+      string,
+      { slug: string; name: string; lt: number | null; ltBlock?: number; address?: string }
+    >();
 
     for (const l of group) {
       spokes.add(l.spoke);
@@ -172,6 +175,7 @@ function buildHubView(
           slug: l.spoke,
           name: SPOKE_NAME_OVERRIDE[l.spoke] ?? l.spokeName,
           lt: l.lt,
+          ltBlock: l.ltBlock,
           address: SPOKE_ADDRESS_BY_KEY[l.spoke],
         });
       }

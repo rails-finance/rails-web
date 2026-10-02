@@ -36,6 +36,7 @@ import {
 import { patchReservesWithChain, patchSpokeCardWithChain } from "@/lib/aave-v4/apply-chain-truth";
 
 import { SPOKE_NAME_TO_KEY } from "@/lib/aave-v4/spoke-meta";
+import { useClosedCollateralFactors, type CollateralEventRef } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { aaveV4LiveEarlierBlocks, aaveV4PriceGapNotesFor, liveAaveV4PriceGapNotes } from "@/lib/aave-v4/market-notes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 
@@ -403,6 +404,30 @@ function AaveV4SpokePageInner({
       return (e.context.data.spokeName ?? "Main") === spokeName;
     });
   }, [sortedEvents, spokeName]);
+
+  // A closed position's collateral factors as they stood while it was open:
+  // each collateral asset's state just before its last event on this spoke.
+  const collateralEventRefs = useMemo<CollateralEventRef[]>(
+    () =>
+      spokeScopedEvents.flatMap((e) => {
+        if (!isAaveV4Event(e)) return [];
+        const d = e.context.data;
+        const symbol =
+          d.eventType === "liquidation"
+            ? d.collateralSymbol
+            : d.eventType === "supply" || d.eventType === "withdraw" || d.eventType === "collateral_toggle"
+              ? d.reserveSymbol
+              : undefined;
+        return symbol ? [{ symbol, blockNumber: e.blockNumber }] : [];
+      }),
+    [spokeScopedEvents],
+  );
+  const closedFactors = useClosedCollateralFactors(
+    activeCard?.isClosed === true && deployment.key !== "base",
+    wallet,
+    SPOKE_NAME_TO_KEY[spokeName],
+    collateralEventRefs,
+  );
 
   // Who executed this spoke position's events — the SAME externalActor()
   // verdict each event card renders on its spine, reduced over the spoke's
@@ -842,6 +867,7 @@ function AaveV4SpokePageInner({
                 // No wallet: the page's wallet row above the card names it
                 // (ui-jobs 228); the spoke name stays with the card.
                 externalActivity={externalActivity}
+                closedFactors={closedFactors}
                 rowExtra={
                   activeCard.totalDebtUsd > 0 && activeCard.healthFactor != null ? (
                     <AaveV4RiskSlot

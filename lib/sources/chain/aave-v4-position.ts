@@ -32,11 +32,12 @@ export const SPOKES: Record<string, { name: string; address: `0x${string}` }> = 
   kelp: { name: "Kelp", address: "0x3131fe68c4722e726fe6b2819ed68e514395b9a4" },
   lido: { name: "Lido", address: "0xe1900480ac69f0b296841cd01cc37546d92f35cd" },
   lombard: { name: "Lombard BTC", address: "0x7ec68b5695e803e98a21a9a05d744f28b0a7753d" },
+  usdg_pendle: { name: "Stablecoin Correlated", address: "0x956d8e0a89cfa3744428c4641b5a53b56167a7f9" },
 };
 
 // Hub contract (lowercased) → the hub key the server sends on each reserve.
 // Addresses from rails-server-onboarding sieve/sieve.toml AaveV4Hub_*.
-const HUB_KEY_BY_ADDR: Record<string, string> = {
+export const HUB_KEY_BY_ADDR: Record<string, string> = {
   "0xcca852bc40e560adc3b1cc58ca5b55638ce826c9": "core",
   "0x06002e9c4412cb7814a791ea3666d905871e536a": "plus",
   "0x943827dca022d0f354a8a8c332da1e5eb9f9f931": "prime",
@@ -51,6 +52,7 @@ const SPOKE_ABI = parseAbi([
   "function getUserSuppliedAssets(uint256 id, address user) view returns (uint256)",
   "function getUserTotalDebt(uint256 id, address user) view returns (uint256)",
   "function getUserReserveStatus(uint256 id, address user) view returns (bool isCollateral, bool hasBorrow)",
+  "function getUserPosition(uint256 id, address user) view returns ((uint120 drawnShares, uint120 premiumShares, int200 premiumOffsetRay, uint120 suppliedShares, uint32 dynamicConfigKey))",
 ]);
 
 // address (lowercased) → display symbol, reversed from the app's TOKEN_ADDR map.
@@ -129,12 +131,11 @@ export async function loadAaveV4SpokePositionFromChain(
   const reserves: AaveV4SpokeChainReserve[] = [];
   let supplyAssetCount = 0;
   let debtAssetCount = 0;
-  // Collect (id, dynamicConfigKey) for reserves this user actually touches, to
-  // batch their LT reads in phase 2.
-  const ltTargets: { reserveId: number; key: number; idx: number }[] = [];
+  // Reserves this user touches, to batch their LT reads in phase 2.
+  const ltTargets: { reserveId: number; idx: number }[] = [];
 
   for (let i = 0; i < count; i++) {
-    const r = meta[i * 4] as { underlying: string; hub: string; decimals: bigint; dynamicConfigKey: number };
+    const r = meta[i * 4] as { underlying: string; hub: string; decimals: bigint };
     const supplied = meta[i * 4 + 1] as bigint;
     const debt = meta[i * 4 + 2] as bigint;
     const status = meta[i * 4 + 3] as readonly [boolean, boolean];
@@ -158,12 +159,16 @@ export async function loadAaveV4SpokePositionFromChain(
       lt: null, // filled in phase 2
       hub: HUB_KEY_BY_ADDR[r.hub.toLowerCase()] ?? null,
     });
-    ltTargets.push({ reserveId: i, key: Number(r.dynamicConfigKey), idx: reserves.length - 1 });
+    ltTargets.push({ reserveId: i, idx: reserves.length - 1 });
   }
 
-  // Phase 2 — liquidation thresholds for the touched reserves only.
+  // Phase 2 — liquidation thresholds for the touched reserves only. A position
+  // keeps the dynamic config key it last took (getUserPosition), which can be
+  // older than the reserve's current one: Kelp rsETH positions hold 95% on key
+  // 0 while the reserve's key 1 reads 0%. The factor is read at the
+  // position's own key, the one getUserAccountData.avgCollateralFactor uses.
   if (ltTargets.length > 0) {
-    const cfgs = (await client.multicall({
+    const positions = (await client.multicall({
       allowFailure: false,
       ...blockOpt,
       contracts: ltTargets.map(
@@ -171,8 +176,21 @@ export async function loadAaveV4SpokePositionFromChain(
           ({
             address,
             abi: SPOKE_ABI,
+            functionName: "getUserPosition",
+            args: [BigInt(t.reserveId), wallet],
+          }) as const,
+      ),
+    })) as { dynamicConfigKey: number }[];
+    const cfgs = (await client.multicall({
+      allowFailure: false,
+      ...blockOpt,
+      contracts: ltTargets.map(
+        (t, k) =>
+          ({
+            address,
+            abi: SPOKE_ABI,
             functionName: "getDynamicReserveConfig",
-            args: [BigInt(t.reserveId), t.key],
+            args: [BigInt(t.reserveId), positions[k].dynamicConfigKey],
           }) as const,
       ),
     })) as { collateralFactor: bigint }[];

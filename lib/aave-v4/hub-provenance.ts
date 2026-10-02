@@ -28,14 +28,14 @@
 //   2. AGGREGATION. A hub figure is an aggregate over N spokes, each a separate
 //      contract — so a one-value-to-one-read receipt cannot describe it. The LT
 //      cell is `0.75–0.83`: the lowest and highest per-spoke threshold in the
-//      hub. Each of those is the EFFECTIVE threshold the spoke applies to the
-//      asset — getUserAccountData.avgCollateralFactor on a position holding it
-//      alone, harvested by the chain-refresher into
-//      aave_v4_reserves.liquidation_threshold. It is a different quantity from
-//      the reserve's static getDynamicReserveConfig.collateralFactor, which an
-//      e-mode or correlated venue lifts above (Core WETH: 0.83 config, 0.92
-//      effective — scripts/verify-aave-v4-chain.mjs, "Deliberately NOT
-//      checked"), so the copy says what the spoke applies, never the config.
+//      hub. Each of those is the collateral factor the spoke sets for the
+//      asset now: getDynamicReserveConfig(reserveId, key).collateralFactor at
+//      the reserve's current dynamicConfigKey, read on chain by the hubs route
+//      (lib/sources/chain/aave-v4-reserve-factors.ts) and carried as
+//      `ltBlock`. A position keeps the key it last took, so an older position
+//      can carry an earlier factor; the receipt says so. A line the chain read
+//      did not cover keeps the indexed figure (harvested from
+//      getUserAccountData.avgCollateralFactor) and its leaf says that instead.
 //      It renders as a COMPUTED receipt whose leaves are the per-spoke figures
 //      (hubLtRangeProv). The summary BRANCHES: when the spread collapsed to one
 //      figure (ltDisplay < 0.0001), it states uniform-across-N-spokes and never
@@ -76,6 +76,8 @@ export interface HubSpokeLeaf {
   slug: string;
   name: string;
   lt: number | null;
+  /** The block `lt` was read from the spoke at; absent for an indexed figure. */
+  ltBlock?: number;
   address?: string;
 }
 
@@ -152,23 +154,37 @@ export const hubLtRangeProv = (
     label: s.name,
     value: s.lt!.toFixed(2),
     kind: "chain",
-    pclass: "indexed",
+    pclass: s.ltBlock != null ? "state" : "indexed",
     contract: s.address ? { name: "spoke contract", address: s.address } : undefined,
-    note: "the collateral factor this spoke reports for the asset",
+    note:
+      s.ltBlock != null
+        ? `getDynamicReserveConfig at the reserve's current config key, read at block ${s.ltBlock}`
+        : "the collateral factor the index holds for this spoke, harvested from a position holding the asset alone",
   }));
+  // Every leaf read from the spoke: the receipt is a chain read. Otherwise it
+  // rests on at least one indexed figure.
+  const allRead = n > 0 && withLt.every((s) => s.ltBlock != null);
+  const pclass = allRead ? ("state" as const) : ("indexed" as const);
+  const block = allRead ? withLt[0].ltBlock : coords.blockNumber;
+  const what = allRead
+    ? "the collateral factor the spoke sets for the asset now, read from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure"
+    : "the collateral factor a spoke reports for a position holding this asset and nothing else";
+  const via = allRead
+    ? `${LANE} · spoke getReserve · getDynamicReserveConfig(reserveId, dynamicConfigKey).collateralFactor`
+    : `${LANE} · spoke getUserAccountData · avgCollateralFactor`;
 
   if (uniform) {
     const value = n > 0 ? withLt[0].lt!.toFixed(2) : "—";
     return {
       kind: "chain",
-      pclass: "indexed",
-      source: { block: coords.blockNumber },
+      pclass,
+      source: { block },
       summary: `${symbol} liquidation threshold — ${value} on ${
         n === 1 ? "the one spoke" : `all ${n} spokes`
-      } that list this asset in ${hub(
+      } that list this asset as collateral in ${hub(
         coords,
-      )}. It is the collateral factor a spoke reports for a position holding this asset and nothing else, read on each of them. The per-spoke figures are listed below, each with the spoke's contract where one is on record, so the agreement is checkable.`,
-      via: `${LANE} · spoke getUserAccountData · avgCollateralFactor, per spoke`,
+      )}. It is ${what}. The per-spoke figures are listed below, each with the spoke's contract where one is on record, so the agreement is checkable.`,
+      via: `${via}, per spoke`,
       inputs: leaves,
     };
   }
@@ -177,12 +193,12 @@ export const hubLtRangeProv = (
   const hi = Math.max(...withLt.map((s) => s.lt!)).toFixed(2);
   return {
     kind: "chain",
-    pclass: "indexed",
-    source: { block: coords.blockNumber },
-    summary: `${symbol} liquidation threshold — ${lo} at the lowest and ${hi} at the highest across the ${n} spokes that list this asset in ${hub(
+    pclass,
+    source: { block },
+    summary: `${symbol} liquidation threshold — ${lo} at the lowest and ${hi} at the highest across the ${n} spokes that list this asset as collateral in ${hub(
       coords,
-    )}. Each figure is the collateral factor that spoke reports for a position holding this asset and nothing else. A position is liquidated at the threshold of the spoke it sits in, and the per-spoke figures are listed below, each with the spoke's contract where one is on record.`,
-    via: `${LANE} · spoke getUserAccountData · avgCollateralFactor · lowest … highest`,
+    )}. Each figure is ${what}. A position is liquidated at the threshold of the spoke it sits in, and the per-spoke figures are listed below, each with the spoke's contract where one is on record.`,
+    via: `${via} · lowest … highest`,
     formula: "min … max",
     inputs: leaves,
   };

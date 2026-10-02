@@ -28,6 +28,7 @@ import {
   fmtYearly,
 } from "@/lib/aave-v4/format";
 import { useSpokeCollateralFactors } from "@/lib/aave-v4/use-spoke-collateral-factors";
+import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fmtPrice } from "@/components/shared/price-pill";
@@ -623,10 +624,26 @@ export function AaveV4PositionExplanation({
  *  the seizure "ended in liquidation"; a scarred life the owner's own
  *  transactions later wound down "ran its course" with the seizures named as
  *  what mark the outcome; a life never liquidated "was closed by its owner". */
-export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: AaveSpokeCardInfo; embedded?: boolean }) {
+export function AaveV4ClosedExplanation({
+  spoke,
+  embedded = false,
+  factorsThen,
+}: {
+  spoke: AaveSpokeCardInfo;
+  embedded?: boolean;
+  /** The collateral factors that applied while the position was open, read
+   *  from the spoke (useClosedCollateralFactors). Without them the bullet
+   *  names today's factors and says so. */
+  factorsThen?: ClosedCollateralFactors;
+}) {
   const supplyOnly = spoke.peakDebtUsd < 1;
-  const cfs = useSpokeCollateralFactors(spoke.name);
-  const perAsset = supplyOnly ? null : cfList(spoke.suppliedSymbolsEver, cfs);
+  const cfsNow = useSpokeCollateralFactors(spoke.name);
+  const then =
+    factorsThen?.status === "ok" ? new Map([...factorsThen.factors].map(([sym, f]) => [sym, f.factor] as const)) : null;
+  // While the read is in flight the bullet waits, so today's factors never
+  // stand in for a moment as the factors of the past.
+  const pending = factorsThen?.status === "loading";
+  const perAsset = supplyOnly || pending ? null : cfList(spoke.suppliedSymbolsEver, then ?? cfsNow);
   const lead = spoke.endedByLiquidation ? (
     <>
       This position on the {spoke.name} spoke <H>ended in liquidation</H> — no balances remain on it:
@@ -685,20 +702,39 @@ export function AaveV4ClosedExplanation({ spoke, embedded = false }: { spoke: Aa
       </span>,
     );
   }
-  if (perAsset) {
+  if (perAsset && then) {
     items.push(
       <span key="collateral-factor">
         {perAsset.single != null ? (
           <>
-            On this spoke {aaveV4DisplaySymbol(spoke.suppliedSymbolsEver[0])} counts at{" "}
-            {Math.round(perAsset.single * 100)}% of its value, its collateral factor: the health factor is the
-            collateral ratio times {Math.round(perAsset.single * 100)}%, so it reaches 1, the liquidation line, when the
-            collateral is worth about {Math.round(100 / perAsset.single)}% of the debt.
+            While it was open, {aaveV4DisplaySymbol(spoke.suppliedSymbolsEver[0])} counted at{" "}
+            {Math.round(perAsset.single * 100)}% of its value on this spoke, its collateral factor: the health factor
+            was the collateral ratio times {Math.round(perAsset.single * 100)}%, so it reached 1, the liquidation line,
+            when the collateral was worth about {Math.round(100 / perAsset.single)}% of the debt.
           </>
         ) : (
           <>
-            On this spoke each collateral counts at its collateral factor, {perAsset.text} of its value: the health
-            factor is the collateral counted that way divided by the debt, and at 1 the position can be liquidated.
+            While it was open, each collateral counted at its collateral factor on this spoke, {perAsset.text} of its
+            value: the health factor was the collateral counted that way divided by the debt, and at 1 the position
+            could be liquidated.
+          </>
+        )}
+      </span>,
+    );
+  } else if (perAsset) {
+    items.push(
+      <span key="collateral-factor">
+        {perAsset.single != null ? (
+          <>
+            Today {aaveV4DisplaySymbol(spoke.suppliedSymbolsEver[0])} counts at {Math.round(perAsset.single * 100)}% of
+            its value on this spoke, its collateral factor now. The factor that applied while this position was open
+            could not be read, and governance may have changed it since.
+          </>
+        ) : (
+          <>
+            Today each collateral counts at its collateral factor on this spoke, {perAsset.text} of its value. The
+            factors that applied while this position was open could not be read, and governance may have changed them
+            since.
           </>
         )}
       </span>,

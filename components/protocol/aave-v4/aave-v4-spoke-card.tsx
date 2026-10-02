@@ -17,6 +17,7 @@ import { AaveV4LiquidationFootnote } from "@/components/protocol/aave-v4/aave-v4
 import { bucketForHealth } from "@/lib/aave-v4/health-bucket";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import type { ClosedCollateralFactors } from "@/lib/aave-v4/use-closed-collateral-factors";
 import { fmtUsd, hfLabelV4, hfColorClass, fmtYearly } from "@/lib/aave-v4/format";
 import {
   AaveV4PositionExplanation,
@@ -25,7 +26,13 @@ import {
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { usdProv, usdProvOnchain, accumProv, healthFactorProv, interestSinceZeroProv } from "@/lib/aave-v4/position-provenance";
+import {
+  usdProv,
+  usdProvOnchain,
+  accumProv,
+  healthFactorProv,
+  interestSinceZeroProv,
+} from "@/lib/aave-v4/position-provenance";
 import { listSymbols, NO_PRICE_HINT, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
@@ -252,6 +259,7 @@ function AaveV4SpokeCard({
   ensName,
   rowExtra,
   externalActivity,
+  closedFactors,
 }: {
   spoke: AaveSpokeCardInfo;
   isSelected: boolean;
@@ -274,6 +282,8 @@ function AaveV4SpokeCard({
    *  detail page has an event stream to reduce, so it is the only caller that
    *  passes this. */
   externalActivity?: ExternalActorSummary;
+  /** A closed position's collateral factors while it was open (detail page). */
+  closedFactors?: ClosedCollateralFactors;
 }) {
   const { isClosed } = spoke;
   // The info area renders by placement: the static detail card, or a
@@ -515,7 +525,7 @@ function AaveV4SpokeCard({
               // describes the chain NOW and never rides a past life.
               explanation={
                 isClosed ? (
-                  <AaveV4ClosedExplanation spoke={spoke} embedded />
+                  <AaveV4ClosedExplanation spoke={spoke} embedded factorsThen={closedFactors} />
                 ) : (
                   <AaveV4PositionExplanation spoke={spoke} embedded externalActivity={externalActivity} />
                 )
@@ -547,6 +557,9 @@ export interface AaveV4SpokeCardSelectorProps {
    *  single spoke, so one summary is unambiguous; a genuine multi-spoke
    *  selector must not pass a summary reduced over another spoke's events. */
   externalActivity?: ExternalActorSummary;
+  /** The SELECTED spoke's collateral factors while it was open, when it is
+   *  closed (detail page only; see useClosedCollateralFactors). */
+  closedFactors?: ClosedCollateralFactors;
 }
 
 export function AaveV4SpokeCardSelector({
@@ -557,6 +570,7 @@ export function AaveV4SpokeCardSelector({
   ensName,
   rowExtra,
   externalActivity,
+  closedFactors,
 }: AaveV4SpokeCardSelectorProps) {
   const items = spokes.map((s) => {
     const status: "open" | "closed" = s.isClosed ? "closed" : "open";
@@ -587,6 +601,7 @@ export function AaveV4SpokeCardSelector({
           // spoke's events, so handing it to a sibling card would state
           // another market's operator pattern under this one's heading.
           externalActivity={item.name === selected ? externalActivity : undefined}
+          closedFactors={item.name === selected ? closedFactors : undefined}
         />
       )}
     />

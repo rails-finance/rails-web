@@ -27,8 +27,12 @@ export interface HubCreditLine {
   symbol: string;
   underlying: string;
   decimals: number;
-  /** LT fraction in (0,1], or null for borrow-only listings. */
+  /** The spoke's collateral factor for the asset, a fraction in (0,1]; null
+   *  where the spoke sets 0 (a borrow-only listing). */
   lt: number | null;
+  /** The block `lt` was read from the spoke at (the hubs route's chain
+   *  overlay). Absent when `lt` is the indexed figure. */
+  ltBlock?: number;
   /** Supply cap, whole-token units. "1099511627775" (2^40-1) ≈ uncapped. */
   addCap: string;
   /** Credit line (max draw), whole-token units. */

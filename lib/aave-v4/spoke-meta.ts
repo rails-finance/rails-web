@@ -229,8 +229,8 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     collateralHub: "Core",
     borrowHubs: ["Core"],
     narrative: [
-      "Kelp Spoke on the Core Hub: rsETH collateral borrowing wETH only — the same single-pair restaking-loop shape as the EtherFi and Lido Spokes.",
-      "Parameters move independently of the wider Hub, sized to rsETH's own risk.",
+      "Kelp Spoke on the Core Hub, built as a single-pair restaking loop like the EtherFi and Lido Spokes: rsETH collateral borrowing wETH.",
+      "Governance has frozen both of its reserves: the Spoke takes no new supply or borrowing, wETH is no longer borrowable, and rsETH's collateral factor is 0% for any position that takes the current terms. Positions that took their terms before the change keep rsETH at 95%.",
     ],
   },
   lido: {
@@ -333,6 +333,8 @@ export const SPOKE_ADDRESS_BY_KEY: Record<string, `0x${string}`> = {
   lido: "0xe1900480ac69f0b296841cd01cc37546d92f35cd",
   lombard: "0x7ec68b5695e803e98a21a9a05d744f28b0a7753d",
   usdg_pendle: "0x956d8e0a89cfa3744428c4641b5a53b56167a7f9",
+  usdg_syrup: "0x774b9655413c34809c1f1b16b654465a89ebe989",
+  usdg_paxg: "0xad75ce6354f87f3135ce10621d385d8d1e2562c2",
 };
 
 /** Spoke contracts of Aave V4 on Base (Aave's address book, AaveV4Base.sol). */

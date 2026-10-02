@@ -2,17 +2,18 @@
  * Aave V4 liquidation-threshold helpers, and the dollar-rail rule.
  *
  * There is intentionally NO hardcoded per-spoke LT table here any more. The
- * threshold a position is liquidated at is the EFFECTIVE collateral factor,
- * which an e-mode or correlated venue lifts above the reserve's static
- * getDynamicReserveConfig.collateralFactor (Core WETH: 0.83 config, 0.92
- * effective), and getReserve / getReserveConfig report collateralRisk = 0, so
- * the only trustworthy source is the chain itself. The server now harvests the true LT for each (spoke,
- * reserve) from getUserAccountData.avgCollateralFactor on single-collateral
- * positions (rails-server-onboarding chain-refresher harvest-lt) and writes it to
- * aave_v4_reserves.liquidation_threshold; it rides the wire on every chain
- * reserve as `reserves[].lt`. The position calculation reads that value (see
- * patchReservesWithChain / patchSpokeCardWithChain). The earlier `LT_BY_SPOKE`
- * hand-maintained table had drifted stale-low by up to 800bps and is gone.
+ * threshold a position is liquidated at is the collateral factor of the
+ * dynamic config key the position last took: getUserPosition(id, user)
+ * .dynamicConfigKey, then getDynamicReserveConfig(id, key).collateralFactor.
+ * That key can be older than the reserve's current one (Kelp rsETH: 95% on
+ * key 0, 0% on the current key 1); the reserve's current factor is the one a
+ * new position takes. The chain reader
+ * (lib/sources/chain/aave-v4-position.ts) reads it at the position's key; the
+ * indexed spoke-position payload carries the server's harvested
+ * aave_v4_reserves.liquidation_threshold as `reserves[].lt`. The position
+ * calculation reads that value (see patchReservesWithChain /
+ * patchSpokeCardWithChain). The earlier `LT_BY_SPOKE` hand-maintained table had
+ * drifted stale-low by up to 800bps and is gone.
  *
  * `AAVE_V4_FALLBACK_LT` is the single conservative value used only in the rare
  * no-chain fallback (a position whose chain read failed / never ran, so no

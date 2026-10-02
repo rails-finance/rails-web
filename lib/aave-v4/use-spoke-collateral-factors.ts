@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { fetchAaveV4Hubs, type AaveV4HubsResponse } from "@/lib/api/fetch-aave-v4-hubs";
 
 // The hubs payload carries each (hub, spoke, asset) line's collateral factor,
-// the effective one the server harvests from getUserAccountData (see
-// lib/aave-v4/liquidation-thresholds.ts). One request per page load.
+// the one the spoke sets now (read on chain by the hubs route; see
+// lib/sources/chain/aave-v4-reserve-factors.ts). One request per page load.
 let hubs: Promise<AaveV4HubsResponse | null> | null = null;
 
 /** Each asset's collateral factor on a spoke (by display name), as a fraction.

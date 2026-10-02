@@ -614,7 +614,7 @@ export function aaveV4BorrowContent(): LearnMoreContent {
       },
       {
         bold: "What moves the rate",
-        text: "the hub that lends the asset sets its borrow rate from how much of its supply is borrowed: the rate rises slowly up to a target share and steeply past it, so every borrow, repay, supply and withdrawal on that hub moves it. Aave V4 can add a per-user risk premium on top, scaled by the quality of the collateral, recalculated on each borrow and withdrawal; every position Rails has read carries a zero premium.",
+        text: "the hub that lends the asset sets its borrow rate from how much of its supply is borrowed: the rate rises slowly up to a target share and steeply past it, so every borrow, repay, supply and withdrawal on that hub moves it. Aave V4 can add a per-user risk premium on top, scaled by the quality of the collateral, recalculated on each borrow and withdrawal; the position page shows the premium when the position carries one.",
       },
       {
         bold: "Position managers",
