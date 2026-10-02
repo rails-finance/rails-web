@@ -57,6 +57,10 @@ export interface MvRow {
   // mig 110) — non-NULL only on priced liquidation/redemption blocks.
   price_usd: string | null;
   price_source: string | null;
+  // The borrowing fee an open or draw paid (LUSDBorrowingFeePaid, mig 375),
+  // raw 1e18; "0" where none was charged. NULL or absent where the index
+  // cannot place it: the row then states the debt added.
+  borrowing_fee?: string | null;
 }
 
 const LABELS: Record<LiquityV1EventType, string> = {
@@ -132,6 +136,12 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
     const debtBefore = bigintOf(r.debt_before);
     const collDelta = collAfter - collBefore;
     const debtDelta = debtAfter - debtBefore;
+    const isOpen = kind === "openTrove";
+    // What the owner received on an open or draw: the debt added less the
+    // borrowing fee and, on an open, the 200 LUSD reserve minted to the GasPool.
+    const fee = debtDelta > ZERO && r.borrowing_fee != null ? bigintOf(r.borrowing_fee) : null;
+    const received = fee != null ? debtDelta - fee - (isOpen ? RESERVE : ZERO) : null;
+    const draw = received != null && received >= ZERO && fee != null ? { fee, received } : null;
 
     const ctx: LiquityV1Context = {
       eventType: kind,
@@ -143,8 +153,14 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
       debtBefore: fmtUnits(debtBefore),
       // Per-life open marker: each Trove life begins with its own openTrove, so a
       // reopened Trove's second life is also flagged (not just the global idx 0).
-      isOpen: kind === "openTrove",
+      isOpen,
       epoch: r.epoch,
+      ...(draw
+        ? {
+            borrowingFee: fmtUnits(draw.fee),
+            lusdReceived: fmtUnits(draw.received),
+          }
+        : {}),
       ...(kind === "liquidation" || kind === "redemption"
         ? { priceAtBlock: priceOf(r.price_usd, r.price_source) }
         : {}),
@@ -156,13 +172,18 @@ export function buildLiquityV1Timeline(rows: MvRow[], walletRaw: string): Liquit
     // out of the owner's wallet: its ETH goes to the Stability Pool, the
     // liquidator or the redeemer, and the debt is cancelled with their LUSD.
     // A close takes the debt less the 200 LUSD reserve from the wallet; the
-    // GasPool burns the reserve.
+    // GasPool burns the reserve. An open or draw brings the owner the debt
+    // added less the fee and the reserve, where the row carries the fee.
     const flows: AssetFlow[] = [];
     const ownerActs = kind !== "liquidation" && kind !== "redemption";
     if (ownerActs && collDelta !== ZERO)
       flows.push(flowFor(ETH_SENTINEL, "ETH", collDelta, collDelta > ZERO ? "out" : "in"));
-    if (ownerActs && debtDelta !== ZERO) {
-      const walletDebt = kind === "closeTrove" && -debtDelta > RESERVE ? debtDelta + RESERVE : debtDelta;
+    if (ownerActs && debtDelta !== ZERO && !(draw && draw.received === ZERO)) {
+      const walletDebt = draw
+        ? draw.received
+        : kind === "closeTrove" && -debtDelta > RESERVE
+          ? debtDelta + RESERVE
+          : debtDelta;
       flows.push(flowFor(LIQUITY_V1_ADDRESSES.LUSD, "LUSD", walletDebt, walletDebt > ZERO ? "in" : "out"));
     }
 

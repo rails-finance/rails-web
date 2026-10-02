@@ -171,7 +171,7 @@ export function LiquityV1PositionCard({
           detailGate={disclosing ? PositionCardDetail : undefined}
           outcomeFootnote={disclosing && claimable ? claimableLine : undefined}
           outcome={v.status}
-          outcomeLabel={v.status === "closed" && endedBy === "redemption" ? "Fully redeemed" : undefined}
+          redeemed={v.status === "closed" && endedBy === "redemption"}
           leadingIdentity={walletId}
           identity={meta}
           closedAt={v.lastActivityAt}

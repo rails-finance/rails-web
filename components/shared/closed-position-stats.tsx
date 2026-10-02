@@ -6,13 +6,17 @@ import { formatDate } from "@/lib/date";
 
 export type PositionOutcome = "closed" | "liquidated" | "expired" | "repaid" | "defaulted" | "denied";
 
-// The badge is the LIFECYCLE word — every terminal card reads "CLOSED", grey
+// The badge is the LIFECYCLE word — a terminal card reads "CLOSED", grey
 // for a wind-down (closed / repaid / denied / expired) or red for a forced
 // exit (liquidated / defaulted). The Outcome column beneath it carries the
 // actual outcome word, so "closed by liquidation" is legible without the
-// badge itself needing a third color.
+// badge itself needing a third color. One ending names itself on the badge:
+// a Trove a redemption closed reads "REDEEMED" in caution orange
+// (color-grammar §5), since "CLOSED" reads as the owner closing it.
 const GREY_BADGE = "bg-rb-500 text-white";
 const RED_BADGE = "bg-red-500 text-white";
+const CAUTION_BADGE = "bg-caution-500 text-white";
+const CAUTION_TEXT = "text-caution-600 dark:text-caution-400";
 
 const OUTCOME: Record<PositionOutcome, { label: string; color: string; badge: string }> = {
   closed: { label: "Closed", color: "text-rb-500", badge: GREY_BADGE },
@@ -57,6 +61,9 @@ export interface ClosedPositionStatsProps {
    *  ended more finely than `outcome` (Liquity V1's "Fully redeemed"). The
    *  badge and colour still follow `outcome`. */
   outcomeLabel?: string;
+  /** A closed position whose last debt a redemption cancelled: the badge
+   *  reads "REDEEMED" and the badge and Outcome take caution orange. */
+  redeemed?: boolean;
   /** Unix timestamp of closure — shown as date beneath Outcome */
   closedAt?: number;
   /** Dated lines beneath Outcome in place of the one closure date, where the
@@ -90,6 +97,7 @@ export function ClosedPositionStats({
   debt,
   outcomeFollows,
   outcomeLabel,
+  redeemed = false,
   labelTips,
   collateralLabel = CARD_VOCAB.peakCollateral,
   debtLabel = CARD_VOCAB.peakDebt,
@@ -110,7 +118,11 @@ export function ClosedPositionStats({
   detailGate,
 }: ClosedPositionStatsProps) {
   const Gate = detailGate ?? Fragment;
-  const { label, color, badge } = OUTCOME[outcome];
+  const base = OUTCOME[outcome];
+  const { label, color, badge } = redeemed
+    ? { label: "Fully redeemed", color: CAUTION_TEXT, badge: CAUTION_BADGE }
+    : base;
+  const badgeWord = redeemed ? "REDEEMED" : "CLOSED";
   const closure = closedAt ? formatClosureDate(closedAt) : null;
   const showDebt = debt !== undefined;
   const hasInColumnAssets = collateralAssetIcons != null || debtAssetIcons != null;
@@ -129,11 +141,16 @@ export function ClosedPositionStats({
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           {badgeTip ? (
-            <RevealTip tip={badgeTip} label={`Closed: ${badgeTip}`} focusable className="focus-ring rounded-xs">
-              <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+            <RevealTip
+              tip={badgeTip}
+              label={`${redeemed ? "Redeemed" : "Closed"}: ${badgeTip}`}
+              focusable
+              className="focus-ring rounded-xs"
+            >
+              <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>{badgeWord}</span>
             </RevealTip>
           ) : (
-            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>CLOSED</span>
+            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>{badgeWord}</span>
           )}
           {leadingIdentity}
         </span>

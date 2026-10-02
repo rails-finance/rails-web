@@ -61,7 +61,8 @@ export function liquityV1ShareCardModel(tail: LiquityV1Tail, wallet: string): Po
   return {
     session: "liquity-v1",
     subject: shortSubject(wallet),
-    status: STATUS_WORD[trove.status] ?? trove.status,
+    status:
+      trove.status === "closed" && trove.closedByRedemption ? "Redeemed" : (STATUS_WORD[trove.status] ?? trove.status),
     stats,
     asOf: new Date(),
   };

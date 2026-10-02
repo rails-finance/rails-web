@@ -10,7 +10,9 @@
 //     on a close (the owner repays the debt less the reserve);
 //   • on a liquidation, what the Stability Pool burned and received, what the
 //     liquidator was paid (the reserve and 0.5% of the ETH), what was
-//     redistributed to other Troves, and any ETH sent to the CollSurplusPool.
+//     redistributed to other Troves, and any ETH sent to the CollSurplusPool;
+//     when the transaction liquidated several Troves, this Trove's share
+//     (splitLiquidation), or the totals where the share does not reconcile.
 //
 // Plus the protocol's ETH price at the end of the event's block
 // (PriceFeed.lastGoodPrice, the figure the redemption rows already carry), so
@@ -29,13 +31,22 @@ const ABI = parseAbi([
   "event EtherSent(address _to, uint256 _amount)",
   "event TroveLiquidated(address indexed _borrower, uint256 _debt, uint256 _coll, uint8 _operation)",
   "event Liquidation(uint256 _liquidatedDebt, uint256 _liquidatedColl, uint256 _collGasCompensation, uint256 _LUSDGasCompensation)",
+  "event CollBalanceUpdated(address indexed _account, uint256 _newBalance)",
+  "event LastGoodPriceUpdated(uint256 _lastGoodPrice)",
 ]);
 const PRICE_ABI = parseAbi(["function lastGoodPrice() view returns (uint256)"]);
+const SURPLUS_ABI = parseAbi(["function getCollateral(address _account) view returns (uint256)"]);
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 /** TroveManagerOperation.liquidateInRecoveryMode. */
 const OP_LIQUIDATE_RECOVERY = 2;
+const E18 = BigInt("1000000000000000000");
+/** MCR, 110%, and LUSD_GAS_COMPENSATION, 200 LUSD (TroveManager constants). */
+const MCR = BigInt("1100000000000000000");
+const LUSD_GAS_COMP = BigInt("200") * E18;
+/** COLL_GAS_COMPENSATION divisor: 0.5% of the collateral. */
+const PERCENT_DIVISOR = BigInt(200);
 
 const A = {
   lusd: LIQUITY_V1_ADDRESSES.LUSD,
@@ -48,9 +59,13 @@ const A = {
 };
 
 export interface LiquityV1LiquidationRead {
-  /** Troves this transaction liquidated. Above 1, every figure below is the
-   *  whole transaction's, not this Trove's alone. */
+  /** Troves this transaction liquidated. */
   trovesInTx: number;
+  /** Whose figures these are when the transaction liquidated several Troves:
+   *  "trove" when this Trove's share was worked out and reconciles with the
+   *  transaction's totals, "transaction" when it did not and the figures are
+   *  the totals. Always "trove" for a single liquidation. */
+  share: "trove" | "transaction";
   /** This Trove was liquidated under Recovery Mode's rules. */
   recoveryMode: boolean;
   liquidator: string | null;
@@ -119,6 +134,86 @@ function decode(logs: Log[]): Decoded[] {
   return out;
 }
 
+/** One Trove's part of a liquidation. */
+interface TroveShare {
+  borrower: string;
+  spDebt: bigint;
+  spEth: bigint;
+  redistDebt: bigint;
+  redistEth: bigint;
+  gasEth: bigint;
+  capped: boolean;
+}
+
+/** Each Trove's share of a batch liquidation, replayed from its TroveLiquidated
+ *  log in log order the way TroveManager's batch loop applies it: 0.5% of the
+ *  collateral to the liquidator; the Stability Pool offsets each debt in turn
+ *  until its LUSD runs out (min(debt, what is left), and the ETH pro rata);
+ *  the rest is redistributed. Under Recovery Mode a Trove at or below 100%
+ *  is redistributed whole, and a capped one (its owner's CollSurplusPool
+ *  balance moved in this transaction) is offset whole, the emitted collateral
+ *  being what the Pool received. The Pool's starting depth is not logged; the
+ *  replay starts from the LUSD it burned, which offsets the same way. Null
+ *  when the replay does not reproduce the transaction's totals to the wei. */
+function splitLiquidation(
+  troves: Decoded[],
+  cappedOwners: Set<string>,
+  price: bigint | null,
+  totals: { spDebt: bigint; spEth: bigint; collGas: bigint | null },
+): TroveShare[] | null {
+  let remaining = totals.spDebt;
+  const out: TroveShare[] = [];
+  for (const t of troves) {
+    const borrower = (t.args._borrower as string).toLowerCase();
+    const debt = t.args._debt as bigint;
+    const coll = t.args._coll as bigint;
+    if (debt <= ZERO) return null;
+    const recovery = Number(t.args._operation) === OP_LIQUIDATE_RECOVERY;
+    if (recovery && cappedOwners.has(borrower)) {
+      if (price == null || price <= ZERO || remaining < debt) return null;
+      const capped = (debt * MCR) / price;
+      const gasEth = capped / PERCENT_DIVISOR;
+      if (capped - gasEth !== coll) return null;
+      out.push({ borrower, spDebt: debt, spEth: coll, redistDebt: ZERO, redistEth: ZERO, gasEth, capped: true });
+      remaining -= debt;
+      continue;
+    }
+    const gasEth = coll / PERCENT_DIVISOR;
+    const toLiquidate = coll - gasEth;
+    if (recovery) {
+      if (price == null || price <= ZERO) return null;
+      if ((coll * price) / debt <= E18) {
+        out.push({
+          borrower,
+          spDebt: ZERO,
+          spEth: ZERO,
+          redistDebt: debt,
+          redistEth: toLiquidate,
+          gasEth,
+          capped: false,
+        });
+        continue;
+      }
+    }
+    const off = remaining > ZERO ? (debt < remaining ? debt : remaining) : ZERO;
+    const spEth = off > ZERO ? (toLiquidate * off) / debt : ZERO;
+    out.push({
+      borrower,
+      spDebt: off,
+      spEth,
+      redistDebt: debt - off,
+      redistEth: toLiquidate - spEth,
+      gasEth,
+      capped: false,
+    });
+    remaining -= off;
+  }
+  const sum = (f: (x: TroveShare) => bigint) => out.reduce((a, x) => a + f(x), ZERO);
+  if (sum((x) => x.spDebt) !== totals.spDebt || sum((x) => x.spEth) !== totals.spEth) return null;
+  if (totals.collGas != null && sum((x) => x.gasEth) !== totals.collGas) return null;
+  return out;
+}
+
 export async function readLiquityV1Event(txHash: string, wallet: string): Promise<LiquityV1EventRead> {
   const client = alchemyClient();
   const hash = txHash as Hex;
@@ -166,9 +261,12 @@ export async function readLiquityV1Event(txHash: string, wallet: string): Promis
     const liqDebt = (totals?.args._liquidatedDebt as bigint | undefined) ?? ZERO;
     const liqColl = (totals?.args._liquidatedColl as bigint | undefined) ?? ZERO;
     const pos = (n: bigint) => (n > ZERO ? n : ZERO);
-    liquidation = {
+    const recoveryMode = Number(mine.args._operation) === OP_LIQUIDATE_RECOVERY;
+    const surplusTotal = sum(etherSent(A.csp), "_amount");
+    const whole: LiquityV1LiquidationRead = {
       trovesInTx: liquidated.length,
-      recoveryMode: Number(mine.args._operation) === OP_LIQUIDATE_RECOVERY,
+      share: liquidated.length > 1 ? "transaction" : "trove",
+      recoveryMode,
       liquidator,
       liquidatorLusd: units(reservePaid.reduce((s, d) => s + (d.args.value as bigint), ZERO)),
       liquidatorEth: units(liquidator ? sum(etherSent(liquidator), "_amount") : ZERO),
@@ -176,8 +274,70 @@ export async function readLiquityV1Event(txHash: string, wallet: string): Promis
       stabilityPoolEth: units(spEth),
       redistributedDebt: units(pos(liqDebt - spDebt)),
       redistributedEth: units(pos(liqColl - spEth)),
-      surplusEth: units(sum(etherSent(A.csp), "_amount")),
+      surplusEth: units(surplusTotal),
     };
+    liquidation = whole;
+    if (liquidated.length > 1) {
+      const cappedOwners = new Set(
+        logs
+          .filter((d) => d.name === "CollBalanceUpdated" && eq(d.address, A.csp))
+          .map((d) => (d.args._account as string).toLowerCase()),
+      );
+      // The price the liquidation acted on: the PriceFeed's store in this
+      // transaction, else its value the block before. A later transaction in
+      // the block can move the end-of-block price.
+      const stored = logs.find(
+        (d) => d.name === "LastGoodPriceUpdated" && eq(d.address, LIQUITY_V1_ADDRESSES.PRICE_FEED),
+      );
+      const txPrice =
+        (stored?.args._lastGoodPrice as bigint | undefined) ??
+        (await client
+          .readContract({
+            address: LIQUITY_V1_ADDRESSES.PRICE_FEED as Hex,
+            abi: PRICE_ABI,
+            functionName: "lastGoodPrice",
+            blockNumber: block - BigInt(1),
+          })
+          .catch(() => null));
+      const shares = splitLiquidation(liquidated, cappedOwners, txPrice, {
+        spDebt,
+        spEth,
+        collGas: (totals?.args._collGasCompensation as bigint | undefined) ?? null,
+      });
+      const own = shares?.find((x) => x.borrower === wallet);
+      if (own) {
+        // A capped Trove's surplus: its CollSurplusPool balance after the
+        // transaction less the balance the block before.
+        let surplus: bigint | null = ZERO;
+        if (own.capped) {
+          const after = logs.find(
+            (d) => d.name === "CollBalanceUpdated" && eq(d.address, A.csp) && eq(d.args._account as string, wallet),
+          );
+          const before = await client
+            .readContract({
+              address: A.csp as Hex,
+              abi: SURPLUS_ABI,
+              functionName: "getCollateral",
+              args: [wallet as Hex],
+              blockNumber: block - BigInt(1),
+            })
+            .catch(() => null);
+          surplus = after && before != null ? pos((after.args._newBalance as bigint) - before) : null;
+        }
+        if (surplus != null)
+          liquidation = {
+            ...whole,
+            share: "trove",
+            liquidatorLusd: units(LUSD_GAS_COMP),
+            liquidatorEth: units(own.gasEth),
+            stabilityPoolDebt: units(own.spDebt),
+            stabilityPoolEth: units(own.spEth),
+            redistributedDebt: units(own.redistDebt),
+            redistributedEth: units(own.redistEth),
+            surplusEth: units(surplus),
+          };
+      }
+    }
   }
 
   return {

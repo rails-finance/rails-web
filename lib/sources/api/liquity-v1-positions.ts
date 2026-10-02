@@ -42,6 +42,9 @@ export interface LiquityV1PositionSummary {
   txCount: number;
   liquidationCount: number;
   redemptionCount: number;
+  /** A closed life whose last event was a redemption: the redemption
+   *  cancelled the last of the debt and closed the Trove. */
+  closedByRedemption: boolean;
 }
 
 /** One (wallet, epoch) page-slice row from the rails route (pre-presentation). */
@@ -59,6 +62,8 @@ export interface RawLiquityV1WalletRow {
   txCount: number;
   liquidationCount: number;
   redemptionCount: number;
+  /** Absent from a server older than the field. */
+  closedByRedemption?: boolean;
 }
 
 const ZERO = BigInt(0);
@@ -91,5 +96,6 @@ export function buildLiquityV1PositionRows(raw: RawLiquityV1WalletRow[]): Liquit
     txCount: w.txCount,
     liquidationCount: w.liquidationCount,
     redemptionCount: w.redemptionCount,
+    closedByRedemption: w.closedByRedemption === true,
   }));
 }

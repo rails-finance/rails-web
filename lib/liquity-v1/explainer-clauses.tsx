@@ -39,6 +39,7 @@ import {
   ratioAtBlockProv,
   borrowingFeeProv,
   lusdReceivedProv,
+  drawReceivedProv,
   ownerRepaidProv,
   closeRepaidProv,
   liqSeizedUsdProv,
@@ -178,9 +179,30 @@ export function liquityV1EventSlots(
       {fmtEth(Math.abs(coll))} {COLLATERAL_SYMBOL}
     </Fig>
   );
-  const debtDeltaFig = () => (
+  // An open or draw whose row carries the fee: the header's LUSD figure is
+  // what the owner received, so that figure carries the echo and the debt
+  // added is stated plainly.
+  const rowDraw =
+    debt > 0 && ctx.lusdReceived != null && ctx.borrowingFee != null
+      ? { received: Number(ctx.lusdReceived), fee: Number(ctx.borrowingFee) }
+      : null;
+  const receivedRowFig = (received: number) => (
     <Fig
       echo
+      info={drawReceivedProv(coords, {
+        debtAdded: ctx.debtDelta,
+        fee: ctx.borrowingFee as string,
+        open: ctx.eventType === "openTrove",
+      })}
+      value={chainTruthDeltaValue(received, labeled)}
+      symbol={DEBT_SYMBOL}
+    >
+      {fmtLusd(received)} {DEBT_SYMBOL}
+    </Fig>
+  );
+  const debtDeltaFig = () => (
+    <Fig
+      echo={!rowDraw}
       info={debtDeltaProv(coords, {
         after: ctx.debtAfter,
         before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debt : null,
@@ -244,9 +266,10 @@ export function liquityV1EventSlots(
 
   // What a draw added to the debt, where the receipt says.
   const drawClauses = (opening: boolean): ClauseInput[] => {
-    const received = read ? Number(read.lusdMintedToOwner) : 0;
-    const fee = read?.borrowingFee != null ? Number(read.borrowingFee) : null;
-    if (!read || fee == null || !(received > 0)) {
+    const received = rowDraw ? rowDraw.received : read ? Number(read.lusdMintedToOwner) : 0;
+    const fee = rowDraw ? rowDraw.fee : read?.borrowingFee != null ? Number(read.borrowingFee) : null;
+    const feeRaw = rowDraw ? (ctx.borrowingFee as string) : (read?.borrowingFee ?? null);
+    if (fee == null || feeRaw == null || !(received > 0)) {
       return [
         clause(
           opening ? (
@@ -261,12 +284,14 @@ export function liquityV1EventSlots(
       ];
     }
     const feeFig = (
-      <Fig info={borrowingFeeProv(coords, read.borrowingFee as string)} symbol={DEBT_SYMBOL}>
+      <Fig info={borrowingFeeProv(coords, feeRaw)} symbol={DEBT_SYMBOL}>
         {fmtLusd(fee)} {DEBT_SYMBOL}
       </Fig>
     );
-    const recvFig = (
-      <Fig info={lusdReceivedProv(coords, read.lusdMintedToOwner)} symbol={DEBT_SYMBOL}>
+    const recvFig = rowDraw ? (
+      receivedRowFig(received)
+    ) : (
+      <Fig info={lusdReceivedProv(coords, (read as LiquityV1EventRead).lusdMintedToOwner)} symbol={DEBT_SYMBOL}>
         {fmtLusd(received)} {DEBT_SYMBOL}
       </Fig>
     );
@@ -306,8 +331,8 @@ export function liquityV1EventSlots(
           ...drawClauses(true),
           clause(
             <>
-              The reserve stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; if
-              the Trove is liquidated, the reserve pays the liquidator.
+              The reserve, Liquity&rsquo;s gas compensation, stays part of the debt: closing repays the debt less 200
+              LUSD and the reserve is burned; if the Trove is liquidated, the reserve pays the liquidator.
             </>,
           ),
         ],
@@ -393,7 +418,7 @@ export function liquityV1EventSlots(
                       <>
                         {" "}
                         The Stability Pool took collateral worth 110% of the debt, and{" "}
-                        <Fig info={liqRouteProv(coords, "surplus")} symbol={COLLATERAL_SYMBOL}>
+                        <Fig info={liqRouteProv(coords, "surplus", l)} symbol={COLLATERAL_SYMBOL}>
                           {fmtEth(n(l.surplusEth))} {COLLATERAL_SYMBOL}
                         </Fig>{" "}
                         was left in the surplus pool for the owner
@@ -407,11 +432,11 @@ export function liquityV1EventSlots(
               ? clause(
                   <>
                     The Stability Pool burned{" "}
-                    <Fig info={liqRouteProv(coords, "stability pool debt")} symbol={DEBT_SYMBOL}>
+                    <Fig info={liqRouteProv(coords, "stability pool debt", l)} symbol={DEBT_SYMBOL}>
                       {fmtLusd(n(l.stabilityPoolDebt))} {DEBT_SYMBOL}
                     </Fig>{" "}
                     of its deposits to clear the debt and received{" "}
-                    <Fig info={liqRouteProv(coords, "stability pool eth")} symbol={COLLATERAL_SYMBOL}>
+                    <Fig info={liqRouteProv(coords, "stability pool eth", l)} symbol={COLLATERAL_SYMBOL}>
                       {fmtEth(n(l.stabilityPoolEth))} {COLLATERAL_SYMBOL}
                     </Fig>
                     , shared among its depositors.
@@ -422,7 +447,7 @@ export function liquityV1EventSlots(
               ? clause(
                   <>
                     The Stability Pool could not cover{" "}
-                    <Fig info={liqRouteProv(coords, "redistributed")} symbol={DEBT_SYMBOL}>
+                    <Fig info={liqRouteProv(coords, "redistributed", l)} symbol={DEBT_SYMBOL}>
                       {fmtLusd(n(l.redistributedDebt))} {DEBT_SYMBOL}
                     </Fig>{" "}
                     of the debt; that debt and {fmtEth(n(l.redistributedEth))} ETH were shared out to every other open
@@ -433,7 +458,7 @@ export function liquityV1EventSlots(
             clause(
               <>
                 The liquidator was paid the{" "}
-                <Fig info={liqRouteProv(coords, "liquidator")} symbol={DEBT_SYMBOL}>
+                <Fig info={liqRouteProv(coords, "liquidator", l)} symbol={DEBT_SYMBOL}>
                   {fmtLusd(n(l.liquidatorLusd))} {DEBT_SYMBOL}
                 </Fig>{" "}
                 reserve and {fmtEth(n(l.liquidatorEth))} ETH (0.5% of the collateral).
@@ -441,10 +466,17 @@ export function liquityV1EventSlots(
             ),
             l.trovesInTx > 1
               ? clause(
-                  <>
-                    The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across all
-                    of them.
-                  </>,
+                  l.share === "trove" ? (
+                    <>
+                      The transaction liquidated {l.trovesInTx} Troves at once; these amounts are this Trove&rsquo;s
+                      share.
+                    </>
+                  ) : (
+                    <>
+                      The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across
+                      all of them.
+                    </>
+                  ),
                 )
               : null,
             l.recoveryMode ? null : clause(<>The system was not in Recovery Mode.</>),
@@ -832,9 +864,13 @@ export function liquityV1RouteSentences(l: LiquityV1LiquidationRead, hl: Hl): Re
   );
   if (l.trovesInTx > 1)
     out.push(
-      <>
-        The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across all of them.
-      </>,
+      l.share === "trove" ? (
+        <>The transaction liquidated {l.trovesInTx} Troves at once; these amounts are this Trove&rsquo;s share.</>
+      ) : (
+        <>
+          The transaction liquidated {l.trovesInTx} Troves at once, so these amounts are its totals across all of them.
+        </>
+      ),
     );
   out.push(
     l.recoveryMode ? (

@@ -1091,6 +1091,13 @@ export interface LiquityV1Context {
    *  itself acted on in that block (mig 110 capture). Absent until the filler
    *  prices the block; the forensics stay token-only meanwhile. */
   priceAtBlock?: { usd: number; source: "pricefeed-lastgoodprice" };
+  /** Opens and draws: the borrowing fee the transaction's LUSDBorrowingFeePaid
+   *  log charged ("0" when none), from the index (mig 375). Absent where the
+   *  index cannot place it on this row; the row then states the debt added. */
+  borrowingFee?: string;
+  /** Opens and draws, beside `borrowingFee`: the LUSD the owner received — the
+   *  debt added less the fee and, on an open, the 200 LUSD reserve. */
+  lusdReceived?: string;
 }
 
 // ───────────────── Liquity V2 fork — the shared per-event decomposition ─────────────────

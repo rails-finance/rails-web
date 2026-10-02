@@ -110,7 +110,7 @@ export function liquityOpenTroveContent(): LearnMoreContent {
       },
       {
         bold: "Upfront fee",
-        text: "a one-time borrowing fee equivalent to 7 days of average interest, deducted from the borrowed amount.",
+        text: "a one-time borrowing fee equivalent to 7 days of average interest, added to the Trove's debt.",
       },
       {
         bold: "Liquidation reserve",

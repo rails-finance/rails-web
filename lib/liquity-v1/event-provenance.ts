@@ -429,6 +429,18 @@ export const ownerRepaidProv = (coords: LiquityV1Coords, amount: string): Proven
 export const liqRouteProv = (
   coords: LiquityV1Coords,
   leg: "stability pool debt" | "stability pool eth" | "liquidator" | "redistributed" | "surplus",
+  l?: { trovesInTx: number; share: "trove" | "transaction" },
+): Provenance => {
+  const split = l != null && l.trovesInTx > 1 && l.share === "trove";
+  const base = liqRouteLeg(coords, leg);
+  if (!split) return base;
+  const share = `This is this Trove's share of the ${l.trovesInTx} Troves the transaction liquidated, replayed from each Trove's TroveLiquidated log in the order the TroveManager applied them; the shares add up to the transaction's logs.`;
+  return { ...base, kind: "chain-derived", summary: [base.summary, share].join(" ") };
+};
+
+const liqRouteLeg = (
+  coords: LiquityV1Coords,
+  leg: "stability pool debt" | "stability pool eth" | "liquidator" | "redistributed" | "surplus",
 ): Provenance => ({
   kind: "chain",
   pclass: "emitted",
@@ -516,6 +528,50 @@ export const closeRepaidProv = (coords: LiquityV1Coords, debtBefore: string): Pr
   contract: BORROWER_OPS,
   formula: "debt before − 200 LUSD reserve",
   inputs: [{ label: "debt before", value: debtBefore, kind: "chain", pclass: "emitted" }, ...eventInputs(coords)],
+});
+
+/** LUSD the owner received on an open or a draw, from the indexed row: the
+ *  debt added less the borrowing fee and, on an open, the 200 LUSD reserve. */
+export const drawReceivedProv = (
+  coords: LiquityV1Coords,
+  v: { debtAdded: string; fee: string; open: boolean },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "indexed",
+  verify: txVerify(coords),
+  summary: v.open
+    ? "LUSD the owner received — the debt the open added, less the one-time borrowing fee and the 200 LUSD liquidation reserve (gas compensation) minted to the GasPool. Both stay in the Trove's debt."
+    : "LUSD the owner received — the debt the draw added, less the one-time borrowing fee, which stays in the Trove's debt.",
+  contract: BORROWER_OPS,
+  via: `${LIQUITY_V1_VIA} · TroveUpdated Δ_debt − LUSDBorrowingFeePaid._LUSDFee${v.open ? " − 200" : ""} · ÷10^18`,
+  formula: v.open ? "debt added − borrowing fee − 200 LUSD reserve" : "debt added − borrowing fee",
+  inputs: [
+    {
+      label: "debt added",
+      value: opVal(v.debtAdded),
+      kind: "chain-derived",
+      pclass: "indexed",
+      note: "TroveUpdated _debt after − before",
+    },
+    {
+      label: "borrowing fee",
+      value: opVal(v.fee),
+      kind: "chain",
+      pclass: "emitted",
+      note: "LUSDBorrowingFeePaid _LUSDFee",
+    },
+    ...(v.open
+      ? [
+          {
+            label: "gas compensation",
+            value: "200",
+            kind: "chain" as const,
+            note: "LUSD_GAS_COMPENSATION, the reserve minted to the GasPool",
+          },
+        ]
+      : []),
+    ...eventInputs(coords),
+  ],
 });
 
 // ── The CollSurplusPool: a full redemption's leftover ETH ─────────────────────

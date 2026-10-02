@@ -555,30 +555,35 @@ function LiquidationRoute({
     <div className="mx-5 my-2 space-y-1 rounded-xl bg-background px-4 py-3">
       <div className="mb-1 text-xs font-semibold text-rb-500">
         Where it went{l.recoveryMode ? " · Recovery Mode liquidation" : ""}
-        {l.trovesInTx > 1 ? ` · this transaction liquidated ${l.trovesInTx} Troves; the figures are its totals` : ""}
+        {l.trovesInTx > 1
+          ? l.share === "trove"
+            ? ` · this Trove's share of the ${l.trovesInTx} Troves this transaction liquidated`
+            : ` · this transaction liquidated ${l.trovesInTx} Troves; the figures are its totals`
+          : ""}
       </div>
       {n(l.stabilityPoolDebt) > EPS && (
         <Row label="Stability Pool">
-          burned <P info={liqRouteProv(coords, "stability pool debt")}>{fmtLusd(n(l.stabilityPoolDebt))}</P>{" "}
+          burned <P info={liqRouteProv(coords, "stability pool debt", l)}>{fmtLusd(n(l.stabilityPoolDebt))}</P>{" "}
           {DEBT_SYMBOL}, received{" "}
-          <P info={liqRouteProv(coords, "stability pool eth")}>{fmtEth(n(l.stabilityPoolEth))}</P> {COLLATERAL_SYMBOL}
+          <P info={liqRouteProv(coords, "stability pool eth", l)}>{fmtEth(n(l.stabilityPoolEth))}</P>{" "}
+          {COLLATERAL_SYMBOL}
         </Row>
       )}
       {(n(l.redistributedDebt) > EPS || n(l.redistributedEth) > EPS) && (
         <Row label="Shared out to other Troves">
-          <P info={liqRouteProv(coords, "redistributed")}>
+          <P info={liqRouteProv(coords, "redistributed", l)}>
             {fmtLusd(n(l.redistributedDebt))} {DEBT_SYMBOL} and {fmtEth(n(l.redistributedEth))} {COLLATERAL_SYMBOL}
           </P>
         </Row>
       )}
       <Row label={<>Liquidator {l.liquidator && <LinkedAddress address={l.liquidator} className="text-rb-500" />}</>}>
-        <P info={liqRouteProv(coords, "liquidator")}>
+        <P info={liqRouteProv(coords, "liquidator", l)}>
           {fmtLusd(n(l.liquidatorLusd))} {DEBT_SYMBOL} + {fmtEth(n(l.liquidatorEth))} {COLLATERAL_SYMBOL}
         </P>
       </Row>
       {n(l.surplusEth) > EPS && (
         <Row label="Left to the owner (surplus pool)">
-          <P info={liqRouteProv(coords, "surplus")}>
+          <P info={liqRouteProv(coords, "surplus", l)}>
             {fmtEth(n(l.surplusEth))} {COLLATERAL_SYMBOL}
           </P>
           {surplusClaimed ? " claimed" : " claimable"}

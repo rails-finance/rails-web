@@ -11,6 +11,7 @@ import {
   collDeltaProv,
   debtDeltaProv,
   closeRepaidProv,
+  drawReceivedProv,
   redemptionLegProv,
   type LiquityV1Coords,
 } from "@/lib/liquity-v1/event-provenance";
@@ -108,6 +109,17 @@ export function LiquityV1EventHeader({
       symbol: DEBT_SYMBOL,
       address: LIQUITY_V1_ADDRESSES.LUSD,
       prov: closeRepaidProv(coords, ctx.debtBefore),
+    });
+  } else if (debt > 0 && perAxis && ctx.lusdReceived != null && ctx.borrowingFee != null) {
+    // An open or draw states what the owner received; the receipt names the
+    // borrowing fee and, on an open, the 200 LUSD gas compensation.
+    deltas.push({
+      value: Number(ctx.lusdReceived),
+      symbol: DEBT_SYMBOL,
+      address: LIQUITY_V1_ADDRESSES.LUSD,
+      prov: drawReceivedProv(coords, { debtAdded: ctx.debtDelta, fee: ctx.borrowingFee, open: isOpen }),
+      label: DEBT_VERB.borrow,
+      axisVerb: true,
     });
   } else if (debt !== 0)
     deltas.push({
