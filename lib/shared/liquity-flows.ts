@@ -115,7 +115,14 @@ export type LiquityFamily = "v2" | "v1";
 export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamily = "v2"): FlowBucket[] {
   const all: FlowBucket[] = [
     { key: LQ.deposited, label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
-    { key: LQ.redistColl, label: "Redistribution gains", event: "Redistribution", side: "collateral", dir: "in" },
+    {
+      key: LQ.redistColl,
+      label: "Redistribution gains",
+      event: "Redistribution",
+      side: "collateral",
+      dir: "in",
+      hatch: "grid",
+    },
     { key: LQ.withdrawn, label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out" },
     {
       key: LQ.collRedeemed,
@@ -146,11 +153,20 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
       hatch: "dots",
     },
     { key: LQ.borrowed, label: "Borrowed", event: "Borrow", side: "debt", dir: "in" },
-    { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in" },
-    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in" },
-    { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in" },
-    { key: LQ.redistDebt, label: "Redistributed debt", event: "Redistribution", side: "debt", dir: "in" },
-    { key: LQ.reserve, label: "Liquidation reserve", event: "Open", side: "debt", dir: "in" },
+    // Each inflow after Borrowed has its texture; interest is dashed
+    // (standards/lexicon.md, lifetime bars' fills).
+    { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
+    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in", hatch: "checker" },
+    { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in", hatch: "dots" },
+    {
+      key: LQ.redistDebt,
+      label: "Redistributed debt",
+      event: "Redistribution",
+      side: "debt",
+      dir: "in",
+      hatch: "grid",
+    },
+    { key: LQ.reserve, label: "Liquidation reserve", event: "Open", side: "debt", dir: "in", hatch: "horizontal" },
     { key: LQ.repaid, label: "Repaid", event: "Repay", side: "debt", dir: "out" },
     {
       key: LQ.reserveBurned,

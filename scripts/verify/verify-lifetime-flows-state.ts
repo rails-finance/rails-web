@@ -77,6 +77,20 @@ import {
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
 import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
+import { AAVE_V3_BASE_FLOW_BUCKETS } from "@/lib/aave-v3-base/flows";
+import { compoundFlowBuckets } from "@/lib/compound/flows";
+import { ctokenFlowBuckets } from "@/lib/shared/ctoken-flows";
+import { dolomiteFlowBuckets } from "@/lib/dolomite/flows";
+import { fluidFlowBuckets } from "@/lib/fluid/flows";
+import { frankencoinFlowBuckets } from "@/lib/frankencoin/flows";
+import { fxFlowBuckets } from "@/lib/fx/flows";
+import { llamalendFlowBuckets } from "@/lib/llamalend/flows";
+import { makerFlowBuckets } from "@/lib/makerdao/flows";
+import { mapleFlowBuckets } from "@/lib/maple/flows";
+import { morphoFlowBuckets } from "@/lib/morpho/flows";
+import { polarisFlowBuckets } from "@/lib/polaris/flows";
+import { pwnFlowBuckets } from "@/lib/pwn/flows";
+import { liquityFlowBuckets } from "@/lib/shared/liquity-flows";
 import {
   binInputFromWire,
   binRanges,
@@ -1501,6 +1515,62 @@ test("the fill rule: no two lines of a side share a fill", () => {
   const used = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "usedToRepay");
   const sold = AAVE_V3_FLOW_BUCKETS.find((b) => b.key === "soldToRepay");
   assert.notEqual(used?.hatch, sold?.hatch, "Used to repay has its own hatch");
+});
+
+test("the fill rule in every family: no two lines of a side share a pattern in one hue", () => {
+  // An inflow's texture and an outflow's hatch read alike where the pattern
+  // and the hue are one (Aave V3 on Base's Interest earned and Used to repay,
+  // both dashed, 2 Oct 2026): the pattern and its hue are the fill here, the
+  // inflow's faded ground aside. A tone draws its own hue.
+  type B = {
+    key: string;
+    label: string;
+    side: "collateral" | "debt";
+    dir: "in" | "out";
+    hatch?: string;
+    tone?: string;
+  };
+  const pattern = (b: B) =>
+    b.dir === "in"
+      ? `${b.hatch ?? "plain"}:side`
+      : `${b.hatch ?? (b.tone && b.tone !== "exit" ? "forward" : "reverse")}:${b.tone && b.tone !== "exit" ? b.tone : "side"}`;
+  const all = new Proxy(new Set<string>(), { get: (t, k) => (k === "has" ? () => true : Reflect.get(t, k)) });
+  const families: Record<string, B[]> = {
+    "Aave V3": AAVE_V3_FLOW_BUCKETS,
+    "Aave V3 on Base": AAVE_V3_BASE_FLOW_BUCKETS,
+    "Compound V3": compoundFlowBuckets({ collateral: true, supply: true, debt: true }, all),
+    "Compound V2 family": ctokenFlowBuckets({ brand: "Compound", receipt: "cToken" }),
+    Dolomite: dolomiteFlowBuckets(),
+    Fluid: fluidFlowBuckets(true),
+    Frankencoin: frankencoinFlowBuckets(),
+    "f(x)": fxFlowBuckets(all),
+    LlamaLend: llamalendFlowBuckets(),
+    MakerDAO: makerFlowBuckets("DAI"),
+    Maple: mapleFlowBuckets(),
+    Morpho: morphoFlowBuckets({ borrower: true, lender: true }),
+    Polaris: polarisFlowBuckets(all),
+    PWN: pwnFlowBuckets(),
+    "Liquity V2": liquityFlowBuckets(false, "v2"),
+    "Liquity V1": liquityFlowBuckets(false, "v1"),
+  };
+  for (const [name, buckets] of Object.entries(families))
+    for (const side of ["collateral", "debt"] as const) {
+      const lines = buckets.filter((b) => b.side === side);
+      // The window's opening line ("Held on …") takes the rings.
+      const fills = [...lines.map(pattern), ...(lines.length ? ["rings:side"] : [])];
+      const seen = new Map<string, string>();
+      lines.forEach((b, i) => {
+        const was = seen.get(fills[i]);
+        assert.ok(!was, `${name}, ${side}: ${was} and ${b.label} share ${fills[i]}`);
+        seen.set(fills[i], b.label);
+      });
+      assert.ok(!seen.has("rings:side"), `${name}, ${side}: a line takes the opening's rings`);
+    }
+  // Interest is dashed wherever a family draws it as a line.
+  for (const [name, buckets] of Object.entries(families))
+    for (const b of buckets)
+      if (/^Interest( earned| accrued)?$/.test(b.label))
+        assert.equal(b.hatch, "dashes", `${name}: ${b.label} is dashed`);
 });
 
 test("the state card: a day between events states the chart's figures, each asset as its last event left it", () => {

@@ -60,10 +60,11 @@ export interface FlowBucket {
 /** The outflow hatches: reverse diagonal (a withdrawal or repayment), cross
  *  (withdrawn and swapped), vertical (swapped within the position), dots (sent
  *  to another account), horizontal (the two sides of a repay with collateral),
- *  dashes (a repay made with aTokens), forward diagonal (a liquidation or a
- *  redemption, in its tone's hue). The inflow textures: grid (received by
- *  transfer), checker (swapped in), rings (what was held when the window
- *  opens). */
+ *  zigzag (a repay made with aTokens), forward diagonal (a liquidation or a
+ *  redemption, in its tone's hue). Dashes are interest, or another amount
+ *  that builds between events, on either side of the bar. The inflow
+ *  textures: grid (received by transfer), checker (swapped in), rings (what
+ *  was held when the window opens). */
 export type FlowHatch =
   | "reverse"
   | "cross"
@@ -71,6 +72,7 @@ export type FlowHatch =
   | "dots"
   | "horizontal"
   | "dashes"
+  | "zigzag"
   | "forward"
   | "grid"
   | "checker"

@@ -150,7 +150,9 @@ const ALL_BUCKETS: FlowBucket[] = [
   },
   { key: PF.settled, label: "Settled to zero", event: "", side: "debt", dir: "in", hatch: "grid" },
   { key: PF.repaid, label: "Repaid", event: "Repay", side: "debt", dir: "out" },
-  { key: PF.stability, label: "Stability gains", event: "", side: "debt", dir: "out", hatch: "dashes" },
+  // Vertical lines, as Frankencoin's Reserve share returned: the debt's
+  // dashes are Interest's.
+  { key: PF.stability, label: "Stability gains", event: "", side: "debt", dir: "out", hatch: "vertical" },
   {
     key: PF.psmDebtOut,
     label: "Net PSM shares cleared",

@@ -88,7 +88,7 @@ export interface CTokenVocab {
 }
 
 /** Every bucket the family can fill, in drawing order. */
-function allBuckets(v: CTokenVocab): FlowBucket[] {
+export function ctokenFlowBuckets(v: CTokenVocab): FlowBucket[] {
   return [
     { key: CT.supplied, label: "Supplied", event: "Supply", side: "collateral", dir: "in" },
     {
@@ -461,7 +461,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
   // borrowed; every other line where a row filled it.
   const base = new Set<string>([CT.supplied, CT.withdrawn, CT.earned]);
   if (rp.borrower) for (const k of [CT.borrowed, CT.accrued, CT.repaid]) base.add(k);
-  const buckets = allBuckets(o.vocab).filter((b) => base.has(b.key) || used.has(b.key));
+  const buckets = ctokenFlowBuckets(o.vocab).filter((b) => base.has(b.key) || used.has(b.key));
 
   const flowEvents: FlowEvent[] = replayed.map((r) => {
     const moved = { coll: false, debt: false };

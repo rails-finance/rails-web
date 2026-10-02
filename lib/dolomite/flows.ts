@@ -224,6 +224,9 @@ const ACT: Record<Exclude<DolomiteEventType, "call">, { up: [string, string]; do
   vaporize: { up: [DL.deposited, DL.writtenOff], down: [DL.seized, DL.borrowed] },
 };
 
+/** Every line the family can draw, in drawing order. */
+export const dolomiteFlowBuckets = (): FlowBucket[] => BUCKETS;
+
 const LIQ_KINDS = new Set<DolomiteEventType>(["liquidation", "seize_out", "vaporize"]);
 
 /** One row as the replay reads it: token amounts in whole tokens, signed
