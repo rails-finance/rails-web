@@ -13,7 +13,13 @@
 // converted part of this position's collateral (user_state.stablecoin > 0 —
 // a state-only figure no event carries), the card grows a third column:
 // the converted amount, traced to the two-contract cross-check. No risk
-// color anywhere — the numbers carry the meaning.
+// color on the figures — the numbers carry the meaning.
+//
+// ⇒ LIQUIDATABLE OUTRANKS IT. When health(user, true) reads below 0, anyone
+// may liquidate the position now, whatever the AMM has converted: the mode
+// word is "Liquidatable", on the CRITICAL red pill (color-grammar.md: the
+// line is the protocol's, so the colour is a claim of fact), and the
+// listing's third column states the health.
 //
 // ⚠️ USD only where the borrowed token IS crvUSD (~$1): debt is already in
 // crvUSD, collateral through the AMM's own price_oracle. The handful of
@@ -26,6 +32,7 @@
 // pill for the mode word.
 
 import { Fragment } from "react";
+import { Icon } from "@/components/icons/icon";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -38,7 +45,8 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
-import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
+import { llamalendConvertedProv, llamalendHealthFullProv } from "@/lib/llamalend/live-provenance";
+import { fmtHealth } from "@/lib/llamalend/event-figures";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -80,6 +88,13 @@ export interface LlamalendPositionView {
   converted: number | null;
   convertedRaw: string | null;
   inSoftLiq: boolean | null;
+  /** Controller.health(user, true) at head (fraction) and its raw 1e18; null
+   *  when the read did not land. */
+  healthFull?: number | null;
+  healthFullRaw?: string | null;
+  /** health(user, true) below 0 on a live loan: anyone may liquidate it now.
+   *  Null or absent = unknown. */
+  liquidatable?: boolean | null;
   /** Whether the AMM's own statement of `converted` matched the Controller's at
    *  this read. Travels on the LIVE overlay only — the listing summary row
    *  carries no such field, so it is absent there and the converted receipt
@@ -339,9 +354,31 @@ export function LlamalendPositionCard({
             : null,
         ]
       : []),
+    // ⇒ Liquidatable now: the listing row has no mode pill, so its third
+    // column carries the word and the health that makes it so.
+    ...(v.liquidatable && v.healthFull != null && !disclosing
+      ? [
+          {
+            label: "Liquidatable",
+            value: (
+              <StatValue>
+                <Prov info={llamalendHealthFullProv(v.controller, v.healthFullRaw ?? null)}>
+                  {fmtHealth(v.healthFull)}
+                </Prov>
+              </StatValue>
+            ),
+            footnote: (
+              <div data-llamalend-liquidatable="" className="text-xs mt-0.5 flex items-center gap-1 text-red-500">
+                <Icon name="triangle" size={12} />
+                health below 0: anyone may liquidate it
+              </div>
+            ),
+          },
+        ]
+      : []),
     // ⇒ The distinctive column — present the moment the live overlay says the
     // AMM has converted anything: the position is in soft-liquidation NOW.
-    ...(v.inSoftLiq && v.converted != null && !disclosing
+    ...(v.inSoftLiq && v.converted != null && !disclosing && !(v.liquidatable && v.healthFull != null)
       ? [
           {
             // The detail card's status pill already says "In soft-liquidation";
@@ -375,9 +412,11 @@ export function LlamalendPositionCard({
       : []),
   ];
 
-  // Detail render (receipts): a neutral mode-word pill — what the position is
-  // doing NOW. The LISTING render keeps the lifecycle pill.
-  const modeWord = v.inSoftLiq ? "In soft-liquidation" : "Borrowing";
+  // Detail render (receipts): the mode-word pill — what the position is doing
+  // NOW, neutral unless anyone may liquidate it. The LISTING render keeps the
+  // lifecycle pill.
+  const liquidatable = v.liquidatable === true && v.status === "open";
+  const modeWord = liquidatable ? "Liquidatable" : v.inSoftLiq ? "In soft-liquidation" : "Borrowing";
 
   return (
     <PositionCardShell
@@ -392,7 +431,14 @@ export function LlamalendPositionCard({
         stackOnPhone={disclosing}
         statusPill={
           receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
+            <span
+              data-llamalend-mode={liquidatable ? "liquidatable" : v.inSoftLiq ? "soft-liquidation" : "borrowing"}
+              className={
+                liquidatable
+                  ? "font-bold px-2 py-0.5 rounded-sm text-xs bg-red-500 text-white"
+                  : "font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60"
+              }
+            >
               {modeWord}
             </span>
           ) : (
@@ -444,6 +490,9 @@ export function viewFromChain(
     converted: c.converted,
     convertedRaw: c.convertedRaw,
     inSoftLiq: c.inSoftLiq,
+    healthFull: c.healthFull,
+    healthFullRaw: c.healthFullRaw,
+    liquidatable: c.hasLoan && c.healthFull != null ? c.healthFull < 0 : null,
     convertedCrossCheckExact: c.convertedCrossCheckExact,
     priceOracle: c.priceOracle,
     collateralUsd:
@@ -480,6 +529,9 @@ export function viewFromSummary(s: LlamalendPositionSummary): LlamalendPositionV
     converted: s.converted,
     convertedRaw: s.convertedRaw,
     inSoftLiq: s.inSoftLiq,
+    healthFull: s.healthFull,
+    healthFullRaw: s.healthFullRaw,
+    liquidatable: s.liquidatable,
     priceOracle: s.priceOracle,
     collateralUsd: s.collateralUsd,
     debtUsd: s.debtUsd,

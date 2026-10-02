@@ -5,7 +5,8 @@
 // inspectable:
 //
 //   • the third headline: the protocol's own health; below 0 anyone may
-//     liquidate;
+//     liquidate, and the opened layer leads with that in CRITICAL red (the
+//     line is the protocol's);
 //   • under it in the opened layer: the soft-liquidation multiple (how far the
 //     price stands above the onset), the collateral the AMM has sold net and
 //     any lost to soft-liquidation, then the band axis, whose lead figure
@@ -18,6 +19,7 @@
 // axis is coloured on the house CAUTION → CRITICAL ladder (2026-07-27): a
 // state, not a verdict on a figure; the reasoning lives in that file.
 
+import { Icon } from "@/components/icons/icon";
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { StatValue } from "@/components/shared/stat-value";
@@ -68,6 +70,12 @@ export function LlamalendRiskDetail({
       {/* Near 0 the figure alone reads as small, not as close to liquidation:
           one plain line, in the caution tone Liquity V1's card gives Recovery
           Mode. */}
+      {chain.healthFull != null && chain.healthFull < 0 && (
+        <div data-llamalend-liquidatable="" className="flex items-center gap-1 text-xs font-semibold text-red-500">
+          <Icon name="triangle" size={12} />
+          Liquidatable: below 0, anyone may liquidate it now
+        </div>
+      )}
       {chain.healthFull != null && chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO && (
         <RiskFigure alignStart caution>
           close to 0; below 0 anyone may liquidate it

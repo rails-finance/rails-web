@@ -13,10 +13,11 @@
 // never render).
 //
 // This builder layers the LIVE chain state on top:
-//   • ONE multicall of `user_state(user)` over the page's OPEN rows — the
-//     per-position soft-liq overlay: live collateral / debt AND the converted
-//     amount (`stablecoin`), which lives in NO event and is deliberately NOT
-//     in the API. O(page), zero-index.
+//   • ONE multicall of `user_state(user)` and `health(user, true)` over the
+//     page's OPEN rows — the per-position soft-liq overlay: live collateral /
+//     debt, the converted amount (`stablecoin`), which lives in NO event and
+//     is deliberately NOT in the API, and the health (below 0: liquidatable).
+//     O(page), zero-index.
 //   • each market's AMM `price_oracle` (for the crvUSD-borrowed markets' USD
 //     figures), from the cached factory discovery.
 // When RPC is down the rows degrade to the MV absolutes (converted stays
@@ -53,7 +54,10 @@ export type LlamalendPositionStatus = "open" | "closed" | "liquidated";
 export type LlamalendPositionSort = "recent" | "debt" | "coll";
 
 const ZERO = BigInt(0);
-const CONTROLLER_ABI = parseAbi(["function user_state(address) view returns (uint256[4])"]);
+const CONTROLLER_ABI = parseAbi([
+  "function user_state(address) view returns (uint256[4])",
+  "function health(address,bool) view returns (int256)",
+]);
 type Res = { status: string; result?: unknown };
 
 export interface LlamalendPositionSummary {
@@ -102,6 +106,13 @@ export interface LlamalendPositionSummary {
   convertedRaw: string | null;
   /** converted > 0 on a live loan; null when unknown. */
   inSoftLiq: boolean | null;
+  /** Controller.health(user, true) at head as a fraction, raw 1e18 beside it;
+   *  null when the read did not land or there is no live loan. */
+  healthFull: number | null;
+  healthFullRaw: string | null;
+  /** health(user, true) below 0 on a live loan: anyone may liquidate it now.
+   *  Null when unknown. */
+  liquidatable: boolean | null;
 
   /** AMM.price_oracle() at head — collateral in the borrowed token. */
   priceOracle: number | null;
@@ -190,28 +201,46 @@ export async function buildLlamalendPositionRows(
     }
   }
 
-  // The per-position soft-liq overlay: ONE multicall of user_state over the
-  // open rows. O(page slice), zero-index.
+  // The per-position soft-liq overlay: ONE multicall of user_state and
+  // health(user, true) over the open rows. O(page slice), zero-index.
   const openRows = raw.filter((r) => statusOf(r.status) === "open");
   let liveStates = new Map<string, readonly [bigint, bigint, bigint, bigint]>();
+  let liveHealth = new Map<string, bigint>();
   if (openRows.length > 0) {
     try {
       const client = alchemyClient();
       const results = (await client.multicall({
         allowFailure: true,
-        contracts: openRows.map(
+        contracts: openRows.flatMap(
           (r) =>
-            ({
-              address: r.controller.toLowerCase() as `0x${string}`,
-              abi: CONTROLLER_ABI,
-              functionName: "user_state",
-              args: [r.user as `0x${string}`],
-            }) as const,
+            [
+              {
+                address: r.controller.toLowerCase() as `0x${string}`,
+                abi: CONTROLLER_ABI,
+                functionName: "user_state",
+                args: [r.user as `0x${string}`],
+              },
+              // Reverts with no loan, which allowFailure turns into null.
+              {
+                address: r.controller.toLowerCase() as `0x${string}`,
+                abi: CONTROLLER_ABI,
+                functionName: "health",
+                args: [r.user as `0x${string}`, true],
+              },
+            ] as const,
         ),
       })) as Res[];
+      liveHealth = new Map(
+        openRows.flatMap((r, i) => {
+          const res = results[2 * i + 1];
+          return res?.status === "success" && typeof res.result === "bigint"
+            ? [[`${r.controller.toLowerCase()}:${r.user.toLowerCase()}`, res.result] as const]
+            : [];
+        }),
+      );
       liveStates = new Map(
         openRows.flatMap((r, i) => {
-          const res = results[i];
+          const res = results[2 * i];
           return res?.status === "success" && res.result != null
             ? [
                 [
@@ -248,6 +277,7 @@ export async function buildLlamalendPositionRows(
     const collateralRaw = useLive ? live[0] : bigintOf(r.collateralRaw);
     const debtRaw = useLive ? live[2] : (bigintOf(r.debtRaw) ?? ZERO);
     const convertedRaw = useLive ? live[1] : null;
+    const healthRaw = useLive ? (liveHealth.get(`${controller}:${user}`) ?? null) : null;
 
     const collateral = collateralRaw != null ? scaleRaw(collateralRaw, collateralDecimals) : null;
     const debt = scaleRaw(debtRaw, borrowedDecimals);
@@ -279,6 +309,9 @@ export async function buildLlamalendPositionRows(
       converted,
       convertedRaw: convertedRaw != null ? convertedRaw.toString() : null,
       inSoftLiq: converted != null ? converted > 0 && debt > 0 : null,
+      healthFull: healthRaw != null ? Number(healthRaw) / 1e18 : null,
+      healthFullRaw: healthRaw != null ? healthRaw.toString() : null,
+      liquidatable: healthRaw != null ? healthRaw < ZERO : null,
       priceOracle,
       // ~$1: crvUSD debt IS the USD figure; collateral through the AMM's own
       // oracle. Null on the non-crvUSD-borrowed markets — their own token is

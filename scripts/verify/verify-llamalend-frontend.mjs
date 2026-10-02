@@ -107,7 +107,7 @@ const compact = (n) =>
  * page is checked against come from the chain read, not from the listing lane
  * the page itself renders.
  */
-async function findSoftLiq(pages = 6, perPage = 100) {
+async function findSoftLiq(want = "soft", pages = 12, perPage = 100) {
   for (let i = 0; i < pages; i++) {
     const res = await fetch(`${BASE}/api/llamalend/positions?status=open&limit=${perPage}&offset=${i * perPage}`);
     if (!res.ok) throw new Error(`listing API ${res.status} while discovering a soft-liq position`);
@@ -115,12 +115,18 @@ async function findSoftLiq(pages = 6, perPage = 100) {
     const rows = j.data ?? [];
     if (rows.length === 0) break;
     for (const row of rows) {
-      if (!row.inSoftLiq) continue;
+      // "soft": in the bands and not liquidatable (the card's "In
+      // soft-liquidation"); "liquidatable": health(user, true) below 0.
+      if (want === "soft" ? !row.inSoftLiq || row.liquidatable !== false : !row.liquidatable) continue;
       const cRes = await fetch(`${BASE}/api/chain/llamalend/position?controller=${row.controller}&user=${row.user}`);
       if (!cRes.ok) continue;
       const chain = await cRes.json();
       if (chain.chainStale) continue;
-      if (chain.hasLoan === true && chain.inSoftLiq === true && chain.converted > 0 && chain.bands > 0) {
+      const agrees =
+        want === "soft"
+          ? chain.inSoftLiq === true && chain.converted > 0 && chain.bands > 0 && chain.healthFull >= 0
+          : chain.healthFull != null && chain.healthFull < 0;
+      if (chain.hasLoan === true && agrees) {
         return { controller: row.controller, user: row.user, chain, scanned: i * perPage + rows.length };
       }
     }
@@ -380,7 +386,7 @@ try {
   body = await page.textContent("body");
   check(
     `listing: soft-liq overlay lands on the searched row (${converted} converted)`,
-    /In soft-liquidation/.test(body) && body.includes(converted),
+    /In soft-liquidation/.test(body) && body.includes(converted) && !/Liquidatable/.test(body),
     body.includes(converted) ? converted : "no converted figure matching the chain read",
   );
 
@@ -437,6 +443,57 @@ try {
     /Borrow/.test(body) && !/No transaction history/.test(body),
   );
   check("detail: no page errors", pageErrors.length === 0, pageErrors.join(" | "));
+
+  // ── 3b. liquidatable — health(user, true) below 0 ──────────────────────────
+  // Found at run time like the soft-liq subject. The listing row, the card's
+  // mode pill and its opened layer must say "Liquidatable", never "In
+  // soft-liquidation", and the listing states the chain read's health.
+  const LIQNOW = await findSoftLiq("liquidatable");
+  if (!LIQNOW) {
+    console.log("NO EVIDENCE  liquidatable: no open position reads health below 0 right now");
+  } else {
+    const h = LIQNOW.chain.healthFull * 100;
+    const a = Math.abs(h);
+    const healthText = `${h < 0 ? "−" : ""}${
+      a > 0 && a < 0.01
+        ? a.toLocaleString("en-US", { maximumSignificantDigits: 2 })
+        : a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }%`;
+    console.log(`INFO  liquidatable subject ${LIQNOW.controller}/${LIQNOW.user} at health ${healthText}`);
+    await page.goto(`${BASE}${EXPLORER}?q=${LIQNOW.user}`, { waitUntil: "networkidle", timeout: 180000 });
+    await page.waitForSelector("[data-llamalend-liquidatable]", { timeout: 60000 }).catch(() => {});
+    body = await page.textContent("body");
+    check(
+      `listing: liquidatable row reads "Liquidatable" at ${healthText}`,
+      /Liquidatable/.test(body) && body.includes(healthText) && !/In soft-liquidation/.test(body),
+    );
+    pageErrors.length = 0;
+    await page.goto(`${BASE}${EXPLORER}/${LIQNOW.controller}/${LIQNOW.user}`, {
+      waitUntil: "networkidle",
+      timeout: 180000,
+    });
+    await page.waitForSelector('[data-llamalend-mode="liquidatable"]', { timeout: 120000 }).catch(() => {});
+    const pill = await page
+      .$eval("[data-llamalend-mode]", (el) => ({
+        mode: el.getAttribute("data-llamalend-mode"),
+        text: el.textContent,
+        cls: el.className,
+      }))
+      .catch(() => null);
+    check(
+      "detail: liquidatable card's mode pill reads Liquidatable on the critical red",
+      pill?.mode === "liquidatable" && pill.text === "Liquidatable" && /bg-red-500/.test(pill.cls),
+      pill ? `${pill.text} (${pill.mode})` : "no mode pill",
+    );
+    await openPositionCards(page);
+    await page.waitForSelector("text=anyone may liquidate it now", { timeout: 60000 }).catch(() => {});
+    body = await page.textContent("body");
+    check(
+      "detail: opened card leads with the liquidatable line, not soft-liquidation",
+      /Liquidatable: below 0, anyone may liquidate it now/.test(body) && !/is in soft-liquidation right now/.test(body),
+    );
+    check("detail (liquidatable): no page errors", pageErrors.length === 0, pageErrors.join(" | "));
+  }
 
   // ── 4. detail — hard liquidation (partial) + self-liquidation legs ──────────
   pageErrors.length = 0;
@@ -588,10 +645,12 @@ try {
     } catch {}
   });
   await page.goto(`${BASE}${EXPLORER}/${NR.controller}/${NR.user}`, { waitUntil: "networkidle", timeout: 180000 });
+  // The card draws closed (ui-jobs 209); the lost line is in its opened layer.
+  await openPositionCards(page);
   await page.waitForSelector("text=Lost to soft-liquidation", { timeout: 120000 });
   await page.waitForSelector("text=fewer than after the 11 Jun event", { timeout: 120000 });
   body = await page.textContent("body");
-  check("nr: card states health", /Health:\s*[\d.]+%/.test(body));
+  check("nr: card states health", /Health:?\s*[\d.]+%/.test(body));
   // Deposited 7.61413 WETH, held 7.42038 WETH while the collateral is unchanged.
   check(
     "nr: card states the collateral lost to soft-liquidation",
@@ -634,6 +693,7 @@ try {
     timeout: 180000,
   });
   await p2.waitForSelector("text=83,966.3", { timeout: 120000 });
+  await openPositionCards(p2);
   await p2.waitForSelector("text=Sold by the AMM, net", { timeout: 120000 });
   body = await openAllAndRead(p2);
   // The opening row's band prices are a closed block's read (exact forever);

@@ -69,7 +69,7 @@ export function llamalendPositionContent(opts: {
     opts.inSoftLiq
       ? {
           bold: "Soft-liquidation is live",
-          text: "the oracle price sits inside this position's bands right now: the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event marking it. The swap reverses; the losses do not.",
+          text: "the AMM has converted part of this position's collateral to the borrowed token. Inside the bands it sells collateral as the price falls and buys it back as the price rises, with no event marking it. The swap reverses; the losses do not.",
         }
       : {
           bold: "Isolated markets",

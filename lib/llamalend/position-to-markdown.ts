@@ -10,6 +10,7 @@
 // market — so this snapshot never aggregates a user across markets. A PURE
 // function of the data already in scope on the detail page — no fetching.
 
+import { fmtHealth } from "@/lib/llamalend/event-figures";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isLlamalendEvent } from "@/lib/shared/types/event-shape";
 import type { LlamalendPositionView } from "@/components/protocol/llamalend/llamalend-position-card";
@@ -92,7 +93,7 @@ export function llamalendPositionToMarkdown(args: LlamalendPositionMarkdownArgs)
         `- **Converted by the AMM (soft-liquidation):** ${amt(view.converted)} ${view.borrowedSymbol} — ` +
           (view.converted > 0
             ? `the position IS in soft-liquidation: this much collateral has already been converted (read live from user_state.stablecoin; it appears in no event)`
-            : `nothing converted; the price sits above the band`),
+            : `nothing converted`),
       );
     }
     lines.push("");
@@ -110,9 +111,16 @@ export function llamalendPositionToMarkdown(args: LlamalendPositionMarkdownArgs)
             `(${live.bands} bands, ticks ${live.n1}…${live.n2}, A = ${live.A}) — derived by the deployed integer formula, exact against the AMM's own p_oracle_up/p_oracle_down`,
         );
       }
+      if (live.healthFull != null) {
+        lines.push(
+          `- **Health (Controller.health(user, true)):** ${fmtHealth(live.healthFull)}${
+            live.healthFull < 0 ? " — LIQUIDATABLE: below 0, anyone may liquidate it now" : ""
+          }`,
+        );
+      }
       if (live.health != null) {
         lines.push(
-          `- **Health (price ÷ soft-liq onset):** ${num(live.health, 4)} — ${
+          `- **Price ÷ soft-liq onset:** ${num(live.health, 4)} — ${
             live.health >= 1
               ? `a fall of about ${Math.round((1 - 1 / live.health) * 100)}% starts conversion`
               : "inside (or beneath) the band"

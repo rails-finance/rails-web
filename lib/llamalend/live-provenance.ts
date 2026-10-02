@@ -126,7 +126,7 @@ export function llamalendHealthProv(amm?: string): Provenance {
       "Re-run the AMM's price_oracle and p_oracle_up(n1) eth_calls and divide — both legs are same-block chain reads in the same unit; only the division is arithmetic. (This deliberately differs from the Controller's health(), which incorporates the liquidation discount and value-above-band accounting; the band ratio is the price-distance read, and each is labeled as itself.)",
     ),
     summary:
-      "How far the price stands above the soft-liquidation onset — the collateral price over this position's band top, price_oracle ÷ pUp: two prices in the same unit at the same block. Exactly 1.0 at the band's top; below 1.0 the position is inside its band and the AMM is converting. The division is client arithmetic over two chain reads, graded state because every input is.",
+      "How far the price stands above the soft-liquidation onset — the collateral price over this position's band top, price_oracle ÷ pUp: two prices in the same unit at the same block. Exactly 1.0 at the band's top; below 1.0 the price is inside or beneath the bands. Whether the AMM holds converted collateral is the Converted figure. The division is client arithmetic over two chain reads, graded state because every input is.",
     contract: ammOf(amm),
     via: `${LANE_VIA} · price_oracle ÷ derived pUp (same block)`,
     formula: "price_oracle ÷ pUp",

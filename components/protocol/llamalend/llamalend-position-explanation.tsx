@@ -294,7 +294,13 @@ export function LlamalendPositionExplanation({
       <H>
         {chain.debt != null ? formatNumber(chain.debt) : "—"} {chain.borrowedSymbol}
       </H>{" "}
-      of debt{chain.inSoftLiq ? ", and is in soft-liquidation right now" : ""}:
+      of debt
+      {chain.healthFull != null && chain.healthFull < 0
+        ? ", and anyone may liquidate it now"
+        : chain.inSoftLiq
+          ? ", and is in soft-liquidation right now"
+          : ""}
+      :
     </>
   );
 

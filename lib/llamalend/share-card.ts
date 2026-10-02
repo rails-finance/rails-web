@@ -8,6 +8,7 @@ import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatUsd } from "@/lib/shared/format-event";
 import { formatCompact } from "@/lib/utils/format";
 import { shortSubject } from "@/lib/shared/page-metadata";
+import { fmtHealth } from "@/lib/llamalend/event-figures";
 import type { PositionCardModel } from "@/lib/share/position-card";
 
 const STATUS_WORD: Record<LlamalendPositionStatus, string> = {
@@ -48,10 +49,11 @@ export function llamalendShareCardModel(
       stats.push({ label: CARD_VOCAB.debt, value: `${formatCompact(position.debt)} ${position.borrowedSymbol}` });
     }
 
-    // No health factor here — LlamaLend's card carries no ratio column at
-    // all. Its distinctive third column is the soft-liquidation state: the
-    // amount the AMM has already converted, present only while it is live.
-    if (position.inSoftLiq && position.converted != null && position.converted > 0) {
+    // The third column is the position's state: the health when anyone may
+    // liquidate it, else the amount the AMM has converted while that is live.
+    if (position.liquidatable && position.healthFull != null) {
+      stats.push({ label: "Liquidatable", value: `health ${fmtHealth(position.healthFull)}` });
+    } else if (position.inSoftLiq && position.converted != null && position.converted > 0) {
       stats.push({
         label: "In soft-liquidation",
         value: `${formatCompact(position.converted)} ${position.borrowedSymbol}`,
