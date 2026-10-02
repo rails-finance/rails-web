@@ -159,6 +159,10 @@ interface IndexSeed {
     repaid: string;
     absorbedDebt: string;
     absorbCredit?: string;
+    /** Interest before the cut, from the chain's block state. Absent on a
+     *  seed from a server that summed the amounts alone. */
+    interestEarned?: string;
+    interestCharged?: string;
     collateral: Record<
       string,
       { supplied: string; withdrawn: string; absorbed: string; received: string; sent: string }
@@ -383,6 +387,8 @@ export async function readCometIndex(p: LoadCometIndexParams, readerIp?: string)
           repaid: BigInt(s.lifetime.repaid),
           absorbedDebt: BigInt(s.lifetime.absorbedDebt),
           ...(s.lifetime.absorbCredit != null ? { absorbCredit: BigInt(s.lifetime.absorbCredit) } : {}),
+          ...(s.lifetime.interestEarned != null ? { interestEarned: BigInt(s.lifetime.interestEarned) } : {}),
+          ...(s.lifetime.interestCharged != null ? { interestCharged: BigInt(s.lifetime.interestCharged) } : {}),
           collateral: Object.fromEntries(
             Object.entries(s.lifetime.collateral).map(([a, c]) => [a.toLowerCase(), legs(c)]),
           ),

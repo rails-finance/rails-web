@@ -759,9 +759,10 @@ export function cometPresentValue(principal: bigint, supplyIndex: bigint, borrow
  *  parsed to bigints. Every field is the accumulator it names in
  *  `MarketState`, so a replay that opens from it and walks the tail lands
  *  where a replay over the whole list lands, to the wei: the base is an
- *  unclamped sum, the peaks a running max over it, the collateral its
- *  clamped walk in closed form, the counts counts, and the lifetime flows
- *  the same zero-crossing split run in SQL over the raw deltas. The one
+ *  unclamped sum, the collateral its clamped walk in closed form, the counts
+ *  counts, and the peaks, the lifetime flows and the interest the server's
+ *  walk of this replay's base arithmetic against the same block state
+ *  (rails-server api/src/services/comet-seed-walk.ts). The one
  *  accumulator a seed cannot hand over is the own-transaction SET — it
  *  carries the set's size, and the tail's own set is counted beside it; the
  *  cut is a transaction boundary, so the two never share a member. */
@@ -789,7 +790,7 @@ export interface CometReplaySeed {
   firstTimestamp: number;
   lastBlock: number;
   lastTimestamp: number;
-  /** Gross lifetime flows before the cut, raw, split at the running base's
+  /** Gross lifetime flows before the cut, raw, split at the chain balance's
    *  zero crossings exactly as `splitCompoundBaseFlow` splits them. */
   lifetime: {
     deposited: bigint;
@@ -799,6 +800,10 @@ export interface CometReplaySeed {
     absorbedDebt: bigint;
     /** Absent on a seed written before the absorb split. */
     absorbCredit?: bigint;
+    /** Interest before the cut, walked against the chain's block state.
+     *  Absent on a seed that summed the amounts alone. */
+    interestEarned?: bigint;
+    interestCharged?: bigint;
     collateral: Record<
       string,
       { supplied: bigint; withdrawn: bigint; absorbed: bigint; received: bigint; sent: bigint }
@@ -963,6 +968,8 @@ export function replayCometRows(p: CometReplayInput): CometChainTimelineResult {
     s.lifetime.base.repaid = lt.repaid;
     s.lifetime.base.absorbedDebt = lt.absorbedDebt;
     s.lifetime.base.absorbCredit = lt.absorbCredit ?? ZERO;
+    s.lifetime.base.interestEarned = lt.interestEarned ?? ZERO;
+    s.lifetime.base.interestCharged = lt.interestCharged ?? ZERO;
     // A seed without the split holds each absorb's whole basePaidOut.
     if (lt.absorbCredit == null && lt.absorbedDebt > ZERO) s.lifetime.absorbUnsplit = true;
     for (const [addr, c] of Object.entries(lt.collateral)) {
