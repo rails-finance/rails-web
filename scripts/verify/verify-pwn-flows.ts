@@ -369,3 +369,43 @@ test("the interest: v1.1 fixed at creation, v1.2/v1.3 the contract's sum at the 
   const a = accrueTo(v61.credit!.amountRaw, 6, 6000, "0", v61.createdAt!, due)!;
   assert.equal(legOf(r61[1], PWN.interest), a.interest);
 });
+
+test("a lapsed v1.2/v1.3 loan's state card: the contract's sum, stopped at the deadline", () => {
+  const f = fx("lapsed-accruing");
+  const m = model(f);
+  const v = view(f);
+  const due = loanDeadlineAt(v)!;
+  const sum = m.words.moment?.minuteSum;
+  assert.ok(sum, "the moment carries the minute sum");
+  assert.equal(sum.deadline, due);
+  const focus = pwnFocusEvents(replay(f));
+  const startDay = m.start / 86_400_000;
+  let before = 0;
+  let after = 0;
+  for (let stop = 1; stop < m.liveStop; stop++) {
+    if (m.eventDays.includes(stop)) continue;
+    const close = (startDay + stop + 1) * DAY;
+    const mo = flowMoment(m, focus, close - 1);
+    if (!mo?.accrual) continue;
+    const to = Math.min(close, due);
+    // Whole minutes from the start, to the deadline once it has passed.
+    assert.equal(mo.accrual.minutes, Math.floor((to - v.createdAt!) / 60), `stop ${stop}`);
+    if (close > due) {
+      assert.equal(mo.accrual.stopped, due, `stop ${stop}: stopped`);
+      after++;
+    } else {
+      assert.equal(mo.accrual.stopped, undefined);
+      before++;
+    }
+    // The card's interest is the contract's sum: principal × APR × whole minutes ÷ 5,256,000,000.
+    const a = mo.sides.debt.assets[0];
+    const want = accrueTo(v.credit!.amountRaw, v.credit!.decimals!, sum.apr, "0", v.createdAt!, to)!;
+    assert.ok(
+      near(a.tokens - a.recorded, Number(want.interest), 1e-9),
+      `stop ${stop}: ${a.tokens - a.recorded} vs ${want.interest}`,
+    );
+  }
+  assert.ok(before > 0 && after > 0, `${before} days before the deadline, ${after} after`);
+  // A fixed loan's moment carries none.
+  assert.equal(model(fx("lapsed-fixed")).words.moment?.minuteSum, undefined);
+});

@@ -131,6 +131,30 @@ export function FlowMomentCard({
   const date = dayStamp(moment.day * DAY_S);
   const when = `the close of ${date}`;
   const lastStamp = dayStamp(moment.lastDay * DAY_S);
+  // A face side whose interest is a contract's minute sum that stops at a
+  // deadline (PWN v1.2/v1.3): its words and receipts state that sum.
+  const minuteSum = model.words.moment?.minuteSum;
+  const sum = minuteSum && moment.accrual?.minutes != null ? { ...minuteSum, minutes: moment.accrual.minutes } : null;
+  const sumStop = moment.accrual?.stopped != null ? dayStamp(moment.accrual.stopped) : null;
+  const sumTo = sumStop ? `to the deadline on ${sumStop}` : `to the end of ${date}`;
+  const sumInputs = (symbol: string) =>
+    sum
+      ? [
+          { label: "principal", value: `${fmtPositionAmount(sum.principal)} ${symbol}`, kind: "chain" as const },
+          {
+            label: "APR",
+            value: `${(sum.apr / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`,
+            kind: "chain" as const,
+            note: "the loan's terms",
+          },
+          {
+            label: "whole minutes",
+            value: sum.minutes.toLocaleString("en-US"),
+            kind: "chain-derived" as const,
+            note: `from the start on ${dayStamp(sum.start)} ${sumTo}`,
+          },
+        ]
+      : [];
   const since = moment.day - moment.lastDay;
   // A name the page does not hold (an event inside a folder) is the chart's:
   // the kinds of flow that day's events made.
@@ -186,34 +210,46 @@ export function FlowMomentCard({
           formula: "recorded balance × index at the close ÷ index at the event",
           inputs: indexInputs(side, a, a.grown),
         }
-      : moment.sides[side].face && moment.accrual
+      : moment.sides[side].face && sum
         ? {
             kind: "chain-derived",
-            summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
-            formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
+            summary: sumStop
+              ? `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest the contract's sum built on the principal to the deadline on ${sumStop}, where it stopped: the figure the chart's debt line states for that day.`
+              : `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest the contract's sum builds on the principal to the end of the day, the figure the chart's debt line states for that day.`,
+            formula: "recorded debt + principal × APR × whole minutes ÷ 5,256,000,000",
             inputs: [
               { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
-              {
-                label: "annual rate",
-                value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
-                kind: "chain",
-                note: "in force after the last event, fees included",
-              },
-              {
-                label: "time",
-                value: `${(moment.accrual.seconds / DAY_S).toLocaleString("en-US", { maximumFractionDigits: 2 })} days`,
-                kind: "chain-derived",
-                note: `from the last event to the end of ${date}`,
-              },
+              ...sumInputs(a.symbol),
             ],
           }
-        : {
-            kind: "chain",
-            summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
-            inputs: [
-              { label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
-            ],
-          };
+        : moment.sides[side].face && moment.accrual
+          ? {
+              kind: "chain-derived",
+              summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
+              formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
+              inputs: [
+                { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
+                {
+                  label: "annual rate",
+                  value: `${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+                  kind: "chain",
+                  note: "in force after the last event, fees included",
+                },
+                {
+                  label: "time",
+                  value: `${(moment.accrual.seconds / DAY_S).toLocaleString("en-US", { maximumFractionDigits: 2 })} days`,
+                  kind: "chain-derived",
+                  note: `from the last event to the end of ${date}`,
+                },
+              ],
+            }
+          : {
+              kind: "chain",
+              summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
+              inputs: [
+                { label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
+              ],
+            };
   const interestProv = (side: FlowSide, a: MomentAsset): Provenance => {
     const g = a.grown as FlowGrowth;
     return {
@@ -336,7 +372,18 @@ export function FlowMomentCard({
       },
     ],
   });
-  const faceInterestProv = (a: MomentAsset): Provenance => ({
+  const faceInterestProv = (a: MomentAsset): Provenance =>
+    sum
+      ? {
+          kind: "chain-derived",
+          summary: sumStop
+            ? `${a.symbol} interest owed to ${when} — the contract's sum on the principal from the start to the deadline on ${sumStop}; it stopped there.`
+            : `${a.symbol} interest owed to ${when} — the contract's sum on the principal from the start to the end of the day.`,
+          formula: "principal × APR × whole minutes ÷ 5,256,000,000",
+          inputs: sumInputs(a.symbol),
+        }
+      : faceRateInterestProv(a);
+  const faceRateInterestProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
     summary: `${a.symbol} interest owed to ${when} — what the rate in force after the last event (${lastStamp}) builds on the debt that event recorded, to the end of the day.`,
     formula: "recorded debt × annual rate × time ÷ 1 year",
@@ -547,11 +594,15 @@ export function FlowMomentCard({
     if (s.assets.length === 0) return null;
     const priced = s.assets.some((a) => a.usd != null) ? ` USD at the price recorded for ${date}.` : "";
     const body =
-      s.face && moment.accrual
-        ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
-        : s.assets.some((a) => a.grown)
-          ? `${grownWords(side)}${priced}`
-          : `as the last event left it on ${lastStamp}; no event changed it by then.${priced}`;
+      s.face && sum
+        ? sumStop
+          ? `the debt the last event recorded, plus the interest the contract's sum built on the principal until the deadline on ${sumStop}, where it stopped: principal × APR × whole minutes from the start to the deadline ÷ 5,256,000,000.`
+          : `the debt the last event recorded, plus the interest the contract's sum builds on the principal to the end of ${date}: principal × APR × whole minutes from the start ÷ 5,256,000,000.`
+        : s.face && moment.accrual
+          ? `the debt the last event recorded, plus the interest at ${moment.accrual.rate.toLocaleString("en-US", { maximumFractionDigits: 2 })}% a year built on it to the end of ${date}.`
+          : s.assets.some((a) => a.grown)
+            ? `${grownWords(side)}${priced}`
+            : `as the last event left it on ${lastStamp}; no event changed it by then.${priced}`;
     const noPrice = !s.priced
       ? ` ${words?.noPrice?.[side] ?? `No price was recorded for this side on ${date}, so it is stated in tokens.`}`
       : "";

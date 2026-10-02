@@ -399,6 +399,11 @@ export interface FlowMomentWords {
   noPrice?: Partial<Record<FlowSide, string>>;
   /** Lines under the figures, on what the moment leaves out. */
   notes?: string[];
+  /** A face side whose interest is a contract's sum by the whole minute from
+   *  `start`, stopped at `deadline` (PWN v1.2/v1.3: principal × APR × whole
+   *  minutes ÷ 5,256,000,000, `apr` in the terms' hundredths of a percent).
+   *  The card states that sum where it would state the rate's straight line. */
+  minuteSum?: { start: number; deadline: number | null; principal: number; apr: number };
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */
