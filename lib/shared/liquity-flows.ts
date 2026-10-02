@@ -510,7 +510,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     carriedWhy: {
       [coll]:
         daily.length > 0
-          ? "the branch's daily price does not reach this day, so it keeps the last price before it."
+          ? "the branch's daily price has none for this day, so it keeps the last price before it."
           : "no daily price is recorded for this branch, so a day between events keeps the last event's price.",
     },
     // A closed Liquity V1 life is the page's whole position: its line ends
