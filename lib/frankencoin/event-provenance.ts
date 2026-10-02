@@ -589,20 +589,10 @@ export const peakAbsoluteProv = (what: "minted" | "collateral", sym: string): Pr
   pclass: "state",
   summary:
     what === "minted"
-      ? "The most ZCHF this position ever had minted at once — the maximum over its own MintingUpdate `minted` absolutes (each equal to the stored minted() slot at its block), replayed over the position's whole life. A closed position's latest absolutes are back at zero, so its headline states the ledger's height instead."
-      : `The most ${sym} this position ever held — the maximum over its own MintingUpdate \`collateral\` absolutes (each equal to the collateral token's balanceOf(position) at its block), replayed over the position's whole life. A closed position's latest absolutes are back at zero, so its headline states the ledger's height instead.`,
+      ? "The most ZCHF this position ever had minted at once — the maximum over its MintingUpdate `minted` absolutes (each equal to the stored minted() slot at its block), replayed over the position's whole life. A closed position's latest absolutes are back at zero, so its headline states the ledger's height instead."
+      : `The most ${sym} this position ever held — the maximum over the opening deposit (MintingHub.openPosition transfers it in without a MintingUpdate; the index records it from the position's balance at its first block) and its MintingUpdate \`collateral\` absolutes (each equal to the collateral token's balanceOf(position) at its block), replayed over the position's whole life. A closed position's latest absolutes are back at zero, so its headline states the ledger's height instead.`,
   contract: { name: "Frankencoin Position" },
   via: `${FRANKENCOIN_VIA} · max(${what}) over all MintingUpdates`,
-});
-
-/** A closed card's collateral headline when the position's MintingUpdates
- *  never recorded any: the most a sale sold. */
-export const soldPeakProv = (sym: string): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  summary: `The ${sym} this position's sale sold — the hub's ForcedSale amount or ChallengeSucceeded acquiredCollateral. The position's own MintingUpdates never recorded this collateral (it arrived without one), so the ledger has no peak to show; the sale's amount is the most it is known to have held.`,
-  contract: { name: "Frankencoin MintingHub" },
-  via: `${FRANKENCOIN_VIA} · ForcedSale amount · ChallengeSucceeded acquiredCollateral`,
 });
 
 /** A lifetime gross flow — Σ of per-event changes on one axis. */

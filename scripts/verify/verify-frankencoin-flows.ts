@@ -19,9 +19,9 @@
 //                      sold in five slices of one challenge (19 events)
 //   forced-sale        V2 clone 0x1ca3…acea: sold at expiry (11 events)
 //   opening-deposit    V2 SPYon original 0x6880…60ce: the opening deposit no
-//                      MintingUpdate records, read from the receipt; open
-//   forced-opening     V2 original 0xa991…4aaf: the opening deposit read from
-//                      the receipt, then sold at expiry
+//                      MintingUpdate records, carried by the index's Open row; open
+//   forced-opening     V2 original 0xa991…4aaf: the opening deposit carried by
+//                      the index's Open row, then sold at expiry
 //   closed-many        V2 LsETH clone 0xf73f…839c: 65 ledger rows, closed
 //
 // Held: the replay meets every row's stated collateral and debt to the base
@@ -91,7 +91,7 @@ const OUT = new Set<string>([
 ]);
 const COLL = new Set<string>([FC.deposited, FC.withdrawn, FC.soldChallenge, FC.soldForced]);
 
-/** The page's rows: the opening read put in place, as the page does. */
+/** The page's rows: the receipt's opening put in place where the index lacks it, as the page does. */
 const prepared = (f: Fixture) =>
   applyFrankencoinOpening(
     f.events as Parameters<typeof applyFrankencoinOpening>[0],
@@ -234,7 +234,7 @@ test("a sale day draws the red liquidation triangle; other days a side's dot", (
   assert.ok(!model(fx("open-minted")).ticks.some((t) => t.tick === "liquidation"), "no sale, no red mark");
 });
 
-test("the opening deposit no MintingUpdate records is counted from the receipt", () => {
+test("the opening deposit no MintingUpdate records is counted from the index's Open row", () => {
   for (const name of ["opening-deposit", "forced-opening"]) {
     const f = fx(name);
     assert.ok(f.opening?.opening, `${name}: an opening read`);

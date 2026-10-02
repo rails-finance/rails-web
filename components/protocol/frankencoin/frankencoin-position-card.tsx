@@ -38,7 +38,6 @@ import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import {
-  soldPeakProv,
   latestAbsoluteProv,
   peakAbsoluteProv,
   lifetimeFlowProv,
@@ -373,11 +372,7 @@ export function FrankencoinPositionCard({
               </div>
             ),
           };
-    // Collateral the ledger never recorded (deposited without a MintingUpdate)
-    // still shows as the amount a sale sold.
-    const peakCollateral =
-      v.peakCollateral != null && v.peakCollateral > 0 ? v.peakCollateral : (ending?.soldMost ?? null);
-    const peakFromSale = !(v.peakCollateral != null && v.peakCollateral > 0) && peakCollateral != null;
+    const peakCollateral = v.peakCollateral;
     return (
       <PositionCardShell
         receipts={receipts}
@@ -402,22 +397,13 @@ export function FrankencoinPositionCard({
           collateral={
             peakCollateral != null && peakCollateral > 0 ? (
               <StatValue>
-                <Prov
-                  info={
-                    peakFromSale ? soldPeakProv(v.collateralSymbol) : peakAbsoluteProv("collateral", v.collateralSymbol)
-                  }
-                >
+                <Prov info={peakAbsoluteProv("collateral", v.collateralSymbol)}>
                   <AssetAmount value={peakCollateral} symbol={v.collateralSymbol} />
                 </Prov>
               </StatValue>
             ) : (
               <StatDash />
             )
-          }
-          collateralFootnote={
-            peakFromSale ? (
-              <StatFootnote>{forcedAt != null ? "sold in its forced sale" : "sold in a challenge"}</StatFootnote>
-            ) : undefined
           }
           debt={
             v.peakMinted != null && v.peakMinted > 0 ? (
