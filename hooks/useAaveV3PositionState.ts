@@ -40,7 +40,9 @@ const LOADING: AaveV3PositionStateResult = { status: "loading" };
 
 /** The Ethereum markets read the index's answer; Base, Seamless and SparkLend
  *  read the chain at the block (app/api/chain/{aave-v3-base,seamless,spark}/
- *  position-state), same wire shape. */
+ *  position-state), same wire shape. "chain:<market>" reads an Ethereum
+ *  market from the chain (app/api/chain/aave-v3/position-state), for a row
+ *  the index holds no event for (an e-mode change). */
 const routeFor = (market: string): string =>
   market === "base"
     ? "/api/chain/aave-v3-base/position-state"
@@ -48,7 +50,9 @@ const routeFor = (market: string): string =>
       ? "/api/chain/seamless/position-state"
       : market === "spark"
         ? "/api/chain/spark/position-state"
-        : "/api/aave-v3/timeline/position-state";
+        : market.startsWith("chain:")
+          ? "/api/chain/aave-v3/position-state"
+          : "/api/aave-v3/timeline/position-state";
 
 const READ_TIMEOUT_MS = 25_000;
 const RETRY_AFTER_MS = 2_000;

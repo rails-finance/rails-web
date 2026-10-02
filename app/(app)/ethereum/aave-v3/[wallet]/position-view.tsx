@@ -59,6 +59,17 @@ import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/compone
 import { fetchAaveV3FlowSeries, type AaveV3FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
+import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
+import {
+  emodeSwitchEvents,
+  fetchAccountSwitches,
+  switchesInWindow,
+  withEmodeRows,
+  withEmodeServedRows,
+  type AaveFamilyAccountSwitches,
+} from "@/lib/aave-v3/account-switches";
+import { hfLabelV3 } from "@/lib/aave-v3/position-state";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { aaveV3CountNote, aaveV3CountSplit, aaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
 import {
   AaveV3PositionCard,
@@ -283,17 +294,60 @@ export default function AaveV3PositionDetail({
   // below) — a fresh array identity every render would cancel the in-flight
   // fetch whenever anything else (e.g. the chain read) re-rendered the page.
   const aaveEvents = useMemo(() => events.filter(isAaveV3Event), [events]);
+  // The account's e-mode changes in this market, from its Pool's logs: each
+  // is a timeline row of its own; nothing else on the page counts it.
+  const [switches, setSwitches] = useState<AaveFamilyAccountSwitches | null>(null);
+  useEffect(() => {
+    const ac = new AbortController();
+    setSwitches(null);
+    fetchAccountSwitches(`/api/chain/aave-v3/account-switches?market=${market}`, wallet, ac.signal)
+      .then(setSwitches)
+      .catch(() => {
+        // The rows and the card read as they did without them.
+      });
+    return () => ac.abort();
+  }, [wallet, market]);
+  // The e-mode rows the timeline draws among the served ones: those inside the
+  // loaded window (on a grouped answer, from its oldest row on).
+  const emodeRows = useMemo(() => {
+    if (!switches) return [];
+    let floor = cutoffBlock;
+    if (groupedTail && floor != null) {
+      const blocks = [
+        ...aaveEvents.map((e) => e.blockNumber),
+        ...groupedTail.rowPlan.flatMap((r) => (r.kind === "folder" ? [r.folder.firstBlock] : [])),
+      ];
+      if (blocks.length > 0) floor = Math.min(...blocks);
+    }
+    return emodeSwitchEvents(wallet, switchesInWindow(switches.emode, floor), "aave-v3", MAINNET_CHAIN_ID).filter(
+      isAaveV3Event,
+    );
+  }, [switches, groupedTail, aaveEvents, wallet, cutoffBlock]);
+  const timelineEvents = useMemo(() => withEmodeRows(aaveEvents, emodeRows), [aaveEvents, emodeRows]);
   // Each card's same-transaction rows and the transaction before it (the
   // liquidation fee's pairing, the health factor's move between events).
-  const neighbours = useMemo(() => aaveV3Neighbours(aaveEvents as AaveV3Event[]), [aaveEvents]);
+  const neighbours = useMemo(() => aaveV3Neighbours(timelineEvents as AaveV3Event[]), [timelineEvents]);
+  // An e-mode row is read from the chain at blocks N−1 and N, which is
+  // "immediately before" and "once it had run" only where no other of the
+  // owner's transactions shares the block.
+  const sharedBlocks = useMemo(() => {
+    const txs = new Map<number, Set<string>>();
+    for (const e of timelineEvents) {
+      const set = txs.get(e.blockNumber) ?? new Set<string>();
+      set.add((e.txHash ?? e.id).toLowerCase());
+      txs.set(e.blockNumber, set);
+    }
+    return new Set([...txs].filter(([, s]) => s.size > 1).map(([b]) => b));
+  }, [timelineEvents]);
 
   // The served list as ROWS. `aaveEvents` holds the grouped answer's own events
   // when one is in hand — the read above put them there — so the plan and the
   // events it interleaves always come from the same answer, and two partitions
   // can never meet on one page.
   const servedRows = useMemo(
-    () => (groupedTail ? interleaveRowPlan(groupedTail.rowPlan, aaveEvents) : undefined),
-    [groupedTail, aaveEvents],
+    () =>
+      groupedTail ? withEmodeServedRows(interleaveRowPlan(groupedTail.rowPlan, aaveEvents), emodeRows) : undefined,
+    [groupedTail, aaveEvents, emodeRows],
   );
   /** The folders the index served, whole and UNFILTERED — the third contributor
    *  to the page's partition, and what every whole-history reduction below adds
@@ -432,7 +486,7 @@ export default function AaveV3PositionDetail({
   );
   const focusRoot = useFlowFocusRoot(focusEvents);
   const { tl, segments, readFolderMembers } = useTimelineSegment({
-    events: aaveEvents,
+    events: timelineEvents,
     groupedTail,
     servedRows,
     servedFolders,
@@ -798,7 +852,19 @@ export default function AaveV3PositionDetail({
                   ) : undefined
                 }
                 renderCard={(event, meta) =>
-                  isAaveV3Event(event) ? (
+                  isAaveV3Event(event) && event.context.data.emodeSwitch ? (
+                    <AaveFamilyEmodeSwitchCard
+                      event={event}
+                      sw={event.context.data.emodeSwitch}
+                      pool={poolIdentity}
+                      persistPrefix="aave-v3"
+                      hfFormat={hfLabelV3}
+                      eventNumber={meta.eventNumber}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      market={sharedBlocks.has(event.blockNumber) ? undefined : `chain:${market}`}
+                    />
+                  ) : isAaveV3Event(event) ? (
                     <AaveV3CtEventCard
                       event={event as AaveV3Event}
                       eventNumber={meta.eventNumber}

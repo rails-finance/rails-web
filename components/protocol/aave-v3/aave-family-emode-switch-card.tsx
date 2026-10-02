@@ -70,9 +70,11 @@ export function AaveFamilyEmodeSwitchCard({
   isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
-  /** Where the account around this transaction can be read at N−1 and N;
-   *  unset where another of the owner's transactions shares the block. */
-  market?: "spark" | "seamless";
+  /** Where the account around this transaction can be read at N−1 and N
+   *  (hooks/useAaveV3PositionState: "spark", "seamless", "base", or an Aave V3
+   *  Ethereum market); unset where another of the owner's transactions shares
+   *  the block. */
+  market?: string;
   /** The explorer's health-factor format (Seamless: the Aave V3 family's
    *  four decimals below 1.1); SparkLend's by default. */
   hfFormat?: (hf: number | null) => string;
