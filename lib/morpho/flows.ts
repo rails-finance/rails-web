@@ -378,6 +378,10 @@ export interface MorphoLive {
 export interface MorphoFlowOptions {
   loanSymbol: string;
   collSymbol: string;
+  /** The tokens' addresses, for the icons: a Pendle PT collateral's mark is
+   *  read through its address. */
+  loanAddress?: string | null;
+  collAddress?: string | null;
   lltv: number;
   /** Unix seconds now; the page's clock. */
   now: number;
@@ -600,6 +604,14 @@ export function morphoFlowTimeline(events: MorphoFlowEvent[], o: MorphoFlowOptio
       debt: "Debt",
     },
     words: morphoFlowWords(o.loanSymbol, o.collSymbol, roles),
+    ...(o.loanAddress || o.collAddress
+      ? {
+          addresses: {
+            ...(o.loanAddress ? { [o.loanSymbol]: o.loanAddress } : {}),
+            ...(o.collAddress && roles.borrower ? { [o.collSymbol]: o.collAddress } : {}),
+          },
+        }
+      : {}),
   };
 }
 

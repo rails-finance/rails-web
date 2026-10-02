@@ -180,6 +180,8 @@ export function MorphoBasePositionSection({
     chainId: MORPHO_BASE_CHAIN_ID,
     loanSymbol: flowsOn && !pos.loanDecimalsUnread ? pos.loanSymbol : null,
     collSymbol: pos.collateralDecimalsUnread ? null : pos.collateralSymbol,
+    loanAddress: pos.loanToken,
+    collAddress: pos.collateralToken,
     lltv: pos.lltv,
     open: morphoViewFromSweep(pos, wallet, chain).status === "open",
     live: flowLive,

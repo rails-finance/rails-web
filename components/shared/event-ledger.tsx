@@ -432,10 +432,13 @@ function LedgerGrid({ cols, children }: { cols: Cols; children: ReactNode }) {
  *  and its tip are the symbol. Muted on an item row, full strength on the
  *  asset's total line. */
 export function LedgerIcon({ symbol, muted = false }: { symbol: string; muted?: boolean }) {
+  // The token's address where the page's flow model names one (Morpho: a
+  // Pendle PT collateral, whose mark is read through its address).
+  const address = useFlowFocus()?.model?.addresses?.[symbol];
   return (
     <span className="inline-flex size-3.5 shrink-0 items-center justify-center" data-ledger-icon={symbol}>
       <RevealTip tip={symbol} label={symbol} align="end" className={muted ? "opacity-70" : ""}>
-        <TokenChipIcon symbol={symbol} size={14} filterable={false} untitled />
+        <TokenChipIcon symbol={symbol} address={address} size={14} filterable={false} untitled />
       </RevealTip>
     </span>
   );
