@@ -2,9 +2,9 @@
 
 // Progressive disclosure on a position card (rails-ops ui-jobs 209). Opt-in:
 // a card whose shell is given a `disclosureKey` draws closed by default at
-// every width — the header row and the headline figures — and a chevron at
-// the end of the header's activity meta opens the detail beneath each
-// headline and the Explanation row. A card without the key draws as before.
+// every width — the header row, the headline figures and the (i) Explanation
+// row — and a chevron at the end of the header's activity meta opens the
+// detail beneath each headline. A card without the key draws as before.
 //
 // Two states are remembered per viewer and per position, in the store the
 // timeline's event cards use (lib/shared/card-open-store.ts): whether the

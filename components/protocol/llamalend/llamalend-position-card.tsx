@@ -25,6 +25,7 @@
 // card with the meta cluster's count. The detail render swaps the lifecycle
 // pill for the mode word.
 
+import { Fragment } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -35,6 +36,7 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
 import { llamalendConvertedProv } from "@/lib/llamalend/live-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
@@ -123,9 +125,22 @@ export function LlamalendPositionCard({
   bodyExtra,
   viewHref,
   bands,
+  disclosureKey,
+  risk,
+  collateralDetail,
 }: {
   v: LlamalendPositionView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** The third headline from the page's live read: the health and its
+   *  opened-layer lines. Omitted until the read lands, and on a listing. */
+  risk?: { value: React.ReactNode; detail?: React.ReactNode };
+  /** Opened-layer lines under Collateral from the live read (what the AMM
+   *  holds converted). Only drawn on a disclosing card. */
+  collateralDetail?: React.ReactNode;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
@@ -143,6 +158,11 @@ export function LlamalendPositionCard({
   /** The position's band count, from the live read, for the "?" modal. */
   bands?: number | null;
 }) {
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>), and the converted amount
+  // joins Collateral there in place of its own column.
+  const disclosing = receipts && !!disclosureKey;
+
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
   // card states the outcome and its metadata (no USD: the oracle prices the
   // PRESENT, not history). The LIQUIDATED outcome appears only here: an open
@@ -154,8 +174,12 @@ export function LlamalendPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={llamalendPositionContent({ status: v.status, liquidationCount: v.liquidationCount })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the final balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={<PositionIdentity v={v} />}
           identity={
@@ -199,6 +223,7 @@ export function LlamalendPositionCard({
   }
 
   const collUsd = v.collateralUsd;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
   const debtUsd = v.debtUsd;
 
   const collateralFootnote =
@@ -258,7 +283,14 @@ export function LlamalendPositionCard({
         ) : (
           <StatDash />
         ),
-      footnote: collateralFootnote,
+      footnote: disclosing ? (
+        <PositionCardDetail>
+          {collateralFootnote}
+          {collateralDetail}
+        </PositionCardDetail>
+      ) : (
+        collateralFootnote
+      ),
     },
     {
       label: CARD_VOCAB.debt,
@@ -281,18 +313,33 @@ export function LlamalendPositionCard({
         ),
       footnote:
         debtUsd != null && v.debt > 0 ? (
-          <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
-            <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
-              <span title={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}>
-                <AmountText value={v.debt} format="compact" /> {v.borrowedSymbol}
-              </span>
-            </Prov>
-          </div>
+          <Detail>
+            <div className="text-xs mt-0.5 text-rb-500 tabular-nums">
+              <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
+                <span title={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}>
+                  <AmountText value={v.debt} format="compact" /> {v.borrowedSymbol}
+                </span>
+              </Prov>
+            </div>
+          </Detail>
         ) : undefined,
     },
+    // The health rides the detail page's live read; the listing carries
+    // none. The page's card holds the third slot empty until the read lands.
+    ...(disclosing
+      ? [
+          risk
+            ? {
+                label: "Health",
+                value: risk.value,
+                footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
+              }
+            : null,
+        ]
+      : []),
     // ⇒ The distinctive column — present the moment the live overlay says the
     // AMM has converted anything: the position is in soft-liquidation NOW.
-    ...(v.inSoftLiq && v.converted != null
+    ...(v.inSoftLiq && v.converted != null && !disclosing
       ? [
           {
             // The detail card's status pill already says "In soft-liquidation";
@@ -337,8 +384,10 @@ export function LlamalendPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={llamalendPositionContent({ status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">

@@ -49,7 +49,7 @@ import {
   viewFromSummary,
   type MakerVaultView,
 } from "@/components/protocol/makerdao/makerdao-vault-card";
-import { MakerdaoRiskSlot } from "@/components/protocol/makerdao/makerdao-risk-slot";
+import { MakerdaoRiskDetail } from "@/components/protocol/makerdao/makerdao-risk-slot";
 import {
   MakerdaoPositionExplanation,
   MakerdaoClosedPositionExplanation,
@@ -432,7 +432,6 @@ export default function MakerVaultDetailView({
         ? {
             ...view,
             drawnDai: lastSplit?.drawnAfter ?? null,
-            drawnSince: lastSplit?.stretchStartAt ?? null,
             ...(peakDebtOwed != null && peakDebtOwed > 0 ? { peakDebtDai: peakDebtOwed } : {}),
           }
         : view,
@@ -636,20 +635,16 @@ export default function MakerVaultDetailView({
                 v={cardView}
                 receipts
                 viewHref={tl.viewHref}
-                // The risk slot rides the card's heading-button row (the Aave V3
-                // treatment): the Display menu plus the chosen risk picture —
-                // liquidation runway (default) or the collateral-ratio card.
-                // Whatever it draws is on the card face and in the card's receipts
-                // scope, so the Provenance list stays 1:1 with the face figures.
-                // Mounts only when the live overlay landed and the vault is open.
-                rowExtra={
+                // Closed by default, remembered per viewer and vault (ui-jobs
+                // 209). The price bar and the room to the ilk's minimum sit in
+                // the opened layer under Collateral ratio, inside the card's
+                // receipts scope, once the live overlay landed.
+                disclosureKey={`makerdao:${cardView.urn.toLowerCase()}`}
+                riskDetail={
                   cardView.source === "chain" && cardView.status === "open" ? (
-                    <MakerdaoRiskSlot v={cardView} />
+                    <MakerdaoRiskDetail v={cardView} />
                   ) : undefined
                 }
-                // The Explanation is now pure prose about those same face figures
-                // (the 3-section page anatomy: card → economics → timeline). The
-                // CR strip is absorbed into the risk slot above.
                 // A terminal vault narrates from the replay + the timeline
                 // already on the page (no chain overlay needed); the open pane
                 // still needs the live overlay for the ilk parameters and

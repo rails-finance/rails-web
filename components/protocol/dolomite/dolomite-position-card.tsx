@@ -36,6 +36,8 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { ShareBar } from "@/components/shared/share-bar";
 import {
   positionCurrentProv,
   positionParProv,
@@ -161,6 +163,36 @@ function FootnoteLines({ v, side }: { v: DolomitePositionView; side: "supply" | 
   );
 }
 
+/** The opened card's per-market lines (ui-jobs 209): each amount beside a bar
+ *  filled to its share of the side's oracle-USD total. */
+function ShareLines({ v, side, total }: { v: DolomitePositionView; side: "supply" | "debt"; total: number }) {
+  const all = side === "supply" ? v.supplies : v.borrows;
+  const usdOf = dustUsdOf(v);
+  const { lines, control } = useDustLines(all, usdOf);
+  if (all.length === 0) return null;
+  return (
+    <div className="mt-1.5 grid max-w-72 grid-cols-[auto_minmax(3rem,1fr)] items-center gap-x-3 gap-y-1 text-xs text-rb-500 tabular-nums">
+      {lines.map((r) => (
+        <div key={r.marketId} className="contents">
+          <div className="whitespace-nowrap">
+            {r.decimalsUnread ? (
+              <TokenAmountNotLoaded label={r.symbol} />
+            ) : (
+              <Prov info={legProv(r, side)}>
+                <ExactSpan exact={legExact(r)} symbol={r.symbol}>
+                  {formatCompact(legAmount(r))} {r.symbol}
+                </ExactSpan>
+              </Prov>
+            )}
+          </div>
+          <ShareBar share={(usdOf(r) ?? 0) / total} side={side === "supply" ? "collateral" : "debt"} />
+        </div>
+      ))}
+      {control && <div className="col-span-2">{control}</div>}
+    </div>
+  );
+}
+
 /** "X% borrow rate" — the live per-second rate (annualized) on the single
  *  borrowed market, or the debt-USD-weighted average. */
 function BorrowRateCaption({ rate }: { rate: DolomiteCardCaptions["borrowRate"] | undefined }) {
@@ -265,9 +297,18 @@ export function DolomitePositionCard({
   explanation,
   viewHref,
   captions,
+  disclosureKey,
+  risk,
 }: {
   v: DolomitePositionView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per account —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** The third headline from the page's live core read: the margin ratio and
+   *  its opened-layer lines. Omitted until the read lands, and on a listing. */
+  risk?: { value: React.ReactNode; detail?: React.ReactNode };
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the account NOW). */
@@ -285,6 +326,9 @@ export function DolomitePositionCard({
   // put them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(v.supplies, dustUsdOf(v)).shown;
   const borrowsShown = splitDust(v.borrows, dustUsdOf(v)).shown;
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
 
   // Closed / liquidated: every par is back at zero, so the headline is what
   // each market lane held at its height — the highest recorded par (no USD:
@@ -303,8 +347,12 @@ export function DolomitePositionCard({
           liquidations: v.liquidations,
           liquidationCount: v.liquidationCount,
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           leadingIdentity={<AccountIdentity v={v} tip={receipts} />}
           identity={
@@ -342,8 +390,10 @@ export function DolomitePositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -378,7 +428,13 @@ export function DolomitePositionCard({
               ) : (
                 <LegStack v={v} side="supply" />
               ),
-            footnote: isDetail && collUsd != null ? <FootnoteLines v={v} side="supply" /> : undefined,
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {collUsd != null && <ShareLines v={v} side="supply" total={collUsd} />}
+              </PositionCardDetail>
+            ) : isDetail && collUsd != null ? (
+              <FootnoteLines v={v} side="supply" />
+            ) : undefined,
           },
           {
             label: CARD_VOCAB.debt,
@@ -389,17 +445,33 @@ export function DolomitePositionCard({
               ) : (
                 <LegStack v={v} side="debt" />
               ),
-            footnote: (
+            footnote: disclosing ? (
+              <PositionCardDetail>
+                {debtUsd != null && <ShareLines v={v} side="debt" total={debtUsd} />}
+                <BorrowRateCaption rate={captions?.borrowRate} />
+              </PositionCardDetail>
+            ) : (
               <>
                 {isDetail && debtUsd != null && <FootnoteLines v={v} side="debt" />}
                 <BorrowRateCaption rate={captions?.borrowRate} />
               </>
             ),
           },
-          // No health column on the CARD: the risk layer rides the detail
-          // page's live core read (runway + margin card + verdict); the
-          // listing snapshot carries none, so listing cards simply don't
-          // assert the layer.
+          // The margin ratio rides the detail page's live core read; the
+          // listing snapshot carries none, so a listing card has two
+          // headlines. The page's card holds the third slot empty until the
+          // read lands.
+          ...(disclosing || risk
+            ? [
+                risk
+                  ? {
+                      label: "Margin ratio",
+                      value: risk.value,
+                      footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
+                    }
+                  : null,
+              ]
+            : []),
         ]}
       />
     </PositionCardShell>

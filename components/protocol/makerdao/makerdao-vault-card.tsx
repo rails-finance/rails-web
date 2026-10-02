@@ -16,6 +16,7 @@
 // leaf — a DefiLlama price, a projection — would push it out; cf. Compound's
 // parked USD.)
 
+import { Fragment } from "react";
 import { collAmount, usdPrice } from "@/lib/makerdao/price-format";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
@@ -24,6 +25,7 @@ import { StatValue, StatFootnote, StatDash } from "@/components/shared/stat-valu
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import {
@@ -32,7 +34,6 @@ import {
   daiDebtProv,
   collateralUsdProv,
   collateralRatioProv,
-  feeInDebtProv,
   stabilityFeeAprProv,
   liquidationPriceProv,
   peakInkProv,
@@ -44,7 +45,6 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerdaoPositionContent } from "@/lib/makerdao/position-content";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
-import { formatDate } from "@/lib/date";
 
 export interface MakerVaultView {
   cdpId: string | null;
@@ -104,10 +104,9 @@ export interface MakerVaultView {
   lse?: boolean;
   /** DAI drawn, net of repayments, since the vault last owed nothing
    *  (lib/makerdao/vault-history.tsx); the debt less this is the stability fee
-   *  in it. Null where that start is not loaded. Set by the detail page. */
+   *  in it, which the Explanation states. Null where that start is not loaded.
+   *  Set by the detail page. */
   drawnDai?: number | null;
-  /** When that stretch began (unix seconds). */
-  drawnSince?: number | null;
 }
 
 const BORROWING_TIP = "Open, with debt drawn against the collateral. The vault list marks it OPEN.";
@@ -133,9 +132,18 @@ export function MakerVaultCard({
   rowExtra,
   explanation,
   viewHref,
+  disclosureKey,
+  riskDetail,
 }: {
   v: MakerVaultView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per vault —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
+  /** Opened-layer lines under Collateral ratio from the page's live overlay
+   *  (the price bar, the room to the minimum). Only drawn on a disclosing card. */
+  riskDetail?: React.ReactNode;
   /** Context content riding the shell's heading-button row (the detail page
    *  passes the compact liquidation runway). */
   rowExtra?: React.ReactNode;
@@ -151,11 +159,10 @@ export function MakerVaultCard({
   // different join mints the token (asset-catalog).
   const debtSym = ilkDebtSymbol(v.ilk);
   const ratio = v.debtDai && v.collateralUsd != null && v.debtDai > 0 ? (v.collateralUsd / v.debtDai) * 100 : null;
-  // The stability fee in the debt: the debt less the DAI drawn since the
-  // vault last owed nothing (lib/makerdao/vault-history.tsx). Stated only where
-  // the page knows that start; suppressed at dust magnitudes.
-  const feeInDebt =
-    v.debtDai != null && v.drawnDai != null && v.debtDai - v.drawnDai > 0.005 ? v.debtDai - v.drawnDai : null;
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
 
   // Closed / liquidated: ink and art have settled to 0, so the headline is what
   // the vault held at its height — highest recorded collateral + DAI debt (the
@@ -187,8 +194,12 @@ export function MakerVaultCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the highest recorded balances are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           badgeTip={
             v.status === "liquidated"
@@ -249,8 +260,10 @@ export function MakerVaultCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         // Detail render (receipts): the V4 spoke-card header grammar — a
         // neutral mode-word pill (what the vault is doing NOW, not a lifecycle
         // word). The LISTING render keeps the lifecycle pill; the owner wallet
@@ -339,11 +352,13 @@ export function MakerVaultCard({
             ),
             footnote:
               v.collateralUsd != null ? (
-                <StatFootnote>
-                  <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
-                    {formatUsd(v.collateralUsd)}
-                  </Prov>
-                </StatFootnote>
+                <Detail>
+                  <StatFootnote>
+                    <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
+                      {formatUsd(v.collateralUsd)}
+                    </Prov>
+                  </StatFootnote>
+                </Detail>
               ) : undefined,
           },
           {
@@ -361,36 +376,15 @@ export function MakerVaultCard({
                   <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
                 </StatValue>
               ),
-            // Captions (the V4 stat-caption grammar): the stability fee in the
-            // debt (the debt less the DAI drawn since the vault last owed
-            // nothing) + the ilk's live stability fee.
+            // The ilk's live stability fee. The fee already in the debt is
+            // the Explanation's and the flows panel's to state.
             footnote:
-              feeInDebt != null || v.stabilityFeeApr != null ? (
-                <StatFootnote>
-                  {feeInDebt != null ? (
-                    <span className="whitespace-nowrap">
-                      {"incl. "}
-                      <Prov
-                        info={feeInDebtProv({
-                          debt: `${formatNumber(v.debtDai ?? 0)} ${debtSym}`,
-                          drawn: `${formatNumber(v.drawnDai ?? 0)} ${debtSym}`,
-                          since: v.drawnSince != null ? `since ${formatDate(v.drawnSince)}` : undefined,
-                        })}
-                      >
-                        {feeInDebt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                        {debtSym}
-                      </Prov>{" "}
-                      fee
-                      {v.stabilityFeeApr != null ? " · " : null}
-                    </span>
-                  ) : null}{" "}
-                  {v.stabilityFeeApr != null ? (
-                    <span className="whitespace-nowrap">
-                      <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov> stability
-                      fee
-                    </span>
-                  ) : null}
-                </StatFootnote>
+              v.stabilityFeeApr != null ? (
+                <Detail>
+                  <StatFootnote>
+                    <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov> stability fee
+                  </StatFootnote>
+                </Detail>
               ) : undefined,
           },
           {
@@ -414,21 +408,25 @@ export function MakerVaultCard({
               ),
             // Liquidates-at caption (single-collateral anchor — a vault has
             // exactly one ilk, so the price form is always meaningful).
-            footnote:
-              v.liquidationPriceUsd != null && v.liquidationPriceUsd > 0 ? (
-                <StatFootnote>
-                  Liquidates at{" "}
-                  <Prov
-                    info={liquidationPriceProv(
-                      v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
-                      v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
-                      `${formatNumber(v.ink)} ${v.collateralSymbol}`,
-                    )}
-                  >
-                    {usdPrice(v.liquidationPriceUsd, formatUsd)}
-                  </Prov>
-                </StatFootnote>
-              ) : undefined,
+            footnote: (
+              <Detail>
+                {v.liquidationPriceUsd != null && v.liquidationPriceUsd > 0 ? (
+                  <StatFootnote>
+                    Liquidates at{" "}
+                    <Prov
+                      info={liquidationPriceProv(
+                        v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
+                        v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
+                        `${formatNumber(v.ink)} ${v.collateralSymbol}`,
+                      )}
+                    >
+                      {usdPrice(v.liquidationPriceUsd, formatUsd)}
+                    </Prov>
+                  </StatFootnote>
+                ) : null}
+                {disclosing && riskDetail}
+              </Detail>
+            ),
           },
         ]}
       />

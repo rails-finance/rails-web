@@ -1,50 +1,55 @@
 "use client";
 
-// The LlamaLend position card's risk slot — the band surface, ON the card.
-// ----------------------------------------------------------------------------
-// It used to be a standalone block below the card, which made LlamaLend the one
-// detail page with a fourth section AND the one risk surface in the repo
-// carrying paragraphs. Both are gone, and so is the full-width body block that
-// replaced them: this is now the ordinary <RiskFooterStrip> riding the card's
-// heading-button row, label-led clusters then a `w-64` meter, the same shape a
-// Trove's card has. Nothing about LlamaLend's risk picture is structurally
-// special any more — only what it measures.
+// The LlamaLend position card's live layer (ui-jobs 209), from the page's
+// chain read and inside the card's receipts scope, so every figure here is
+// inspectable:
 //
-// Riding the card also puts every <Prov> here INSIDE the shell's receipts
-// scope. As a sibling it was outside — health, the band count, both band edges
-// and the oracle price registered nothing at all, so the inspector had no row
-// for any of them (the prov-scope silent no-op). Keep this component mounted
-// only through the card's children.
+//   • the third headline: the protocol's own health; below 0 anyone may
+//     liquidate;
+//   • under it in the opened layer: the soft-liquidation multiple (how far the
+//     price stands above the onset), the collateral the AMM has sold net and
+//     any lost to soft-liquidation, then the band axis, whose lead figure
+//     states the band state ("Converting now" / "Fully converted");
+//   • under Collateral in the opened layer: what the AMM holds converted from
+//     the collateral. A zero is worth stating: it is a positive claim about
+//     the chain, and this explorer's signature figure.
 //
-// Two clusters, then the axis:
-//   • the health multiple — how far the price stands above the onset. It used
-//     to carry the three-way band state as a prose tail; the axis's own lead
-//     figure now states that ("Converting now" / "Fully converted") in the
-//     shared runway's slot and voice, so saying it twice on one card is gone;
-//   • the converted amount, but ONLY outside soft-liquidation. In it, the card
-//     grows a third stat column carrying the same figure with the same receipt,
-//     and a second <Prov> on the same info in the same scope would register a
-//     duplicate row. A ZERO has no twin up there and is worth stating — it is a
-//     positive claim about the chain, and this explorer's signature figure.
-//
-// The figures here carry no risk colour (feedback-no-opinionated-color) — they
-// are numbers, and the numbers carry the meaning. The band axis below them is
-// coloured on the house CAUTION → CRITICAL ladder (2026-07-27) — a state, not a
-// verdict on a figure; the reasoning lives in that file.
+// The figures carry no risk colour (feedback-no-opinionated-color). The band
+// axis is coloured on the house CAUTION → CRITICAL ladder (2026-07-27): a
+// state, not a verdict on a figure; the reasoning lives in that file.
 
 import { Prov } from "@/components/shared/provenance";
-import { RiskFigure, RiskFooterStrip, RiskMeter, RiskStrong } from "@/components/shared/risk-footer-strip";
+import { RiskFigure } from "@/components/shared/risk-footer-strip";
+import { StatValue } from "@/components/shared/stat-value";
 import { llamalendConvertedProv, llamalendHealthFullProv, llamalendHealthProv } from "@/lib/llamalend/live-provenance";
 import { llamalendLostProv, llamalendSoldProv } from "@/lib/llamalend/event-provenance";
 import { fmtColl, fmtHealth } from "@/lib/llamalend/event-figures";
-import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
+import { formatUnitsExact } from "@/lib/utils/format";
+import { AmountText } from "@/components/shared/amount-text";
 import { LlamalendBandsAxis } from "./llamalend-bands-axis";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 
 /** Health under this (5%) and above 0 carries the near-0 line. */
 const HEALTH_NEAR_ZERO = 0.05;
 
-export function LlamalendRiskSlot({
+/** Whether the read describes a live loan. */
+export function llamalendHasRisk(chain: LlamalendChainResponse): boolean {
+  return !chain.chainStale && chain.hasLoan;
+}
+
+/** The headline: the protocol's own health. */
+export function LlamalendRiskHeadline({ chain }: { chain: LlamalendChainResponse }) {
+  if (chain.healthFull == null) return null;
+  return (
+    <StatValue>
+      <Prov info={llamalendHealthFullProv(chain.controller, chain.healthFullRaw)}>{fmtHealth(chain.healthFull)}</Prov>
+    </StatValue>
+  );
+}
+
+/** Under Health: the soft-liquidation multiple, what the AMM sold and what
+ *  was lost, then the band axis. */
+export function LlamalendRiskDetail({
   chain,
   lost,
   sold,
@@ -57,100 +62,81 @@ export function LlamalendRiskSlot({
    *  now (llamalendSoldInBands). */
   sold?: number | null;
 }) {
-  if (chain.chainStale || !chain.hasLoan) return null;
-
+  if (!llamalendHasRisk(chain)) return null;
   return (
-    <RiskFooterStrip>
+    <div className="mt-0.5 max-w-72 space-y-1">
+      {/* Near 0 the figure alone reads as small, not as close to liquidation:
+          one plain line, in the caution tone Liquity V1's card gives Recovery
+          Mode. */}
+      {chain.healthFull != null && chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO && (
+        <RiskFigure alignStart caution>
+          close to 0; below 0 anyone may liquidate it
+        </RiskFigure>
+      )}
+      {chain.health != null && (
+        <RiskFigure alignStart label="Soft-liquidation">
+          <Prov info={llamalendHealthProv(chain.amm)}>{chain.health.toFixed(3)}</Prov>× the onset price
+        </RiskFigure>
+      )}
+      {sold != null && sold > 0 && (
+        <RiskFigure alignStart label="Sold by the AMM, net">
+          <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>
+            {fmtColl(sold)} {chain.collateralSymbol}
+          </Prov>
+        </RiskFigure>
+      )}
+      {lost != null && lost > 0 && (
+        <RiskFigure alignStart label="Lost to soft-liquidation">
+          <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>
+            {fmtColl(lost)} {chain.collateralSymbol}
+          </Prov>
+        </RiskFigure>
+      )}
+      <div className="pt-0.5">
+        <LlamalendBandsAxis chain={chain} alignStart />
+      </div>
+    </div>
+  );
+}
+
+/** Under Collateral: what the AMM holds converted, led by the caution when
+ *  the market answered the cross-check two ways. */
+export function LlamalendConvertedDetail({ chain }: { chain: LlamalendChainResponse }) {
+  if (!llamalendHasRisk(chain)) return null;
+  return (
+    <div className="mt-0.5 max-w-72 space-y-1">
       {/* The misleading-figure caution (copy charter §2's one exception): the
-          converted figure on this card cannot be trusted as it stands. Plain
-          words, no machinery — the receipt on the figure names the two reads.
-          It leads the strip because it qualifies everything after it. The
-          `null` case says nothing (§4: a missing fact is simply absent), and
-          the receipt records it either way. */}
+          converted figure cannot be trusted as it stands. Plain words, no
+          machinery — the receipt on the figure names the two reads. The `null`
+          case says nothing (§4: a missing fact is simply absent). */}
       {chain.convertedCrossCheckExact === false && (
-        <RiskFigure caution>
+        <RiskFigure alignStart caution>
           ⚠️ Converted figure unconfirmed — the market gave two different answers, most likely a trade mid-check.
           Reloading checks it again.
         </RiskFigure>
       )}
-
-      {/* The protocol's own health: below 0 anyone may liquidate. */}
-      {chain.healthFull != null && (
-        <RiskFigure label="Health">
-          <RiskStrong>
-            <Prov info={llamalendHealthFullProv(chain.controller, chain.healthFullRaw)}>
-              {fmtHealth(chain.healthFull)}
-            </Prov>
-          </RiskStrong>
-          {/* Near 0 the figure alone reads as small, not as close to
-              liquidation: one plain line, in the caution tone Liquity V1's
-              card gives Recovery Mode. */}
-          {chain.healthFull > 0 && chain.healthFull < HEALTH_NEAR_ZERO && (
-            <span className="font-semibold text-caution-600 dark:text-caution-400">
-              {" "}
-              · close to 0; below 0 anyone may liquidate it
-            </span>
+      <RiskFigure alignStart label="Converted">
+        <Prov
+          info={llamalendConvertedProv(
+            chain.borrowedSymbol,
+            chain.convertedCrossCheckExact,
+            chain.controller,
+            chain.amm,
           )}
-        </RiskFigure>
-      )}
-
-      {chain.health != null && (
-        <RiskFigure label="Soft-liquidation">
-          <RiskStrong>
-            <Prov info={llamalendHealthProv(chain.amm)}>{chain.health.toFixed(3)}</Prov>
-          </RiskStrong>
-          × the onset price
-        </RiskFigure>
-      )}
-
-      {!chain.inSoftLiq && (
-        <RiskFigure label="Converted">
-          <RiskStrong>
-            <Prov
-              info={llamalendConvertedProv(
-                chain.borrowedSymbol,
-                chain.convertedCrossCheckExact,
-                chain.controller,
-                chain.amm,
-              )}
-            >
-              <span
-                title={
-                  chain.convertedRaw != null
-                    ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)} — exact`
-                    : undefined
-                }
-              >
-                {chain.converted != null ? formatNumber(chain.converted) : "—"} {chain.borrowedSymbol}
-              </span>
-            </Prov>
-          </RiskStrong>
-        </RiskFigure>
-      )}
-
-      {sold != null && sold > 0 && (
-        <RiskFigure label="Sold by the AMM, net">
-          <RiskStrong>
-            <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>
-              {fmtColl(sold)} {chain.collateralSymbol}
-            </Prov>
-          </RiskStrong>
-        </RiskFigure>
-      )}
-
-      {lost != null && lost > 0 && (
-        <RiskFigure label="Lost to soft-liquidation">
-          <RiskStrong>
-            <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>
-              {fmtColl(lost)} {chain.collateralSymbol}
-            </Prov>
-          </RiskStrong>
-        </RiskFigure>
-      )}
-
-      <RiskMeter>
-        <LlamalendBandsAxis chain={chain} />
-      </RiskMeter>
-    </RiskFooterStrip>
+        >
+          <span
+            title={
+              chain.convertedRaw != null
+                ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)} — exact`
+                : undefined
+            }
+          >
+            {chain.converted != null ? <AmountText value={chain.converted} format="compact" /> : "—"}{" "}
+            {chain.borrowedSymbol}
+          </span>
+        </Prov>
+        {chain.inSoftLiq && <> from sold {chain.collateralSymbol}</>}
+      </RiskFigure>
+    </div>
   );
 }

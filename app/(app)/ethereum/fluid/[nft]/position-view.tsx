@@ -44,7 +44,7 @@ import {
   viewFromSummary,
   type FluidPositionView,
 } from "@/components/protocol/fluid/fluid-position-card";
-import { FluidRiskSlot } from "@/components/protocol/fluid/fluid-risk-slot";
+import { FluidDebtDetail } from "@/components/protocol/fluid/fluid-risk-card";
 import { FluidPositionExplanation } from "@/components/protocol/fluid/fluid-position-explanation";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -439,19 +439,13 @@ export default function FluidPositionView({
                 receipts
                 viewHref={tl.viewHref}
                 chain={chain}
-                // The risk slot rides the card's heading-button row (the Aave
-                // V3 treatment): the Display menu plus the chosen risk picture
-                // — liquidation runway (the vault oracle's debt-per-col price
-                // vs the borrow ÷ (supply × threshold) liquidation price) or
-                // the position-ratio view (the same engine-space read against
-                // the vault's three lines, framed as a capacity bar). Whatever
-                // it draws is on the card face and in the card's receipts
-                // scope, so the Provenance list stays 1:1 with the face
-                // figures.
-                rowExtra={liveRisk ? <FluidRiskSlot chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
-                // The Explanation is now pure layman prose about those same
-                // face figures — no secondary figure-strips. The
-                // position-ratio strip is absorbed into the risk slot above.
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209). The borrow rate and the room to the borrow limit from
+                // the live read sit in the opened layer under Debt, inside the
+                // card's receipts scope.
+                disclosureKey={`fluid:${nftId}`}
+                debtDetail={liveRisk ? <FluidDebtDetail chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
+                // The Explanation is layman prose about the face figures.
                 // Rendered whenever there's a view or a chain read — a closed
                 // position gets its prose too (the risk slot keeps its own gate).
                 explanation={

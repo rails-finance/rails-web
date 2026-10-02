@@ -1,22 +1,23 @@
 "use client";
 
-// The Fluid position card's footer figures, in the engine's own space (the
-// vault oracle prices the collateral IN THE DEBT TOKEN; no USD feed): the
-// headroom to the vault's borrow limit (collateralFactor, where operate stops
-// lending) and the vault's current borrow rate. The ratio and the liquidation
-// line are the card's third column; the penalty and the full-absorption limit
-// are in the card's Explanation. Every figure is a same-block resolver read or
-// arithmetic over them, each in the provenance that names its basis.
+// The Fluid position card's opened layer under Debt (ui-jobs 209), in the
+// engine's own space (the vault oracle prices the collateral IN THE DEBT
+// TOKEN; no USD feed): the vault's current borrow rate and the headroom to the
+// vault's borrow limit (collateralFactor, where operate stops lending). The
+// ratio, the liquidation line and the runway are the card's third headline;
+// the penalty and the full-absorption limit are in the card's Explanation.
+// Every figure is a same-block resolver read or arithmetic over them, each in
+// the provenance that names its basis.
 
 import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
-import { RiskFigure, RiskStrong } from "@/components/shared/risk-footer-strip";
+import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { vaultConfigProv, fluidLiqPriceProv, liveBorrowRateProv } from "@/lib/fluid/live-provenance";
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
 import { AmountText } from "@/components/shared/amount-text";
 
-export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainResponse; pair: string }) {
+export function FluidDebtDetail({ chain, pair }: { chain: FluidPositionChainResponse; pair: string }) {
   // Meaningful only for a live borrowing position with a live oracle price.
   if (
     chain.chainStale ||
@@ -40,12 +41,16 @@ export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainRespon
     chain.supply * chain.oraclePriceLiquidateDebtPerCol * chain.collateralFactor - chain.borrow,
   );
 
-  // Label-led clusters on the shared risk footer strip (design-grammar rule):
-  // headroom to the borrow limit, then the borrow rate where the vault states
-  // one for this leg.
+  // The borrow rate where the vault states one for this leg, then the
+  // headroom to the borrow limit.
   return (
-    <>
-      <RiskFigure>
+    <div className="mt-0.5">
+      {chain.borrowRatePct != null && (
+        <RiskFigure alignStart>
+          <Prov info={liveBorrowRateProv(chain.vault, pair)}>{chain.borrowRatePct.toFixed(2)}%</Prov> borrow rate
+        </RiskFigure>
+      )}
+      <RiskFigure alignStart>
         <Prov info={fluidLiqPriceProv(colSym, debtSym, chain.vault, pair)}>
           <AmountText value={headroom} format="compact" /> {debtSym}
         </Prov>{" "}
@@ -55,13 +60,6 @@ export function FluidRiskView({ chain, pair }: { chain: FluidPositionChainRespon
         </Prov>{" "}
         borrow limit
       </RiskFigure>
-      {chain.borrowRatePct != null && (
-        <RiskFigure label="Borrow rate">
-          <Prov info={liveBorrowRateProv(chain.vault, pair)}>
-            <RiskStrong>{chain.borrowRatePct.toFixed(2)}%</RiskStrong>
-          </Prov>
-        </RiskFigure>
-      )}
-    </>
+    </div>
   );
 }
