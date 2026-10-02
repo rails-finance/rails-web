@@ -72,6 +72,7 @@ import {
   type AaveV3DecodedRow,
   type AaveV3ReplayInput,
   type AaveV3ReplaySeed,
+  AAVE_V3_SEED_LEGS,
 } from "@/lib/sources/chain/aave-v3-events";
 import { resolveV3Tokens, type V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 import type { ChainId } from "@/lib/shared/chains";
@@ -199,7 +200,24 @@ interface IndexSeed {
       supply?: { scaled: string; net: string; index: string } | null;
       debt?: { scaled: string; net: string; index: string } | null;
     };
+    /** The classifier's legs before the cut, raw (rails-server
+     *  `aaveLegsSeedSql`), and the Pool sums of the rows a swap made there.
+     *  Absent on a seed written before them. */
+    legs?: Partial<Record<string, string>>;
+    swapPool?: Partial<Record<string, string>>;
   }[];
+}
+
+/** A raw-amount map off the wire, keeping only the keys named and the
+ *  entries that are integers. */
+function rawMap<K extends string>(src: Partial<Record<string, string>> | undefined, keys: readonly K[]) {
+  if (!src) return undefined;
+  const out: Partial<Record<K, bigint>> = {};
+  for (const k of keys) {
+    const v = src[k];
+    if (typeof v === "string" && /^\d+$/.test(v)) out[k] = BigInt(v);
+  }
+  return out;
 }
 
 /** The Pool's V3.5 upgrade, per lane: events at or before it round half up,
@@ -442,6 +460,8 @@ export function prepareAaveV3Index(
                       ),
                     }
                   : {}),
+                ...(r.legs ? { legs: rawMap(r.legs, AAVE_V3_SEED_LEGS) } : {}),
+                ...(r.swapPool ? { swapPool: rawMap(r.swapPool, ["supplied", "borrowed", "repaid"] as const) } : {}),
               },
             ];
           }),

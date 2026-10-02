@@ -403,7 +403,10 @@ function seedOf(rows) {
     const b = axis.S - axis.M;
     if (b > axis.peak) axis.peak = b;
   };
+  // Own transactions: a liquidation's transaction is the liquidator's, and so
+  // are the aToken transfers it emits (rails-server aaveFullSeedSql).
   const txs = new Set();
+  const liqTxs = new Set(rows.filter((d) => d.kind === "liquidation").map((d) => d.txHash));
   for (const d of rows) {
     if (d.kind === "liquidation") {
       const c = stateOf(d.collateralAsset);
@@ -414,7 +417,7 @@ function seedOf(rows) {
       s.lifetime.liquidatedDebt += d.amount;
       continue;
     }
-    txs.add(d.txHash);
+    if (!liqTxs.has(d.txHash)) txs.add(d.txHash);
     const s = stateOf(d.reserve);
     const supplySide = d.kind === "supply" || d.kind === "withdraw" || d.kind.startsWith("transfer");
     const positive = d.kind === "supply" || d.kind === "borrow" || d.kind === "transfer_in";
@@ -521,8 +524,11 @@ function checkSeededReplay(name, rows, whole) {
         ),
       }
     : seedExact;
-  const wholeDrawn = replay(rows, tail.length);
-  const seeded = replay(tail, tail.length, { seed });
+  // Every row here is wallet-signed, so the whole replay would anchor (draw)
+  // every row below its cut; a seed's rows cannot be drawn. The comparison is
+  // the plain depth cut on both sides.
+  const wholeDrawn = replay(rows, tail.length, { anchorWalletRows: false });
+  const seeded = replay(tail, tail.length, { seed, anchorWalletRows: false });
 
   assert(
     rawOf(seeded.lifetimeRaw) === rawOf(whole.lifetimeRaw),
@@ -711,6 +717,82 @@ function checkClassifiedLegs() {
   assert(near(usdc.borrowed, 8000), `USDC Borrowed holds both borrows (${usdc.borrowed})`);
   const raw = r.lifetimeRaw.find((x) => x.reserve === CBETH);
   assert(raw?.supplied === units("1.9", 18).toString(), "lifetimeRaw stays the Pool rows' sums");
+
+  // The same history as a seed and a tail: the seed carries the legs the
+  // head's swap and transfers gave (rails-server aaveLegsSeedSql) and the
+  // swap's Pool sums, and the tail is the debt swap. Every leg and lane per
+  // symbol must equal the whole walk's.
+  const cut = rows.findIndex((x) => x.txHash === `0x${DEBT.toString(16).padStart(64, "0")}`);
+  const head = seedOf(rows.slice(0, cut));
+  const legsBy = {
+    [WETH]: {
+      transferredIn: units("1", 18),
+      transferredOut: units("0.5", 18),
+      liquidatedCollateral: units("0.01", 18),
+      treasuryFee: units("0.01", 18),
+      swappedOut: units("2", 18),
+    },
+    [CBETH]: { swappedIn: units("1.9", 18) },
+  };
+  const seed = {
+    ...head,
+    reserves: head.reserves.map((x) => ({
+      ...x,
+      ...(legsBy[x.reserve] ? { legs: legsBy[x.reserve] } : { legs: {} }),
+      swapPool: x.reserve === CBETH ? { supplied: units("1.9", 18) } : {},
+    })),
+  };
+  const tail = rows.slice(cut);
+  const seeded = replayAaveV3Rows({
+    wallet: WALLET,
+    chainId: 8453,
+    rows: tail,
+    metas,
+    timestamps: new Map(tail.map((x) => [x.blockNumber, x.blockNumber])),
+    senders: new Map(),
+    maxRendered: 1,
+    anchorWalletRows: false,
+    seed,
+    coverage: { fromBlock: 0, toBlock: 200, fromDeployment: true, deployBlock: 0, gaps: [], source: "index" },
+  });
+  const KEYS = [
+    ...LANES,
+    "soldToRepay",
+    "withdrawnSwapped",
+    "swappedOut",
+    "transferredIn",
+    "transferredOut",
+    "swappedIn",
+    "repaidBySwap",
+    "treasuryFee",
+  ];
+  const off = [];
+  for (const f of r.lifetime) {
+    const g = seeded.lifetime.find((x) => x.symbol === f.symbol) ?? {};
+    for (const k of KEYS)
+      if (Math.abs((f[k] ?? 0) - (g[k] ?? 0)) > 1e-9) off.push(`${f.symbol}.${k} ${f[k]} vs ${g[k]}`);
+  }
+  assert(
+    off.length === 0,
+    `a seed's legs and swap rows give the whole walk's figures (${off.join("; ") || "all equal"})`,
+  );
+  const unseeded = replayAaveV3Rows({
+    wallet: WALLET,
+    chainId: 8453,
+    rows: tail,
+    metas,
+    timestamps: new Map(tail.map((x) => [x.blockNumber, x.blockNumber])),
+    senders: new Map(),
+    maxRendered: 1,
+    anchorWalletRows: false,
+    seed: { ...seed, reserves: head.reserves },
+    coverage: { fromBlock: 0, toBlock: 200, fromDeployment: true, deployBlock: 0, gaps: [], source: "index" },
+  });
+  const w = unseeded.lifetime.find((x) => x.symbol === "WETH") ?? {};
+  assert(
+    !w.transferredIn && near(w.liquidatedCollateral, 0.4),
+    `a seed without legs leaves them to the tail (WETH Received ${w.transferredIn ?? 0}, Liquidated ${w.liquidatedCollateral})`,
+  );
 }
 
 assert(transfersWithRemainder > 0, `${transfersWithRemainder} transfers whose value × index ÷ 1e27 has a remainder`);

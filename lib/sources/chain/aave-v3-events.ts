@@ -197,7 +197,8 @@ export interface ChainLifetimeFlows {
   /** The legs the Ethereum route's classifier gives a swap's rows and an
    *  aToken transfer (lib/aave-v3/chain-truth-tower `ReserveFlows`). A swap's
    *  Pool rows are counted here and not in the lanes above. Over the rows the
-   *  replay walked: a seed carries the six lanes only. */
+   *  replay walked and, beside a seed, the seed's `legs` (a seed written
+   *  before them carries the six lanes only). */
   soldToRepay?: number;
   withdrawnSwapped?: number;
   swappedOut?: number;
@@ -727,7 +728,31 @@ export interface AaveV3ReplaySeedReserve {
    *  seed cannot state it, no key where the lane had no row before the cut.
    *  Absent on a seed that predates it: no lane is stated. */
   chain?: { supply?: AaveV3ChainSeedLane | null; debt?: AaveV3ChainSeedLane | null };
+  /** The classifier's legs over the swaps' rows and the aToken transfers
+   *  before the cut, raw (rails-server `aaveLegsSeedSql`). Absent on a seed
+   *  that predates them: the legs then cover the tail. */
+  legs?: Partial<Record<AaveV3SeedLeg, bigint>>;
+  /** Of `lifetime`, the Pool sums of the rows a swap made before the cut:
+   *  they leave the lanes, as a swap's rows in the tail do. */
+  swapPool?: Partial<Record<"supplied" | "borrowed" | "repaid", bigint>>;
 }
+
+/** The legs a seed carries (rails-server `AAVE_SEED_LEGS`). `treasuryFee` is
+ *  the part of `liquidatedCollateral` the treasury took. */
+export const AAVE_V3_SEED_LEGS = [
+  "borrowed",
+  "repaid",
+  "withdrawn",
+  "liquidatedCollateral",
+  "soldToRepay",
+  "swappedOut",
+  "swappedIn",
+  "repaidBySwap",
+  "transferredIn",
+  "transferredOut",
+  "treasuryFee",
+] as const;
+export type AaveV3SeedLeg = (typeof AAVE_V3_SEED_LEGS)[number];
 
 export interface AaveV3ChainSeedLane {
   scaled: bigint;
@@ -1068,6 +1093,16 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     if (d.liquidator) e.liquidators.add(d.liquidator.toLowerCase());
     liqOf.set(t, e);
   }
+  // A seed's swaps leave the lanes as the tail's do, and its legs join the
+  // classifier's at the edge, scaled per reserve.
+  for (const r of seed?.reserves ?? []) {
+    if (!r.swapPool) continue;
+    const sr = newLifetimeRaw();
+    sr.supplied += r.swapPool.supplied ?? ZERO;
+    sr.borrowed += r.swapPool.borrowed ?? ZERO;
+    sr.repaid += r.swapPool.repaid ?? ZERO;
+    swapRaw.set(r.reserve, sr);
+  }
 
   let undated = 0;
   // The render cut's ledger. Below the cut, a wallet-signed row is anchored
@@ -1361,6 +1396,20 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       if (!cur.address && l.address) cur.address = l.address.toLowerCase();
       classified.set(l.symbol, cur);
     }
+  }
+  for (const r of seed?.reserves ?? []) {
+    const m = meta(r.reserve);
+    if (!r.legs || !m) continue;
+    const cur = classified.get(m.symbol) ?? {};
+    for (const leg of AAVE_V3_SEED_LEGS) {
+      const raw = r.legs[leg];
+      if (raw == null || raw <= ZERO) continue;
+      const amount = scaleV3(raw, m.decimals);
+      if (leg === "treasuryFee") cur.treasuryFee = (cur.treasuryFee ?? 0) + amount;
+      else cur[leg] = (cur[leg] ?? 0) + amount;
+    }
+    if (!cur.address) cur.address = r.reserve;
+    classified.set(m.symbol, cur);
   }
 
   // ── The edge: scale ONCE ──────────────────────────────────────────────────
