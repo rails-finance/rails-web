@@ -161,18 +161,21 @@ const noDollar = (name, text) => {
     `debt renders (${minted} under Debt, off the chain read)`,
     new RegExp(`Debt\\s*\\n\\s*${rx(minted)}\\b`).test(text) && /minted ZCHF/.test(text),
   );
+  // The Lifetime flows panel (in place of the tower) heads each side in its
+  // own token: no oracle prices cbBTC in ZCHF.
   check(
-    "economics tower carries native units (cbBTC + ZCHF)",
-    new RegExp(`cbBTC\\s*\\n\\s*${rx(collateral)}`).test(text) && new RegExp(`ZCHF\\s*\\n\\s*${rx(minted)}`).test(text),
+    "lifetime flows carry native units (cbBTC + ZCHF)",
+    /LIFETIME FLOWS\s*\n\s*[\d.,]+[KM]? cbBTC\s*\n\s*Collateral\s*\n\s*[\d.,]+[KM]? ZCHF\s*\n\s*Debt/i.test(text),
   );
   check(
     `owner-declared liq. price renders (${liqPrice} ZCHF/cbBTC, off the chain read)`,
     new RegExp(`${rx(liqPrice)}(\\.\\d+)?\\s*ZCHF/cbBTC`).test(text) && /owner-declared/i.test(text),
   );
   check("expiry renders", /expires in \d+d|expired/i.test(text), "countdown against expiration()");
+  // Newcomer round 2 (web 26cd5a8) words the rate as charged at each mint.
   check(
-    `interest renders (${interest}% at minting, off annualInterestPPM)`,
-    new RegExp(`${rx(interest)}%`).test(text) && /at minting/i.test(text),
+    `interest renders (${interest}% charged at each mint, off annualInterestPPM)`,
+    new RegExp(`${rx(interest)}% a year`).test(text) && /charged at each mint/i.test(text),
   );
   // The two-axis pill rule: the DETAIL page carries the neutral mode word;
   // the green OPEN lifecycle pill is the listing's (checked in Section 2).
@@ -229,11 +232,9 @@ const noDollar = (name, text) => {
   check("group hub tag says Hub V1 (casing regression)", /Hub V1/.test(t) && !/Hub V2/.test(t));
   check("both verdicts render (AVERTED + SUCCEEDED)", /AVERTED/.test(t) && /SUCCEEDED/.test(t));
   check("5 succeeded slices grouped under one challenge", /5 slices \(one settlement per bid/.test(t));
-  check(
-    "slice copy says who paid what in which token",
-    /paid\s+1,?704\.\d+\s*ZCHF/.test(t) && /took\s+1\.4\s*WETH/.test(t),
-  );
-  check("two-axis outcome line renders", /closed at head|remains open/.test(t));
+  check("slice copy says who paid what in which token", /paid\s+1,?704\.\d+\s*ZCHF for 1\.4\s*WETH/.test(t));
+  // Newcomer round 2 (web 26cd5a8) states the outcome as a sentence.
+  check("two-axis outcome line renders", /The position is closed\.|remains open/.test(t));
   check("Owner Set at Mint initialization row renders", /Owner Set at Mint/.test(t));
   // The 5 slices collapse into one run row (10 events: a Challenge Succeeded
   // and its Auction Settlement echo per bid). Since 2026-09-02 that row speaks
@@ -311,7 +312,9 @@ const noDollar = (name, text) => {
   );
   check("system: the enforcement record renders", /Challenges ever/.test(t) && /forced sale/i.test(t));
   check("system: no collateral total is invented (counts, with the reason)", /no collateral total exists here/.test(t));
-  check("system: chain snapshot stamp renders", /Chain snapshot · (?:block )?[\d,]+/.test(t));
+  // The block-clock icon stands in for the word (web f245752), so the number
+  // starts its own line in innerText.
+  check("system: chain snapshot stamp renders", /Chain snapshot ·\s*(?:block )?[\d,]+/.test(t));
   noDollar("system view", t);
 }
 

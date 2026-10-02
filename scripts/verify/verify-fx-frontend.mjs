@@ -321,7 +321,12 @@ check(
     p243.text,
   ),
 );
-check("243 r3: the flows segment has the card's name", /Moved by the pool\n/.test(p243.text));
+// The Lifetime flows panel (in place of the tower since web 5052626) names each
+// part the card's debt line names, where the tower had one "Moved by the pool".
+check(
+  "243 r3: the flows segments have the card's names",
+  /Cleared by rebalances\n/.test(p243.text) && /Cleared by redemptions\n/.test(p243.text),
+);
 check(
   "243 r3: same-block rebalances state the change once",
   /both rebalances in this block/.test(p243.text) && /included above/.test(p243.text),
@@ -442,15 +447,24 @@ check(
 
   const p = await openAndRead("/ethereum/fx/wsteth-1801");
   check("1801 r4: no page errors", p.errors.length === 0, p.errors.slice(0, 2).join(" | "));
-  check(
-    "1801 r4 P1: the card states the whole gap, 1.341, as 1.332 between and 0.00971 inside 3 transactions",
-    /funding & rebalances took 1\.341 stETH \(1\.332 between the transactions and 0\.00971 stETH inside 3 of them\)/.test(
+  // Funding keeps taking collateral between transactions, so the gap grows
+  // with the days (1.341 = 1.332 + 0.00971 on 29 Sep 2026): the card's whole is
+  // checked as the sum of its parts, the inside part (fixed by 3 past
+  // transactions) pinned, and the table's total against the card's.
+  const gap =
+    /funding & rebalances took (\d+\.\d+) stETH \((\d+\.\d+) between the transactions and 0\.00971 stETH inside 3 of them\)/.exec(
       p.text,
-    ),
+    );
+  check(
+    "1801 r4 P1: the card states the whole gap as between plus 0.00971 inside 3 transactions",
+    gap != null && Math.abs(Number(gap[1]) - Number(gap[2]) - 0.00971) < 0.0015,
+    gap ? `${gap[1]} = ${gap[2]} + 0.00971` : "absent",
   );
   check(
     "1801 r4 P1: the stretch table hides the empty stretches and totals the rest",
-    /11 stretches with no change\./.test(p.text) && /Total between the transactions\t−1\.332 stETH/.test(p.text),
+    /11 stretches with no change\./.test(p.text) &&
+      gap != null &&
+      new RegExp(`Total between the transactions\\t−${gap[2].replace(".", "\\.")} stETH`).test(p.text),
   );
   check("1801 r4 P6: the table header no longer says the owner's", !/Between the owner’s transactions/.test(p.text));
   check(
@@ -484,7 +498,12 @@ check(
     ),
   );
   check("1801 r4 P9: one name for the transfer", /Ownership Transfer/.test(p.text) && !/\nTransferred\n/.test(p.text));
-  check("1801 r4 P9: the flows note says none moved by the pool", /Moved by the pool: none/.test(p.text));
+  // The flows panel's key: funding is the pool's one move here (the tower's
+  // note said "Moved by the pool: none" of rebalances and redemptions).
+  check(
+    "1801 r4 P9: the flows key names funding and no rebalance or redemption",
+    /\nFunding\n/.test(p.text) && !/Taken by rebalances|Taken by redemptions/.test(p.text),
+  );
 
   const t1 = await json("/api/fx/position/wsteth/1/timeline");
   const ops1 = t1.events.filter((e) => e.context.data.eventType === "operate");
