@@ -25,6 +25,16 @@
 //   tbtc-borrowed       crvUSD / tBTC 0xe438…21b8 / 0x07cb…4d76: a market
 //                       that lends tBTC, liquidated (34 events)
 //
+// Each fixture also runs with the server's stored values (rails-server mig
+// 373, scripts/verify/fixtures/llamalend-stored.json: the filler's read at
+// every fixture row's block, 2 Oct 2026) on its rows, as the timeline route
+// serves them: `<name>+stored` with no per-view read at all, and
+// `<name>+half-stored` with the older half stored and the newer half read per
+// view. The stored price and state are the archive's reads to the bit, so the
+// figures are the archive's; the borrowed token the AMM holds in the bands
+// is then on the collateral bar, and its lines meet the stored balance at
+// every stored row.
+//
 // Held: the replay meets every row's stated balances to the base unit and
 // moves an unstated row by its amounts; the debt's interest is the row's
 // gap and never negative; the collateral's gap past the AMM's rounding is the
@@ -41,9 +51,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { BaseActivityEvent, LlamalendContext } from "@/lib/shared/types/event-shape";
+import { scale1e18 } from "@/lib/llamalend/band-math";
 import {
   LL,
+  llamalendPriceBlocks,
+  llamalendStateBlocks,
   llamalendFlowEvents,
   llamalendFlowFacts,
   llamalendFlowReplay,
@@ -76,20 +89,83 @@ interface Fixture {
 
 const FIX = join(__dirname, "fixtures", "llamalend-flows.json");
 const ALL = (JSON.parse(readFileSync(FIX, "utf8")) as { fixtures: Fixture[] }).fixtures;
+/** The filler's read at every fixture row's block: price_oracle raw (1e18)
+ *  and user_state's collateral, borrowed and debt, base units. */
+type Stored = Record<string, { price: string | null; coll: string; borrowed: string; debt: string }>;
+const STORED = (
+  JSON.parse(readFileSync(join(__dirname, "fixtures", "llamalend-stored.json"), "utf8")) as {
+    fixtures: Record<string, Stored>;
+  }
+).fixtures;
+
+/** The fixture's rows as the timeline route serves them once the filler has
+ *  stored the blocks `keep` passes: each row carries its block's values. */
+function storedEvents(f: Fixture, keep: (block: number) => boolean): BaseActivityEvent[] {
+  const st = STORED[f.name];
+  return f.events.map((e) => {
+    const v = st[String(e.blockNumber)];
+    if (!v || !keep(e.blockNumber) || !e.context) return e;
+    const c = e.context.data as LlamalendContext;
+    return {
+      ...e,
+      context: {
+        ...e.context,
+        data: {
+          ...c,
+          raw: {
+            ...c.raw,
+            ...(v.price != null ? { priceAtBlock: v.price } : {}),
+            stateCollateralAtBlock: v.coll,
+            stateBorrowedAtBlock: v.borrowed,
+            stateDebtAtBlock: v.debt,
+          },
+        },
+      },
+    } as BaseActivityEvent;
+  });
+}
+/** The block that splits a fixture's rows in half: older stored, newer not. */
+const midBlock = (f: Fixture) => f.events[Math.floor(f.events.length / 2)].blockNumber;
 /** 1 Oct 2026, 23:00 UTC: after every fixture's last row. */
 const NOW = 1_790_895_600;
 const DAY = 86_400;
 const NAMES = ALL.map((f) => f.name);
-/** Each fixture as read, and without the archive's reads of the rows that
- *  state no after-image (`<name>+unread`). */
-const MODES = [...ALL, ...ALL.map((f) => ({ ...f, name: `${f.name}+unread`, states: {} }))];
+/** Each fixture as read, without the archive's reads of the rows that
+ *  state no after-image (`<name>+unread`), with every row stored and no read
+ *  per view (`<name>+stored`), and with the older half stored and the newer
+ *  half read per view (`<name>+half-stored`). */
+const MODES: Fixture[] = [
+  ...ALL,
+  ...ALL.map((f) => ({ ...f, name: `${f.name}+unread`, states: {} })),
+  ...ALL.map((f) => ({ ...f, name: `${f.name}+stored`, events: storedEvents(f, () => true), prices: {}, states: {} })),
+  ...ALL.map((f) => {
+    const mid = midBlock(f);
+    const newer = (b: string) => Number(b) >= mid;
+    return {
+      ...f,
+      name: `${f.name}+half-stored`,
+      events: storedEvents(f, (b) => b < mid),
+      prices: Object.fromEntries(Object.entries(f.prices).filter(([b]) => newer(b))),
+      states: Object.fromEntries(Object.entries(f.states).filter(([b]) => newer(b))),
+    };
+  }),
+];
 const MODE_NAMES = MODES.map((f) => f.name);
 const fx = (name: string) => MODES.find((f) => f.name === name) as Fixture;
 const stateMap = (f: Fixture) =>
   new Map(Object.entries(f.states).map(([b, v]) => [Number(b), { coll: BigInt(v.coll), debt: BigInt(v.debt) }]));
 const priceMap = (f: Fixture) => new Map(Object.entries(f.prices).map(([b, p]) => [Number(b), p]));
-const OUT = new Set<string>([LL.collOut, LL.softSold, LL.collSeized, LL.repaid, LL.debtLiquidated]);
-const COLL = new Set<string>([LL.collIn, LL.boughtBack, LL.collOut, LL.softSold, LL.collSeized]);
+const OUT = new Set<string>([LL.collOut, LL.softSold, LL.softSpent, LL.collSeized, LL.repaid, LL.debtLiquidated]);
+const COLL = new Set<string>([
+  LL.collIn,
+  LL.boughtBack,
+  LL.softReceived,
+  LL.collOut,
+  LL.softSold,
+  LL.softSpent,
+  LL.collSeized,
+]);
+const isStored = (name: string) => name.endsWith("+stored") || name.endsWith("+half-stored");
 
 function opts(f: Fixture): LlamalendFlowOptions {
   return {
@@ -130,6 +206,7 @@ for (const name of MODE_NAMES) {
     const ev = rows(f);
     const rp = llamalendFlowReplay(ev, opts(f));
     let coll = 0;
+    let conv = 0;
     let debt = 0;
     let prevColl = 0;
     let prevDebt = 0;
@@ -137,9 +214,17 @@ for (const name of MODE_NAMES) {
       for (const l of r.legs) {
         assert.ok(l.amount > 0, `${name} ${r.ev.id}: a positive leg`);
         const sign = OUT.has(l.bucket) ? -1 : 1;
-        if (COLL.has(l.bucket)) coll += sign * l.amount;
+        if (l.conv) conv += sign * l.amount;
+        else if (COLL.has(l.bucket)) coll += sign * l.amount;
         else debt += sign * l.amount;
       }
+      // The borrowed token in the bands: its lines meet the stored balance.
+      if (r.ev.convAfter != null)
+        assert.ok(
+          Math.abs(conv - human(r.ev.convAfter, r.ev.debtDecimals)) <= 1e-9 * Math.max(1, conv),
+          `${name} ${r.ev.id}: in the bands ${conv} vs ${human(r.ev.convAfter, r.ev.debtDecimals)}`,
+        );
+      assert.ok(Math.abs(conv - r.conv) <= 1e-9 * Math.max(1, conv), `${name} ${r.ev.id}: the row's converted`);
       const cd = r.ev.collDecimals;
       const dd = r.ev.debtDecimals;
       if (r.ev.collAfter != null) assert.ok(near(coll, human(r.ev.collAfter, cd)), `${name} ${r.ev.id}: collateral`);
@@ -263,7 +348,8 @@ for (const name of MODE_NAMES) {
       const G = 10 ** m.unit!.scale;
       assert.ok(f.live, `${name}: a live read`);
       assert.ok(Math.abs(end.debt.now / G - f.live.debt) < 1e-6 * Math.max(1, f.live.debt), `${name}: debt now`);
-      const collNow = f.live.coll * f.live.price;
+      const withConv = isStored(name);
+      const collNow = f.live.coll * f.live.price + (withConv ? (f.live.converted ?? 0) : 0);
       assert.ok(Math.abs(end.collateral.now / G - collNow) < 1e-6 * Math.max(1, collNow), `${name}: collateral now`);
     }
   });
@@ -492,4 +578,139 @@ test("a row with no after-image takes the archive's read at its block, which the
     (t.live.pending ?? []).every((x) => x.bucket === LL.boughtBack && x.usd < rp.grain),
     "dust since",
   );
+});
+
+test("the stored values are the archive's reads to the bit", () => {
+  let prices = 0;
+  let states = 0;
+  for (const f of ALL) {
+    const st = STORED[f.name];
+    for (const e of f.events) {
+      const v = st[String(e.blockNumber)];
+      assert.ok(v, `${f.name} ${e.blockNumber}: stored`);
+      assert.equal(scale1e18(BigInt(v.price!)), f.prices[String(e.blockNumber)], `${f.name} ${e.blockNumber}: price`);
+      prices++;
+      const read = f.states[String(e.blockNumber)];
+      if (!read) continue;
+      const noLoan = BigInt(v.debt) === BigInt(0);
+      assert.equal(noLoan ? "0" : v.coll, read.coll, `${f.name} ${e.blockNumber}: collateral`);
+      assert.equal(noLoan ? "0" : v.debt, read.debt, `${f.name} ${e.blockNumber}: debt`);
+      states++;
+    }
+  }
+  assert.equal(prices, 193);
+  assert.equal(states, 23);
+});
+
+test("stored rows: the figures are the archive's, the bands line aside", () => {
+  for (const name of NAMES) {
+    const f = fx(name);
+    const s = fx(`${name}+stored`);
+    const perView = rows(f);
+    const stored = rows(s);
+    // Strip the borrowed token in the bands: the rest is the per-view replay.
+    const bare = stored.map((e) => ({ ...e, convAfter: null, stored: false }));
+    assert.deepEqual(llamalendFlowTimeline(bare, opts(s)), llamalendFlowTimeline(perView, opts(f)), name);
+    const a = llamalendFlowReplay(stored, opts(s)).replayed;
+    const b = llamalendFlowReplay(perView, opts(f)).replayed;
+    a.forEach((r, i) => {
+      assert.equal(r.price, b[i].price, `${name} ${r.ev.id}: price`);
+      assert.equal(r.coll, b[i].coll, `${name} ${r.ev.id}: collateral`);
+      assert.equal(r.debt, b[i].debt, `${name} ${r.ev.id}: debt`);
+      assert.deepEqual(
+        r.legs.filter((l) => !l.conv),
+        b[i].legs,
+        `${name} ${r.ev.id}: the legs`,
+      );
+    });
+  }
+});
+
+test("stored rows need no per-view read, carry no dotted stretch, and the half not stored is read as before", () => {
+  for (const name of NAMES) {
+    const s = fx(`${name}+stored`);
+    const ev = llamalendFlowEvents(s.events);
+    assert.deepEqual(llamalendPriceBlocks(ev), [], `${name}: no price read`);
+    assert.deepEqual(llamalendStateBlocks(ev), [], `${name}: no state read`);
+    const t = llamalendFlowTimeline(rows(s), opts(s))!;
+    // Nothing dotted or asterisked but the days between events and a repay
+    // that closed the position after the AMM traded (its proceeds since the
+    // row before at the row's price): bought-back 21,452,491 and
+    // partial-last 20,464,262, flows only.
+    const unsure = t.days.flatMap((d) => d.unsure ?? []);
+    const facts = llamalendFlowFacts(llamalendFlowReplay(rows(s), opts(s)), t);
+    assert.equal(unsure.length, facts.convEstimatedRows, `${name}: only the estimated closes`);
+    for (const u of unsure) {
+      assert.match(u.why, /valued at this row's oracle price: the repay closed the position/);
+      assert.ok(!u.held && !u.untilNext, `${name}: the flows only`);
+    }
+    if (name === "bought-back" || name === "partial-last") assert.equal(facts.convEstimatedRows, 1, name);
+
+    const h = fx(`${name}+half-stored`);
+    const mid = midBlock(fx(name));
+    const hev = llamalendFlowEvents(h.events);
+    const newer = [
+      ...new Set(
+        fx(name)
+          .events.map((e) => e.blockNumber)
+          .filter((b) => b >= mid),
+      ),
+    ];
+    assert.deepEqual(llamalendPriceBlocks(hev).sort(), newer.sort(), `${name}: the newer half's prices are read`);
+    for (const b of llamalendStateBlocks(hev)) assert.ok(b >= mid, `${name}: a state read in the newer half`);
+  }
+});
+
+test("the borrowed token in the bands: the AMM's sales and buy-backs on the collateral bar", () => {
+  const leg = (r: { legs: { bucket: string; amount: number; conv?: true }[] }, k: string, conv: boolean) =>
+    r.legs.filter((l) => l.bucket === k && !!l.conv === conv).reduce((a, l) => a + l.amount, 0);
+  // WETH / crvUSD 0xaade…267b / 0x8f1e…6c2d, Jun 2026: four underwater repays
+  // while the AMM sold WETH for crvUSD and bought some back; the next borrow
+  // found it all bought back.
+  const s = fx("open-in-bands+stored");
+  const rp = llamalendFlowReplay(rows(s), opts(s));
+  const at = (b: number) => rp.replayed.find((r) => r.ev.block === b)!;
+  assert.ok(near(at(25388879).conv, 1484.5757941861932), "in the bands at the first repay");
+  assert.ok(leg(at(25388879), LL.softSold, false) > 0 && leg(at(25388879), LL.softReceived, true) > 0);
+  assert.ok(leg(at(25398012), LL.softReceived, true) > 0, "more sold");
+  assert.ok(leg(at(25394684), LL.softSpent, true) > 0 && leg(at(25394684), LL.boughtBack, false) > 0, "bought back");
+  assert.equal(at(25448023).conv, 0, "all bought back by the next borrow");
+  // Every sale's proceeds on the bar are within a few percent of the
+  // collateral sold at the row's price: the AMM traded at band prices
+  // between.
+  for (const r of rp.replayed) {
+    const sold = leg(r, LL.softSold, false) * r.price;
+    const got = leg(r, LL.softReceived, true);
+    if (sold > 0 && got > 0 && leg(r, LL.softSpent, true) === 0 && leg(r, LL.boughtBack, false) === 0)
+      assert.ok(Math.abs(got / sold - 1) < 0.05, `${r.ev.id}: received ${got} for ${sold}`);
+  }
+  // weETH 0x652a…6b11 / 0x9c28…9112: the first hard liquidation took
+  // 10,946.6 crvUSD with the collateral, Seized; the self-liquidation took
+  // what was left in the bands, Withdrawn.
+  const p = fx("liquidated-partial+stored");
+  const pr = llamalendFlowReplay(rows(p), opts(p));
+  const liq = pr.replayed.find((r) => r.ev.block === 23728317)!;
+  assert.ok(near(leg(liq, LL.collSeized, true), 10946.601474297315), "seized from the bands");
+  const self = pr.replayed.find((r) => r.ev.block === 25540439)!;
+  assert.ok(near(leg(self, LL.collOut, true), 20631.162142974762), "withdrawn at the self-liquidation");
+  assert.equal(self.conv, 0);
+  // Nothing stored: no line for it, and the timeline is the collateral token's.
+  const f = fx("open-in-bands");
+  assert.ok(rows(f).every((e) => e.convAfter == null));
+  assert.ok(!llamalendFlowTimeline(rows(f), opts(f))!.days.some((d) => d.balances.some((b) => b.asset === "conv")));
+});
+
+test("partial-last, stored: today's crvUSD in the bands is on the collateral at the live stop", () => {
+  const s = fx("partial-last+stored");
+  const t = llamalendFlowTimeline(rows(s), opts(s))!;
+  const conv = t.live.assets!.find((a) => a.side === "collateral" && a.symbol === "crvUSD");
+  assert.ok(conv && near(conv.amount!, s.live!.converted!), "the live read's converted");
+  const rp = llamalendFlowReplay(rows(s), opts(s));
+  const G = rp.grain;
+  assert.ok(near(t.live.collateralUsd, (s.live!.coll * s.live!.price + s.live!.converted!) * G));
+  // What the AMM took in since the last event is on its line at the live stop.
+  const last = rp.replayed[rp.replayed.length - 1];
+  const gap = s.live!.converted! - last.conv;
+  const p = (t.live.pending ?? []).find((x) => x.bucket === (gap > 0 ? LL.softReceived : LL.softSpent));
+  if (Math.abs(gap) > 1e-6) assert.ok(p && near(p.usd, Math.abs(gap) * G), `pending ${gap}`);
 });

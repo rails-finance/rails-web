@@ -28,24 +28,32 @@
 //
 // Two rows state no after-image: an underwater partial repay (the Controller
 // logs a sentinel collateral, which the index drops) and a partial
-// liquidation (no UserState at all). Their balances are read from the archive
-// at the row's block (`user_state`, /api/chain/llamalend/event-state, the
-// read the card's detail makes), where the row is the position's last in its
-// block, up to LLAMALEND_STATE_READS rows. A row still unstated keeps the
-// collateral as it stood, or lowers each side by its amounts, and the
-// next row that states its balances settles both.
+// liquidation (no UserState at all). Their balances are the position at the
+// end of the row's block (`user_state`), where the row is the position's last
+// in its block: stored by the server (rails-server mig 373, served on each
+// row of the timeline route), else read from the archive per page view
+// (/api/chain/llamalend/event-state, the read the card's detail makes), up to
+// LLAMALEND_STATE_READS rows. A row still unstated keeps the collateral as it
+// stood, or lowers each side by its amounts, and the next row that states its
+// balances settles both.
 //
-// The bars count the collateral token in the bands. What the AMM sold it for
-// (the borrowed token it holds for the position, "converted") is a state read
-// that no row records, so it is not on the bars; the position card states it
-// live.
+// The borrowed token in the bands. What the AMM sold collateral for, it holds
+// for the position in the bands ("converted", user_state's second word), and
+// no event records it. Where the server stored the position's state at the
+// rows' blocks, it is a second asset on the collateral side, in the borrowed
+// token: what it took in for its sales since the row before is Received in
+// soft liquidation, what it spent buying back is Spent in soft liquidation,
+// what a hard liquidation took with the collateral is Seized, and what a
+// close handed back is Withdrawn. With nothing stored, the bars count the
+// collateral token alone, as before the store.
 //
-// Prices. The rows carry none: each row's block is read from the archive
-// (the AMM's price_oracle at the block, /api/chain/llamalend/liq-price), up
-// to LLAMALEND_PRICE_READS blocks a position; a row not read takes the
-// nearest priced moment in time (a read row, or today's live read). LlamaLend
-// is not in the daily price store, so between events the collateral keeps its
-// latest event's price.
+// Prices. The rows carry none: each row's block is priced at the AMM's
+// price_oracle there, stored by the server, else read from the archive per
+// page view (/api/chain/llamalend/liq-price), up to LLAMALEND_PRICE_READS
+// blocks a position; a row with neither takes the nearest priced moment in
+// time (a priced row, or today's live read). LlamaLend is not in the daily
+// price store, so between events the collateral keeps its latest event's
+// price.
 //
 // Between events the debt grows at the rate the rows imply
 // (`FlowTimeline.indexes`, basis `llamalend-rows`): from one row to the next
@@ -66,16 +74,19 @@ import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LlamalendContext, LlamalendEventType } from "@/lib/shared/types/event-shape";
 import { isLlamalendEvent } from "@/lib/shared/types/event-shape";
+import { scale1e18 } from "@/lib/llamalend/band-math";
 
 const DAY_S = 86_400;
 const ONE_YEAR_S = 31_557_600;
 const DUST = 1e-12;
 const ZERO = BigInt(0);
 
-/** At most this many blocks' price reads per position; the rest take the
- *  nearest priced moment, and the Explanation counts them. */
+/** At most this many blocks' price reads per position, among the rows the
+ *  server has not stored; the rest take the nearest priced moment, and the
+ *  Explanation counts them. */
 export const LLAMALEND_PRICE_READS = 250;
-/** At most this many unstated rows' balances read per position. */
+/** At most this many unstated rows' balances read per position, among the
+ *  rows the server has not stored. */
 export const LLAMALEND_STATE_READS = 100;
 
 /** Bucket keys. */
@@ -89,13 +100,23 @@ export const LL = {
   accrued: "ll-accrued",
   repaid: "ll-repaid",
   debtLiquidated: "ll-debt-liquidated",
+  softReceived: "ll-soft-received",
+  softSpent: "ll-soft-spent",
 } as const;
 
-const COLL_KEYS = new Set<string>([LL.collIn, LL.boughtBack, LL.collOut, LL.softSold, LL.collSeized]);
-const OUT_KEYS = new Set<string>([LL.collOut, LL.softSold, LL.collSeized, LL.repaid, LL.debtLiquidated]);
+const COLL_KEYS = new Set<string>([
+  LL.collIn,
+  LL.boughtBack,
+  LL.softReceived,
+  LL.collOut,
+  LL.softSold,
+  LL.softSpent,
+  LL.collSeized,
+]);
+const OUT_KEYS = new Set<string>([LL.collOut, LL.softSold, LL.softSpent, LL.collSeized, LL.repaid, LL.debtLiquidated]);
 /** Legs that are no act of the row's: the interest and the AMM's trades
  *  since the row before. */
-const BETWEEN_KEYS = new Set<string>([LL.accrued, LL.softSold, LL.boughtBack]);
+const BETWEEN_KEYS = new Set<string>([LL.accrued, LL.softSold, LL.boughtBack, LL.softReceived, LL.softSpent]);
 
 /** The buckets in drawing order. */
 export function llamalendFlowBuckets(): FlowBucket[] {
@@ -109,6 +130,18 @@ export function llamalendFlowBuckets(): FlowBucket[] {
       side: "collateral",
       dir: "in",
       hatch: "checker",
+      link: "ll-soft-buy",
+    },
+    // The borrowed token the AMM took in for its sales, held in the bands.
+    // Dashed: it builds between events, as interest does.
+    {
+      key: LL.softReceived,
+      label: "Received in soft liquidation",
+      event: "",
+      side: "collateral",
+      dir: "in",
+      hatch: "dashes",
+      link: "ll-soft-sale",
     },
     { key: LL.collOut, label: "Withdrawn", event: "Remove collateral", side: "collateral", dir: "out" },
     // Swapped within the position: the AMM sold it for the borrowed token,
@@ -120,6 +153,17 @@ export function llamalendFlowBuckets(): FlowBucket[] {
       side: "collateral",
       dir: "out",
       hatch: "vertical",
+      link: "ll-soft-sale",
+    },
+    // The borrowed token the AMM paid out of the bands for its buy-backs.
+    {
+      key: LL.softSpent,
+      label: "Spent in soft liquidation",
+      event: "",
+      side: "collateral",
+      dir: "out",
+      hatch: "horizontal",
+      link: "ll-soft-buy",
     },
     {
       key: LL.collSeized,
@@ -174,8 +218,15 @@ export interface LlamalendFlowEvent {
   collDecimals: number;
   debtDecimals: number;
   /** The AMM's oracle price at the row's block (borrowed per collateral),
-   *  where it was read. */
+   *  where the server stored it or the page read it. */
   price: number | null;
+  /** The borrowed token the AMM holds in the position's bands after the
+   *  row, base units: the server's stored user_state at the row's block,
+   *  where the row is the position's last in it; else null. */
+  convAfter: bigint | null;
+  /** The server stored the position's state at the row's block (rails-server
+   *  mig 373). */
+  stored: boolean;
 }
 
 const big = (v: string | undefined | null): bigint | null => {
@@ -196,9 +247,10 @@ export interface LlamalendStateRead {
 
 /** The page's rows as the replay reads them, oldest first: the borrower's
  *  rows (a row where the page's wallet liquidated someone else's position is
- *  not this position's), each with the price read at its block, and a row
- *  with no after-image given the archive's read at its block where it is the
- *  position's last row in that block. */
+ *  not this position's), each with the price at its block (the server's
+ *  stored price, else the page's read), and a row with no after-image given
+ *  the position at the end of its block (the server's stored state, else the
+ *  page's read) where it is the position's last row in that block. */
 export function llamalendFlowEvents(
   events: BaseActivityEvent[],
   prices?: Map<number, number> | null,
@@ -212,12 +264,25 @@ export function llamalendFlowEvents(
   // A stable sort keeps the served order inside a block (the log order).
   return rows.map((e, i) => {
     const c = e.context.data as LlamalendContext;
-    const p = prices?.get(e.blockNumber);
+    const storedPriceRaw = big(c.raw?.priceAtBlock);
+    const storedPrice = storedPriceRaw != null && storedPriceRaw > ZERO ? scale1e18(storedPriceRaw) : null;
+    const p = storedPrice ?? prices?.get(e.blockNumber);
     const collAfter = big(c.raw?.collateralAfter);
     const debtAfter = big(c.raw?.debtAfter);
     const unstated = collAfter == null || debtAfter == null;
     const lastInBlock = rows[i + 1]?.blockNumber !== e.blockNumber;
-    const st = unstated && lastInBlock ? states?.get(e.blockNumber) : undefined;
+    // The server's state at the block: a position with no loan there holds
+    // nothing (its stale words read as zero), as the page's read takes it.
+    const sColl = big(c.raw?.stateCollateralAtBlock);
+    const sConv = big(c.raw?.stateBorrowedAtBlock);
+    const sDebt = big(c.raw?.stateDebtAtBlock);
+    const stored = sColl != null && sConv != null && sDebt != null;
+    const storedState: LlamalendStateRead | null = stored
+      ? sDebt > ZERO
+        ? { coll: sColl, debt: sDebt }
+        : { coll: ZERO, debt: ZERO }
+      : null;
+    const st = unstated && lastInBlock ? (storedState ?? states?.get(e.blockNumber)) : undefined;
     return {
       id: e.id,
       ts: e.timestamp,
@@ -234,15 +299,19 @@ export function llamalendFlowEvents(
       collDecimals: c.collateralDecimals,
       debtDecimals: c.borrowedDecimals,
       price: p != null && p > 0 ? p : null,
+      convAfter: stored && lastInBlock ? (sDebt > ZERO ? sConv : ZERO) : null,
+      stored,
     };
   });
 }
 
-/** The blocks whose price the replay reads, newest first, at most `cap`. */
+/** The blocks whose price the page reads, newest first, at most `cap`: the
+ *  rows the server has not priced. */
 export function llamalendPriceBlocks(events: LlamalendFlowEvent[], cap = LLAMALEND_PRICE_READS): number[] {
   const out: number[] = [];
   const seen = new Set<number>();
   for (let i = events.length - 1; i >= 0 && out.length < cap; i--) {
+    if (events[i].price != null) continue;
     const b = events[i].block;
     if (seen.has(b)) continue;
     seen.add(b);
@@ -251,8 +320,9 @@ export function llamalendPriceBlocks(events: LlamalendFlowEvent[], cap = LLAMALE
   return out;
 }
 
-/** The blocks whose position the replay reads: each row with no after-image
- *  that is the position's last row in its block, at most `cap`. */
+/** The blocks whose position the page reads: each row with no after-image
+ *  that is the position's last row in its block and whose state the server
+ *  has not stored, at most `cap`. */
 export function llamalendStateBlocks(events: LlamalendFlowEvent[], cap = LLAMALEND_STATE_READS): number[] {
   const out: number[] = [];
   for (let i = 0; i < events.length && out.length < cap; i++) {
@@ -264,27 +334,50 @@ export function llamalendStateBlocks(events: LlamalendFlowEvent[], cap = LLAMALE
   return out;
 }
 
-/** Where a row's price came from: its block's read, the nearest read row's,
- *  or today's live read. */
+/** Where a row's price came from: its block's price (stored or read), the
+ *  nearest priced row's, or today's live read. */
 export type LlamalendPriceFrom = "row" | "nearest" | "today";
+
+/** One leg of a replayed row, in tokens: the collateral token, the borrowed
+ *  token on the debt side, or (`conv`) the borrowed token in the bands. */
+export interface LlamalendLeg {
+  bucket: string;
+  amount: number;
+  conv?: true;
+}
 
 /** A replayed row's legs in tokens, by bucket. */
 export interface LlamalendReplayed {
   ev: LlamalendFlowEvent;
   price: number;
   priceFrom: LlamalendPriceFrom;
-  legs: { bucket: string; amount: number }[];
+  legs: LlamalendLeg[];
   /** Balances after the row, tokens; whether the row stated each. */
   coll: number;
   debt: number;
   collStated: boolean;
   debtStated: boolean;
+  /** The borrowed token the AMM holds in the bands after the row, tokens:
+   *  the stored state, else carried from the row before less what the row
+   *  took (0 where nothing is stored for the position). */
+  conv: number;
+  /** The row's converted balance is carried, not stored, while the AMM was
+   *  trading the bands: the next stored row settles it. */
+  convUnread: boolean;
+  /** The row closed the position by a repay after the AMM traded since the
+   *  row before: what it took in for those trades is valued at the row's
+   *  price, and the rest of what it held is Withdrawn. */
+  convEstimated: boolean;
 }
 
 const human = (v: bigint, decimals: number): number => Number(v) / 10 ** decimals;
 
+/** Whether any row has the server's stored converted balance: the bars then
+ *  carry the borrowed token in the bands. */
+export const llamalendHasConv = (events: LlamalendFlowEvent[]) => events.some((e) => e.convAfter != null);
+
 /** The per-row replay. `livePrice` (today's oracle, borrowed per collateral)
- *  is the nearest price for rows nearer today than any read row. */
+ *  is the nearest price for rows nearer today than any priced row. */
 export function replayLlamalend(
   events: LlamalendFlowEvent[],
   livePrice: number | null,
@@ -303,20 +396,24 @@ export function replayLlamalend(
     cands.sort((x, y) => x.dt - y.dt);
     return cands[0] ?? { price: 0, from: "nearest" };
   };
+  const withConv = llamalendHasConv(events);
   let coll = ZERO;
   let debt = ZERO;
+  let conv = ZERO;
   const out: LlamalendReplayed[] = [];
-  for (const ev of events) {
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
     const cd = ev.collDecimals;
     const dd = ev.debtDecimals;
-    const legs: { bucket: string; amount: number }[] = [];
-    const add = (bucket: string, raw: bigint, decimals: number) => {
+    const legs: LlamalendLeg[] = [];
+    const add = (bucket: string, raw: bigint, decimals: number, inBands = false) => {
       if (raw <= ZERO) return;
       const amount = human(raw, decimals);
-      if (amount > DUST) legs.push({ bucket, amount });
+      if (amount > DUST) legs.push(inBands ? { bucket, amount, conv: true } : { bucket, amount });
     };
     const liq = ev.kind === "liquidation";
     const taken = liq && !ev.self;
+    const p = ev.price != null ? { price: ev.price, from: "row" as const } : nearest(ev.ts);
 
     // Debt: the interest since the row before, then the act.
     let debtAfter: bigint;
@@ -344,10 +441,12 @@ export function replayLlamalend(
     // Collateral: what the AMM sold or bought back since the row before, then
     // the act.
     let collAfter: bigint;
+    let collGap = ZERO;
     if (ev.collAfter != null) {
       const gap = ev.collAfter - ev.collDelta - coll;
       const tol = BigInt(1000) > coll / BigInt(1_000_000) ? BigInt(1000) : coll / BigInt(1_000_000);
       const traded = gap < -tol || gap > tol;
+      if (traded) collGap = gap;
       if (traded && gap < ZERO) add(LL.softSold, -gap, cd);
       if (traded && gap > ZERO) add(LL.boughtBack, gap, cd);
       const act = ev.collAfter - coll - (traded ? gap : ZERO);
@@ -365,7 +464,50 @@ export function replayLlamalend(
       collAfter = after;
     }
 
-    const p = ev.price != null ? { price: ev.price, from: "row" as const } : nearest(ev.ts);
+    // The borrowed token in the bands, where the server stored it: its move
+    // since the row before less the row's act is what the AMM took in for its
+    // sales (above zero) or spent on its buy-backs (below). A liquidation
+    // takes what its log states (`convertedTaken`); a repay that closes the
+    // position hands back what was there, which no log states.
+    let convAfter = conv;
+    let convUnread = false;
+    let convEstimated = false;
+    if (withConv) {
+      const took = liq ? ev.convertedTaken : ZERO;
+      const closes = debtAfter === ZERO && collAfter === ZERO;
+      const known = ev.convAfter ?? (closes ? ZERO : null);
+      if (known != null) {
+        let trades: bigint;
+        let handed: bigint;
+        if (closes && !liq) {
+          // The trades since the row before: none where the collateral did
+          // not move, else the collateral's trade at the row's price.
+          trades = ZERO;
+          if (collGap !== ZERO && p.price > 0) {
+            convEstimated = true;
+            trades = BigInt(Math.round(-human(collGap, cd) * p.price * 10 ** dd));
+            if (conv + trades < ZERO) trades = -conv;
+          }
+          handed = conv + trades;
+        } else {
+          handed = took;
+          trades = known - conv + took;
+        }
+        if (trades > ZERO) add(LL.softReceived, trades, dd, true);
+        if (trades < ZERO) add(LL.softSpent, -trades, dd, true);
+        add(taken ? LL.collSeized : LL.collOut, handed, dd, true);
+        convAfter = known;
+      } else {
+        // Not stored: carried, less what the row took; the next stored row
+        // settles it.
+        const left = conv - took;
+        convAfter = left > ZERO ? left : ZERO;
+        add(taken ? LL.collSeized : LL.collOut, conv - convAfter, dd, true);
+        const settled = events[i + 1]?.block === ev.block;
+        convUnread = !settled && (convAfter > ZERO || collGap !== ZERO);
+      }
+    }
+
     out.push({
       ev,
       price: p.price,
@@ -375,9 +517,13 @@ export function replayLlamalend(
       debt: human(debtAfter, dd),
       collStated: ev.collAfter != null,
       debtStated: ev.debtAfter != null,
+      conv: human(convAfter, dd),
+      convUnread,
+      convEstimated,
     });
     coll = collAfter;
     debt = debtAfter;
+    conv = convAfter;
   }
   return out;
 }
@@ -389,6 +535,8 @@ export interface LlamalendLive {
   /** The collateral in the bands and the debt now, tokens. */
   coll?: number | null;
   debt?: number | null;
+  /** The borrowed token the AMM holds in the bands now, tokens. */
+  converted?: number | null;
 }
 
 export interface LlamalendFlowOptions {
@@ -415,7 +563,7 @@ export interface LlamalendFlowReplay {
   scale: number;
 }
 
-const legOf = (r: LlamalendReplayed, k: string) => r.legs.find((l) => l.bucket === k)?.amount ?? 0;
+const legOf = (r: LlamalendReplayed, k: string) => r.legs.find((l) => l.bucket === k && !l.conv)?.amount ?? 0;
 
 export function llamalendFlowReplay(events: LlamalendFlowEvent[], o: LlamalendFlowOptions): LlamalendFlowReplay {
   const livePrice = o.live?.price != null && o.live.price > 0 ? o.live.price : null;
@@ -454,10 +602,11 @@ export function llamalendFlowReplay(events: LlamalendFlowEvent[], o: LlamalendFl
   for (const r of replayed) {
     for (const l of r.legs) {
       if (OUT_KEYS.has(l.bucket)) continue;
-      if (COLL_KEYS.has(l.bucket)) inColl += l.amount * r.price;
+      if (l.conv) inColl += l.amount;
+      else if (COLL_KEYS.has(l.bucket)) inColl += l.amount * r.price;
       else inDebt += l.amount;
     }
-    peak = Math.max(peak, inColl, inDebt, r.coll * r.price, r.debt);
+    peak = Math.max(peak, inColl, inDebt, r.coll * r.price + r.conv, r.debt);
   }
   const scale = unitScaleFor(peak);
   return { replayed, borrowRate, borrowIndex, grain: 10 ** scale, scale };
@@ -468,6 +617,8 @@ const grow = (rate: number, dt: number) => 1 + rate * (Math.max(0, dt) / ONE_YEA
 
 const COLL = "coll";
 const DEBT = "debt";
+/** The borrowed token in the bands, a second collateral asset. */
+const CONV = "conv";
 
 /** Whether a balance moved by more than the AMM's rounding. */
 const tolOf = (amount: number, decimals: number) => Math.max(1000 / 10 ** decimals, amount * 1e-6);
@@ -482,6 +633,7 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
   if (!replayed.some((r) => r.price > 0)) return null;
   const cp = (r: LlamalendReplayed) => r.price * G;
   const buckets = llamalendFlowBuckets();
+  const withConv = llamalendHasConv(events);
   const flowEvents: FlowEvent[] = replayed.map((r, i) => {
     const moved = { coll: false, debt: false };
     for (const l of r.legs) {
@@ -494,18 +646,29 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
     // oracle price (past the reads' cap, or not landed), and its balances
     // where the row states none and no read stood in.
     const unsure: FlowUnsure[] = [];
-    if (r.priceFrom !== "row" && (r.coll > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket))))
+    if (r.priceFrom !== "row" && (r.coll > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket) && !l.conv)))
       unsure.push({
         side: "collateral",
         why:
           r.priceFrom === "today"
-            ? `${o.collSymbol} priced at today's oracle read: the oracle at this block is not read (the page reads the latest ${LLAMALEND_PRICE_READS} event blocks).`
-            : `${o.collSymbol} priced at the nearest read row: the oracle at this block is not read (the page reads the latest ${LLAMALEND_PRICE_READS} event blocks).`,
+            ? `${o.collSymbol} priced at today's oracle read: the oracle at this block is not stored yet, and the page reads the latest ${LLAMALEND_PRICE_READS} such event blocks.`
+            : `${o.collSymbol} priced at the nearest priced row: the oracle at this block is not stored yet, and the page reads the latest ${LLAMALEND_PRICE_READS} such event blocks.`,
         held: true,
       });
-    const unread = `Balances at this row not read: it states none, and the page reads up to ${LLAMALEND_STATE_READS} such rows; the next row that states its balances settles both sides.`;
+    const unread = `Balances at this row not read: it states none, the server has not stored its block yet, and the page reads up to ${LLAMALEND_STATE_READS} such rows; the next row that states its balances settles both sides.`;
     if (!r.collStated) unsure.push({ side: "collateral", why: unread, untilNext: true });
     if (!r.debtStated) unsure.push({ side: "debt", why: unread, untilNext: true });
+    if (r.convUnread)
+      unsure.push({
+        side: "collateral",
+        why: `The ${o.debtSymbol} the AMM holds in the bands at this row is not stored yet: it stands as the row before left it until the next stored row.`,
+        untilNext: true,
+      });
+    if (r.convEstimated)
+      unsure.push({
+        side: "collateral",
+        why: `The ${o.debtSymbol} the AMM took in for its trades since the row before is valued at this row's oracle price: the repay closed the position, and no balance is stored between.`,
+      });
     return {
       id: r.ev.id,
       ts: r.ev.ts,
@@ -513,7 +676,7 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
       tick: liq ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       ...(unsure.length ? { unsure } : {}),
       legs: r.legs.map((l) =>
-        COLL_KEYS.has(l.bucket)
+        COLL_KEYS.has(l.bucket) && !l.conv
           ? { bucket: l.bucket, usd: l.amount * cp(r), symbol: o.collSymbol }
           : { bucket: l.bucket, usd: l.amount * G, symbol: o.debtSymbol },
       ),
@@ -521,14 +684,14 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
       countsTx: !liq,
       balances: [
         { asset: COLL, symbol: o.collSymbol, side: "collateral", amount: Math.max(0, r.coll) },
+        ...(withConv
+          ? [{ asset: CONV, symbol: o.debtSymbol, side: "collateral" as const, amount: Math.max(0, r.conv) }]
+          : []),
         { asset: DEBT, symbol: o.debtSymbol, side: "debt", amount: Math.max(0, r.debt), index: rp.borrowIndex[i] },
       ],
       // Every row states the price its collateral flows were valued at (its
       // own, or the nearest), so a card and the bars agree on its day.
-      prices: [
-        { asset: COLL, usd: cp(r) },
-        { asset: DEBT, usd: G },
-      ],
+      prices: [{ asset: COLL, usd: cp(r) }, ...(withConv ? [{ asset: CONV, usd: G }] : []), { asset: DEBT, usd: G }],
     };
   });
   const days: FlowDayRow[] = daysFromEvents(
@@ -548,6 +711,7 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
   // grown at the last rate).
   const sinceLast = o.now - last.ev.ts;
   const nowColl = open ? (o.live?.coll ?? last.coll) : 0;
+  const nowConv = open && withConv ? (o.live?.converted ?? last.conv) : 0;
   const nowDebt = open ? (o.live?.debt ?? last.debt * grow(rp.borrowRate[li], sinceLast)) : 0;
   const priceNow = (livePrice ?? last.price) * G;
 
@@ -561,6 +725,15 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
         bucket: gap < 0 ? LL.softSold : LL.boughtBack,
         symbol: o.collSymbol,
         usd: Math.abs(gap) * priceNow,
+      });
+  }
+  if (open && withConv && o.live?.converted != null) {
+    const gap = o.live.converted - last.conv;
+    if (Math.abs(gap) > tolOf(last.conv, last.ev.debtDecimals))
+      pending.push({
+        bucket: gap > 0 ? LL.softReceived : LL.softSpent,
+        symbol: o.debtSymbol,
+        usd: Math.abs(gap) * G,
       });
   }
 
@@ -593,6 +766,7 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
   if (open) {
     if (nowColl > DUST)
       assets.push({ side: "collateral", symbol: o.collSymbol, amount: nowColl, usd: nowColl * priceNow });
+    if (nowConv > DUST) assets.push({ side: "collateral", symbol: o.debtSymbol, amount: nowConv, usd: nowConv * G });
     if (nowDebt > DUST) assets.push({ side: "debt", symbol: o.debtSymbol, amount: nowDebt, usd: nowDebt * G });
   }
 
@@ -601,13 +775,17 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
     buckets,
     days,
     live: {
-      collateralUsd: open ? nowColl * priceNow : 0,
+      collateralUsd: open ? nowColl * priceNow + nowConv * G : 0,
       debtUsd: open ? nowDebt * G : 0,
       assets,
       ...(pending.length > 0 ? { pending } : {}),
     },
-    todayPrices: { [COLL]: priceNow, [DEBT]: G },
-    dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
+    todayPrices: { [COLL]: priceNow, [DEBT]: G, ...(withConv ? { [CONV]: G } : {}) },
+    dailyPrices: {
+      [COLL]: [...collObs].sort((a, b) => a[0] - b[0]),
+      [DEBT]: unitObs,
+      ...(withConv ? { [CONV]: unitObs } : {}),
+    },
     seriesCarry: true,
     carriedWhy: {
       [COLL]: "LlamaLend is not in the daily price store, so a day between events keeps the last event's price.",
@@ -615,12 +793,16 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
     indexes,
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
-    words: llamalendFlowWords(o.collSymbol, o.debtSymbol),
+    words: llamalendFlowWords(o.collSymbol, o.debtSymbol, withConv),
   };
 }
 
 /** The panel's words for a LlamaLend position. */
-export function llamalendFlowWords(collSymbol: string, debtSymbol: string): NonNullable<FlowTimeline["words"]> {
+export function llamalendFlowWords(
+  collSymbol: string,
+  debtSymbol: string,
+  withConv = false,
+): NonNullable<FlowTimeline["words"]> {
   return {
     held: "Still in the bands",
     restBySide: {
@@ -636,7 +818,9 @@ export function llamalendFlowWords(collSymbol: string, debtSymbol: string): NonN
       debt: `Every figure is in ${debtSymbol}, the market's borrowed token.`,
     },
     heldBasis: {
-      collateral: `the ${collSymbol} in the bands after the last event, at the oracle price of the latest event that priced it, in ${debtSymbol}.`,
+      collateral: withConv
+        ? `the ${collSymbol} in the bands after the last event, at the oracle price of the latest event that priced it, in ${debtSymbol}, and the ${debtSymbol} the AMM holds in the bands.`
+        : `the ${collSymbol} in the bands after the last event, at the oracle price of the latest event that priced it, in ${debtSymbol}.`,
       debt: `the ${debtSymbol} owed after the last event, grown at the rate the market charged until its next event (after the last, the rate that meets today's debt).`,
     },
     linePrices: `in ${debtSymbol}, with the collateral at the oracle price of its latest priced event and the debt grown at the market's rate since the last event`,
@@ -645,7 +829,9 @@ export function llamalendFlowWords(collSymbol: string, debtSymbol: string): NonN
         collateral: `No oracle price is recorded for this day, so the ${collSymbol} is stated in tokens.`,
       },
       notes: [
-        `The collateral is the ${collSymbol} in the bands. What the AMM sold of it is held as ${debtSymbol} in the bands, which no event records, so it is not counted here.`,
+        withConv
+          ? `The collateral is the ${collSymbol} in the bands and the ${debtSymbol} the AMM holds there from its sales, as the last event's block left them.`
+          : `The collateral is the ${collSymbol} in the bands. What the AMM sold of it is held as ${debtSymbol} in the bands, which no event records, so it is not counted here.`,
       ],
     },
   };
@@ -655,7 +841,9 @@ export function llamalendFlowWords(collSymbol: string, debtSymbol: string): NonN
  *  each row's legs in the model's figures (the unit in grains) and in
  *  tokens. Each side's figure just before and once the row's transaction had
  *  run is the transaction's last row's balance at that row's price, less the
- *  transaction's acts. */
+ *  transaction's acts. The card's sums in tokens are the collateral token's
+ *  and the debt's: a leg of the borrowed token in the bands carries no token
+ *  amount, so it is in the figures and not in the collateral's tokens. */
 export function llamalendFocusEvents(rp: LlamalendFlowReplay, collSymbol: string, debtSymbol: string): FocusEvent[] {
   const { replayed, grain: G } = rp;
   const cp = (r: LlamalendReplayed) => r.price * G;
@@ -670,15 +858,18 @@ export function llamalendFocusEvents(rp: LlamalendFlowReplay, collSymbol: string
     const tx = byTx.get(r.ev.tx ?? r.ev.id) ?? [r];
     const lastOf = tx[tx.length - 1];
     let collMove = 0;
+    let convMove = 0;
     let debtMove = 0;
     for (const t of tx)
       for (const l of t.legs) {
         if (BETWEEN_KEYS.has(l.bucket)) continue;
         const sign = OUT_KEYS.has(l.bucket) ? -1 : 1;
-        if (COLL_KEYS.has(l.bucket)) collMove += sign * l.amount;
+        if (l.conv) convMove += sign * l.amount;
+        else if (COLL_KEYS.has(l.bucket)) collMove += sign * l.amount;
         else debtMove += sign * l.amount;
       }
     const collHeld = Math.max(0, lastOf.coll);
+    const convHeld = Math.max(0, lastOf.conv);
     const debtHeld = Math.max(0, lastOf.debt);
     const collPrice = cp(lastOf);
     return {
@@ -686,26 +877,33 @@ export function llamalendFocusEvents(rp: LlamalendFlowReplay, collSymbol: string
       ts: r.ev.ts,
       ...(r.ev.tx ? { tx: r.ev.tx } : {}),
       legs: r.legs.map((l) =>
-        COLL_KEYS.has(l.bucket)
+        l.conv
           ? {
               bucket: l.bucket,
-              usd: l.amount * cp(r),
-              amount: l.amount,
-              symbol: collSymbol,
-              ...(BETWEEN_KEYS.has(l.bucket) ? { accrual: true } : {}),
-            }
-          : {
-              bucket: l.bucket,
               usd: l.amount * G,
-              amount: l.amount,
               symbol: debtSymbol,
               ...(BETWEEN_KEYS.has(l.bucket) ? { accrual: true } : {}),
-            },
+            }
+          : COLL_KEYS.has(l.bucket)
+            ? {
+                bucket: l.bucket,
+                usd: l.amount * cp(r),
+                amount: l.amount,
+                symbol: collSymbol,
+                ...(BETWEEN_KEYS.has(l.bucket) ? { accrual: true } : {}),
+              }
+            : {
+                bucket: l.bucket,
+                usd: l.amount * G,
+                amount: l.amount,
+                symbol: debtSymbol,
+                ...(BETWEEN_KEYS.has(l.bucket) ? { accrual: true } : {}),
+              },
       ),
       sides: {
         collateral: {
-          before: Math.max(0, collHeld - collMove) * collPrice,
-          after: collHeld * collPrice,
+          before: Math.max(0, collHeld - collMove) * collPrice + Math.max(0, convHeld - convMove) * G,
+          after: collHeld * collPrice + convHeld * G,
           amount: collMove,
           symbol: collSymbol,
           held: collHeld,
@@ -746,6 +944,14 @@ export interface LlamalendFlowFacts {
   accruedRows: number;
   /** Converted borrowed token taken by hard liquidations, tokens. */
   convertedTaken: number;
+  /** The server stored the position's state at its rows' blocks: the
+   *  borrowed token in the bands is on the bars. */
+  withConv: boolean;
+  /** Rows whose converted balance is carried (not stored yet), and closing
+   *  repays whose trades since the row before are valued at the row's
+   *  price. */
+  convUnreadRows: number;
+  convEstimatedRows: number;
 }
 
 export function llamalendFlowFacts(rp: LlamalendFlowReplay, timeline: FlowTimeline | null): LlamalendFlowFacts {
@@ -755,7 +961,7 @@ export function llamalendFlowFacts(rp: LlamalendFlowReplay, timeline: FlowTimeli
     pricing[r.priceFrom]++;
     if (r.ev.kind === "liquidation" && !r.ev.self) convertedTaken += human(r.ev.convertedTaken, r.ev.debtDecimals);
   }
-  const has = (k: string) => rp.replayed.filter((r) => r.legs.some((l) => l.bucket === k)).length;
+  const has = (k: string) => rp.replayed.filter((r) => r.legs.some((l) => l.bucket === k && !l.conv)).length;
   const pend = timeline?.live.pending?.[0]?.bucket;
   const liq = rp.replayed.filter((r) => r.ev.kind === "liquidation");
   return {
@@ -771,5 +977,8 @@ export function llamalendFlowFacts(rp: LlamalendFlowReplay, timeline: FlowTimeli
     unstatedRows: rp.replayed.filter((r) => !r.collStated || !r.debtStated).length,
     accruedRows: has(LL.accrued),
     convertedTaken,
+    withConv: llamalendHasConv(rp.replayed.map((r) => r.ev)),
+    convUnreadRows: rp.replayed.filter((r) => r.convUnread).length,
+    convEstimatedRows: rp.replayed.filter((r) => r.convEstimated).length,
   };
 }

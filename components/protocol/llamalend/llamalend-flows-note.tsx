@@ -57,13 +57,29 @@ export function LlamalendFlowsNote({ facts, collSymbol, debtSymbol }: LlamalendF
           " Since the last event the AMM has sold more, which today's read shows on that line at today."}
         {facts?.softSinceLast === "bought" &&
           " Since the last event the AMM has bought some back, which today's read shows on that line at today."}{" "}
-        The {debtSymbol} the AMM holds for the position from those sales (the card&apos;s Converted) is not on the bars:
-        no event records it.
+        {facts?.withConv ? (
+          <>
+            The {debtSymbol} the AMM holds for the position from those sales (the card&apos;s Converted) is on the
+            collateral bar too, read at each event&apos;s block and stored: what it took in for its sales since the
+            event before is Received in soft liquidation, and what it spent buying back is Spent in soft liquidation; a
+            close hands it back (Withdrawn), and a hard liquidation takes it with the collateral (Seized in
+            liquidations).
+            {facts.convUnreadRows > 0 &&
+              ` At ${count(facts.convUnreadRows, "one event", "events")} it is not stored yet and stands as the event before left it until the next stored event.`}
+            {facts.convEstimatedRows > 0 &&
+              ` At ${count(facts.convEstimatedRows, "a repay that closed the position", "repays that closed the position")}, what it took in since the event before is valued at that event's price, as no balance is stored between.`}
+          </>
+        ) : (
+          <>
+            The {debtSymbol} the AMM holds for the position from those sales (the card&apos;s Converted) is not on the
+            bars: no event records it.
+          </>
+        )}
       </p>
       {facts && facts.liquidations + facts.selfLiquidations + facts.readRows + facts.unstatedRows > 0 && (
         <p>
           {facts.liquidations > 0 &&
-            `${count(facts.liquidations, "A hard liquidation", "hard liquidations")} took collateral (Seized in liquidations) and cleared debt (Cleared by liquidations)${facts.partialLiquidations > 0 ? `, ${facts.partialLiquidations === facts.liquidations ? (facts.liquidations === 1 ? "a partial one" : "all of them partial") : `${facts.partialLiquidations.toLocaleString("en-US")} of them partial`}` : ""}${facts.convertedTaken > 0 ? `; ${facts.liquidations === 1 ? "it" : "they"} also took ${formatNumber(facts.convertedTaken)} ${debtSymbol} the AMM held for the position, which is not on the bars` : ""}. `}
+            `${count(facts.liquidations, "A hard liquidation", "hard liquidations")} took collateral (Seized in liquidations) and cleared debt (Cleared by liquidations)${facts.partialLiquidations > 0 ? `, ${facts.partialLiquidations === facts.liquidations ? (facts.liquidations === 1 ? "a partial one" : "all of them partial") : `${facts.partialLiquidations.toLocaleString("en-US")} of them partial`}` : ""}${facts.convertedTaken > 0 ? `; ${facts.liquidations === 1 ? "it" : "they"} also took ${formatNumber(facts.convertedTaken)} ${debtSymbol} the AMM held for the position${facts.withConv ? "" : ", which is not on the bars"}` : ""}. `}
           {facts.selfLiquidations > 0 &&
             `${count(facts.selfLiquidations, "A self-liquidation", "self-liquidations")}, the owner closing the loan through the liquidation path, ${facts.selfLiquidations === 1 ? "is" : "are"} counted as Repaid and Withdrawn. `}
           {facts.readRows + facts.unstatedRows > 0 && unstatedSentence(facts)}

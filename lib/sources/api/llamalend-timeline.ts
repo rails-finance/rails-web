@@ -98,6 +98,13 @@ export interface LlamalendMvRow {
   liquidation_discount: string | null;
   /** Unique per row (action:txhash:logindex:leg) — the React render key. */
   event_key: string;
+  /** What the server stored at the row's block (mig 373; absent before the
+   *  api deploy, NULL until its filler reaches the block): the AMM's
+   *  price_oracle (1e18) and the position's user_state, raw integers. */
+  price_oracle_at?: string | null;
+  state_collateral_at?: string | null;
+  state_borrowed_at?: string | null;
+  state_debt_at?: string | null;
 }
 
 const LABELS: Record<LlamalendEventType, string> = {
@@ -260,6 +267,10 @@ export function buildLlamalendTimeline(
         convertedTaken: rawVal(convertedTaken),
         collateralAfter: rawVal(collateralAfter),
         debtAfter: rawVal(debtAfter),
+        priceAtBlock: rawVal(bigintOf(r.price_oracle_at ?? null)),
+        stateCollateralAtBlock: rawVal(bigintOf(r.state_collateral_at ?? null)),
+        stateBorrowedAtBlock: rawVal(bigintOf(r.state_borrowed_at ?? null)),
+        stateDebtAtBlock: rawVal(bigintOf(r.state_debt_at ?? null)),
       },
       isOpen: idx === 0,
     };

@@ -5,15 +5,18 @@
 // whole history as events hands them over; a windowed page reads the flat
 // history once (the read its CSV export makes), and a read short of the whole
 // history is a failed read, since a replay of part of a history would state
-// the wrong lifetime. The rows carry no price, so the AMM's oracle price at
-// each row's block is read from the archive (/api/chain/llamalend/liq-price,
-// six at a time, up to LLAMALEND_PRICE_READS blocks; the route caches each
-// block's answer at the edge), and a row with no after-image (an underwater
-// repay, a partial liquidation) has the position read at its block
-// (/api/chain/llamalend/event-state, the read its card's detail makes). LlamaLend is not in the shared daily price
-// store, so nothing is read between events: the collateral keeps its latest
-// event's price. It also gives the page the value that ties the panel to the
-// timeline (components/shared/flow-focus-context.tsx).
+// the wrong lifetime. Each row carries what the server stored at its block
+// (rails-server mig 373: the AMM's oracle price and the position's state,
+// once its filler has reached the block). For a row it has not stored, the
+// price is read from the archive (/api/chain/llamalend/liq-price, six at a
+// time, up to LLAMALEND_PRICE_READS blocks; the route caches each block's
+// answer at the edge), and a row with no after-image (an underwater repay, a
+// partial liquidation) has the position read at its block
+// (/api/chain/llamalend/event-state, the read its card's detail makes).
+// LlamaLend is not in the shared daily price store, so nothing is read
+// between events: the collateral keeps its latest event's price. It also
+// gives the page the value that ties the panel to the timeline
+// (components/shared/flow-focus-context.tsx).
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";

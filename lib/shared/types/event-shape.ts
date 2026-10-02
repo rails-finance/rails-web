@@ -2514,6 +2514,14 @@ export interface LlamalendContextRaw {
   /** UserState after-image absolutes (raw integer strings). */
   collateralAfter?: string;
   debtAfter?: string;
+  /** What the server stored at the row's block (rails-server mig 373), where
+   *  its filler has reached it: the AMM's price_oracle at the block's end
+   *  (1e18, borrowed per collateral), and the position's user_state there
+   *  (collateral and borrowed token in the bands, debt; raw integers). */
+  priceAtBlock?: string;
+  stateCollateralAtBlock?: string;
+  stateBorrowedAtBlock?: string;
+  stateDebtAtBlock?: string;
 }
 
 export interface LlamalendContext {

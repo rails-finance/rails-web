@@ -335,6 +335,7 @@ export default function LlamalendPositionView({
             price: chain.priceOracle,
             coll: chain.hasLoan ? chain.collateral : 0,
             debt: chain.hasLoan ? chain.debt : 0,
+            converted: chain.hasLoan ? chain.converted : 0,
           }
         : null,
     [chain],
