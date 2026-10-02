@@ -259,14 +259,6 @@ export default function LlamalendPositionView({
   }, [view, chain]);
 
   const llamalendEvents = useMemo(() => events.filter(isLlamalendEvent), [events]);
-  // The card's transaction count, raised to the distinct transactions the
-  // whole history holds: the index counts the borrower's own, and a
-  // liquidation is someone else's.
-  const cardView = useMemo<LlamalendPositionView | null>(() => {
-    if (!liveView || cutoffBlock != null) return liveView;
-    const txs = new Set(llamalendEvents.map((e) => e.txHash).filter(Boolean)).size;
-    return txs > liveView.txCount ? { ...liveView, txCount: txs } : liveView;
-  }, [liveView, llamalendEvents, cutoffBlock]);
   const previousStated = useMemo(() => llamalendPreviousStatedMap(llamalendEvents), [llamalendEvents]);
   const nextRows = useMemo(() => llamalendNextRowMap(llamalendEvents), [llamalendEvents]);
   // The loans this page holds (a closed loan and a later one share the key);
@@ -405,9 +397,9 @@ export default function LlamalendPositionView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {cardView && liveView && (
+            {liveView && (
               <LlamalendPositionCard
-                v={cardView}
+                v={liveView}
                 bands={chain?.hasLoan ? chain.bands : null}
                 receipts
                 viewHref={tl.viewHref}

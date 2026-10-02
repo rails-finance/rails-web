@@ -314,11 +314,11 @@ export default function FxPositionView({
     };
   }, [fxEvents, socializedRows, socializedReadsMap, noTxParts]);
   const loans = useMemo(() => fxLoans(fxEvents), [fxEvents]);
-  // Pool-wide liquidations (mig 369) are not in the summary's counts, which
-  // come from the per-position LiquidatePosition lane: the card counts them
-  // from the rows. A LiquidatePosition that took no collateral and repaid
-  // under 0.000001 fxUSD (a keeper's call that found the position already
-  // emptied) stays a row and leaves the count (fxLiquidationMoved).
+  // A LiquidatePosition that took no collateral and repaid under 0.000001
+  // fxUSD (a keeper's call that found the position already emptied) stays a
+  // row and is out of the count (fxLiquidationMoved); the Explanation names
+  // those rows. The card's count is the server's `liquidation_count`, which
+  // adds the pool-wide liquidations and applies the same rule.
   const emptyLiquidations = useMemo(
     () =>
       fxEvents.filter(
@@ -327,16 +327,6 @@ export default function FxPositionView({
       ).length,
     [fxEvents],
   );
-  const cardView = useMemo(() => {
-    const n = socializedRows.filter((e) => e.context.data.eventType === "liquidation").length;
-    if (!view || (n === 0 && emptyLiquidations === 0) || historyWindow.state !== "whole") return view;
-    return {
-      ...view,
-      everLiquidated: view.everLiquidated || n > 0,
-      liquidationCount: view.liquidationCount + n - emptyLiquidations,
-      activity: { ...view.activity, eventCount: view.activity.eventCount + n - emptyLiquidations },
-    };
-  }, [view, socializedRows, emptyLiquidations, historyWindow.state]);
   const blockDates = useMemo(() => new Map(fxEvents.map((e) => [e.blockNumber, e.timestamp])), [fxEvents]);
 
   const tl = useTimelineEvents(fxEvents, {
@@ -454,7 +444,7 @@ export default function FxPositionView({
       <div className="py-8 space-y-6">
         <DetailTopRow
           session="fx"
-          owner={{ wallet: (cardView ?? view)?.owner }}
+          owner={{ wallet: view?.owner }}
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
@@ -483,7 +473,7 @@ export default function FxPositionView({
               // figures, in two moods — the pool's own figures present, or still
               // pending (the card shows dashes and the pane says so plainly).
               <FxPositionCard
-                v={cardView ?? view}
+                v={view}
                 receipts
                 viewHref={tl.viewHref}
                 // Closed by default, remembered per viewer and position (ui-jobs
@@ -502,7 +492,7 @@ export default function FxPositionView({
                 }
                 explanation={
                   <FxPositionExplanation
-                    v={cardView ?? view}
+                    v={view}
                     parts={noTxParts}
                     emptyLiquidations={historyWindow.state === "whole" ? emptyLiquidations : 0}
                     externalActivity={externalActivity}

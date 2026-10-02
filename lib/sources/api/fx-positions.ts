@@ -81,7 +81,13 @@ export interface RawFxPositionRow {
   last_event_block: string | null;
   last_event_ts: string | null;
   n_operates: number;
+  /** LiquidatePosition logs (mv_fx_positions), every one. */
   n_liquidations: number;
+  /** The counted figure: n_liquidations plus the pool-wide Liquidate logs
+   *  that reached the position, less the calls that moved nothing (rails-server
+   *  services/fx-liquidation-counts.ts). Absent from a server before it. */
+  liquidation_count?: number;
+  /** Includes a pool-wide liquidation. */
   ever_liquidated: boolean;
   implied_debt: string;
   coll_in_token: string;
@@ -121,6 +127,7 @@ export function toFxSummary(r: RawFxPositionRow): FxPositionSummary {
   const settledDebts = num(r.chain_raw_debts);
   const oraclePrice = num(r.pool_oracle_price);
   const impliedDebt = Number(r.implied_debt) / WAD;
+  const liquidationCount = r.liquidation_count ?? r.n_liquidations;
   return {
     pool: r.pool_key,
     poolSymbol: meta.tokenSymbol,
@@ -131,7 +138,7 @@ export function toFxSummary(r: RawFxPositionRow): FxPositionSummary {
     openedBy: r.opened_by,
     status: statusOf(r),
     everLiquidated: r.ever_liquidated,
-    liquidationCount: r.n_liquidations,
+    liquidationCount,
     settled: {
       colls: settledColls,
       collsRaw: r.chain_raw_colls,
@@ -152,7 +159,7 @@ export function toFxSummary(r: RawFxPositionRow): FxPositionSummary {
       lastBlock: r.last_event_block != null ? Number(r.last_event_block) : null,
       firstTs: r.opened_ts != null ? Number(r.opened_ts) : null,
       lastTs: r.last_event_ts != null ? Number(r.last_event_ts) : null,
-      eventCount: r.n_operates + r.n_liquidations,
+      eventCount: r.n_operates + liquidationCount,
     },
     lastTick: r.last_tick != null ? Number(r.last_tick) : null,
   };
