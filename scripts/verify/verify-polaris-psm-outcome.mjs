@@ -1,22 +1,18 @@
 // Polaris — the PSM's shares get a net-outcome strip, valued at the feed at
-// settle, and the tower's redemption-share/mint-share swatches turn pink.
+// settle, on the Lifetime flows panel's heading row.
 // ---------------------------------------------------------------------------
 // The per-row effect (mintRedeemCollGain × priceAtBlock − mintRedeemDebtGain)
 // and its lifetime sums for three fixture CDPs are pinned from psql over the
 // RAW tables on the onboarding box, 2026-09-06 — never derived from this code.
 // This script proves:
 //
-//   1. usdp/8: the strip is present under the tower heading row; its three
+//   1. usdp/8: the strip is present on the flows panel's heading row; its three
 //      "at settle" figures match the pinned sums (compact formatting); the
 //      "today" figure is recomputed from the live overlay (0.5% tolerance,
 //      since the feed moves); the strip carries no "profit" and no "%".
 //   2. usdp/27: +124.509 total; usdp/166: +0.719, no mint clause.
-//   3. The tower's "− Net PSM shares" and "+ Net PSM shares" breakdown
-//      swatches carry the pink checker (a background-image containing "244"
-//      and "114" and "182", none containing "251" "146" "60").
-//   4. A Liquity V2 trove with a redemption also draws the pink checker on
-//      its redemption line, and liquityRedemptionOutcome's own strip still
-//      renders (TROVE_B from verify-market-note-row-liquity-v2.mjs — a WETH
+//   4. A Liquity V2 trove with a redemption: liquityRedemptionOutcome's own
+//      strip still renders (TROVE_B from verify-market-note-row-liquity-v2.mjs — a WETH
 //      trove whose price-gap stretch ends in a redemption).
 //   5. The markdown export carries the outcome line on usdp/8.
 //
@@ -86,7 +82,7 @@ async function open(context, url) {
     .waitFor({ state: "visible", timeout: 120000 })
     .catch(() => {});
   // The chain overlay lands a moment after first paint (index-only first
-  // render), and the tower needs it for the "today" figure — a heavier CDP
+  // render), and the strip needs it for the "today" figure — a heavier CDP
   // (usdp/8, 45 touches) takes longer than a light one, so poll rather than
   // a single fixed sleep.
   await page.waitForTimeout(1500);
@@ -107,25 +103,6 @@ const econSection = (page) => page.locator('[data-skel-section="detail-economics
  *  both render, distinct from the collapsed Explanation bullet that states
  *  the same sentence. */
 const outcomeStrip = (page) => econSection(page).locator("div.justify-end.pl-2").first();
-
-/** A breakdown-row's swatch `background-image`, by its exact label text. */
-async function swatchOf(page, label, sign) {
-  return econSection(page).evaluate(
-    (root, [label, sign]) => {
-      for (const tr of root.querySelectorAll("tr")) {
-        const tds = tr.querySelectorAll("td");
-        if (tds.length < 3) continue;
-        if (sign && tds[0].textContent?.trim() !== sign) continue;
-        if (tds[2].textContent?.trim().startsWith(label)) {
-          const swatch = tds[1].querySelector("span[style]");
-          return swatch ? swatch.getAttribute("style") : null;
-        }
-      }
-      return null;
-    },
-    [label, sign],
-  );
-}
 
 console.log("Polaris — PSM net-outcome strip, valued at the feed at settle\n");
 console.log(`BASE ${BASE}\n`);
@@ -192,21 +169,6 @@ check(
   stripText8,
 );
 
-// ── 3. the tower's PSM swatches carry the pink checker ──────────────────────
-const redemptionSwatch = await swatchOf(page8, "Net PSM shares", "−");
-const mintSwatch = await swatchOf(page8, "Net PSM shares", "+");
-const isPink = (style) => !!style && style.includes("244") && style.includes("114") && style.includes("182");
-const isOrange = (style) => !!style && style.includes("251") && style.includes("146") && style.includes("60");
-check(
-  '3a. a "− Net PSM shares" breakdown row carries the pink checker',
-  isPink(redemptionSwatch) && !isOrange(redemptionSwatch),
-  redemptionSwatch ?? "row not found",
-);
-check(
-  '3b. a "+ Net PSM shares" breakdown row carries the pink checker',
-  isPink(mintSwatch) && !isOrange(mintSwatch),
-  mintSwatch ?? "row not found",
-);
 await page8.close();
 
 // ── 2. usdp/27 and usdp/166 ───────────────────────────────────────────────────
@@ -241,12 +203,6 @@ const troveUrl = `${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_B}`;
 const pageTrove = await open(context, troveUrl);
 const troveEcon = econSection(pageTrove);
 check("4a. TROVE_B's economics section renders", (await troveEcon.count()) > 0);
-const redemptionSwatchV2 = await swatchOf(pageTrove, "Redeemed");
-check(
-  '4b. TROVE_B\'s "Redeemed" breakdown row still carries the pink checker',
-  isPink(redemptionSwatchV2) && !isOrange(redemptionSwatchV2),
-  redemptionSwatchV2 ?? "row not found",
-);
 const troveStripText =
   (await outcomeStrip(pageTrove).count()) > 0 ? (await outcomeStrip(pageTrove).innerText()).replace(/\s+/g, " ") : "";
 check(

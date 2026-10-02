@@ -600,11 +600,12 @@ const LEG_VIA: Record<PolarisLifetimeLeg, string> = {
 
 // A reader who opens one PSM leg's own receipt has no reason to know it is
 // one half of a figure stated elsewhere on the page — so each of the four
-// PSM legs' summaries points at the outcome strip beside the tower, which
+// PSM legs' summaries points at the outcome strip on the Lifetime flows
+// panel's heading row, which
 // values every one of these same rows at the feed each settled at (never
 // this leg's own raw amount) and states the CDP's net equity effect.
 const PSM_OUTCOME_POINTER =
-  "This leg feeds the PSM-outcome figure beside the tower, which values every priced PSM-share row at the feed it settled at and states the CDP's net equity effect there.";
+  "This leg feeds the PSM-outcome figure on the Lifetime flows panel's heading row, which values every priced PSM-share row at the feed it settled at and states the CDP's net equity effect there.";
 
 // Two legs need a summary that does NOT read as if this CDP was redeemed by
 // an event of its own: it is the CDP's pro-rata share of the MARKET's PSM

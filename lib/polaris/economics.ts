@@ -1,15 +1,5 @@
-// Polaris economics — the dual tower in NATIVE UNITS (pETH / the stablecoin).
-// ----------------------------------------------------------------------------
-// Token mode: the collateral side stacks in pETH and the debt side in USDp or
-// GOLDp, so the two towers are not height-comparable and the component labels
-// them so. USD is not stacked — the protocol prices pETH in its debt unit, not
-// its debt in dollars, so a dollar debt tower would assert a par the chain
-// never states. (The card carries the collateral's USD from the protocol's
-// own feed; that is a figure, not a bar.)
-//
-// Current lines come from the card view — the live overlay's entire figures
-// where they landed, the last CDPUpdated's resulting figures otherwise. The
-// lifetime layer sums the ledger's own legs, one bucket per leg:
+// Polaris lifetime sums — the CDP's ledger legs summed over its rows, in
+// NATIVE UNITS (pETH / the stablecoin), one bucket per leg:
 //
 //   collateral: deposited (holder) · withdrawn (holder) · liquidated (op 3)
 //               · PSM mint shares in, PSM redemption shares out · reward pETH
@@ -17,20 +7,12 @@
 //               · interest charged · stability gains · PSM mint shares in,
 //               PSM redemption shares out · minted to settle a residual
 //
-// The reconcile gate is the replay identity itself: every side's signed legs
-// must sum to the last row's resulting figure. They do on every transition
-// the ledger has emitted; if a captured history ever fell short the gate
-// keeps the lifetime layer off rather than posing a partial window as a life.
+// The card's Explanation, the PSM outcome strip on the Lifetime flows panel
+// and the markdown export read them. The panel's own replay is
+// lib/polaris/flows.ts.
 
-import type { PolarisPositionView } from "@/components/protocol/polaris/polaris-position-card";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isPolarisEvent } from "@/lib/shared/types/event-shape";
-import { latestStateProv, lifetimeLegProv, type PolarisLifetimeLeg } from "@/lib/polaris/event-provenance";
-import { liveEntireProv, livePendingProv } from "@/lib/polaris/live-provenance";
-import { PETH } from "@/lib/polaris/asset-catalog";
-import { flowsReconcile, type ChainTruthTowerData, type TowerLine } from "@/lib/shared/chain-truth-economics";
-
-const DUST = 1e-9;
 
 export interface PolarisLifetime {
   deposited: number;
@@ -150,179 +132,4 @@ export function polarisLifetime(events: BaseActivityEvent[]): PolarisLifetime {
     f.lastDebt = num(c.newDebt);
   }
   return f;
-}
-
-export function computePolarisEconomics(view: PolarisPositionView, events?: BaseActivityEvent[]): ChainTruthTowerData {
-  const stable = view.stableSymbol;
-  const market = view.market;
-
-  const collProv = view.basis === "chain" ? liveEntireProv("coll", market) : latestStateProv("coll", market);
-  const debtProv = view.basis === "chain" ? liveEntireProv("debt", market) : latestStateProv("debt", market);
-
-  const supplyLines: TowerLine[] =
-    view.coll > DUST
-      ? [
-          {
-            key: "collateral",
-            symbol: PETH.symbol,
-            amount: view.coll,
-            usd: null,
-            address: PETH.address,
-            prov: collProv,
-          },
-        ]
-      : [];
-
-  // On the chain lane the debt figure is the entire debt, and the interest
-  // pending since the last touch is its own getter — so the split is real:
-  // the rest beneath, pending interest on top, summing to the entire debt the
-  // card states. An entire debt at or below zero owes nothing (the pending
-  // legs cleared more than the recorded debt), so it has no lines at all; the
-  // interest inside it is capped at the whole, never stated above it.
-  const owed = Math.max(0, view.debt);
-  const pendingInterest = view.basis === "chain" ? Math.min(view.pendingInterest ?? 0, owed) : 0;
-  const principal = owed - pendingInterest;
-  const debtLines: TowerLine[] =
-    principal > DUST ? [{ key: "debt", symbol: stable, amount: principal, usd: null, prov: debtProv }] : [];
-  const interestLine: TowerLine | null =
-    view.basis === "chain" && pendingInterest > DUST
-      ? {
-          key: "interest-pending",
-          symbol: stable,
-          amount: pendingInterest,
-          usd: null,
-          prov: livePendingProv("accruedInterest", market),
-        }
-      : null;
-
-  const lifetime = events && events.length > 0 ? polarisLifetime(events) : null;
-  // The replay identity as the gate: each side's signed legs sum to the last
-  // row's resulting figure. Gross is the sum of magnitudes, for the epsilon.
-  const collNet = lifetime
-    ? lifetime.deposited -
-      lifetime.withdrawn -
-      lifetime.collLiquidated +
-      lifetime.collFromPsm -
-      lifetime.collToPsm +
-      lifetime.rewardPeth
-    : 0;
-  const collGross = lifetime
-    ? lifetime.deposited +
-      lifetime.withdrawn +
-      lifetime.collLiquidated +
-      lifetime.collFromPsm +
-      lifetime.collToPsm +
-      lifetime.rewardPeth
-    : 0;
-  const debtNet = lifetime
-    ? lifetime.borrowed -
-      lifetime.repaid -
-      lifetime.debtLiquidated +
-      lifetime.interestCharged -
-      lifetime.stableGains +
-      lifetime.debtFromPsm -
-      lifetime.debtToPsm +
-      lifetime.mintedToSettle
-    : 0;
-  const debtGross = lifetime
-    ? lifetime.borrowed +
-      lifetime.repaid +
-      lifetime.debtLiquidated +
-      lifetime.interestCharged +
-      lifetime.stableGains +
-      lifetime.debtFromPsm +
-      lifetime.debtToPsm +
-      lifetime.mintedToSettle
-    : 0;
-  const collOk = lifetime != null && lifetime.rows > 0 && flowsReconcile(collNet, lifetime.lastColl, collGross);
-  const debtOk = lifetime != null && lifetime.rows > 0 && flowsReconcile(debtNet, lifetime.lastDebt, debtGross);
-
-  const line = (
-    ok: boolean,
-    key: string,
-    symbol: string,
-    amount: number,
-    leg: PolarisLifetimeLeg,
-    extra: Partial<Pick<TowerLine, "flowLabel" | "flowKind" | "address">> = {},
-  ): TowerLine[] =>
-    ok && amount > DUST
-      ? [{ key, symbol, amount, usd: null, prov: lifetimeLegProv(leg, symbol, market), ...extra }]
-      : [];
-
-  return {
-    valued: false,
-    collateralUnit: PETH.symbol,
-    debtUnit: stable,
-    debtListLabel: `Debt · ${stable} owed`,
-    collateral: {
-      current: supplyLines,
-      interest: null,
-      exited: [
-        ...line(collOk, "coll-withdrawn", PETH.symbol, lifetime?.withdrawn ?? 0, "withdrawn", {
-          address: PETH.address,
-        }),
-        ...line(collOk, "coll-to-psm", PETH.symbol, lifetime?.collToPsm ?? 0, "pETH to PSM redemptions", {
-          flowLabel: "Net PSM shares",
-          flowKind: "redeemed",
-          address: PETH.address,
-        }),
-      ],
-      liquidated: line(collOk, "coll-liquidated", PETH.symbol, lifetime?.collLiquidated ?? 0, "collateral liquidated", {
-        address: PETH.address,
-      }),
-      received: [
-        ...line(collOk, "coll-from-psm", PETH.symbol, lifetime?.collFromPsm ?? 0, "pETH from PSM mints", {
-          flowLabel: "Net PSM shares",
-          flowKind: "external",
-          address: PETH.address,
-        }),
-        ...line(collOk, "coll-reward", PETH.symbol, lifetime?.rewardPeth ?? 0, "reward pETH", {
-          flowLabel: "Reward pETH",
-          address: PETH.address,
-        }),
-      ],
-      lifetimeInflow: collOk ? (lifetime?.deposited ?? 0) : 0,
-    },
-    debt: {
-      current: debtLines,
-      interest: interestLine,
-      exited: [
-        ...line(debtOk, "debt-repaid", stable, lifetime?.repaid ?? 0, "repaid"),
-        ...line(debtOk, "debt-stable-gains", stable, lifetime?.stableGains ?? 0, "stability gains", {
-          flowLabel: "Stability gains",
-        }),
-        ...line(debtOk, "debt-to-psm", stable, lifetime?.debtToPsm ?? 0, "debt cleared by PSM redemptions", {
-          flowLabel: "Net PSM shares",
-          flowKind: "redeemed",
-        }),
-      ],
-      liquidated: line(debtOk, "debt-liquidated", stable, lifetime?.debtLiquidated ?? 0, "debt liquidated"),
-      received: [
-        ...line(debtOk, "debt-from-psm", stable, lifetime?.debtFromPsm ?? 0, "debt from PSM mints", {
-          flowLabel: "Net PSM shares",
-          flowKind: "external",
-        }),
-      ],
-      // The settle-to-zero mint is its own line, apart from what the holder
-      // borrowed: it offsets a net PSM share that cleared more than the debt.
-      costs: [
-        ...line(debtOk, "debt-interest-charged", stable, lifetime?.interestCharged ?? 0, "interest charged", {
-          flowLabel: "Interest charged",
-        }),
-        ...line(debtOk, "debt-minted-to-settle", stable, lifetime?.mintedToSettle ?? 0, "minted to settle", {
-          flowLabel: "Settled to zero",
-        }),
-      ],
-      lifetimeInflow: debtOk ? (lifetime?.borrowed ?? 0) : 0,
-    },
-    interestLabel: "Pending interest",
-    interestNote:
-      view.basis === "chain"
-        ? "Interest accrues continuously at the market's rate and is written into the debt at each touch; the figure on top is what has accrued since the last touch and is not yet written in. The interest already charged over the CDP's life is listed beside the flows. Units are native — pETH on one side, the market's stablecoin on the other — so the two towers are not height-comparable."
-        : "The debt figure is the CDP's debt as of its last touch; interest accrued since then appears once the live figures land. Units are native — pETH on one side, the market's stablecoin on the other — so the two towers are not height-comparable.",
-    flowsNote:
-      lifetime != null
-        ? undefined
-        : "Lifetime flows for this CDP aren't available yet — they appear once its history is in place.",
-  };
 }
