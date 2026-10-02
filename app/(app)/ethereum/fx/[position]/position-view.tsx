@@ -485,6 +485,9 @@ export default function FxPositionView({
                 v={cardView ?? view}
                 receipts
                 viewHref={tl.viewHref}
+                // Closed by default, remembered per viewer and position (ui-jobs
+                // 209).
+                disclosureKey={`fx:${view.pool.toLowerCase()}:${view.positionId}`}
                 drift={drift}
                 rebalanceRows={historyWindow.state === "whole" ? rebalanceRows : undefined}
                 inTxFunding={inTxFunding}

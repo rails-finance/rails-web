@@ -19,6 +19,7 @@
 // socialized lane (funding / rebalances / write-offs). It is always surfaced,
 // never hidden — e.g. wsteth-285 shows implied 25,178 fxUSD against settled 0.
 
+import { Fragment } from "react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
@@ -27,6 +28,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import {
   settledCollateralProv,
   settledDebtProv,
@@ -557,9 +559,14 @@ export function FxPositionCard({
   inTxFunding,
   bodyExtra,
   listingPx,
+  disclosureKey,
 }: {
   v: FxPositionView;
   receipts?: boolean;
+  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
+   *  forwarded to `PositionCardShell`. Closed, the card is its header and
+   *  three headlines; opened, each headline's detail. */
+  disclosureKey?: string;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
@@ -582,6 +589,10 @@ export function FxPositionCard({
   listingPx?: FxListingPrice | null;
 }) {
   const st = STATUS[v.status] ?? STATUS.unknown;
+  // The closed/opened card (ui-jobs 209): every line under a headline moves
+  // into the opened layer (<PositionCardDetail>).
+  const disclosing = receipts && !!disclosureKey;
+  const Detail = disclosing ? PositionCardDetail : Fragment;
   const poolMeta = FX_POOLS[v.pool];
   const terms = useFxPoolTerms(receipts ? v.pool : null);
   // The oracle's anchor and min legs at the settled block (detail page only).
@@ -642,8 +653,12 @@ export function FxPositionCard({
           pool: poolMeta.tokenSymbol,
           terms,
         })}
+        disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
+          // A disclosing card's closed layer is the header and the outcome;
+          // the final balances and their reconciliation are its opened layer.
+          detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.everLiquidated ? "liquidated" : "closed"}
           leadingIdentity={identityLead}
           identity={meta}
@@ -710,8 +725,10 @@ export function FxPositionCard({
         colls: v.settled.colls,
         normalizedSymbol: v.normalizedSymbol,
       })}
+      disclosureKey={disclosureKey}
     >
       <OpenPositionStats
+        stackOnPhone={disclosing}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -744,10 +761,10 @@ export function FxPositionCard({
                 <StatDash />
               ),
             footnote: (
-              <>
+              <Detail>
                 <CollateralUsdFootnote v={v} px={px} listing={listingPx} />
                 {drift ? <CollateralDriftLine v={v} drift={drift} rows={rebalanceRows} inTx={inTxFunding} /> : null}
-              </>
+              </Detail>
             ),
           },
           {
@@ -766,7 +783,11 @@ export function FxPositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote: <SocializedLine v={v} rows={rebalanceRows} />,
+            footnote: (
+              <Detail>
+                <SocializedLine v={v} rows={rebalanceRows} />
+              </Detail>
+            ),
           },
           {
             // getPositionDebtRatio, 0–1 scaled to a percentage — the pool's
@@ -780,7 +801,11 @@ export function FxPositionCard({
               ) : (
                 <StatDash />
               ),
-            footnote: receipts ? <RatioFootnote v={v} terms={terms} px={px} /> : undefined,
+            footnote: receipts ? (
+              <Detail>
+                <RatioFootnote v={v} terms={terms} px={px} />
+              </Detail>
+            ) : undefined,
           },
         ]}
       />

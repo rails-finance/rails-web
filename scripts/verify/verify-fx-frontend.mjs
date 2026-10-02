@@ -21,6 +21,7 @@
 //                (scripts/verify-fx-chain.mjs, round 3).
 
 import { chromium } from "playwright";
+import { openPositionCards } from "./lib/position-card.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3903";
 let pass = 0;
@@ -135,6 +136,8 @@ async function openAndRead(path) {
   pg.on("pageerror", (e) => errors.push(String(e)));
   await pg.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 120000 });
   await pg.waitForTimeout(9000);
+  // The position card draws closed (ui-jobs 209): open it first.
+  await openPositionCards(pg);
   for (let round = 0; round < 3; round++) {
     for (const h of await pg.$$('[role="button"]:not([data-v])')) {
       try {
