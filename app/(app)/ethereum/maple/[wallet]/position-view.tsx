@@ -622,9 +622,8 @@ export default function MaplePositionView({
                       tenurePending={!lifetimeFiguresKnown(historyWindow)}
                       // "in the pool 315 days" runs to today. A wallet that left
                       // and came back names each stretch it held shares.
-                      labelTenure={view.status === "open" ? "in the pool" : true}
+                      labelTenure={view.status === "open" ? "in the pool" : undefined}
                       lives={lives}
-                      labelLastActivity
                     />
                   ) : undefined
                 }

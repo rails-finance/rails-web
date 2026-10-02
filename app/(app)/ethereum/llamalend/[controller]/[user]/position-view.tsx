@@ -490,7 +490,6 @@ export default function LlamalendPositionView({
                     // does.
                     firstAt={opening?.firstTimestamp}
                     tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                    labelLastActivity
                     reopenedAt={
                       loans.length > 1 && loans[loans.length - 1].closedAt == null
                         ? loans[loans.length - 1].openedAt
@@ -509,6 +508,7 @@ export default function LlamalendPositionView({
                     previousStated={previousStated.get(event.id) ?? null}
                     loanMark={loanMarks?.get(event.id) ?? null}
                     marketDiscount={chain?.marketLiquidationDiscount ?? null}
+                    controllerHasApprovals={chain?.controllerHasApprovals ?? null}
                     next={nextRows.get(event.id) ?? null}
                   />
                 ) : null

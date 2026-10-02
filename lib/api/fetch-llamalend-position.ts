@@ -114,6 +114,10 @@ export interface LlamalendChainResponse {
   /** Controller.liquidation_discount(): the market's figure now, which a
    *  position copies when its owner opens or adds to the loan. */
   marketLiquidationDiscount: number | null;
+  /** Whether the controller answers `approval(address,address)`: true where
+   *  the owner may approve other addresses to liquidate at any health, false
+   *  where the call reverts (only the owner may), null when the read failed. */
+  controllerHasApprovals: boolean | null;
 
   /** True when the chain read failed and this is an empty stub. */
   chainStale: boolean;

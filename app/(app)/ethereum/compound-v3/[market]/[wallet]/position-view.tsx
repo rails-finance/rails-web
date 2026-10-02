@@ -579,7 +579,6 @@ export default function CompoundPositionView({
                     // because its oldest loaded card is.
                     firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                     tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                    labelLastActivity
                   />
                 }
                 renderCard={(event, meta) =>

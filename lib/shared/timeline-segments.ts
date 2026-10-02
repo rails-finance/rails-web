@@ -114,17 +114,29 @@ export function planSegmentAsk(
   monthIdx: number,
   lifeDays: ReadonlyMap<number, number>,
   cap: number | null,
+  /** A cut inside the month ("Show timeline to {date}"): the week or day is
+   *  the newest on or before it, so the ask holds the cut's top. */
+  until: number | null = null,
 ): { from: number; to: number } {
   const from = monthStartTs(monthIdx);
   const to = monthEndTs(monthIdx);
   if (cap == null || eventsWithin(lifeDays, from, to) <= cap) return { from, to };
+  const upTo = until != null ? Math.min(to, until) : to;
   let newest = -Infinity;
-  for (const [day, count] of lifeDays) if (count > 0 && day >= from && day <= to && day > newest) newest = day;
+  for (const [day, count] of lifeDays) if (count > 0 && day >= from && day <= upTo && day > newest) newest = day;
   if (!Number.isFinite(newest)) return { from, to };
   const weekFrom = Math.max(from, newest - 6 * DAY);
   const weekTo = newest + DAY - 1;
   if (eventsWithin(lifeDays, weekFrom, weekTo) <= cap) return { from: weekFrom, to: weekTo };
   return { from: newest, to: newest + DAY - 1 };
+}
+
+/** The newest day the life holds an event on, on or before `ts`; null when
+ *  it holds none that early. */
+export function newestLifeDayBefore(lifeDays: ReadonlyMap<number, number>, ts: number): number | null {
+  let newest: number | null = null;
+  for (const [day, count] of lifeDays) if (count > 0 && day <= ts && (newest == null || day > newest)) newest = day;
+  return newest;
 }
 
 /** The segment's span for `TimelineWindow`, from a month, the ask and the

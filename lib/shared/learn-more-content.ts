@@ -2166,12 +2166,21 @@ export function llamalendRepayContent(kind: "repay" | "remove_collateral"): Lear
   };
 }
 
-export function llamalendLiquidationContent(self: boolean): LearnMoreContent {
+/** `approvals`: whether this controller answers `approval(address,address)`
+ *  (the position's live read); the approved-address clause appears only where
+ *  it does. */
+export function llamalendLiquidationContent(self: boolean, approvals: boolean | null = null): LearnMoreContent {
+  const anyHealth =
+    approvals === true
+      ? "The owner, or an address the owner approved, may liquidate at any health."
+      : approvals === false
+        ? "Only the owner may liquidate at any health."
+        : "The owner may liquidate at any health.";
   return {
     title: self ? "How Self-Liquidation Works" : "How Hard Liquidation Works",
     intro: self
       ? "A borrower whose position is partly converted can settle it themselves: self-liquidation repays the debt using the already-converted borrowed tokens plus a top-up, and withdraws whatever collateral remains. It is a normal close from soft-liquidation, with no third party."
-      : "Hard liquidation needs health below 0. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales. Anyone may then liquidate the position, in full or in part: the position's converted tokens go toward the debt, the liquidator pays the rest and receives the collateral, and any converted tokens above the debt. The owner receives nothing and keeps what they borrowed. The owner, or an address the owner approved, may liquidate at any health.",
+      : `Hard liquidation needs health below 0. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales. Anyone may then liquidate the position, in full or in part: the position's converted tokens go toward the debt, the liquidator pays the rest and receives the collateral, and any converted tokens above the debt. The owner receives nothing and keeps what they borrowed. ${anyHealth}`,
     extraParagraphs: [
       "Soft-liquidation comes first: while the oracle price is inside the position's bands, the AMM sells its collateral for the borrowed token as the price falls and buys it back as the price rises, with no event and no liquidator. The swap reverses; the losses do not. The converted amount can be read from the chain up to the liquidating block.",
       "The market logs a repay alongside every liquidation with the same amounts; the timeline shows the pair as one liquidation event.",

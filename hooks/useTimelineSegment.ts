@@ -116,8 +116,8 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   // and from then on the page reads segments flat.
   const apiGroupsSpans = useRef<boolean | null>(null);
   const loadSegment = useCallback(
-    async (monthIdx: number) => {
-      const ask = planSegmentAsk(monthIdx, lifeDays, preloadCap);
+    async (monthIdx: number, until?: number) => {
+      const ask = planSegmentAsk(monthIdx, lifeDays, preloadCap, until ?? null);
       segmentRead.current?.abort();
       const ac = new AbortController();
       segmentRead.current = ac;
@@ -203,11 +203,11 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   });
   const { setDateRange } = tl;
   const pickMonth = useCallback(
-    (monthIdx: number) => {
+    (monthIdx: number, until?: number) => {
       // Picking a month replaces the segment; a date typed within the old
       // one does not carry over.
       setDateRange(null);
-      void loadSegment(monthIdx);
+      void loadSegment(monthIdx, until);
     },
     [setDateRange, loadSegment],
   );

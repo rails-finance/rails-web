@@ -67,6 +67,12 @@ export function formatDate(dateInput: string | number | Date): string {
   return `${date.getUTCDate()} ${monthShort(date.getUTCMonth())} ${date.getUTCFullYear()}`;
 }
 
+/** "7 Feb '26" — day, short month, two-digit year: the timeline's short form. */
+export function formatDateShortYear(dateInput: string | number | Date): string {
+  const date = toDate(dateInput);
+  return `${date.getUTCDate()} ${monthShort(date.getUTCMonth())} '${String(date.getUTCFullYear()).slice(-2)}`;
+}
+
 /** "7 Feb" — day and short month, no year. */
 export function formatDayMonth(dateInput: string | number | Date): string {
   const date = toDate(dateInput);

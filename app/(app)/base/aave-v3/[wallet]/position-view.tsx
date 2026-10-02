@@ -51,7 +51,7 @@ import { AaveV3PoolNotes } from "@/components/protocol/aave-v3/aave-v3-pool-note
 import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
-import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
+import { aaveV3Neighbours, aaveV3ReplayCountNote, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -349,10 +349,21 @@ export default function AaveV3BasePositionView({
       .finally(() => setPricesSettled(true));
   }, [data, events, timeline, wallet]);
 
-  const view = useMemo(
-    () => (data && !data.chainStale ? v3ViewFromChain(data, "base", prices, events, history) : null),
-    [data, prices, events, history],
-  );
+  // Why the timeline's event count and the card's transaction count differ,
+  // stated where the page holds every row the count was taken over.
+  const countWhole = sweptClean && (timeline?.coverage.omitted?.count ?? 0) === 0;
+  const countNote = useMemo(() => {
+    if (!data || data.chainStale || !countWhole || (servedFolders?.length ?? 0) > 0) return null;
+    return aaveV3ReplayCountNote(aaveEvents as AaveV3TimelineEvent[], timeline?.txCount ?? 0);
+  }, [data, countWhole, timeline, servedFolders, aaveEvents]);
+  const view = useMemo(() => {
+    if (!data || data.chainStale) return null;
+    const v = v3ViewFromChain(data, "base", prices, events, history);
+    // The card's count counts transactions; its tip gives the events too.
+    return countWhole && timeline && (servedFolders?.length ?? 0) === 0
+      ? { ...v, eventTotal: timeline.totalEvents, countNote: countNote?.parts.join(", ") || undefined }
+      : v;
+  }, [data, prices, events, history, countWhole, timeline, servedFolders, countNote]);
 
   // Debt the Pool wrote off that this history does not show (DeficitCreated
   // is not among the logs Base reads). Stated only where it left a remainder.
@@ -605,6 +616,7 @@ export default function AaveV3BasePositionView({
                           events={aaveEvents}
                           folders={servedFolders}
                           marketPhrase="Base market"
+                          countNote={countNote}
                         />
                       ) : (
                         <>
@@ -613,6 +625,7 @@ export default function AaveV3BasePositionView({
                             captions={captions}
                             view={view}
                             externalActivity={externalActivity}
+                            countNote={countNote}
                           />
                           <AaveV3PoolNotes chain={data} collateralAccounting="v3.2+" />
                         </>

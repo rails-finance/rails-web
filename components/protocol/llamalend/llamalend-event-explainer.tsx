@@ -43,7 +43,7 @@ export interface LlamalendEventExplainerProps {
 /** Mechanic modal content for this event — never-empty floor: every event type
  *  maps to a modal. Used by the card composer, which renders the "?" trigger
  *  on the footer row (this pane renders prose only). */
-export function llamalendLearnMoreContent(ctx: LlamalendContext): LearnMoreContent {
+export function llamalendLearnMoreContent(ctx: LlamalendContext, approvals: boolean | null = null): LearnMoreContent {
   switch (ctx.eventType) {
     case "borrow":
     case "add_collateral":
@@ -52,7 +52,7 @@ export function llamalendLearnMoreContent(ctx: LlamalendContext): LearnMoreConte
     case "remove_collateral":
       return llamalendRepayContent(ctx.eventType);
     case "liquidation":
-      return llamalendLiquidationContent(!!ctx.selfLiquidation);
+      return llamalendLiquidationContent(!!ctx.selfLiquidation, approvals);
     default:
       return llamalendEventFallbackContent();
   }

@@ -280,7 +280,8 @@ async function main() {
 
     // Tenure comes from the opening balance's first event, not the window's.
     if (opening.firstTimestamp) {
-      const year = String(new Date(opening.firstTimestamp * 1000).getUTCFullYear());
+      // The heading's short year: "Active since 31 Jan '25".
+      const year = `'${String(new Date(opening.firstTimestamp * 1000).getUTCFullYear()).slice(-2)}`;
       // Scoped to the eyebrow's own element, not the page body: a year string
       // appears in a dozen places on a three-year position, and a body-wide
       // `includes` would pass on any of them while the tenure said 2026.

@@ -12,6 +12,8 @@
 //   Controller.health(user, true)      the protocol's health (below 0: liquidatable)
 //   Controller.liquidation_discounts(user)  the discount that health subtracts
 //   Controller.liquidation_discount()       the market's current discount
+//   Controller.approval(user, user)         answers only on controllers with
+//                                           approvals (a revert means none)
 //
 // `user_state.stablecoin` is the figure no event carries: collateral the AMM
 // has ALREADY converted for this user — soft-liquidation observed live. It is
@@ -46,6 +48,7 @@ const CONTROLLER_ABI = parseAbi([
   "function health(address,bool) view returns (int256)",
   "function liquidation_discounts(address) view returns (uint256)",
   "function liquidation_discount() view returns (uint256)",
+  "function approval(address,address) view returns (bool)",
 ]);
 const AMM_ABI = parseAbi([
   "function read_user_tick_numbers(address) view returns (int256[2])",
@@ -105,6 +108,7 @@ function stub(controller: string, user: string): LlamalendChainResponse {
     healthFullRaw: null,
     liquidationDiscount: null,
     marketLiquidationDiscount: null,
+    controllerHasApprovals: null,
     chainStale: true,
   };
 }
@@ -146,6 +150,9 @@ export async function loadLlamalendPositionFromChain(
             args: [user],
           },
           { address: controller as `0x${string}`, abi: CONTROLLER_ABI, functionName: "liquidation_discount" },
+          // Some controllers have no approvals (the WETH mint market's
+          // 0xa920…9635): the call reverts there.
+          { address: controller as `0x${string}`, abi: CONTROLLER_ABI, functionName: "approval", args: [user, user] },
         ] as const,
       }) as Promise<Res[]>,
     ]);
@@ -166,6 +173,7 @@ export async function loadLlamalendPositionFromChain(
 
     const marketDiscountRaw = ok<bigint>(reads[8]);
     if (marketDiscountRaw != null) base.marketLiquidationDiscount = scale1e18(marketDiscountRaw);
+    base.controllerHasApprovals = reads[9]?.status === "success";
 
     const priceOracleRaw = ok<bigint>(reads[5]);
     if (priceOracleRaw != null) {

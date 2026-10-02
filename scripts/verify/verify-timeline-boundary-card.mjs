@@ -828,7 +828,7 @@ async function readPage(page) {
     // is withheld from a closed position — a dot on a position that ended is a
     // claim that it is still running. Neither phrase found is not "open": it
     // is a page this check cannot read, and it is reported as one.
-    const eyebrow = [...document.querySelectorAll("span")]
+    const eyebrow = [...document.querySelectorAll("span, button")]
       .map((e) => (e.textContent ?? "").trim())
       .find((t) => /^(Active since|Opened) /.test(t) || t === "Active since —" || t === "Opened —");
     const tenure = eyebrow == null ? null : /^Opened/.test(eyebrow) ? "closed" : "open";

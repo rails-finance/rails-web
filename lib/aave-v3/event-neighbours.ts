@@ -190,3 +190,59 @@ export function aaveV3CountSentence(split: AaveV3CountSplit, txCount: number): s
   if (parts.length === 0) return null;
   return `The timeline lists ${split.events} events: ${parts.join("; ")}.`;
 }
+
+/** The same statement for a replayed history (Base, Seamless), whose
+ *  transaction count is every transaction of the owner's rows that holds no
+ *  liquidation (lib/sources/chain/aave-v3-events.ts `txCount`). Each row past
+ *  that count is a liquidation, an aToken transfer the liquidation emitted
+ *  (the seized collateral to the liquidator, the fee to the treasury), or a
+ *  further row in a transaction already counted. Null where the two counts
+ *  agree, or where `events` is not the whole history the count was taken
+ *  over (the parts would not add up). */
+export function aaveV3ReplayCountNote(events: readonly AaveV3TimelineEvent[], txCount: number): AaveV3CountNote | null {
+  if (events.length === txCount) return null;
+  const txOf = (e: AaveV3TimelineEvent) => (e.txHash ?? e.id.slice(0, e.id.lastIndexOf("-"))).toLowerCase();
+  const byTx = new Map<string, AaveV3TimelineEvent[]>();
+  for (const e of events) byTx.set(txOf(e), [...(byTx.get(txOf(e)) ?? []), e]);
+  let liquidations = 0;
+  let liquidationRows = 0;
+  let liquidationTransfersOnly = true;
+  let ownTxs = 0;
+  let ownRows = 0;
+  for (const rows of byTx.values()) {
+    const liq = rows.filter((r) => r.context.data.eventType === "liquidation").length;
+    if (liq > 0) {
+      liquidations += liq;
+      liquidationRows += rows.length - liq;
+      for (const r of rows) {
+        const t = r.context.data.eventType;
+        if (t !== "liquidation" && t !== "transfer_in" && t !== "transfer_out") liquidationTransfersOnly = false;
+      }
+    } else {
+      ownTxs++;
+      ownRows += rows.length;
+    }
+  }
+  if (ownTxs !== txCount) return null;
+  const parts: string[] = [];
+  if (liquidations > 0) parts.push(plural(liquidations, "liquidation by a liquidator", "liquidations by liquidators"));
+  if (liquidationRows > 0) {
+    const what = liquidationTransfersOnly ? "aToken transfer" : "row";
+    const where = liquidations === 1 ? "in that liquidation's transaction" : "in the liquidations' transactions";
+    parts.push(plural(liquidationRows, `${what} ${where}`, `${what}s ${where}`));
+  }
+  if (ownRows > ownTxs)
+    parts.push(
+      plural(
+        ownRows - ownTxs,
+        "more row in a transaction already counted",
+        "more rows in transactions already counted",
+      ),
+    );
+  return {
+    text: `${events.length} rows: ${[`${plural(txCount, "transaction", "transactions")} by or for the owner`, ...parts].join(", ")}.`,
+    total: events.length,
+    txCount,
+    parts,
+  };
+}

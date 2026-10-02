@@ -848,10 +848,13 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     }
   };
   // The wallet's own transactions over EVERY row: a liquidation is the
-  // liquidator's transaction, not the position owner's. A seeded wallet's
-  // count is this set's size plus the seed's — the cut is a block boundary,
-  // so no member of the seed's set can reappear here.
+  // liquidator's transaction, not the position owner's, and so are the aToken
+  // transfers it emits (the seized collateral to the liquidator, the fee to
+  // the treasury). A seeded wallet's count is this set's size plus the
+  // seed's — the cut is a block boundary, so no member of the seed's set can
+  // reappear here.
   const ownTxs = new Set<string>();
+  const liquidationTxs = new Set<string>();
   let liquidationCount = 0;
 
   // A seeded wallet opens with the state the elided rows left, BEFORE the
@@ -1092,7 +1095,10 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
       }
     }
     if (d.kind !== "liquidation") ownTxs.add(d.txHash);
-    else liquidationCount++;
+    else {
+      liquidationCount++;
+      liquidationTxs.add(d.txHash);
+    }
     // Every row advances the replay; rows past the cutoff are rendered, and
     // so is every older row the wallet signed itself (the anchor) — but only
     // those whose block could actually be dated. An event with no timestamp
@@ -1447,7 +1453,7 @@ export function replayAaveV3Rows(p: AaveV3ReplayInput): AaveV3ChainTimelineResul
     totalEvents: events.length,
     lifetime: [...lifetime.values()],
     lifetimeRaw,
-    txCount: seededTxs + ownTxs.size,
+    txCount: seededTxs + [...ownTxs].filter((h) => !liquidationTxs.has(h)).length,
     liquidationCount,
     lastActivityAt:
       rows.length > 0

@@ -705,8 +705,6 @@ export default function MakerVaultDetailView({
                   // When the vault actually opened, not when the window does.
                   firstAt={opening?.firstTimestamp ?? oldestFolderAt}
                   tenurePending={!lifetimeFiguresKnown(historyWindow)}
-                  labelLastActivity
-                  labelTenure
                 />
               }
               renderCard={(event, meta) =>

@@ -387,7 +387,6 @@ function MarketSection({
                   folders={servedFolders}
                   closed={view.status !== "open"}
                   firstAt={replay?.firstEventAt ?? null}
-                  labelLastActivity
                 />
               }
               emptyLabel={

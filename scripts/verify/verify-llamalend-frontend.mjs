@@ -727,7 +727,10 @@ try {
   );
   check("inband: mint market line on the card", /This is a mint market/.test(body));
   check("inband: opening row reads Open · Deposit · Borrow", /Open\s*Deposit\s*Borrow/.test(body));
-  check("inband: freshness pill says last activity", /last activity \d+ days ago/.test(body));
+  check(
+    "inband: heading states the start date, no freshness",
+    /Active since \d{1,2} [A-Z][a-z]{2} '\d\d/.test(body) && !/last activity \d+ days ago/.test(body),
+  );
   await p2.close();
 
   const REOPEN = {
@@ -759,10 +762,7 @@ try {
   check("reopen: no top-up wording on loan 2's first borrow", !/Borrowed another 9,000/.test(body));
   check("reopen: band move said in price", /moved the bands 2 up in price, to 74…83/.test(body));
   check("reopen: the full repay reads Close · Withdraw · Repay", /Close\s*Withdraw\s*Repay/.test(body));
-  check(
-    "reopen: last activity sits before first opened",
-    /Open again since[\s\S]{0,60}last activity[\s\S]{0,40}first opened/.test(body),
-  );
+  check("reopen: open again, then first opened", /Open again since[\s\S]{0,40}first opened/.test(body));
   check("reopen: lend market line on the card", /This is a lend market/.test(body));
   await p3.close();
 

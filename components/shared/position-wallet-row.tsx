@@ -12,10 +12,60 @@
 // id-keyed page learns its owner from the position read).
 
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
+import { protocolForSession } from "@/lib/shared/protocols";
+import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
+import type { ChainId } from "@/lib/shared/chains";
+
+/** The row's words for what the address is (ui-jobs 232), and the read
+ *  behind them for the tip. */
+function addressKindWords(k: AddressKind): { label: string; tip: string } {
+  const at = `eth_getCode at block ${k.block.toLocaleString("en-US")}`;
+  switch (k.kind) {
+    case "account":
+      return { label: "Wallet", tip: `No code at this address (${at}): an account a key controls.` };
+    case "delegated":
+      return {
+        label: "Smart account (EIP-7702)",
+        tip: `The code is an EIP-7702 delegation to ${k.delegate} (${at}): a key controls the account and it runs the delegate's code.`,
+      };
+    case "safe":
+      return { label: "Smart account (Safe)", tip: `A Safe ${k.version} (${at}): its owners sign together.` };
+    case "contract": {
+      const named = k.name && k.symbol ? `${k.name} (${k.symbol})` : (k.name ?? k.symbol);
+      return {
+        label: named ? `Contract: ${named}` : "Contract",
+        tip: named
+          ? `A contract (${at}); its name() and symbol() answer ${named}.`
+          : `A contract (${at}); it answers no name().`,
+      };
+    }
+  }
+}
+
+function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainId }) {
+  const [kind, setKind] = useState<AddressKind | null>(null);
+  useEffect(() => {
+    let live = true;
+    setKind(null);
+    fetchAddressKind(wallet, chainId).then((k) => {
+      if (live) setKind(k);
+    });
+    return () => {
+      live = false;
+    };
+  }, [wallet, chainId]);
+  if (!kind) return null;
+  const w = addressKindWords(kind);
+  return (
+    <span className="min-w-0 truncate" data-address-kind={kind.kind} title={w.tip}>
+      {w.label}
+    </span>
+  );
+}
 
 export interface PositionOwner {
   /** The wallet; null or undefined while the page has not read it. */
@@ -52,6 +102,7 @@ export function PositionWalletRow({
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
+  const chainId = session ? protocolForSession(session)?.chainId : undefined;
   const pill = owner.wallet ? (
     <WalletPill
       wallet={owner.wallet}
@@ -76,6 +127,7 @@ export function PositionWalletRow({
       <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
         {pill && owner.prefix}
         {pill && (owner.wrap ? owner.wrap(pill) : pill)}
+        {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
         {owner.extra}
       </span>
       <span className="shrink-0">{tools || <ToolsMenu />}</span>

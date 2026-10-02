@@ -14,7 +14,7 @@
 // in the position card's Explanation pane now, not here — see `CopyViewLink`
 // in `provenance-info-tabs.tsx`.
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
 import { CalendarRange, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { actionNoun } from "@/lib/shared/event-action-nouns";
@@ -38,7 +38,7 @@ import {
   CTRL_ON_HOVER,
   ctrlWaking,
 } from "@/lib/shared/ui-grammar";
-import { formatDate, formatDateRange, formatDayMonth, formatDuration } from "@/lib/date";
+import { formatDate, formatDateRange, formatDateShortYear, formatDayMonth, formatDuration } from "@/lib/date";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
@@ -47,16 +47,62 @@ import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/sh
 import { useHydrated } from "@/hooks/useHydrated";
 import type { TimelineEventsState } from "@/hooks/useTimelineEvents";
 
-/** The age and the freshness on the heading line: muted text after a middle
- *  dot, so only the filters below read as controls (rails-ops ui-jobs 227). */
+/** The muted text after a middle dot on the heading line, so only the filters
+ *  below read as controls (rails-ops ui-jobs 227). */
 const HEAD_META = "whitespace-nowrap text-rb-500";
 
-/** Tenure-first activity eyebrow for a position timeline (the V4 spoke
- *  treatment): "Active since {date} · {tenure} · updated {since last activity} ago" —
- *  when the position started, how long it has run, how fresh the latest
- *  activity is, read off the captured event stream (any order — first/last are
- *  scanned, not assumed). A closed position reads "Opened" and measures tenure
- *  to its last activity instead of now.
+// Which form the heading states, remembered per viewer across every position
+// page (rails-ops ui-jobs 231): the start date ("Active since 31 Jan '25") or
+// the tenure ("Active for 608 days"). Read through useSyncExternalStore with
+// the date form as the server snapshot, so the server render and the
+// hydrating render agree and a viewer who chose the tenure sees it straight
+// after hydration.
+const HEAD_FORM_KEY = "rails-ui-timeline-head-tenure";
+const headFormListeners = new Set<() => void>();
+function readHeadTenure(): boolean {
+  try {
+    return localStorage.getItem(HEAD_FORM_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeHeadTenure(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(HEAD_FORM_KEY, "1");
+    else localStorage.removeItem(HEAD_FORM_KEY);
+  } catch {}
+  for (const l of headFormListeners) l();
+}
+function subscribeHeadForm(onChange: () => void): () => void {
+  headFormListeners.add(onChange);
+  return () => {
+    headFormListeners.delete(onChange);
+  };
+}
+const dateFormOnServer = () => false;
+
+/** The heading's one statement, a button that flips between its two forms. */
+function HeadToggle({ tenure, date, dur }: { tenure: boolean; date: string; dur: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      data-head-form={tenure ? "tenure" : "date"}
+      aria-pressed={tenure}
+      aria-label={tenure ? "Show the start date" : "Show how long"}
+      onClick={() => writeHeadTenure(!tenure)}
+      className="cursor-pointer rounded-sm text-foreground focus-ring"
+    >
+      {tenure ? dur : date}
+    </button>
+  );
+}
+
+/** Tenure-first activity heading for a position timeline: "Active since 31
+ *  Jan '25", and on a click "Active for 608 days" — when the position started
+ *  or how long it has run, read off the captured event stream (any order —
+ *  first/last are scanned, not assumed). A closed position reads "Opened" and
+ *  "Open for", measured to its last activity. How fresh the latest activity
+ *  is belongs to the position card's header, which states it.
  *
  *  "Since" is the first CAPTURED event. For a genesis-complete index that IS
  *  the position's start; where an index has a backfill floor (Aave V3), a
@@ -70,14 +116,13 @@ export function TimelineActivityHeader({
   tenurePending,
   reopenedAt,
   lives,
-  labelLastActivity,
   labelTenure,
 }: {
   events: { timestamp: number }[];
   /** Each served folder's own first and last member, whole and unfiltered —
-   *  the newest (or oldest) thing a position did can sit inside a folder
-   *  rather than in `events`, so the tenure and the "ago" pill miss it unless
-   *  every served folder's span is read alongside the events on screen. */
+   *  the oldest (or newest) thing a position did can sit inside a folder
+   *  rather than in `events`, so the tenure misses it unless every served
+   *  folder's span is read alongside the events on screen. */
   folders?: readonly { firstAt: number; lastAt: number }[] | null;
   closed?: boolean;
   /** When the position actually STARTED, for a surface whose event list is a
@@ -86,35 +131,30 @@ export function TimelineActivityHeader({
    *  not the oldest event. */
   firstAt?: number | null;
   /** True while the position's opening balance is still in flight, or failed.
-   *  The eyebrow then states the tenure as an OMISSION rather than measuring it
-   *  from the oldest event on screen: on a windowed page that event is the
+   *  The heading then states the start as an OMISSION rather than measuring
+   *  it from the oldest event on screen: on a windowed page that event is the
    *  start of the last thousand, not the start of the position, and a date
-   *  three years wrong reads exactly as confidently as a right one. The
-   *  freshness pill stays — the NEWEST event is always in the window (a served
-   *  folder's `lastAt` included). */
+   *  three years wrong reads as confidently as a right one. */
   tenurePending?: boolean;
   /** Where the position closed and opened again under the same key (a
    *  LlamaLend borrower who repaid in full and borrowed later), when the open
-   *  loan began: the eyebrow then reads "Open again since {date} · {tenure} ·
-   *  first opened {date}". Unset changes nothing. */
+   *  loan began: the heading then reads "Open again since {date} · first
+   *  opened {date}". Unset changes nothing. */
   reopenedAt?: number | null;
   /** Where the account emptied and started again, each stretch it held
-   *  something (unix seconds; `to` null while open): the eyebrow then names
+   *  something (unix seconds; `to` null while open): the heading then names
    *  every stretch and its length ("7 Oct - 31 Oct 2025 · 24 days · again 29
    *  Sep 2026 · 1 minute"). Drawn with two or more. Unset changes nothing. */
   lives?: readonly { from: number; to: number | null }[] | null;
-  /** Say "last activity" inside the freshness pill, so it cannot read as the
-   *  age of the date before it. Unset changes nothing. */
-  labelLastActivity?: boolean;
-  /** Say what the tenure pill measures ("open 1,508 days", "active 281
-   *  days"). A string is the word itself ("in the pool 315 days"). Unset
-   *  changes nothing. */
-  labelTenure?: boolean | string;
+  /** What an open position is doing, in place of "Active" ("in the pool":
+   *  "In the pool since 31 Jan '25", "In the pool for 315 days"). */
+  labelTenure?: string;
 }) {
   // Null until the browser mounts: the server and the first browser render
-  // agree on a placeholder, then the age is stated (no layout shift: the
+  // agree on a placeholder, then the tenure is stated (no layout shift: the
   // placeholder is the same words, invisible).
   const clock = useMountedNow();
+  const tenure = useSyncExternalStore(subscribeHeadForm, readHeadTenure, dateFormOnServer);
   if (events.length === 0 && !folders?.length) return null;
   let first = events.length ? events[0].timestamp : folders![0].firstAt;
   let last = first;
@@ -131,7 +171,6 @@ export function TimelineActivityHeader({
   // A duration that reads the clock: the placeholder holds the width.
   const dur = (from: number, to: number | null) =>
     to == null && clock == null ? <span className="invisible">00 days</span> : formatDuration(from, to ?? now);
-  const ago = clock == null ? <span className="invisible">00 days ago</span> : `${formatDuration(last, now)} ago`;
   if (!tenurePending && lives && lives.length > 1) {
     // Past three, the first and the last are named and the rest counted; the
     // tip lists every one.
@@ -171,53 +210,47 @@ export function TimelineActivityHeader({
             </span>
           );
         })}
-        <span className={HEAD_META}>
-          · {labelLastActivity ? "last activity " : "updated "}
-          {ago}
-        </span>
       </div>
     );
   }
   if (!tenurePending && !closed && reopenedAt != null && reopenedAt > first) {
     return (
-      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm">
-        <span className="text-foreground">Open again since {formatDate(reopenedAt)}</span>
-        <span className={HEAD_META} data-prov-exempt="">
-          · {dur(reopenedAt, null)}
-        </span>
-        <span className={HEAD_META}>
-          · {labelLastActivity ? "last activity " : "updated "}
-          {ago}
-        </span>
-        <span className={HEAD_META}>· first opened {formatDate(first)}</span>
+      <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm" data-timeline-activity-head="">
+        <HeadToggle
+          tenure={tenure}
+          date={`Open again since ${formatDateShortYear(reopenedAt)}`}
+          dur={<>Open again for {dur(reopenedAt, null)}</>}
+        />
+        <span className={HEAD_META}>· first opened {formatDateShortYear(first)}</span>
       </div>
     );
   }
+  const lead = labelTenure ? labelTenure.charAt(0).toUpperCase() + labelTenure.slice(1) : "Active";
   return (
-    <div className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm" data-timeline-activity-head="">
+    // data-prov-exempt: a span between two event timestamps ("40 days"),
+    // timeline chrome the coverage tripwire reads as a figure.
+    <div
+      className="flex flex-wrap items-baseline gap-x-1 gap-y-1 text-sm"
+      data-timeline-activity-head=""
+      data-prov-exempt=""
+    >
       {tenurePending ? (
-        <span className="text-muted-foreground">{closed ? "Opened" : "Active since"} —</span>
+        <span className="text-muted-foreground">{closed ? "Opened" : `${lead} since`} —</span>
       ) : (
-        <>
-          <span className="text-foreground">
-            {closed ? "Opened" : "Active since"} {formatDate(first)}
-          </span>
-          {/* data-prov-exempt: a span between two event timestamps ("40 days"),
-              timeline chrome the coverage tripwire reads as a figure. */}
-          <span
-            className={HEAD_META}
-            data-prov-exempt=""
-            title={`${closed ? "Open from" : "Active from"} ${formatDate(first)} to ${closed ? formatDate(last) : "today"}`}
-          >
-            · {labelTenure ? (typeof labelTenure === "string" ? `${labelTenure} ` : closed ? "open " : "active ") : ""}
-            {dur(first, closed ? last : null)}
-          </span>
-        </>
+        <HeadToggle
+          tenure={tenure}
+          date={closed ? `Opened ${formatDateShortYear(first)}` : `${lead} since ${formatDateShortYear(first)}`}
+          dur={
+            closed ? (
+              <>Open for {dur(first, last)}</>
+            ) : (
+              <>
+                {lead} for {dur(first, null)}
+              </>
+            )
+          }
+        />
       )}
-      <span className={HEAD_META} title={`Last activity ${formatDate(last)}`}>
-        · {labelLastActivity ? "last activity " : "updated "}
-        {ago}
-      </span>
     </div>
   );
 }

@@ -136,7 +136,14 @@ import { setCardOpen } from "@/lib/shared/card-open-store";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
-import { eventsWithin, monthEndTs, monthLabel, monthStartTs } from "@/lib/shared/timeline-segments";
+import {
+  eventsWithin,
+  monthEndTs,
+  monthIdxOf,
+  monthLabel,
+  monthStartTs,
+  newestLifeDayBefore,
+} from "@/lib/shared/timeline-segments";
 
 // The small-print register a pinned/not-found notice draws in — the same
 // `text-[11px]` scale `TimelineCoverageFooter`'s NOTE uses, so a reader who has
@@ -516,8 +523,9 @@ export interface TimelineSegments {
   /** The month being loaded, while one is: the rows give way to a skeleton
    *  sized from that month's days, under its label. */
   loading: number | null;
-  /** A month was picked that the loaded rows do not hold: read it. */
-  onPick: (monthIdx: number) => void;
+  /** A month was picked that the loaded rows do not hold: read it. `until`
+   *  is a cut inside it, whose top the read must hold. */
+  onPick: (monthIdx: number, until?: number) => void;
   /** Back to the rows the page opened with. Null at rest. */
   onReset: (() => void) | null;
 }
@@ -1179,8 +1187,9 @@ function ChainTruthTimelineBody({
   useRewindParam(tl.datesAxis ? null : focusStore);
   const go = useFlowFocusState((st) => st.go);
   const [rewindNote, setRewindNote] = useState<string | null>(null);
-  /** The month this code asked the page to read. */
+  /** The month this code asked the page to read, and the cut it read for. */
   const askedMonth = useRef<number | null>(null);
+  const askedCut = useRef<number | null>(null);
   const releaseRewind = useCallback(() => {
     if (focusStore?.get().rewind) focusStore.set({ rewind: null });
   }, [focusStore]);
@@ -1194,6 +1203,27 @@ function ChainTruthTimelineBody({
     tl.resetHiddenCounterparties();
     if (tl.dateRange) tl.setDateRange(null);
     releaseRewind();
+  };
+  /** The list a cut emptied (ui-jobs 232): what the cut hides and how to
+   *  reach it, in place of the label for a history with no events. */
+  const cutEmptyState = (cutTs: number, word: string): ReactNode => {
+    const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cutTs) : null;
+    if (segments && topDay == null) return `No events on or before ${word}.`;
+    if (segments?.loading != null) return `Loading events to ${word}…`;
+    if (!segments) return `No loaded events on or before ${word}.`;
+    return (
+      <>
+        No loaded events on or before {word}.{" "}
+        <button
+          type="button"
+          data-timeline-empty-load=""
+          onClick={() => segments.onPick(monthIdxOf(topDay!), cutTs)}
+          className="cursor-pointer text-teal-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-teal-400"
+        >
+          Load events to {word}
+        </button>
+      </>
+    );
   };
   /** The last "go" not yet answered by a card brought into view: a cut whose
    *  month is still loading scrolls once its rows land. */
@@ -1261,6 +1291,7 @@ function ChainTruthTimelineBody({
       // opened with.
       if (askedMonth.current != null && segments?.month === askedMonth.current) segments.onReset?.();
       askedMonth.current = null;
+      askedCut.current = null;
       pendingGo.current = 0;
       return;
     }
@@ -1270,15 +1301,22 @@ function ChainTruthTimelineBody({
       const d = new Date(cut * 1000);
       const cutMonth = d.getUTCFullYear() * 12 + d.getUTCMonth();
       const oldestHeld = tl.sortedEvents[0]?.timestamp ?? Infinity;
-      const lifeBefore = segments ? [...segments.lifeDays.keys()].some((dayStartTs) => dayStartTs <= cut) : false;
-      if (
-        segments &&
-        ((segments.month != null && segments.month !== cutMonth) ||
-          (segments.month == null && oldestHeld > cut && lifeBefore))
-      ) {
-        askedMonth.current = cutMonth;
-        segments.onPick(cutMonth);
-        setRewindNote(`The timeline now shows the month of ${words}.`);
+      // The month to read is the one holding the cut's top: the newest day
+      // with an event on or before the cut, which can sit in an earlier month.
+      const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cut) : null;
+      const topMonth = topDay != null ? monthIdxOf(topDay) : cutMonth;
+      // A month the page holds only the newest days of can still miss the
+      // cut's top (ui-jobs 232): read up to the cut, once per cut.
+      const heldShort = topDay != null && oldestHeld > cut && askedCut.current !== cut;
+      if (segments && ((segments.month != null && segments.month !== topMonth) || heldShort)) {
+        askedMonth.current = topMonth;
+        askedCut.current = cut;
+        segments.onPick(topMonth, cut);
+        setRewindNote(
+          topMonth === cutMonth
+            ? `The timeline now shows the month of ${words}.`
+            : `The timeline now shows ${monthLabel(topMonth)}, the last month with events before ${words}.`,
+        );
         return;
       }
       // A filter that leaves the cut list empty stands: the list says so in
@@ -2193,12 +2231,14 @@ function ChainTruthTimelineBody({
                     )}
                   </div>
                 )}
-                <div className="py-8 text-center text-sm text-rb-500">
+                <div className="py-8 text-center text-sm text-rb-500" data-timeline-empty="">
                   {tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
                     ? `Nothing to ${rewind!.word} matches these filters.`
                     : tl.isFiltered
                       ? "All events filtered out — adjust the filters above to show some."
-                      : emptyLabel}
+                      : cut != null
+                        ? cutEmptyState(cut, rewind!.word)
+                        : emptyLabel}
                 </div>
               </>
             )}

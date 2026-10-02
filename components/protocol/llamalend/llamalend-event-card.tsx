@@ -40,6 +40,8 @@ export interface LlamalendEventCardProps {
   loanMark?: LlamalendLoanMark | null;
   /** The market's liquidation discount now (the page's live read). */
   marketDiscount?: number | null;
+  /** Whether the controller has approvals (the page's live read). */
+  controllerHasApprovals?: boolean | null;
   /** The loan's next row (llamalendNextRowMap). */
   next?: LlamalendNextRow | null;
 }
@@ -52,6 +54,7 @@ export function LlamalendEventCard({
   previousStated,
   loanMark,
   marketDiscount,
+  controllerHasApprovals,
   next,
 }: LlamalendEventCardProps) {
   const ctx = event.context.data;
@@ -180,7 +183,7 @@ export function LlamalendEventCard({
         explainerLabel="Plain English"
         explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
         txHash={event.txHash}
-        learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx)} />}
+        learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx, controllerHasApprovals ?? null)} />}
         persistKey={`llamalend:${event.id}`}
       />
     </LlamalendLedgerProvider>

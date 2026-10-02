@@ -209,19 +209,19 @@ const ERC20_ABI = parseAbi(["function balanceOf(address) view returns (uint256)"
 /** EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") − 1. */
 const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 /** Slot 0 — where a Safe proxy keeps its singleton address. */
-const SLOT_ZERO = "0x0000000000000000000000000000000000000000000000000000000000000000";
+export const SLOT_ZERO = "0x0000000000000000000000000000000000000000000000000000000000000000";
 /** The EIP-1167 minimal-proxy runtime, implementation embedded at [10, 30). */
-const EIP1167_RE = /^0x363d3d373d3d3d363d73([0-9a-f]{40})5af43d82803e903d91602b57fd5bf3/i;
+export const EIP1167_RE = /^0x363d3d373d3d3d363d73([0-9a-f]{40})5af43d82803e903d91602b57fd5bf3/i;
 /** The EIP-7702 delegation indicator: EXACTLY 23 bytes, `0xef0100` then the
  *  20-byte delegate. Anchored at both ends — a longer code that merely starts
  *  this way is not a delegation. Tested BEFORE every other code branch: read
  *  after them, a delegated account reads as an anonymous 23-byte contract. */
-const EIP7702_RE = /^0xef0100([0-9a-f]{40})$/i;
+export const EIP7702_RE = /^0xef0100([0-9a-f]{40})$/i;
 
 /** The Safe singletons a proxy can point at, by released version. A Safe is
  *  proven by the address in its slot 0 (or embedded in its minimal-proxy
  *  bytecode) matching one of these — never by a guess about its ABI. */
-const SAFE_SINGLETONS: Record<string, string> = {
+export const SAFE_SINGLETONS: Record<string, string> = {
   "0xd9db270c1b5e3bd161e8c8503c55ceabee709552": "1.3.0",
   "0x3e5c63644e683549055b9be8653de26e0b4cd36e": "1.3.0 L2",
   "0xfb1bffc9d739b8d520daf37df666da4c687191ea": "1.3.0 L2 (eip155)",
