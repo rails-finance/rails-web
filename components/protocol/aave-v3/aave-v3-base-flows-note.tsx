@@ -88,6 +88,13 @@ export function AaveV3BaseFlowsNote({
           event this history does not read. It is the debt bar&apos;s Written off line today.
         </p>
       )}
+      {facts?.source === "route" && (
+        <p data-aave-base-flows-source="route">
+          This account has {count(facts.events, "event")}, more than this page holds, so the bars and the line come from
+          Rails&apos; server: it replays every event from its index of {pool}, by the rules this page uses on a history
+          it holds whole. The cards on the timeline state the newest events&apos; flows from the same replay.
+        </p>
+      )}
       {p && (
         <p>
           {other > 0 ? pricingWords(p, brand) : "Every flow is valued at the oracle price at its block. "}

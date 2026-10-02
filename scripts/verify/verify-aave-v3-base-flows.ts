@@ -36,6 +36,14 @@
 // grows by its reserve's index and today is the Pool's; debt the Pool wrote
 // off is the Written off line today.
 //
+// THE ROUTE (scripts/verify/fixtures/aave-v3-base-flows-route.json): for
+// every account above but 0xe908…4f81, which moved after its history was
+// read, rails-server's /api/{aave-v3-base,seamless}/flows/daily answer, read
+// on 2 Oct 2026 from a local server over copies of the Base box's rows. The
+// summary it serves draws the timeline the page's own replay of the
+// fixture's history draws, figure for figure at every day and the live stop;
+// the cards' legs and the Explanation's counts are the replay's.
+//
 //   npx tsx --test scripts/verify/verify-aave-v3-base-flows.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -49,10 +57,13 @@ import {
   aaveBaseFocusEvents,
   aaveBaseLegSign,
   aaveBaseReplay,
+  aaveBaseTimelineFromSummary,
+  aaveBaseWrittenOff,
   isAaveBaseInterest,
   type AaveBaseFlowOptions,
   type AaveBaseLiveReserve,
 } from "@/lib/aave-v3-base/flows";
+import { isAaveBaseSummaryAnswer, type AaveBaseFlowAnswer } from "@/lib/api/fetch-aave-base-flows";
 import { AAVE_V3_BASE_FIRST_WRITE_OFF_BLOCK } from "@/lib/aave-v3-base/write-off-gap";
 import { dailyPricesFromAnswer, type DailyAnswer } from "@/lib/api/fetch-daily-prices";
 import { buildFlowModel, stateAt, type FlowModel, type FlowSide } from "@/lib/shared/flows-timeline";
@@ -424,3 +435,41 @@ test("aave-written-off: the debt the Pool wrote off is the Written off line toda
   // Seamless applies no write-off.
   assert.equal(replay(fx("seamless-liquidated")).writtenOff.length, 0);
 });
+
+// ── The route against the page's replay ─────────────────────────────────────
+
+const ROUTE = JSON.parse(readFileSync(join(__dirname, "fixtures", "aave-v3-base-flows-route.json"), "utf8")) as {
+  readAt: number;
+  answers: Record<string, AaveBaseFlowAnswer>;
+};
+const asJson = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+test("the route fixture answers for both lanes", () => {
+  const names = Object.keys(ROUTE.answers);
+  assert.ok(names.some((n) => n.startsWith("aave-")) && names.some((n) => n.startsWith("seamless-")));
+});
+
+for (const [name, answer] of Object.entries(ROUTE.answers)) {
+  test(`${name}: the route's summary draws what the page's replay draws`, () => {
+    assert.ok(isAaveBaseSummaryAnswer(answer), `${name}: a summary`);
+    const f = fx(name);
+    // The route prices a leg with no price at its block at the store's day,
+    // as the page does with the store answering.
+    const o = opts(f);
+    const rp = replay(f);
+    const fromPage = aaveBaseFlowTimeline(rp, o)!;
+    const fromRoute = aaveBaseTimelineFromSummary(answer, o)!;
+    assert.equal(answer.totalEvents, f.events.length, "every event");
+    assert.deepEqual(asJson(fromRoute), asJson(fromPage), `${name}: the timeline`);
+    const a = buildFlowModel(fromPage)!;
+    const b = buildFlowModel(fromRoute)!;
+    assert.equal(b.liveStop, a.liveStop);
+    for (let stop = 0; stop <= a.liveStop; stop++)
+      assert.deepEqual(asJson(stateAt(b, stop)), asJson(stateAt(a, stop)), `${name} at stop ${stop}`);
+    assert.deepEqual(asJson(aaveBaseWrittenOff(answer, o)), asJson(rp.writtenOff), `${name}: written off`);
+    // The newest events' legs, as the cards read them.
+    assert.deepEqual(answer.events, asJson(aaveBaseFocusEvents(rp).slice(-answer.events.length)));
+    assert.equal(answer.facts.liquidations, rp.replayed.filter((r) => eventType(r.ev) === "liquidation").length);
+    assert.equal(answer.facts.treasuryFees, rp.replayed.filter((r) => r.treasuryFee).length);
+  });
+}

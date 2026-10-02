@@ -73,7 +73,7 @@ import {
   type AaveV3ReplayInput,
   type AaveV3ReplaySeed,
 } from "@/lib/sources/chain/aave-v3-events";
-import { resolveV3Tokens } from "@/lib/sources/chain/aave-v3-tokens";
+import { resolveV3Tokens, type V3TokenMeta } from "@/lib/sources/chain/aave-v3-tokens";
 import type { ChainId } from "@/lib/shared/chains";
 
 /** One row as rails-server's /api/<protocol>/timeline returns it (api/src/
@@ -134,7 +134,7 @@ function priceOf(
   return Number.isFinite(n) && n > 0 ? { usd: n, source } : undefined;
 }
 
-interface IndexResponse {
+export interface AaveV3IndexResponse {
   wallet: string;
   rows: IndexRow[];
   totalEvents: number;
@@ -303,7 +303,36 @@ export async function readAaveV3Index(
     if (res.status !== 503) console.error(`${p.apiPrefix}/timeline answered ${res.status} ${res.statusText}`);
     return null;
   }
-  const json = (await res.json()) as IndexResponse;
+  const json = (await res.json()) as AaveV3IndexResponse;
+  // The replay needs a symbol and decimals for every reserve it holds a
+  // figure for — the rows' and the seed's.
+  const metas = await resolveV3Tokens(aaveV3IndexReserves(json), p.chainId);
+  return prepareAaveV3Index(json, metas, p);
+}
+
+/** Every reserve an index answer names: the rows' and the seed's. */
+export function aaveV3IndexReserves(json: AaveV3IndexResponse): string[] {
+  const addrs = new Set<string>();
+  for (const r of json.rows) {
+    addrs.add(r.reserve.toLowerCase());
+    if (r.collateral_asset) addrs.add(r.collateral_asset.toLowerCase());
+  }
+  if (json.heavy?.seed?.version === SEED_VERSION)
+    for (const r of json.heavy.seed.reserves) {
+      const reserve = r.reserve.toLowerCase();
+      if (ADDRESS.test(reserve)) addrs.add(reserve);
+    }
+  return [...addrs];
+}
+
+/** An index answer decoded for the replay, given its reserves' metadata.
+ *  Pure: the verifiers run it over stored answers. */
+export function prepareAaveV3Index(
+  json: AaveV3IndexResponse,
+  metas: Map<string, V3TokenMeta>,
+  p: LoadAaveV3IndexParams,
+): AaveV3IndexPrepared {
+  const wallet = p.wallet.toLowerCase();
   const cov = json.coverage;
 
   const rows: AaveV3DecodedRow[] = [];
@@ -419,16 +448,6 @@ export async function readAaveV3Index(
         }
       : undefined;
   const seeded = seed != null;
-
-  // The replay needs a symbol and decimals for every reserve it holds a
-  // figure for — the tail's rows' and the seed's.
-  const addrs = new Set<string>();
-  for (const d of rows) {
-    addrs.add(d.reserve);
-    if (d.collateralAsset) addrs.add(d.collateralAsset);
-  }
-  for (const r of seed?.reserves ?? []) addrs.add(r.reserve);
-  const metas = await resolveV3Tokens([...addrs], p.chainId);
 
   // What the index is a complete record of. The backfill walks up from the
   // deploy block and Sieve holds everything past its checkpoint, so an
