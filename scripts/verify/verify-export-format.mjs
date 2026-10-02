@@ -140,11 +140,15 @@ if (process.env.FORMAT_ONLY) {
     process.exit(1);
   }
   const reader = f.body.getReader();
+  const chunks = [];
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
-    process.stdout.write(value);
+    chunks.push(value);
   }
+  // A pipe's write is asynchronous on macOS: exit only once it has flushed, or
+  // the reader gets the file cut short.
+  await new Promise((r) => process.stdout.write(Buffer.concat(chunks), r));
   process.exit(0);
 }
 

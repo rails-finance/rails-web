@@ -32,8 +32,10 @@
 //   TTL in rails-server-onboarding api/src/services/timeline-export/
 //   timeline-export.test.ts.)
 //
-// Usage (the box URL and bearer token come from .env.local, never printed):
-//   BASE=https://rails.finance node scripts/verify/verify-queued-export.mjs
+// Usage (the box URL, bearer token and Vercel bypass secret come from
+// .env.local, never printed; requests to BASE carry the bypass header through
+// lib/host.mjs, so dev.rails.finance answers past Vercel Authentication):
+//   BASE=https://dev.rails.finance node scripts/verify/verify-queued-export.mjs
 //   RESTART_CMD="<a command that redeploys the api>" BASE=… node …
 // BREAK=drop|cell|order|header|token|concurrent|daily|ttl|restart|format turns one
 // check's input wrong; the run must go red on that check.
@@ -44,6 +46,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { hostFetch } from "./lib/host.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 try {
@@ -107,7 +110,7 @@ async function waitReady(id, token, via = "box", ms = 10 * 60_000) {
   for (;;) {
     const s =
       via === "web"
-        ? await fetch(`${BASE}/api/exports/${id}?token=${token}`).then(async (r) => ({
+        ? await hostFetch(`${BASE}/api/exports/${id}?token=${token}`).then(async (r) => ({
             status: r.status,
             body: await r.json().catch(() => null),
           }))
@@ -137,6 +140,21 @@ function formattedHere(gz, family) {
   });
   unlinkSync(tmp);
   return r.status === 0 ? r.stdout : null;
+}
+
+/** Where two texts first part, as "; line n: web … / here …" (empty when equal). */
+function firstLineDiff(a, b) {
+  if (a === b || a == null || b == null) return "";
+  const la = a.split("\n");
+  const lb = b.split("\n");
+  const n = la.findIndex((l, i) => l !== lb[i]);
+  const i = n < 0 ? la.length : n;
+  const at = [...(la[i] ?? "")].findIndex((ch, k) => ch !== (lb[i] ?? "")[k]);
+  const from = Math.max(0, at - 40);
+  return (
+    `; line ${i + 1} of ${la.length} (here ${lb.length}): web ${JSON.stringify((la[i] ?? "").slice(from, from + 160))}` +
+    ` / here ${JSON.stringify((lb[i] ?? "").slice(from, from + 160))}`
+  );
 }
 
 // ── the served history ───────────────────────────────────────────────────────
@@ -297,6 +315,34 @@ async function rowForRow(id, fx, text) {
 }
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
+// Columns the file always heads and the route sets only on the rows that have
+// them: a position with no debt lane serves no chain debt column, one with no
+// share transfer no transfer_assets. The file's empty cell is the route's
+// absent field, so R2 still compares them.
+const CHAIN_COLUMNS = [
+  "chain_supply_before",
+  "chain_supply_after",
+  "supply_scaled_after",
+  "supply_index",
+  "supply_interest",
+  "chain_debt_before",
+  "chain_debt_after",
+  "debt_scaled_after",
+  "debt_index",
+  "debt_interest",
+];
+const AAVE_OPTIONAL = [...CHAIN_COLUMNS, "swap"];
+const MAPLE_OPTIONAL = [
+  "rate_assets",
+  "rate_shares",
+  "rate_source",
+  "value_before",
+  "value_after",
+  "interest_since_prev",
+  "transfer_assets",
+  "transfer_rate_source",
+];
+
 const FIXTURES = [
   {
     id: "aave-v3 deep 0xee7c…2954",
@@ -304,7 +350,7 @@ const FIXTURES = [
     params: { wallet: "0xee7ca610d896c53ffe716b801c05748efd902954", market: "core" },
     route: "/api/aave-v3/timeline?wallet=0xee7ca610d896c53ffe716b801c05748efd902954&market=core&swaps=1",
     pager: "span",
-    optional: ["swap"],
+    optional: AAVE_OPTIONAL,
     viaWeb: true,
   },
   {
@@ -313,25 +359,28 @@ const FIXTURES = [
     params: { wallet: "0xd01607c3c5ecaba394d8be377a08590149325722", market: "core" },
     route: "/api/aave-v3/timeline?wallet=0xd01607c3c5ecaba394d8be377a08590149325722&market=core&swaps=1",
     pager: "span",
-    optional: ["swap"],
+    optional: AAVE_OPTIONAL,
   },
   {
     id: "maple small",
     protocol: "maple",
     params: { wallet: null }, // resolved below: the last wallet on the listing's first page
     route: null,
+    optional: MAPLE_OPTIONAL,
   },
   {
     id: "maple deep 0x134c…df76",
     protocol: "maple",
     params: { wallet: "0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76" },
     route: "/api/maple/timeline?wallet=0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76",
+    optional: MAPLE_OPTIONAL,
   },
   {
     id: "spark deep 0xed0c…4312",
     protocol: "spark",
     params: { wallet: "0xed0c6079229e2d407672a117c22b62064f4a4312" },
     route: "/api/spark/timeline?wallet=0xed0c6079229e2d407672a117c22b62064f4a4312",
+    optional: CHAIN_COLUMNS,
   },
   {
     id: "compound-v3 deep 0xe7f5…e110 usdc",
@@ -377,7 +426,7 @@ await resolveFixtures();
 if (!process.env.ONLY || process.env.ONLY === "web") {
   const fx = FIXTURES[0];
   const post = () =>
-    fetch(`${BASE}/api/exports`, {
+    hostFetch(`${BASE}/api/exports`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ protocol: fx.protocol, params: fx.params }),
@@ -401,12 +450,12 @@ if (!process.env.ONLY || process.env.ONLY === "web") {
     `a second request while one is in progress answered ${second.status} ${second.body?.code ?? ""}`,
   );
   const bad = BREAK === "token" ? token : token.replace(/.$/, (c) => (c === "0" ? "1" : "0"));
-  const badStatus = await fetch(`${BASE}/api/exports/${id}?token=${bad}`).then((r) => r.status);
-  const noToken = await fetch(`${BASE}/api/exports/${id}`).then((r) => r.status);
+  const badStatus = await hostFetch(`${BASE}/api/exports/${id}?token=${bad}`).then((r) => r.status);
+  const noToken = await hostFetch(`${BASE}/api/exports/${id}`).then((r) => r.status);
   check("L2", badStatus === 404 && noToken === 404, `status with a wrong token ${badStatus}, with none ${noToken}`);
   const job = await waitReady(id, token, "web");
   check("W2", job?.status === "ready", `the job is ${job?.status} (${job?.rowsWritten ?? "?"} rows)`);
-  const badDl = await fetch(`${BASE}/api/exports/${id}/download?token=${bad}`).then((r) => r.status);
+  const badDl = await hostFetch(`${BASE}/api/exports/${id}/download?token=${bad}`).then((r) => r.status);
   check("L3", badDl === 404, `download with a wrong token ${badDl}`);
   const ttl = (Date.parse(job.expiresAt) - Date.parse(job.readyAt)) / 1000;
   check(
@@ -414,7 +463,7 @@ if (!process.env.ONLY || process.env.ONLY === "web") {
     Math.abs(ttl - (BREAK === "ttl" ? 23 : 24) * 3600) <= 2,
     `kept ${(ttl / 3600).toFixed(3)} h after it was ready`,
   );
-  const web = await fetch(`${BASE}/api/exports/${id}/download?token=${token}`);
+  const web = await hostFetch(`${BASE}/api/exports/${id}/download?token=${token}`);
   const webText = Buffer.from(await web.arrayBuffer()).toString("utf8");
   const box = await boxDownload(id, token);
   const expected = formattedHere(box.gz, fx.protocol);
@@ -423,7 +472,8 @@ if (!process.env.ONLY || process.env.ONLY === "web") {
     "W3",
     web.status === 200 && (web.headers.get("content-type") ?? "").startsWith("text/csv") && webBody === expected,
     `web download ${web.status} ${web.headers.get("content-type")}, ${web.headers.get("content-disposition")}; ` +
-      `equals the box's file formatted here (${Buffer.byteLength(expected ?? "")} bytes): ${webBody === expected}`,
+      `equals the box's file formatted here (${Buffer.byteLength(expected ?? "")} bytes): ${webBody === expected}` +
+      firstLineDiff(webBody, expected),
   );
   await rowForRow(fx.id, fx, box.text);
 }
