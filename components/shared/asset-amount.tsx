@@ -39,6 +39,9 @@ export interface AssetAmountProps {
   /** The figure as shown, where the family states amounts at its own
    *  precision. Default: formatCompact of `value`. */
   display?: string;
+  /** The unit `exact` is stated in, where it is not `symbol` — a cToken
+   *  balance behind an underlying headline. Default: `symbol`. */
+  exactUnit?: string;
 }
 
 export function AssetAmount({
@@ -50,6 +53,7 @@ export function AssetAmount({
   signed = false,
   unit = false,
   display,
+  exactUnit,
 }: AssetAmountProps) {
   // Full pipeline precision (String(n) round-trip, no 3-dp re-rounding) — the
   // strict-truth figure behind the compact headline, for both the hover tip and
@@ -58,14 +62,14 @@ export function AssetAmount({
   const shown = display ?? formatCompact(value);
   const compact = signed ? withRealMinus(shown) : shown;
   return (
-    <RevealTip tip={`${full} ${symbol}`} label={`${full} ${symbol}`} className="gap-2">
+    <RevealTip tip={`${full} ${exactUnit ?? symbol}`} label={`${full} ${exactUnit ?? symbol}`} className="gap-2">
       {/* data-prov-exact: the provenance inspector reads the exact figure from
           here when this cell is clicked, so its receipt can headline the compact
           form and anchor the trace to the full one (number only — the ticker
           rides data-prov-symbol). data-prov-hidden marks the glyph as decoration
           so its fallback letter never leaks into the text capture ("3.27K" +
           "A" + tooltip read as one garbled string before). */}
-      <span data-prov-exact={full} data-prov-symbol={symbol}>
+      <span data-prov-exact={full} data-prov-symbol={exactUnit ?? symbol}>
         {compact}
       </span>
       {unit && (

@@ -56,12 +56,16 @@ function apr(raw: string | null): number | null {
 /** The route's market state as the builder's roster. */
 export function rosterFromMarketState(state: RawMoonwellBaseMarketState[] | null | undefined): MoonwellListingRoster {
   const roster: MoonwellListingRoster = new Map();
+  // Base's bridged and native USDC mTokens both answer symbol() = "mUSDC": a
+  // shared mToken symbol carries its underlying's, "mUSDC (USDbC)".
+  const seen = new Map<string, number>();
+  for (const m of state ?? []) seen.set(m.mSymbol, (seen.get(m.mSymbol) ?? 0) + 1);
   for (const m of state ?? []) {
     const key = m.market.toLowerCase();
     const entry: MoonwellListingMarket = {
       key,
       symbol: m.symbol,
-      mSymbol: m.mSymbol,
+      mSymbol: (seen.get(m.mSymbol) ?? 0) > 1 ? `${m.mSymbol} (${m.symbol})` : m.mSymbol,
       underlying: m.underlying.toLowerCase(),
       decimals: m.decimals,
       exchangeRate: ratio(m.exchangeRateRaw, 18 + m.decimals - MTOKEN_DECIMALS),

@@ -141,12 +141,11 @@ function SupplyFootnoteLines({ v, total }: { v: MoonwellPositionView; total?: nu
   return (
     <ShareLines total={total} control={control}>
       {lines.map((r) => {
-        const exact =
-          r.current != null ? `${formatUnitsExact(r.mTokensRaw, 8)} ${mSymbolOf(r)}` : `${r.principal} ${r.symbol}`;
+        const exact = r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal);
         return (
           <ShareLine key={r.address} share={total ? (usdOf(r) ?? 0) / total : null} side="collateral">
             <Prov info={supplyProv(r)}>
-              <ExactSpan exact={exact} symbol={r.symbol}>
+              <ExactSpan exact={exact} symbol={r.current != null ? mSymbolOf(r) : r.symbol}>
                 {formatCompact(supplyAmount(r))} {r.symbol}
               </ExactSpan>
             </Prov>
@@ -206,7 +205,8 @@ function SupplyStack({ v }: { v: MoonwellPositionView }) {
             <AssetAmount
               value={supplyAmount(r)}
               symbol={r.symbol}
-              exact={r.current != null ? `${formatUnitsExact(r.mTokensRaw, 8)} ${mSymbolOf(r)}` : String(r.principal)}
+              exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
+              {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
             />
           </Prov>
         </StatValue>
@@ -603,13 +603,15 @@ const txCountNote = (liquidations: number) =>
     : "one transaction can hold several rows (a repayment and a withdrawal)";
 
 /** A liquidated card's two dates: the last liquidation, then the closing,
- *  when they fall on different days. */
+ *  when they fall on different days. An account liquidated more than once
+ *  says the date is the last of its count. */
 function outcomeDates(v: MoonwellPositionView): { label: string; at: number }[] | undefined {
   const last = v.liquidations?.at(-1)?.at;
   if (v.status !== "liquidated" || last == null) return undefined;
   if (Math.floor(last / 86400) === Math.floor(v.lastActivityAt / 86400)) return undefined;
+  const n = Math.max(v.liquidationCount, v.liquidations?.length ?? 0);
   return [
-    { label: "Liquidated", at: last },
+    { label: n > 1 ? `Last of ${n} liquidations` : "Liquidated", at: last },
     { label: "Closed", at: v.lastActivityAt },
   ];
 }

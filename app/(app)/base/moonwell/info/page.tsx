@@ -26,7 +26,7 @@ const intro = (
       </Link>
       .
     </p>
-    <BaseLendingCoverageNote route="/api/moonwell-base/coverage" unreadListed={false} />
+    <BaseLendingCoverageNote route="/api/moonwell-base/coverage" unreadListed={false} restsOnOpen />
   </>
 );
 

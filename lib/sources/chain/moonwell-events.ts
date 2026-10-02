@@ -916,7 +916,7 @@ export function replayMoonwellRows(p: MoonwellReplayInput): MoonwellChainTimelin
         storyRows.push({
           timestamp: ts,
           txHash: d.txHash,
-          kind: d.kind === "liquidation" ? "liquidation" : d.kind === "repay" ? "repay" : "other",
+          kind: d.kind === "liquidation" ? "liquidation" : d.kind === "repay" ? "repay" : d.kind === "borrow" ? "borrow" : "other",
           market: d.market,
           symbol: m.symbol,
           amount: d.amount != null ? scaleUnits(d.amount, m.decimals) : undefined,

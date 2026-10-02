@@ -52,7 +52,14 @@ import {
 } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
-import { formatCompact, formatExact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import {
+  decimalSub,
+  formatCompact,
+  formatExact,
+  formatExactFromString,
+  formatNumber,
+  formatUsdValue,
+} from "@/lib/utils/format";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { CTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
@@ -165,15 +172,18 @@ function supplyStat(ctx: MoonwellContext, mSym: string, coords: MoonwellCoords):
   const afterN = Number(ctx.supplyAfter);
   const beforeN = Number(ctx.supplyBefore);
   let transition: ChainTruthTransition | undefined;
-  const changeN = afterN - beforeN;
+  // The change from the two decimal strings exactly: a float subtraction
+  // prints digits the token never had ("+10,345.805595999991").
+  const changeStr = decimalSub(ctx.supplyAfter, ctx.supplyBefore);
+  const changeN = changeStr != null ? Number(changeStr) : afterN - beforeN;
   if (Number.isFinite(changeN) && changeN !== 0) {
     const sign = changeN >= 0 ? "+" : "−";
     transition = {
       before: formatCompact(beforeN),
-      beforeExact: formatExact(beforeN),
+      beforeExact: formatExactFromString(ctx.supplyBefore, beforeN),
       beforeProv: supplyBeforeProv(ctx.marketSymbol, mSym, coords),
       change: `${sign}${formatCompact(Math.abs(changeN))}`,
-      changeExact: `${sign}${formatExact(Math.abs(changeN))}`,
+      changeExact: `${sign}${changeStr != null ? formatExactFromString(changeStr.replace(/^-/, ""), Math.abs(changeN)) : formatExact(Math.abs(changeN))}`,
       changeProv: supplyChangeProv(ctx.marketSymbol, mSym, coords),
     };
   }

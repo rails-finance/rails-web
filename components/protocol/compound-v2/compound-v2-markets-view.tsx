@@ -95,9 +95,15 @@ const coordsFor = (m: CompoundV2MarketRow, block: number, oracle: string | null)
 const keyOf = (cToken: string) => COMPOUND_V2_MARKETS.find((c) => c.ctoken === cToken.toLowerCase())?.key;
 
 /** The cToken's name on screen. The SAI market's cToken calls itself "cDAI"
- *  on chain, the same as the DAI market's. */
-const cTokenLabel = (m: CompoundV2MarketRow) =>
-  keyOf(m.cToken) === "sai" ? "cSAI (the original cDAI)" : m.cTokenSymbol;
+ *  on chain, the same as the DAI market's, and both WBTC markets' cTokens call
+ *  themselves "cWBTC". */
+const cTokenLabel = (m: CompoundV2MarketRow) => {
+  const key = keyOf(m.cToken);
+  if (key === "sai") return "cSAI (the original cDAI)";
+  if (key === "wbtc") return "cWBTC (the first WBTC market)";
+  if (key === "wbtc2") return "cWBTC2 (the second WBTC market)";
+  return m.cTokenSymbol;
+};
 
 function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: number; oracle: string | null }) {
   const key = keyOf(m.cToken);

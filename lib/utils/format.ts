@@ -126,13 +126,17 @@ export const formatCompact = (value: number): string => {
   return formatNumber(value);
 };
 
-/** BTC-class and gold tokens: a unit is worth thousands of dollars, so
- *  "<0.01" on a headline would hide up to about $830 of BTC or $41 of gold
- *  (28 Sep 2026 prices).
+/** BTC-class, ETH-class and gold tokens: a unit is worth thousands of
+ *  dollars, so "<0.01" on a headline would hide up to about $830 of BTC, $41
+ *  of gold (28 Sep 2026 prices) or about $40 of ETH.
  *  Matches WBTC, cbBTC, tBTC, BTC.b, WBTC18, cbBTC18, LBTC and every other
- *  symbol containing "BTC", plus XAUt, XAUT0 and PAXG. */
+ *  symbol containing "BTC"; ETH and its wrapped and staked forms (WETH,
+ *  stETH, wstETH, cbETH, rETH, weETH, ezETH, rsETH, wrsETH, osETH); and
+ *  XAUt, XAUT0 and PAXG. A cToken or mToken of ETH (cETH, mWETH) is a
+ *  fraction of an ETH and stays out. */
 export const isHighValueUnit = (symbol: string | null | undefined): boolean =>
-  !!symbol && (/btc/i.test(symbol) || /^(xau|paxg)/i.test(symbol));
+  !!symbol &&
+  (/btc/i.test(symbol) || /^(xau|paxg)/i.test(symbol) || /^(w|st|wst|cb|r|we|ez|rs|wrs|os)?eth$/i.test(symbol));
 
 // Headline form (the timeline card's collapsed header, the share card's flow
 // line): a magnitude below 0.01 reads "<0.01" rather than digits. For a

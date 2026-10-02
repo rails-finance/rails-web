@@ -11,7 +11,7 @@ import { formatNumber } from "@/lib/utils/format";
 export interface StoryRow {
   timestamp: number;
   txHash: string;
-  kind: "liquidation" | "repay" | "other";
+  kind: "liquidation" | "repay" | "borrow" | "other";
   market: string;
   symbol: string;
   /** Underlying amount (unsigned). */
@@ -30,8 +30,9 @@ export interface LiquidationStory {
   /** The debt in that market just before the liquidation, when a row states it. */
   debtBefore: number | null;
   /** The owner's own repayment that took this market's debt to zero after
-   *  the liquidation, with how long after. */
-  ownerRepaidRest: { amount: number; afterSeconds: number } | null;
+   *  the liquidation, with how long after, and what the owner borrowed in
+   *  that market between the two (0 when nothing). */
+  ownerRepaidRest: { amount: number; afterSeconds: number; borrowedSince: number } | null;
 }
 
 export function liquidationStories(rows: readonly StoryRow[]): LiquidationStory[] {
@@ -46,12 +47,14 @@ export function liquidationStories(rows: readonly StoryRow[]): LiquidationStory[
       sorted.find((x) => x.txHash === r.txHash && x.kind === "repay" && x.market === r.market)?.debtBefore ??
       null;
     let rest: LiquidationStory["ownerRepaidRest"] = null;
+    let borrowedSince = 0;
     for (const x of sorted.slice(i + 1)) {
       if (x.market !== r.market) continue;
       if (x.kind === "liquidation") break;
+      if (x.kind === "borrow") borrowedSince += x.amount ?? 0;
       if (x.kind === "repay" && x.byOwner && x.txHash !== r.txHash) {
         if (x.debtAfter != null && x.debtAfter <= 1e-12) {
-          rest = { amount: x.amount ?? 0, afterSeconds: x.timestamp - r.timestamp };
+          rest = { amount: x.amount ?? 0, afterSeconds: x.timestamp - r.timestamp, borrowedSince };
           break;
         }
       }
@@ -89,7 +92,14 @@ export function liquidationSentences(stories: readonly LiquidationStory[]): stri
       s.debtBefore != null && s.debtBefore > 0
         ? `, ${shareWords(s.repaid, s.debtBefore)} of its ${amt(s.debtBefore)} ${s.symbol} debt`
         : "";
-    const rest = s.ownerRepaidRest ? `; the owner repaid the rest ${spanWords(s.ownerRepaidRest.afterSeconds)}` : "";
+    const r = s.ownerRepaidRest;
+    // Debt the owner took on after the liquidation is part of what the final
+    // repayment cleared, so it is named.
+    const rest = !r
+      ? ""
+      : r.borrowedSince > 0
+        ? `; the owner then borrowed ${amt(r.borrowedSince)} ${s.symbol} more and repaid the whole debt ${spanWords(r.afterSeconds)}`
+        : `; the owner repaid the rest ${spanWords(r.afterSeconds)}`;
     return `On ${formatDate(s.at)} a liquidator repaid ${amt(s.repaid)} ${s.symbol}${of}${rest}.`;
   });
 }

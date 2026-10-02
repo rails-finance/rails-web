@@ -62,6 +62,9 @@ const LINK = "text-blue-500 hover:underline";
 const ONE_UNIT_TITLE =
   "A cap of one base unit of the token (the smallest amount it has). In Moonwell a cap of 0 means no cap, so a market is closed to new activity by setting the cap to the smallest positive amount.";
 
+const PAUSE_TITLE =
+  "Read from the Comptroller (mintGuardianPaused / borrowGuardianPaused) at this block. The pause guardian stops new supply or new borrowing in one market; repaying, withdrawing and liquidation are not paused by these flags.";
+
 const SUPPLY_CAP_TITLE =
   "Supply cap: the most this market accepts in deposits. A new supply that would take it past the cap is refused; withdrawing still works.";
 const BORROW_CAP_TITLE =
@@ -90,7 +93,11 @@ function MarketCard({
   comptroller,
   listingBasePath,
   listingFilterKey,
+  mLabel,
 }: {
+  /** The mToken's name on screen: its symbol(), with the underlying's added
+   *  where two markets share it (Base's USDC and USDbC are both "mUSDC"). */
+  mLabel: string;
   m: MoonwellMarketRow;
   block: number;
   oracle: string | null;
@@ -145,7 +152,7 @@ function MarketCard({
             className="link-external text-[11px] text-rb-500"
             title="The mToken: the receipt this market gives suppliers. Its exchange rate for the underlying rises as borrowers pay interest."
           >
-            {m.mTokenSymbol} · {shortAddress(m.mToken)}
+            {mLabel} · {shortAddress(m.mToken)}
           </a>
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
@@ -215,6 +222,11 @@ function MarketCard({
           borrow{" "}
           {m.borrowApr != null ? <Prov info={mwRateProv("borrow", coords)}>{`${m.borrowApr.toFixed(2)}%`}</Prov> : "—"}
         </span>
+        {(m.mintPaused || m.borrowPaused) && (
+          <span className="text-caution-500" data-prov-exempt="" title={PAUSE_TITLE}>
+            {m.mintPaused && m.borrowPaused ? "supply and borrow paused" : m.mintPaused ? "supply paused" : "borrow paused"}
+          </span>
+        )}
       </div>
 
       {(m.supplyCap != null || m.borrowCap != null) && (
@@ -487,6 +499,20 @@ export function MoonwellMarketsView({
         </p>
       )}
 
+      {data.markets.some((m) => m.mintPaused || m.borrowPaused) && (
+        <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-pause-note="">
+          The Comptroller&rsquo;s pause guardian has paused{" "}
+          {data.markets
+            .filter((m) => m.mintPaused || m.borrowPaused)
+            .map(
+              (m) =>
+                `${m.mTokenSymbol} (${m.mintPaused && m.borrowPaused ? "supplying and borrowing" : m.mintPaused ? "supplying" : "borrowing"})`,
+            )
+            .join(", ")}
+          . Repaying, withdrawing and liquidation still work there.
+        </p>
+      )}
+
       <div className="grid gap-2.5 sm:grid-cols-2">
         {data.markets.map((m) => (
           <MarketCard
@@ -498,6 +524,11 @@ export function MoonwellMarketsView({
             comptroller={comptroller}
             listingBasePath={listingBasePath}
             listingFilterKey={listingFilterKey}
+            mLabel={
+              data.markets.filter((x) => x.mTokenSymbol === m.mTokenSymbol).length > 1
+                ? `${m.mTokenSymbol} (${m.underlyingSymbol})`
+                : m.mTokenSymbol
+            }
           />
         ))}
       </div>

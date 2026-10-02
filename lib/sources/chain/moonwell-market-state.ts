@@ -173,6 +173,8 @@ const ROSTER_COMPTROLLER_ABI = parseAbi([
   "function borrowCaps(address mToken) view returns (uint256)",
   "function closeFactorMantissa() view returns (uint256)",
   "function liquidationIncentiveMantissa() view returns (uint256)",
+  "function mintGuardianPaused(address mToken) view returns (bool)",
+  "function borrowGuardianPaused(address mToken) view returns (bool)",
 ]);
 
 const ROSTER_MTOKEN_ABI = parseAbi([
@@ -249,6 +251,11 @@ export interface MoonwellMarketRow {
    *  name it as such and quote no share used (which runs to 1e23%). */
   supplyCapOneUnit: boolean;
   borrowCapOneUnit: boolean;
+  /** The Comptroller's pause guardian has paused minting (supplying) or
+   *  borrowing in this market. Repaying, redeeming and liquidating are not
+   *  gated by these two flags. */
+  mintPaused: boolean;
+  borrowPaused: boolean;
 
   /** Annual percent (5.2 = 5.2%) from the protocol's own per-SECOND rates on
    *  the model's own timestampsPerYear. (The overlay lane's
@@ -354,7 +361,7 @@ export async function loadMoonwellMarkets(
       }),
     ]);
 
-    const PER_MARKET = 15;
+    const PER_MARKET = 17;
     const results = (await client.multicall({
       allowFailure: true,
       contracts: mTokens.flatMap(
@@ -375,6 +382,8 @@ export async function loadMoonwellMarkets(
             { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "supplyCaps", args: [c] },
             { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowCaps", args: [c] },
             { address: oracle, abi: ORACLE_ABI, functionName: "getUnderlyingPrice", args: [c] },
+            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "mintGuardianPaused", args: [c] },
+            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowGuardianPaused", args: [c] },
           ] as const,
       ),
     })) as Res[];
@@ -495,6 +504,8 @@ export async function loadMoonwellMarkets(
         borrowCapUsed: borrowCap != null && borrowCap > 0 ? totalBorrowsUnderlying / borrowCap : null,
         supplyCapOneUnit,
         borrowCapOneUnit,
+        mintPaused: ok<boolean>(results[base + 15]) === true,
+        borrowPaused: ok<boolean>(results[base + 16]) === true,
 
         supplyApr: apr(results[base + 8]),
         borrowApr: apr(results[base + 7]),
