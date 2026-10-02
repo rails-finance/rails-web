@@ -640,7 +640,7 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
       else moved.debt = true;
     }
     const k = r.row.kind;
-    // A row with no price of its own or at its block takes the nearest priced
+    // A row with no price on it or read at its block takes the nearest priced
     // moment: its collateral figures that day rest on it.
     const unpriced =
       (r.priceFrom === "nearest" || r.priceFrom === "today") &&

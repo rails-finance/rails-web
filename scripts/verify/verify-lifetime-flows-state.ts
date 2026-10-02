@@ -1523,7 +1523,7 @@ test("the fill rule in every family: no two lines of a side share a pattern in o
   // An inflow's texture and an outflow's hatch read alike where the pattern
   // and the hue are one (Aave V3 on Base's Interest earned and Used to repay,
   // both dashed, 2 Oct 2026): the pattern and its hue are the fill here, the
-  // inflow's faded ground aside. A tone draws its own hue.
+  // inflow's faded ground aside. A tone draws in the tone's hue.
   type B = {
     key: string;
     label: string;

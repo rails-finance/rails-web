@@ -352,7 +352,7 @@ test("between events the debt grows by its interest and the collateral keeps its
 // part of its seizure and its cleared debt from the pool's share to
 // `_collRedistributed` / `_debtRedistributed`; a receiving CDP's next touch
 // states an after-image past its legs by what it received.
-test("a redistribution takes its own lines, on the liquidated CDP and on a receiving one, and they add", () => {
+test("a redistribution takes separate lines, on the liquidated CDP and on a receiving one, and they add", () => {
   const big = (s: string | null) => BigInt(s ?? "0");
   const linesAdd = (f: Fixture, what: string) => {
     const m = model(f);

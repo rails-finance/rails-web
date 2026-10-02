@@ -344,7 +344,7 @@ export interface FlowTimeline {
   indexes?: FlowIndexes;
   /** Per asset whose daily prices come from its events alone (no daily price
    *  store answers for it): why a day valued at a price recorded on an
-   *  earlier day has none of its own. Such a day's figure is drawn dashed. */
+   *  earlier day has none for that day. Such a day's figure is drawn dotted. */
   carriedWhy?: Record<string, string>;
 }
 
@@ -380,7 +380,7 @@ export interface FlowWords {
   /** The timeline's card for a moment between events (lib/shared/flow-moment.ts). */
   moment?: FlowMomentWords;
   /** The Explanation's words for a mark under the line, where a family's
-   *  event of that kind has its own name (Frankencoin's sales, PWN's default
+   *  event of that kind has a name of the family's (Frankencoin's sales, PWN's default
    *  claim under the red triangle). */
   marks?: Partial<Record<FlowTick, string>>;
 }

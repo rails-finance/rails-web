@@ -26,7 +26,7 @@
 //
 // Redistribution (none on Sepolia by 2 Oct 2026). A liquidation's part the
 // pool does not absorb (`_collRedistributed`, `_debtRedistributed`) takes
-// its own lines on the liquidated CDP; what a receiving CDP's touch states
+// separate lines on the liquidated CDP; what a receiving CDP's touch states
 // past its legs is its Redistribution gains and Redistributed debt.
 //
 // Between rows. Interest accrues on the recorded debt at the market's rate
@@ -416,7 +416,7 @@ export function replayPolaris(rows: PolarisFlowRow[], live: PolarisLive | null, 
     };
     if (r.kind === "liquidation") {
       // What the pool absorbed is Liquidated; what it passed on to the
-      // other CDPs, its own line; the surplus the owner's to claim.
+      // other CDPs, a separate line; the surplus the owner's to claim.
       const taken = r.collChange < ZERO ? -r.collChange : ZERO;
       const surplus = r.surplus > taken ? taken : r.surplus > ZERO ? r.surplus : ZERO;
       const left = taken - surplus;
@@ -443,8 +443,8 @@ export function replayPolaris(rows: PolarisFlowRow[], live: PolarisLive | null, 
     add(PF.settled, r.settled);
     const collSum = prevColl + r.collChange + r.mintRedeemCollGain + r.bcTokenGain;
     const debtSum = prevDebt + r.debtChange + r.accruedInterest + r.mintRedeemDebtGain - r.stableGain + r.settled;
-    // Another CDP's liquidation passed on to this one arrives with no leg of
-    // its own: what the after-image holds past the legs, on an owner's row.
+    // Another CDP's liquidation passed on to this one arrives with no leg:
+    // it is what the after-image holds past the legs, on an owner's row.
     const gainColl = r.kind === "owner" && r.newColl > collSum ? r.newColl - collSum : ZERO;
     const gainDebt = r.kind === "owner" && r.newDebt > debtSum ? r.newDebt - debtSum : ZERO;
     add(PF.collRedistIn, gainColl);

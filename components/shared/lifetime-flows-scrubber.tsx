@@ -700,8 +700,8 @@ const FOCUS_READ =
 function tickWords(model: FlowModel, hasDebt: boolean): string {
   const has = new Set(model.ticks.map((t) => t.tick));
   const parts: string[] = [];
-  const own = model.words.marks ?? {};
-  if (has.has("liquidation")) parts.push(own.liquidation ?? "a red triangle for a liquidation");
+  const named = model.words.marks ?? {};
+  if (has.has("liquidation")) parts.push(named.liquidation ?? "a red triangle for a liquidation");
   if (has.has("redemption")) parts.push("an orange triangle for a redemption");
   if (has.has("caution")) parts.push("an orange triangle for another change the owner did not make");
   if (has.has("rate-delegate")) parts.push("a pink dot for a rate change the delegate set");
