@@ -81,8 +81,9 @@ async function live(): Promise<void> {
 
     await page.goto(`${BASE}/ethereum/frankencoin/${V1_POSITION}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
     const line = page.getByText(/Interest was charged at each mint/).first();
-    await line.waitFor({ timeout: 90_000 });
-    const text = await line.innerText();
+    // The explanation sits in a collapsed drawer: read it attached, not visible.
+    await line.waitFor({ state: "attached", timeout: 90_000 });
+    const text = (await line.textContent()) ?? "";
     check(
       "V1 position: interest line names the 4-week minimum and the fixed rate",
       /at least 4 weeks, at the rate fixed when the position opened/.test(text),
