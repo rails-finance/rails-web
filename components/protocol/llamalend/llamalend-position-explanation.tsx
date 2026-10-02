@@ -318,7 +318,8 @@ function marketKindLine(factory: LlamalendFactoryKind | null | undefined, borrow
       <>
         This is a mint market: the {borrowedSymbol} is minted against the loan by Curve&rsquo;s crvUSD system, up to the
         market&rsquo;s debt ceiling. The rate moves with crvUSD&rsquo;s price and the size of the Peg Stabilization
-        Reserve.
+        Reserve. The interest goes to Curve: the Controller sends it to the factory&rsquo;s fee receiver, a splitter
+        that pays the scrvUSD savings vault and the DAO&rsquo;s fee collector, which distributes to veCRV lockers.
       </>
     );
   }
@@ -326,7 +327,8 @@ function marketKindLine(factory: LlamalendFactoryKind | null | undefined, borrow
     return (
       <>
         This is a lend market: the {borrowedSymbol} is lent from a vault of lenders&rsquo; deposits, all the interest
-        goes to those lenders, and the rate rises with the share of the vault that is lent.
+        goes to those lenders, and in most markets the rate rises with the share of the vault that is lent; /markets
+        names those where it follows time alone.
       </>
     );
   }

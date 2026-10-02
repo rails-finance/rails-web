@@ -8,22 +8,25 @@
 // f(x) is the protocol where a naive reader goes wrong in three specific ways,
 // so the preamble and footnotes name each one outright:
 //
-//   1. EVENT REPLAY IS NOT CURRENT STATE. Funding, socialized tick/pool
-//      rebalances and bad-debt write-offs mutate every position with NO
-//      per-position event (chain-proven: scripts/verify-fx-chain.mjs recovers
-//      a position's shares at two blocks — identical shares, moved amounts).
-//      So the Σ of the timeline is the IMPLIED lane, history only; the gap
-//      against the settled truth is the socialized lane, carried explicitly.
+//   1. EVENT REPLAY IS NOT CURRENT STATE. Funding, rebalances, redemptions,
+//      pool-wide liquidations and other positions' bad debt move every
+//      position with NO transaction of the owner's (chain-proven:
+//      scripts/verify-fx-chain.mjs recovers a position's shares at two blocks
+//      — identical shares, moved amounts). So the Σ of the timeline is what
+//      the transactions add up to, history only; the gap against the pool's
+//      own figure is what the pool moved, named part by part.
 //   2. TWO COLLATERAL UNIT SYSTEMS. An operate's collateral delta is the
 //      TOKEN as transferred (wstETH 18dp / WBTC 8dp); the settled amounts and
 //      liquidation/rebalance figures are RATE-NORMALIZED 1e18 (stETH-
 //      equivalent). They never mix or sum, and the table says which is which.
 //   3. TICK-LEVEL ROWS ARE NOT THIS POSITION'S SLICE. A tickRebalance names
-//      what the WHOLE TICK gave up; the per-position share isn't provable
-//      from those logs. The per-stretch drift (the pool's own getPosition
-//      read at the position's event boundaries) carries it, and the settled
-//      reconciliation carries the lifetime total.
+//      what the WHOLE TICK gave up. The position's own change is the pool's
+//      getPosition read at the block before the row and at the row's block
+//      (lib/fx/socialized-reads.tsx), stated on the row where the page has
+//      the read; the per-stretch table carries the quiet stretches between
+//      the position's own events, and the reconciliation the lifetime total.
 //
+// The words are the position page's (the card's debt line, lib/fx/no-tx-parts.ts).
 // Debt is fxUSD token units — fxUSD is not $1-pinned (chain-truth charter §S3
 // forbids convenience pins), so it is never restated as USD. A PURE function
 // of the data already in scope on the detail page — no fetching.
@@ -31,13 +34,11 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isFxEvent } from "@/lib/shared/types/event-shape";
 import type { FxPositionView } from "@/components/protocol/fx/fx-position-card";
+import type { FxStateAt } from "@/lib/sources/chain/fx-event-state";
 import { FX_POOLS } from "@/lib/fx/asset-catalog";
-import {
-  driftIntervalAt,
-  summariseFxDrift,
-  type FxDriftInterval,
-  type FxDriftResult,
-} from "@/lib/sources/api/fx-drift";
+import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift";
+import { fxBlockChange } from "@/lib/fx/socialized-reads";
+import type { FxNoTxParts } from "@/lib/fx/no-tx-parts";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
 import { markdownTimelineSlice, type MarkdownHistoryScope } from "@/lib/shared/markdown-history";
 
@@ -48,9 +49,16 @@ export interface FxPositionMarkdownArgs {
   view: FxPositionView;
   /** Chronologically sorted (oldest → newest) f(x) event list. */
   events: BaseActivityEvent[];
-  /** The per-stretch drift the page has in hand (the newest suffix of the
-   *  position's stretches), or null before it answered. */
+  /** The per-stretch reads the page has in hand (the newest suffix of the
+   *  position's stretches), or null before they answered. */
   drift?: FxDriftResult | null;
+  /** The position read at each rebalance, redemption and pool-wide
+   *  liquidation row's block and the block before (the page's reads), where
+   *  the page holds the whole history. */
+  reads?: Record<string, FxStateAt> | null;
+  /** What moved the debt without a transaction, part by part — the card's
+   *  debt line (lib/fx/no-tx-parts.ts). */
+  parts?: FxNoTxParts | null;
   /** When the snapshot was taken (copy time) — passed in so the serializer
    *  stays pure. */
   generatedAt: Date;
@@ -58,28 +66,24 @@ export interface FxPositionMarkdownArgs {
 
 const DUST = 1e-9;
 
-/** Signed drift with the socialized lane's sign convention: negative = the
- *  lane took from the position. Dust renders as a dash. */
-function driftCell(value: number, symbol: string): string {
+/** A signed change in the pool's direction: negative = the pool took from the
+ *  position. Dust renders as a dash. */
+function changeCell(value: number, symbol: string): string {
   if (Math.abs(value) <= DUST) return "—";
   return `${value > 0 ? "+" : "−"}${amt(Math.abs(value))} ${symbol}`;
 }
 
-/** How many of the timeline's tick rebalances fall inside one stretch — one
- *  means the stretch's debt drift is this position's exact slice of that
- *  tick's clear. */
-function rebalancesIn(iv: FxDriftInterval, events: BaseActivityEvent[]): number {
-  let n = 0;
-  for (const e of events) {
-    if (!isFxEvent(e) || e.context.data.eventType !== "tickRebalance") continue;
-    if (e.blockNumber != null && iv.fromBlock <= e.blockNumber && e.blockNumber <= iv.toBlock) n++;
-  }
-  return n;
-}
+const dateSpan = (a: number, b: number): string => {
+  const da = fmtUtc(a).slice(0, 10);
+  const db = fmtUtc(b).slice(0, 10);
+  return da === db ? da : `${da} – ${db}`;
+};
 
 export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
   const { view, events, generatedAt } = args;
   const drift = args.drift ?? null;
+  const reads = args.reads ?? null;
+  const parts = args.parts ?? null;
   const pool = FX_POOLS[view.pool];
   const colSym = view.normalizedSymbol;
   const tokenSym = pool.tokenSymbol;
@@ -99,11 +103,12 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
   lines.push("");
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
-      `Current state is the SETTLED lane — the pool's own \`getPosition\` / \`getPositionDebtRatio\` views read ` +
-      `at a named block. That is the only valid current figure: f(x) charges funding on collateral and socializes ` +
-      `tick/pool rebalances and bad-debt write-offs on debt with NO per-position event, so replaying the timeline below CANNOT ` +
-      `state what this position holds now — its Σ is the "implied" lane, history only, and the gap against the ` +
-      `settled truth is the socialized lane, given explicitly. ` +
+      `Current state is the pool's own figure — its \`getPosition\` / \`getPositionDebtRatio\` views read ` +
+      `at a named block. That is the only valid current figure: f(x) charges funding on collateral, and rebalances, ` +
+      `redemptions, pool-wide liquidations and other positions' bad debt move the debt, all with NO transaction of the ` +
+      `owner's, so replaying the timeline below CANNOT state what this position holds now — its Σ is what the ` +
+      `transactions add up to, history only, and the difference against the pool's figure is what the pool moved, ` +
+      `named part by part. ` +
       `UNITS: ${unitsNote}. Debt is fxUSD token units; fxUSD is not $1-pinned and is never restated as USD. ` +
       `Everything drifts as the market and position change. Not financial advice.`,
   );
@@ -130,16 +135,16 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
 
   // ── Settled position ──
   if (settled.colls == null && settled.debts == null) {
-    lines.push(`## Position — settled read pending`);
+    lines.push(`## Position — the pool's figure pending`);
     lines.push("");
     lines.push(
       `- The settled sweep has not landed for this position, so its CURRENT collateral and debt are not stated here. ` +
-        `The event-implied running debt is ${amt(view.impliedDebt.amount)} fxUSD — history only, and known to be wrong ` +
-        `by whatever rebalances, write-offs and socialized bad debt have applied since. It is deliberately not presented as the current figure.`,
+        `Its transactions add up to ${amt(view.impliedDebt.amount)} fxUSD of debt — history only, and off by whatever ` +
+        `the pool has moved since. It is deliberately not presented as the current figure.`,
     );
     lines.push("");
   } else {
-    lines.push(`## Position (settled at block ${settled.block ?? "—"})`);
+    lines.push(`## Position (the pool's figure at block ${settled.block ?? "—"})`);
     lines.push("");
     const empty = (settled.colls ?? 0) <= 0 && (settled.debts ?? 0) <= 0;
     if (empty) {
@@ -179,48 +184,14 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
     }
     lines.push("");
 
-    // ── The socialized reconciliation — f(x)'s unique lane ──
+    // ── Debt moved by the pool — f(x)'s unique lane ──
     if (settled.debts != null && view.activity.eventCount > 0) {
-      const implied = view.impliedDebt.amount;
-      const gap = view.socializedDebt ?? implied - settled.debts;
-      lines.push(`## Socialized reconciliation`);
-      lines.push("");
-      if (implied < 0) {
-        // The Σ has run BELOW zero: the timeline recorded more debt leaving
-        // than it ever recorded arriving, because bad debt socialized from
-        // other positions' liquidations kept raising this position's debt
-        // silently and the repay/liquidation rows cleared that too. Printing
-        // a bare negative "debt" would read as nonsense, so name what it is.
-        lines.push(
-          `- **Event-implied debt:** ${amt(implied)} fxUSD — Σ of this position's own event deltas, and it has run **negative**, ` +
-            `which is not a debt: the timeline recorded more debt leaving than it ever recorded arriving. Bad debt socialized ` +
-            `from other positions' liquidations kept adding debt with no event, and the repay and liquidation rows cleared ` +
-            `that silent debt along with the borrowed principal. The overshoot is the measure of what the events never saw.`,
-        );
-      } else {
-        lines.push(`- **Event-implied debt:** ${amt(implied)} fxUSD — Σ of this position's own event deltas`);
-      }
-      lines.push(`- **Settled debt:** ${amt(settled.debts)} fxUSD — the contract's own reckoning`);
-      if (Math.abs(gap) <= DUST)
-        lines.push(
-          `- **Gap:** none — the event-implied and settled debt agree, so no rebalance, write-off or socialized bad debt has ` +
-            `touched this position's debt. Funding never shows here: it is charged on collateral (the line under Collateral above).`,
-        );
-      else
-        lines.push(
-          `- **Gap:** ${amt(Math.abs(gap))} fxUSD ${gap >= 0 ? "**cleared**" : "**accrued**"} with no per-position event — ` +
-            `${
-              gap >= 0
-                ? "socialized rebalances and/or write-offs removed debt the timeline never recorded leaving"
-                : "the settled truth sits above the event record: bad debt socialized from other positions' liquidations accrued debt beyond anything the timeline captures"
-            }. This gap is why the timeline cannot be replayed to a current figure.`,
-        );
-      lines.push("");
-      lines.push(...driftTable(drift, events, colSym));
+      lines.push(...debtMovedSection(view, settled.debts, parts));
+      lines.push(...driftTable(drift, colSym));
     } else if (view.activity.eventCount === 0) {
       lines.push(
         `- **No indexed events:** this position was minted via a path that emits no \`Operate\`, so there is nothing to ` +
-          `reconcile against — its state exists only in the settled lane above. An empty timeline is the truthful record here, not missing data.`,
+          `reconcile against — its state exists only in the pool's own figures above. An empty timeline is the truthful record here, not missing data.`,
       );
       lines.push("");
     }
@@ -251,36 +222,104 @@ export function fxPositionToMarkdown(args: FxPositionMarkdownArgs): string {
     lines.push("");
   }
 
-  lines.push(...timelineTable(events.filter(isFxEvent), colSym, tokenSym, rateDiffers, args.history, drift));
+  lines.push(...timelineTable(events.filter(isFxEvent), colSym, tokenSym, rateDiffers, args.history, reads));
   return lines.join("\n");
 }
 
-/** The card's collateral-side reconciliation line: what funding and
- *  rebalances moved on collateral with no event of the position's own,
- *  summed over the stretches in hand and qualified when that is not yet the
- *  whole life. Null before the drift answered or while it has no stretch. */
+/** The card's debt line: what the transactions add up to, the pool's own
+ *  figure, and what moved the debt between them, part by part where the page
+ *  has read each row's block, else the net. */
+function debtMovedSection(view: FxPositionView, settledDebts: number, parts: FxNoTxParts | null): string[] {
+  const out: string[] = [];
+  const implied = view.impliedDebt.amount;
+  const gap = view.socializedDebt ?? implied - settledDebts;
+  out.push(`## Debt moved by the pool`);
+  out.push("");
+  if (implied < 0) {
+    // The Σ has run BELOW zero: the timeline recorded more debt leaving than
+    // it ever recorded arriving, because other positions' bad debt kept
+    // raising this position's debt with no transaction and the repay and
+    // liquidation rows cleared that too. A bare negative "debt" would read as
+    // nonsense, so name what it is.
+    out.push(
+      `- **Its transactions add up to:** ${amt(implied)} fxUSD — Σ of this position's own event deltas, and it has run **negative**, ` +
+        `which is not a debt: the timeline recorded more debt leaving than it ever recorded arriving. Other positions' bad debt ` +
+        `kept adding to this position's debt with no transaction, and the repay and liquidation rows cleared that along with ` +
+        `the borrowed principal. The overshoot is the measure of what the transactions never saw.`,
+    );
+  } else {
+    out.push(`- **Its transactions add up to:** ${amt(implied)} fxUSD — Σ of this position's own event deltas`);
+  }
+  out.push(`- **The pool's own figure:** ${amt(settledDebts)} fxUSD`);
+  if (Math.abs(gap) <= DUST) {
+    out.push(
+      `- **Moved by the pool:** nothing — the two agree, so no rebalance, redemption, liquidation or bad debt has touched ` +
+        `this position's debt. Funding never shows here: it is charged on collateral (the line under Collateral above).`,
+    );
+    out.push("");
+    return out;
+  }
+  if (parts && parts.badDebt > -0.0005) {
+    const items: string[] = [];
+    if (parts.rebalances && parts.rebalances.debt > 0.0005)
+      items.push(
+        `${amt(parts.rebalances.debt)} fxUSD cleared by ${parts.rebalances.rows === 1 ? "a rebalance" : `${parts.rebalances.rows} rebalances`} (${dateSpan(parts.rebalances.firstTs, parts.rebalances.lastTs)})`,
+      );
+    if (parts.redemptions && parts.redemptions.debt > 0.0005)
+      items.push(
+        `${amt(parts.redemptions.debt)} fxUSD by ${parts.redemptions.rows === 1 ? "a redemption" : `${parts.redemptions.rows} redemptions`} (${dateSpan(parts.redemptions.firstTs, parts.redemptions.lastTs)})`,
+      );
+    if (parts.poolLiquidations && parts.poolLiquidations.debt > 0.0005)
+      items.push(
+        `${amt(parts.poolLiquidations.debt)} fxUSD by a pool-wide liquidation that repaid ${amt(parts.poolLiquidations.poolRepaid ?? 0)} fxUSD across the pool and wrote off the rest (${dateSpan(parts.poolLiquidations.firstTs, parts.poolLiquidations.lastTs)})`,
+      );
+    if (parts.leftUnpaid > 0.0005)
+      items.push(`${amt(parts.leftUnpaid)} fxUSD written off at this position's liquidation`);
+    if (parts.badDebt > 0.0005) items.push(`+${amt(parts.badDebt)} fxUSD of other positions' bad debt`);
+    out.push(`- **Moved by the pool:** ${amt(Math.abs(gap))} fxUSD ${gap >= 0 ? "cleared" : "added"}, in parts:`);
+    for (const it of items) out.push(`  - ${it}`);
+    out.push(
+      `- Each part is the pool's own \`getPosition\` read at the block before the row and at the row's block, so it is this ` +
+        `position's change and not the whole tick's; the bad debt is the remainder, added through the pool's debt index.`,
+    );
+  } else {
+    out.push(
+      `- **Moved by the pool:** ${amt(Math.abs(gap))} fxUSD ${gap >= 0 ? "cleared" : "added"} with no transaction of the owner's, net — ` +
+        `${
+          gap >= 0
+            ? "rebalances, redemptions and liquidations cleared debt the transactions never recorded leaving"
+            : "other positions' bad debt added to this position's debt beyond anything the transactions record"
+        }. This is why the timeline cannot be replayed to a current figure.`,
+    );
+  }
+  out.push("");
+  return out;
+}
+
+/** The card's collateral-side line: what funding and the pool's rows moved on
+ *  collateral with no transaction of the owner's, summed over the stretches in
+ *  hand and qualified when that is not yet the whole life. Null before the
+ *  reads answered or while they have no stretch. */
 function collateralDriftLine(drift: FxDriftResult | null, colSym: string): string | null {
   if (!drift || drift.intervals.length === 0) return null;
   const s = summariseFxDrift(drift);
   const scope = s.complete
-    ? `with no event of its own (every stretch of the position's life read, ending at the settled sweep's block ${drift.headBlock})`
+    ? `without a transaction (every stretch of the position's life read, ending at the settled sweep's block ${drift.headBlock})`
     : `over the latest ${s.intervals} stretch${s.intervals === 1 ? "" : "es"} read so far — not yet the whole life`;
-  if (Math.abs(s.collsDrift) <= DUST)
-    return `- **Funding & rebalances on collateral:** 0 ${colSym} of movement ${scope}`;
+  if (Math.abs(s.collsDrift) <= DUST) return `- **Moved by the pool on collateral:** 0 ${colSym} of movement ${scope}`;
   return (
-    `- **Funding & rebalances on collateral:** ${s.collsDrift < 0 ? "took" : "added"} ${amt(Math.abs(s.collsDrift))} ${colSym} ${scope}. ` +
-    `Funding is charged on collateral through the pool's collateral index, never on debt — this line is where it shows.`
+    `- **Moved by the pool on collateral:** ${s.collsDrift < 0 ? "took" : "added"} ${amt(Math.abs(s.collsDrift))} ${colSym} ${scope}. ` +
+    `Funding is charged on collateral through the pool's collateral index, never on debt — this line is where it shows, with what rebalances and redemptions took.`
   );
 }
 
-/** The per-stretch decomposition of the reconciliation lines: one row per
- *  quiet stretch between the position's own events, each the pool's own
- *  getPosition read at the stretch's start and end blocks and their
- *  difference. Empty before the drift answered. */
-function driftTable(drift: FxDriftResult | null, events: BaseActivityEvent[], colSym: string): string[] {
+/** The per-stretch table: one row per quiet stretch between the position's
+ *  own events, each the pool's own getPosition read at the stretch's start
+ *  and end blocks and their difference. Empty before the reads answered. */
+function driftTable(drift: FxDriftResult | null, colSym: string): string[] {
   if (!drift) return [];
   const out: string[] = [];
-  out.push(`## Socialized drift by stretch`);
+  out.push(`## Moved without a transaction, by stretch`);
   out.push("");
   if (drift.intervals.length === 0) {
     out.push(
@@ -296,17 +335,17 @@ function driftTable(drift: FxDriftResult | null, events: BaseActivityEvent[], co
   out.push(
     `Each row is one quiet stretch between this position's own events: the pool's own \`getPosition\` read at the ` +
       `stretch's start block (post-event) and end block (the block before the next event, or the settled sweep's block ` +
-      `for the last row), and their difference. Negative = the socialized lane took from the position. Collateral drift ` +
-      `is funding plus this position's share of any tick rebalance in the stretch; debt drift is its share of rebalances ` +
-      `(down) and of bad debt socialized from other positions' liquidations (up). A stretch holding exactly one rebalance ` +
-      `states this position's exact slice of that tick's clear.`,
+      `for the last row), and their difference. Negative = the pool took from the position. Collateral moved is funding ` +
+      `plus what any rebalance or redemption in the stretch took; debt moved is what rebalances, redemptions and ` +
+      `pool-wide liquidations cleared (down) and other positions' bad debt added (up). The timeline below states each ` +
+      `such row's own change at its block.`,
   );
   out.push("");
-  out.push(`| From block | To block | Collateral drift | Debt drift | Rebalances in stretch |`);
-  out.push("|------------|----------|------------------|------------|-----------------------|");
+  out.push(`| From block | To block | Collateral moved | Debt moved |`);
+  out.push("|------------|----------|------------------|------------|");
   for (const iv of drift.intervals) {
     out.push(
-      `| ${iv.fromBlock} | ${iv.toHead ? `${iv.toBlock} (settled sweep)` : iv.toBlock} | ${driftCell(iv.collsDrift, colSym)} | ${driftCell(iv.debtsDrift, "fxUSD")} | ${rebalancesIn(iv, events) || "—"} |`,
+      `| ${iv.fromBlock} | ${iv.toHead ? `${iv.toBlock} (settled sweep)` : iv.toBlock} | ${changeCell(iv.collsDrift, colSym)} | ${changeCell(iv.debtsDrift, "fxUSD")} |`,
     );
   }
   out.push("");
@@ -332,7 +371,7 @@ function timelineTable(
   tokenSym: string,
   rateDiffers: boolean,
   history: MarkdownHistoryScope | undefined,
-  drift: FxDriftResult | null,
+  reads: Record<string, FxStateAt> | null,
 ): string[] {
   const out: string[] = [];
   const { rows, heading, firstIndex } = markdownTimelineSlice(events, history, { unit: "row" });
@@ -346,6 +385,27 @@ function timelineTable(
   const sign = (v: string | undefined) => {
     const n = Number(v ?? 0) || 0;
     return n === 0 ? "—" : `${n > 0 ? "+" : "−"}${amt(Math.abs(n))}`;
+  };
+  // A block holding several pool rows (rebalances, a pool-wide liquidation)
+  // is read once; its change belongs to the block, so only the block's first
+  // row here states it and the rest say so.
+  const poolRowsPerBlock = new Map<number, number>();
+  for (const e of rows) {
+    if (!isFxEvent(e)) continue;
+    const d = e.context.data;
+    if (d.eventType === "tickRebalance" || (d.eventType === "liquidation" && d.poolWide))
+      poolRowsPerBlock.set(e.blockNumber, (poolRowsPerBlock.get(e.blockNumber) ?? 0) + 1);
+  }
+  const statedBlocks = new Set<number>();
+  const ownChange = (e: BaseActivityEvent): { coll: string; debt: string } | null => {
+    if (e.blockNumber == null) return null;
+    const peers = poolRowsPerBlock.get(e.blockNumber) ?? 1;
+    if (statedBlocks.has(e.blockNumber)) return { coll: "included above", debt: "included above" };
+    const change = fxBlockChange(reads, e.blockNumber);
+    if (!change) return null;
+    statedBlocks.add(e.blockNumber);
+    const who = peers > 1 ? `this position, the block's ${peers} rows together` : "this position";
+    return { coll: `${who} ${changeCell(change.coll, colSym)}`, debt: `${who} ${changeCell(change.debt, "fxUSD")}` };
   };
   out.push(
     `| # | Date | Action | Collateral Δ | fxUSD Δ | Collateral after (${colSym}) | Debt after (fxUSD) | Moved since previous | Implied debt after | Transaction |`,
@@ -366,14 +426,18 @@ function timelineTable(
     switch (d.eventType) {
       case "liquidation": {
         if (d.poolWide) {
-          // A pool-wide Liquidate run: its amounts are the whole run's.
+          // A pool-wide Liquidate run: its amounts are the whole run's; the
+          // position's own change first, where the page read the block.
           action = `Pool-wide liquidation (tick ${d.rebalancedTick}${d.emptiesPosition ? ", liquidated whole" : ""})`;
-          colD =
-            d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${tokenSym} (pool)` : "—";
-          debtD =
+          const own = ownChange(e);
+          const poolColl =
+            d.tickRebColls && Number(d.tickRebColls) > 0 ? `pool −${amt(Number(d.tickRebColls))} ${tokenSym}` : null;
+          const poolDebt =
             d.tickRebFxusdDebts && Number(d.tickRebFxusdDebts) > 0
-              ? `−${amt(Number(d.tickRebFxusdDebts))} (pool)`
-              : "—";
+              ? `pool repaid ${amt(Number(d.tickRebFxusdDebts))}`
+              : null;
+          colD = [own?.coll, poolColl].filter(Boolean).join("; ") || "—";
+          debtD = [own?.debt, poolDebt].filter(Boolean).join("; ") || "—";
           impliedCell = "—";
           break;
         }
@@ -383,30 +447,26 @@ function timelineTable(
         break;
       }
       case "tickRebalance": {
-        // TICK-level, not this position's slice — flagged in the cell itself
-        // so a reader skimming the table cannot mistake it for a own-position
-        // amount. When the stretch holding the rebalance has been read, the
-        // position's OWN drift over that stretch follows in the same cell,
-        // labeled as such (one rebalance in the stretch = its exact slice).
+        // This position's own change first (the pool's getPosition at the
+        // block before and at the block), then the TICK-level amounts — the
+        // whole tick's clear, NOT this position's slice — with their scope
+        // word, so a reader skimming the table cannot mistake them for an
+        // own-position amount.
         const scope = d.poolWide ? "pool" : "tick";
         action = d.redemption
           ? `Redemption (took from tick ${d.rebalancedTick})`
           : d.poolWide
             ? `Pool-wide rebalance (moved tick ${d.rebalancedTick})`
             : `Tick ${d.rebalancedTick} rebalanced (whole tick)`;
-        colD =
-          d.tickRebColls && Number(d.tickRebColls) > 0 ? `−${amt(Number(d.tickRebColls))} ${tokenSym} (${scope})` : "—";
-        debtD =
+        const own = ownChange(e);
+        const tickColl =
+          d.tickRebColls && Number(d.tickRebColls) > 0 ? `${scope} −${amt(Number(d.tickRebColls))} ${tokenSym}` : null;
+        const tickDebt =
           d.tickRebFxusdDebts && Number(d.tickRebFxusdDebts) > 0
-            ? `−${amt(Number(d.tickRebFxusdDebts))} (${scope})`
-            : "—";
-        const iv = e.blockNumber != null ? driftIntervalAt(drift, e.blockNumber) : undefined;
-        if (iv) {
-          const shared = rebalancesIn(iv, events);
-          const stretch = shared > 1 ? `over a stretch shared by ${shared} rebalances` : "over its stretch";
-          colD += `; this position ${driftCell(iv.collsDrift, colSym)} ${stretch}`;
-          debtD += `; this position ${driftCell(iv.debtsDrift, "fxUSD")} ${stretch}`;
-        }
+            ? `${scope} repaid ${amt(Number(d.tickRebFxusdDebts))}`
+            : null;
+        colD = [own?.coll, tickColl].filter(Boolean).join("; ") || "—";
+        debtD = [own?.debt, tickDebt].filter(Boolean).join("; ") || "—";
         impliedCell = "—";
         break;
       }
@@ -431,13 +491,13 @@ function timelineTable(
     `_Collateral deltas on an **Operate** row are ${tokenSym} TOKEN units (as transferred); liquidation and tick rows ` +
       `are RATE-NORMALIZED ${colSym} units${rateDiffers ? ` — a different quantity, via the pool's own token rate` : ` at 18dp rather than the token's own`}. ` +
       `The two systems never mix or sum — and neither reconciles against the settled ` +
-      `collateral above, because funding mutates collateral with no event at all. **Tick rebalance** rows state what the ` +
-      `WHOLE TICK gave up while this position's shares sat in it; the per-position slice is not provable from those logs — ` +
-      `where a row also says "this position … over its stretch", that is the pool's own getPosition drift across the ` +
-      `quiet stretch holding the rebalance (see the drift table above), and the settled reconciliation carries the ` +
-      `lifetime total. "Collateral after" and "Debt after" are the pool's getPosition at the row's block; "Moved since ` +
-      `previous" is what the debt moved between the previous event and this one with no event of the position's own ` +
-      `(funding, rebalances). "Implied debt after" is the running Σ of this position's own deltas._`,
+      `collateral above, because funding moves collateral with no transaction at all. On a **rebalance**, **redemption** or ` +
+      `**pool-wide liquidation** row, "this position …" is the pool's own getPosition at the block before the row and at ` +
+      `the row's block — the position's own change; a block holding several such rows is read once and its first row ` +
+      `states it. The "tick" and "pool" amounts beside it are what the WHOLE TICK or pool gave up, not this position's ` +
+      `slice. "Collateral after" and "Debt after" are the pool's getPosition at the row's block; "Moved since ` +
+      `previous" is what the debt moved between the previous event and this one with no transaction of the owner's ` +
+      `(funding, rebalances, bad debt). "Implied debt after" is the running Σ of this position's own deltas._`,
   );
   out.push("");
   return out;

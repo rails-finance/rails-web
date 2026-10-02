@@ -86,8 +86,8 @@ export function FxEventHeader({
     const lead = blockNumber != null && eventId != null && socialized?.leads.has(eventId) === true;
     const change = lead ? fxBlockChange(socialized?.reads, blockNumber as number) : null;
     const peers = blockNumber != null ? (socialized?.peers?.get(blockNumber) ?? 1) : 1;
-    const noun = ctx.redemption ? "redemptions" : poolLiq ? "liquidations" : "rebalances";
-    if (peers > 1) note = lead ? `${peers === 2 ? "both" : `all ${peers}`} ${noun} in this block` : "included above";
+    // Kept short: a longer note pushes the date onto a second line at 1280 px.
+    if (peers > 1) note = lead ? `${peers === 2 ? "both" : `all ${peers}`} in this block` : "included above";
     if (poolLiq && change) {
       const repaid = Number(ctx.tickRebFxusdDebts ?? "0") || 0;
       if (-change.debt - repaid > 0.001) note = "debt written off";

@@ -163,6 +163,15 @@ export interface LlamalendLoan {
   openedAt: number;
   closedAt: number | null;
   ending: "open" | "repaid" | "liquidated";
+  /** The loan's own flows (the rows' emitted deltas, as
+   *  replayLlamalendLifetime buckets them): what the owner borrowed and
+   *  repaid, deposited and withdrew. A third-party liquidation's row adds to
+   *  none of them, so on a liquidated loan borrowed − repaid is what the owner
+   *  kept and deposited − withdrawn what they lost. */
+  borrowed: number;
+  repaid: number;
+  collateralAdded: number;
+  collateralWithdrawn: number;
 }
 
 export function llamalendLoans(
@@ -176,7 +185,25 @@ export function llamalendLoans(
   let cur: LlamalendLoan | null = null;
   for (const e of rows) {
     const c = e.context.data;
-    if (!cur) cur = { openedAt: e.timestamp, closedAt: null, ending: "open" };
+    if (!cur)
+      cur = {
+        openedAt: e.timestamp,
+        closedAt: null,
+        ending: "open",
+        borrowed: 0,
+        repaid: 0,
+        collateralAdded: 0,
+        collateralWithdrawn: 0,
+      };
+    const coll = Number(c.collateralDelta ?? "0");
+    const debt = Number(c.debtDelta ?? "0");
+    const thirdPartyLiquidation = c.eventType === "liquidation" && !c.selfLiquidation && c.role !== "self";
+    if (!thirdPartyLiquidation) {
+      if (Number.isFinite(coll) && coll > 0) cur.collateralAdded += coll;
+      else if (Number.isFinite(coll) && coll < 0) cur.collateralWithdrawn += -coll;
+      if (Number.isFinite(debt) && debt > 0) cur.borrowed += debt;
+      else if (Number.isFinite(debt) && debt < 0) cur.repaid += -debt;
+    }
     if (c.debtAfter != null && Number(c.debtAfter) <= 1e-12) {
       cur.closedAt = e.timestamp;
       cur.ending = c.eventType === "liquidation" && !c.selfLiquidation && c.role !== "self" ? "liquidated" : "repaid";

@@ -94,11 +94,3 @@ export function summariseFxDrift(drift: FxDriftResult): {
     complete: drift.unread === 0 && !drift.headPending && drift.headBlock != null,
   };
 }
-
-/** This position's OWN drift over the stretch holding a tick rebalance at
- *  `blockNumber` — the interval whose block range contains it, or undefined
- *  while that interval is unread. */
-export function driftIntervalAt(drift: FxDriftResult | null, blockNumber: number): FxDriftInterval | undefined {
-  if (!drift) return undefined;
-  return drift.intervals.find((iv) => iv.fromBlock <= blockNumber && blockNumber <= iv.toBlock);
-}

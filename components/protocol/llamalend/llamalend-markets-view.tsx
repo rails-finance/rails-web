@@ -28,6 +28,7 @@
 // data-prov-exempt rather than a receipt that would overclaim.
 
 import { formatTinyNonZero } from "@/lib/utils/format";
+import { formatDate } from "@/lib/date";
 import {
   llamaDebtProv,
   llamaAmplificationProv,
@@ -85,7 +86,40 @@ const YIELD_SHARES: Record<string, string> = {
 const nearZeroRate = (m: LlamalendMarketRow): boolean =>
   m.minRateRaw != null && m.maxRateRaw != null && BigInt(m.maxRateRaw) < BigInt(1_000_000);
 
-function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
+/** A per-second 1e18 rate as a yearly percentage, as the borrow figure is. */
+const aprText = (raw: string): string => `${((Number(raw) / 1e18) * 31_536_000 * 100).toFixed(0)}%`;
+
+/** Rate policies whose rate is a function of time alone: "Flat Time-Linear
+ *  Monetary Policy" (verified source), rate(t) = clamp(base_rate + slope ×
+ *  (t − snapshot_time), min_rate, max_rate), the same answer to every
+ *  Controller wired to it. base_rate, slope and snapshot_time have no setter;
+ *  min_rate and max_rate are read per market. Read 2026-10-02: 32 V1 lend
+ *  markets use 0x066a…3cee (TO-DO-ui-jobs 171). */
+interface TimeLinearPolicy {
+  /** The starting rate, a year at a time (%). */
+  basePct: number;
+  /** The rise, in percentage points a year. */
+  slopePctPerYear: number;
+  /** snapshot_time, unix seconds. */
+  since: number;
+}
+
+const TIME_LINEAR_POLICIES: Record<string, TimeLinearPolicy> = {
+  // base_rate 3170979198 (10%/yr), slope 904 wei/s² (89.9 points a year),
+  // snapshot_time 1779714611 (25 May 2026).
+  "0x066a89bdf4efb6ad58427d278f16b7a2c53c3cee": { basePct: 10, slopePctPerYear: 89.9, since: 1779714611 },
+};
+
+const timeLinearPolicy = (m: LlamalendMarketRow): TimeLinearPolicy | undefined =>
+  TIME_LINEAR_POLICIES[m.monetaryPolicy?.toLowerCase() ?? ""];
+
+/** The splitter the crvUSD ControllerFactory names as its fee receiver
+ *  (`fee_receiver()`, read 2026-10-02): two receivers, the scrvUSD vault's
+ *  RewardsHandler and the DAO's FeeCollector (TO-DO-ui-jobs 169). */
+const CRVUSD_FEE_SPLITTER = "0x2dfd89449faff8a532790667bab21cf733c064f2";
+
+function MarketCard({ m, block, sharers }: { m: LlamalendMarketRow; block: number; sharers: number }) {
+  const timeLinear = timeLinearPolicy(m);
   // Every per-market figure traces to the same coordinates: the head block, the
   // three contracts this market's reads came from, and the two flags that decide
   // a figure's unit (crvUSD par) and denominator (utilisation basis).
@@ -167,6 +201,27 @@ function MarketCard({ m, block }: { m: LlamalendMarketRow; block: number }) {
           The market&rsquo;s rate policy sets its minimum and maximum at{" "}
           {m.minRateRaw === m.maxRateRaw ? `${m.minRateRaw} wei` : `${m.minRateRaw} and ${m.maxRateRaw} wei`} a second,
           about 0% a year at any utilisation.
+        </p>
+      )}
+
+      {timeLinear && (
+        <p className="mt-1 text-[11px] text-rb-500" data-llamalend-time-linear-policy="">
+          The rate follows time alone: the policy{" "}
+          <a
+            href={explorerUrl(MAINNET_CHAIN_ID, "address", m.monetaryPolicy)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-external"
+          >
+            {shortAddress(m.monetaryPolicy)}
+          </a>{" "}
+          started it at {timeLinear.basePct}% a year on {formatDate(timeLinear.since)} and raises it about{" "}
+          {Math.round(timeLinear.slopePctPerYear)} points a year
+          {m.minRateRaw != null && m.maxRateRaw != null
+            ? `, held between ${aprText(m.minRateRaw)} and ${aprText(m.maxRateRaw)}`
+            : ""}
+          , whatever the utilisation
+          {sharers > 1 ? `; ${sharers - 1} other market${sharers - 1 === 1 ? "" : "s"} use the same policy` : ""}.
         </p>
       )}
 
@@ -261,6 +316,10 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
   // repaid, which is not what the sentence below is claiming.
   const v2Live = v2.filter((m) => m.nLoans > 0).length;
   const nonCrvusd = data.markets.filter((m) => !m.borrowedIsCrvusd);
+  // How many markets each rate policy serves, and how many follow time alone.
+  const policyUsers = new Map<string, number>();
+  for (const m of data.markets) policyUsers.set(m.monetaryPolicy, (policyUsers.get(m.monetaryPolicy) ?? 0) + 1);
+  const timeLinearMarkets = data.markets.filter((m) => timeLinearPolicy(m)).length;
   // Roster-summary receipts need only the block; the per-market coordinates
   // live on each card.
   const summaryCoords: LlamalendMarketCoords = { blockNumber: data.blockNumber };
@@ -348,12 +407,26 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
         <dt className="font-semibold text-foreground">Mint market</dt>
         <dd>
           The crvUSD is minted against the loan by Curve&rsquo;s crvUSD system, up to the market&rsquo;s debt ceiling.
-          The rate moves with crvUSD&rsquo;s price and the size of the Peg Stabilization Reserve.
+          The rate moves with crvUSD&rsquo;s price and the size of the Peg Stabilization Reserve. The interest goes to
+          Curve: the Controller sends it to the factory&rsquo;s fee receiver, a splitter (
+          <a
+            href={explorerUrl(MAINNET_CHAIN_ID, "address", CRVUSD_FEE_SPLITTER)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link-external"
+          >
+            {shortAddress(CRVUSD_FEE_SPLITTER)}
+          </a>
+          ) that pays the scrvUSD savings vault and the DAO&rsquo;s fee collector, which distributes to veCRV lockers.
         </dd>
         <dt className="font-semibold text-foreground">Lend market</dt>
         <dd>
           The borrowed token is lent from a vault of lenders&rsquo; deposits, and all the interest goes to those
-          lenders. The rate rises with the share of the vault that is lent.
+          lenders. The rate rises with the share of the vault that is lent
+          {timeLinearMarkets > 0
+            ? `; in ${timeLinearMarkets} markets the rate follows time alone, and their cards give the rule`
+            : ""}
+          .
         </dd>
         <dt className="font-semibold text-foreground">A</dt>
         <dd>The band width: each band spans about 1/A of its price (1% at A = 100).</dd>
@@ -375,7 +448,12 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
         <h2 className="mb-2 text-sm font-semibold text-foreground">V1 markets</h2>
         <div className="grid gap-2.5 sm:grid-cols-2">
           {v1.map((m) => (
-            <MarketCard key={m.controller} m={m} block={data.blockNumber} />
+            <MarketCard
+              key={m.controller}
+              m={m}
+              block={data.blockNumber}
+              sharers={policyUsers.get(m.monetaryPolicy) ?? 1}
+            />
           ))}
         </div>
       </section>
@@ -402,7 +480,12 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
           </p>
           <div className="grid gap-2.5 sm:grid-cols-2">
             {v2.map((m) => (
-              <MarketCard key={m.controller} m={m} block={data.blockNumber} />
+              <MarketCard
+                key={m.controller}
+                m={m}
+                block={data.blockNumber}
+                sharers={policyUsers.get(m.monetaryPolicy) ?? 1}
+              />
             ))}
           </div>
         </section>

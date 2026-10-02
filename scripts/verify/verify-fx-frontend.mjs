@@ -329,7 +329,7 @@ check(
 );
 check(
   "243 r3: same-block rebalances state the change once",
-  /both rebalances in this block/.test(p243.text) && /included above/.test(p243.text),
+  /both in this block/.test(p243.text) && /included above/.test(p243.text),
 );
 check("243 r3: dust after liquidation 1", /dust left/.test(p243.text));
 check("243 r3: the card names the position's tick", /in tick #\d+ · find it on the pools page/.test(p243.text));
@@ -374,11 +374,15 @@ check(
     : /redemption closed: it opens only while fxUSD trades below its peg/.test(pPools.text),
 );
 {
+  // wsteth-243's tick as its card states it today; a rebalance of the tick
+  // moves the position to another one.
+  const tick243 = p243.text.match(/in tick\s*#(\d+)/)?.[1];
+  check("pools r3: wsteth-243's card names its tick", tick243 != null);
   const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
-  await pg.goto(BASE + "/ethereum/fx/pools?pool=wsteth&tick=4718", { waitUntil: "networkidle", timeout: 120000 });
+  await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
   await pg.waitForTimeout(3000);
   const t = await pg
-    .locator("#tick-wsteth-4718")
+    .locator(`#tick-wsteth-${tick243}`)
     .innerText()
     .catch(() => "");
   check("pools r3: a linked tick is marked", /the position’s tick/.test(t), t.split("\n").join(" "));

@@ -427,7 +427,11 @@ export default function LlamalendPositionView({
                 // loan narrates nothing.
                 bodyExtra={
                   loans.length > 1 ? (
-                    <LlamalendLoansLine loans={loans} />
+                    <LlamalendLoansLine
+                      loans={loans}
+                      borrowedSymbol={liveView.borrowedSymbol}
+                      collateralSymbol={liveView.collateralSymbol}
+                    />
                   ) : ownerOutcome ? (
                     <LlamalendOwnerOutcomeLine
                       {...ownerOutcome}

@@ -454,6 +454,8 @@ export default function FxPositionView({
               view={view}
               events={fxEvents}
               drift={drift}
+              reads={historyWindow.state === "whole" ? socializedReadsMap : undefined}
+              parts={noTxParts}
               csvFilename={`fx-${slug}-activity.csv`}
               fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
               history={markdownHistoryScope(historyWindow, fxEvents)}
