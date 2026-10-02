@@ -1,9 +1,9 @@
 "use client";
 
-// One wallet's Seamless position on Base — state, economics and whole history.
+// One wallet's Seamless position on Base — state, lifetime flows and whole history.
 //
 // Structurally the Aave V3 Base page, because Seamless is an Aave V3 fork and
-// the same readers, cards and tower serve both. What differs is this market's
+// the same readers, cards and flow replay serve both. What differs is this market's
 // own Pool, its own oracle and its own receipts — and one fact about the market
 // itself that changes what the surfaces mean rather than how they are built.
 //
@@ -18,7 +18,7 @@
 // differing from every other Aave-shaped card.
 //
 // Three reads, in the order they can answer: the Pool (fast, feeds the card),
-// the history (feeds the timeline, the tower's lifetime layer and the card's
+// the history (feeds the timeline, the Lifetime flows panel and the card's
 // own history), then the oracle for every reserve the position ever touched.
 //
 // The first two are done on the SERVER and handed down as `initialPosition` and
@@ -28,7 +28,6 @@
 // history's completeness is a property of the request rather than of the
 // explorer, so it is stated under the last event.
 
-import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -54,7 +53,11 @@ import {
 } from "@/lib/aave-v3/account-switches";
 import { aaveV3Neighbours, type AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
-import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
+import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
+import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowFocusContext } from "@/components/shared/flow-focus-context";
+import { AaveV3BaseFlowsNote, aaveV3BaseFlowsContent } from "@/components/protocol/aave-v3/aave-v3-base-flows-note";
+import { useAaveV3BaseFlows } from "@/hooks/useAaveV3BaseFlows";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -74,15 +77,10 @@ import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import { AAVE_V3_FOLDER_REGISTER, AAVE_V3_TIMELINE_RUNS } from "@/lib/aave-v3/timeline-runs";
-import {
-  computeAaveV3CardCaptions,
-  computeAaveV3Economics,
-  unpricedAaveV3FlowAddresses,
-} from "@/lib/aave-v3/chain-truth-tower";
-import { aaveV3EconomicsExplanation, aaveV3EconomicsContent } from "@/lib/aave-v3/economics-explanation";
+import { computeAaveV3CardCaptions, unpricedAaveV3FlowAddresses } from "@/lib/aave-v3/chain-truth-tower";
 import { v3ViewFromChain, type V3SweptHistory } from "@/lib/aave-v3/chain-position-view";
 import { V3PoolProvider, type V3PoolIdentity } from "@/lib/aave-v3/pool-context";
-import { SEAMLESS_LIVE_CARD_DEPLOYMENT, SEAMLESS_TOWER_VOCABULARY } from "@/lib/seamless/position-provenance";
+import { SEAMLESS_LIVE_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
 import {
   SEAMLESS_CHAIN_ID,
   SEAMLESS_FREEZE_BLOCK,
@@ -331,7 +329,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   );
   /** The folders, whole and unfiltered. Every whole-history claim below that
    *  is reduced over `aaveEvents` adds them, or states nothing it cannot. The
-   *  tower, the card's counts and the peaks need nothing: the route replayed
+   *  card's counts and the peaks need nothing: the route replayed
    *  every row before it grouped, and those figures ride the replay. */
   const servedFolders = useMemo(
     () => (servedRows ? servedRows.flatMap((row) => (row.kind === "folder" ? [row.folder] : [])) : null),
@@ -359,11 +357,10 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     [aaveEvents, servedFolders],
   );
 
-  // The tower's lifetime layer and the card's captions read THESE, not the
-  // events above. The list is capped for a long history; these sums are not,
-  // so "all time" and "incl. interest" stay true.
+  // The card's captions read THESE, not the events above. The list is capped
+  // for a long history; these sums are not, so "all time" and "incl. interest"
+  // stay true.
   const lifetime = timeline?.lifetime;
-  const laneInterest = (timeline as { laneInterest?: AaveLaneInterest[] } | null)?.laneInterest;
 
   // "The sweep read every block of this Pool's life." Both conditions are
   // needed: no holes inside the span, AND the span reaching the Pool's own
@@ -405,7 +402,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
         if (!cancelled && Object.keys(p).length > 0) setPrices(p);
       })
       .catch(() => {
-        // The tower stays on the token-only list, which is what no price means.
+        // A reserve without a price today keeps its last recorded one.
       });
     return () => {
       cancelled = true;
@@ -461,6 +458,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
     folderParams: { wallet },
     storageKey: `seamless-${wallet}`,
     protocolKey: "aave-v3",
+    // Navigated by the Lifetime flows chart's "Show timeline to": no Dates.
+    dates: false,
   });
 
   // The CSV on a grouped page: the rows in the order the route served them,
@@ -564,228 +563,236 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   const historyPending = nothingOnChain && timelineState === "loading";
   const historyUnread = nothingOnChain && (timelineState === "failed" || timelineState === "unavailable");
 
-  // The tower's lifetime layer is labelled "all time" and is only entitled to
-  // that word if the sweep read every block. A holed sweep keeps the bars (the
-  // current state comes from the Pool, not the logs) and drops the flows.
-  const towerData = useMemo(() => {
-    if (!view) return null;
-    // Every row in hand: the flows reduce from the rows, so a withdrawal
-    // through the WETH gateway counts as withdrawn and each flow is valued at
-    // its event's oracle price. The route's lifetime sums stand in only where
-    // rows are missing.
-    const built = computeAaveV3Economics(
-      view,
-      wholeRows ? aaveEvents : undefined,
-      SEAMLESS_TOWER_VOCABULARY,
-      sweptClean && !wholeRows ? lifetime : undefined,
-      // Each lane's net moved beside its chain balance (decision 0033): a side
-      // holding one reserve splits into that net and the interest on top.
-      sweptClean ? laneInterest : undefined,
-    );
-    return sweptClean
-      ? built
-      : {
-          ...built,
-          flowsNote:
-            "Lifetime flows are hidden because the history sweep did not read every block of this position's life — see the note under the timeline for where it stopped or what it missed. Summing what did arrive would label a partial history “all time”. The current balances above are unaffected: they are read from the Pool, not replayed from the events.",
-        };
-  }, [view, lifetime, sweptClean, laneInterest, wholeRows, aaveEvents]);
+  // The Lifetime flows panel replays the account's whole history
+  // (lib/aave-v3-base/flows.ts): the page's rows where they are all of it,
+  // else the flat history read once; a read that is not the whole life (a
+  // heavy wallet's elided rows, a holed or horizoned sweep) is a failed read.
+  // The write-off rule is the Aave Pool's (lib/aave-v3-base/write-off-gap.ts);
+  // it is not applied here.
+  const fetchFlatHistory = useCallback(async () => {
+    const flat = await fetchChainTimeline<BaseTimeline>({ wallet, route: TIMELINE_ROUTE, mark: "seamless-flows" });
+    const whole = flat.coverage.fromDeployment === true && flat.coverage.gaps.length === 0;
+    return {
+      events: flat.events.filter(isAaveV3Event),
+      missing: whole ? (flat.coverage.omitted?.count ?? 0) : Math.max(1, flat.coverage.omitted?.count ?? 0),
+    };
+  }, [wallet]);
+  const flows = useAaveV3BaseFlows({
+    family: "seamless",
+    brand: "Seamless",
+    writeOffFrom: null,
+    pending: timelineState === "loading",
+    wholeEvents: wholeRows ? aaveEvents : null,
+    fetchAll: timelineState === "ready" ? fetchFlatHistory : null,
+    chain: data,
+    prices,
+  });
 
   return (
     <CaptureSourceProvider value={captureSource}>
       <V3PoolProvider pool={POOL_IDENTITY}>
-        <div className="py-8 space-y-6">
-          <DetailTopRow
-            session="seamless"
-            wallet={wallet}
-            assets={stripAssets}
-            closed={view != null && view.status !== "open"}
-          >
-            {view && (
-              <AaveV3ExportMenu
-                wallet={wallet}
-                protocolName="Seamless"
-                marketName="Base"
-                source={captureSource}
-                view={view}
-                chain={data}
-                captions={captions}
-                events={aaveEvents}
-                history={markdownHistoryScope(undefined, aaveEvents, servedFolders)}
-                scopeNote={exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders)}
-                fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
-                csvFilename={`seamless-${wallet.slice(0, 10)}-activity.csv`}
-              />
-            )}
-          </DetailTopRow>
-
-          {loading ? (
-            <DetailBodySkeleton />
-          ) : error ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">Couldn&apos;t read this position.</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          ) : historyPending ? (
-            <SweepInFlight>
-              Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
-              Pool&rsquo;s first block, so it takes a moment.
-            </SweepInFlight>
-          ) : historyUnread ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
-              <p className="text-sm">
-                Whether this account ever held a position is a question only its history answers, and that read failed.
-                Reload to try again.
-              </p>
-            </div>
-          ) : untouched ? (
-            <div className="py-12 text-center text-rb-500">
-              <p className="mb-1">This wallet has never touched Seamless.</p>
-              <p className="text-sm">
-                No supplied assets, no debt, and no events on the Pool between its first block and now — and because the
-                market has been closed to new positions since April 2025, nothing can start here.
-              </p>
-            </div>
-          ) : (
-            <>
-              {view && data && (
-                <AaveV3PositionCard
-                  v={view}
-                  receipts
-                  viewHref={tl.viewHref}
-                  deployment={SEAMLESS_LIVE_CARD_DEPLOYMENT}
-                  captions={captions ?? undefined}
-                  // Closed by default, remembered per viewer and position (ui-jobs
-                  // 209), as on Ethereum. The room left to borrow and the
-                  // distance bar from the Pool read sit in the opened layer
-                  // under Debt and Health factor, inside the card's receipts scope.
-                  disclosureKey={`seamless:${wallet.toLowerCase()}`}
-                  debtDetail={<AaveV3BorrowRoom chain={data} />}
-                  riskDetail={<AaveV3RiskDetail chain={data} />}
-                  // The Explanation: the L1 prose about the face figures, then
-                  // what is particular to THIS Pool — eMode, a supply that
-                  // backs nothing (pre-3.2 accounting here), and the freeze.
-                  explanation={
-                    view.status !== "open" ? (
-                      <>
-                        <AaveV3ClosedPositionExplanation
-                          v={view}
-                          events={aaveEvents}
-                          folders={servedFolders}
-                          marketPhrase="Seamless market"
-                        />
-                        <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
-                      </>
-                    ) : (
-                      <>
-                        <AaveV3PositionExplanation
-                          chain={data}
-                          captions={captions}
-                          view={view}
-                          externalActivity={externalActivity}
-                          lastBorrowRate={lastBorrowRate}
-                        />
-                        <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
-                      </>
-                    )
-                  }
+        <FlowFocusContext.Provider value={flows.focus}>
+          <div className="py-8 space-y-6">
+            <DetailTopRow
+              session="seamless"
+              wallet={wallet}
+              assets={stripAssets}
+              closed={view != null && view.status !== "open"}
+            >
+              {view && (
+                <AaveV3ExportMenu
+                  wallet={wallet}
+                  protocolName="Seamless"
+                  marketName="Base"
+                  source={captureSource}
+                  view={view}
+                  chain={data}
+                  captions={captions}
+                  events={aaveEvents}
+                  history={markdownHistoryScope(undefined, aaveEvents, servedFolders)}
+                  scopeNote={exportScopeNote(undefined, aaveEvents, "this wallet's whole history", servedFolders)}
+                  fetchAllEvents={servedFolders && servedFolders.length > 0 ? fetchAllHistory : undefined}
+                  csvFilename={`seamless-${wallet.slice(0, 10)}-activity.csv`}
                 />
               )}
+            </DetailTopRow>
 
-              {towerData && timelineState === "ready" && (
-                <ChainTruthTower
-                  data={towerData}
-                  explanation={aaveV3EconomicsExplanation(towerData, { label: "Seamless" })}
-                  learnMore={aaveV3EconomicsContent({ label: "Seamless" }, towerData)}
-                />
-              )}
-
-              {timelineState === "ready" && timeline ? (
-                <>
-                  <TimelineFillWell fill={timeline.coverage.fill} />
-                  <ChainTruthTimeline
-                    // Matches `AaveV3CtEventCard`'s own
-                    // `persistKey={`aave-v3:${event.id}`}` — lets pinned mode
-                    // (the per-event share route) force a landed card's detail
-                    // panel open on its first mount.
-                    persistKeyPrefix="aave-v3"
-                    closed={view?.status !== "open"}
-                    tl={tl}
-                    // Both grouping paths: the specs group a flat answer in the
-                    // browser, the register draws the folders the route served.
-                    runs={AAVE_V3_TIMELINE_RUNS}
-                    folderRegister={AAVE_V3_FOLDER_REGISTER}
-                    readFolderMembers={readFolderMembers}
-                    segments={segments}
-                    displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
-                    toolbarLeading={
-                      <TimelineActivityHeader
-                        events={headerStamps}
-                        closed={view?.status !== "open"}
-                        firstAt={timeline.coverage.firstEventAt}
-                      />
-                    }
-                    emptyLabel={
-                      sweptClean
-                        ? "This wallet has no Seamless activity."
-                        : "No events to show — the sweep could not read this wallet's history."
-                    }
-                    footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
-                    // On a grouped answer the list covers `eventsServed`; a month
-                    // read holds no card, the grid holding the other months.
-                    boundary={
-                      tl.historyWindow.state === "span"
-                        ? null
-                        : boundaryFromChainCoverage(
-                            timeline.coverage,
-                            servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
-                          )
-                    }
-                    renderCard={(event, meta) =>
-                      isAaveV3Event(event) && event.context.data.emodeSwitch ? (
-                        <AaveFamilyEmodeSwitchCard
-                          event={event}
-                          sw={event.context.data.emodeSwitch}
-                          pool={POOL_IDENTITY}
-                          persistPrefix="aave-v3"
-                          hfFormat={hfLabelV3}
-                          eventNumber={meta.eventNumber}
-                          isFirst={meta.isFirst}
-                          isLast={meta.isLast}
-                          market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
-                        />
-                      ) : isAaveV3Event(event) ? (
-                        <AaveV3CtEventCard
-                          event={event}
-                          eventNumber={meta.eventNumber}
-                          isFirst={meta.isFirst}
-                          isLast={meta.isLast}
-                          market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
-                          siblings={neighbours.get(event.id)?.siblings}
-                          previous={neighbours.get(event.id)?.previous}
-                        />
-                      ) : null
+            {loading ? (
+              <DetailBodySkeleton />
+            ) : error ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">Couldn&apos;t read this position.</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : historyPending ? (
+              <SweepInFlight>
+                Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
+                Pool&rsquo;s first block, so it takes a moment.
+              </SweepInFlight>
+            ) : historyUnread ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">Nothing is supplied or borrowed on this Pool.</p>
+                <p className="text-sm">
+                  Whether this account ever held a position is a question only its history answers, and that read
+                  failed. Reload to try again.
+                </p>
+              </div>
+            ) : untouched ? (
+              <div className="py-12 text-center text-rb-500">
+                <p className="mb-1">This wallet has never touched Seamless.</p>
+                <p className="text-sm">
+                  No supplied assets, no debt, and no events on the Pool between its first block and now — and because
+                  the market has been closed to new positions since April 2025, nothing can start here.
+                </p>
+              </div>
+            ) : (
+              <>
+                {view && data && (
+                  <AaveV3PositionCard
+                    v={view}
+                    receipts
+                    viewHref={tl.viewHref}
+                    deployment={SEAMLESS_LIVE_CARD_DEPLOYMENT}
+                    captions={captions ?? undefined}
+                    // Closed by default, remembered per viewer and position (ui-jobs
+                    // 209), as on Ethereum. The room left to borrow and the
+                    // distance bar from the Pool read sit in the opened layer
+                    // under Debt and Health factor, inside the card's receipts scope.
+                    disclosureKey={`seamless:${wallet.toLowerCase()}`}
+                    debtDetail={<AaveV3BorrowRoom chain={data} />}
+                    riskDetail={<AaveV3RiskDetail chain={data} />}
+                    // The Explanation: the L1 prose about the face figures, then
+                    // what is particular to THIS Pool — eMode, a supply that
+                    // backs nothing (pre-3.2 accounting here), and the freeze.
+                    explanation={
+                      view.status !== "open" ? (
+                        <>
+                          <AaveV3ClosedPositionExplanation
+                            v={view}
+                            events={aaveEvents}
+                            folders={servedFolders}
+                            marketPhrase="Seamless market"
+                          />
+                          <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
+                        </>
+                      ) : (
+                        <>
+                          <AaveV3PositionExplanation
+                            chain={data}
+                            captions={captions}
+                            view={view}
+                            externalActivity={externalActivity}
+                            lastBorrowRate={lastBorrowRate}
+                          />
+                          <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
+                        </>
+                      )
                     }
                   />
-                </>
-              ) : timelineState === "loading" ? (
-                <SweepInFlight>
-                  Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
-                  Pool&rsquo;s first block, so it takes a moment.
-                </SweepInFlight>
-              ) : (
-                <p className="py-6 text-center text-sm text-rb-500">
-                  {timelineState === "unavailable"
-                    ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Pool and is unaffected."
-                    : "The history sweep failed. Reload to try again — the position above is read live from the Pool and is unaffected."}
-                </p>
-              )}
-            </>
-          )}
+                )}
 
-          <ProvInspectorLayer />
-        </div>
+                {/* Lifetime flows: the bars and the line over the account's
+              replay (lib/aave-v3-base/flows.ts), in place of the tower
+              (TO-DO-ui-jobs 206). */}
+                {view && (
+                  <LifetimeFlowsPanel
+                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                    read={timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read}
+                    explanation={
+                      <div className="space-y-2 text-sm text-rb-500">
+                        <AaveV3BaseFlowsNote facts={flows.facts} brand="Seamless" pool="the Seamless Pool" />
+                      </div>
+                    }
+                    learnMore={aaveV3BaseFlowsContent("Seamless")}
+                  />
+                )}
+
+                {timelineState === "ready" && timeline ? (
+                  <>
+                    <TimelineFillWell fill={timeline.coverage.fill} />
+                    <ChainTruthTimeline
+                      // Matches `AaveV3CtEventCard`'s own
+                      // `persistKey={`aave-v3:${event.id}`}` — lets pinned mode
+                      // (the per-event share route) force a landed card's detail
+                      // panel open on its first mount.
+                      persistKeyPrefix="aave-v3"
+                      closed={view?.status !== "open"}
+                      tl={tl}
+                      // Both grouping paths: the specs group a flat answer in the
+                      // browser, the register draws the folders the route served.
+                      runs={AAVE_V3_TIMELINE_RUNS}
+                      folderRegister={AAVE_V3_FOLDER_REGISTER}
+                      readFolderMembers={readFolderMembers}
+                      segments={segments}
+                      displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+                      toolbarLeading={
+                        <TimelineActivityHeader
+                          events={headerStamps}
+                          closed={view?.status !== "open"}
+                          firstAt={timeline.coverage.firstEventAt}
+                        />
+                      }
+                      emptyLabel={
+                        sweptClean
+                          ? "This wallet has no Seamless activity."
+                          : "No events to show — the sweep could not read this wallet's history."
+                      }
+                      footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
+                      // On a grouped answer the list covers `eventsServed`; a month
+                      // read holds no card, the grid holding the other months.
+                      boundary={
+                        tl.historyWindow.state === "span"
+                          ? null
+                          : boundaryFromChainCoverage(
+                              timeline.coverage,
+                              servedRows ? (timeline.eventsServed ?? timeline.events.length) : timeline.events.length,
+                            )
+                      }
+                      renderCard={(event, meta) =>
+                        isAaveV3Event(event) && event.context.data.emodeSwitch ? (
+                          <AaveFamilyEmodeSwitchCard
+                            event={event}
+                            sw={event.context.data.emodeSwitch}
+                            pool={POOL_IDENTITY}
+                            persistPrefix="aave-v3"
+                            hfFormat={hfLabelV3}
+                            eventNumber={meta.eventNumber}
+                            isFirst={meta.isFirst}
+                            isLast={meta.isLast}
+                            market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
+                          />
+                        ) : isAaveV3Event(event) ? (
+                          <AaveV3CtEventCard
+                            event={event}
+                            eventNumber={meta.eventNumber}
+                            isFirst={meta.isFirst}
+                            isLast={meta.isLast}
+                            market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
+                            siblings={neighbours.get(event.id)?.siblings}
+                            previous={neighbours.get(event.id)?.previous}
+                          />
+                        ) : null
+                      }
+                    />
+                  </>
+                ) : timelineState === "loading" ? (
+                  <SweepInFlight>
+                    Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
+                    Pool&rsquo;s first block, so it takes a moment.
+                  </SweepInFlight>
+                ) : (
+                  <p className="py-6 text-center text-sm text-rb-500">
+                    {timelineState === "unavailable"
+                      ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Pool and is unaffected."
+                      : "The history sweep failed. Reload to try again — the position above is read live from the Pool and is unaffected."}
+                  </p>
+                )}
+              </>
+            )}
+
+            <ProvInspectorLayer />
+          </div>
+        </FlowFocusContext.Provider>
       </V3PoolProvider>
     </CaptureSourceProvider>
   );

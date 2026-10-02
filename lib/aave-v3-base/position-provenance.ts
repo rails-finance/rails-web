@@ -1,16 +1,7 @@
-// The Aave V3 Base tower's receipts — the shared swept-lane vocabulary, bound
-// to this Pool. See lib/aave-v3/swept-tower-provenance.ts for why the swept
-// lane cannot reuse Ethereum's.
+// The Aave V3 Base cards' receipts, bound to this Pool.
 
-import { makeSweptTowerVocabulary } from "@/lib/aave-v3/swept-tower-provenance";
 import { makeLivePoolCardDeployment, makeSweptCardDeployment } from "@/lib/aave-v3/card-deployment";
-import { AAVE_V3_BASE_POOL, AAVE_V3_BASE_ORACLE, AAVE_V3_BASE_DEPLOY_BLOCK } from "./asset-catalog";
-
-export const AAVE_V3_BASE_TOWER_VOCABULARY = makeSweptTowerVocabulary({
-  poolName: "Aave V3 Pool (Base)",
-  poolAddress: AAVE_V3_BASE_POOL,
-  deployBlock: AAVE_V3_BASE_DEPLOY_BLOCK,
-});
+import { AAVE_V3_BASE_POOL, AAVE_V3_BASE_ORACLE } from "./asset-catalog";
 
 /** The listing card's receipts: every figure a chain read of the Base Pool's
  *  own contracts at the block the row names, served by rails-server (mig 170). */

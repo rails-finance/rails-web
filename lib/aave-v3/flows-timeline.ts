@@ -224,6 +224,9 @@ export function lifetimeFromSeries(series: FlowSeries): ReserveFlows[] | undefin
 const bucketOf = (l: FlowEventLeg): string | null =>
   l.leg == null ? null : l.fromCollateral ? "repaidWithCollateral" : BUCKET_OF[l.leg];
 
+/** A leg's bucket key (rails-server `rowLegs`' mapping), or null. */
+export const aaveV3LegBucket = bucketOf;
+
 const sideOf = (bucket: string): FlowSide => AAVE_V3_FLOW_BUCKETS.find((b) => b.key === bucket)?.side ?? "collateral";
 const signOf = (bucket: string): number => (AAVE_V3_FLOW_BUCKETS.find((b) => b.key === bucket)?.dir === "in" ? 1 : -1);
 

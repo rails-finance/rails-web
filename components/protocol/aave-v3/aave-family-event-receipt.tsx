@@ -295,7 +295,21 @@ function SideLedger({
   const at = atWords(eventTs);
   const ev = focus.events.find((e) => e.id === eventId) ?? null;
   const balances = sideBalances(state, side);
-  const bySum = eventId ? eventAssetSum(model, focus.events, side, cum, eventId, balances) : null;
+  // Where the family books interest as its own lines (Aave V3 on Base and
+  // Seamless, lib/aave-v3-base/flows.ts), the balancing line holds only the
+  // interest since each reserve's last event, and float dust is no interest.
+  const booksInterest = model.buckets.some((b) => b.key === "interestEarned" || b.key === "interestAccrued");
+  const bySum = eventId
+    ? eventAssetSum(
+        model,
+        focus.events,
+        side,
+        cum,
+        eventId,
+        balances,
+        booksInterest ? { interestLabel: "Interest since the last event", relDust: 1e-9 } : {},
+      )
+    : null;
   const name = SIDE_NAME[side];
   const { afterProv: totalProv, beforeProv: totalBeforeProv } = sideTotals(side, state, coords, facts, at);
   const note = <DayCloseNote cum={cum} eventTs={eventTs} />;

@@ -1,18 +1,9 @@
-// The Seamless tower's receipts — the shared swept-lane vocabulary, bound to
-// this Pool. See lib/aave-v3/swept-tower-provenance.ts for why the swept lane
-// cannot reuse Ethereum's, and lib/seamless/asset-catalog.ts for why this Pool
-// is Seamless's own rather than Aave's despite answering Aave's interface.
+// The Seamless cards' receipts, bound to this Pool. See
+// lib/seamless/asset-catalog.ts for why this Pool is Seamless's own rather than
+// Aave's despite answering Aave's interface.
 
-import { makeSweptTowerVocabulary } from "@/lib/aave-v3/swept-tower-provenance";
 import { makeLivePoolCardDeployment, makeSweptCardDeployment } from "@/lib/aave-v3/card-deployment";
-import { SEAMLESS_POOL, SEAMLESS_ORACLE, SEAMLESS_DEPLOY_BLOCK } from "./asset-catalog";
-
-export const SEAMLESS_TOWER_VOCABULARY = makeSweptTowerVocabulary({
-  poolName: "Seamless Pool",
-  poolAddress: SEAMLESS_POOL,
-  protocol: "Seamless",
-  deployBlock: SEAMLESS_DEPLOY_BLOCK,
-});
+import { SEAMLESS_POOL, SEAMLESS_ORACLE } from "./asset-catalog";
 
 /** The listing card's receipts: every figure a chain read of Seamless's own
  *  contracts at the block the row names, served by rails-server (mig 170). */
