@@ -19,7 +19,13 @@
 //       row with no price the cell is empty (never 0). Liquidation legs are
 //       checked the same way. Comet's is the row's own usdValue ÷ 1e8.
 //   F4  BALANCES — the file's balance-after cells equal the served row's
-//       *_after fields scaled here from raw.
+//       *_after fields scaled here from raw. On Aave V3 and SparkLend the
+//       "Supply/Debt Balance" cells are the chain balance (chain_*_after,
+//       decision 0033), and empty where the row has none.
+//   F7  NO PRINCIPAL UNDER A BALANCE HEADING — the same served rows written as
+//       a box file without the chain columns (a server that does not attach
+//       them) come out of the proxy with every Supply/Debt Balance cell empty
+//       (Aave V3 and SparkLend fixtures).
 //   F5  REFUSAL — with the chain reader unreachable, the proxy refuses the
 //       file (EXPORT_TOKEN_META) and the in-browser serializer writes "not
 //       loaded" in every Amount cell, rather than a stand-in's 18 decimals
@@ -36,7 +42,7 @@
 //     file and checks it against the served history (F1 on the box's bytes).
 //   FORMAT_ONLY=<a box export .csv.gz> FAMILY=spark node … prints the proxy's
 //     file for it and does nothing else.
-// BREAK=bytes|count|usd|balance|meta turns one check's input wrong; the run
+// BREAK=bytes|count|usd|balance|meta|principal turns one check's input wrong; the run
 // must go red on that check.
 
 import { spawnSync } from "node:child_process";
@@ -147,6 +153,7 @@ const { eventsToCsv, timelineCsvHeader } = await import("../../lib/shared/events
 const { formatQueuedExport, parseCsvLine } = await import("../../lib/sources/api/queued-export-format.ts");
 const { resolveV3Tokens } = await import("../../lib/sources/chain/aave-v3-tokens.ts");
 const { resolveErc20Meta } = await import("../../lib/sources/chain/erc20-meta.ts");
+const { feeAfterSeizure } = await import("../../lib/sources/api/spark-timeline.ts");
 const { marketOf: compoundMarketOf } = await import("../../lib/compound/asset-catalog.ts");
 const { COMPOUND_V2_MARKET_BY_KEY, CTOKEN_DECIMALS } = await import("../../lib/compound-v2/asset-catalog.ts");
 const { maplePoolOf, MAPLE_SHARE_DECIMALS } = await import("../../lib/maple/asset-catalog.ts");
@@ -300,7 +307,13 @@ async function spotChecks(fx, served, file) {
   const priceBreak = BREAK === "usd" ? 1.01 : 1;
   if (f === "aave-v3" || f === "spark") {
     const dec = await decimalsFor(f, served);
-    served.forEach((r, i) => {
+    // SparkLend's transform places a liquidation's fee transfer after the
+    // seizure and rebuilds the pair's balances (spark-timeline.ts
+    // feeAfterSeizure): the file follows that order, and those two rows'
+    // balances are F1's to check.
+    const ordered = f === "spark" ? feeAfterSeizure(served) : served;
+    const liqTx = new Set(f === "spark" ? served.filter((r) => r.action === "liquidation").map((r) => r.tx_hash) : []);
+    ordered.forEach((r, i) => {
       const c = file.rows[i] ?? {};
       if (r.action === "liquidation") {
         const coll = scale(r.liquidated_collateral_amount, dec(r.collateral_asset));
@@ -309,8 +322,11 @@ async function spotChecks(fx, served, file) {
         const dp = r.debt_price_source === "iaave-oracle" ? Number(r.debt_price_usd) * priceBreak : null;
         usd.push([c["Liq Collateral Value (USD)"], cp == null ? null : coll * cp, i]);
         usd.push([c["Liq Debt Value (USD)"], dp == null ? null : debt * dp, i]);
-        bal.push([c["Supply After"], scale(r.supply_after, dec(r.collateral_asset)), i]);
-        bal.push([c["Debt After"], scale(r.debt_after, dec(r.debt_asset)), i]);
+        if (liqTx.has(r.tx_hash)) return;
+        // One basis per card: both lanes at the chain balance, or both empty.
+        const chain = r.chain_supply_after != null && r.chain_debt_after != null;
+        bal.push([c["Supply Balance After"], chain ? scale(r.chain_supply_after, dec(r.collateral_asset)) : null, i]);
+        bal.push([c["Debt Balance After"], chain ? scale(r.chain_debt_after, dec(r.debt_asset)) : null, i]);
         return;
       }
       const p = r.price_source === "iaave-oracle" && Number(r.price_usd) > 0 ? Number(r.price_usd) * priceBreak : null;
@@ -318,8 +334,10 @@ async function spotChecks(fx, served, file) {
       const supplySide = ["supply", "withdraw", "transfer_in", "transfer_out"].includes(r.action);
       const debtSide = ["borrow", "repay", "bad_debt_written_off"].includes(r.action);
       const d = dec(r.reserve);
-      if (supplySide) bal.push([c["Supply After"], scale(r.supply_after, d), i]);
-      if (debtSide) bal.push([c["Debt After"], scale(r.debt_after, d), i]);
+      // A merged swap's basis needs both legs; its cells are F1's to check.
+      if (r.swap?.received || liqTx.has(r.tx_hash)) return;
+      if (supplySide) bal.push([c["Supply Balance After"], scale(r.chain_supply_after, d), i]);
+      if (debtSide) bal.push([c["Debt Balance After"], scale(r.chain_debt_after, d), i]);
     });
   } else if (f === "compound-v3") {
     const dec = await decimalsFor(f, served);
@@ -432,6 +450,22 @@ for (const fx of FIXTURES) {
         ? `; ${badBal.length} wrong, first row ${badBal[0][2]}: "${badBal[0][0]}" vs ${badBal[0][1]}`
         : ""),
   );
+  if (fx.family === "aave-v3" || fx.family === "spark") {
+    const CHAIN = /^(chain_(supply|debt)_(before|after)|(supply|debt)_(scaled_after|index|interest))$/;
+    const strip = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => BREAK === "principal" || !CHAIN.test(k)));
+    const principalOnly = served.map((r) =>
+      r.swap?.received ? { ...strip(r), swap: { ...r.swap, received: strip(r.swap.received) } } : strip(r),
+    );
+    const pf = await formatQueuedExport(new Uint8Array(gzipSync(boxFile(principalOnly))), fx.family);
+    const pt = pf.ok ? table(await streamText(pf.body)) : { header: [], rows: [] };
+    const heads = pt.header.filter((h) => /^(Supply|Debt) Balance /.test(h));
+    const filled = pt.rows.flatMap((row) => heads.filter((h) => row[h] !== ""));
+    check(
+      `${id} F7`,
+      pf.ok && heads.length === 4 && pt.rows.length === served.length && filled.length === 0,
+      `a file without the chain columns: ${pt.rows.length} rows, ${filled.length} balance cells filled across ${heads.join(" / ")}`,
+    );
+  }
   if (
     (fx.family === "aave-v3" || fx.family === "spark") &&
     refusalInput.length < 2 &&

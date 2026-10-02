@@ -183,6 +183,12 @@ const HEAD: Column[] = CORE_COLUMNS.filter((c) => ["Date (UTC)", "Block", "Actio
 const TAIL: Column[] = CORE_COLUMNS.filter((c) => ["Tx Hash", "Etherscan"].includes(c.header));
 const FLOWS: Column = { header: "Token Flows", get: (e) => summarizeFlows(e.flows) };
 
+// Aave V3 and SparkLend balance cells hold what the aToken / variable debt
+// token held (`balanceBasis: "chain"`, decision 0033). A row the server sent
+// without the chain balance has principal only, and its balance cells are
+// empty.
+const onChain = (d: { balanceBasis?: "chain" }, v: string | undefined) => (d.balanceBasis === "chain" ? v : undefined);
+
 // The token each amount column is in. On a liquidation row the supply
 // columns are the collateral reserve's and the debt columns the debt
 // reserve's; otherwise both are the row's own reserve.
@@ -196,10 +202,10 @@ const AAVE_V3_FAMILY: Column[] = [
   col<AaveV3Context>(isAaveV3Event, "Amount", (d) => d.amount, v3Reserve),
   col<AaveV3Context>(isAaveV3Event, "Price (USD)", (d) => d.price?.usd),
   col<AaveV3Context>(isAaveV3Event, "Value (USD)", (d) => usdOf(d.amount, d.price?.usd), v3Reserve),
-  col<AaveV3Context>(isAaveV3Event, "Supply Before", (d) => d.supplyBefore, v3Supply),
-  col<AaveV3Context>(isAaveV3Event, "Supply After", (d) => d.supplyAfter, v3Supply),
-  col<AaveV3Context>(isAaveV3Event, "Debt Before", (d) => d.debtBefore, v3Reserve),
-  col<AaveV3Context>(isAaveV3Event, "Debt After", (d) => d.debtAfter, v3Reserve),
+  col<AaveV3Context>(isAaveV3Event, "Supply Balance Before", (d) => onChain(d, d.supplyBefore), v3Supply),
+  col<AaveV3Context>(isAaveV3Event, "Supply Balance After", (d) => onChain(d, d.supplyAfter), v3Supply),
+  col<AaveV3Context>(isAaveV3Event, "Debt Balance Before", (d) => onChain(d, d.debtBefore), v3Reserve),
+  col<AaveV3Context>(isAaveV3Event, "Debt Balance After", (d) => onChain(d, d.debtAfter), v3Reserve),
   col<AaveV3Context>(isAaveV3Event, "Liq Collateral", (d) => d.collateralSymbol),
   col<AaveV3Context>(isAaveV3Event, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount, v3Collateral),
   col<AaveV3Context>(
@@ -232,10 +238,10 @@ const SPARK_FAMILY: Column[] = [
     (d) => (d.eventType === "liquidation" ? "" : usdOf(d.assetsDelta, d.price?.usd)),
     sparkReserve,
   ),
-  col<SparkContext>(isSparkEvent, "Supply Before", (d) => d.supplyBefore, sparkSupply),
-  col<SparkContext>(isSparkEvent, "Supply After", (d) => d.supplyAfter, sparkSupply),
-  col<SparkContext>(isSparkEvent, "Debt Before", (d) => d.debtBefore, sparkReserve),
-  col<SparkContext>(isSparkEvent, "Debt After", (d) => d.debtAfter, sparkReserve),
+  col<SparkContext>(isSparkEvent, "Supply Balance Before", (d) => onChain(d, d.supplyBefore), sparkSupply),
+  col<SparkContext>(isSparkEvent, "Supply Balance After", (d) => onChain(d, d.supplyAfter), sparkSupply),
+  col<SparkContext>(isSparkEvent, "Debt Balance Before", (d) => onChain(d, d.debtBefore), sparkReserve),
+  col<SparkContext>(isSparkEvent, "Debt Balance After", (d) => onChain(d, d.debtAfter), sparkReserve),
   col<SparkContext>(isSparkEvent, "Liq Collateral", (d) => d.collateralSymbol),
   col<SparkContext>(isSparkEvent, "Liq Collateral Seized", (d) => d.liquidatedCollateralAmount, sparkCollateral),
   col<SparkContext>(
