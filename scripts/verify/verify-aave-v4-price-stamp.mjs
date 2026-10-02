@@ -38,10 +38,6 @@ import { fileURLToPath } from "node:url";
 import { BASE, hostFetch } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-<<<<<<< HEAD
-=======
-import { BASE, hostFetch } from "./lib/host.mjs";
->>>>>>> 0c43769 (Verifiers re-pinned to the current site; clock reads in five components wait for the browser; exact tile figures from decimal strings)
 const env = Object.fromEntries(
   fs
     .readFileSync(path.join(ROOT, ".env.local"), "utf8")
