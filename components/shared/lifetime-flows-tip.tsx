@@ -86,6 +86,9 @@ function hatchImage(hatch: FlowHatch, color: string): CSSProperties {
     // Horizontal lines broken and offset row to row, like brick: kin to the
     // repay-with-collateral lines, and apart from them at bar size.
     dashes: `<path d='M0,1.5 h3 M3,4.5 h3' stroke='${c}' stroke-width='1.4'/>`,
+    // A horizontal zigzag, one a tile: kin to the repay-with-collateral
+    // lines, and apart from the dashes interest takes.
+    zigzag: `<path d='M0,4.5 L1.5,1.5 L3,4.5 L4.5,1.5 L6,4.5' fill='none' stroke='${c}' stroke-width='1.1'/>`,
     // One dot a tile, a square grid: a diagonal pair of dots reads as the
     // reverse diagonal at bar size.
     dots: `<circle cx='3' cy='3' r='1.3' fill='${c}'/>`,

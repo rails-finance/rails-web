@@ -411,10 +411,26 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
       if (COLL_KEYS.has(l.bucket)) moved.coll = true;
       else moved.debt = true;
     }
+    // A row valued without the OSM price at its block (only a liquidation's
+    // is stored): its collateral flows rest on the price it took.
+    const isToday = Math.floor(r.ev.ts / DAY_S) >= Math.floor(o.now / DAY_S);
+    const why =
+      r.priceFrom === "store"
+        ? `${o.collSymbol} priced at the day's close: the OSM price at this block is not stored (only a liquidation's is).`
+        : r.priceFrom === "store-near"
+          ? `${o.collSymbol} priced at the store's nearest day: no price is stored for its day.`
+          : r.priceFrom === "nearest" || (r.priceFrom === "today" && !isToday)
+            ? `${o.collSymbol} priced at the nearest priced moment: no daily price is stored for this ilk.`
+            : null;
+    const unsure =
+      why && (r.ev.inkAfter > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket)))
+        ? [{ side: "collateral" as const, why, ...(r.priceFrom !== "store" ? { held: true } : {}) }]
+        : [];
     return {
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
+      ...(unsure.length ? { unsure } : {}),
       tick:
         r.ev.kind === "grab" ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       legs: r.legs.map((l) =>
@@ -492,6 +508,13 @@ export function makerFlowTimeline(events: MakerFlowEvent[], o: MakerFlowOptions)
       [debt]: debtObs,
     },
     seriesCarry: true,
+    ...(o.daily && o.daily.length > 0
+      ? {}
+      : {
+          carriedWhy: {
+            [coll]: "no daily price is stored for this ilk, so a day between events keeps the last event's price.",
+          },
+        }),
     today: open ? today : endDay,
     words: makerFlowWords(o.collSymbol, o.debtSymbol, o.daily != null && o.daily.length > 0),
   };

@@ -463,9 +463,11 @@ export function frankencoinFlowTimeline(
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
-      // A sale is a change the owner did not make: Frankencoin has no
-      // liquidation, so its day reads as caution, not as one.
-      tick: sale ? "caution" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
+      // A challenge sale or a sale at expiry takes collateral from the
+      // position to clear its debt without the owner's act: the red
+      // liquidation triangle (rails-ops reference/lifetime-flows-scrubber.md,
+      // "The contract (web)", the markers).
+      tick: sale ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
       legs: r.legs.map((l) =>
         COLL_KEYS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * G.collateral, symbol: o.collSymbol }
@@ -473,6 +475,18 @@ export function frankencoinFlowTimeline(
       ),
       tx: r.ev.tx,
       countsTx: r.ev.sale == null,
+      // A mint or repayment whose receipt was not read stays one line: what
+      // the debt owes is exact, its split is not.
+      ...(legOf(r, FC.minted) > 0 || legOf(r, FC.repaidWhole) > 0
+        ? {
+            unsure: [
+              {
+                side: "debt" as const,
+                why: "A mint or repayment's split is not read: its receipt did not load, so it stands as one line.",
+              },
+            ],
+          }
+        : {}),
       balances: [
         { asset: COLL, symbol: o.collSymbol, side: "collateral", amount: Math.max(0, r.coll) },
         { asset: DEBT, symbol: "ZCHF", side: "debt", amount: Math.max(0, r.debt) },
@@ -557,6 +571,7 @@ export function frankencoinFlowWords(collSymbol: string): NonNullable<FlowTimeli
       debt: "the ZCHF owed after the last ledger row. Interest is paid at each mint, so nothing accrues between rows.",
     },
     linePrices: `with the collateral in ${collSymbol} and the debt in ZCHF, each on its own scale`,
+    marks: { liquidation: "a red triangle for a challenge sale or a sale at expiry" },
     moment: {
       tokensOnly: ["collateral", "debt"],
       notes: [

@@ -74,7 +74,8 @@ export const AAVE_V3_FLOW_BUCKETS: FlowBucket[] = [
     event: "Repay",
     side: "collateral",
     dir: "out",
-    hatch: "dashes",
+    // Dashes are interest's (Interest earned on Aave V3 on Base).
+    hatch: "zigzag",
   },
   {
     key: "withdrawnSwapped",

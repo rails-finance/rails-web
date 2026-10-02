@@ -640,7 +640,23 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
       else moved.debt = true;
     }
     const k = r.row.kind;
+    // A row with no price on it or read at its block takes the nearest priced
+    // moment: its collateral figures that day rest on it.
+    const unpriced =
+      (r.priceFrom === "nearest" || r.priceFrom === "today") &&
+      (r.coll > 0 || r.legs.some((l) => FX_COLL_KEYS.has(l.bucket)));
     return {
+      ...(unpriced
+        ? {
+            unsure: [
+              {
+                side: "collateral" as const,
+                why: `${o.collSymbol} priced at the ${r.priceFrom === "today" ? "live read today" : "nearest priced row"}: no price is recorded or read at this block.`,
+                held: true,
+              },
+            ],
+          }
+        : {}),
       id: r.row.id,
       ts: r.row.ts,
       block: r.row.block,
@@ -717,6 +733,9 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
     dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
     seriesCarry: true,
+    carriedWhy: {
+      [COLL]: "f(x) is not in the daily price store, so a day between events keeps the last event's price.",
+    },
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
     words: fxFlowWords(o.collSymbol),

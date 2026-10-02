@@ -454,6 +454,30 @@ test("a row the route prices at its block (oracle_price) is valued there, the st
   // The panel still adds up at every stop.
   const t = dolomiteFlowTimeline(r, opts(f))!;
   const m = buildFlowModel(t)!;
+  // A row at the day's close names it on its flows; a row at its block does not.
+  const fe = t.days.flatMap((d) => d.unsure ?? []);
+  assert.ok(fe.some((u) => /priced at the day's close: the price at this block is not stored yet/.test(u.why)));
+  const blockOnly = dolomiteFlowTimeline(
+    dolomiteFlowRows(
+      evs.map((e) => {
+        const d = dataOf(e);
+        const q = day(e.timestamp, String(d.marketId));
+        return q == null
+          ? e
+          : ({
+              ...e,
+              context: { ...e.context, data: { ...d, oraclePrice: { usd: q, raw: "0" } } },
+            } as BaseActivityEvent);
+      }),
+      f.owner,
+    )!,
+    opts(f),
+  )!;
+  const allPriced = dolomiteFlowReplay(dolomiteFlowRows(evs, f.owner)!, opts(f)).replayed.every(
+    (x) => day(x.ev.ts, x.ev.market) != null,
+  );
+  if (allPriced)
+    assert.equal(blockOnly.days.flatMap((d) => d.unsure ?? []).length, 0, "every row at its block: nothing named");
   for (let stop = 0; stop <= m.liveStop; stop++) {
     const st = stateAt(m, stop);
     for (const side of ["collateral", "debt"] as const) {

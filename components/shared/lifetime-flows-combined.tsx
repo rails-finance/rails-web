@@ -39,6 +39,8 @@ import {
   formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
+  partialAt,
+  unsureAt,
   type FlowModel,
   type FlowTick,
   tickRank,
@@ -388,6 +390,9 @@ export function CombinedFlows({
   }, [onLedgerNote, ledgerText]);
   useEffect(() => () => onLedgerNote?.(null), [onLedgerNote]);
   const outside = barState == null;
+  // What the headline's figure and the bar under it rest on that the page
+  // could not read, for the headline's mark.
+  const partialOf = (side: "collateral" | "debt") => partialAt(model, head.isLive ? model.liveStop : cur.stop, side);
   const windowDay = dayStamp(dayStart(model, from));
   const through = useMemo(() => (busy ? throughput(bars) : null), [busy, bars]);
   // Outside the window the bars hold the window's first day, greyed.
@@ -427,9 +432,18 @@ export function CombinedFlows({
                 when={when}
                 isLive={liveReceipts}
                 assets={assets}
+                partial={partialOf("collateral")}
               />
               {hasDebt && (
-                <Headline side="debt" st={head.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
+                <Headline
+                  side="debt"
+                  st={head.debt}
+                  model={model}
+                  when={when}
+                  isLive={liveReceipts}
+                  assets={assets}
+                  partial={partialOf("debt")}
+                />
               )}
               <div className="ml-auto flex min-w-0 items-center gap-2">
                 <OldPriceLabel note={head.isLive ? null : oldPriceAt(model, cur.stop)} />
@@ -877,10 +891,13 @@ function LineStrip({
     return [...lead, ...pts].map((p, j) => `${j ? "L" : "M"}${p}`).join("");
   };
   // Where the side's value at a point rests on an old price (the model's
-  // `stale`, as the readout's label): the segment into that point is drawn
-  // dotted. Today's point is at live prices.
+  // `stale`, as the readout's label), or on a price or a read the page does
+  // not have (`unsure`): the segment into that point is drawn dotted. Today's
+  // point is at live prices.
   const oldAt = (k: "collateral" | "debt", i: number) =>
-    i < n - 1 && (model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k);
+    i < n - 1 &&
+    ((model.stale.get(points[i].to - startDay) ?? []).some((x) => x.side === k) ||
+      (model.unsure.get(points[i].to - startDay) ?? []).some((x) => x.side === k));
   /** A run's line as its solid and dotted pieces, each a path of whole
    *  segments; a dotted piece keeps the indexes of its points for its tip. */
   const piecesOf = (k: "collateral" | "debt", seq: number[]) => {
@@ -913,8 +930,14 @@ function LineStrip({
     const px = e.clientX - (ref.current?.getBoundingClientRect().left ?? 0);
     let best = idx[idx.length - 1];
     for (const i of idx) if (oldAt(k, i) && Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i;
-    const note = oldPriceAt(model, points[best].to - startDay);
-    setOldTip(note ? { x: px, y: y(points[best][k] as number, k), lines: note.lines } : null);
+    const stop = points[best].to - startDay;
+    const held = unsureAt(model, stop, k).held;
+    // The old-price line once, where a reason already names each asset it names.
+    const old = oldPriceAt(model, stop)?.lines ?? [];
+    const stale = (model.stale.get(stop) ?? []).filter((x) => x.side === k);
+    const named = stale.length > 0 && stale.every((x) => held.some((h) => h.startsWith(`${x.symbol} `)));
+    const lines = [...(named ? old.slice(0, old.length - 1) : old), ...held];
+    setOldTip(lines.length ? { x: px, y: y(points[best][k] as number, k), lines } : null);
   };
   const area = (k: "collateral" | "debt", seq: number[]) =>
     `${lineOf(k, seq)}L${x(seq[seq.length - 1])},${STRIP_H}L${seq[0] === 0 ? PAD : x(seq[0])},${STRIP_H}Z`;

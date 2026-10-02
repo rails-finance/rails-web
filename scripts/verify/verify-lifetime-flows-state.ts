@@ -56,6 +56,8 @@ import { aaveV4FlowSeriesTimeline, aaveV4FlowTimeline } from "@/lib/aave-v4/flow
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
   oldPriceAt,
+  partialAt,
+  unsureAt,
   assetsAt,
   axisFor,
   axisLabelOnPhone,
@@ -77,6 +79,20 @@ import {
 } from "@/lib/shared/flows-timeline";
 import { formatDate } from "@/lib/date";
 import { binUnitFor, flowBins, groupOperations, isBusy, throughput } from "@/lib/shared/flows-busy";
+import { AAVE_V3_BASE_FLOW_BUCKETS } from "@/lib/aave-v3-base/flows";
+import { compoundFlowBuckets } from "@/lib/compound/flows";
+import { ctokenFlowBuckets } from "@/lib/shared/ctoken-flows";
+import { dolomiteFlowBuckets } from "@/lib/dolomite/flows";
+import { fluidFlowBuckets } from "@/lib/fluid/flows";
+import { frankencoinFlowBuckets } from "@/lib/frankencoin/flows";
+import { fxFlowBuckets } from "@/lib/fx/flows";
+import { llamalendFlowBuckets } from "@/lib/llamalend/flows";
+import { makerFlowBuckets } from "@/lib/makerdao/flows";
+import { mapleFlowBuckets } from "@/lib/maple/flows";
+import { morphoFlowBuckets } from "@/lib/morpho/flows";
+import { polarisFlowBuckets } from "@/lib/polaris/flows";
+import { pwnFlowBuckets } from "@/lib/pwn/flows";
+import { liquityFlowBuckets } from "@/lib/shared/liquity-flows";
 import {
   binInputFromWire,
   binRanges,
@@ -1503,6 +1519,62 @@ test("the fill rule: no two lines of a side share a fill", () => {
   assert.notEqual(used?.hatch, sold?.hatch, "Used to repay has its own hatch");
 });
 
+test("the fill rule in every family: no two lines of a side share a pattern in one hue", () => {
+  // An inflow's texture and an outflow's hatch read alike where the pattern
+  // and the hue are one (Aave V3 on Base's Interest earned and Used to repay,
+  // both dashed, 2 Oct 2026): the pattern and its hue are the fill here, the
+  // inflow's faded ground aside. A tone draws in the tone's hue.
+  type B = {
+    key: string;
+    label: string;
+    side: "collateral" | "debt";
+    dir: "in" | "out";
+    hatch?: string;
+    tone?: string;
+  };
+  const pattern = (b: B) =>
+    b.dir === "in"
+      ? `${b.hatch ?? "plain"}:side`
+      : `${b.hatch ?? (b.tone && b.tone !== "exit" ? "forward" : "reverse")}:${b.tone && b.tone !== "exit" ? b.tone : "side"}`;
+  const all = new Proxy(new Set<string>(), { get: (t, k) => (k === "has" ? () => true : Reflect.get(t, k)) });
+  const families: Record<string, B[]> = {
+    "Aave V3": AAVE_V3_FLOW_BUCKETS,
+    "Aave V3 on Base": AAVE_V3_BASE_FLOW_BUCKETS,
+    "Compound V3": compoundFlowBuckets({ collateral: true, supply: true, debt: true }, all),
+    "Compound V2 family": ctokenFlowBuckets({ brand: "Compound", receipt: "cToken" }),
+    Dolomite: dolomiteFlowBuckets(),
+    Fluid: fluidFlowBuckets(true),
+    Frankencoin: frankencoinFlowBuckets(),
+    "f(x)": fxFlowBuckets(all),
+    LlamaLend: llamalendFlowBuckets(),
+    MakerDAO: makerFlowBuckets("DAI"),
+    Maple: mapleFlowBuckets(),
+    Morpho: morphoFlowBuckets({ borrower: true, lender: true }),
+    Polaris: polarisFlowBuckets(all),
+    PWN: pwnFlowBuckets(),
+    "Liquity V2": liquityFlowBuckets(false, "v2"),
+    "Liquity V1": liquityFlowBuckets(false, "v1"),
+  };
+  for (const [name, buckets] of Object.entries(families))
+    for (const side of ["collateral", "debt"] as const) {
+      const lines = buckets.filter((b) => b.side === side);
+      // The window's opening line ("Held on …") takes the rings.
+      const fills = [...lines.map(pattern), ...(lines.length ? ["rings:side"] : [])];
+      const seen = new Map<string, string>();
+      lines.forEach((b, i) => {
+        const was = seen.get(fills[i]);
+        assert.ok(!was, `${name}, ${side}: ${was} and ${b.label} share ${fills[i]}`);
+        seen.set(fills[i], b.label);
+      });
+      assert.ok(!seen.has("rings:side"), `${name}, ${side}: a line takes the opening's rings`);
+    }
+  // Interest is dashed wherever a family draws it as a line.
+  for (const [name, buckets] of Object.entries(families))
+    for (const b of buckets)
+      if (/^Interest( earned| accrued)?$/.test(b.label))
+        assert.equal(b.hatch, "dashes", `${name}: ${b.label} is dashed`);
+});
+
 test("the state card: a day between events states the chart's figures, each asset as its last event left it", () => {
   const series = readJson<AaveV3FlowSeries>("lifetime-flows-series-fb93.json");
   const route = buildFlowModel(aaveV3FlowSeriesTimeline(series, tower, fixture.view.priceByAddress)!) as FlowModel;
@@ -1691,4 +1763,111 @@ test("indexes: a route without them grows nothing and says so on the card", () =
   assert.equal(t.words?.moment?.notes?.length, 1);
   const m = buildFlowModel(t) as FlowModel;
   assert.ok(m.heldAt.every((hs) => hs.every((h) => h.grown == null)));
+});
+
+test("incomplete stretches: a figure without its price or read is dashed and named, the figures unchanged", () => {
+  const D0 = 20_000;
+  const ts = (d: number) => (D0 + d) * 86_400 + 3_600;
+  const buckets = [
+    { key: "in", label: "Deposited", side: "collateral" as const, dir: "in" as const },
+    { key: "out", label: "Withdrawn", side: "collateral" as const, dir: "out" as const },
+    { key: "b", label: "Borrowed", side: "debt" as const, dir: "in" as const },
+  ];
+  const ev = (d: number, legs: { bucket: string; usd: number }[], coll: number, debt: number, extra = {}) => ({
+    id: `e${d}`,
+    ts: ts(d),
+    block: d,
+    tick: "collateral" as const,
+    legs,
+    balances: [
+      { asset: "C", symbol: "WETH", side: "collateral" as const, amount: coll },
+      { asset: "D", symbol: "USDC", side: "debt" as const, amount: debt },
+    ],
+    prices: [
+      { asset: "C", usd: 1000 },
+      { asset: "D", usd: 1 },
+    ],
+    ...extra,
+  });
+  const why = {
+    legs: "WETH priced at the day's close: the price at this block is not stored yet.",
+    unread: "Balances at this row not read.",
+  };
+  const events = [
+    ev(
+      0,
+      [
+        { bucket: "in", usd: 2000 },
+        { bucket: "b", usd: 500 },
+      ],
+      2,
+      500,
+    ),
+    ev(3, [{ bucket: "in", usd: 1000 }], 3, 500, { unsure: [{ side: "collateral", why: why.legs }] }),
+    ev(6, [{ bucket: "out", usd: 1000 }], 2, 500, { unsure: [{ side: "debt", why: why.unread, untilNext: true }] }),
+    ev(9, [{ bucket: "in", usd: 1000 }], 3, 500),
+  ];
+  const base: FlowTimeline = {
+    buckets,
+    days: daysFromEvents(
+      buckets.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 3000, debtUsd: 500 },
+    dailyPrices: { C: [[D0, 1000]], D: [[D0, 1]] },
+    seriesCarry: true,
+    today: D0 + 12,
+  };
+  const plain = buildFlowModel(base)!;
+  const m = buildFlowModel({
+    ...base,
+    carriedWhy: { C: "no daily price is stored, so a day between events keeps the last event's price." },
+  })!;
+  // The figures do not move.
+  assert.deepEqual(m.valued, plain.valued);
+  for (let st = 0; st <= m.liveStop; st++) assert.deepEqual(stateAt(m, st), stateAt(plain, st));
+  // Without reasons a model marks nothing (every other family's panel as before).
+  const bare = buildFlowModel({ ...base, days: base.days.map(({ unsure: _u, ...d }) => d) })!;
+  assert.equal(bare.unsure.size, 0);
+  assert.equal(bare.unsureFlows.length, 0);
+  assert.deepEqual(partialAt(bare, 5, "collateral"), []);
+  // A leg priced off its block marks the bars from its day, not the day's held figure.
+  assert.deepEqual(unsureAt(m, 2, "collateral").flows, []);
+  assert.deepEqual(unsureAt(m, 3, "collateral"), { held: [], flows: [why.legs] });
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [why.legs]);
+  // An unread balance stands until the next day with events.
+  for (const st of [6, 7, 8]) assert.deepEqual(unsureAt(m, st, "debt").held, [why.unread], `stop ${st}`);
+  assert.deepEqual(unsureAt(m, 9, "debt").held, []);
+  assert.deepEqual(unsureAt(m, 9, "debt").flows, [why.unread]);
+  // A carried price marks each day between events, naming the price's day.
+  assert.equal(unsureAt(m, 0, "collateral").held.length, 0, "an event day has its price");
+  assert.match(
+    unsureAt(m, 1, "collateral").held[0],
+    /^WETH is valued at its price of \d+ \w+ '\d\d: no daily price is stored/,
+  );
+  assert.equal(unsureAt(m, 4, "collateral").held.length, 1);
+  // The live stop is the live read's: only the flows' reasons.
+  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, []);
+  // A window keeps each reason, those before it from its opening.
+  const w = windowModel(m, 5);
+  assert.deepEqual(unsureAt(w, 0, "collateral").flows, [why.legs]);
+  assert.deepEqual(unsureAt(w, 1, "debt").held, [why.unread]);
+  // One reason over several assets reads as one sentence naming them.
+  const two = buildFlowModel({
+    ...base,
+    days: daysFromEvents(
+      buckets.map((b) => b.key),
+      [
+        ...events,
+        ev(10, [{ bucket: "in", usd: 10 }], 3, 500, {
+          unsure: [
+            { side: "collateral", symbol: "WETH", why: "priced at the day's close." },
+            { side: "collateral", symbol: "USDC", why: "priced at the day's close." },
+            { side: "collateral", symbol: "WBTC", why: "priced at the day's close." },
+          ],
+        }),
+      ],
+    ),
+  })!;
+  assert.ok(unsureAt(two, 10, "collateral").flows.includes("WETH, USDC and WBTC priced at the day's close."));
 });

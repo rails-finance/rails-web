@@ -80,7 +80,16 @@ export interface FlowMoment {
   /** Where a side is counted at its face: the rate the last event left in
    *  force (annual %, fees included), the seconds since that event to the
    *  day's end, and the factor they give. */
-  accrual: { rate: number; seconds: number; factor: number } | null;
+  accrual: {
+    rate: number;
+    seconds: number;
+    factor: number;
+    /** Where the interest is a contract's minute sum (`FlowMomentWords.minuteSum`):
+     *  the whole minutes it counts to the moment, and the deadline it stopped
+     *  at where the moment is past it. */
+    minutes?: number;
+    stopped?: number;
+  } | null;
   sides: Record<FlowSide, MomentSide>;
 }
 
@@ -146,6 +155,14 @@ export function flowMoment(model: FlowModel, events: FocusEvent[], endTs: number
   if (face.size > 0 && last?.rate != null) {
     const seconds = Math.max(0, close - last.ts);
     accrual = { rate: last.rate, seconds, factor: 1 + (last.rate / 100) * (seconds / ONE_YEAR_S) };
+    const sum = model.words.moment?.minuteSum;
+    if (sum) {
+      const past = sum.deadline != null && close > sum.deadline;
+      const to = past ? (sum.deadline as number) : close;
+      accrual.minutes = Math.max(0, Math.floor((to - sum.start) / 60));
+      accrual.seconds = Math.max(0, to - last.ts);
+      if (past) accrual.stopped = sum.deadline as number;
+    }
   }
   return {
     endTs: close - 1,

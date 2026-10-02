@@ -87,6 +87,9 @@ const ALL_BUCKETS: FlowBucket[] = [
   },
 ];
 
+/** Every line the family can draw, in drawing order. */
+export const mapleFlowBuckets = (): FlowBucket[] => ALL_BUCKETS;
+
 /** One row of a Maple position, in the pool's token. */
 export interface MapleFlowRow {
   id: string;

@@ -54,6 +54,7 @@ import {
   type FlowLive,
   type FlowSide,
   type FlowTimeline,
+  type FlowUnsure,
   type FlowWords,
 } from "@/lib/shared/flows-timeline";
 import { aaveV3EventLegs, aaveV3LiquidationTxs } from "@/lib/aave-v3/chain-truth-tower";
@@ -121,6 +122,15 @@ export interface AaveBaseLeg {
   price: number;
   basis: AaveBasePriceBasis;
 }
+
+/** Why a leg's figure is not at the oracle's price at its block, by how its
+ *  price was found. */
+const UNSURE_WHY: Partial<Record<AaveBasePriceBasis, string>> = {
+  day: "priced at the day's close: the oracle price at this block is not stored.",
+  nearest: "priced at the nearest priced row: no price is stored for its block or its day.",
+  today: "priced at today's oracle read: no price is stored for its block or its day.",
+  none: "has no price stored: its flows count at zero.",
+};
 
 /** A balance a row states: before (where it states one) and after. */
 export interface AaveBaseStated {
@@ -610,10 +620,18 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
     const moved = new Set<FlowSide>();
     for (const l of r.legs) if (!ACCRUAL_KEYS.has(l.bucket)) moved.add(l.side);
     const liq = r.legs.some((l) => l.bucket === "liquidatedCollateral" || l.bucket === "liquidatedDebt");
+    // A leg valued without the oracle's price at its block.
+    const unsure: FlowUnsure[] = [];
+    for (const l of r.legs) {
+      const why = UNSURE_WHY[l.basis];
+      if (why && !unsure.some((u) => u.side === l.side && u.why === why && u.symbol === l.symbol))
+        unsure.push({ side: l.side, why, symbol: l.symbol, ...(l.basis !== "day" ? { held: true } : {}) });
+    }
     return {
       id: r.ev.id,
       ts: r.ev.timestamp,
       block: r.ev.blockNumber,
+      ...(unsure.length ? { unsure } : {}),
       tick:
         liq || r.seizureTransfer
           ? "liquidation"
@@ -727,6 +745,15 @@ export function aaveBaseFlowTimeline(rp: AaveBaseReplay, o: AaveBaseFlowOptions)
     todayPrices,
     dailyPrices,
     seriesCarry: true,
+    // A reserve the store did not answer for keeps its last row's price between rows.
+    carriedWhy: Object.fromEntries(
+      [...byAsset.keys()]
+        .filter((a) => !o.dailyPrices?.[a]?.length)
+        .map((a) => [
+          a,
+          "no daily price is stored for this reserve, so a day between rows keeps the last row's price.",
+        ]),
+    ),
     indexes,
     today: open ? today : endDay,
     totalEvents: replayed.length,

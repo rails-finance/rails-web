@@ -470,6 +470,10 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
       prices.push({ asset: DEBT, usd: G });
     }
     const liq = isLiquidation(r.ev.kind);
+    // A row the server's filler has not reached is priced at the nearest
+    // priced moment: its collateral figures that day rest on that price.
+    const unpriced =
+      borrower && r.priceFrom !== "row" && (r.coll > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket)));
     return {
       id: r.ev.id,
       ts: r.ev.ts,
@@ -484,6 +488,20 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
       countsTx: !liq,
       balances,
       prices,
+      ...(unpriced
+        ? {
+            unsure: [
+              {
+                side: "collateral" as const,
+                why:
+                  r.priceFrom === "today"
+                    ? `${o.collSymbol} priced at today's oracle read: the oracle price at this block is not stored yet.`
+                    : `${o.collSymbol} priced at the nearest priced row: the oracle price at this block is not stored yet.`,
+                held: true,
+              },
+            ],
+          }
+        : {}),
     };
   });
   const days: FlowDayRow[] = daysFromEvents(
@@ -568,6 +586,14 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
     todayPrices: { [COLL]: priceNow, ...(borrower ? { [DEBT]: G } : {}) },
     dailyPrices,
     seriesCarry: true,
+    // Without the store, a day between events keeps the last event's price.
+    ...(borrower && !daily
+      ? {
+          carriedWhy: {
+            [COLL]: "no daily price is stored for this vault, so a day between events keeps the last event's price.",
+          },
+        }
+      : {}),
     indexes,
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },

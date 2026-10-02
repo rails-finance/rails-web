@@ -115,7 +115,14 @@ export type LiquityFamily = "v2" | "v1";
 export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamily = "v2"): FlowBucket[] {
   const all: FlowBucket[] = [
     { key: LQ.deposited, label: "Deposited", event: "Deposit", side: "collateral", dir: "in" },
-    { key: LQ.redistColl, label: "Redistribution gains", event: "Redistribution", side: "collateral", dir: "in" },
+    {
+      key: LQ.redistColl,
+      label: "Redistribution gains",
+      event: "Redistribution",
+      side: "collateral",
+      dir: "in",
+      hatch: "grid",
+    },
     { key: LQ.withdrawn, label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out" },
     {
       key: LQ.collRedeemed,
@@ -146,11 +153,20 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
       hatch: "dots",
     },
     { key: LQ.borrowed, label: "Borrowed", event: "Borrow", side: "debt", dir: "in" },
-    { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in" },
-    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in" },
-    { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in" },
-    { key: LQ.redistDebt, label: "Redistributed debt", event: "Redistribution", side: "debt", dir: "in" },
-    { key: LQ.reserve, label: "Liquidation reserve", event: "Open", side: "debt", dir: "in" },
+    // Each inflow after Borrowed has its texture; interest is dashed
+    // (standards/lexicon.md, lifetime bars' fills).
+    { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
+    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in", hatch: "checker" },
+    { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in", hatch: "dots" },
+    {
+      key: LQ.redistDebt,
+      label: "Redistributed debt",
+      event: "Redistribution",
+      side: "debt",
+      dir: "in",
+      hatch: "grid",
+    },
+    { key: LQ.reserve, label: "Liquidation reserve", event: "Open", side: "debt", dir: "in", hatch: "horizontal" },
     { key: LQ.repaid, label: "Repaid", event: "Repay", side: "debt", dir: "out" },
     {
       key: LQ.reserveBurned,
@@ -370,14 +386,28 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const debt = `debt:${o.debtSymbol}`;
   const family = o.family ?? "v2";
   const buckets = liquityFlowBuckets(o.surplusClaimed, family);
-  const flowEvents: FlowEvent[] = replayed.map(({ ev, price, legs }) => {
+  const flowEvents: FlowEvent[] = replayed.map(({ ev, price, legs, borrowedPrice }) => {
     const moved = { coll: false, debt: false };
     for (const l of legs) {
       if (l.bucket === LQ.interest || l.bucket === LQ.batchFee) continue;
       if (COLL_BUCKETS.has(l.bucket)) moved.coll = true;
       else moved.debt = true;
     }
+    // An event that records no price takes the last one recorded before it.
+    const unpriced =
+      borrowedPrice && price > 0 && (ev.collAfter > DUST || legs.some((l) => COLL_BUCKETS.has(l.bucket)));
     return {
+      ...(unpriced
+        ? {
+            unsure: [
+              {
+                side: "collateral" as const,
+                why: `${o.collSymbol} priced at the last event's price: this event records none.`,
+                held: true,
+              },
+            ],
+          }
+        : {}),
       id: ev.id,
       ts: ev.ts,
       block: ev.block,
@@ -477,6 +507,12 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
       [debt]: debtObs,
     },
     seriesCarry: true,
+    carriedWhy: {
+      [coll]:
+        daily.length > 0
+          ? "the branch's daily price has none for this day, so it keeps the last price before it."
+          : "no daily price is recorded for this branch, so a day between events keeps the last event's price.",
+    },
     // A closed Liquity V1 life is the page's whole position: its line ends
     // the day after its last event.
     today: family === "v1" && !open ? endDay : today,
