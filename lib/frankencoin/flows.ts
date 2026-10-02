@@ -475,6 +475,18 @@ export function frankencoinFlowTimeline(
       ),
       tx: r.ev.tx,
       countsTx: r.ev.sale == null,
+      // A mint or repayment whose receipt was not read stays one line: what
+      // the debt owes is exact, its split is not.
+      ...(legOf(r, FC.minted) > 0 || legOf(r, FC.repaidWhole) > 0
+        ? {
+            unsure: [
+              {
+                side: "debt" as const,
+                why: "A mint or repayment's split is not read: its receipt did not load, so it stands as one line.",
+              },
+            ],
+          }
+        : {}),
       balances: [
         { asset: COLL, symbol: o.collSymbol, side: "collateral", amount: Math.max(0, r.coll) },
         { asset: DEBT, symbol: "ZCHF", side: "debt", amount: Math.max(0, r.debt) },

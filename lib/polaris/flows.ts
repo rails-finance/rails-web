@@ -483,7 +483,20 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
       if (PL_COLL_KEYS.has(l.bucket)) moved.coll = true;
       else moved.debt = true;
     }
+    // A row the feed lane has not priced takes the nearest priced moment.
+    const unpriced = r.priceFrom !== "row" && (r.coll > 0 || r.legs.some((l) => PL_COLL_KEYS.has(l.bucket)));
     return {
+      ...(unpriced
+        ? {
+            unsure: [
+              {
+                side: "collateral" as const,
+                why: `${PETH_SYMBOL} priced at the ${r.priceFrom === "today" ? "feed's live price" : "nearest priced row"}: the feed's price at this block is not stored.`,
+                held: true,
+              },
+            ],
+          }
+        : {}),
       id: r.row.id,
       ts: r.row.ts,
       block: r.row.block,
@@ -570,6 +583,9 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
     dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: debtObs },
     seriesCarry: true,
+    carriedWhy: {
+      [COLL]: "Polaris is not in the daily price store, so a day between events keeps the last event's price.",
+    },
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
     words: polarisFlowWords(o.stable),

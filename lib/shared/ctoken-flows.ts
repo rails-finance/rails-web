@@ -483,7 +483,15 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     if (r.ev.debtAfter != null)
       balances.push({ asset: m, symbol: r.ev.symbol, side: "debt", amount: Math.max(0, r.debt), index: r.debtIndex });
     const liq = r.ev.kind === "liquidation" || r.ev.kind === "seize_liquidator" || r.ev.kind === "seize_protocol";
+    // A row with no price read at its block takes the nearest priced row's
+    // on its market, else today's: its figures that day rest on that price.
+    const why = r.ownPrice
+      ? null
+      : "priced at the nearest price read on its market, else today's: the price at this block is not read.";
+    const unsure =
+      why && r.legs.length > 0 ? balances.map((b) => ({ side: b.side, why, symbol: r.ev.symbol, held: true })) : [];
     return {
+      ...(unsure.length ? { unsure } : {}),
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
@@ -586,6 +594,12 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     todayPrices,
     dailyPrices,
     seriesCarry: true,
+    // A market the store did not answer for keeps its last read between rows.
+    carriedWhy: Object.fromEntries(
+      [...byMarket.keys()]
+        .filter((m) => !o.dailyPrices?.[m]?.length)
+        .map((m) => [m, "no daily price is stored for this market, so a day between rows keeps the last row's price."]),
+    ),
     indexes,
     today: open ? today : endDay,
     words: ctokenFlowWords(o.vocab, rp.borrower),

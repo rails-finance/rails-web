@@ -56,6 +56,8 @@ import { aaveV4FlowSeriesTimeline, aaveV4FlowTimeline } from "@/lib/aave-v4/flow
 import { aaveV3RowsToEvents, type MvRow } from "@/lib/sources/api/aave-v3-timeline";
 import {
   oldPriceAt,
+  partialAt,
+  unsureAt,
   assetsAt,
   axisFor,
   axisLabelOnPhone,
@@ -1761,4 +1763,111 @@ test("indexes: a route without them grows nothing and says so on the card", () =
   assert.equal(t.words?.moment?.notes?.length, 1);
   const m = buildFlowModel(t) as FlowModel;
   assert.ok(m.heldAt.every((hs) => hs.every((h) => h.grown == null)));
+});
+
+test("incomplete stretches: a figure without its price or read is dashed and named, the figures unchanged", () => {
+  const D0 = 20_000;
+  const ts = (d: number) => (D0 + d) * 86_400 + 3_600;
+  const buckets = [
+    { key: "in", label: "Deposited", side: "collateral" as const, dir: "in" as const },
+    { key: "out", label: "Withdrawn", side: "collateral" as const, dir: "out" as const },
+    { key: "b", label: "Borrowed", side: "debt" as const, dir: "in" as const },
+  ];
+  const ev = (d: number, legs: { bucket: string; usd: number }[], coll: number, debt: number, extra = {}) => ({
+    id: `e${d}`,
+    ts: ts(d),
+    block: d,
+    tick: "collateral" as const,
+    legs,
+    balances: [
+      { asset: "C", symbol: "WETH", side: "collateral" as const, amount: coll },
+      { asset: "D", symbol: "USDC", side: "debt" as const, amount: debt },
+    ],
+    prices: [
+      { asset: "C", usd: 1000 },
+      { asset: "D", usd: 1 },
+    ],
+    ...extra,
+  });
+  const why = {
+    legs: "WETH priced at the day's close: the price at this block is not stored yet.",
+    unread: "Balances at this row not read.",
+  };
+  const events = [
+    ev(
+      0,
+      [
+        { bucket: "in", usd: 2000 },
+        { bucket: "b", usd: 500 },
+      ],
+      2,
+      500,
+    ),
+    ev(3, [{ bucket: "in", usd: 1000 }], 3, 500, { unsure: [{ side: "collateral", why: why.legs }] }),
+    ev(6, [{ bucket: "out", usd: 1000 }], 2, 500, { unsure: [{ side: "debt", why: why.unread, untilNext: true }] }),
+    ev(9, [{ bucket: "in", usd: 1000 }], 3, 500),
+  ];
+  const base: FlowTimeline = {
+    buckets,
+    days: daysFromEvents(
+      buckets.map((b) => b.key),
+      events,
+    ),
+    live: { collateralUsd: 3000, debtUsd: 500 },
+    dailyPrices: { C: [[D0, 1000]], D: [[D0, 1]] },
+    seriesCarry: true,
+    today: D0 + 12,
+  };
+  const plain = buildFlowModel(base)!;
+  const m = buildFlowModel({
+    ...base,
+    carriedWhy: { C: "no daily price is stored, so a day between events keeps the last event's price." },
+  })!;
+  // The figures do not move.
+  assert.deepEqual(m.valued, plain.valued);
+  for (let st = 0; st <= m.liveStop; st++) assert.deepEqual(stateAt(m, st), stateAt(plain, st));
+  // Without reasons a model marks nothing (every other family's panel as before).
+  const bare = buildFlowModel({ ...base, days: base.days.map(({ unsure: _u, ...d }) => d) })!;
+  assert.equal(bare.unsure.size, 0);
+  assert.equal(bare.unsureFlows.length, 0);
+  assert.deepEqual(partialAt(bare, 5, "collateral"), []);
+  // A leg priced off its block marks the bars from its day, not the day's held figure.
+  assert.deepEqual(unsureAt(m, 2, "collateral").flows, []);
+  assert.deepEqual(unsureAt(m, 3, "collateral"), { held: [], flows: [why.legs] });
+  assert.deepEqual(partialAt(m, m.liveStop, "collateral"), [why.legs]);
+  // An unread balance stands until the next day with events.
+  for (const st of [6, 7, 8]) assert.deepEqual(unsureAt(m, st, "debt").held, [why.unread], `stop ${st}`);
+  assert.deepEqual(unsureAt(m, 9, "debt").held, []);
+  assert.deepEqual(unsureAt(m, 9, "debt").flows, [why.unread]);
+  // A carried price marks each day between events, naming the price's day.
+  assert.equal(unsureAt(m, 0, "collateral").held.length, 0, "an event day has its price");
+  assert.match(
+    unsureAt(m, 1, "collateral").held[0],
+    /^WETH is valued at its price of \d+ \w+ '\d\d: no daily price is stored/,
+  );
+  assert.equal(unsureAt(m, 4, "collateral").held.length, 1);
+  // The live stop is the live read's: only the flows' reasons.
+  assert.deepEqual(unsureAt(m, m.liveStop, "collateral").held, []);
+  // A window keeps each reason, those before it from its opening.
+  const w = windowModel(m, 5);
+  assert.deepEqual(unsureAt(w, 0, "collateral").flows, [why.legs]);
+  assert.deepEqual(unsureAt(w, 1, "debt").held, [why.unread]);
+  // One reason over several assets reads as one sentence naming them.
+  const two = buildFlowModel({
+    ...base,
+    days: daysFromEvents(
+      buckets.map((b) => b.key),
+      [
+        ...events,
+        ev(10, [{ bucket: "in", usd: 10 }], 3, 500, {
+          unsure: [
+            { side: "collateral", symbol: "WETH", why: "priced at the day's close." },
+            { side: "collateral", symbol: "USDC", why: "priced at the day's close." },
+            { side: "collateral", symbol: "WBTC", why: "priced at the day's close." },
+          ],
+        }),
+      ],
+    ),
+  })!;
+  assert.ok(unsureAt(two, 10, "collateral").flows.includes("WETH, USDC and WBTC priced at the day's close."));
 });

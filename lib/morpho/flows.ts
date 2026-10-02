@@ -467,11 +467,23 @@ export function morphoFlowTimeline(events: MorphoFlowEvent[], o: MorphoFlowOptio
       if (r.ownPrice && r.price > 0) prices.push({ asset: COLL, usd: r.price * G });
       prices.push({ asset: DEBT, usd: G });
     }
+    // A row with no oracle read at its block takes the last read before it.
+    const unsure =
+      roles.borrower && !r.ownPrice && (r.coll > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket)))
+        ? [
+            {
+              side: "collateral" as const,
+              why: `${o.collSymbol} priced at the oracle's last read before this row: the oracle at this block is not read.`,
+              held: true,
+            },
+          ]
+        : [];
     if (roles.lender) {
       balances.push({ asset: SUPPLY, symbol: o.loanSymbol, side: "collateral", amount: Math.max(0, r.supply) });
       prices.push({ asset: SUPPLY, usd: G });
     }
     return {
+      ...(unsure.length ? { unsure } : {}),
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
@@ -574,6 +586,14 @@ export function morphoFlowTimeline(events: MorphoFlowEvent[], o: MorphoFlowOptio
     },
     dailyPrices,
     seriesCarry: true,
+    ...(roles.borrower
+      ? {
+          carriedWhy: {
+            [COLL]:
+              "no daily oracle price is recorded for this market, so a day between events keeps the last event's price.",
+          },
+        }
+      : {}),
     today: open ? today : endDay,
     labels: {
       collateral: roles.borrower ? (roles.lender ? "Collateral and supply" : "Collateral") : "Supplied",

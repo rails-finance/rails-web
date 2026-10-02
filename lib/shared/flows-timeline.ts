@@ -100,6 +100,26 @@ export interface FlowEvent {
   balances: { asset: string; symbol: string; side: FlowSide; amount: number; index?: number }[];
   /** Prices the event carries, USD per token at its block. */
   prices: { asset: string; usd: number }[];
+  /** Where the event's figures rest on something the page could not read: a
+   *  leg valued without its block's price, or a balance not read at the
+   *  block. `held`: the day's held or owed figure rests on it too (the line
+   *  is dashed into that day's point); else only the flows (the bars). */
+  unsure?: FlowUnsure[];
+}
+
+/** A figure the panel draws without its price or its read, and why, in the
+ *  words the line's tip and the headline's mark state (rails-ops
+ *  reference/lifetime-flows-scrubber.md, "Incomplete stretches"). */
+export interface FlowUnsure {
+  side: FlowSide;
+  why: string;
+  /** The asset the reason is about, where a family names several with one
+   *  reason: the words then read "WETH and USDC " + `why`. */
+  symbol?: string;
+  held?: boolean;
+  /** The held figure rests on it until the next day with events (a balance
+   *  the row did not state, which the next row settles). */
+  untilNext?: boolean;
 }
 
 export interface FlowLive {
@@ -273,6 +293,8 @@ export interface FlowDayRow {
   txs?: number;
   /** The running USD per bucket and symbol, for the cells the day moved. */
   cumAsset?: { bucket: string; symbol: string; usd: number }[];
+  /** The day's events' figures that rest on something not read (`FlowEvent.unsure`). */
+  unsure?: FlowUnsure[];
 }
 
 /** The token a family states its flows in, where it is not USD: every
@@ -320,6 +342,10 @@ export interface FlowTimeline {
   /** The reserves' indexes at each held day's close: a balance between events
    *  is grown by interest from the event that recorded it. */
   indexes?: FlowIndexes;
+  /** Per asset whose daily prices come from its events alone (no daily price
+   *  store answers for it): why a day valued at a price recorded on an
+   *  earlier day has none of its own. Such a day's figure is drawn dashed. */
+  carriedWhy?: Record<string, string>;
 }
 
 /** Per-timeline words for the scrubber. Every field is optional and defaults
@@ -431,6 +457,11 @@ export interface FlowModel {
   valued: { collateral: number; debt: number }[];
   /** Held assets on an old price, per stop (only stops that have any). */
   stale: Map<number, StalePrice[]>;
+  /** Per stop, the held and owed figures that rest on a price or a read the
+   *  page does not have, and why (only stops that have any). */
+  unsure: Map<number, { side: FlowSide; why: string; symbol?: string }[]>;
+  /** The flows that rest on one: each reason's first stop. */
+  unsureFlows: { stop: number; side: FlowSide; why: string; symbol?: string }[];
   /** Whether held assets are valued at a daily price series. */
   daily: boolean;
   /** Days a price may age before the asset is on an old price. */
@@ -574,6 +605,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
     balances: Map<string, FlowEvent["balances"][number]>;
     prices: Map<string, { usd: number; ts: number }>;
     cells: Set<string>;
+    unsure: Map<string, FlowUnsure>;
   } | null = null;
   let n = 0;
   let txs = 0;
@@ -594,6 +626,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
         symbol: c.slice(c.indexOf("|") + 1),
         usd: cumAsset[c],
       })),
+      ...(cur.unsure.size ? { unsure: [...cur.unsure.values()] } : {}),
     });
     cur = null;
   };
@@ -608,6 +641,7 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       balances: new Map(),
       prices: new Map(),
       cells: new Set(),
+      unsure: new Map(),
     };
     n += 1;
     // A transaction's events are consecutive; the card leaves some out.
@@ -629,6 +663,11 @@ export function daysFromEvents(bucketKeys: string[], events: FlowEvent[]): FlowD
       }
     }
     for (const b of ev.balances) cur.balances.set(`${b.side}:${b.asset}`, b);
+    for (const u of ev.unsure ?? []) {
+      const k = `${u.side}|${u.symbol ?? ""}|${u.why}`;
+      const had = cur.unsure.get(k);
+      cur.unsure.set(k, had ? { ...had, held: had.held || u.held, untilNext: had.untilNext || u.untilNext } : u);
+    }
     if (ev.tick === "both") {
       cur.sides.add("collateral");
       cur.sides.add("debt");
@@ -707,13 +746,29 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
   const valued: FlowModel["valued"] = [];
   const heldAt: FlowAssetHeld[][] = [];
   const stale = new Map<number, StalePrice[]>();
+  type Reason = { side: FlowSide; why: string; symbol?: string };
+  const same = (a: Reason, b: Reason) => a.side === b.side && a.why === b.why && a.symbol === b.symbol;
+  const unsure = new Map<number, Reason[]>();
+  const unsureFlows: FlowModel["unsureFlows"] = [];
+  /** Reasons that stand from an event day until the next one (`untilNext`). */
+  let standing: Reason[] = [];
   const repricings: Repricing[] = [];
   let prevPrice = new Map<string, PriceAt>();
   let di = 0;
 
   for (let stop = 0; stop < liveStop; stop++) {
+    const unsureHere: Reason[] = [];
+    const note = (r: Reason) => {
+      if (!unsureHere.some((u) => same(u, r))) unsureHere.push(r);
+    };
+    const reason = (u: FlowUnsure): Reason => ({ side: u.side, why: u.why, ...(u.symbol ? { symbol: u.symbol } : {}) });
     if (di < days.length && days[di].day - startDay === stop) {
       const d = days[di++];
+      standing = (d.unsure ?? []).filter((u) => u.untilNext).map(reason);
+      for (const u of d.unsure ?? []) {
+        if (u.held || u.untilNext) note(reason(u));
+        if (!unsureFlows.some((f) => same(f, reason(u)))) unsureFlows.push({ stop, ...reason(u) });
+      }
       for (const p of d.prices)
         if (p.usd > 0) eventPrice.set(p.asset, { usd: p.usd, ts: p.ts, day: utcDay(p.ts) - startDay, series: false });
       for (const b of d.balances)
@@ -724,7 +779,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
           ...(b.index != null ? { index: b.index } : {}),
           day: d.day,
         });
-    }
+    } else for (const u of standing) note(u);
     const priceNow = new Map<string, PriceAt>();
     let coll = 0;
     let debt = 0;
@@ -768,6 +823,10 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       if (h.side === "collateral") coll += usd;
       else debt += usd;
       lines.push({ asset, h, usd, p, ...(g.grown ? { grown: g.grown } : {}) });
+      // A price from an earlier day, where only the events record one.
+      const carried = t.carriedWhy?.[asset];
+      if (carried && p && p.day < stop && usd >= STALE_FLOOR_USD)
+        note({ side: h.side, why: `${h.symbol} is valued at its price of ${dayStampOf(p.ts)}: ${carried}` });
       if (p && usd >= STALE_FLOOR_USD) {
         const old = daily ? stop - p.day > gapDays : (startDay + stop + 1) * DAY_S - p.ts > gapDays * DAY_S;
         if (old) staleHere.push({ symbol: h.symbol, side: h.side, pricedAt: p.ts, usd });
@@ -809,6 +868,7 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
       })),
     );
     if (staleHere.length) stale.set(stop, staleHere);
+    if (unsureHere.length) unsure.set(stop, unsureHere);
   }
 
   const last = rows[rows.length - 1];
@@ -863,6 +923,8 @@ export function buildFlowModel(t: FlowTimeline): FlowModel | null {
     live: t.live,
     valued,
     stale,
+    unsure,
+    unsureFlows,
     daily,
     gapDays,
     totalEvents: t.totalEvents ?? last.events,
@@ -1088,6 +1150,42 @@ export function oldPriceAt(m: FlowModel, stop: number): { word: "Old price" | "R
   return { word: stale.length > 0 ? "Old price" : "Repriced", lines };
 }
 
+/** What a side's figures at a stop rest on that the page could not read:
+ *  `held`, the held or owed figure there (the line dashed into that day);
+ *  `flows`, the flows the bar counts by then. At the live stop the figure is
+ *  the live read's, and every reason the history has counts for the flows. */
+export function unsureAt(m: FlowModel, stop: number, side: FlowSide): { held: string[]; flows: string[] } {
+  const live = stop >= m.liveStop;
+  const held = live ? [] : (m.unsure.get(stop) ?? []).filter((u) => u.side === side);
+  const flows = m.unsureFlows.filter(
+    (u) => u.side === side && (live || u.stop <= stop) && !held.some((h) => h.why === u.why && h.symbol === u.symbol),
+  );
+  return { held: reasonWords(held), flows: reasonWords(flows) };
+}
+
+/** One sentence per reason, the assets it names first ("WETH and USDC
+ *  priced at the day's close: …"). */
+function reasonWords(rs: { why: string; symbol?: string }[]): string[] {
+  const by = new Map<string, string[]>();
+  for (const r of rs) {
+    const list = by.get(r.why) ?? [];
+    if (r.symbol && !list.includes(r.symbol)) list.push(r.symbol);
+    by.set(r.why, list);
+  }
+  return [...by].map(([why, syms]) =>
+    syms.length === 0
+      ? why
+      : `${syms.length === 1 ? syms[0] : `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`} ${why}`,
+  );
+}
+
+/** The headline's mark at a stop: every reason a side's figure or its bar is
+ *  not complete, the held figure's first. */
+export const partialAt = (m: FlowModel, stop: number, side: FlowSide): string[] => {
+  const u = unsureAt(m, stop, side);
+  return [...u.held, ...u.flows];
+};
+
 /** "3 Mar 2025": the window's dates. */
 export function longDay(tsSec: number): string {
   const d = new Date(tsSec * 1000);
@@ -1152,6 +1250,9 @@ export function windowModel(m: FlowModel, from: number): FlowModel {
     repricings: shift(m.repricings),
     valued,
     stale: new Map([...m.stale].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
+    unsure: new Map([...m.unsure].filter(([d]) => d >= from).map(([d, v]) => [d - from, v])),
+    // A reason before the window stands from its opening: the bars there count what it left.
+    unsureFlows: m.unsureFlows.map((u) => ({ ...u, stop: Math.max(0, u.stop - from) })),
     heldAt: m.heldAt.slice(from),
     axis: axisFor(peak),
     ...(m.sideAxes ? { sideAxes: { collateral: axisFor(sidePeak.collateral), debt: axisFor(sidePeak.debt) } } : {}),

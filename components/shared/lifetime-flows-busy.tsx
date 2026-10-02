@@ -34,6 +34,7 @@ import {
   formatFlowToken,
   formatFlowUsd,
   oldPriceAt,
+  partialAt,
   spokenUsd,
   stateAt,
   unitOf,
@@ -42,7 +43,8 @@ import {
   type FlowSideState,
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
-import { OldPriceLabel } from "@/components/shared/flow-old-price";
+import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 
 const PLAY_MS = 220;
@@ -319,6 +321,7 @@ export function Headline({
   when,
   isLive,
   assets,
+  partial,
 }: {
   side: FlowSide;
   st: FlowSideState;
@@ -326,6 +329,9 @@ export function Headline({
   when: string;
   isLive: boolean;
   assets: ReturnType<typeof assetsAt>;
+  /** What the figure and its bar rest on that the page could not read
+   *  (`unsureAt`): an asterisk after the figure opens these words. */
+  partial?: string[];
 }) {
   const word = side === "collateral" ? model.labels.collateral : model.labels.debt;
   const tokens = assets.held.filter((h) => h.side === side && (h.amount ?? 0) > 0).map((h) => h.symbol);
@@ -336,6 +342,18 @@ export function Headline({
           {formatFlowUsd(st.now, unitOf(model, side))}
         </span>
       </Prov>
+      {partial && partial.length > 0 && (
+        <RevealTip
+          className="focus-ring -ml-1.5 self-start rounded"
+          focusable
+          label={`Not complete: ${partial.join(" ")}`}
+          tip={<OldPriceTip lines={partial} />}
+        >
+          <span className="cursor-help px-0.5 text-sm font-semibold leading-none text-rb-500" data-flow-partial={side}>
+            *
+          </span>
+        </RevealTip>
+      )}
       {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
       <span className="text-xs text-rb-500">{word}</span>
     </div>
@@ -397,7 +415,16 @@ export function Rescaled({
       {headlines && (
         <div className="mb-2 flex flex-wrap gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">
           {sides.map((side) => (
-            <Headline key={side} side={side} st={s[side]} model={model} when={when} isLive={isLive} assets={assets} />
+            <Headline
+              key={side}
+              side={side}
+              st={s[side]}
+              model={model}
+              when={when}
+              isLive={isLive}
+              assets={assets}
+              partial={partialAt(model, s.stop, side)}
+            />
           ))}
         </div>
       )}

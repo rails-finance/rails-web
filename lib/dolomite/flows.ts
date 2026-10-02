@@ -404,6 +404,14 @@ function pricesFor(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): { price: nu
   });
 }
 
+/** Why a row's figures are not at its block's price, by how its price was found. */
+const UNSURE_WHY: Partial<Record<DolomitePriceBasis, string>> = {
+  day: "priced at the day's close: the price at this block is not stored yet.",
+  carried: "priced at the last stored close before its day: no price is stored for the day.",
+  nearest: "priced at the nearest priced row: no price is stored near its day.",
+  none: "has no price stored: its flows count at zero.",
+};
+
 /** The per-row replay. */
 export function replayDolomite(rows: DolomiteFlowRow[], o: DolomiteFlowOptions): DolomiteReplayed[] {
   const prices = pricesFor(rows, o);
@@ -589,6 +597,22 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
     if (r.ev.before < 0 || r.ev.after < 0)
       balances.push({ asset: m, symbol: r.ev.symbol, side: "debt", amount: r.debt, index: r.ev.borrowIndex });
     const liq = LIQ_KINDS.has(r.ev.kind);
+    // A row valued without its block's price: the flows rest on the price
+    // used; where no price was stored for the row's day, the day's held or
+    // owed figure does too.
+    const why = UNSURE_WHY[r.basis];
+    const sides = new Set<FlowSide>(balances.map((b) => b.side));
+    if (moved.coll) sides.add("collateral");
+    if (moved.debt) sides.add("debt");
+    const unsure =
+      why && r.legs.length > 0
+        ? [...sides].map((side) => ({
+            side,
+            why,
+            symbol: r.ev.symbol,
+            ...(r.basis !== "day" ? { held: true } : {}),
+          }))
+        : [];
     return {
       id: r.ev.id,
       ts: r.ev.ts,
@@ -599,6 +623,7 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
       countsTx: r.ev.byOwner,
       balances,
       prices: r.price > 0 && r.basis !== "nearest" && r.basis !== "none" ? [{ asset: m, usd: r.price }] : [],
+      ...(unsure.length ? { unsure } : {}),
     };
   });
   const days = daysFromEvents(
@@ -687,6 +712,12 @@ export function dolomiteFlowTimeline(rows: DolomiteFlowRow[], o: DolomiteFlowOpt
     todayPrices,
     dailyPrices,
     seriesCarry: true,
+    // A market the store did not answer for keeps its last row's price between rows.
+    carriedWhy: Object.fromEntries(
+      [...byMarket.keys()]
+        .filter((m) => !o.dailyPrices?.[m]?.length)
+        .map((m) => [m, "no daily price is stored for this market, so a day between rows keeps the last row's price."]),
+    ),
     indexes,
     today: open ? today : endDay,
     words: dolomiteFlowWords(rp.borrower),

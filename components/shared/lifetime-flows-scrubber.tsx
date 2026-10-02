@@ -66,6 +66,7 @@ import {
   formatFlowUsd,
   nextEventDay,
   oldPriceAt,
+  partialAt,
   prevEventDay,
   sideAxis,
   spokenUsd,
@@ -760,6 +761,11 @@ function panelWords(
     model.stale.size > 0
       ? ` Where a held asset's latest price is more than ${model.gapDays} days old, ${lined ? "the line is dotted and " : ""}“Old price” shows by the date, its tip naming the asset and the day of that price${model.repricings.length > 0 ? "; “Repriced” marks a day whose newer price moves its side by 1% or more" : ""}.`
       : "";
+  // Only where a figure rests on a price or a read the page does not have.
+  const incomplete =
+    model.unsure.size > 0 || model.unsureFlows.length > 0
+      ? ` Where a figure rests on a price or a read the page does not have, ${lined && model.unsure.size > 0 ? "the line is dotted for that stretch, its tip saying what is missing and why, and " : ""}an asterisk by the headline names it.`
+      : "";
   return {
     key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
     explain: lined
@@ -771,8 +777,9 @@ function panelWords(
         (from > 0
           ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`
           : "") +
-        old
-      : cover + read + old,
+        old +
+        incomplete
+      : cover + read + old + incomplete,
     outline: model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null,
     lines: [
       { label: model.labels.collateral, color: LINE_HUE.collateral },
@@ -1007,9 +1014,18 @@ function ScrubberBody({
             when={when}
             isLive={liveReceipts}
             assets={assets}
+            partial={partialAt(model, stop, "collateral")}
           />
           {hasDebt && (
-            <Headline side="debt" st={s.debt} model={model} when={when} isLive={liveReceipts} assets={assets} />
+            <Headline
+              side="debt"
+              st={s.debt}
+              model={model}
+              when={when}
+              isLive={liveReceipts}
+              assets={assets}
+              partial={partialAt(model, stop, "debt")}
+            />
           )}
         </div>
         <SideBlock

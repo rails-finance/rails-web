@@ -640,7 +640,18 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
       if (t !== base) prices.push({ asset: collAsset(t), usd: r.price[t] });
       else prices.push({ asset: SUPPLY_ASSET, usd: r.price[t] }, { asset: DEBT_ASSET, usd: r.price[t] });
     const absorb = r.ev.kind === "absorb_debt" || r.ev.kind === "absorb_collateral";
+    // A leg whose token the reads did not price at this block takes the
+    // nearest priced row's price.
+    const unsure: { side: "collateral" | "debt"; why: string; symbol: string; held: true }[] = [];
+    for (const l of r.legs) {
+      if (r.own.has(l.token)) continue;
+      const side = COLL_SIDE.has(l.bucket) ? ("collateral" as const) : ("debt" as const);
+      const why = "priced at the nearest priced row: the price at this block is not read.";
+      if (!unsure.some((u) => u.side === side && u.symbol === l.symbol))
+        unsure.push({ side, why, symbol: l.symbol, held: true });
+    }
     return {
+      ...(unsure.length ? { unsure } : {}),
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
@@ -765,6 +776,19 @@ export function compoundFlowTimeline(events: CompoundFlowEvent[], o: CompoundFlo
     todayPrices,
     dailyPrices,
     seriesCarry: true,
+    // An asset the store did not answer for keeps its last read between rows.
+    carriedWhy: Object.fromEntries(
+      [
+        ...[...collTokens].map((t) => [collAsset(t), t] as const),
+        [SUPPLY_ASSET, base] as const,
+        [DEBT_ASSET, base] as const,
+      ]
+        .filter(([, t]) => !o.dailyPrices?.[t]?.length)
+        .map(([a]) => [
+          a,
+          "no daily price is stored for this asset, so a day between rows keeps the last row's price.",
+        ]),
+    ),
     indexes: { basis: "comet", assets: { [SUPPLY_ASSET]: indexRows, [DEBT_ASSET]: indexRows } },
     today: open ? today : endDay,
     labels: {

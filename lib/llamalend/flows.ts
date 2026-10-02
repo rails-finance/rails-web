@@ -54,7 +54,14 @@
 //
 // Pure: tested offline in scripts/verify/verify-llamalend-flows.ts.
 
-import type { FlowBucket, FlowDayRow, FlowEvent, FlowIndexes, FlowTimeline } from "@/lib/shared/flows-timeline";
+import type {
+  FlowBucket,
+  FlowDayRow,
+  FlowEvent,
+  FlowIndexes,
+  FlowTimeline,
+  FlowUnsure,
+} from "@/lib/shared/flows-timeline";
 import { daysFromEvents, unitScaleFor } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LlamalendContext, LlamalendEventType } from "@/lib/shared/types/event-shape";
@@ -483,11 +490,28 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
       else moved.debt = true;
     }
     const liq = r.ev.kind === "liquidation" && !r.ev.self;
+    // What the row's figures rest on that the page did not read: its block's
+    // oracle price (past the reads' cap, or not landed), and its balances
+    // where the row states none and no read stood in.
+    const unsure: FlowUnsure[] = [];
+    if (r.priceFrom !== "row" && (r.coll > DUST || r.legs.some((l) => COLL_KEYS.has(l.bucket))))
+      unsure.push({
+        side: "collateral",
+        why:
+          r.priceFrom === "today"
+            ? `${o.collSymbol} priced at today's oracle read: the oracle at this block is not read (the page reads the latest ${LLAMALEND_PRICE_READS} event blocks).`
+            : `${o.collSymbol} priced at the nearest read row: the oracle at this block is not read (the page reads the latest ${LLAMALEND_PRICE_READS} event blocks).`,
+        held: true,
+      });
+    const unread = `Balances at this row not read: it states none, and the page reads up to ${LLAMALEND_STATE_READS} such rows; the next row that states its balances settles both sides.`;
+    if (!r.collStated) unsure.push({ side: "collateral", why: unread, untilNext: true });
+    if (!r.debtStated) unsure.push({ side: "debt", why: unread, untilNext: true });
     return {
       id: r.ev.id,
       ts: r.ev.ts,
       block: r.ev.block,
       tick: liq ? "liquidation" : moved.coll && moved.debt ? "both" : moved.debt ? "debt" : "collateral",
+      ...(unsure.length ? { unsure } : {}),
       legs: r.legs.map((l) =>
         COLL_KEYS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * cp(r), symbol: o.collSymbol }
@@ -585,6 +609,9 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
     todayPrices: { [COLL]: priceNow, [DEBT]: G },
     dailyPrices: { [COLL]: [...collObs].sort((a, b) => a[0] - b[0]), [DEBT]: unitObs },
     seriesCarry: true,
+    carriedWhy: {
+      [COLL]: "LlamaLend is not in the daily price store, so a day between events keeps the last event's price.",
+    },
     indexes,
     today: open ? today : endDay,
     labels: { collateral: "Collateral", debt: "Debt" },
