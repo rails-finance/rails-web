@@ -543,7 +543,7 @@ export default function FrankencoinPositionView({
 
               {indexPending && frankEvents.length === 0 ? (
                 <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                  Event history pending — the indexed backend for this explorer is still being filled. Everything above
+                  Event history pending — the indexed backend for this explorer is still being built. Everything above
                   is read live from the position contract at the latest block.
                 </div>
               ) : (

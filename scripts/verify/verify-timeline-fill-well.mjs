@@ -157,7 +157,7 @@ for (const f of FIXTURES) {
     const text = (await well.innerText()).replace(/\s+/g, " ").trim();
     check(
       `${f.name}: well opens with the stated sentence`,
-      text.startsWith("USD values for part of this position’s history are still being filled in."),
+      text.startsWith("USD values for part of this position’s history are still being added."),
       text,
     );
     const source = await well.getAttribute("data-fill-eta-source");
