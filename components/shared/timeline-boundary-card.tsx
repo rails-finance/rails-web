@@ -219,7 +219,7 @@ export function TimelineBoundaryCard({
   // so it runs N – 1 and counts DOWN towards the oldest event.
   const range = counted ? `${n(b.omitted as number)} – 1` : null;
   const header = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-4 pb-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       <span className="shrink-0 text-sm font-medium text-rb-500">{label}</span>
       {/* The same slot, the same register and the same pill gate as the rows'
           date, time and number — so the span aligns with the dates above it

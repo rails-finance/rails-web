@@ -520,7 +520,7 @@ export function ChainTruthRow({
   // sits at phrase spacing (the 6px between a figure and its glyph) behind
   // whatever precedes it — the `-ml-1.5` on the chip wrappers below.
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-4 pb-3">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       {spec.labelOnSpine ? (
         // The spine's pill carries "Redemption" on desktop; here it's a
         // mobile-only badge (the spine is hidden below sm), mirroring V2.

@@ -168,7 +168,7 @@ export function AaveV4EventHeader({
     ) : null;
 
   return (
-    <div className="px-5 pt-4 pb-3">
+    <div className="pl-5 pt-4 pb-3">
       <div className="flex items-center gap-1.5 flex-wrap">
         {groupChip}
         {ctx.alsoToggledCollateral ? (

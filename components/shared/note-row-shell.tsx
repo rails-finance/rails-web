@@ -107,7 +107,7 @@ export function NoteRowShell({
               }}
             >
               <div className="relative flex items-start gap-2 evt-has-chev">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 px-5 pt-4 pb-3">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 pl-5 pt-4 pb-3">
                   {header}
                 </div>
                 <ExpandChevron isOpen={open} group="evt" className="absolute right-0 top-0 mr-5 mt-[18px] sm:static" />

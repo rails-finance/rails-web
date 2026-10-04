@@ -269,7 +269,7 @@ export function EventCard({
               for the chevron when present — see the `.evt-meta` rules in
               app/globals.css. */}
           <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
-            <div className="flex-1 min-w-0">{header}</div>
+            <div className={`flex-1 min-w-0${showChevron ? "" : " pr-5"}`}>{header}</div>
             {showChevron && (
               <div
                 className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
