@@ -73,7 +73,7 @@ const intro = (
         Stability Pool took the collateral at a 5% penalty, the owner can claim any surplus, and any shortfall in the
         pool went to the branch&apos;s other Troves, raising their debt and collateral with no action of theirs.
       </li>
-      <li>Lifetime flows total every borrow, repayment, fee and redemption, net.</li>
+      <li>Lifetime flows total every borrow, repayment, fee and redemption, with the net result.</li>
       <li>The timeline lists each event, newest first. </li>
     </ul>
 
