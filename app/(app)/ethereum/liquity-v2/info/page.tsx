@@ -40,7 +40,7 @@ const intro = (
         Delegating: a batch manager sets one rate for its Troves and charges a yearly management fee, added to the debt.
         The manager&apos;s rate change costs every member the upfront fee only if the manager&apos;s previous change was
         within 7 days; a change a day after a Trove joins is free if the manager last moved the rate earlier. Leaving
-        means setting a rate of their own again.
+        means setting a rate again.
       </li>
       <li>
         Zombie: debt left under 2,000 BOLD (usually 0) by a redemption. It leaves the normal queue; the owner can close
@@ -63,18 +63,19 @@ const intro = (
     <h2 className={H}>Trove page</h2>
     <ul className={UL}>
       <li>
-        The top card shows collateral, debt, collateral ratio, interest rate and the share of the redemption queue ahead
-        of this Trove. It names the last owner; the history belongs to the Trove, whoever held it. Its counts cover the
-        owner&apos;s transactions and, separately, the redemptions against the Trove; the timeline lists every event,
-        including the manager&apos;s rate changes and the redemptions, so its count is higher.
+        The top card shows collateral, debt and collateral ratio; opened, it adds the interest rate, the yearly cost,
+        the share of the redemption queue ahead of this Trove and the liquidation price. The wallet chip is the last
+        owner; the history belongs to the Trove, whoever held it. The card counts the owner&apos;s transactions and,
+        separately, the redemptions against the Trove; the timeline lists every event, the manager&apos;s rate changes
+        and the redemptions among them.
       </li>
       <li>
         Closed: the owner closed it. Liquidated: the whole Trove fell below the branch&apos;s minimum ratio; the
         Stability Pool took the collateral at a 5% penalty, the owner can claim any surplus, and any shortfall in the
-        pool went to the branch&apos;s other Troves, raising their debt and collateral with no action of theirs.
+        pool went to the branch&apos;s other Troves, raising their debt and collateral while they did nothing.
       </li>
       <li>Lifetime flows total every borrow, repayment, fee and redemption, with the net result.</li>
-      <li>The timeline lists each event, newest first. </li>
+      <li>The timeline lists each event, newest first.</li>
     </ul>
 
     <h2 className={H}>Branches page</h2>
@@ -83,8 +84,8 @@ const intro = (
         Each branch&apos;s debt, collateral, Trove count, rate span, total collateral ratio (TCR) and minimum ratios.
       </li>
       <li>
-        Below its shutdown ratio, or with a failed price feed, a branch shuts down: borrowing and rate changes stop;
-        closing and redemptions continue.
+        Below its shutdown ratio, or with a failed price feed, a branch shuts down: borrowing, adjustments, rate changes
+        and batch operations stop; closing and redemptions continue.
       </li>
       <li>
         A queue link per branch opens its Troves in redemption order.{" "}
