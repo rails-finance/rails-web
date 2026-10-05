@@ -12,7 +12,9 @@ import { CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
  * live in the shared `TimelineRunCard`; this is the redemption vocabulary for
  * it: caution tone (color-grammar.md §5), "REDEMPTIONS" pill, "redemption" as the member noun the
  * Σ receipt and the aria label pluralise, and the two pairs a redemption
- * moves — collateral cleared, debt reduced. Every redemption run draws in the
+ * moves. Liquity V2 names them debt first, "Cleared" BOLD then "Took" the
+ * collateral (`debtFirst`); Liquity V1 and the forks keep collateral
+ * "Cleared", debt "Reduced", as their event headers do. Every redemption run draws in the
  * folder register
  * (TimelineRunCard's `folder`) — one folder per chronological chunk of the
  * run, sliced by the caller via `renderRunFolders`.
@@ -37,6 +39,8 @@ export interface RedemptionRunCardProps {
   isLast?: boolean;
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
+  /** Liquity V2's wording: "Cleared" the debt, then "Took" the collateral. */
+  debtFirst?: boolean;
 }
 
 export function RedemptionRunCard({
@@ -50,6 +54,7 @@ export function RedemptionRunCard({
   isFirst,
   isLast,
   children,
+  debtFirst,
 }: RedemptionRunCardProps) {
   return (
     <TimelineRunCard
@@ -59,10 +64,17 @@ export function RedemptionRunCard({
       warningLabel="Redemptions"
       folder
       folderBadge={CAUTION_FOLDER_BADGE}
-      aggregates={[
-        { verb: "Cleared", value: totalColl, symbol: collateralSymbol, provWhat: "Collateral sent to redeemers" },
-        { verb: "Reduced", value: totalDebt, symbol: debtSymbol, provWhat: "Debt cleared" },
-      ]}
+      aggregates={
+        debtFirst
+          ? [
+              { verb: "Cleared", value: totalDebt, symbol: debtSymbol, provWhat: "Debt cleared" },
+              { verb: "Took", value: totalColl, symbol: collateralSymbol, provWhat: "Collateral sent to redeemers" },
+            ]
+          : [
+              { verb: "Cleared", value: totalColl, symbol: collateralSymbol, provWhat: "Collateral sent to redeemers" },
+              { verb: "Reduced", value: totalDebt, symbol: debtSymbol, provWhat: "Debt cleared" },
+            ]
+      }
       firstTimestamp={firstTimestamp}
       lastTimestamp={lastTimestamp}
       isFirst={isFirst}
