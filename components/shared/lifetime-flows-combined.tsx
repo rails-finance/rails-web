@@ -26,7 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronLeft, ChevronRight, ListEnd, Pause, Play, SkipBack, SkipForward } from "lucide-react";
-import { Headline, Rescaled, Throughput, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
+import { Headline, Rescaled, TrackEnds, useWidth } from "@/components/shared/lifetime-flows-busy";
 import { FlowCursorContext, KEEP_PANEL, SegmentTipContext } from "@/components/shared/lifetime-flows-tip";
 import { useFlowFocus, useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
@@ -47,7 +47,6 @@ import {
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
-import { throughput } from "@/lib/shared/flows-busy";
 import type { FlowBinSeries } from "@/lib/shared/flows-series";
 import {
   combinedAt,
@@ -394,7 +393,6 @@ export function CombinedFlows({
   // could not read, for the headline's mark.
   const partialOf = (side: "collateral" | "debt") => partialAt(model, head.isLive ? model.liveStop : cur.stop, side);
   const windowDay = dayStamp(dayStart(model, from));
-  const through = useMemo(() => (busy ? throughput(bars) : null), [busy, bars]);
   // Outside the window the bars hold the window's first day, greyed.
   const barStop = cur.barStop ?? 0;
   const barAssets = useMemo(() => assetsAt(bars, barStop), [bars, barStop]);
@@ -421,7 +419,6 @@ export function CombinedFlows({
       <SegmentTipContext.Provider value={byDays || null}>
         <div className="text-sm" data-flows-combined="" data-flow-frozen={frozen ? "" : undefined}>
           <Steady>
-            {through && <Throughput t={through} hasDebt={hasDebt} />}
             {/* The headlines, and the date they are at on the same row's
                 right end. */}
             <div className="mb-2 flex flex-wrap items-center gap-x-6 gap-y-2" data-flow-headlines="" data-anatomy="F2">

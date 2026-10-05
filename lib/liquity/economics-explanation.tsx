@@ -1,8 +1,7 @@
 // Liquity V2 economics Explanation — the bullets the bespoke
 // components/protocol/liquity/trove-economics.tsx built as `economicsItems`,
-// carried over verbatim (the redemption net-outcome strip keeps its own
-// slot on the heading-button row via `liquityRedemptionOutcome`; the
-// batch/delegate wording is kept) now that the tower itself is the shared
+// carried over verbatim (the redemption net outcome is a Totals bullet via
+// `liquityRedemptionOutcome`; the batch/delegate wording is kept) now that the tower itself is the shared
 // <ChainTruthTower>. The "?" FAQ stays `liquityEconomicsContent` from
 // lib/shared/learn-more-content.ts — unchanged, so it isn't duplicated here.
 //
@@ -223,10 +222,10 @@ export function liquityEconomicsExplanation(
   );
 }
 
-/** The redemption net-outcome strip that rides the tower's heading-button row
- *  (the bespoke V2 tower's `rowExtra`): realised P/L at each redemption's own
- *  price, and — when a live price is known — the same debt cleared against
- *  the lost collateral repriced today. Both figures carry their receipts. */
+/** The redemption net outcome, a bullet of the Lifetime flows Explanation's
+ *  Totals: realised P/L at each redemption's price and, when a live price is
+ *  known, the same debt cleared against the lost collateral repriced today.
+ *  Both figures carry their receipts. */
 export function liquityRedemptionOutcome(economics: TroveEconomicsType, currentPrice?: number): ReactNode {
   const { redemption } = economics;
   if (!redemption) return undefined;
@@ -285,32 +284,29 @@ export function liquityRedemptionOutcome(economics: TroveEconomicsType, currentP
         ],
       }
     : null;
+  const signed = (n: number) => `${n >= 0 ? "+" : "−"}${formatUsdValue(Math.abs(n))}`;
   return (
-    // Right-aligned to mirror the position card's context line: the
-    // heading-buttons hold the left edge, the summary the right.
-    <div
-      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
-      data-anatomy="F13·liquity"
-    >
-      <span>Borrower&apos;s net outcome from redemptions was</span>
-      <Prov info={realizedPLProv} value={formatExact(redemption.realizedPL)}>
-        <span className={redemption.realizedPL >= 0 ? "text-green-400" : "text-red-400"}>
-          {redemption.realizedPL >= 0 ? "+" : "−"}
-          {formatUsdValue(Math.abs(redemption.realizedPL))}
-        </span>
-      </Prov>
-      {opportunityPL !== null && opportunityPLProv && (
-        <>
-          <span> or </span>
-          <Prov info={opportunityPLProv} value={formatExact(opportunityPL)}>
-            <span className={opportunityPL >= 0 ? "text-green-400" : "text-red-400"}>
-              {opportunityPL >= 0 ? "+" : "−"}
-              {formatUsdValue(Math.abs(opportunityPL))}
-            </span>
-          </Prov>
-          <span>at today&apos;s value</span>
-        </>
-      )}
-    </div>
+    // A bullet of the Lifetime flows Explanation's Totals.
+    <li className="flex items-start gap-2" data-anatomy="F13·liquity" data-flows-outcome="">
+      <span aria-hidden className="select-none">
+        •
+      </span>
+      <span className="min-w-0">
+        Redemptions:{" "}
+        <Prov info={realizedPLProv} value={formatExact(redemption.realizedPL)}>
+          <span className="font-medium tabular-nums">{signed(redemption.realizedPL)}</span>
+        </Prov>{" "}
+        at the time
+        {opportunityPL !== null && opportunityPLProv && (
+          <>
+            ,{" "}
+            <Prov info={opportunityPLProv} value={formatExact(opportunityPL)}>
+              <span className="font-medium tabular-nums">{signed(opportunityPL)}</span>
+            </Prov>{" "}
+            at today&apos;s value
+          </>
+        )}
+      </span>
+    </li>
   );
 }

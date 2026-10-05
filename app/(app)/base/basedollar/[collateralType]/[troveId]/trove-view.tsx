@@ -540,7 +540,7 @@ export default function BasedollarTroveDetail({
                       </div>
                     }
                     learnMore={liquityForkEconomicsContent(forkOpts)}
-                    rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
+                    outcome={liquityForkRedemptionOutcome(towerData, forkOpts)}
                   />
                 );
               })()}

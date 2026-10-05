@@ -681,7 +681,7 @@ export default function TroveView({
                   </div>
                 }
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
-                rowExtra={liquityRedemptionOutcome(result.economics, currentPrice)}
+                outcome={liquityRedemptionOutcome(result.economics, currentPrice)}
               />
               {result.redeemer && <RedeemerSummary stats={result.redeemer} currentPrice={currentPrice} />}
             </>

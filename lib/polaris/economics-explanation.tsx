@@ -1,6 +1,6 @@
 // The PSM outcome for a Polaris CDP: the net PSM shares' effect on its
-// equity, as a sentence (the markdown export) and as the strip on the
-// Lifetime flows panel's heading row. Third person; the market's own unit.
+// equity, as a sentence (the markdown export) and as a bullet of the Lifetime
+// flows Explanation's Totals. Third person; the market's own unit.
 
 import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -23,8 +23,7 @@ function hasPsmOutcome(lifetime: PolarisLifetime): boolean {
 }
 
 /** The one sentence describing the PSM's effect on this CDP's equity — the
- *  rowExtra strip's plain text and the markdown export all
- *  state it with these same words, so the figure never reads two ways. */
+ *  markdown export states it with these words. */
 export function polarisPsmOutcomeSentence(
   lifetime: PolarisLifetime,
   stable: string,
@@ -47,10 +46,9 @@ export function polarisPsmOutcomeSentence(
   return `${s}.`;
 }
 
-/** The PSM-outcome strip that rides the Lifetime flows panel's heading row — the
- *  Polaris mirror of `liquityRedemptionOutcome`. States the same sentence
- *  `polarisPsmOutcomeSentence` builds, with each figure carrying its own
- *  receipt. Never a verdict: "changed the CDP's equity at the feed" is the
+/** The PSM outcome, a bullet of the Lifetime flows Explanation's Totals — the
+ *  Polaris mirror of `liquityRedemptionOutcome`. The same figures
+ *  `polarisPsmOutcomeSentence` states, each carrying its receipt. Never a verdict: "changed the CDP's equity at the feed" is the
  *  phrase, not "profit" or "P&L" — a PSM share is not this CDP's own trade,
  *  and an open CDP's own position is not scored here. */
 export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pethInDebt?: number): ReactNode {
@@ -60,7 +58,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
   const todayEffect = pethInDebt != null ? netCollLeg * pethInDebt - netDebtLeg : null;
 
   const signed = (n: number) => (
-    <span className="font-semibold text-foreground tabular-nums">
+    <span className="whitespace-nowrap font-medium tabular-nums">
       {n >= 0 ? "+" : "−"}
       <AmountText value={Math.abs(n)} format="compact" /> {stable}
     </span>
@@ -128,21 +126,28 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
       : null;
 
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500">
-      <span>The net PSM shares, valued at the feed at each settling block, changed the CDP&rsquo;s equity by</span>
-      <Prov info={effectProv} value={formatExact(lifetime.psmEffectAtSettle)}>
-        {signed(lifetime.psmEffectAtSettle)}
-      </Prov>
-      {todayEffect != null && todayProv && (
-        <>
-          {/* Pulled back over the flex gap so the semicolon sits on the figure before it. */}
-          <span className="-ml-1.5">; at today&rsquo;s feed the same legs come to</span>
-          <Prov info={todayProv} value={formatExact(todayEffect)}>
-            {signed(todayEffect)}
-          </Prov>
-        </>
-      )}
-      {lifetime.psmRowsUnpriced > 0 && <span>({lifetime.psmRowsUnpriced} rows carry no price yet)</span>}
-    </div>
+    // A bullet of the Lifetime flows Explanation's Totals.
+    <li className="flex items-start gap-2" data-flows-outcome="psm">
+      <span aria-hidden className="select-none">
+        •
+      </span>
+      <span className="min-w-0">
+        PSM shares:{" "}
+        <Prov info={effectProv} value={formatExact(lifetime.psmEffectAtSettle)}>
+          {signed(lifetime.psmEffectAtSettle)}
+        </Prov>{" "}
+        to equity at the settling feeds
+        {todayEffect != null && todayProv && (
+          <>
+            ,{" "}
+            <Prov info={todayProv} value={formatExact(todayEffect)}>
+              {signed(todayEffect)}
+            </Prov>{" "}
+            at today&rsquo;s feed
+          </>
+        )}
+        {lifetime.psmRowsUnpriced > 0 && <>, {lifetime.psmRowsUnpriced} rows not yet priced</>}
+      </span>
+    </li>
   );
 }

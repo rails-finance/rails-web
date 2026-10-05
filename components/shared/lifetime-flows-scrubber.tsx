@@ -81,7 +81,15 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import {
+  AxisLabels,
+  BusyFlows,
+  DateRow,
+  flowsTotals,
+  Headline,
+  TrackEnds,
+  type FlowsTotalsData,
+} from "@/components/shared/lifetime-flows-busy";
 import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
@@ -134,6 +142,8 @@ export type FlowsKeyItems = {
   /** How the line values a point ("USD at each day's close"), beside the
    *  panel's (i). */
   basis?: string;
+  /** The Explanation's Totals: what came in over the bars' stops. */
+  totals?: FlowsTotalsData;
 };
 export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
 
@@ -638,6 +648,10 @@ export function LifetimeFlowsScrubber({
   const basisUnit = model?.sideUnits
     ? `${model.sideUnits.collateral.symbol} and ${model.sideUnits.debt.symbol}`
     : (model?.unit?.symbol ?? "USD");
+  const totals = useMemo(
+    () => (bars && model ? flowsTotals(bars, from > 0 ? dayStamp(dayStart(bars, 0)) : null) : null),
+    [bars, model, from],
+  );
   const words = useMemo(
     () => (bars && model ? panelWords(model, bars, from, bin, lined, busy, focused) : null),
     [model, bars, from, bin, lined, busy, focused],
@@ -654,8 +668,9 @@ export function LifetimeFlowsScrubber({
       views: words.key,
       explain: words.explain,
       basis: lined ? `${basisUnit} at each ${bin}’s close` : undefined,
+      totals: totals ?? undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;

@@ -618,7 +618,7 @@ export default function LiquityV1TroveView({
                   </div>
                 }
                 learnMore={liquityV1EconomicsContent()}
-                rowExtra={liquityV1RedemptionOutcome(redemptions, priceNow)}
+                outcome={liquityV1RedemptionOutcome(redemptions, priceNow)}
               />
             )}
             <ChainTruthTimeline

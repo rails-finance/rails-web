@@ -19,6 +19,8 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
+import { ExplainGroup } from "@/components/shared/explain-groups";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -51,9 +53,11 @@ export interface LifetimeFlowsPanelProps {
   /** The collapse store's id; the route's explorer by default, null for none
    *  (lib/shared/flows-collapse-store.ts). */
   collapseKey?: string | null;
-  /** Inline content on the Explanation's heading row (a Liquity Trove's
-   *  redemption outcome strip). */
-  rowExtra?: ReactNode;
+  /** Bullets (`<li>`) the Explanation's Totals carry after the throughput: a
+   *  Liquity Trove's redemption outcome, a Polaris CDP's PSM outcome. The
+   *  panel's face keeps figures, bars, chart, controls and the axis caption
+   *  (rails-ops TO-DO-ui-jobs §251). */
+  outcome?: ReactNode;
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
@@ -65,7 +69,7 @@ export function LifetimeFlowsPanel({
   learnMore,
   title = "Lifetime flows",
   collapseKey: collapseKeyProp,
-  rowExtra,
+  outcome,
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
@@ -153,30 +157,31 @@ export function LifetimeFlowsPanel({
           <ProvenanceInfoTabs
             className="mt-3"
             explanation={
-              scrubber != null && flowsKey ? (
+              explanation == null && !outcome && !flowsKey ? undefined : (
                 <>
                   {explanation}
-                  {flowsKey.explain && (
-                    <p className="mt-2 first:mt-0" data-flow-views-explain="">
-                      {flowsKey.explain}
-                    </p>
+                  {(flowsKey?.totals || outcome) && (
+                    <ExplainGroup title="Lifetime totals" data-flow-totals="">
+                      {flowsKey?.totals && <FlowsTotalsBullets t={flowsKey.totals} />}
+                      {outcome}
+                    </ExplainGroup>
                   )}
-                  <FlowsKey {...flowsKey} />
+                  {scrubber != null && flowsKey && (
+                    <>
+                      {flowsKey.explain && (
+                        <p className="mt-2 first:mt-0" data-flow-views-explain="">
+                          {flowsKey.explain}
+                        </p>
+                      )}
+                      <FlowsKey {...flowsKey} />
+                    </>
+                  )}
                 </>
-              ) : (
-                explanation
               )
             }
             learnMore={learnMore}
             anatomy={FLOWS_ANATOMY}
-            rowExtra={
-              flowsKey?.basis || rowExtra ? (
-                <>
-                  {flowsKey?.basis && <FlowsBasis text={flowsKey.basis} />}
-                  {rowExtra}
-                </>
-              ) : undefined
-            }
+            rowExtra={flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
           />
         </div>
       </section>

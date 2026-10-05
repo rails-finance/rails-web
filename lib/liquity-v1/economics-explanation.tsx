@@ -1,5 +1,5 @@
-// Liquity V1's Lifetime flows panel: the redemption net outcome on the
-// Explanation's heading row (at each redemption's price and at today's) and
+// Liquity V1's Lifetime flows panel: the redemption net outcome as a bullet of
+// the Explanation's Totals (at each redemption's price and at today's) and
 // the panel's "?" content. The panel's own lines are
 // lib/shared/liquity-flows-explanation.tsx (LiquityV1FlowsNote).
 
@@ -9,8 +9,8 @@ import type { LiquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { fmtEth, fmtLusd, fmtUsd, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
 
-/** The redemption net-outcome strip on the panel's heading row (the V2
- *  panel's rowExtra): the net at each redemption's price, and at today's price. */
+/** The redemption net outcome, a bullet of the panel's Totals: the net at each
+ *  redemption's price, and at today's price. */
 export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, priceNow?: number | null): ReactNode {
   if (!t) return undefined;
   const netThen = t.lusdRedeemed - t.ethValueAtRedemption;
@@ -44,28 +44,30 @@ export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, 
           ],
         }
       : null;
-  const tone = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
   const shownThen = Math.abs(netThen) < 0.005 ? 0 : netThen;
   return (
-    <div
-      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
-      data-anatomy="F13·liquity"
-    >
-      <span>Owner&apos;s net outcome from redemptions was</span>
-      <Prov info={thenProv}>
-        <span className={tone(shownThen)}>{fmtUsdSigned(shownThen)}</span>
-      </Prov>
-      <span>at the redemption prices</span>
-      {netNow != null && nowProv && (
-        <>
-          <span>and</span>
-          <Prov info={nowProv}>
-            <span className={tone(netNow)}>{fmtUsdSigned(netNow)}</span>
-          </Prov>
-          <span>against having held the ETH</span>
-        </>
-      )}
-    </div>
+    // A bullet of the Lifetime flows Explanation's Totals.
+    <li className="flex items-start gap-2" data-anatomy="F13·liquity" data-flows-outcome="">
+      <span aria-hidden className="select-none">
+        •
+      </span>
+      <span className="min-w-0">
+        Redemptions:{" "}
+        <Prov info={thenProv}>
+          <span className="font-medium tabular-nums">{fmtUsdSigned(shownThen)}</span>
+        </Prov>{" "}
+        at the redemption prices
+        {netNow != null && nowProv && (
+          <>
+            ,{" "}
+            <Prov info={nowProv}>
+              <span className="font-medium tabular-nums">{fmtUsdSigned(netNow)}</span>
+            </Prov>{" "}
+            against having held the ETH
+          </>
+        )}
+      </span>
+    </li>
   );
 }
 

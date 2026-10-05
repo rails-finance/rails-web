@@ -3,11 +3,12 @@
 // The bars for a busy window (lib/shared/flows-busy.ts; rails-ops
 // reference/lifetime-flows-scrubber.md, "The two views"): each bar is what is
 // held or owed, on an axis fixed to the most either has been in the window,
-// with the window's throughput in one line, a density strip counting the
+// a density strip counting the
 // transactions in each bin (a day, a week or a month, by the window's span),
 // and the slider stepping by bin. Every figure is `stateAt(model, stop)` at a
 // bin's last day, or the live stop. A tap on a bar opens its side's panel
-// (lifetime-flows-tip.tsx): how its flows add up to what is held.
+// (lifetime-flows-tip.tsx): how its flows add up to what is held. The
+// window's throughput is a bullet in the panel's Explanation (FlowsTotalsBullets).
 
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
@@ -45,6 +46,7 @@ import {
 } from "@/lib/shared/flows-timeline";
 import { OldPriceLabel, OldPriceTip } from "@/components/shared/flow-old-price";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { ExplainBullet } from "@/components/shared/explain-groups";
 import { flowBins, throughput, type FlowBin } from "@/lib/shared/flows-busy";
 
 const PLAY_MS = 220;
@@ -122,7 +124,7 @@ export interface BusyFlowsProps {
 
 export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   const { unit, bins } = useMemo(() => flowBins(model), [model]);
-  const through = useMemo(() => throughput(model), [model]);
+  const unitWord = model.totalTxs != null ? "transaction" : "event";
   const last = bins.length; // the live stop's index
   const [at, setAt] = useState(last);
   const [playing, setPlaying] = useState(false);
@@ -164,7 +166,6 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   // The readout states the date alone (Miles, 1 Oct 2026).
   const dateLine = s.isLive && !atClose ? (model.words.live ?? "Today") : dateText;
   const liveReceipts = s.isLive && !closed;
-  const unitWord = through.unit;
 
   const ledgerText = s.isLive ? null : closed ? "Shows the position at close" : "Shows the position today";
   useEffect(() => {
@@ -187,7 +188,6 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
     <FlowCursorContext.Provider value={cursor}>
       <div className="text-sm" data-flows-busy="">
         <DateRow aside={<OldPriceLabel note={oldPriceAt(model, stop)} />}>{dateLine}</DateRow>
-        <Throughput t={through} hasDebt={hasDebt} />
 
         <Rescaled model={model} s={s} hasDebt={hasDebt} when={when} isLive={liveReceipts} assets={assets} />
 
@@ -239,7 +239,7 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   );
 }
 
-// ── The lifetime's throughput, in one line ──────────────────────────────────
+// ── The lifetime's totals, as the Explanation's bullets ─────────────────────
 
 const throughputProv = (what: string, figure: string): Provenance => ({
   kind: "chain-derived",
@@ -247,28 +247,58 @@ const throughputProv = (what: string, figure: string): Provenance => ({
   formula: "Σ amount × price at block",
 });
 
-export function Throughput({ t, hasDebt }: { t: ReturnType<typeof throughput>; hasDebt: boolean }) {
-  const uc = useFlowUnit("collateral");
-  const ud = useFlowUnit("debt");
-  const fig = (v: number, what: string) => {
-    const u = what === "Borrowed" ? ud : uc;
-    return (
-      <Prov info={throughputProv(what, formatFlowUsd(v, u))}>
-        <span className="font-medium tabular-nums text-foreground">{formatFlowUsd(v, u)}</span>
-      </Prov>
-    );
+/** What the scrubber reports for the panel's Totals: the throughput over the
+ *  bars' stops, its figures already formatted in each side's unit. */
+export type FlowsTotalsData = {
+  deposited: string;
+  /** Null on a position with no debt side, or nothing borrowed. */
+  borrowed: string | null;
+  txs: number;
+  unit: "transaction" | "event";
+  turnover: number | null;
+  /** The bars' window's first day, where the window is cut. */
+  since: string | null;
+};
+
+export function flowsTotals(model: FlowModel, since: string | null): FlowsTotalsData {
+  const t = throughput(model);
+  const hasDebt = model.buckets.some((b) => b.side === "debt");
+  return {
+    deposited: formatFlowUsd(t.deposited, unitOf(model, "collateral")),
+    borrowed: hasDebt && t.borrowed > 0.5 ? formatFlowUsd(t.borrowed, unitOf(model, "debt")) : null,
+    txs: t.txs,
+    unit: t.unit,
+    turnover: t.turnover,
+    since,
   };
+}
+
+/** The Totals bullets: "Deposited $2.5M, borrowed $2.3M, 92 transactions",
+ *  "Turned over about 4 times". */
+export function FlowsTotalsBullets({ t }: { t: FlowsTotalsData }) {
+  const fig = (v: string, what: string) => (
+    <Prov info={throughputProv(what, v)}>
+      <span className="font-medium tabular-nums">{v}</span>
+    </Prov>
+  );
   return (
-    <p className="mb-3 text-xs leading-relaxed text-rb-500" data-flow-throughput="" data-anatomy="F11">
-      {fig(t.deposited, "Deposited")} deposited
-      {hasDebt && t.borrowed > 0.5 && <> and {fig(t.borrowed, "Borrowed")} borrowed</>} across{" "}
-      <span className="font-medium tabular-nums text-foreground" data-prov-exempt="">
-        {count(t.txs)}
-      </span>{" "}
-      {t.unit}
-      {t.txs === 1 ? "" : "s"}
-      {t.turnover != null ? `; the position has turned over about ${count(t.turnover)} times.` : "."}
-    </p>
+    <>
+      <ExplainBullet data-flow-throughput="" data-anatomy="F11">
+        <>
+          Deposited {fig(t.deposited, "Deposited")}
+          {t.borrowed && <>, borrowed {fig(t.borrowed, "Borrowed")}</>},{" "}
+          <span className="font-medium tabular-nums" data-prov-exempt="">
+            {count(t.txs)}
+          </span>{" "}
+          {t.unit}
+          {t.txs === 1 ? "" : "s"}
+          {t.since ? ` since ${t.since}` : ""}
+        </>
+      </ExplainBullet>
+      {t.turnover != null && (
+        <ExplainBullet data-flow-turnover="">Turned over about {count(t.turnover)} times</ExplainBullet>
+      )}
+    </>
   );
 }
 

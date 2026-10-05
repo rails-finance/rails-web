@@ -563,7 +563,7 @@ export default function PolarisPositionView({
                 </div>
               }
               learnMore={polarisFlowsContent(stable)}
-              rowExtra={lifetime ? polarisPsmOutcome(lifetime, stable, chain?.price?.pethInDebt) : undefined}
+              outcome={lifetime ? polarisPsmOutcome(lifetime, stable, chain?.price?.pethInDebt) : undefined}
             />
 
             {indexPending && polarisEvents.length === 0 ? (
