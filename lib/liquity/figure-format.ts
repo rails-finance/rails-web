@@ -30,13 +30,19 @@ export function fmtAccrued(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/** An annual interest rate as the rate cell writes it ("4.1%"). */
+/** An annual interest rate as the rate cell, the header pills and the
+ *  explanation write it: two places ("4.12%"). */
 export function fmtRate(pct: number): string {
-  return `${pct.toFixed(1)}%`;
+  return `${fmtRateNum(pct)}%`;
+}
+
+/** The rate's number without the sign, for a cell that sets the "%" apart. */
+export function fmtRateNum(pct: number): string {
+  return pct.toFixed(2);
 }
 
 /** A delegate's before/after rate for a batch rate-change clause. A step can be
- *  smaller than the rate cell's one decimal place (a batch manager re-affirming
+ *  smaller than the rate cell's two decimal places (a batch manager re-affirming
  *  close to its old rate), which at fmtRate's precision reads as the same figure
  *  on both sides. Widens the precision only as far as it takes for the two to
  *  read apart, and reports `changed: false` when the rate is the same value, so
@@ -46,7 +52,7 @@ export function fmtRateChange(before: number, after: number): { before: string; 
     const at = fmtRate(after);
     return { before: at, after: at, changed: false };
   }
-  for (let digits = 1; digits <= 6; digits++) {
+  for (let digits = 2; digits <= 6; digits++) {
     const beforeStr = `${before.toFixed(digits)}%`;
     const afterStr = `${after.toFixed(digits)}%`;
     if (beforeStr !== afterStr) return { before: beforeStr, after: afterStr, changed: true };
