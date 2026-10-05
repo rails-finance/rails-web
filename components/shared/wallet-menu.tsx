@@ -3,8 +3,9 @@
 // The owner's address on a position page, as the trigger of a menu (ui-jobs
 // 271): Copy the address, Bookmark it (the row reads as set or not), View its
 // positions. A dropdown on desktop, a sheet below sm. The copy and bookmark
-// icons that sat beside the address on the wallet row are these rows now, and
-// no bookmark glyph rides the row or the facehash.
+// icons that sat beside the address on the wallet row are these rows now; a
+// bookmarked address shows a small BookmarkCheck between its label and the
+// chevron.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -121,16 +122,17 @@ export function WalletMenu({
   );
 
   return (
-    // The address keeps its width (a name is capped at 15ch); the address
-    // kind beside it gives way first. The row does not hide overflow, so the
-    // dropdown below the address shows.
-    <div ref={ref} className="relative shrink-0" data-wallet-menu="" data-anatomy="C7">
+    // The address keeps its width (a name is capped at 15ch) while the address
+    // kind beside it gives way (shrink-[100]); past that the name truncates, so
+    // the bookmark glyph and chevron stay on the line. The row does not hide
+    // overflow, so the dropdown below the address shows.
+    <div ref={ref} className="relative min-w-0" data-wallet-menu="" data-anatomy="C7">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`${name ? `${name} · ` : ""}${wallet}: open the address menu`}
+        aria-label={`${name ? `${name} · ` : ""}${wallet}${fav ? ", bookmarked" : ""}: open the address menu`}
         title={name ? `${name} · ${wallet}` : wallet}
         // A 28px row with a 44px press area (after:).
         className="relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md text-xs text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
@@ -142,6 +144,13 @@ export function WalletMenu({
         >
           {label}
         </span>
+        {fav && (
+          <BookmarkCheck
+            data-wallet-bookmarked=""
+            className="h-3.5 w-3.5 shrink-0"
+            aria-hidden="true"
+          />
+        )}
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden="true"
