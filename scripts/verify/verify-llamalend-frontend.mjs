@@ -724,8 +724,8 @@ try {
     /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) && /Sold by the AMM and not bought back:\s*0\.0\d+ WBTC/.test(body),
   );
   check(
-    "inband: flows put the converted balance on the collateral bar, named as the card's Converted",
-    /\(the card's Converted\) is on the collateral bar too/.test(body),
+    "inband: flows put the converted balance on the collateral bar",
+    /from those sales is on the collateral bar: received, spent, withdrawn or seized/.test(body),
   );
   check("inband: mint market line on the card", /This is a mint market/.test(body));
   check("inband: opening row reads Open · Deposit · Borrow", /Open\s*Deposit\s*Borrow/.test(body));
@@ -938,7 +938,7 @@ try {
     check(
       "r4 P4: a closed loan's Lifetime flows stand at its close",
       /At close, 10 Mar '24/.test(body) &&
-        /The bars cover all 4 days with events, from 20 Dec 2023 to the close on 10 Mar 2024/.test(body),
+        /Bars: all 4 days with events, from 20 Dec 2023/.test(body),
     );
     check(
       "r4 P7: a closed, never-liquidated card says so and where the AMM sold",
