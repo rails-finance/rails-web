@@ -2,7 +2,9 @@
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
-import { calculateInterestBetweenTransactions } from "@/lib/liquity/utils/interest-calculator";
+import { accrualNoun, type LiquityAccrual } from "@/lib/liquity/accrual";
+import { liquityEventSafety } from "@/lib/liquity/event-safety";
+import { useBatchFeeAfter, useLiquityAccrual, type BatchFeeAfter } from "./use-liquity-accrual";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -17,7 +19,7 @@ import {
   PriceChipShell,
   changeTone,
 } from "@/components/shared/state-transition";
-import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued } from "@/lib/liquity/figure-format";
+import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued, fmtRateNum } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
@@ -86,8 +88,8 @@ function DebtMetric({
   isClose,
   isLiquidation,
   upfrontFee,
-  accruedInterest,
-  accruedManagementFees,
+  accrual,
+  accrualProv,
   stablecoinSymbol = "BOLD",
   provBefore,
   provAfter,
@@ -99,8 +101,9 @@ function DebtMetric({
   isClose: boolean;
   isLiquidation: boolean;
   upfrontFee?: number;
-  accruedInterest: number;
-  accruedManagementFees: number;
+  accrual: LiquityAccrual;
+  /** Receipt for the "incl. +N interest" sub-line. */
+  accrualProv?: Provenance;
   stablecoinSymbol?: string;
   provBefore?: Provenance;
   provAfter?: Provenance;
@@ -112,7 +115,7 @@ function DebtMetric({
   // `changed`: the T2 change-colour rule, which an open's new debt meets too.
   const showBefore = isClose ? before !== after : before !== 0 && before !== after;
   const changed = before !== after;
-  const totalAccruedFees = accruedInterest + accruedManagementFees;
+  const totalAccruedFees = accrual.total;
 
   // The arrow doubles as a toggle (see DeltaToggle). The header headline and
   // timeline spine both show the borrowed/repaid *principal*; the fee-inclusive
@@ -180,7 +183,11 @@ function DebtMetric({
         </StateTransition>
         {((upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01) && (
           <StatSubline changed={changed}>
-            {totalAccruedFees > 0.01 && <span>incl. +{fmtAccrued(totalAccruedFees)} interest</span>}
+            {totalAccruedFees > 0.01 && (
+              <span>
+                incl. +<P info={accrualProv}>{fmtAccrued(totalAccruedFees)}</P> {accrualNoun(accrual)}
+              </span>
+            )}
             {upfrontFee !== undefined && upfrontFee > 0 && (
               <>
                 {totalAccruedFees > 0.01 && <span> +</span>}
@@ -299,6 +306,9 @@ function InterestRateMetric({
   provBefore,
   provAfter,
   afterExact,
+  batched,
+  batchFee,
+  batchFeeProv,
 }: {
   before: number;
   after: number;
@@ -307,6 +317,11 @@ function InterestRateMetric({
   stablecoinSymbol?: string;
   provBefore?: Provenance;
   provAfter?: Provenance;
+  /** The trove is in a batch after this event. */
+  batched?: boolean;
+  /** The batch's annual management fee after this event, where known. */
+  batchFee?: BatchFeeAfter | null;
+  batchFeeProv?: Provenance;
   /** Exact after-rate for the receipt key — the header's rate pills echo this
    *  receipt, and their display precision differs (the delegate pill is 2dp),
    *  so the key must not lean on the rendered text. */
@@ -320,6 +335,24 @@ function InterestRateMetric({
   // annualInterestRate is in percent units (3.4 = 3.4% APR), so divide by 100
   // to get the fractional rate for the BOLD/year cost.
   const yearlyCost = afterDebt && hasAfterValue ? afterDebt * (after / 100) : 0;
+  const yearlyFee = afterDebt && batchFee ? afterDebt * (batchFee.fee / 100) : 0;
+  const yearlyProv = (what: "interest" | "fee", pct: number): Provenance => ({
+    kind: "derived",
+    summary:
+      what === "interest"
+        ? `A year's interest on the debt after this event at this rate (${stablecoinSymbol}), before any management fee. Interest accrues simply, per second, on the recorded debt.`
+        : `A year's batch management fee on the debt after this event (${stablecoinSymbol}). It accrues the same way as interest, on top of it.`,
+    formula: what === "interest" ? "debt after × rate" : "debt after × management fee",
+    inputs: [
+      {
+        label: "debt",
+        value: `${toLocaleStringHelper(afterDebt ?? 0)} ${stablecoinSymbol}`,
+        kind: "chain",
+        note: "after",
+      },
+      { label: what === "interest" ? "rate" : "management fee", value: `${pct}%`, kind: "chain" },
+    ],
+  });
 
   return (
     <StatCard label="Interest Rate">
@@ -328,7 +361,7 @@ function InterestRateMetric({
           <>
             <P info={provBefore}>
               <span className="text-sm font-semibold">
-                {before.toFixed(1)}
+                {fmtRateNum(before)}
                 <span className="ml-0.5">%</span>
               </span>
             </P>
@@ -342,16 +375,26 @@ function InterestRateMetric({
         ) : (
           <P info={provAfter} value={afterExact}>
             <span className={`text-sm font-semibold ${changeTone(changed)}`}>
-              {after.toFixed(1)}
+              {fmtRateNum(after)}
               <span className="ml-0.5">%</span>
             </span>
           </P>
         )}
       </StateTransition>
       {!isClose && yearlyCost > 0.01 && (
-        // The yearly cost qualifies the rate, so it takes the rate's tone.
+        // The yearly cost qualifies the rate, so it takes the rate's tone. A
+        // batched trove's debt also carries the batch's management fee: the
+        // line says whether the figure includes it, and states the fee.
         <StatSubline changed={changed}>
-          {toLocaleStringHelper(yearlyCost)} {stablecoinSymbol} / year
+          <P info={yearlyProv("interest", after)}>{toLocaleStringHelper(yearlyCost)}</P> {stablecoinSymbol} / year
+          interest
+          {batched && !batchFee ? ", excl. management fee" : null}
+        </StatSubline>
+      )}
+      {!isClose && batched && batchFee && yearlyFee > 0.01 && (
+        <StatSubline changed={changed}>
+          + <P info={batchFeeProv}>{fmtRateNum(batchFee.fee)}%</P> management fee ·{" "}
+          <P info={yearlyProv("fee", batchFee.fee)}>{toLocaleStringHelper(yearlyFee)}</P> {stablecoinSymbol} / year
         </StatSubline>
       )}
     </StatCard>
@@ -452,6 +495,8 @@ export function LiquityEventDetail({
   currentPrice,
 }: LiquityEventDetailProps) {
   const { stateBefore, stateAfter, troveOperation, liquidation, redemption } = ctx;
+  const accrual = useLiquityAccrual(ctx, previousEvent, currentEvent);
+  const batchFee = useBatchFeeAfter(ctx, currentEvent);
 
   if (!stateBefore || !stateAfter) {
     return null;
@@ -465,15 +510,6 @@ export function LiquityEventDetail({
     ctx.operation === "adjustUnredeemableZombieTrove";
   const isBatchManagerOp = ctx.operation === "setBatchManagerAnnualInterestRate";
   const collPrice = ctx.collateralPrice ?? 0;
-
-  // Calculate accrued interest
-  let accruedInterest = 0;
-  let accruedManagementFees = 0;
-  if (previousEvent && currentEvent) {
-    const calc = calculateInterestBetweenTransactions(currentEvent, previousEvent);
-    accruedInterest = calc.accruedInterest;
-    accruedManagementFees = calc.accruedManagementFees;
-  }
 
   // Upfront fee
   const upfrontFee = troveOperation?.debtIncreaseFromUpfrontFee;
@@ -526,8 +562,11 @@ export function LiquityEventDetail({
   let afterCollRatio = stateAfter.collateralRatio;
   if (afterCollRatio === 0 && collPrice > 0 && stateAfter.debt > 0)
     afterCollRatio = (afterCollInUsd / stateAfter.debt) * 100;
-  if (beforeCollRatio === 0 && collPrice > 0 && beforeColl > 0 && beforeDebt > 0)
-    beforeCollRatio = ((beforeColl * collPrice) / beforeDebt) * 100;
+  // The ratio before, at THIS event's price (lib/liquity/event-safety.ts):
+  // the logged before-ratio is at the previous event's price, which would
+  // mix the market's move into the owner's act.
+  const safety = liquityEventSafety(ctx, previousEvent);
+  if (!isLiquidation && safety.crBefore != null) beforeCollRatio = safety.crBefore;
 
   const showGrid = beforeDebt > 0 || stateAfter.debt > 0 || isClose;
 
@@ -835,7 +874,7 @@ export function LiquityEventDetail({
   const crBeforeProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral ratio before this event — the collateral's dollar value divided by the debt before this event, at Liquity's price for this block.",
+      "Collateral ratio before this event — the collateral's dollar value divided by the debt before this event, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
     formula: "collateral × price ÷ debt × 100",
     inputs: [
       { label: "collateral", value: `${toLocaleStringHelper(beforeColl)} ${collSym}`, kind: "chain", note: "before" },
@@ -843,6 +882,51 @@ export function LiquityEventDetail({
       { label: "debt", value: `${toLocaleStringHelper(beforeDebt)} ${debtSym}`, kind: "chain", note: "before" },
     ],
   };
+  const accrualProv: Provenance =
+    accrual.source === "ledger"
+      ? {
+          kind: "derived",
+          summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — what the debt accrued, as the debt ledger states it: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out${accrual.batched ? ", split by the batch's rate and fee" : ""}.`,
+          formula: "debt after − debt before − operation − upfront fee − redistributed debt",
+          inputs: [
+            { label: "interest", value: `${fmtAccrued(accrual.interest)} ${debtSym}`, kind: "chain" },
+            ...(accrual.fee > 0
+              ? [{ label: "management fee", value: `${fmtAccrued(accrual.fee)} ${debtSym}`, kind: "chain" as const }]
+              : []),
+          ],
+        }
+      : accrual.source === "logs"
+        ? {
+            kind: "derived",
+            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — what the debt accrued: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out.`,
+            formula: "debt after − debt before − operation − upfront fee − redistributed debt",
+            inputs: eventInputs(coords),
+          }
+        : {
+            kind: "derived",
+            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — worked from the recorded debt and rate: Liquity accrues it simply, per second, over a 365-day year.`,
+            formula: "recorded debt × (rate + fee) × seconds ÷ 31,536,000",
+          };
+  const batchFeeProv: Provenance | undefined = batchFee
+    ? batchFee.source === "log"
+      ? {
+          kind: "chain",
+          pclass: "emitted",
+          verify: txVerify,
+          summary:
+            "The batch's annual management fee — charged on top of the interest rate on every trove in the batch, set by its batch manager.",
+          contract: tmContract,
+          via: `${streamVia()} · BatchUpdated log · _annualManagementFee · ÷10^16`,
+          inputs: eventInputs(coords),
+        }
+      : {
+          kind: "derived",
+          summary:
+            "The batch's annual management fee — charged on top of the interest rate on every trove in the batch. Carried from the batch's last BatchUpdated log, as the debt ledger reads it.",
+          formula: "rate in force (rate + fee) − rate",
+          via: `${streamVia()} · previous BatchUpdated log · _annualManagementFee · ÷10^16`,
+        }
+    : undefined;
   const addrProv: Provenance = {
     kind: "chain",
     pclass: "emitted",
@@ -869,6 +953,9 @@ export function LiquityEventDetail({
                 provBefore={rateBeforeProv}
                 provAfter={rateP?.info}
                 afterExact={rateP?.value}
+                batched={ctx.isInBatch}
+                batchFee={batchFee}
+                batchFeeProv={batchFeeProv}
               />
             </div>
           ) : (
@@ -892,8 +979,8 @@ export function LiquityEventDetail({
                 isClose={isClose}
                 isLiquidation={isLiquidation}
                 upfrontFee={upfrontFee}
-                accruedInterest={accruedInterest}
-                accruedManagementFees={accruedManagementFees}
+                accrual={accrual}
+                accrualProv={accrualProv}
                 stablecoinSymbol={ctx.assetType}
                 provBefore={debtBeforeProv}
                 provAfter={debtAfterProv}
@@ -918,6 +1005,9 @@ export function LiquityEventDetail({
                 provBefore={rateBeforeProv}
                 provAfter={rateP?.info}
                 afterExact={rateP?.value}
+                batched={ctx.isInBatch}
+                batchFee={batchFee}
+                batchFeeProv={batchFeeProv}
               />
             </div>
           )}

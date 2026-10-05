@@ -17,6 +17,7 @@ import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
+import { useLiquityAccrual } from "./use-liquity-accrual";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -57,6 +58,7 @@ export function LiquityEventCard({
   const ctx = event.context.data;
   const wallet = event.wallet;
   const { prefs } = usePreferences();
+  const accrual = useLiquityAccrual(ctx, previousEvent, event);
 
   // Column 1 — Avatar
   const avatarSlot =
@@ -107,7 +109,7 @@ export function LiquityEventCard({
 
   const isRedemption = ctx.operation === "redeemCollateral";
   // A redemption's amounts, worded as the header words them, for the phone
-  // spine view's flanks: collateral "Cleared", debt "Reduced". The same
+  // spine view's flanks: debt "Cleared", collateral "Took". The same
   // change receipts the header's figures trace.
   const redemptionLegs = (() => {
     if (!isRedemption) return undefined;
@@ -119,7 +121,7 @@ export function LiquityEventCard({
       left:
         collCp && Math.abs(collCp.change) >= 0.01
           ? {
-              label: "Cleared",
+              label: "Took",
               value: Math.abs(collCp.change),
               symbol: ctx.collateralType,
               address: soleFlowAddress(event.flows, ctx.collateralType),
@@ -129,7 +131,7 @@ export function LiquityEventCard({
       right:
         debtCp && Math.abs(debtCp.change) >= 0.01
           ? {
-              label: "Reduced",
+              label: "Cleared",
               value: Math.abs(debtCp.change),
               symbol: debtSym,
               address: soleFlowAddress(event.flows, debtSym),
@@ -197,7 +199,11 @@ export function LiquityEventCard({
       const debtProv = debtCp && fmtSpine(Math.abs(debtCp.change)) === fmtSpine(Math.abs(debtOp)) ? debtCp : undefined;
       const boldDir = debtOp < 0 ? ("right" as const) : ("left" as const);
       const collDir = collOp < 0 ? ("left" as const) : ("right" as const);
-      const showBold = ctx.operation === "closeTrove" || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
+      // A close moves BOLD only when it repaid debt: closing a zombie a
+      // redemption already cleared to zero returns collateral and nothing else.
+      const closeRepaid =
+        ctx.operation === "closeTrove" && (Math.abs(debtOp) >= 0.01 || (ctx.stateBefore?.debt ?? 0) >= 0.01);
+      const showBold = closeRepaid || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
       const showColl = ctx.operation === "closeTrove" || Math.abs(collOp) >= 0.01 || !ctx.troveOperation;
       const isActiveOp = ![
         "redeemCollateral",
@@ -260,6 +266,7 @@ export function LiquityEventCard({
       previousEvent,
       event,
       currentPrice,
+      accrual,
     );
   const liquityTeaser = teaserBuild() ? <InLedgerFigures build={teaserBuild} /> : null;
 

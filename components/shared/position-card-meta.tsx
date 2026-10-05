@@ -48,6 +48,12 @@ export interface PositionCardMetaProps {
   /** Print the count's noun beside it ("19 transactions") rather than only in
    *  its tip. Opt-in; unset, the count is the icon and the figure as before. */
   countNounVisible?: boolean;
+  /** `age-last`: transactions, warnings, then the age (the card's foot strip,
+   *  ui-jobs 270). Default `age-first`. */
+  order?: "age-first" | "age-last";
+  /** Close the cluster with the disclosure chevron. Default true; a card
+   *  whose chevron sits in its header passes false. */
+  chevron?: boolean;
 }
 
 // formatDuration treats a bare number as SECONDS. Unix seconds are ~1.7e9 today;
@@ -75,6 +81,8 @@ export function PositionCardMeta({
   countNote,
   countRule,
   countNounVisible = false,
+  order = "age-first",
+  chevron = true,
 }: PositionCardMetaProps) {
   const showTime = lastActivityAt != null && lastActivityAt > 0;
   const showEvents = eventCount != null && eventCount > 0;
@@ -84,7 +92,19 @@ export function PositionCardMeta({
 
   // The disclosure chevron closes the cluster on a card whose shell opted in
   // (PositionCardShell `disclosureKey`); it renders nothing anywhere else.
-  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return <PositionCardDisclosureToggle />;
+  const toggle = chevron ? <PositionCardDisclosureToggle /> : null;
+  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return toggle;
+  const age = showTime && (
+    <RevealTip
+      tip={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
+      label={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
+      focusable
+      className="gap-1 focus-ring rounded-sm"
+    >
+      <Icon name="clock-zap" size={12} />
+      <MountedAge from={toSeconds(lastActivityAt as number)} suffix=" ago" />
+    </RevealTip>
+  );
 
   return (
     // data-prov-exempt: activity-meta chrome — the time-ago, event count and
@@ -92,17 +112,7 @@ export function PositionCardMeta({
     // (index row counts, not chain-state figures), stated here without a
     // receipt on every consumer. Exempted once at the cluster root.
     <span data-prov-exempt="" data-anatomy="C8" className="flex items-center gap-2 text-xs text-rb-500">
-      {showTime && (
-        <RevealTip
-          tip={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
-          label={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
-          focusable
-          className="gap-1 focus-ring rounded-sm"
-        >
-          <Icon name="clock-zap" size={12} />
-          <MountedAge from={toSeconds(lastActivityAt as number)} suffix=" ago" />
-        </RevealTip>
-      )}
+      {order === "age-first" && age}
       {showEvents &&
         (() => {
           const n = eventCount as number;
@@ -140,7 +150,8 @@ export function PositionCardMeta({
       {showLiquidation && (
         <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} rule={liquidationRule} />
       )}
-      <PositionCardDisclosureToggle />
+      {order === "age-last" && age}
+      {toggle}
     </span>
   );
 }

@@ -37,6 +37,8 @@ import {
 } from "@/lib/liquity/explainer-clauses";
 import { useCollFigures } from "@/components/shared/event-ledger-context";
 import { usePreferences } from "@/lib/shared/preferences-context";
+import type { LiquityAccrual } from "@/lib/liquity/accrual";
+import { useLiquityAccrual } from "./use-liquity-accrual";
 
 // ── LearnMore selection (byte-unchanged from the bullet-era explainer) ──────
 // Exported for the card composer, which renders the "?" trigger on the footer
@@ -93,8 +95,9 @@ export function getLiquityExplainerTeaser(
   previousEvent?: BaseActivityEvent,
   currentEvent?: BaseActivityEvent,
   currentPrice?: number,
+  accrual?: LiquityAccrual,
 ): ReactNode | null {
-  return liquityExplainerTeaser(ctx, coords, mode, previousEvent, currentEvent, currentPrice);
+  return liquityExplainerTeaser(ctx, coords, mode, previousEvent, currentEvent, currentPrice, accrual);
 }
 
 // ── The pane ────────────────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ export function LiquityEventExplainer({
   const coords = { txHash, blockNumber };
   const claim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const figures = useCollFigures();
+  const accrual = useLiquityAccrual(ctx, previousEvent, currentEvent);
   const clauses = figures(() =>
     eventClauses(
       liquityEventSlots(
@@ -141,6 +145,7 @@ export function LiquityEventExplainer({
         currentEvent,
         currentPrice,
         claim ? claim.timestamp : undefined,
+        accrual,
       ),
     ),
   );

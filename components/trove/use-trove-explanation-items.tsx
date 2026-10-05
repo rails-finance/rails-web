@@ -48,6 +48,9 @@ interface UseTroveExplanationItemsArgs {
   queueDebtTotal?: number | null;
   /** A liquidated trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
+  /** A closed trove's debt just before the close, where the page knows it:
+   *  0 when redemption had cleared it and the owner closed a zombie. */
+  debtAtClose?: number | null;
 }
 
 /** The trove pane's content: a subject-first, colon-terminated status lead
@@ -72,12 +75,14 @@ export function useTroveExplanationItems({
   trovesAhead,
   queueDebtTotal,
   surplus,
+  debtAtClose,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   return useMemo(() => {
     if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
-    if (trove.status === "closed") return buildClosedItems(trove);
+    if (trove.status === "closed")
+      return buildClosedItems(trove, debtAtClose === 0 && trove.activity.redemptionCount > 0);
     return buildOpenItems({ trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal });
-  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus]);
+  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus, debtAtClose]);
 }
 
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
@@ -150,12 +155,17 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
   return { lead, items };
 }
 
-function buildClosedItems(trove: TroveSummary): TroveExplanation {
+function buildClosedItems(trove: TroveSummary, clearedByRedemption: boolean): TroveExplanation {
   const items: React.ReactNode[] = [];
 
   // The status verdict — subject-first, one sentence, colon-terminated
   // (absorbs the old "closure" bullet).
-  const lead = (
+  const lead = clearedByRedemption ? (
+    <span key="closure" className="text-rb-500">
+      This trove has been closed after redemption cleared all its debt — the owner closed it to collect the collateral
+      left, and the 0.0375 ETH liquidation reserve was refunded on top:
+    </span>
+  ) : (
     <span key="closure" className="text-rb-500">
       This trove has been closed with all debt repaid — all the collateral was returned to the owner, and the 0.0375 ETH
       liquidation reserve was refunded on top:

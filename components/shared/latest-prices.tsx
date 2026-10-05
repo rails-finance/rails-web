@@ -66,9 +66,13 @@ export function LatestPrices({
   assets,
   reason,
   at,
+  bare = false,
 }: {
   assets: LatestPriceAsset[];
   reason?: string;
+  /** The wallet row's strip (ui-jobs 272): no "Prices" word before the
+   *  figure; the icon, the price and "+1" with its chevron. */
+  bare?: boolean;
   /** Set on a closed position: the prices are the closing block's, and the
    *  panel says so under its heading. */
   at?: PricesAt;
@@ -153,7 +157,7 @@ export function LatestPrices({
       >
         {first ? (
           <>
-            <span className="text-[11px] text-rb-500 sm:text-xs">{anyPriced ? "Prices" : "Assets"}</span>
+            {!bare && <span className="text-[11px] text-rb-500 sm:text-xs">{anyPriced ? "Prices" : "Assets"}</span>}
             <TokenChipIcon symbol={first.symbol} address={first.address} size={14} filterable={false} />
             {first.triggerLabel && <span className="font-medium text-foreground">{first.triggerLabel}</span>}
             {/* The figure shows at every width (ui-jobs 59). It used to be

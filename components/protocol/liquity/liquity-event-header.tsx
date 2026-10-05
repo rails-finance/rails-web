@@ -306,6 +306,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
         <div className="flex items-center gap-1.5 flex-wrap">
           {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
             <>
+              <span className="text-sm text-rb-500">{style.label}</span>
               <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
               {ctx.batchManager && (
                 <span className="text-sm font-bold text-pink-500">{getBatchManagerName(ctx.batchManager)}</span>
@@ -366,8 +367,8 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
           ) : ctx.operation === "redeemCollateral" ? (
             // The dotted spine carries a "REDEMPTION" pill on desktop, so the
             // header badge is mobile-only here. The freed space lets the two
-            // facts that matter read with labels — collateral cleared, debt
-            // reduced — mirroring the Aave liquidation header grammar. The
+            // facts that matter read with labels — the debt it cleared, then
+            // the collateral it took — as the explanation tells them. The
             // phone spine view draws both lozenges on the node's flanks, so
             // its opened card drops them while timeline values are on.
             <>
@@ -376,24 +377,9 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               >
                 {style.label}
               </span>
-              {hasCollChange && (
-                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">Cleared</span>
-                  {wrapColl(
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
-                        exact={formatExact(Math.abs(collChange))}
-                        symbol={ctx.collateralType}
-                      />
-                    </span>,
-                  )}
-                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                </span>
-              )}
               {hasDebtChange && (
                 <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">Reduced</span>
+                  <span className="text-caution-600 dark:text-caution-400">Cleared</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -404,6 +390,21 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                     </span>,
                   )}
                   <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
+                </span>
+              )}
+              {hasCollChange && (
+                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
+                  <span className="text-caution-600 dark:text-caution-400">Took</span>
+                  {wrapColl(
+                    <span className="font-bold text-foreground">
+                      <ExactTip
+                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                        exact={formatExact(Math.abs(collChange))}
+                        symbol={ctx.collateralType}
+                      />
+                    </span>,
+                  )}
+                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
                 </span>
               )}
             </>
@@ -498,7 +499,8 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
           {/* Debt change (skip for open trove, redemption, liquidation, delegate, and combined — shown inline or n/a).
               Also skip rate changes: a rate adjustment moves no principal — the only thing that makes
               `hasDebtChange` true is the fee-inclusive upfront fee, which rides the detail's "incl. … fee"
-              line, not the header. The header keeps just the label and the new-rate pill. */}
+              line, not the header. The header keeps just the label and the new-rate pill. A batch manager's
+              rate update likewise moves only the interest and management fee it settles into debt. */}
           {hasDebtChange &&
             !style.label.includes(" + ") &&
             ctx.operation !== "openTrove" &&
@@ -506,6 +508,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "redeemCollateral" &&
             ctx.operation !== "liquidate" &&
             ctx.operation !== "adjustTroveInterestRate" &&
+            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapDebt(
@@ -529,6 +532,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "redeemCollateral" &&
             ctx.operation !== "liquidate" &&
             ctx.operation !== "adjustTroveInterestRate" &&
+            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapColl(

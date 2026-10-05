@@ -30,7 +30,7 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
+import { PositionCardDetail, PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -290,6 +290,21 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
   };
 }
 
+/** The debt's dollar value at its $1 face: each family stablecoin is
+ *  redeemable for $1 of collateral, and the card states no market price for
+ *  it (ui-jobs 270: USD under every asset figure, the stablecoin's included). */
+function debtUsdProv(symbol: string, debt: number): Provenance {
+  return {
+    kind: "derived",
+    summary: `Debt value in USD — the ${symbol} debt at its $1 face: the protocol redeems ${symbol} for $1 of collateral.`,
+    formula: "debt × $1",
+    inputs: [
+      { label: "debt", value: `${formatPrice(debt)} ${symbol}`, kind: "chain", pclass: "state" },
+      { label: "face", value: "$1", kind: "derived", note: `${symbol} redeems at $1` },
+    ],
+  };
+}
+
 /** A fork's collateral on the card face. The forks run BTC branches, where two
  *  decimals move the amount by up to a quarter (0.016237 tBTC reads 0.02), so an
  *  amount below one keeps five significant digits; one and above keeps two
@@ -436,6 +451,8 @@ export function LiquityPositionCard({
   disclosureKey,
   debtDetail,
   riskDetail,
+  headerSet = false,
+  cardMenu,
 }: {
   protocol: LiquityFamilyId;
   v: LiquityTroveView;
@@ -473,6 +490,14 @@ export function LiquityPositionCard({
   /** Opened-layer lines under Collateral ratio from the page's live read
    *  (the price bar). Only drawn on a disclosing card. */
   riskDetail?: ReactNode;
+  /** The card header set (ui-jobs 270, built on Liquity V2 first): a status
+   *  tag only for an ended Trove, no asset names or IDs in the header, the
+   *  chevron alone at its right, the activity and `cardMenu` in the foot
+   *  strip, and USD under each asset figure. Detail render only. */
+  headerSet?: boolean;
+  /** The card's ⋮ menu (ToolsMenu `card` variant), at the end of the foot
+   *  strip with `headerSet`. */
+  cardMenu?: ReactNode;
 }) {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   // The closed/opened card (ui-jobs 209): every line under a headline moves
@@ -535,6 +560,60 @@ export function LiquityPositionCard({
       </p>
     </div>
   );
+
+  // The header set's pieces (ui-jobs 270): the foot strip (transactions,
+  // warnings, age, ⋮), the header's right end (the delegate flag and the
+  // chevron), and the small tag naming an ended or redeemed-down Trove.
+  const set = headerSet && !!receipts;
+  // The listing card under the header set (ui-jobs 246): status, the owner
+  // as text, the activity and the headline figures; no action icons, and
+  // the branch's ticker once, as the collateral's icon.
+  const listSet = headerSet && !receipts;
+  const inertIdentity = listSet ? (
+    <TroveIdentityRow
+      protocol={protocol}
+      troveId={v.id}
+      owner={v.owner}
+      lastOwner={v.lastOwner}
+      ownerEns={ownerEns}
+      shortId={ops.shortId}
+      inert
+    />
+  ) : undefined;
+  const footStrip = set ? (
+    <>
+      <PositionCardMeta
+        lastActivityAt={v.lastActivityAt}
+        eventCount={v.txCount}
+        liquidationCount={v.liquidationCount}
+        redemptionCount={v.redemptionCount}
+        order="age-last"
+        chevron={false}
+      />
+      {cardMenu}
+    </>
+  ) : undefined;
+  const delegateFlag = v.isBatched && v.status === "open" && (
+    // Delegate marker: the name is in the Explanation; pink marks an outside party.
+    <span
+      className="inline-flex items-center text-pink-500/90"
+      title={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+    >
+      <Users className="w-3.5 h-3.5" aria-hidden="true" />
+    </span>
+  );
+  const headerEnd = set ? (
+    <span className="flex items-center gap-2">
+      {delegateFlag}
+      <PositionCardDisclosureToggle />
+    </span>
+  ) : undefined;
+  const tag = (word: string, cls: string) => (
+    <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${cls}`} data-anatomy="C6">
+      {word}
+    </span>
+  );
+  const MUTED_TAG = "bg-rb-300 dark:bg-rb-700 text-foreground/70";
 
   const meta =
     showActivityMeta !== false ? (
@@ -617,33 +696,45 @@ export function LiquityPositionCard({
         explanationDefaultOpen={explanationDefaultOpen}
         onExplanationToggle={onExplanationToggle}
         disclosureKey={disclosureKey}
+        footerEnd={footStrip}
       >
         {deprecationBanner}
         <ClosedPositionStats
+          tag={
+            set
+              ? v.status === "liquidated"
+                ? tag("Liquidated", "bg-red-500/20 text-red-500")
+                : tag("Closed", MUTED_TAG)
+              : undefined
+          }
           // A disclosing card's closed layer is the header, the outcome and any
           // claimable surplus; the life's highest balances open.
           detailGate={disclosing ? PositionCardDetail : undefined}
           outcome={v.status}
           closedAt={v.lastActivityAt}
           leadingIdentity={
-            <>
-              <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
-              <TroveIdentityRow
-                protocol={protocol}
-                troveId={v.id}
-                owner={v.owner}
-                lastOwner={v.lastOwner}
-                ownerEns={ownerEns}
-                // A closed life keeps its NFT link in the header on both
-                // surfaces — the terminal Explanation pane carries no NFT
-                // bullet to hand it to.
-                nftUrl={v.nftUrl}
-                shortId={ops.shortId}
-                showOwner={!receipts}
-              />
-            </>
+            set ? undefined : listSet ? (
+              inertIdentity
+            ) : (
+              <>
+                <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
+                <TroveIdentityRow
+                  protocol={protocol}
+                  troveId={v.id}
+                  owner={v.owner}
+                  lastOwner={v.lastOwner}
+                  ownerEns={ownerEns}
+                  // A closed life keeps its NFT link in the header on both
+                  // surfaces — the terminal Explanation pane carries no NFT
+                  // bullet to hand it to.
+                  nftUrl={v.nftUrl}
+                  shortId={ops.shortId}
+                  showOwner={!receipts}
+                />
+              </>
+            )
           }
-          identity={meta}
+          identity={set ? headerEnd : meta}
           collateralIcon={<TokenChipIcon symbol={ct} size={28} filterable={false} />}
           debtIcon={<TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />}
           collateral={peakCollateralStat}
@@ -665,6 +756,7 @@ export function LiquityPositionCard({
       explanationDefaultOpen={explanationDefaultOpen}
       onExplanationToggle={onExplanationToggle}
       disclosureKey={disclosureKey}
+      footerEnd={footStrip}
     >
       {deprecationBanner}
       <OpenPositionStats
@@ -674,7 +766,11 @@ export function LiquityPositionCard({
         // LISTING render keeps the lifecycle pill, with ZOMBIE standing in
         // for OPEN on a redeemed-down Trove.
         statusPill={
-          receipts ? (
+          set ? (
+            zombie ? (
+              tag("Zombie", MUTED_TAG)
+            ) : null
+          ) : receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
               {zombie ? "Zombie" : "Borrowing"}
             </span>
@@ -687,38 +783,45 @@ export function LiquityPositionCard({
           )
         }
         leadingIdentity={
-          <>
-            <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
-            <TroveIdentityRow
-              protocol={protocol}
-              troveId={v.id}
-              owner={v.owner}
-              lastOwner={v.lastOwner}
-              ownerEns={ownerEns}
-              nftUrl={v.nftUrl}
-              // V2's detail page (receipts) carries the OpenSea link in its
-              // footnote NFT bullet, so drop the redundant header chip
-              // there. Listing cards have no footnote, and the forks'
-              // Explanation pane states the Trove NFT without linking it
-              // (lib/shared/liquity-fork-position-content.ts) — both keep
-              // the header chip as the only way to reach the NFT.
-              showNftLink={!receipts || protocol !== "liquity-v2"}
-              shortId={ops.shortId}
-              showOwner={!receipts}
-            />
-            {/* Delegate marker — name lives in the row below the card, the
+          set ? undefined : listSet ? (
+            <>
+              {inertIdentity}
+              {delegateFlag}
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
+              <TroveIdentityRow
+                protocol={protocol}
+                troveId={v.id}
+                owner={v.owner}
+                lastOwner={v.lastOwner}
+                ownerEns={ownerEns}
+                nftUrl={v.nftUrl}
+                // V2's detail page (receipts) carries the OpenSea link in its
+                // footnote NFT bullet, so drop the redundant header chip
+                // there. Listing cards have no footnote, and the forks'
+                // Explanation pane states the Trove NFT without linking it
+                // (lib/shared/liquity-fork-position-content.ts) — both keep
+                // the header chip as the only way to reach the NFT.
+                showNftLink={!receipts || protocol !== "liquity-v2"}
+                shortId={ops.shortId}
+                showOwner={!receipts}
+              />
+              {/* Delegate marker — name lives in the row below the card, the
                 pink icon here is just a status flag (pink = external party). */}
-            {v.isBatched && (
-              <span
-                className="inline-flex items-center text-pink-500/90"
-                title={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
-              >
-                <Users className="w-3.5 h-3.5" aria-hidden="true" />
-              </span>
-            )}
-          </>
+              {v.isBatched && (
+                <span
+                  className="inline-flex items-center text-pink-500/90"
+                  title={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+                >
+                  <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                </span>
+              )}
+            </>
+          )
         }
-        identity={meta}
+        identity={set ? headerEnd : meta}
         columns={[
           {
             label: CARD_VOCAB.collateral,
@@ -738,7 +841,19 @@ export function LiquityPositionCard({
                 </span>
               </StatValue>
             ),
-            footnote: (
+            footnote: headerSet ? (
+              <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
+                {collUsd !== null && collUsd > 0 ? (
+                  <Prov info={fp.collUsd}>
+                    <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
+                      <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
+                    </HighlightableValue>
+                  </Prov>
+                ) : pending && coll > 0 ? (
+                  <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+                ) : null}
+              </div>
+            ) : (
               <Detail>
                 <div className="text-xs mt-0.5 min-h-[1rem]">
                   {collUsd !== null && collUsd > 0 ? (
@@ -780,17 +895,26 @@ export function LiquityPositionCard({
               </StatValue>
             ),
             footnote: (
-              <Detail>
-                <div className="text-xs mt-0.5 text-rb-500">
-                  <Prov info={fp.rate}>
-                    <HighlightableValue type="interestRate" state="after" value={rate} className="text-rb-500">
-                      <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
-                    </HighlightableValue>
-                  </Prov>{" "}
-                  interest rate
-                </div>
-                {disclosing && debtDetail}
-              </Detail>
+              <>
+                {headerSet && debt > 0 && (
+                  <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
+                    <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
+                      <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
+                    </Prov>
+                  </div>
+                )}
+                <Detail>
+                  <div className="text-xs mt-0.5 text-rb-500">
+                    <Prov info={fp.rate}>
+                      <HighlightableValue type="interestRate" state="after" value={rate} className="text-rb-500">
+                        <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
+                      </HighlightableValue>
+                    </Prov>{" "}
+                    interest rate
+                  </div>
+                  {disclosing && debtDetail}
+                </Detail>
+              </>
             ),
           },
           {

@@ -14,6 +14,7 @@
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useEffect, useState, type ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -61,7 +62,8 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
   if (!kind) return null;
   const w = addressKindWords(kind);
   return (
-    <span className="min-w-0 truncate" data-address-kind={kind.kind} title={w.tip}>
+    // Gives way before the address does (shrink-[100]).
+    <span className="min-w-0 shrink-[100] truncate" data-address-kind={kind.kind} title={w.tip}>
       {w.label}
     </span>
   );
@@ -93,27 +95,45 @@ export function PositionWalletRow({
   owner,
   session,
   tools,
+  strip,
 }: {
   owner: PositionOwner;
   /** The page's explorer, the default for the listing link and bookmark. */
   session?: SessionProtocol;
-  /** The Tools menu with the page's export shapes; a bare menu without. */
-  tools?: ReactNode;
+  /** The Tools menu with the page's export shapes; a bare menu without;
+   *  false for none, on a page whose card carries the menu (ui-jobs 270). */
+  tools?: ReactNode | false;
+  /** The price and recency strip at the row's right end, before Tools
+   *  (ui-jobs 272). The address truncates before it gives way. */
+  strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
   const chainId = session ? protocolForSession(session)?.chainId : undefined;
+  // A wallet is its address menu (ui-jobs 271); a vault or a page that links
+  // the address elsewhere (PWN's other side) keeps the pill.
+  const plain = !owner.vault && !owner.href;
   const pill = owner.wallet ? (
-    <WalletPill
-      wallet={owner.wallet}
-      ensName={owner.ensName ?? null}
-      filterProtocol={filterProtocol}
-      bookmarkProtocol={bookmarkProtocol}
-      bookmarkListing={owner.bookmarkListing}
-      vault={owner.vault}
-      href={owner.href}
-      hrefLabel={owner.hrefLabel}
-    />
+    plain ? (
+      <WalletMenu
+        wallet={owner.wallet}
+        ensName={owner.ensName ?? null}
+        filterProtocol={filterProtocol}
+        bookmarkProtocol={bookmarkProtocol}
+        bookmarkListing={owner.bookmarkListing}
+      />
+    ) : (
+      <WalletPill
+        wallet={owner.wallet}
+        ensName={owner.ensName ?? null}
+        filterProtocol={filterProtocol}
+        bookmarkProtocol={bookmarkProtocol}
+        bookmarkListing={owner.bookmarkListing}
+        vault={owner.vault}
+        href={owner.href}
+        hrefLabel={owner.hrefLabel}
+      />
+    )
   ) : null;
   return (
     // One line at every width: the pill does not wrap, Tools keeps its size.
@@ -124,13 +144,18 @@ export function PositionWalletRow({
       data-position-wallet-row=""
       data-anatomy="H13"
     >
-      <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
+      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-rb-500">
         {pill && owner.prefix}
         {pill && (owner.wrap ? owner.wrap(pill) : pill)}
         {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
         {owner.extra}
       </span>
-      <span className="shrink-0">{tools || <ToolsMenu />}</span>
+      {(strip || tools !== false) && (
+        <span className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {strip}
+          {tools !== false && (tools || <ToolsMenu />)}
+        </span>
+      )}
     </div>
   );
 }

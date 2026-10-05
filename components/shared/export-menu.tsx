@@ -24,7 +24,7 @@
 // CSV" opens <QueuedExportWindow>, which asks rails-server to build the file
 // and hands the reader a link to collect it within 24 hours.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Copy, FileText, Download } from "lucide-react";
 import { eventsToCsv } from "@/lib/shared/events-to-csv";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -74,6 +74,11 @@ type Props = {
    *  Used in place of `fetchAllEvents` when the history is over the in-browser
    *  threshold (lib/shared/queued-export.ts). */
   queued?: QueuedExportRequest;
+  /** Where the shapes ride: the page's Tools menu, or the position card's ⋮
+   *  menu (`ToolsMenu` variant). */
+  variant?: "tools" | "card";
+  /** The card menu's rows above the shapes (`ToolsMenu` leading). */
+  leading?: (close: () => void) => ReactNode;
 };
 
 export function ExportMenu({
@@ -84,6 +89,8 @@ export function ExportMenu({
   ariaLabel = "Export this position",
   scopeNote,
   queued,
+  variant,
+  leading,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [preparing, setPreparing] = useState(false);
@@ -162,7 +169,7 @@ export function ExportMenu({
 
   return (
     <>
-      <ToolsMenu ariaLabel={ariaLabel} copied={copied}>
+      <ToolsMenu ariaLabel={ariaLabel} copied={copied} variant={variant} leading={leading}>
         {(close) => (
           <>
             <ToolsMenuItem

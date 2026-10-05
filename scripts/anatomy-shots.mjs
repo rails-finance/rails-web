@@ -46,7 +46,8 @@ const CODE = /\b[A-Z]\d+(?:\.\d+)*(?:·[a-z0-9-]+)?(?![\w.])/g;
 /** Parts reached by selector, not by attribute. */
 const FALLBACKS = {
   // Each protocol renders its own mode-word pill into OpenPositionStats' status slot.
-  C6: '[data-anatomy~="C5"] > span > :first-child:not([data-anatomy])',
+  // A disclosing card's header lays its content in a div beside the toggle (ui-jobs 265).
+  C6: '[data-anatomy~="C5"] > span > :first-child:not([data-anatomy]), [data-anatomy~="C5"] > div > span > :first-child:not([data-anatomy])',
   // Protocol event cards pass their own <LearnMore> into the footer.
   T4: '[data-anatomy~="T6"] button[aria-label="Learn more"]',
   // The economics tower: components/shared/chain-truth-tower.tsx, frozen under item 206.
@@ -167,7 +168,14 @@ async function click(page, selector) {
 }
 
 const openCard = async (page) => {
-  if (await seen(page, `${sel("P1")}${sel("C1")}`, 5000)) await click(page, `${sel("P1")} ${sel("C9")}`);
+  // The header button is the toggle (ui-jobs 265); C9 is its chevron cue.
+  if (await seen(page, `${sel("P1")}${sel("C1")}`, 5000)) {
+    await page
+      .locator(`${sel("P1")} [data-card-disclosure-toggle]`)
+      .first()
+      .dispatchEvent("click");
+    await page.waitForTimeout(400);
+  }
 };
 const openCardExplanation = async (page) => {
   await openCard(page);

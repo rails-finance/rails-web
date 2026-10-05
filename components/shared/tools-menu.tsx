@@ -15,10 +15,17 @@
 // A caller with no export shapes (the vault holder pages) renders <ToolsMenu />
 // with no children: the menu is then the inspector alone, which is what those
 // pages had in the dock.
+//
+// The `card` variant is the position card's one menu (ui-jobs 270, 246): a ⋮
+// trigger at the end of the card's foot strip, the position's own rows
+// (`leading`) first, the export shapes, then the inspector last. Below sm it
+// opens as a sheet with each row full width.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Check, ChevronDown, Wrench } from "lucide-react";
-import { CTRL_GHOST, CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
+import { Check, ChevronDown, EllipsisVertical, Wrench } from "lucide-react";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { provInspector } from "@/components/shared/provenance";
 import { ProvInspectorToggle } from "@/components/shared/prov-inspector";
 
@@ -56,8 +63,16 @@ export function ToolsMenuItem({
 export function ToolsMenu({
   ariaLabel,
   copied = false,
+  variant = "tools",
+  leading,
   children,
 }: {
+  /** `tools`: the spanner trigger of a page row. `card`: the position card's
+   *  ⋮ menu, a sheet on a phone. */
+  variant?: "tools" | "card";
+  /** Rows above the export shapes (the card's ID, NFT and page link), handed
+   *  the menu's close like `children`. */
+  leading?: (close: () => void) => ReactNode;
   /** What the caller's shapes act on, folded into the trigger's accessible
    *  name ("Tools: Export this position"). Absent on a menu that carries only
    *  the inspector. */
@@ -72,13 +87,19 @@ export function ToolsMenu({
   const [open, setOpen] = useState(false);
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
   const ref = useRef<HTMLDivElement>(null);
+  const card = variant === "card";
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const sheet = card && isPhone;
+  const close = () => setOpen(false);
 
   // Close on outside click / Escape — mirrors the listing sort dropdown. While
   // the inspector is armed Escape belongs to the inspector's own ladder, which
   // is mounted on document too; closing this panel as well is harmless because
   // the panel is shut by the time a pick can be made.
   useEffect(() => {
-    if (!open) return;
+    // The sheet closes from its own scrim and Escape; its rows are portalled
+    // outside `ref`, so the outside-press rule would shut it under a tap.
+    if (!open || sheet) return;
     function handlePointer(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
@@ -91,7 +112,78 @@ export function ToolsMenu({
       document.removeEventListener("pointerdown", handlePointer);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open]);
+  }, [open, sheet]);
+
+  const rows = (
+    <>
+      {card ? (
+        <>
+          {leading?.(close)}
+          {leading && children && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
+          {children?.(close)}
+          <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
+          <ProvInspectorToggle variant="menu" onPick={close} />
+        </>
+      ) : (
+        <>
+          <ProvInspectorToggle variant="menu" onPick={close} />
+          {children && (
+            <>
+              <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
+              {children(close)}
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  if (card) {
+    return (
+      <div ref={ref} className="relative" data-export-menu data-tools-menu data-card-menu data-anatomy="C17">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={copied ? "Copied" : ariaLabel ? `Position menu: ${ariaLabel}` : "Position menu"}
+          // A 28px glyph with a 44px press area: the after: box reaches past
+          // the button without moving the strip.
+          className={`${CTRL_GHOST} ${open ? CTRL_ON : CTRL_OFF} relative h-7 w-7 justify-center rounded-md after:absolute after:-inset-2 after:content-['']`}
+        >
+          {copied ? (
+            <Check className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
+          )}
+          <span
+            data-prov-armed={armed ? "" : undefined}
+            className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${armed ? "bg-green-500" : "bg-transparent"}`}
+            aria-hidden="true"
+          />
+        </button>
+        {open &&
+          (sheet ? (
+            <MobileSheet
+              label="Position menu"
+              onClose={close}
+              header={<div className={`${OVERLAY_HEADING} px-1 pb-2`}>Position</div>}
+            >
+              <div role="menu" className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)]">
+                {rows}
+              </div>
+            </MobileSheet>
+          ) : (
+            <div
+              className="overlay-panel absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden py-1"
+              role="menu"
+            >
+              {rows}
+            </div>
+          ))}
+      </div>
+    );
+  }
 
   return (
     // `data-export-menu` stays on the wrapper: it is what the export verifiers
@@ -118,8 +210,10 @@ export function ToolsMenu({
         {copied ? (
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
         ) : (
+          // Below sm the wallet row also carries the price and recency strip
+          // (ui-jobs 272): the spanner alone is the trigger there.
           <ChevronDown
-            className={`h-3.5 w-3.5 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`hidden h-3.5 w-3.5 text-rb-500 transition-transform sm:block ${open ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
         )}
@@ -130,13 +224,7 @@ export function ToolsMenu({
           className="overlay-panel absolute right-0 top-full z-50 mt-2 min-w-[260px] overflow-hidden py-1"
           role="menu"
         >
-          <ProvInspectorToggle variant="menu" onPick={() => setOpen(false)} />
-          {children && (
-            <>
-              <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
-              {children(() => setOpen(false))}
-            </>
-          )}
+          {rows}
         </div>
       )}
     </div>
