@@ -948,7 +948,16 @@ function redeemSlots(
 
   const collRedeemed = troveOperation ? Math.abs(troveOperation.collChangeFromOperation) : redemption.ETHSent;
   const debtRedeemed = troveOperation ? Math.abs(troveOperation.debtChangeFromOperation) : redemption.actualBoldAmount;
-  const redemptionFee = Number(redemption.ETHFee) || 0;
+  // This trove's share of the fee: `redemptionFee` is the collateral the redemption left in this trove;
+  // `ETHFee` is the whole redemption's, so it is pro-rated by debt cleared when the share is missing.
+  const wholeFee = Number(redemption.ETHFee) || 0;
+  const redemptionFee =
+    Number(redemption.redemptionFee) ||
+    (redemption.actualBoldAmount > 0 ? (wholeFee * debtRedeemed) / redemption.actualBoldAmount : 0);
+  // The rate against the collateral drawn from this trove (sent to the redeemer plus the fee left behind).
+  // Four decimals lose most of a small fee (0.001446 reads 0.0014), so under 0.01 it keeps four significant figures.
+  const fmtFee = (n: number) =>
+    n > 0 && n < 0.01 ? n.toLocaleString("en-US", { maximumSignificantDigits: 4 }) : fmtColl(n);
   const feeRate = redemptionFee > 0 ? (redemptionFee / (collRedeemed + redemptionFee)) * 100 : 0;
   const collValueMarketPrice = collRedeemed * collateralPrice;
   const feeValueMarket = redemptionFee * collateralPrice;
@@ -988,8 +997,9 @@ function redeemSlots(
     changed.push(
       clause(
         <>
-          A {feeRate.toFixed(3)}% redemption fee of {fmtColl(redemptionFee)} {collateralType} ({fmtUsd(feeValueMarket)}
-          ), paid by the redeemer, stays in the trove as extra collateral.
+          {redemption.actualBoldAmount > debtRedeemed + 0.01 ? "This trove’s share of the" : "The"} redemption fee,{" "}
+          {fmtFee(redemptionFee)} {collateralType} ({fmtUsd(feeValueMarket)}) or {feeRate.toFixed(3)}% of the collateral
+          drawn from it, was paid by the redeemer and stays in the trove as extra collateral.
         </>,
       ),
     );
