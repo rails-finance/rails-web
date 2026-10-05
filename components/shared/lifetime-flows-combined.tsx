@@ -314,8 +314,10 @@ export function CombinedFlows({
     if (!row || !controls || !probe) return;
     const fit = () => {
       // Button chrome: 12px padding each side, the 16px icon and its 6px gap;
-      // 12px between the controls and the button.
-      const room = row.clientWidth - controls.offsetWidth - 12 - 24 - 22;
+      // 12px between the controls and the button. Below sm the button has a
+      // row of its own (TO-DO-ui-jobs §247).
+      const own = window.matchMedia("(max-width: 639.98px)").matches;
+      const room = row.clientWidth - (own ? 0 : controls.offsetWidth + 12) - 24 - 22;
       const widths = Array.from(probe.children).map((c) => (c as HTMLElement).offsetWidth);
       const i = widths.findIndex((w) => w <= room);
       setLabelLevel(i < 0 ? widths.length - 1 : i);
@@ -505,7 +507,8 @@ export function CombinedFlows({
           </div>
 
           {/* The playback controls at the left; "Show timeline to {date}" at the
-              right, on a page that ties the panel to its timeline. */}
+              right, on a page that ties the panel to its timeline. Below sm the
+              button takes the full width on a row of its own. */}
           <div ref={rowRef} className="relative mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div
               ref={controlsRef}
@@ -564,7 +567,7 @@ export function CombinedFlows({
             {byDays && (
               <button
                 type="button"
-                className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} ml-auto min-h-11 gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:min-h-9`}
+                className={`${CTRL_GHOST} ${canApply ? CTRL_ON_ACCENT : "text-rb-400 disabled:cursor-default dark:text-rb-600"} min-h-11 w-full justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-semibold sm:ml-auto sm:min-h-9 sm:w-auto`}
                 disabled={!canApply}
                 title={
                   canApply
