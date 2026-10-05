@@ -338,9 +338,9 @@ function openTroveSlots(
       clause(
         <>
           The trove joined a batch manager on open
-          {bu.interestBatchManager ? (
+          {(bu.interestBatchManager ?? ctx.batchManager) ? (
             <>
-              , delegating its rate to {shortenAddress(bu.interestBatchManager)} at{" "}
+              , delegating its rate to {delegateLink((bu.interestBatchManager ?? ctx.batchManager)!)} at{" "}
               {fig(undefined, fmtRate(bu.annualInterestRate))} APR
               {bu.annualManagementFee > 0 ? <>, with a {bu.annualManagementFee.toFixed(2)}% management fee</> : null}
             </>
