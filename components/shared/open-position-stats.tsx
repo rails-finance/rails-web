@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
+import { PositionCardHeader, PositionCardRegion } from "@/components/shared/position-card-disclosure";
 
 export interface OpenPositionStatsColumn {
   label: string;
@@ -75,7 +76,7 @@ export function OpenPositionStats({
   const visibleCount = columns.filter(Boolean).length;
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-3" data-anatomy="C5">
+      <PositionCardHeader className="flex items-center justify-between gap-2 flex-wrap" spacing="mb-3" anatomy="C5">
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -83,8 +84,8 @@ export function OpenPositionStats({
           {leadingIdentity}
         </span>
         {identity}
-      </div>
-      <div className={gridClass} data-anatomy="C10">
+      </PositionCardHeader>
+      <PositionCardRegion className={gridClass} anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         {columns.map((col, i) => {
           if (!col) return <div key={`empty-${i}`} className="hidden sm:block" />;
@@ -110,7 +111,7 @@ export function OpenPositionStats({
             </div>
           );
         })}
-      </div>
+      </PositionCardRegion>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Fragment, type ComponentType, type ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
+import { PositionCardHeader, PositionCardRegion } from "@/components/shared/position-card-disclosure";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatDate } from "@/lib/date";
@@ -136,7 +137,7 @@ export function ClosedPositionStats({
     : "grid grid-cols-2 sm:grid-cols-4 gap-4";
   return (
     <div data-anatomy="C11">
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-3" data-anatomy="C5">
+      <PositionCardHeader className="flex items-center justify-between gap-2 flex-wrap" spacing="mb-3" anatomy="C5">
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -155,8 +156,8 @@ export function ClosedPositionStats({
           {leadingIdentity}
         </span>
         {identity}
-      </div>
-      <div className={gridClass} data-anatomy="C10">
+      </PositionCardHeader>
+      <PositionCardRegion className={gridClass} anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         <Gate>
           <div>
@@ -218,7 +219,7 @@ export function ClosedPositionStats({
             <div className="hidden sm:block" />
           )}
         </Gate>
-      </div>
+      </PositionCardRegion>
     </div>
   );
 }

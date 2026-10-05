@@ -13,7 +13,7 @@ export async function openPositionCards(page, deadlineMs = 10_000) {
     if ((await closed.count()) === 0) return opened;
     await closed
       .first()
-      .click({ timeout: 3000 })
+      .dispatchEvent("click", undefined, { timeout: 3000 })
       .then(() => (opened += 1))
       .catch(() => {});
     await page.waitForTimeout(300);

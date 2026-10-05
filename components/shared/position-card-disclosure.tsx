@@ -17,7 +17,7 @@
 // disclosing card, so an armed click can reach a figure in the detail layer —
 // the rule `useReserveDisclosure` follows.
 
-import { createContext, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { provInspector } from "@/components/shared/provenance";
 import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
@@ -28,6 +28,8 @@ export interface PositionCardDisclosure {
   /** The Explanation row's remembered state, for the shell to restore. */
   explanationOpen: boolean;
   setExplanationOpen: (open: boolean) => void;
+  /** The id of the card's figures, which the header button controls. */
+  regionId: string;
 }
 
 const DisclosureContext = createContext<PositionCardDisclosure | null>(null);
@@ -54,6 +56,7 @@ export function usePositionCardDisclosureState(key: string | undefined): Positio
   const stored = useStoredOpen(key ? storeKey(key) : null);
   const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  const regionId = useId();
   const toggle = useCallback(() => {
     if (key) setCardOpen(storeKey(key), !isCardOpen(storeKey(key)));
   }, [key]);
@@ -64,7 +67,7 @@ export function usePositionCardDisclosureState(key: string | undefined): Positio
     [key],
   );
   if (!key) return null;
-  return { open: stored || armed, toggle, explanationOpen, setExplanationOpen };
+  return { open: stored || armed, toggle, explanationOpen, setExplanationOpen, regionId };
 }
 
 export function PositionCardDisclosureProvider({
@@ -77,22 +80,121 @@ export function PositionCardDisclosureProvider({
   return <DisclosureContext.Provider value={value}>{children}</DisclosureContext.Provider>;
 }
 
-/** The header chevron. Renders nothing on a card that has not opted in. */
+/** Set by `PositionCardHeader` around its row: inside it the chevron is the
+ *  row's visible cue, and the row's own button is the control. */
+const HeaderToggleContext = createContext(false);
+
+/** The header chevron. Inside a `PositionCardHeader` it is a cue drawn in the
+ *  row the header button covers; outside one (a card whose header is its own)
+ *  it stays the button. Renders nothing on a card that has not opted in. */
 export function PositionCardDisclosureToggle() {
   const d = usePositionCardDisclosure();
+  const inHeader = useContext(HeaderToggleContext);
   if (!d) return null;
+  if (inHeader) {
+    return (
+      <span data-card-chevron="" data-anatomy="C9" aria-hidden="true" className="inline-flex items-center">
+        <ExpandChevron isOpen={d.open} group="card" size={14} />
+      </span>
+    );
+  }
   return (
     <button
       type="button"
       data-card-disclosure-toggle=""
       data-anatomy="C9"
       aria-expanded={d.open}
+      aria-controls={d.regionId}
       aria-label={d.open ? "Hide position details" : "Show position details"}
       onClick={d.toggle}
       className="group/card -my-1 -mr-1 inline-flex cursor-pointer items-center rounded-sm focus-ring"
     >
       <ExpandChevron isOpen={d.open} group="card" size={14} />
     </button>
+  );
+}
+
+/** Pointer travel, in px, past which a press is a drag (a text selection) and
+ *  not a click on the header. */
+const DRAG_PX = 5;
+
+/** A position card's header row (ui-jobs 265). On a card that discloses, the
+ *  whole row toggles the details: one button laid under the row's content
+ *  covers it, out to the card's edges, and the content lets pointer events
+ *  through to it except on its own controls (links, copy, bookmark, menus),
+ *  which stay siblings of the button. The chevron in the row is its visible
+ *  cue. A press that travels (a selection drag) does not toggle. On a card
+ *  that does not disclose the row is a plain div. */
+export function PositionCardHeader({
+  className,
+  spacing,
+  anatomy,
+  children,
+}: {
+  /** The row's layout (flex and gaps). */
+  className: string;
+  /** The row's outer margin. */
+  spacing?: string;
+  anatomy?: string;
+  children: ReactNode;
+}) {
+  const d = usePositionCardDisclosure();
+  const from = useRef<{ x: number; y: number } | null>(null);
+  if (!d) {
+    return (
+      <div className={`${className} ${spacing ?? ""}`} data-anatomy={anatomy}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className={`relative ${spacing ?? ""}`} data-anatomy={anatomy} data-card-header="">
+      <button
+        type="button"
+        data-card-disclosure-toggle=""
+        aria-expanded={d.open}
+        aria-controls={d.regionId}
+        aria-label={d.open ? "Hide position details" : "Show position details"}
+        onPointerDown={(e) => {
+          from.current = { x: e.clientX, y: e.clientY };
+        }}
+        onClick={(e) => {
+          const start = from.current;
+          from.current = null;
+          // A keyboard press has no pointer travel and no selection to read.
+          const moved = start != null && e.detail > 0 && Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_PX;
+          const selected = typeof window !== "undefined" && (window.getSelection()?.toString() ?? "") !== "";
+          if (moved || selected) return;
+          d.toggle();
+        }}
+        className="group/card absolute -inset-x-3 -top-3 -bottom-3 z-0 cursor-pointer rounded-lg focus-ring"
+      />
+      <HeaderToggleContext.Provider value={true}>
+        <div
+          className={`pointer-events-none relative z-[1] ${className} [&_a]:pointer-events-auto [&_button]:pointer-events-auto [&_[role=button]]:pointer-events-auto [&_[role=link]]:pointer-events-auto [&_[tabindex]]:pointer-events-auto`}
+        >
+          {children}
+        </div>
+      </HeaderToggleContext.Provider>
+    </div>
+  );
+}
+
+/** The card's figures: the region the header button controls. */
+export function PositionCardRegion({
+  className,
+  anatomy,
+  children,
+}: {
+  className: string;
+  anatomy?: string;
+  children: ReactNode;
+}) {
+  const d = usePositionCardDisclosure();
+  return (
+    <div className={className} data-anatomy={anatomy} id={d?.regionId}>
+      {children}
+    </div>
   );
 }
 
