@@ -499,7 +499,8 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
           {/* Debt change (skip for open trove, redemption, liquidation, delegate, and combined — shown inline or n/a).
               Also skip rate changes: a rate adjustment moves no principal — the only thing that makes
               `hasDebtChange` true is the fee-inclusive upfront fee, which rides the detail's "incl. … fee"
-              line, not the header. The header keeps just the label and the new-rate pill. */}
+              line, not the header. The header keeps just the label and the new-rate pill. A batch manager's
+              rate update likewise moves only the interest and management fee it settles into debt. */}
           {hasDebtChange &&
             !style.label.includes(" + ") &&
             ctx.operation !== "openTrove" &&
@@ -507,6 +508,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "redeemCollateral" &&
             ctx.operation !== "liquidate" &&
             ctx.operation !== "adjustTroveInterestRate" &&
+            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapDebt(
@@ -530,6 +532,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             ctx.operation !== "redeemCollateral" &&
             ctx.operation !== "liquidate" &&
             ctx.operation !== "adjustTroveInterestRate" &&
+            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
             ctx.operation !== "setInterestBatchManager" && (
               <span className="inline-flex items-center gap-1.5 text-sm">
                 {wrapColl(
