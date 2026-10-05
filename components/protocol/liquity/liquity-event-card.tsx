@@ -199,7 +199,11 @@ export function LiquityEventCard({
       const debtProv = debtCp && fmtSpine(Math.abs(debtCp.change)) === fmtSpine(Math.abs(debtOp)) ? debtCp : undefined;
       const boldDir = debtOp < 0 ? ("right" as const) : ("left" as const);
       const collDir = collOp < 0 ? ("left" as const) : ("right" as const);
-      const showBold = ctx.operation === "closeTrove" || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
+      // A close moves BOLD only when it repaid debt: closing a zombie a
+      // redemption already cleared to zero returns collateral and nothing else.
+      const closeRepaid =
+        ctx.operation === "closeTrove" && (Math.abs(debtOp) >= 0.01 || (ctx.stateBefore?.debt ?? 0) >= 0.01);
+      const showBold = closeRepaid || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
       const showColl = ctx.operation === "closeTrove" || Math.abs(collOp) >= 0.01 || !ctx.troveOperation;
       const isActiveOp = ![
         "redeemCollateral",
