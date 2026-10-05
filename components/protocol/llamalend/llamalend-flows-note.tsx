@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { LlamalendFlowFacts } from "@/lib/llamalend/flows";
 import { formatNumber } from "@/lib/utils/format";
+import { ExplainBullet, ExplainGroup, ExplainMore } from "@/components/shared/explain-groups";
 
 const DOCS = "https://docs.curve.finance/lending/overview/";
 
@@ -20,80 +21,98 @@ const count = (k: number, one: string, many: string) => (k === 1 ? one : `${k.to
 export function LlamalendFlowsNote({ facts, collSymbol, debtSymbol }: LlamalendFlowsNoteProps): ReactNode {
   const p = facts?.pricing;
   const priced = p ? p.row + p.nearest + p.today : 0;
+  const soft = facts ? facts.softSold + facts.boughtBack : 0;
   return (
-    <div className="space-y-2" data-llamalend-flows-note="" data-anatomy="F14·llamalend">
-      <p>
-        Every figure is in {debtSymbol}, this market&apos;s borrowed token: the market&apos;s AMM prices {collSymbol} in{" "}
-        {debtSymbol}, and that is the price it lends and liquidates against. Each {collSymbol} flow is converted at that
-        price at its block, so the collateral&apos;s last line, Market move since the last event, is the change in the
-        price since each flow.
-      </p>
-      <p>
-        Each event states the position after it and its amounts, so the interest between two events is exact to the base
-        unit: the debt just before an event less the debt the event before left is Interest accrued. Between events the
-        debt grows at the rate between those two events; after the last, at the rate that meets today&apos;s debt from
-        the live read.
-      </p>
-      <p>
-        The collateral sits in the AMM&apos;s bands. While the price is inside them the AMM sells {collSymbol} for{" "}
-        {debtSymbol} as the price falls and buys it back as it rises (soft liquidation). No event records those trades:
-        the collateral an event starts from, less what the event before left, is what the AMM sold (Sold in soft
-        liquidation) or bought back (Bought back in soft liquidation) in between, at the event&apos;s price.
-        {facts && facts.softSold + facts.boughtBack > 0
-          ? ` Here ${[
-              facts.softSold > 0
-                ? `the AMM had sold collateral before ${count(facts.softSold, "one event", "events")}`
-                : "",
-              facts.boughtBack > 0
-                ? `${facts.softSold > 0 ? "it" : "the AMM"} had bought some back before ${count(facts.boughtBack, "one event", "events")}`
-                : "",
+    <div data-llamalend-flows-note="" data-anatomy="F14·llamalend">
+      <ExplainGroup title="Soft liquidation">
+        <ExplainBullet>The AMM sells {collSymbol} as its price falls and buys it back as it rises</ExplainBullet>
+        <ExplainBullet>
+          No event records those trades; the collateral bar shows them as sold or bought back
+        </ExplainBullet>
+        {facts?.withConv ? (
+          <ExplainBullet>
+            The {debtSymbol} from those sales is on the collateral bar: received, spent, withdrawn or seized
+          </ExplainBullet>
+        ) : (
+          <ExplainBullet>The {debtSymbol} the AMM holds from those sales is not on the bars</ExplainBullet>
+        )}
+        {facts && soft > 0 && (
+          <ExplainBullet>
+            {[
+              facts.softSold > 0 ? `Sold before ${count(facts.softSold, "one event", "events")}` : "",
+              facts.boughtBack > 0 ? `bought back before ${count(facts.boughtBack, "one event", "events")}` : "",
             ]
               .filter(Boolean)
-              .join(", and ")}.`
-          : facts
-            ? " Here no event found the collateral changed since the one before."
-            : ""}
-        {facts?.softSinceLast === "sold" &&
-          " Since the last event the AMM has sold more, which today's read shows on that line at today."}
-        {facts?.softSinceLast === "bought" &&
-          " Since the last event the AMM has bought some back, which today's read shows on that line at today."}{" "}
-        {facts?.withConv ? (
-          <>
-            The {debtSymbol} the AMM holds for the position from those sales (the card&apos;s Converted) is on the
-            collateral bar too, read at each event&apos;s block and stored: what it took in for its sales since the
-            event before is Received in soft liquidation, and what it spent buying back is Spent in soft liquidation; a
-            close hands it back (Withdrawn), and a hard liquidation takes it with the collateral (Seized in
-            liquidations).
-            {facts.convUnreadRows > 0 &&
-              ` At ${count(facts.convUnreadRows, "one event", "events")} it is not stored yet and stands as the event before left it until the next stored event.`}
-            {facts.convEstimatedRows > 0 &&
-              ` At ${count(facts.convEstimatedRows, "a repay that closed the position", "repays that closed the position")}, what it took in since the event before is valued at that event's price, as no balance is stored between.`}
-          </>
-        ) : (
-          <>
-            The {debtSymbol} the AMM holds for the position from those sales (the card&apos;s Converted) is not on the
-            bars: no event records it.
-          </>
+              .join(", ")
+              .replace(/^b/, "B")}
+          </ExplainBullet>
         )}
-      </p>
-      {facts && facts.liquidations + facts.selfLiquidations + facts.readRows + facts.unstatedRows > 0 && (
-        <p>
-          {facts.liquidations > 0 &&
-            `${count(facts.liquidations, "A hard liquidation", "hard liquidations")} took collateral (Seized in liquidations) and cleared debt (Cleared by liquidations)${facts.partialLiquidations > 0 ? `, ${facts.partialLiquidations === facts.liquidations ? (facts.liquidations === 1 ? "a partial one" : "all of them partial") : `${facts.partialLiquidations.toLocaleString("en-US")} of them partial`}` : ""}${facts.convertedTaken > 0 ? `; ${facts.liquidations === 1 ? "it" : "they"} also took ${formatNumber(facts.convertedTaken)} ${debtSymbol} the AMM held for the position${facts.withConv ? "" : ", which is not on the bars"}` : ""}. `}
-          {facts.selfLiquidations > 0 &&
-            `${count(facts.selfLiquidations, "A self-liquidation", "self-liquidations")}, the owner closing the loan through the liquidation path, ${facts.selfLiquidations === 1 ? "is" : "are"} counted as Repaid and Withdrawn. `}
-          {facts.readRows + facts.unstatedRows > 0 && unstatedSentence(facts)}
-        </p>
+        {facts?.softSinceLast === "sold" && (
+          <ExplainBullet>More sold since the last event, in today&apos;s read</ExplainBullet>
+        )}
+        {facts?.softSinceLast === "bought" && (
+          <ExplainBullet>Some bought back since the last event, in today&apos;s read</ExplainBullet>
+        )}
+      </ExplainGroup>
+      <ExplainGroup title="Prices and debt">
+        <ExplainBullet>Every figure is in {debtSymbol}, the market&apos;s borrowed token</ExplainBullet>
+        <ExplainBullet>
+          {collSymbol} takes the AMM&apos;s oracle price at the latest priced event&apos;s block
+        </ExplainBullet>
+        <ExplainBullet>No daily price is recorded; between events that price holds</ExplainBullet>
+        <ExplainBullet>Debt grows at the market&apos;s rate since the last transaction</ExplainBullet>
+      </ExplainGroup>
+      {facts && facts.liquidations + facts.selfLiquidations > 0 && (
+        <ExplainGroup title="Liquidations">
+          {facts.liquidations > 0 && (
+            <ExplainBullet>
+              {count(facts.liquidations, "One hard liquidation", "hard liquidations")}
+              {facts.partialLiquidations > 0
+                ? `, ${facts.partialLiquidations === facts.liquidations ? (facts.liquidations === 1 ? "partial" : "all partial") : `${facts.partialLiquidations.toLocaleString("en-US")} partial`}`
+                : ""}
+              : seized collateral and cleared debt
+            </ExplainBullet>
+          )}
+          {facts.convertedTaken > 0 && (
+            <ExplainBullet>
+              Liquidations also took {formatNumber(facts.convertedTaken)} {debtSymbol} the AMM held
+            </ExplainBullet>
+          )}
+          {facts.selfLiquidations > 0 && (
+            <ExplainBullet>
+              {count(facts.selfLiquidations, "One self-liquidation", "self-liquidations")}, counted as repaid and
+              withdrawn
+            </ExplainBullet>
+          )}
+        </ExplainGroup>
       )}
-      {p && priced > 0 && (
+      <ExplainMore title="More about the sums">
         <p>
-          {p.row === priced
-            ? "Every flow is valued at the AMM's oracle price at its block, read from the chain. "
-            : `${count(p.row, "One event is", "events are")} valued at the AMM's oracle price at ${p.row === 1 ? "its block" : "their blocks"}, read from the chain; the ${count(p.nearest + p.today, "other takes", "others take")} the nearest price read in time${p.today > 0 ? (p.today === p.nearest + p.today ? ", today's" : `, ${p.today.toLocaleString("en-US")} of them today's`) : ""}. `}
-          LlamaLend has no daily price recorded, so between events the collateral keeps the price of its latest event,
-          and a price more than 30 days old is stated as such.
+          Each {collSymbol} flow is converted at the AMM&apos;s price at its block, so the collateral&apos;s last line,
+          Market move since the last event, is the change in that price since each flow. Each event states the position
+          after it, so the interest between two events is exact.
         </p>
-      )}
+        {facts?.withConv && facts.convUnreadRows > 0 && (
+          <p>
+            At {count(facts.convUnreadRows, "one event", "events")} the {debtSymbol} from sales is not stored yet and
+            stands as the event before left it.
+          </p>
+        )}
+        {facts?.withConv && facts.convEstimatedRows > 0 && (
+          <p>
+            At {count(facts.convEstimatedRows, "a repay that closed the position", "repays that closed the position")},
+            what the sales took in is valued at that event&apos;s price.
+          </p>
+        )}
+        {facts && facts.readRows + facts.unstatedRows > 0 && <p>{unstatedSentence(facts)}</p>}
+        {p && priced > 0 && p.row < priced && (
+          <p>
+            {count(p.row, "One event takes", "events take")} the oracle price at its block; the{" "}
+            {count(p.nearest + p.today, "other takes", "others take")} the nearest price read
+            {p.today > 0 ? ", or today's" : ""}. A price more than 30 days old is stated as such.
+          </p>
+        )}
+      </ExplainMore>
     </div>
   );
 }

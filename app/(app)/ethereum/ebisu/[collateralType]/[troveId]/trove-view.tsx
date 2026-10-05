@@ -578,7 +578,7 @@ export default function EbisuTroveDetail({
                       </div>
                     }
                     learnMore={liquityForkEconomicsContent(forkOpts)}
-                    rowExtra={liquityForkRedemptionOutcome(towerData, forkOpts)}
+                    outcome={liquityForkRedemptionOutcome(towerData, forkOpts)}
                   />
                 );
               })()}

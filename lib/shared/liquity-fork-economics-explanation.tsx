@@ -205,8 +205,8 @@ export function liquityForkEconomicsExplanation(
   );
 }
 
-/** The redemption net-outcome strip on the tower's heading-button row — the
- *  fork mirror of Liquity V2's `liquityRedemptionOutcome`: the net at each
+/** The redemption net outcome, a bullet of the Lifetime flows Explanation's
+ *  Totals — the fork mirror of Liquity V2's `liquityRedemptionOutcome`: the net at each
  *  redemption's own price and, with a price on this load, at today's. */
 export function liquityForkRedemptionOutcome(
   data: LiquityForkTowerData,
@@ -263,24 +263,28 @@ export function liquityForkRedemptionOutcome(
         }
       : null;
   return (
-    <div
-      className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-2 text-xs text-rb-500"
-      data-anatomy="F13·liquity"
-    >
-      <span>Borrower&apos;s net outcome from redemptions was</span>
-      <Prov info={realizedProv} value={formatExact(atRedemption)}>
-        <span className={atRedemption >= 0 ? "text-green-400" : "text-red-400"}>{signedUsd(atRedemption)}</span>
-      </Prov>
-      {today != null && todayProv && (
-        <>
-          <span> or </span>
-          <Prov info={todayProv} value={formatExact(today)}>
-            <span className={today >= 0 ? "text-green-400" : "text-red-400"}>{signedUsd(today)}</span>
-          </Prov>
-          <span>at today&apos;s value</span>
-        </>
-      )}
-    </div>
+    // A bullet of the Lifetime flows Explanation's Totals.
+    <li className="flex items-start gap-2" data-anatomy="F13·liquity" data-flows-outcome="">
+      <span aria-hidden className="select-none">
+        •
+      </span>
+      <span className="min-w-0">
+        Redemptions:{" "}
+        <Prov info={realizedProv} value={formatExact(atRedemption)}>
+          <span className="font-medium tabular-nums">{signedUsd(atRedemption)}</span>
+        </Prov>{" "}
+        at the time
+        {today != null && todayProv && (
+          <>
+            ,{" "}
+            <Prov info={todayProv} value={formatExact(today)}>
+              <span className="font-medium tabular-nums">{signedUsd(today)}</span>
+            </Prov>{" "}
+            at today&apos;s value
+          </>
+        )}
+      </span>
+    </li>
   );
 }
 

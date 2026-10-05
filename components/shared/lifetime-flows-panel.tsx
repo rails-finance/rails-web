@@ -2,13 +2,13 @@
 
 // <LifetimeFlowsPanel> — the Lifetime flows panel on a position page that has a
 // date scrubber (rails-ops reference/lifetime-flows-scrubber.md): the header
-// that collapses the panel, the scrubber, and the Explanation with the
-// scrubber's Key after its prose. The scrubber reports the Key's hatches where
-// it draws them, and a line each for the Key and the Explanation on what the
-// bars and the line under them cover; the line's basis ("USD at each day's
-// close") sits beside the (i). Until the scrubber's timeline
-// lands the panel says it is reading; where that read fails, that it was not
-// read.
+// that collapses the panel, the scrubber, and the Explanation. The face carries
+// figures, bars, chart, controls and the axis caption ("USD at each day's
+// close", beside the (i)); everything that explains or totals is in the
+// Explanation (TO-DO-ui-jobs §251): the protocol's bullets, the Lifetime
+// totals the scrubber reports with any outcome bullet, the Chart bullets and
+// the Key. Until the scrubber's timeline lands the panel says it is reading;
+// where that read fails, that it was not read.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -19,10 +19,15 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
+import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
+import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
+import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
-import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { lifetimeFlowsReadingContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -51,12 +56,15 @@ export interface LifetimeFlowsPanelProps {
   /** The collapse store's id; the route's explorer by default, null for none
    *  (lib/shared/flows-collapse-store.ts). */
   collapseKey?: string | null;
-  /** Inline content on the Explanation's heading row (a Liquity Trove's
-   *  redemption outcome strip). */
-  rowExtra?: ReactNode;
+  /** Bullets (`<li>`) the Explanation's Totals carry after the throughput: a
+   *  Liquity Trove's redemption outcome, a Polaris CDP's PSM outcome. The
+   *  panel's face keeps figures, bars, chart, controls and the axis caption
+   *  (rails-ops TO-DO-ui-jobs §251). */
+  outcome?: ReactNode;
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
+const READING = lifetimeFlowsReadingContent();
 
 export function LifetimeFlowsPanel({
   scrubber,
@@ -65,7 +73,7 @@ export function LifetimeFlowsPanel({
   learnMore,
   title = "Lifetime flows",
   collapseKey: collapseKeyProp,
-  rowExtra,
+  outcome,
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
@@ -92,19 +100,26 @@ export function LifetimeFlowsPanel({
     setCollapsed(false);
     setSettled(true);
   }, [move, collapseKey]);
+  // The (i) open, or the history still loading: the height is not the one a
+  // return visit should reserve (TO-DO-ui-jobs §266).
+  const [infoOpen, setInfoOpen] = useState(false);
+  const { remembered } = useSkeletonSizes();
   if (scrubber == null && read === "done") return null;
+  const loading = scrubber == null && read !== "failed";
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
     <ProvReceiptsScope registry={registry}>
       <section
         data-skel-section="detail-economics"
+        {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
         data-lifetime-flows-panel=""
         data-anatomy="P2"
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
         suppressHydrationWarning
         className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
+        style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
       >
         {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
         <div
@@ -123,7 +138,7 @@ export function LifetimeFlowsPanel({
               aria-expanded={!collapsed}
               aria-controls={bodyId}
               aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -mx-2 h-7 w-[calc(100%+1rem)] min-w-0 rounded-md px-2`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 rounded-md px-2`}
             >
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -136,47 +151,62 @@ export function LifetimeFlowsPanel({
           ) : (
             <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
+          {/* How to read the charts: one text on every explorer (§264). */}
+          <div className="pointer-events-auto -mr-1 shrink-0">
+            <LearnMore content={READING} inline anatomy="F16" ariaLabel="How to read these charts" />
+          </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (
             <FlowsKeyContext.Provider value={setFlowsKey}>
               <div className="mt-2">{scrubber}</div>
             </FlowsKeyContext.Provider>
-          ) : (
+          ) : read === "failed" ? (
             <p
               className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
               data-flows-read={read}
             >
-              {read === "failed" ? "The flow history was not read. Reload to try again." : "Reading the flow history…"}
+              The flow history was not read. Reload to try again.
             </p>
+          ) : (
+            <div data-flows-read={read}>
+              <p className="sr-only" role="status">
+                Reading the flow history…
+              </p>
+              <LifetimeFlowsSkeleton />
+            </div>
           )}
           <ProvenanceInfoTabs
             className="mt-3"
             explanation={
-              scrubber != null && flowsKey ? (
+              explanation == null && !outcome && !flowsKey ? undefined : (
                 <>
                   {explanation}
-                  {flowsKey.explain && (
-                    <p className="mt-2 first:mt-0" data-flow-views-explain="">
-                      {flowsKey.explain}
-                    </p>
+                  {(flowsKey?.totals || outcome) && (
+                    <ExplainGroup title="Lifetime totals" data-flow-totals="">
+                      {flowsKey?.totals && <FlowsTotalsBullets t={flowsKey.totals} />}
+                      {outcome}
+                    </ExplainGroup>
                   )}
-                  <FlowsKey {...flowsKey} />
+                  {scrubber != null && flowsKey && (
+                    <>
+                      {flowsKey.chart && flowsKey.chart.length > 0 && (
+                        <ExplainGroup title="Chart" data-flow-chart-words="">
+                          {flowsKey.chart.map((t) => (
+                            <ExplainBullet key={t}>{t}</ExplainBullet>
+                          ))}
+                        </ExplainGroup>
+                      )}
+                      <FlowsKey {...flowsKey} />
+                    </>
+                  )}
                 </>
-              ) : (
-                explanation
               )
             }
             learnMore={learnMore}
             anatomy={FLOWS_ANATOMY}
-            rowExtra={
-              flowsKey?.basis || rowExtra ? (
-                <>
-                  {flowsKey?.basis && <FlowsBasis text={flowsKey.basis} />}
-                  {rowExtra}
-                </>
-              ) : undefined
-            }
+            onExplanationToggle={setInfoOpen}
+            rowExtra={flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
           />
         </div>
       </section>

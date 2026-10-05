@@ -81,7 +81,15 @@ import {
   windowModel,
 } from "@/lib/shared/flows-timeline";
 import { isBusy } from "@/lib/shared/flows-busy";
-import { AxisLabels, BusyFlows, DateRow, Headline, TrackEnds } from "@/components/shared/lifetime-flows-busy";
+import {
+  AxisLabels,
+  BusyFlows,
+  DateRow,
+  flowsTotals,
+  Headline,
+  TrackEnds,
+  type FlowsTotalsData,
+} from "@/components/shared/lifetime-flows-busy";
 import { CombinedFlows, FLOW_TICK, LINE_HUE } from "@/components/shared/lifetime-flows-combined";
 import {
   binInputFromTimeline,
@@ -127,13 +135,13 @@ export type FlowsKeyItems = {
   /** The line's two sides, and the bars' window where it is shaded. */
   lines?: { label: string; color: string }[];
   shade?: string | null;
-  /** The Key's line on what the bars and the line cover. */
-  views?: string;
-  /** The Explanation's line on the same, and how to read the panel. */
-  explain?: string;
+  /** The Explanation's Chart bullets: what the bars and the line cover. */
+  chart?: string[];
   /** How the line values a point ("USD at each day's close"), beside the
    *  panel's (i). */
   basis?: string;
+  /** The Explanation's Totals: what came in over the bars' stops. */
+  totals?: FlowsTotalsData;
 };
 export const FlowsKeyContext = createContext<((key: FlowsKeyItems | null) => void) | null>(null);
 
@@ -486,8 +494,8 @@ function SideBlock({
  *  draw, by name, for each kind of exit the position has had over its life.
  *  The segments' tips carry the figures. Where the position has other stops,
  *  the dashed outline too: where each bar ends at the last stop. */
-export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems) {
-  if (items.length === 0 && !outline && !lines?.length && !shade && !views) return null;
+export function FlowsKey({ items, outline, lines, shade }: FlowsKeyItems) {
+  if (items.length === 0 && !outline && !lines?.length && !shade) return null;
   return (
     <div className="mt-3 first:mt-0" data-flow-key="" data-anatomy="F10">
       <p className="text-xs font-semibold text-foreground">Key</p>
@@ -517,11 +525,6 @@ export function FlowsKey({ items, outline, lines, shade, views }: FlowsKeyItems)
           </li>
         )}
       </ul>
-      {views && (
-        <p className="mt-1.5 text-xs leading-relaxed text-rb-500" data-flow-key-views="">
-          {views}
-        </p>
-      )}
     </div>
   );
 }
@@ -638,9 +641,13 @@ export function LifetimeFlowsScrubber({
   const basisUnit = model?.sideUnits
     ? `${model.sideUnits.collateral.symbol} and ${model.sideUnits.debt.symbol}`
     : (model?.unit?.symbol ?? "USD");
+  const totals = useMemo(
+    () => (bars && model ? flowsTotals(bars, from > 0 ? dayStamp(dayStart(bars, 0)) : null) : null),
+    [bars, model, from],
+  );
   const words = useMemo(
-    () => (bars && model ? panelWords(model, bars, from, bin, lined, busy, focused) : null),
-    [model, bars, from, bin, lined, busy, focused],
+    () => (bars && model ? panelWords(model, bars, from, bin, lined) : null),
+    [model, bars, from, bin, lined],
   );
   useEffect(() => {
     if (!words) return;
@@ -651,11 +658,11 @@ export function LifetimeFlowsScrubber({
       outline: lined ? words.outline : (drawn?.outline ?? null),
       lines: lined ? words.lines : undefined,
       shade: lined && from > 0 ? "The bars' window" : null,
-      views: words.key,
-      explain: words.explain,
+      chart: words.chart,
       basis: lined ? `${basisUnit} at each ${bin}’s close` : undefined,
+      totals: totals ?? undefined,
     });
-  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit]);
+  }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals]);
   useEffect(() => () => reportKey?.(null), [reportKey]);
 
   if (!model || !bars || !words) return null;
@@ -691,95 +698,53 @@ export function LifetimeFlowsScrubber({
   );
 }
 
-/** How the chart and the timeline meet, on a page that ties them. */
-const FOCUS_READ =
-  "A click on the line freezes the cursor on a day, and the line after it is dimmed; the button “Show timeline to” that day then cuts the timeline below at that day's close, which is how the timeline is read by date, and the page's link keeps that day. Each day's last event has a chart button that brings the chart to its day. Each event's card adds up its side as of that event, line by line.";
-
-/** The Explanation's sentence on the marks under the line, naming only the
- *  kinds this position has; empty where every mark is a plain dot. */
-function tickWords(model: FlowModel, hasDebt: boolean): string {
+/** The Chart bullet on the marks under the line, naming only the kinds this
+ *  position has; null where every mark is a plain dot. */
+function tickWords(model: FlowModel): string | null {
   const has = new Set(model.ticks.map((t) => t.tick));
   const parts: string[] = [];
   const named = model.words.marks ?? {};
-  if (has.has("liquidation")) parts.push(named.liquidation ?? "a red triangle for a liquidation");
-  if (has.has("redemption")) parts.push("an orange triangle for a redemption");
-  if (has.has("caution")) parts.push("an orange triangle for another change the owner did not make");
-  if (has.has("rate-delegate")) parts.push("a pink dot for a rate change the delegate set");
-  if (has.has("rate-owner")) parts.push("a ring for a rate change the owner made");
-  if (parts.length === 0) return "";
-  const side = hasDebt ? "a dot in the hue of the side it moved" : "a dot";
-  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
-  return `Under the line each day with events has one mark: ${list}, and otherwise ${side}; a day with several shows the strongest. `;
+  if (has.has("liquidation")) parts.push(named.liquidation ?? "red triangle, a liquidation");
+  if (has.has("redemption")) parts.push("orange triangle, a redemption");
+  if (has.has("caution")) parts.push("orange triangle, a change the owner did not make");
+  if (has.has("rate-delegate")) parts.push("pink dot, the delegate's rate change");
+  if (has.has("rate-owner")) parts.push("ring, the owner's rate change");
+  return parts.length === 0 ? null : `Marks: ${parts.join("; ")}`;
 }
 
-/** The Key's and the Explanation's lines on what the bars and the line cover
- *  and how to read them, and the line's two sides for the Key. */
+/** The Explanation's Chart bullets: what this position's bars and line cover,
+ *  and the marks and notes it has. How to read any chart is the panel's "?"
+ *  (TO-DO-ui-jobs §245, §264). And the line's two sides for the Key. */
 function panelWords(
   model: FlowModel,
   bars: FlowModel,
   from: number,
   bin: SeriesBin,
   lined: boolean,
-  busy: boolean,
-  focused = false,
 ): {
-  key: string | undefined;
-  explain: string;
+  chart: string[];
   lines: { label: string; color: string }[];
   /** The Key's name for the dashed outline, where there is more than one stop. */
   outline: string | null;
 } {
   const closed = !(model.heldAt[model.heldAt.length - 1] ?? []).some((h) => (h.amount ?? 0) > 0);
   const opens = longDay(dayStart(bars, 0));
-  const ends = closed ? `the close on ${longDay(dayStart(model, model.lastDay))}` : "today";
-  const days = (n: number) => `${n.toLocaleString("en-US")} day${n === 1 ? "" : "s"} with events`;
+  const n = (k: number) => k.toLocaleString("en-US");
   const hasDebt = model.buckets.some((b) => b.side === "debt");
-  const what = hasDebt
-    ? `${model.labels.collateral.toLowerCase()} and ${model.labels.debt.toLowerCase()}`
-    : model.labels.collateral.toLowerCase();
-  const barsCover =
-    from > 0 ? `the last ${WINDOW_ACTIVE_DAYS} active days, from ${opens}` : `every active day since ${opens}`;
-  // One bar on a one-sided position (savings, a lender).
-  const [bs, cov, them, heads, each] = hasDebt
-    ? ["bars", "cover", "them", "the headlines and the bars are", "each bar ends"]
-    : ["bar", "covers", "it", "the headline and the bar are", "the bar ends"];
-  const cover =
+  const Bars = hasDebt ? "Bars" : "Bar";
+  const chart = [
     from > 0
-      ? `The ${bs} ${cov} the last ${WINDOW_ACTIVE_DAYS} of the position's ${days(model.eventDays.length)}, from ${opens} to ${ends}, and start${hasDebt ? "" : "s"} with what was held as that window opens. `
-      : `The ${bs} ${cov} all ${days(bars.eventDays.length)}, from ${opens} to ${ends}; a position with more than ${WINDOW_ACTIVE_DAYS} such days shows its last ${WINDOW_ACTIVE_DAYS}. `;
-  const read = focused
-    ? busy
-      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a click on ${hasDebt ? "one" : "it"} names what it holds. ${FOCUS_READ}`
-      : `A bar's length is everything that came in: the headline is the solid part of the bar, and a click on a part names it with its share of the bar. ${FOCUS_READ}`
-    : busy
-      ? `The ${bs} ${hasDebt ? "are" : "is"} drawn at the scale of what is held: the headline is the bar, and a tap on ${hasDebt ? "one" : "it"} opens how that side's flows add up to it, line by line.`
-      : "A bar's length is everything that came in: the headline is the solid part of the bar, and a tap on any part opens its assets and that side's sum, line by line to what is held.";
-  const today = closed ? "at the close" : "today";
-  const marks = tickWords(model, hasDebt);
-  // Only where the position has an old-price period.
-  const old =
-    model.stale.size > 0
-      ? ` Where a held asset's latest price is more than ${model.gapDays} days old, ${lined ? "the line is dotted and " : ""}“Old price” shows by the date, its tip naming the asset and the day of that price${model.repricings.length > 0 ? "; “Repriced” marks a day whose newer price moves its side by 1% or more" : ""}.`
-      : "";
-  // Only where a figure rests on a price or a read the page does not have.
-  const incomplete =
-    model.unsure.size > 0 || model.unsureFlows.length > 0
-      ? ` Where a figure rests on a price or a read the page does not have, ${lined && model.unsure.size > 0 ? "the line is dotted for that stretch, its tip saying what is missing and why, and " : ""}an asterisk by the headline names it.`
-      : "";
+      ? `${Bars}: the last ${WINDOW_ACTIVE_DAYS} of ${n(model.eventDays.length)} days with events, from ${opens}`
+      : `${Bars}: all ${n(bars.eventDays.length)} days with events, from ${opens}`,
+  ];
+  const marks = tickWords(model);
+  if (marks) chart.push(marks);
+  if (model.stale.size > 0)
+    chart.push(`Old price: a held asset's price over ${model.gapDays} days old${lined ? ", the line dotted" : ""}`);
+  if (model.unsure.size > 0 || model.unsureFlows.length > 0)
+    chart.push("Asterisk: a figure rests on a price or read the page lacks");
   return {
-    key: lined ? `${hasDebt ? "Bars" : "Bar"}: ${barsCover} · Line: ${what} by ${bin} since the open` : undefined,
-    explain: lined
-      ? cover +
-        `The line under ${them} draws ${what} at the end of each ${bin} since the open, ${model.words.linePrices ?? "at the daily prices the index records"}` +
-        `${from > 0 ? `, with the ${bs}' window shaded` : ""}${model.words.linePrices ? "" : `, and leaves a gap where a held asset has no price that ${bin}`}. ` +
-        `One cursor moves both; press the line and drag to scrub it. It stops at the end of each ${bin === "day" ? "day (tap a tick to go to a day with events)" : `${bin}, on each day with events (tap a tick to go to it)`} and ${today}; at each stop ${heads} the position at the end of that day, the balances its last event left at that day's prices, so they state the same figure. ${marks}` +
-        `${read} The dashed outline is where ${each} ${today}.` +
-        (from > 0
-          ? ` Before the ${bs}' window opens ${hasDebt ? "they grey" : "it greys"} out at its first day; the ${hasDebt ? "headlines still follow" : "headline still follows"} the line.`
-          : "") +
-        old +
-        incomplete
-      : cover + read + old + incomplete,
+    chart,
     outline: model.liveStop > 0 ? (closed ? "Length at close" : "Today's length") : null,
     lines: [
       { label: model.labels.collateral, color: LINE_HUE.collateral },

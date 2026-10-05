@@ -1,5 +1,5 @@
-// Polaris — the PSM's shares get a net-outcome strip, valued at the feed at
-// settle, on the Lifetime flows panel's heading row.
+// Polaris — the PSM's shares get a net-outcome bullet, valued at the feed at
+// settle, in the Lifetime flows Explanation's Totals (TO-DO-ui-jobs §251).
 // ---------------------------------------------------------------------------
 // The per-row effect (mintRedeemCollGain × priceAtBlock − mintRedeemDebtGain)
 // and its lifetime sums for three fixture CDPs are pinned from psql over the
@@ -98,11 +98,11 @@ async function open(context, url) {
 
 const econSection = (page) => page.locator('[data-skel-section="detail-economics"]').first();
 
-/** The rowExtra strip's own container (the heading-row stat line) — the
- *  `justify-end` flex row `polarisPsmOutcome`/`liquityRedemptionOutcome`
- *  both render, distinct from the collapsed Explanation bullet that states
- *  the same sentence. */
-const outcomeStrip = (page) => econSection(page).locator("div.justify-end.pl-2").first();
+/** The outcome bullet `polarisPsmOutcome`/`liquityRedemptionOutcome` both
+ *  render in the panel's Totals (the pane stays mounted while closed, so its
+ *  text is read without opening it). */
+const outcomeStrip = (page) => econSection(page).locator("[data-flows-outcome]").first();
+const stripText = async (loc) => ((await loc.count()) > 0 ? (await loc.textContent()).replace(/\s+/g, " ") : "");
 
 console.log("Polaris — PSM net-outcome strip, valued at the feed at settle\n");
 console.log(`BASE ${BASE}\n`);
@@ -137,7 +137,7 @@ await strip8
   .filter({ hasText: /today.s feed/ })
   .waitFor({ state: "attached", timeout: 20000 })
   .catch(() => {});
-const stripText8 = (await strip8.count()) > 0 ? (await strip8.innerText()).replace(/\s+/g, " ") : "";
+const stripText8 = await stripText(strip8);
 check(
   "1b. the strip states the total at-settle effect (pinned +1.64M)",
   stripText8.includes(signedCompact(PIN_8.effect)),
@@ -155,7 +155,7 @@ check(
 const chain8 = await api(`/api/chain/polaris/position?market=usdp&id=8`);
 if (check("1d. usdp/8's live overlay answers with a price (precondition)", !chain8.chainStale && !!chain8.price)) {
   const todayExpected = PIN_8.netCollLeg * chain8.price.pethInDebt - PIN_8.netDebtLeg;
-  const m = /at today.s feed the same legs come to\s*([+−][\d,.]+[MK]?)/.exec(stripText8);
+  const m = /,\s*([+−][\d,.]+[MK]?)\s*\S*\s*at today.s feed/.exec(stripText8);
   const gotToday = m ? parseSignedCompact(m[1]) : NaN;
   check(
     `1e. the strip's "today's feed" figure matches netCollLeg × pethInDebt − netDebtLeg (0.5% tolerance)`,
@@ -176,8 +176,7 @@ const PIN_27 = { effect: 124.508871, redemption: 43.570811, mint: 80.93806 };
 const PIN_166 = { effect: 0.71855454 };
 
 const page27 = await open(context, polarisUrl("usdp", "27"));
-const strip27Text =
-  (await outcomeStrip(page27).count()) > 0 ? (await outcomeStrip(page27).innerText()).replace(/\s+/g, " ") : "";
+const strip27Text = await stripText(outcomeStrip(page27));
 check(
   "2a. usdp/27's strip states the pinned total (+124.509)",
   strip27Text.includes(signedCompact(PIN_27.effect)),
@@ -186,8 +185,7 @@ check(
 await page27.close();
 
 const page166 = await open(context, polarisUrl("usdp", "166"));
-const strip166Text =
-  (await outcomeStrip(page166).count()) > 0 ? (await outcomeStrip(page166).innerText()).replace(/\s+/g, " ") : "";
+const strip166Text = await stripText(outcomeStrip(page166));
 check(
   "2b. usdp/166's strip states the pinned total (+0.719) with no mint-share clause",
   strip166Text.includes(signedCompact(PIN_166.effect)) && !/mint shares/i.test(strip166Text),
@@ -203,11 +201,10 @@ const troveUrl = `${BASE}/ethereum/liquity-v2/trove/WETH/${TROVE_B}`;
 const pageTrove = await open(context, troveUrl);
 const troveEcon = econSection(pageTrove);
 check("4a. TROVE_B's economics section renders", (await troveEcon.count()) > 0);
-const troveStripText =
-  (await outcomeStrip(pageTrove).count()) > 0 ? (await outcomeStrip(pageTrove).innerText()).replace(/\s+/g, " ") : "";
+const troveStripText = await stripText(outcomeStrip(pageTrove));
 check(
-  '4c. liquityRedemptionOutcome\'s own strip still renders ("net outcome from redemptions")',
-  /net outcome from redemptions/i.test(troveStripText),
+  '4c. liquityRedemptionOutcome\'s bullet renders ("… at the time, … at today\'s oracle price")',
+  /at the time, [+−]\$[\d,.]+ at today.s oracle price/i.test(troveStripText),
   troveStripText,
 );
 await pageTrove.close();
