@@ -5,7 +5,7 @@
 // shells), watches their heights with a ResizeObserver, and records the
 // settled values per route shape × viewport bucket. The skeletons themselves
 // carry NO data-skel-section attribute, so a placeholder's own height can
-// never be recorded.
+// never be recorded; a section drawing one inside itself sets data-skel-pause.
 //
 // A ResizeObserver rather than a one-shot measure is load-bearing here: detail
 // pages merge the live chain-state overlay AFTER first paint, which changes
@@ -39,8 +39,11 @@ export function SkeletonSizeRecorder() {
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const section = (entry.target as HTMLElement).dataset.skelSection as SkeletonSection | undefined;
-        if (!section) continue;
+        const el = entry.target as HTMLElement;
+        const section = el.dataset.skelSection as SkeletonSection | undefined;
+        // A section marks itself paused while its height is not the settled
+        // one to reserve: still loading, or an Explanation open under it.
+        if (!section || el.dataset.skelPause != null) continue;
         latest[section] = entry.target.getBoundingClientRect().height;
       }
       if (debounce) clearTimeout(debounce);

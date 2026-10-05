@@ -21,6 +21,8 @@ import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
+import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
+import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -96,19 +98,26 @@ export function LifetimeFlowsPanel({
     setCollapsed(false);
     setSettled(true);
   }, [move, collapseKey]);
+  // The (i) open, or the history still loading: the height is not the one a
+  // return visit should reserve (TO-DO-ui-jobs §266).
+  const [infoOpen, setInfoOpen] = useState(false);
+  const { remembered } = useSkeletonSizes();
   if (scrubber == null && read === "done") return null;
+  const loading = scrubber == null && read !== "failed";
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
     <ProvReceiptsScope registry={registry}>
       <section
         data-skel-section="detail-economics"
+        {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
         data-lifetime-flows-panel=""
         data-anatomy="P2"
         {...(collapseKey ? { [COLLAPSE_KEY_ATTR]: collapseKey } : {})}
         {...(collapseKey && settled ? { [COLLAPSED_ATTR]: collapsed ? "1" : "0" } : {})}
         suppressHydrationWarning
         className={`rounded-2xl bg-raised ${CARD_PAD_X} py-4`}
+        style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
       >
         {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
         <div
@@ -146,13 +155,20 @@ export function LifetimeFlowsPanel({
             <FlowsKeyContext.Provider value={setFlowsKey}>
               <div className="mt-2">{scrubber}</div>
             </FlowsKeyContext.Provider>
-          ) : (
+          ) : read === "failed" ? (
             <p
               className="mt-2 flex h-24 items-center justify-center rounded-md bg-sunken px-3 text-center text-xs text-rb-500"
               data-flows-read={read}
             >
-              {read === "failed" ? "The flow history was not read. Reload to try again." : "Reading the flow history…"}
+              The flow history was not read. Reload to try again.
             </p>
+          ) : (
+            <div data-flows-read={read}>
+              <p className="sr-only" role="status">
+                Reading the flow history…
+              </p>
+              <LifetimeFlowsSkeleton />
+            </div>
           )}
           <ProvenanceInfoTabs
             className="mt-3"
@@ -183,6 +199,7 @@ export function LifetimeFlowsPanel({
             }
             learnMore={learnMore}
             anatomy={FLOWS_ANATOMY}
+            onExplanationToggle={setInfoOpen}
             rowExtra={flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
           />
         </div>
