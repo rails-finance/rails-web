@@ -305,9 +305,9 @@ export function TimelineRunCard({
       <div className="flex items-center gap-1.5 flex-wrap">
         {/* The dotted spine carries the pill on desktop; on mobile the badge
             moves into the header, matching the single passive card's hand-off.
-            Folder rows never carry it — the corner mark + dot/connector tone
-            already state the severity, at every width. */}
-        {!spine && !folder && warningLabel && (
+            A folder row carries it too: the corner mark and the tone state the
+            severity, the pill names the kind. */}
+        {!spine && warningLabel && (
           <span
             className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PILL_CLASSES[tone]}`}
           >
