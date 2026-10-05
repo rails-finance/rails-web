@@ -14,6 +14,7 @@
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useEffect, useState, type ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import type { BookmarkScope, SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -104,17 +105,30 @@ export function PositionWalletRow({
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
   const chainId = session ? protocolForSession(session)?.chainId : undefined;
+  // A wallet is its address menu (ui-jobs 271); a vault or a page that links
+  // the address elsewhere (PWN's other side) keeps the pill.
+  const plain = !owner.vault && !owner.href;
   const pill = owner.wallet ? (
-    <WalletPill
-      wallet={owner.wallet}
-      ensName={owner.ensName ?? null}
-      filterProtocol={filterProtocol}
-      bookmarkProtocol={bookmarkProtocol}
-      bookmarkListing={owner.bookmarkListing}
-      vault={owner.vault}
-      href={owner.href}
-      hrefLabel={owner.hrefLabel}
-    />
+    plain ? (
+      <WalletMenu
+        wallet={owner.wallet}
+        ensName={owner.ensName ?? null}
+        filterProtocol={filterProtocol}
+        bookmarkProtocol={bookmarkProtocol}
+        bookmarkListing={owner.bookmarkListing}
+      />
+    ) : (
+      <WalletPill
+        wallet={owner.wallet}
+        ensName={owner.ensName ?? null}
+        filterProtocol={filterProtocol}
+        bookmarkProtocol={bookmarkProtocol}
+        bookmarkListing={owner.bookmarkListing}
+        vault={owner.vault}
+        href={owner.href}
+        hrefLabel={owner.hrefLabel}
+      />
+    )
   ) : null;
   return (
     // One line at every width: the pill does not wrap, Tools keeps its size.
