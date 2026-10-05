@@ -103,7 +103,7 @@ check(
   JSON.stringify(ethx),
 );
 const owner = await kindOf(LIQUIDATED);
-check("232: a wallet row names its kind", owner.kind != null, JSON.stringify(owner));
+check("232: a plain wallet's row carries no kind label", owner.kind == null, JSON.stringify(owner));
 
 // ── 232: a cut that empties the loaded list ────────────────────────────────
 await page.goto(`${BASE}${CONTRACT}?to=2026-09-06`, { waitUntil: "domcontentloaded", timeout: 180000 });

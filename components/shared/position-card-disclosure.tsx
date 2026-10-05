@@ -150,7 +150,11 @@ export function PositionCardHeader({
     );
   }
   return (
-    <div className={`relative ${spacing ?? ""}`} data-anatomy={anatomy} data-card-header="">
+    // `group/card` sits on the wrapper: the chevron is a sibling of the button,
+    // and hovering the button (under the content) hovers the wrapper, so the
+    // chevron lights (globals.css .expand-chev) and the button tints, the
+    // Lifetime flows bar's hover.
+    <div className={`group/card relative ${spacing ?? ""}`} data-anatomy={anatomy} data-card-header="">
       <button
         type="button"
         data-card-disclosure-toggle=""
@@ -169,7 +173,7 @@ export function PositionCardHeader({
           if (moved || selected) return;
           d.toggle();
         }}
-        className="group/card absolute -inset-x-3 -top-3 -bottom-3 z-0 cursor-pointer rounded-lg focus-ring"
+        className="absolute -inset-x-3 -top-3 -bottom-3 z-0 cursor-pointer rounded-lg transition-colors hover:bg-rb-100 dark:hover:bg-rb-800 focus-ring"
       />
       <HeaderToggleContext.Provider value={true}>
         <div

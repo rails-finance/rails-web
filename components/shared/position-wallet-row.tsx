@@ -22,12 +22,10 @@ import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind
 import type { ChainId } from "@/lib/shared/chains";
 
 /** The row's words for what the address is (ui-jobs 232), and the read
- *  behind them for the tip. */
-function addressKindWords(k: AddressKind): { label: string; tip: string } {
+ *  behind them for the tip. A plain wallet (`account`) has no label. */
+function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): { label: string; tip: string } {
   const at = `eth_getCode at block ${k.block.toLocaleString("en-US")}`;
   switch (k.kind) {
-    case "account":
-      return { label: "Wallet", tip: `No code at this address (${at}): an account a key controls.` };
     case "delegated":
       return {
         label: "Smart account (EIP-7702)",
@@ -59,7 +57,7 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
       live = false;
     };
   }, [wallet, chainId]);
-  if (!kind) return null;
+  if (!kind || kind.kind === "account") return null;
   const w = addressKindWords(kind);
   return (
     // Gives way before the address does (shrink-[100]).
@@ -144,7 +142,7 @@ export function PositionWalletRow({
       data-position-wallet-row=""
       data-anatomy="H13"
     >
-      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-rb-500">
+      <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
         {pill && owner.prefix}
         {pill && (owner.wrap ? owner.wrap(pill) : pill)}
         {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
