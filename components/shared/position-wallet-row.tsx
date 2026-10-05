@@ -62,7 +62,8 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
   if (!kind) return null;
   const w = addressKindWords(kind);
   return (
-    <span className="min-w-0 truncate" data-address-kind={kind.kind} title={w.tip}>
+    // Gives way before the address does (shrink-[100]).
+    <span className="min-w-0 shrink-[100] truncate" data-address-kind={kind.kind} title={w.tip}>
       {w.label}
     </span>
   );
@@ -143,7 +144,7 @@ export function PositionWalletRow({
       data-position-wallet-row=""
       data-anatomy="H13"
     >
-      <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
+      <span className="flex min-w-0 items-center gap-2 overflow-hidden text-xs text-rb-500">
         {pill && owner.prefix}
         {pill && (owner.wrap ? owner.wrap(pill) : pill)}
         {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}

@@ -121,7 +121,8 @@ export function WalletMenu({
   );
 
   return (
-    // The address keeps its width; the address kind beside it gives way first.
+    // The address keeps its width (a name is capped at 15ch); the address
+    // kind beside it gives way first, and the row clips past that.
     <div ref={ref} className="relative shrink-0" data-wallet-menu="" data-anatomy="C7">
       <button
         type="button"
