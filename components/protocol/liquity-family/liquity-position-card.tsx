@@ -565,6 +565,21 @@ export function LiquityPositionCard({
   // warnings, age, ⋮), the header's right end (the delegate flag and the
   // chevron), and the small tag naming an ended or redeemed-down Trove.
   const set = headerSet && !!receipts;
+  // The listing card under the header set (ui-jobs 246): status, the owner
+  // as text, the activity and the headline figures; no action icons, and
+  // the branch's ticker once, as the collateral's icon.
+  const listSet = headerSet && !receipts;
+  const inertIdentity = listSet ? (
+    <TroveIdentityRow
+      protocol={protocol}
+      troveId={v.id}
+      owner={v.owner}
+      lastOwner={v.lastOwner}
+      ownerEns={ownerEns}
+      shortId={ops.shortId}
+      inert
+    />
+  ) : undefined;
   const footStrip = set ? (
     <>
       <PositionCardMeta
@@ -698,7 +713,9 @@ export function LiquityPositionCard({
           outcome={v.status}
           closedAt={v.lastActivityAt}
           leadingIdentity={
-            set ? undefined : (
+            set ? undefined : listSet ? (
+              inertIdentity
+            ) : (
               <>
                 <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
                 <TroveIdentityRow
@@ -766,7 +783,12 @@ export function LiquityPositionCard({
           )
         }
         leadingIdentity={
-          set ? undefined : (
+          set ? undefined : listSet ? (
+            <>
+              {inertIdentity}
+              {delegateFlag}
+            </>
+          ) : (
             <>
               <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
               <TroveIdentityRow
@@ -819,7 +841,7 @@ export function LiquityPositionCard({
                 </span>
               </StatValue>
             ),
-            footnote: set ? (
+            footnote: headerSet ? (
               <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
                 {collUsd !== null && collUsd > 0 ? (
                   <Prov info={fp.collUsd}>
@@ -874,7 +896,7 @@ export function LiquityPositionCard({
             ),
             footnote: (
               <>
-                {set && debt > 0 && (
+                {headerSet && debt > 0 && (
                   <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
                     <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
                       <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>

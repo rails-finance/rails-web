@@ -126,7 +126,9 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
       searchPlaceholder="Address, ENS, or ID"
-      renderCard={(t) => <LiquityPositionCard protocol="liquity-v2" v={viewFromTroveSummary(t, prices)} compact />}
+      renderCard={(t) => (
+        <LiquityPositionCard protocol="liquity-v2" v={viewFromTroveSummary(t, prices)} compact headerSet />
+      )}
       hrefFor={(t) => `/ethereum/liquity-v2/trove/${t.collateralType}/${t.id}`}
       keyFor={(t) => `${t.collateralType}-${t.id}`}
       strategy={serverStrategy<TroveSummary, LiquityV2ListFilters>({

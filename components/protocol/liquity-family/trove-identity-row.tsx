@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
+import { Facehash } from "@/components/shared/facehash";
+import { useEnsName } from "@/lib/ens/use-ens-names";
 import type { LiquityFamilyId } from "./types";
 
 /**
@@ -31,6 +33,7 @@ export function TroveIdentityRow({
   showBookmark = true,
   showNftLink = true,
   showOwner = true,
+  inert = false,
 }: {
   protocol: LiquityFamilyId;
   troveId?: string;
@@ -56,6 +59,10 @@ export function TroveIdentityRow({
   /** The owner's pill. The detail card passes false: the page's wallet row
    *  above the card names the owner (ui-jobs 228). */
   showOwner?: boolean;
+  /** The listing card under the header set (ui-jobs 246): the owner, or the
+   *  Trove ID where there is none, as text with its facehash and no
+   *  controls; the whole card is the link. */
+  inert?: boolean;
 }) {
   const [copiedTrove, setCopiedTrove] = useState(false);
   const troveLabel = troveId ? shortId(troveId) : null;
@@ -64,7 +71,35 @@ export function TroveIdentityRow({
   const ownerAddress = showOwner ? (owner ?? lastOwner ?? null) : null;
   const isLastOwner = !owner && !!lastOwner;
 
+  const resolved = useEnsName(inert && ownerAddress && !ownerEns ? ownerAddress : null);
   if (!troveLabel && !nftUrl && !ownerAddress) return null;
+
+  if (inert) {
+    const name = ownerEns ?? resolved;
+    return (
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-rb-500">
+        {ownerAddress ? (
+          <>
+            {isLastOwner && <span className="text-rb-400">last owner</span>}
+            <Facehash address={ownerAddress} size={16} />
+            <span
+              className={name ? "max-w-[15ch] truncate" : "font-mono"}
+              title={name ? `${name} · ${ownerAddress}` : ownerAddress}
+            >
+              {name ?? `${ownerAddress.slice(0, 6)}…${ownerAddress.slice(-4)}`}
+            </span>
+          </>
+        ) : (
+          troveLabel && (
+            <>
+              <Icon name="trove-id" size={12} />
+              <span className="font-mono">{troveLabel}</span>
+            </>
+          )
+        )}
+      </span>
+    );
+  }
 
   const copy = (value: string, setter: (v: boolean) => void) => {
     navigator.clipboard.writeText(value);
