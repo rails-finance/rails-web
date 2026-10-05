@@ -171,8 +171,7 @@ const changeVerify = (coords?: EventCoords): ProvVerify | undefined =>
 /** The trove's recorded annual interest rate AFTER this event. The detail
  *  grid's Interest Rate metric is the receipt's primary; the header's rate
  *  pills (RatePill / DelegateRatePill) echo it — the shared exact value keeps
- *  the receipt key stable across their different display precisions (the
- *  detail renders 1dp, the delegate pill 2dp). */
+ *  the receipt key stable whatever precision each surface renders. */
 export function rateAfterProv(ctx: LiquityContext, coords?: EventCoords): FigureProv | undefined {
   const { stateAfter } = ctx;
   if (!stateAfter) return undefined;

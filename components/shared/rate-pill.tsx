@@ -76,18 +76,18 @@ export function RateEcho({ prov, children }: { prov?: FigureProv; children: Reac
   );
 }
 
-/** Interest-rate pill for individual (non-delegated) troves — 1dp. */
+/** Interest-rate pill for individual (non-delegated) troves — 2dp. */
 export function RatePill({ rate, prov }: { rate: number; prov?: FigureProv }) {
   return (
     <RatePillShell>
-      <RateEcho prov={prov}>{rate.toFixed(1)}%</RateEcho>
+      <RateEcho prov={prov}>{rate.toFixed(2)}%</RateEcho>
     </RatePillShell>
   );
 }
 
 /** Interest-rate pill for delegated troves — pink with the people glyph, 2dp.
- *  The precision split (1dp individual, 2dp delegate) encodes that a delegate
- *  rate is a published figure quoted exactly. */
+ *  Both pills state a rate at two places, as the detail grid and the
+ *  explanation do. */
 export function DelegateRatePill({ rate, prov }: { rate: number; prov?: FigureProv }) {
   return (
     <DelegateRatePillShell>
