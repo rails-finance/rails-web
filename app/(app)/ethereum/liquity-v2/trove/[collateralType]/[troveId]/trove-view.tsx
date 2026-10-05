@@ -27,10 +27,10 @@ import {
   unpricedEvents,
 } from "@/lib/shared/liquity-flows";
 import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/components/shared/flow-focus-context";
-import { LiquityFlowsNote, troveLives } from "@/lib/shared/liquity-flows-explanation";
+import { troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
-import { liquityEconomicsExplanation, liquityRedemptionOutcome } from "@/lib/liquity/economics-explanation";
+import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
 import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
@@ -662,26 +662,18 @@ export default function TroveView({
                 scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
                 read={flowsNow == null || !flowDaily.settled ? "reading" : flowsRead}
                 explanation={
-                  <div className="space-y-2 text-sm text-rb-500">
-                    {liquityEconomicsExplanation(
-                      result.economics,
-                      result.economics._meta,
-                      now,
-                      currentPrice,
-                      surplus?.claimed != null,
-                    )}
-                    <LiquityFlowsNote
-                      collSymbol={flowCollSymbol}
-                      debtSymbol={flowDebtSymbol}
-                      unpriced={unpricedEvents(flowEvents)}
-                      lives={troveLives(flowEvents)}
-                      zombie={result.economics._meta.isZombie}
-                      daily={flowDaily.obs != null}
-                    />
-                  </div>
+                  <LiquityFlowsExplanation
+                    economics={result.economics}
+                    meta={result.economics._meta}
+                    now={now}
+                    currentPrice={currentPrice}
+                    surplusClaimed={surplus?.claimed != null}
+                    unpriced={unpricedEvents(flowEvents)}
+                    lives={troveLives(flowEvents)}
+                    daily={flowDaily.obs != null}
+                  />
                 }
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
-                outcome={liquityRedemptionOutcome(result.economics, currentPrice)}
               />
               {result.redeemer && <RedeemerSummary stats={result.redeemer} currentPrice={currentPrice} />}
             </>

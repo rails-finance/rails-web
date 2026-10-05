@@ -287,11 +287,13 @@ export function FlowsTotalsBullets({ t }: { t: FlowsTotalsData }) {
         <>
           Deposited {fig(t.deposited, "Deposited")}
           {t.borrowed && <>, borrowed {fig(t.borrowed, "Borrowed")}</>},{" "}
-          <span className="font-medium tabular-nums" data-prov-exempt="">
-            {count(t.txs)}
-          </span>{" "}
-          {t.unit}
-          {t.txs === 1 ? "" : "s"}
+          <span className="whitespace-nowrap">
+            <span className="font-medium tabular-nums" data-prov-exempt="">
+              {count(t.txs)}
+            </span>{" "}
+            {t.unit}
+            {t.txs === 1 ? "" : "s"}
+          </span>
           {t.since ? ` since ${t.since}` : ""}
         </>
       </ExplainBullet>

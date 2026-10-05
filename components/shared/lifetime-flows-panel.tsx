@@ -2,13 +2,13 @@
 
 // <LifetimeFlowsPanel> — the Lifetime flows panel on a position page that has a
 // date scrubber (rails-ops reference/lifetime-flows-scrubber.md): the header
-// that collapses the panel, the scrubber, and the Explanation with the
-// scrubber's Key after its prose. The scrubber reports the Key's hatches where
-// it draws them, and a line each for the Key and the Explanation on what the
-// bars and the line under them cover; the line's basis ("USD at each day's
-// close") sits beside the (i). Until the scrubber's timeline
-// lands the panel says it is reading; where that read fails, that it was not
-// read.
+// that collapses the panel, the scrubber, and the Explanation. The face carries
+// figures, bars, chart, controls and the axis caption ("USD at each day's
+// close", beside the (i)); everything that explains or totals is in the
+// Explanation (TO-DO-ui-jobs §251): the protocol's bullets, the Lifetime
+// totals the scrubber reports with any outcome bullet, the Chart bullets and
+// the Key. Until the scrubber's timeline lands the panel says it is reading;
+// where that read fails, that it was not read.
 //
 // Mounted by the position views directly, with no <ChainTruthTower>, so the
 // towers can be removed without removing the scrubber (rails-ops
@@ -20,7 +20,7 @@ import { ChevronDown } from "lucide-react";
 import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
-import { ExplainGroup } from "@/components/shared/explain-groups";
+import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
@@ -168,10 +168,12 @@ export function LifetimeFlowsPanel({
                   )}
                   {scrubber != null && flowsKey && (
                     <>
-                      {flowsKey.explain && (
-                        <p className="mt-2 first:mt-0" data-flow-views-explain="">
-                          {flowsKey.explain}
-                        </p>
+                      {flowsKey.chart && flowsKey.chart.length > 0 && (
+                        <ExplainGroup title="Chart" data-flow-chart-words="">
+                          {flowsKey.chart.map((t) => (
+                            <ExplainBullet key={t}>{t}</ExplainBullet>
+                          ))}
+                        </ExplainGroup>
                       )}
                       <FlowsKey {...flowsKey} />
                     </>
