@@ -17,7 +17,7 @@
 // disclosing card, so an armed click can reach a figure in the detail layer —
 // the rule `useReserveDisclosure` follows.
 
-import { createContext, useCallback, useContext, useId, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { provInspector } from "@/components/shared/provenance";
 import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
@@ -56,7 +56,9 @@ export function usePositionCardDisclosureState(key: string | undefined): Positio
   const stored = useStoredOpen(key ? storeKey(key) : null);
   const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  const regionId = useId();
+  // From the key, not useId: the page above the card can render differently
+  // on the server and in the browser, which would move a generated id.
+  const regionId = `position-card-${(key ?? "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const toggle = useCallback(() => {
     if (key) setCardOpen(storeKey(key), !isCardOpen(storeKey(key)));
   }, [key]);
