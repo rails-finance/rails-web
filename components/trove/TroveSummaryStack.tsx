@@ -9,6 +9,7 @@ import { viewFromTroveSummary, liveFromTroveState } from "@/lib/liquity/trove-ca
 import { TroveDetailsBand } from "@/components/trove/TroveDetailsBand";
 import { troveQueueShareProv } from "@/lib/liquity/trove-queue-provenance";
 import { useTroveExplanationItems } from "@/components/trove/use-trove-explanation-items";
+import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { PriceRunway } from "@/components/shared/price-runway";
 import { RedemptionRunway } from "@/components/shared/redemption-runway";
@@ -66,6 +67,15 @@ export function TroveSummaryStack({
    *  the header set; the home hero passes neither. */
   cardMenu?: ReactNode;
 }) {
+  // The close's debt before it ran, from the page's replayed events (the
+  // last one is the close); the home hero has no provider and keeps null.
+  const focusEvents = useFlowFocus()?.events;
+  const closeSide = trove.status === "closed" ? focusEvents?.[focusEvents.length - 1]?.sides?.debt : undefined;
+  const debtAtClose = closeSide
+    ? closeSide.before > 0.005 || Math.abs(closeSide.amount) > 0.005
+      ? closeSide.before
+      : 0
+    : null;
   const { lead, items } = useTroveExplanationItems({
     trove,
     liveState,
@@ -74,6 +84,7 @@ export function TroveSummaryStack({
     trovesAhead,
     queueDebtTotal,
     surplus,
+    debtAtClose,
   });
   const showBand = trove.status === "open";
 
