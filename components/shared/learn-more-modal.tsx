@@ -37,7 +37,7 @@ export interface LearnMoreContent {
 
 // ── ? Button (placed bottom-right of explainer panel) ────────────────────────
 
-export function LearnMoreButton({ onClick }: { onClick: () => void }) {
+export function LearnMoreButton({ onClick, ariaLabel = "Learn more" }: { onClick: () => void; ariaLabel?: string }) {
   return (
     <button
       onClick={(e) => {
@@ -45,7 +45,8 @@ export function LearnMoreButton({ onClick }: { onClick: () => void }) {
         onClick();
       }}
       className="cursor-pointer btn-icon w-7 h-7 rounded-full focus-ring"
-      aria-label="Learn more"
+      aria-label={ariaLabel}
+      title={ariaLabel === "Learn more" ? undefined : ariaLabel}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -266,9 +267,13 @@ export function LearnMore({
   inline = false,
   label,
   anatomy,
+  ariaLabel,
 }: {
   content: LearnMoreContent;
   inline?: boolean;
+  /** The "?" button's accessible name, where "Learn more" would not tell two
+   *  triggers on one panel apart. */
+  ariaLabel?: string;
   /** A text label before the "?" that opens the same modal. */
   label?: string;
   /** The app-anatomy code (rails-ops reference/app-anatomy.md): "T4" on an event
@@ -290,7 +295,7 @@ export function LearnMore({
             {label}
           </button>
         )}
-        <LearnMoreButton onClick={() => setOpen(true)} />
+        <LearnMoreButton onClick={() => setOpen(true)} ariaLabel={ariaLabel} />
       </div>
       {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy} />}
     </>

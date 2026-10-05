@@ -329,7 +329,7 @@ export function liquityRedemptionOutcome(
             <Prov info={opportunityPLProv} value={formatExact(opportunityPL)}>
               <span className="font-medium tabular-nums">{signed(opportunityPL)}</span>
             </Prov>{" "}
-            at today&apos;s value
+            at today&apos;s oracle price
           </>
         )}
       </span>
@@ -380,10 +380,17 @@ export function LiquityFlowsExplanation({
   return (
     <div data-liquity-flows-note="" data-anatomy="F14·liquity">
       <ExplainGroup title={open ? "Current position" : "At close"}>
-        <ExplainBullet>
-          Collateral {tok(meta.collateralAmount, coll)}, the blue bar{meta.isZombie ? ", claimable" : ""}
-        </ExplainBullet>
-        <ExplainBullet>Debt {tok(f.entireDebt, debt)}, the green bar</ExplainBullet>
+        {!open && !meta.isZombie && (
+          <ExplainBullet>Closed: nothing held or owed; the bars keep the lifetime flows</ExplainBullet>
+        )}
+        {(open || meta.isZombie) && (
+          <>
+            <ExplainBullet>
+              Collateral {tok(meta.collateralAmount, coll)}, the blue bar{meta.isZombie ? ", claimable" : ""}
+            </ExplainBullet>
+            <ExplainBullet>Debt {tok(f.entireDebt, debt)}, the green bar</ExplainBullet>
+          </>
+        )}
         {open && LIQUIDATION_RESERVE_ETH > 0 && (
           <ExplainBullet>
             Reserve <Fig>{LIQUIDATION_RESERVE_ETH} ETH</Fig>, refunded when the Trove closes
@@ -397,7 +404,7 @@ export function LiquityFlowsExplanation({
         )}
       </ExplainGroup>
       {(f.interestAccrued > 0 || costs.totalUpfrontFees > 0) && (
-        <ExplainGroup title="Costs so far">
+        <ExplainGroup title="Costs">
           {f.interestAccrued > 0 && <ExplainBullet>Interest {tok(f.interestAccrued, debt)}</ExplainBullet>}
           {costs.totalUpfrontFees > 0 && (
             <ExplainBullet>Upfront fees {tok(costs.totalUpfrontFees, debt)}</ExplainBullet>

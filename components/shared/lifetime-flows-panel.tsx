@@ -26,7 +26,8 @@ import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
-import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { lifetimeFlowsReadingContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
@@ -63,6 +64,7 @@ export interface LifetimeFlowsPanelProps {
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
+const READING = lifetimeFlowsReadingContent();
 
 export function LifetimeFlowsPanel({
   scrubber,
@@ -136,7 +138,7 @@ export function LifetimeFlowsPanel({
               aria-expanded={!collapsed}
               aria-controls={bodyId}
               aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -mx-2 h-7 w-[calc(100%+1rem)] min-w-0 rounded-md px-2`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 rounded-md px-2`}
             >
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
@@ -149,6 +151,10 @@ export function LifetimeFlowsPanel({
           ) : (
             <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
+          {/* How to read the charts: one text on every explorer (§264). */}
+          <div className="pointer-events-auto -mr-1 shrink-0">
+            <LearnMore content={READING} inline anatomy="F16" ariaLabel="How to read these charts" />
+          </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
           {scrubber != null ? (

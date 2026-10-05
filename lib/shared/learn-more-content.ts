@@ -16,6 +16,45 @@ import {
 } from "@/lib/compound-v2/deprecated-markets";
 import { COMPOUND_V2_NO_SEIZE_SHARE } from "@/lib/compound-v2/asset-catalog";
 
+// ── Lifetime flows: how to read the charts ───────────────────────────────────
+
+/** The "?" on every Lifetime flows header (rails-ops TO-DO-ui-jobs §264): how
+ *  to read the panel on any explorer. One text, no protocol and no figures;
+ *  what is specific to a protocol's position is its (i). The colours are the
+ *  chart's tokens: collateral blue-500, debt green-400, liquidation red-500,
+ *  caution orange, a delegate's rate change pink-500. Each behaviour was
+ *  checked on desktop and at 390 by touch, 5 Oct 2026. */
+export function lifetimeFlowsReadingContent(): LearnMoreContent {
+  return {
+    title: "How to read these charts",
+    intro:
+      "The panel draws the position's whole life: a bar for what it holds and one for what it owes, and a line of both over time, moved by one cursor.",
+    detailsHeading: "The parts:",
+    details: [
+      {
+        bold: "The bars",
+        text: "Blue is the collateral, green the debt. The solid part is what is held or owed on the cursor's day, the figure above it. The hatched parts are what left: withdrawn, repaid, redeemed, liquidated. On an earlier day, a dashed outline marks where the bar ends today. Click or tap a part for its name, value and share of the bar. A very busy position draws each bar at the scale of what is held.",
+      },
+      {
+        bold: "The line",
+        text: "Collateral and debt at the close of each day, week or month since the position opened, in the unit named under the chart. A dotted stretch rests on an old or missing price. The marks under it are days with events: a red triangle for a liquidation, an orange one for a redemption or a change the owner did not make, a pink dot for a delegate's rate change, a ring for the owner's, otherwise a dot in the side's colour.",
+      },
+      {
+        bold: "The cursor",
+        text: "Press the line and drag to move it; it stops at each close, on each day with events and at today. The figures and the bars follow it. A click or tap holds it on a day and dims the line after it; the last of the buttons under the line lets go and returns to today. The buttons between step through the days with events or play the life through.",
+      },
+      {
+        bold: "Show timeline to [day]",
+        text: "Cuts the transaction list below at the close of the cursor's day, and the page's link keeps that day. The × on the chip above the list removes the cut.",
+      },
+      {
+        bold: "The chart button on an event",
+        text: "Each day's last event in the list carries one. It moves the cursor to that day and holds it there.",
+      },
+    ],
+  };
+}
+
 // ── CoW Protocol ─────────────────────────────────────────────────────────────
 
 // ── Liquity — Redemptions ────────────────────────────────────────────────────
