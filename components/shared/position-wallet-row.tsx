@@ -97,8 +97,9 @@ export function PositionWalletRow({
   owner: PositionOwner;
   /** The page's explorer, the default for the listing link and bookmark. */
   session?: SessionProtocol;
-  /** The Tools menu with the page's export shapes; a bare menu without. */
-  tools?: ReactNode;
+  /** The Tools menu with the page's export shapes; a bare menu without;
+   *  false for none, on a page whose card carries the menu (ui-jobs 270). */
+  tools?: ReactNode | false;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
@@ -130,7 +131,7 @@ export function PositionWalletRow({
         {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
         {owner.extra}
       </span>
-      <span className="shrink-0">{tools || <ToolsMenu />}</span>
+      {tools !== false && <span className="shrink-0">{tools || <ToolsMenu />}</span>}
     </div>
   );
 }

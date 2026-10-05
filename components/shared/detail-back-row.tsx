@@ -127,6 +127,7 @@ export function DetailTopRow({
   closed = false,
   closing,
   owner,
+  tools = true,
   children,
 }: {
   session: SessionProtocol;
@@ -142,6 +143,9 @@ export function DetailTopRow({
   closing?: ClosingPrices;
   /** The wallet row (PositionWalletRow); omitted, Tools stays on this row. */
   owner?: PositionOwner;
+  /** False on a page whose position card carries the menu (ui-jobs 270): the
+   *  wallet row then draws no Tools. Only read with `owner`. */
+  tools?: boolean;
   children?: ReactNode;
 }) {
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
@@ -188,7 +192,7 @@ export function DetailTopRow({
         <div className="mt-6">
           {/* In the row's scope: a holder can carry a receipt (Polaris). */}
           <ProvReceiptsScope registry={registry}>
-            <PositionWalletRow owner={owner} session={session} tools={children} />
+            <PositionWalletRow owner={owner} session={session} tools={tools ? children : false} />
           </ProvReceiptsScope>
         </div>
       )}

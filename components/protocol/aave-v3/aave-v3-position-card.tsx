@@ -589,19 +589,22 @@ function AaveV3PositionCardBody({
                   bookmarkProtocol={dep.session}
                 />
               )}
-              {marketLabel}
+              {!receipts && marketLabel}
             </span>
           }
           identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventTotal}
-              liquidationCount={v.liquidationCount}
-              countNote={v.countNote}
-              countRule={v.countRule}
-              liquidationRule={v.liquidationRule}
-            />
+            <span className="flex items-center gap-3">
+              {receipts && marketLabel && <span className="text-xs font-semibold text-rb-500">{marketLabel}</span>}
+              <PositionCardMeta
+                lastActivityAt={v.lastActivityAt}
+                eventCount={v.txCount}
+                eventTotal={v.eventTotal}
+                liquidationCount={v.liquidationCount}
+                countNote={v.countNote}
+                countRule={v.countRule}
+                liquidationRule={v.liquidationRule}
+              />
+            </span>
           }
           closedAt={v.lastActivityAt}
           // The peaks are supplied balances, collateral or not.
@@ -630,6 +633,17 @@ function AaveV3PositionCardBody({
   // `isDetail` (== `receipts`) doubles as the surface discriminator: the
   // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
   // capped cluster only), the detail page keeps the full traced list.
+
+  const marketBadge = marketLabel && (
+    <span
+      className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
+      title={marketTitle}
+      data-tooltip={marketTitle}
+      tabIndex={receipts ? 0 : undefined}
+    >
+      {marketLabel}
+    </span>
+  );
 
   return (
     <PositionCardShell
@@ -660,39 +674,36 @@ function AaveV3PositionCardBody({
         // account) follows. WalletPill on both surfaces (buttons, not anchors, so it
         // lives safely inside the listing card's <Link>); the bookmark rides the
         // pill — it bookmarks the wallet, so the address row is its accurate home.
+        // The detail card (ui-jobs 270 item 6): the Pool label sits at the
+        // right end of the header, beside the activity, and the left end is
+        // the status's. The listing card keeps the wallet and the Pool at the left.
         leadingIdentity={
-          <span className="flex items-center gap-2">
-            {!receipts && (
+          receipts ? undefined : (
+            <span className="flex items-center gap-2">
               <WalletPill
                 wallet={v.wallet}
                 ensName={null}
                 filterProtocol={dep.session}
                 bookmarkProtocol={dep.session}
               />
-            )}
-            {marketLabel && (
-              <span
-                className="text-xs font-semibold text-rb-500 header-badge-tip focus-ring rounded-sm"
-                title={marketTitle}
-                data-tooltip={marketTitle}
-                tabIndex={receipts ? 0 : undefined}
-              >
-                {marketLabel}
-              </span>
-            )}
-          </span>
+              {marketBadge}
+            </span>
+          )
         }
         // Right-hand activity-meta cluster: time-ago, transaction count, liquidation.
         identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            eventTotal={v.eventTotal}
-            liquidationCount={v.liquidationCount}
-            countNote={v.countNote}
-            countRule={v.countRule}
-            liquidationRule={v.liquidationRule}
-          />
+          <span className="flex items-center gap-3">
+            {receipts && marketBadge}
+            <PositionCardMeta
+              lastActivityAt={v.lastActivityAt}
+              eventCount={v.txCount}
+              eventTotal={v.eventTotal}
+              liquidationCount={v.liquidationCount}
+              countNote={v.countNote}
+              countRule={v.countRule}
+              liquidationRule={v.liquidationRule}
+            />
+          </span>
         }
         columns={[
           // The V4 spoke-card grammar: ONE oracle-USD figure leads each side

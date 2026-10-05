@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { TroveSummary } from "@/types/api/trove";
 import { TroveStateData } from "@/types/api/troveState";
 import { OraclePricesData } from "@/types/api/oracle";
@@ -38,6 +39,7 @@ export function TroveSummaryStack({
   loadingStatus,
   viewHref,
   surplus,
+  cardMenu,
 }: {
   trove: TroveSummary;
   liveState?: TroveStateData;
@@ -60,6 +62,9 @@ export function TroveSummaryStack({
   viewHref?: () => string;
   /** A liquidated trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
+  /** The card's ⋮ menu (ui-jobs 270). With `disclosureKey` the card draws
+   *  the header set; the home hero passes neither. */
+  cardMenu?: ReactNode;
 }) {
   const { lead, items } = useTroveExplanationItems({
     trove,
@@ -157,6 +162,8 @@ export function TroveSummaryStack({
       viewHref={viewHref}
       surplus={surplus}
       disclosureKey={disclosureKey}
+      headerSet={!!disclosureKey}
+      cardMenu={cardMenu}
       debtDetail={debtDetail}
       riskDetail={riskDetail}
       footer={

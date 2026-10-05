@@ -38,6 +38,7 @@ export function PositionCardShell({
   explanationDefaultOpen,
   onExplanationToggle,
   disclosureKey,
+  footerEnd,
   children,
 }: {
   receipts?: boolean;
@@ -73,6 +74,10 @@ export function PositionCardShell({
    *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
    *  Only meaningful with `receipts`: a listing row never discloses. */
   disclosureKey?: string;
+  /** The foot strip at the right of the Explanation row, in both states
+   *  (ui-jobs 270: transactions, warnings, age and the card's ⋮ menu). Only
+   *  meaningful with `receipts`. */
+  footerEnd?: ReactNode;
   children: ReactNode;
 }) {
   const registry = useReceiptRegistry();
@@ -96,7 +101,16 @@ export function PositionCardShell({
       {receipts && (
         <ProvenanceInfoTabs
           className="mt-3"
-          rowExtra={disclosure && !disclosure.open ? undefined : rowExtra}
+          rowExtra={
+            footerEnd ? (
+              <>
+                {disclosure && !disclosure.open ? null : rowExtra}
+                <span className="ml-auto flex items-center gap-2 self-center">{footerEnd}</span>
+              </>
+            ) : disclosure && !disclosure.open ? undefined : (
+              rowExtra
+            )
+          }
           explanation={explanation}
           learnMore={learnMore}
           viewHref={viewHref}

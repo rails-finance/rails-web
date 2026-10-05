@@ -607,19 +607,8 @@ export default function TroveView({
           assets={stripAssets}
           closed={troveData.status !== "open"}
           closing={closing}
-        >
-          <TroveExportMenu
-            trove={troveData}
-            liveState={liveState}
-            prices={prices}
-            debtInFront={debtInFront}
-            trovesAhead={trovesAhead}
-            events={tl.sortedEvents}
-            notes={notes}
-            liveNotes={liveNotes}
-            csvFilename={`liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`}
-          />
-        </DetailTopRow>
+          tools={false}
+        />
         <TroveSummaryStack
           trove={troveData}
           liveState={liveState}
@@ -633,6 +622,20 @@ export default function TroveView({
           disclosureKey={`liquity-v2:${troveKey.toLowerCase()}`}
           viewHref={tl.viewHref}
           surplus={surplus}
+          cardMenu={
+            <TroveExportMenu
+              variant="card"
+              trove={troveData}
+              liveState={liveState}
+              prices={prices}
+              debtInFront={debtInFront}
+              trovesAhead={trovesAhead}
+              events={tl.sortedEvents}
+              notes={notes}
+              liveNotes={liveNotes}
+              csvFilename={`liquity-v2-${collateralType}-trove-${troveId.slice(0, 12)}-activity.csv`}
+            />
+          }
           loadingStatus={{
             message: getEnhancementStatus(),
             snapshotDate: lastEventTs ?? undefined,

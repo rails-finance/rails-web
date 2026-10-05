@@ -217,8 +217,26 @@ export function FluidPositionCard({
   // into the opened layer (<PositionCardDetail>). The events-plus-interest
   // footnotes leave it: the flows panel counts the interest.
   const disclosing = receipts && !!disclosureKey;
+  // The position type and the share pair are labels the figures do not
+  // carry; on the detail card they sit at the header's right end (ui-jobs
+  // 270 item 6), leaving the left end to the status.
+  const typeLabel = (
+    <span className="text-xs font-semibold text-rb-500">
+      {pairText}
+      <span className="ml-2 font-normal tabular-nums text-rb-400">
+        #{v.nftId} · {v.vaultKindLabel}
+      </span>
+    </span>
+  );
   const identityMeta = (
-    <PositionCardMeta lastActivityAt={v.lastActivityAt} eventCount={v.txCount} liquidationCount={v.liquidationCount} />
+    <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      {receipts && typeLabel}
+      <PositionCardMeta
+        lastActivityAt={v.lastActivityAt}
+        eventCount={v.txCount}
+        liquidationCount={v.liquidationCount}
+      />
+    </span>
   );
 
   // The owner pill (facehash + copy + bookmark) leads; the pair rides
@@ -232,12 +250,7 @@ export function FluidPositionCard({
       ) : (
         <span className="font-normal tabular-nums text-rb-400">—</span>
       )}
-      <span>
-        {pairText}
-        <span className="ml-2 font-normal tabular-nums text-rb-400">
-          #{v.nftId} · {v.vaultKindLabel}
-        </span>
-      </span>
+      {!receipts && typeLabel}
     </span>
   );
 

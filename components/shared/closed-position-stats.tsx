@@ -86,6 +86,9 @@ export interface ClosedPositionStatsProps {
    *  (`PositionCardDetail`): every cell but Outcome then draws only while the
    *  card is open, so the closed card is its header and the outcome. */
   detailGate?: ComponentType<{ children: ReactNode }>;
+  /** Drawn in place of the CLOSED badge: a card that names its ending in its
+   *  own tag (ui-jobs 270's "Closed" / "Liquidated"). */
+  tag?: ReactNode;
 }
 
 function formatClosureDate(unix: number): string {
@@ -117,6 +120,7 @@ export function ClosedPositionStats({
   leadingIdentity,
   badgeTip,
   detailGate,
+  tag,
 }: ClosedPositionStatsProps) {
   const Gate = detailGate ?? Fragment;
   const base = OUTCOME[outcome];
@@ -141,7 +145,9 @@ export function ClosedPositionStats({
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          {badgeTip ? (
+          {tag !== undefined ? (
+            tag
+          ) : badgeTip ? (
             <RevealTip
               tip={badgeTip}
               label={`${redeemed ? "Redeemed" : "Closed"}: ${badgeTip}`}
