@@ -154,6 +154,19 @@ export function DetailTopRow({
   // opened scope leaves this trigger's price tracing nothing (rails-ops
   // provenance-receipts-grammar.md §7, the unscoped-sibling gap).
   const registry = useReceiptRegistry();
+  const prices = (bare: boolean) =>
+    !closed ? (
+      <LatestPrices assets={assets} reason={priceReason} bare={bare} />
+    ) : (
+      closingPriced && (
+        <LatestPrices
+          assets={closing.assets}
+          reason={priceReason}
+          bare={bare}
+          at={{ block: closing.block, timestamp: closing.timestamp }}
+        />
+      )
+    );
   return (
     // With the wallet row, the gap to the card (16px, in place of the page's
     // space-y-6 margin) is smaller than the gap above the row (24px), so the
@@ -164,21 +177,14 @@ export function DetailTopRow({
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2" data-anatomy="H7">
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <DetailBackButton session={session} wallet={wallet} compact />
-          {showStamp && !closed && <RecencyStamp compact />}
-          <ProvReceiptsScope registry={registry}>
-            {!closed ? (
-              <LatestPrices assets={assets} reason={priceReason} />
-            ) : (
-              closingPriced && (
-                <LatestPrices
-                  assets={closing.assets}
-                  reason={priceReason}
-                  at={{ block: closing.block, timestamp: closing.timestamp }}
-                />
-              )
-            )}
-          </ProvReceiptsScope>
+          <DetailBackButton session={session} wallet={wallet} compact={!owner} />
+          {/* A page without a wallet row keeps the strip beside Back. */}
+          {!owner && (
+            <>
+              {showStamp && !closed && <RecencyStamp compact />}
+              <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
+            </>
+          )}
         </div>
         {/* Tools is part of the row, not of the export menu that usually fills
             it: a caller renders its shapes only once the view has loaded
@@ -190,9 +196,21 @@ export function DetailTopRow({
       </div>
       {owner && (
         <div className="mt-6">
-          {/* In the row's scope: a holder can carry a receipt (Polaris). */}
+          {/* In the row's scope: a holder can carry a receipt (Polaris). The
+              price and the chain's recency ride the row's right end, price
+              first (ui-jobs 272); Back stays alone above. */}
           <ProvReceiptsScope registry={registry}>
-            <PositionWalletRow owner={owner} session={session} tools={tools ? children : false} />
+            <PositionWalletRow
+              owner={owner}
+              session={session}
+              tools={tools ? children : false}
+              strip={
+                <>
+                  {prices(true)}
+                  {showStamp && !closed && <RecencyStamp bare />}
+                </>
+              }
+            />
           </ProvReceiptsScope>
         </div>
       )}

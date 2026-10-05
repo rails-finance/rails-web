@@ -121,7 +121,8 @@ export function WalletMenu({
   );
 
   return (
-    <div ref={ref} className="relative min-w-0" data-wallet-menu="" data-anatomy="C7">
+    // The address keeps its width; the address kind beside it gives way first.
+    <div ref={ref} className="relative shrink-0" data-wallet-menu="" data-anatomy="C7">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -130,7 +131,7 @@ export function WalletMenu({
         aria-label={`${name ? `${name} · ` : ""}${wallet}: open the address menu`}
         title={name ? `${name} · ${wallet}` : wallet}
         // A 28px row with a 44px press area (after:).
-        className="relative flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md text-xs text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
+        className="relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md text-xs text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-['']"
       >
         <Facehash address={wallet} size={16} />
         <span

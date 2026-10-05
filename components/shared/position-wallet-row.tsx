@@ -94,6 +94,7 @@ export function PositionWalletRow({
   owner,
   session,
   tools,
+  strip,
 }: {
   owner: PositionOwner;
   /** The page's explorer, the default for the listing link and bookmark. */
@@ -101,6 +102,9 @@ export function PositionWalletRow({
   /** The Tools menu with the page's export shapes; a bare menu without;
    *  false for none, on a page whose card carries the menu (ui-jobs 270). */
   tools?: ReactNode | false;
+  /** The price and recency strip at the row's right end, before Tools
+   *  (ui-jobs 272). The address truncates before it gives way. */
+  strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
   const bookmarkProtocol = owner.bookmarkProtocol === null ? undefined : (owner.bookmarkProtocol ?? session);
@@ -145,7 +149,12 @@ export function PositionWalletRow({
         {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
         {owner.extra}
       </span>
-      {tools !== false && <span className="shrink-0">{tools || <ToolsMenu />}</span>}
+      {(strip || tools !== false) && (
+        <span className="flex shrink-0 items-center gap-1 sm:gap-2">
+          {strip}
+          {tools !== false && (tools || <ToolsMenu />)}
+        </span>
+      )}
     </div>
   );
 }

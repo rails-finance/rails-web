@@ -46,7 +46,17 @@ function formatCompactAge(elapsedMs: number): string {
 /** `compact` drops the cube below sm, for the detail pages' top row, which
  *  carries back, this stamp, the labelled prices trigger and Tools across
  *  390px. */
-export function RecencyStamp({ className, compact = false }: { className?: string; compact?: boolean }) {
+export function RecencyStamp({
+  className,
+  compact = false,
+  bare = false,
+}: {
+  className?: string;
+  compact?: boolean;
+  /** The wallet row's strip (ui-jobs 272): the age without "ago", the block
+   *  icon at every width. */
+  bare?: boolean;
+}) {
   const head = useChainHead();
   // The head itself was already per-chain (useChainHead reads the route's
   // chain); only this label was not, so a Base page showed a Base block number
@@ -86,7 +96,7 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
       className={className ?? `${CTRL_GHOST} ${CTRL_OFF} h-7 gap-1.5 rounded-md px-1.5 text-[11px] tabular-nums`}
     >
       <Box size={12} aria-hidden className={compact ? "hidden sm:block" : undefined} />
-      <span aria-hidden>{showBlock ? block : `${age} ago`}</span>
+      <span aria-hidden>{showBlock ? block : bare ? age : `${age} ago`}</span>
     </button>
   );
 }

@@ -581,7 +581,16 @@ export default function TroveView({
           const price = row.context.data.collateralPrice;
           return price > 0
             ? [
-                { symbol: troveData.collateralType, price },
+                {
+                  symbol: troveData.collateralType,
+                  price,
+                  info: {
+                    kind: "chain-derived",
+                    pclass: "oracle",
+                    summary: `${troveData.collateralType}'s price at the Trove's closing row — the collateral price Liquity's oracle gave that transaction.`,
+                    via: "the closing event's collateral price",
+                  } satisfies Provenance,
+                },
                 { symbol: "BOLD", price: 1 },
               ]
             : undefined;
@@ -599,7 +608,7 @@ export default function TroveView({
             ensName: troveData?.ownerEns ?? null,
             prefix:
               effectiveOwner && effectiveOwner !== troveData?.owner ? (
-                <span className="text-rb-400" title="Last owner (trove closed)">
+                <span className="shrink-0 whitespace-nowrap text-rb-400" title="Last owner (trove closed)">
                   last owner
                 </span>
               ) : undefined,

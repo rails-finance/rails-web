@@ -210,8 +210,10 @@ export function ToolsMenu({
         {copied ? (
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
         ) : (
+          // Below sm the wallet row also carries the price and recency strip
+          // (ui-jobs 272): the spanner alone is the trigger there.
           <ChevronDown
-            className={`h-3.5 w-3.5 text-rb-500 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`hidden h-3.5 w-3.5 text-rb-500 transition-transform sm:block ${open ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
         )}
