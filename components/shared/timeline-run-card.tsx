@@ -393,7 +393,9 @@ export function TimelineRunCard({
                   <span className="text-xs text-rb-500">{agg.symbol}</span>
                 )}
                 {agg.count != null && (
+                  // data-prov-exempt: a row count, as the folder's member count.
                   <span
+                    data-prov-exempt=""
                     className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
                     title={`${agg.count.toLocaleString("en-US")} ${agg.verb.toLowerCase()} rows, grouped in this row; open it to see each`}
                   >

@@ -103,8 +103,9 @@ export function LiquityForkEventHeader({
   };
   const deltas: ChainTruthDelta[] = [];
 
-  // A redemption borrows the V2 grammar: collateral "Cleared", debt "Reduced",
-  // both in the caution orange, magnitudes only — the action name rides the spine.
+  // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
+  // "Reduced", both in the caution orange, magnitudes only; the action name
+  // rides the spine.
   const isRedemption = ctx.eventType === "redeemCollateral";
 
   // Opens + owner adjusts get V2's per-axis grammar: each axis carries its own
@@ -157,7 +158,7 @@ export function LiquityForkEventHeader({
         ctx.origin?.coll,
       ),
       ...(isRedemption
-        ? { label: "Cleared", tone: "caution" as const }
+        ? { label: "Reduced", tone: "caution" as const }
         : perAxis
           ? { label: coll > 0 ? COLL_VERB.add : COLL_VERB.withdraw, axisVerb: true }
           : {}),
@@ -174,11 +175,18 @@ export function LiquityForkEventHeader({
       address: soleFlowAddress(flows, builders.debtSymbol),
       prov: builders.debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
       ...(isRedemption
-        ? { label: "Reduced", tone: "caution" as const }
+        ? { label: "Cleared", tone: "caution" as const }
         : perAxis
           ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
           : {}),
     });
+
+  // A redemption names the debt first.
+  if (isRedemption) {
+    const iColl = deltas.findIndex((d) => d.label === "Reduced");
+    const iDebt = deltas.findIndex((d) => d.label === "Cleared");
+    if (iColl >= 0 && iDebt > iColl) deltas.splice(iColl, 0, ...deltas.splice(iDebt, 1));
+  }
 
   // A redistribution from a liquidated Trove on this branch, applied on this
   // touch: its own part of the row, in the caution tone, so a repayment that

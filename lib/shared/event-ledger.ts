@@ -155,7 +155,7 @@ function eventPart(
 }
 
 const usdTotal = (dollars: number, before: number | null, unit?: FlowUnit) => ({
-  before: before != null && Math.round(before) !== dollars ? wholeUsd(before, unit) : null,
+  before: before != null && Math.round(before) !== dollars && Math.round(before) !== 0 ? wholeUsd(before, unit) : null,
   after: wholeUsd(dollars, unit),
   dollars,
 });
@@ -282,7 +282,7 @@ export function tokenLedger({
         if (units(earlier) === 0 && !earlier.usd?.dollars) rows.splice(at, 1);
         break;
       }
-    before = recorded !== sum.total.units ? fmtTokens(recorded / scale, sum.decimals) : null;
+    before = recorded !== sum.total.units && recorded !== 0 ? fmtTokens(recorded / scale, sum.decimals) : null;
   }
   return {
     side,

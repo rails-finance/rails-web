@@ -52,7 +52,6 @@ const REDEMPTION_RUN: TimelineRunSpec = {
           lastTimestamp={events[events.length - 1].timestamp}
           isFirst={folder.isFirst}
           isLast={folder.isLast}
-          debtFirst
         >
           {folder.children}
         </RedemptionRunCard>

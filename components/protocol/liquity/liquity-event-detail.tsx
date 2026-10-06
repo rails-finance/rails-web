@@ -1005,7 +1005,7 @@ export function LiquityEventDetail({
           <LiquityGas footer={prose.footer} />
           {l2.redemption &&
             (() => {
-              // P/L reconciles with the header's Cleared / Took: debt cleared
+              // P/L reconciles with the header's Cleared / Reduced: debt cleared
               // less the collateral given up, at the redemption's price and,
               // where it reads differently, at today's.
               const { claimable, showPl, plHistoric, plToday } = l2.redemption;
