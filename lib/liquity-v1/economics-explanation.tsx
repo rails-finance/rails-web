@@ -35,7 +35,7 @@ export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, 
       ? {
           kind: "derived",
           summary:
-            "Redemption net outcome at today's price — the LUSD the redeemers paid in, counted at $1, less the ETH they took valued at the PriceFeed price now.",
+            "Redemption net outcome at the latest block's price — the LUSD the redeemers paid in, counted at $1, less the ETH they took valued at the PriceFeed price at the latest block.",
           formula: "LUSD redeemed − ETH taken × price now",
           inputs: [
             { label: "LUSD redeemed", value: fmtLusd(t.lusdRedeemed), kind: "chain-derived" },
@@ -63,7 +63,7 @@ export function liquityV1RedemptionOutcome(t: LiquityV1RedemptionTotals | null, 
             <Prov info={nowProv}>
               <span className="font-medium tabular-nums">{fmtUsdSigned(netNow)}</span>
             </Prov>{" "}
-            against having held the ETH
+            at the latest block&apos;s price, against having held the ETH
           </>
         )}
       </span>

@@ -127,9 +127,9 @@ export function liquityForkEconomicsExplanation(
         {atToday != null && outcome.currentPrice != null && (
           <>
             {" "}
-            The same {collSym} repriced at today&apos;s {strong(formatUsdValue(outcome.currentPrice))} is worth{" "}
-            {strong(formatUsdValue(atToday))}, which makes it {strong(signedUsd(outcome.debtCleared - atToday))} at
-            today&apos;s value.
+            The same {collSym} repriced at the latest block&apos;s {strong(formatUsdValue(outcome.currentPrice))} is
+            worth {strong(formatUsdValue(atToday))}, which makes it {strong(signedUsd(outcome.debtCleared - atToday))}{" "}
+            at that price.
           </>
         )}
       </span>,
@@ -236,7 +236,7 @@ export function liquityForkRedemptionOutcome(
     o.currentPrice != null
       ? {
           kind: "derived",
-          summary: `Redemption net outcome at today's value — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's current price.`,
+          summary: `Redemption net outcome at the latest block's price — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's price at the latest block.`,
           via: "added up across the trove's redemptions",
           formula: "debt cleared − collateral taken × current price",
           inputs: [
@@ -280,7 +280,7 @@ export function liquityForkRedemptionOutcome(
             <Prov info={todayProv} value={formatExact(today)}>
               <span className="font-medium tabular-nums">{signedUsd(today)}</span>
             </Prov>{" "}
-            at today&apos;s value
+            at the latest block&apos;s price
           </>
         )}
       </span>
@@ -303,7 +303,7 @@ export function liquityForkEconomicsContent({
       'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
       "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
       `USD values use the branch's own oracle price for collateral and ${debtSymbol}'s $1 redemption face for debt, and appear only once that on-chain price has loaded.`,
-      "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at today's price.",
+      "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at the latest block's price.",
     ],
     detailsHeading: "Key concepts:",
     details: [

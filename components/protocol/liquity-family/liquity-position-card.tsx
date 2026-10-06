@@ -717,7 +717,7 @@ export function LiquityPositionCard({
               inertIdentity
             ) : (
               <>
-                <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
+                <span className="text-xs font-bold tracking-wide text-foreground/80">{ct}</span>
                 <TroveIdentityRow
                   protocol={protocol}
                   troveId={v.id}
@@ -790,7 +790,7 @@ export function LiquityPositionCard({
             </>
           ) : (
             <>
-              <span className="text-xs font-bold uppercase tracking-wide text-foreground/80">{ct}</span>
+              <span className="text-xs font-bold tracking-wide text-foreground/80">{ct}</span>
               <TroveIdentityRow
                 protocol={protocol}
                 troveId={v.id}

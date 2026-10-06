@@ -1613,8 +1613,13 @@ function ChainTruthTimelineBody({
   // on chart") and every other card states its time only.
   const dayMarks = useFlowFocus() != null;
   const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) => {
-    if (dayMarks) return null;
     const event = events[flatIdx];
+    // Under day marks the date stays on the day's mark, which takes the
+    // prefix's place on the row that opens a drawn day. A row that opens its
+    // day without a mark (the first row under a collapsed folder or inside a
+    // run that spans two days) carries the date, so a reader scrolling
+    // the list never meets a bare time as the first card of a day.
+    if (dayMarks && flatIdx > 0 && utcDay(events[flatIdx - 1].timestamp) === utcDay(event.timestamp)) return null;
     return `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`;
   };
   /** A row's newest and oldest moment: the day its mark names, and the day
@@ -2029,7 +2034,15 @@ function ChainTruthTimelineBody({
                 const marked = opensDay(rowIdx);
                 const rowNode =
                   row.kind === "event" ? (
-                    renderEventRow(row.event, row.flatIdx, { mark: marked })
+                    renderEventRow(row.event, row.flatIdx, {
+                      mark: marked,
+                      // The card below a folder or a run draws no mark when its
+                      // day is the one that row ends on, so it carries the date:
+                      // the range on the row above is not this day's first card.
+                      ...(dayMarks && !marked && rowIdx > 0 && windowed[rowIdx - 1].kind !== "event"
+                        ? { datePrefix: `${shortDate(row.event.timestamp)} ${shortDateYear(row.event.timestamp)}` }
+                        : {}),
+                    })
                   ) : row.kind === "folder" ? (
                     <SpineTipContext.Provider
                       key={`folder_${row.folder.responseId}`}
