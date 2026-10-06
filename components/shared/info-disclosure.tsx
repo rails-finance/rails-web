@@ -396,7 +396,7 @@ export function InfoTabsDisclosure({
       ) : (
         <>
           {/* With a `rowExtra` (a tall risk strip) the row grows past the
-              buttons' own height; centring would float the open button away
+              buttons' height; centring would float the open button away
               from the pane it is supposed to be a tab of, and the `after:`
               connector can't span the gap. Bottom-align in that case; without
               a rowExtra the row is button-height and centring is unchanged. */}
