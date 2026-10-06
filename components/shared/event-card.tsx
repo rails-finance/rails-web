@@ -158,7 +158,8 @@ export function EventCard({
   const registry = useReceiptRegistry();
   // Which info section is expanded — the section heading is the button,
   // bridging into the pane below.
-  const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
+  // The event page (`pageAside`) opens the explanation, and with it the footer, on load.
+  const [openInfoTab, setOpenInfoTab] = useState<string | null>(pageAside != null ? "explanation" : null);
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
@@ -348,7 +349,7 @@ export function EventCard({
                   rowExtra={infoActionNode}
                 />
               ) : (
-                <InfoDisclosure footer={footerNode} rowExtra={infoActionNode}>
+                <InfoDisclosure footer={footerNode} rowExtra={infoActionNode} defaultOpen={pageAside != null}>
                   {null}
                 </InfoDisclosure>
               )}
@@ -393,7 +394,7 @@ export function EventCard({
           the first event card stands for the spine's row height. */}
       <div
         data-skel-section="detail-event"
-        className={`flex w-full ${pageAside != null ? "flex-col sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
+        className={`flex w-full ${pageAside != null ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
           muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
         }`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
@@ -402,7 +403,8 @@ export function EventCard({
         {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
             header there). Matches the sm breakpoint the card's own detail grid uses,
             so the spine and the card body reflow together. On the event page the
-            column holds `pageAside`, stacked above the card below sm. */}
+            column holds `pageAside`, stacked above the card below sm, where the row
+            drops its side padding so the paragraph and the card share one width. */}
         {pageAside != null ? (
           <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
             {pageAside}

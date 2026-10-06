@@ -148,7 +148,9 @@ try {
     await card.waitFor({ timeout: 60_000 });
     // The ledgers land with the flows panel: the copy waits for the cells.
     await page.waitForTimeout(3000);
-    await page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first().click();
+    // The event page opens T3 on load; a closed one is opened here.
+    const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
+    if ((await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
     const copyBtn = page.locator("[data-copy-for-llm]").first();
     await copyBtn.waitFor({ timeout: 30_000 });
     await copyBtn.click();
