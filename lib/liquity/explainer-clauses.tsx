@@ -48,7 +48,7 @@ import { LinkedAddress } from "@/components/shared/linked-address";
 import { getBatchManagerByAddress } from "@/lib/liquity/batch-managers";
 import { formatGasCost } from "@/lib/shared/format-event";
 import { formatMonthDay } from "@/lib/date";
-import { liquityAccrual, type LiquityAccrual } from "@/lib/liquity/accrual";
+import { batchRateDebtMove, liquityAccrual, type BatchRateDebtMove, type LiquityAccrual } from "@/lib/liquity/accrual";
 import { branchMcr, liquityEventSafety, type LiquityEventSafety } from "@/lib/liquity/event-safety";
 import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import {
@@ -1354,12 +1354,77 @@ function removeFromBatchSlots(
   return { happened, changed, meansNow };
 }
 
-function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventProseSlots {
+/** The span since the trove's previous event, as the interest bullet states it. */
+function fmtSpan(seconds: number): string {
+  const hours = seconds / 3600;
+  if (hours < 24) {
+    const h = Math.max(1, Math.round(hours));
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  return `${(hours / 24).toFixed(1)} days`;
+}
+
+/** The debt's move on a batch manager's rate change, one part per bullet
+ *  (lib/liquity/accrual.ts `batchRateDebtMove`). The move echoes the header's
+ *  "Debt +…" receipt; the parts are stated only here. */
+function batchRateMoveClauses(ctx: LiquityContext, coords: EventCoords, move: BatchRateDebtMove): ClauseInput[] {
+  const debtSym = ctx.assetType ?? "BOLD";
+  if (!(Math.abs(move.total) >= 0.01)) return [];
+  const out: ClauseInput[] = [
+    clause(
+      <>
+        Debt{" "}
+        {fig(
+          debtChangeProv(ctx, coords),
+          `${move.total >= 0 ? "+" : "−"}${fmtAccrued(Math.abs(move.total))} ${debtSym}`,
+        )}{" "}
+        since {formatDate(move.since)}, the trove&rsquo;s previous event.
+      </>,
+    ),
+  ];
+  if (move.interest >= 0.005) {
+    out.push(
+      clause(
+        <>
+          Interest {fmtAccrued(move.interest)} {debtSym} at {fig(undefined, fmtRate(move.rate))} over{" "}
+          {fmtSpan(move.elapsed)}.
+        </>,
+      ),
+    );
+  }
+  if (move.fee >= 0.005) {
+    out.push(
+      clause(
+        <>
+          Management fee {fmtAccrued(move.fee)} {debtSym} at the batch&rsquo;s {fig(undefined, fmtRate(move.feeRate))} a
+          year.
+        </>,
+      ),
+    );
+  }
+  if (move.upfront >= 0.005) {
+    out.push(
+      clause(
+        <>
+          Upfront fee {fmtAccrued(move.upfront)} {debtSym}: the manager changed the rate again within 7 days.
+        </>,
+      ),
+    );
+  }
+  return out;
+}
+
+function batchRateUpdateSlots(
+  ctx: LiquityContext,
+  coords: EventCoords,
+  move: BatchRateDebtMove | null,
+): EventProseSlots {
   const { stateBefore, stateAfter, collateralType, collateralPrice } = ctx;
   const debtSym = ctx.assetType ?? "BOLD";
   const rateChange = fmtRateChange(stateBefore.annualInterestRate, stateAfter.annualInterestRate);
   const afterCollUsd = stateAfter.coll * collateralPrice;
   const rateAfter = rateAfterProv(ctx, coords);
+  const changed = move ? batchRateMoveClauses(ctx, coords, move) : [];
 
   const happened: ClauseInput[] = [
     rateChange.changed
@@ -1403,7 +1468,7 @@ function batchRateUpdateSlots(ctx: LiquityContext, coords: EventCoords): EventPr
     meansNow.push(clause(<>The collateral ratio is {fmtCr(stateAfter.collateralRatio)}.</>));
   }
 
-  return { happened, meansNow };
+  return { happened, changed, meansNow };
 }
 
 // ── transfer ─────────────────────────────────────────────────────────────────
@@ -1484,15 +1549,18 @@ export function liquityEventSlots(
    *  from the logs where absent. */
   accrual?: LiquityAccrual,
 ): EventProseSlots {
-  const slots = liquityEventSlotsFor(
-    ctx,
-    coords,
-    mode,
-    accrual ?? liquityAccrual(ctx, previousEvent, currentEvent),
-    liquityEventSafety(ctx, previousEvent),
-    currentPrice,
-    surplusClaimedAt,
-  );
+  const slots =
+    ctx.operation === "setBatchManagerAnnualInterestRate"
+      ? batchRateUpdateSlots(ctx, coords, batchRateDebtMove(ctx, previousEvent, currentEvent))
+      : liquityEventSlotsFor(
+          ctx,
+          coords,
+          mode,
+          accrual ?? liquityAccrual(ctx, previousEvent, currentEvent),
+          liquityEventSafety(ctx, previousEvent),
+          currentPrice,
+          surplusClaimedAt,
+        );
   const same = sameBlockClause(ctx, coords);
   return same ? { ...slots, meansNow: [...(slots.meansNow ?? []), same] } : slots;
 }
@@ -1529,7 +1597,7 @@ function liquityEventSlotsFor(
     case "removeFromBatch":
       return removeFromBatchSlots(ctx, coords, accrual, mode);
     case "setBatchManagerAnnualInterestRate":
-      return batchRateUpdateSlots(ctx, coords);
+      return batchRateUpdateSlots(ctx, coords, null);
     case "transferTrove":
       return transferSlots(ctx, mode);
     default:

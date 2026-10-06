@@ -13,6 +13,7 @@ import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/component
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { formatExact } from "@/lib/utils/format";
+import { exactDebtAfter, exactDebtBefore } from "@/lib/liquity/utils/interest-calculator";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const INDEX_VIA = "rails-server index of decoded Liquity V2 logs";
@@ -363,7 +364,7 @@ export function debtChangeProv(ctx: LiquityContext, coords?: EventCoords): Chang
     ? troveOperation.debtChangeFromOperation +
       (actOnly ? 0 : troveOperation.debtIncreaseFromRedist) +
       troveOperation.debtIncreaseFromUpfrontFee
-    : stateAfter.debt - stateBefore.debt;
+    : exactDebtAfter(ctx) - exactDebtBefore(ctx);
   return {
     change,
     value: formatExact(Math.abs(change)),

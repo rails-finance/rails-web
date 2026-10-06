@@ -311,6 +311,27 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               {ctx.batchManager && (
                 <span className="text-sm font-bold text-pink-500">{getBatchManagerName(ctx.batchManager)}</span>
               )}
+              {/* The debt's move since the trove's previous event: interest, the
+                  management fee and any upfront fee, split in the explanation.
+                  The spine carries no value on a rate change, so the figure
+                  stays at every width (no hideVal). */}
+              {hasDebtChange && (
+                <span className="inline-flex items-center gap-1.5 text-sm">
+                  <span className="text-rb-500">Debt</span>
+                  {debtCp ? (
+                    <Prov value={debtCp.value} symbol={debtCp.symbol} info={debtCp.info}>
+                      <span className="font-bold text-foreground">
+                        <ExactTip
+                          text={`${debtChange > 0 ? "+" : "−"}${fmtHeaderMagnitude(Math.abs(debtChange), debtSym)}`}
+                          exact={formatExact(Math.abs(debtChange))}
+                          symbol={debtSym}
+                        />
+                      </span>
+                    </Prov>
+                  ) : null}
+                  <TokenChipIcon symbol={debtSym} size={16} />
+                </span>
+              )}
             </>
           ) : ctx.operation === "setInterestBatchManager" ? (
             <>
@@ -500,7 +521,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               Also skip rate changes: a rate adjustment moves no principal — the only thing that makes
               `hasDebtChange` true is the fee-inclusive upfront fee, which rides the detail's "incl. … fee"
               line, not the header. The header keeps just the label and the new-rate pill. A batch manager's
-              rate update likewise moves only the interest and management fee it settles into debt. */}
+              rate update labels its debt move in its own branch above. */}
           {hasDebtChange &&
             !style.label.includes(" + ") &&
             ctx.operation !== "openTrove" &&
