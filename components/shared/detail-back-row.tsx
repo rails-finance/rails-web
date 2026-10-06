@@ -128,6 +128,7 @@ export function DetailTopRow({
   closing,
   owner,
   tools = true,
+  fallbackHref,
   children,
 }: {
   session: SessionProtocol;
@@ -146,6 +147,8 @@ export function DetailTopRow({
   /** False on a page whose position card carries the menu (ui-jobs 270): the
    *  wallet row then draws no Tools. Only read with `owner`. */
   tools?: boolean;
+  /** Where Back lands on a fresh tab; see DetailBackButton. */
+  fallbackHref?: string;
   children?: ReactNode;
 }) {
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
@@ -175,9 +178,9 @@ export function DetailTopRow({
       <div className="mb-2.5">
         <RailHeader session={session} venue="position" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2" data-anatomy="H7">
+      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2" data-anatomy="H7" data-back-row>
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          <DetailBackButton session={session} wallet={wallet} compact={!owner} />
+          <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact={!owner} />
           {/* A page without a wallet row keeps the strip beside Back. */}
           {!owner && (
             <>

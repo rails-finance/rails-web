@@ -203,8 +203,8 @@ const troveEcon = econSection(pageTrove);
 check("4a. TROVE_B's economics section renders", (await troveEcon.count()) > 0);
 const troveStripText = await stripText(outcomeStrip(pageTrove));
 check(
-  '4c. liquityRedemptionOutcome\'s bullet renders ("… at the time, … at today\'s oracle price")',
-  /at the time, [+−]\$[\d,.]+ at today.s oracle price/i.test(troveStripText),
+  '4c. liquityRedemptionOutcome\'s bullet renders ("… at the time, … at the latest block\'s price")',
+  /at the time, [+−]\$[\d,.]+ at the latest block.s price/i.test(troveStripText),
   troveStripText,
 );
 await pageTrove.close();

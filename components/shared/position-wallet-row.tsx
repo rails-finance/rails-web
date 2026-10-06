@@ -102,7 +102,7 @@ export function PositionWalletRow({
    *  false for none, on a page whose card carries the menu (ui-jobs 270). */
   tools?: ReactNode | false;
   /** The price and recency strip at the row's right end, before Tools
-   *  (ui-jobs 272). The address truncates before it gives way. */
+   *  (ui-jobs 272). It wraps under the address when the row is narrow. */
   strip?: ReactNode;
 }) {
   const filterProtocol = owner.filterProtocol === null ? undefined : (owner.filterProtocol ?? session);
@@ -134,25 +134,31 @@ export function PositionWalletRow({
     )
   ) : null;
   return (
-    // One line at every width: the pill does not wrap, Tools keeps its size.
-    // The wallet starts on the card content's line (CARD_INSET_START); Tools
-    // stays at the page edge.
+    // The address, its chevron and the kind label keep their width. The strip
+    // sits at the right end of their line when it fits and takes a line
+    // below, right-aligned, when it does not (ui-jobs 272); Tools stays at the
+    // first line's right. The wallet starts on the card content's line
+    // (CARD_INSET_START); Tools stays at the page edge.
     <div
-      className={`flex min-h-7 items-center justify-between gap-2 ${CARD_INSET_START}`}
+      className={`flex min-h-7 items-start justify-between gap-2 ${CARD_INSET_START}`}
       data-position-wallet-row=""
       data-anatomy="H13"
     >
-      <span className="flex min-w-0 items-center gap-2 text-xs text-rb-500">
-        {pill && owner.prefix}
-        {pill && (owner.wrap ? owner.wrap(pill) : pill)}
-        {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
-        {owner.extra}
-      </span>
-      {(strip || tools !== false) && (
-        <span className="flex shrink-0 items-center gap-1 sm:gap-2">
-          {strip}
-          {tools !== false && (tools || <ToolsMenu />)}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+        <span className="flex min-h-7 min-w-0 items-center gap-2 text-xs text-rb-500">
+          {pill && owner.prefix}
+          {pill && (owner.wrap ? owner.wrap(pill) : pill)}
+          {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
+          {owner.extra}
         </span>
+        {strip && (
+          <span className="ml-auto flex min-h-7 shrink-0 items-center gap-1 sm:gap-2" data-position-strip="">
+            {strip}
+          </span>
+        )}
+      </div>
+      {tools !== false && (
+        <span className="flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
       )}
     </div>
   );
