@@ -1,16 +1,16 @@
 "use client";
 
-// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281): at the right end of T3's
-// row, after the transaction hash, on the timeline card and the event page.
-// The position card's menu (C17, `ToolsMenu` variant `card`) with the event's
-// rows: copy the hash, open the event page (not on that page), open the
-// explorer, copy the page's link, then the family's rows (`extra`, Liquity
-// V2's Copy for LLM). A copy row shows a tick and "Copied" for a moment, as
-// C17's rows do.
+// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281): at the right end of T2's
+// price row where the family draws one (`EventMenuSlot`), else in T6 before
+// the "?", on the timeline card and the event page. The position card's menu
+// (C17, `ToolsMenu` variant `card`) with the event's rows: open the event page
+// (not on that page), open the explorer, copy the page's link, then the
+// family's rows (`extra`, Liquity V2's Copy for LLM). A copy row shows a tick
+// and "Copied" for a moment, as C17's rows do.
 
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Copy, Link2 } from "lucide-react";
+import { ArrowUpRight, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ExplorerMark } from "@/components/shared/explorer-mark";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -23,8 +23,6 @@ import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 export interface EventMenuWords {
   menu: string;
   heading: string;
-  copy_hash: string;
-  copy_hash_hint: string;
   view_page: string;
   view_page_hint: string;
   view_explorer?: string;
@@ -37,8 +35,6 @@ export interface EventMenuWords {
 export const EVENT_MENU_WORDS: EventMenuWords = {
   menu: "Event menu",
   heading: "Event",
-  copy_hash: "Copy event hash",
-  copy_hash_hint: "Copy the transaction hash",
   view_page: "View event page",
   view_page_hint: "Open this event's page",
   view_explorer_hint: "Open the transaction's logs",
@@ -46,6 +42,14 @@ export const EVENT_MENU_WORDS: EventMenuWords = {
   copy_link_hint: "Copy the page's address",
   copied: "Copied",
 };
+
+/** The event menu, handed to a family's T2 that draws a price row: the row
+ *  places it at its right end (`EventCard`'s `menuInDetail`). Null elsewhere. */
+export const EventMenuSlot = createContext<ReactNode>(null);
+
+export function useEventMenuSlot(): ReactNode {
+  return useContext(EventMenuSlot);
+}
 
 /** A copy row's moment of confirmation, keyed by row. */
 export function useMenuCopied(): [string | null, (key: string, value: string) => void] {
@@ -88,14 +92,6 @@ export function EventCardMenu({
     <ToolsMenu variant="event" label={words.menu} heading={words.heading}>
       {(close) => (
         <>
-          <ToolsMenuItem
-            item="copy-hash"
-            icon={copied === "hash" ? tick : <Copy size={16} />}
-            title={words.copy_hash}
-            subtitle={copied === "hash" ? words.copied : words.copy_hash_hint}
-            copied={copied === "hash"}
-            onClick={() => copy("hash", txHash)}
-          />
           {shareHref && !onEventPage && (
             <ToolsMenuItem
               item="view-page"

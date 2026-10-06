@@ -582,7 +582,7 @@ copy_words:
   footer: |-
     Footer
 
-# ── The event menu: the ⋮ at the right end of the explanation's row ──
+# ── The event menu: the ⋮ at the right end of the price row ──
 # Each row is a title and the line under it; a copy row's line reads `copied`
 # for a moment after the copy. The last row, Copy for LLM, reads copy_words.
 menu_words:
@@ -590,10 +590,6 @@ menu_words:
     Event menu
   heading: |-
     Event
-  copy_hash: |-
-    Copy event hash
-  copy_hash_hint: |-
-    Copy the transaction hash
   view_page: |-
     View event page
   view_page_hint: |-

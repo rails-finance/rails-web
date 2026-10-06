@@ -41,6 +41,7 @@ import {
   type FigureProv,
 } from "@/lib/liquity/event-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { useEventMenuSlot } from "@/components/shared/event-card-menu";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -487,6 +488,8 @@ export function LiquityEventDetail({
 }: LiquityEventDetailProps) {
   const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
   const l2 = prose.L2;
+  // The event menu, at the price row's right end (EventCard `menuInDetail`).
+  const eventMenu = useEventMenuSlot();
 
   if (!stateBefore || !stateAfter || !l2) {
     return null;
@@ -949,8 +952,8 @@ export function LiquityEventDetail({
           there by generateLiquidateItems, so it no longer appears in the
           details body. */}
 
-      {/* Historic collateral price pill, sharing its row with the gas the
-          owner paid and the redemption P/L (net outcome), left of it. P/L
+      {/* The price row: the gas the owner paid, the redemption P/L (net
+          outcome), the historic collateral price, then the event menu. P/L
           reconciles with the Cleared / Reduced figures in the header: debt
           cleared minus the value of collateral given up, at the
           redemption-time price and (when available) at today's price.
@@ -997,11 +1000,12 @@ export function LiquityEventDetail({
                 </div>
               );
             })()}
-          <PriceChipShell title={`${ctx.collateralType} price at the time of this event`}>
+          <PriceChipShell bare title={`${ctx.collateralType} price at the time of this event`}>
             <P info={priceP?.info} value={priceP?.value} icon={<TokenChipIcon symbol={ctx.collateralType} size={14} />}>
               {formatUsd(collPrice)}
             </P>
           </PriceChipShell>
+          {eventMenu}
         </div>
       )}
     </>

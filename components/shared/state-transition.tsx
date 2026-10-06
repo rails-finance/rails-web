@@ -175,17 +175,21 @@ export function PriceChipShell({
   changed = false,
   title,
   marker,
+  bare,
   children,
 }: {
   changed?: boolean;
   title?: string;
   /** Stamped as `data-note-price-chip` where a verifier reads the chip. */
   marker?: boolean;
+  /** The figure and its icon with no fill or box (Liquity V2's event price,
+   *  ui-jobs 281). */
+  bare?: boolean;
   children: ReactNode;
 }) {
   return (
     <span
-      className={`ml-auto inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-xs font-bold ${changeTone(changed)}`}
+      className={`ml-auto inline-flex items-center gap-1.5 text-xs font-bold ${bare ? "" : "rounded-md bg-background px-2 py-1 "}${changeTone(changed)}`}
       title={title}
       data-note-price-chip={marker ? "" : undefined}
     >

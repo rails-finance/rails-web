@@ -154,7 +154,7 @@ try {
     const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
     if ((await t3.count()) > 0 && (await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
     // Copy for LLM is the last row of the event menu, the ⋮ at the end of
-    // T3's row (ui-jobs 281).
+    // the price row, or in T6 on a card without one (ui-jobs 281).
     const menuBtn = page.locator('[data-anatomy="T2"] [data-event-menu] > button').first();
     await menuBtn.waitFor({ timeout: 30_000 });
     await menuBtn.click();

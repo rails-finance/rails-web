@@ -53,8 +53,6 @@ export interface LiquityEventCardProps {
 const menuWords: EventMenuWords = {
   menu: MENU_WORDS.menu,
   heading: MENU_WORDS.heading,
-  copy_hash: MENU_WORDS.copy_hash,
-  copy_hash_hint: MENU_WORDS.copy_hash_hint,
   view_page: MENU_WORDS.view_page,
   view_page_hint: MENU_WORDS.view_page_hint,
   view_explorer: MENU_WORDS.view_explorer,
@@ -285,8 +283,8 @@ export function LiquityEventCard({
 
   const liquityTeaser = prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : null;
   // Gas (owner-paid events only; the generator leaves a third party's out)
-  // stands in T2's price row (LiquityEventDetail); a card that draws no price
-  // row keeps it in the footer.
+  // and the event menu stand in T2's price row (LiquityEventDetail); a card
+  // that draws no price row keeps both in the footer.
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra =
     prose.footer.gas && !priceRow ? <span className="text-xs text-rb-500">{prose.footer.gas}</span> : undefined;
@@ -325,6 +323,7 @@ export function LiquityEventCard({
         explanationHeading={PAGE_WORDS.explanation_heading}
         menuWords={menuWords}
         menuExtra={buildMarkdown ? <CopyForLlmItem build={buildMarkdown} /> : undefined}
+        menuInDetail={priceRow}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
         {...(page

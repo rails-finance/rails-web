@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useContext, useId } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
-import { EventCardMenu, type EventMenuWords } from "@/components/shared/event-card-menu";
+import { EventCardMenu, EventMenuSlot, type EventMenuWords } from "@/components/shared/event-card-menu";
 import { TxHashBadge } from "@/components/shared/tx-hash-badge";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import {
@@ -63,8 +63,8 @@ export interface EventCardProps {
   /** How the teaser reads: "bullet" (default) keeps the leading • glyph; "prose"
    *  renders it as a plain lead paragraph with no glyph. */
   explainerTeaserVariant?: "bullet" | "prose";
-  /** Transaction hash: the hash and the event menu at the right end of T3's
-   *  row. */
+  /** Transaction hash: the hash at the right end of T3's row, and the event
+   *  menu (`menuInDetail`). */
   txHash?: string;
   /** A word before the hash ("Transaction"). Unset changes nothing. */
   txHashLabel?: string;
@@ -79,6 +79,10 @@ export interface EventCardProps {
   /** The family's rows at the end of the event menu (Liquity V2's Copy for
    *  LLM). */
   menuExtra?: React.ReactNode;
+  /** The family's `detail` draws a price row that places the event menu at
+   *  its right end (`useEventMenuSlot`). Unset, the menu stands in T6 before
+   *  the "?". */
+  menuInDetail?: boolean;
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
    *  the only dismiss action is an explicit close button. */
@@ -143,6 +147,7 @@ export function EventCard({
   explanationHeading = "Event explanation",
   menuWords,
   menuExtra,
+  menuInDetail,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -243,20 +248,20 @@ export function EventCard({
         ]
       : []),
   ];
-  const footerNode = txHash ? <EventCardFooter extra={footerExtra} learnMore={learnMore} /> : undefined;
+  const menuNode = txHash ? (
+    <EventCardMenu txHash={txHash} shareHref={shareHref} words={menuWords} extra={menuExtra} />
+  ) : null;
+  const footerNode = txHash ? (
+    <EventCardFooter extra={footerExtra} menu={menuInDetail ? undefined : menuNode} learnMore={learnMore} />
+  ) : undefined;
 
-  // The (i) row's right end, reachable with the explanation closed: the
-  // card's action, then the transaction hash and the event menu.
+  // The (i) row's right end, before its chevron and reachable with the
+  // explanation closed: the card's action, then the transaction hash.
   const infoActionNode =
     infoAction || txHash ? (
-      <div className="ml-auto flex items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
+      <div className="flex shrink-0 items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
         {infoAction && <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>}
-        {txHash && (
-          <>
-            <TxHashBadge txHash={txHash} label={txHashLabel} />
-            <EventCardMenu txHash={txHash} shareHref={shareHref} words={menuWords} extra={menuExtra} />
-          </>
-        )}
+        {txHash && <TxHashBadge txHash={txHash} label={txHashLabel} />}
       </div>
     ) : undefined;
 
@@ -350,7 +355,7 @@ export function EventCard({
               treatment is a separate design call; this fixes the
               accessibility gap without it. */}
           {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
-          {detail}
+          {menuInDetail ? <EventMenuSlot.Provider value={menuNode}>{detail}</EventMenuSlot.Provider> : detail}
 
           {/* ── Info sections: under a hairline, the (i) Explanation button
                    at the bottom-left opens the pane beneath, drawn with no
@@ -363,13 +368,13 @@ export function EventCard({
               {pageMode && infoTabs.length > 0 ? (
                 <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
                   <div className="flex items-center gap-2">
-                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rb-500" data-t3-heading="">
                       <svg className="h-5 w-5 text-rb-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
                       </svg>
                       {explanationHeading}
                     </h3>
-                    {infoActionNode}
+                    <div className="ml-auto">{infoActionNode}</div>
                   </div>
                   {infoTabs.map((t) => (
                     <div key={t.key} className="pb-3 pt-2 text-sm">
@@ -390,7 +395,12 @@ export function EventCard({
                   rowExtra={infoActionNode}
                 />
               ) : (
-                <InfoDisclosure bare footer={footerNode} rowExtra={infoActionNode} defaultOpen={pageMode}>
+                <InfoDisclosure
+                  bare
+                  footer={footerNode}
+                  rowExtra={infoActionNode && <div className="ml-auto">{infoActionNode}</div>}
+                  defaultOpen={pageMode}
+                >
                   {null}
                 </InfoDisclosure>
               )}

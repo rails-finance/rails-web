@@ -123,8 +123,9 @@ export function ToolsMenu({
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
-   *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ (T3's row), the
-   *  card menu without the inspector, named by `label` and `heading`. */
+   *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ (T2's price row
+   *  or T6), the card menu without the inspector, named by `label` and
+   *  `heading`. */
   variant?: "tools" | "card" | "event";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */

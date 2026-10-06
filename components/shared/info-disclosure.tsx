@@ -279,10 +279,18 @@ export interface InfoTabsDisclosureProps {
    *  the row, the (i) button and the open pane drawn with no fill and no
    *  rounded box. Unset, the panel register. */
   bare?: boolean;
-  /** Words after the (i), before the chevron ("Event explanation" on an
-   *  event card), shown on every tab's button. */
+  /** Words after the (i) ("Event explanation" on an event card). Set, the
+   *  first tab draws as the event card's row (ui-jobs 281): the toggle spans
+   *  the (i), the words and the free space after them, `rowExtra` follows it,
+   *  and the chevron stands at the row's right end. */
   heading?: string;
 }
+
+/** The row's tones: muted at rest, foreground while either half of the
+ *  toggle is hovered or the toggle has keyboard focus, so the (i), the words
+ *  and the chevron change as one control. */
+const ROW_TONE =
+  "text-rb-500 duration-200 group-has-[[data-t3-toggle]:hover]/t3row:text-foreground group-has-[[data-t3-toggle]:focus-visible]/t3row:text-foreground";
 
 /**
  * The event card's info affordance: each section heading is its own button —
@@ -319,77 +327,140 @@ export function InfoTabsDisclosure({
     () => (open ? (buttons.current.get(open.key) ?? null) : null),
   );
 
+  const first = tabs[0];
+  const toggleFirst = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onOpenTabChange(open?.key === first.key ? null : first.key);
+  };
+
   return (
     <div className={`${bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
-      {/* With a `rowExtra` (a tall risk strip) the row grows past the buttons'
-          own height; centring would float the open button away from the pane it
-          is supposed to be a tab of, and the `after:` connector can't span the
-          gap. Bottom-align in that case; without a rowExtra the row is
-          button-height and centring is unchanged. */}
-      <div className={`flex gap-2 ${rowExtra != null ? "flex-wrap items-end" : "items-center"}`}>
-        {tabs.map((t) => {
-          const active = open?.key === t.key;
-          return (
-            <button
-              key={t.key}
-              ref={(el) => {
-                if (el) buttons.current.set(t.key, el);
-                else buttons.current.delete(t.key);
-              }}
-              type="button"
-              data-anatomy={anatomy}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenTabChange(active ? null : t.key);
-              }}
-              aria-expanded={active}
-              aria-label={active ? `Hide ${t.label.toLowerCase()}` : `Show ${t.label.toLowerCase()}`}
-              className={`group/info relative inline-flex cursor-pointer items-center gap-1 ${
-                bare
-                  ? "rounded-md py-1"
-                  : // The open button becomes the pane's tab: square bottom
-                    // corners plus an ::after strip that paints the button's
-                    // background across the gap down into the pane — the
-                    // physical connection.
-                    `rounded-lg bg-background p-1 ${
-                      active
-                        ? "rounded-b-none after:absolute after:inset-x-0 after:top-full after:h-1.5 after:bg-background"
-                        : ""
-                    }`
-              }`}
+      {heading && first ? (
+        // The event card's row. `rowExtra` (the card's action, the hash and
+        // its copy control) sits between the two halves of the toggle as a
+        // sibling, so no control nests in another. The chevron is a second
+        // press area for the same toggle, out of the tab order: Tab reaches
+        // the toggle, then the controls in `rowExtra`.
+        <div className="group/t3row flex items-center gap-2">
+          <button
+            ref={(el) => {
+              if (el) buttons.current.set(first.key, el);
+              else buttons.current.delete(first.key);
+            }}
+            type="button"
+            data-anatomy={anatomy}
+            data-t3-toggle=""
+            onClick={toggleFirst}
+            aria-expanded={open?.key === first.key}
+            aria-label={
+              open?.key === first.key ? `Hide ${first.label.toLowerCase()}` : `Show ${first.label.toLowerCase()}`
+            }
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch rounded-md py-1 text-left"
+          >
+            <svg
+              className={`h-5 w-5 shrink-0 transition-colors ${ROW_TONE}`}
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
             >
-              <svg
-                className="h-5 w-5 text-rb-500 transition-colors duration-200 group-hover/info:text-foreground"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
-              </svg>
-              {heading && (
-                <span className="ml-0.5 text-sm font-semibold text-foreground" data-t3-heading="">
-                  {heading}
-                </span>
-              )}
-              <svg
-                className={`mr-0.5 h-3 w-3 text-rb-500 transition-[color,transform] duration-200 group-hover/info:text-foreground ${
-                  active ? "rotate-180" : ""
-                }`}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-          );
-        })}
-        {rowExtra}
-      </div>
+              <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
+            </svg>
+            <span className={`truncate text-sm font-semibold transition-colors ${ROW_TONE}`} data-t3-heading="">
+              {heading}
+            </span>
+          </button>
+          {rowExtra}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            data-t3-toggle=""
+            data-t3-chevron=""
+            onClick={toggleFirst}
+            className="flex cursor-pointer items-center self-stretch py-1 pl-1"
+          >
+            <svg
+              className={`h-3 w-3 ${ROW_TONE} transition-[color,transform] ${open?.key === first.key ? "rotate-180" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* With a `rowExtra` (a tall risk strip) the row grows past the
+              buttons' own height; centring would float the open button away
+              from the pane it is supposed to be a tab of, and the `after:`
+              connector can't span the gap. Bottom-align in that case; without
+              a rowExtra the row is button-height and centring is unchanged. */}
+          <div className={`flex gap-2 ${rowExtra != null ? "flex-wrap items-end" : "items-center"}`}>
+            {tabs.map((t) => {
+              const active = open?.key === t.key;
+              return (
+                <button
+                  key={t.key}
+                  ref={(el) => {
+                    if (el) buttons.current.set(t.key, el);
+                    else buttons.current.delete(t.key);
+                  }}
+                  type="button"
+                  data-anatomy={anatomy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTabChange(active ? null : t.key);
+                  }}
+                  aria-expanded={active}
+                  aria-label={active ? `Hide ${t.label.toLowerCase()}` : `Show ${t.label.toLowerCase()}`}
+                  className={`group/info relative inline-flex cursor-pointer items-center gap-1 ${
+                    bare
+                      ? "rounded-md py-1"
+                      : // The open button becomes the pane's tab: square bottom
+                        // corners plus an ::after strip that paints the button's
+                        // background across the gap down into the pane — the
+                        // physical connection.
+                        `rounded-lg bg-background p-1 ${
+                          active
+                            ? "rounded-b-none after:absolute after:inset-x-0 after:top-full after:h-1.5 after:bg-background"
+                            : ""
+                        }`
+                  }`}
+                >
+                  <svg
+                    className="h-5 w-5 text-rb-500 transition-colors duration-200 group-hover/info:text-foreground"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
+                  </svg>
+                  <svg
+                    className={`mr-0.5 h-3 w-3 text-rb-500 transition-[color,transform] duration-200 group-hover/info:text-foreground ${
+                      active ? "rotate-180" : ""
+                    }`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              );
+            })}
+            {rowExtra}
+          </div>
+        </>
+      )}
       {keepMounted ? (
         // All tab contents stay in the DOM; the pane chrome (and the footer)
         // only shows while a tab is open, and only the open tab's content is
