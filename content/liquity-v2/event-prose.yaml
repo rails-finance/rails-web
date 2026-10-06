@@ -567,12 +567,15 @@ copy_words:
   footer: |-
     Footer
 
-# ── The event page: the paragraph beside the card and the card's page controls ──
-# The paragraph states the Trove, the event's place in its history, the day, and
-# what the figures are. {holder} is held_by or
-# last_held_by (a closed Trove's owner is its last one).
+# ── The event page: the side column beside the card ──
+# The column holds the paragraph, a table of facts the card does not show, and
+# the previous, next and timeline links. The metadata description is
+# `description`; {holder} is held_by or last_held_by (a closed Trove's owner is
+# its last one).
 page_words:
   paragraph: |-
+    This page is one transaction; its figures are the Trove's state after it.
+  description: |-
     One transaction from the {coll_symbol} Trove {trove}, {holder}: event {n|count} of {total|count}, on {day}. The figures are the Trove's state after it.
   held_by: |-
     held by {owner}
@@ -580,12 +583,32 @@ page_words:
     last held by {owner}
   timeline_link: |-
     See the whole history in the timeline.
+  branch: |-
+    Branch
+  trove: |-
+    Trove
+  holder: |-
+    Holder
+  last_holder: |-
+    Last holder
+  event: |-
+    Event
+  event_of: |-
+    {n|count} of {total|count}
+  block: |-
+    Block
+  copy_trove: |-
+    Copy the Trove id
+  copied: |-
+    Copied
   in_timeline: |-
     See in timeline
   previous: |-
     Previous event
   next: |-
     Next event
+  explanation_heading: |-
+    Event explanation
 
 # ── Words the L5 modals fill in ──
 L5_words:

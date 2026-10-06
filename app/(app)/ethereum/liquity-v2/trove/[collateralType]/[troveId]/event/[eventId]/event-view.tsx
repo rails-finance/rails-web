@@ -1,9 +1,9 @@
 "use client";
 
 // The Liquity V2 event page's client half (rails-ops TO-DO-ui-jobs 236): the
-// sub-nav the trove page has, then the event's card in its page mode (the
-// previous and next events and "See in timeline" in its header) with a
-// paragraph in the spine's column (lib/liquity/event-page.ts). The card is
+// sub-nav the trove page has, then the event's card in its page mode with the
+// side column in the spine's place (liquity-event-page-aside.tsx: the
+// paragraph, the facts table, the previous, next and timeline links). The card is
 // the timeline's `LiquityEventCard`, fed the replay the trove page feeds it
 // (lib/liquity/event-prose-position.ts is the same path for the exports), so
 // its levels and Copy for LLM are the timeline's.
@@ -18,8 +18,9 @@ import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/compone
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { eventPageParagraph, eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
+import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
+import { LiquityEventPageAside } from "@/components/protocol/liquity/liquity-event-page-aside";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -173,19 +174,6 @@ export default function EventView({
     : undefined;
 
   const timelineHref = `${trovePath}?at=${encodeURIComponent(eventId)}`;
-  const paragraph = event
-    ? eventPageParagraph({
-        collSymbol: trove.collateralType,
-        troveId,
-        owner: holder.address,
-        ownerEns: trove.ownerEns ?? null,
-        lastOwner: holder.last,
-        n,
-        total,
-        timestamp: event.timestamp,
-      })
-    : null;
-
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -224,19 +212,20 @@ export default function EventView({
                         eventNumber={n}
                         currentPrice={currentPrice}
                         page={{
-                          previousHref: previous ? eventPath(previous.id) : null,
-                          nextHref: next ? eventPath(next.id) : null,
-                          timelineHref,
-                          aside: paragraph && (
-                            <p
-                              className="pb-4 pt-3 text-sm leading-relaxed text-rb-500 sm:pb-0 sm:pr-6"
-                              data-event-page-paragraph=""
-                            >
-                              {paragraph.text}{" "}
-                              <a href={timelineHref} className="text-blue-600 hover:underline dark:text-blue-400">
-                                {paragraph.link}
-                              </a>
-                            </p>
+                          aside: (
+                            <LiquityEventPageAside
+                              collSymbol={trove.collateralType}
+                              troveId={troveId}
+                              owner={holder.address}
+                              ownerEns={trove.ownerEns ?? null}
+                              lastOwner={holder.last}
+                              n={n}
+                              total={total}
+                              blockNumber={event.blockNumber}
+                              previousHref={previous ? eventPath(previous.id) : null}
+                              nextHref={next ? eventPath(next.id) : null}
+                              timelineHref={timelineHref}
+                            />
                           ),
                         }}
                       />

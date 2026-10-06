@@ -5,7 +5,12 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { useEventShareHref } from "@/components/shared/event-share-context";
-import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
+import {
+  INFO_PATH,
+  InfoDisclosure,
+  InfoTabsDisclosure,
+  type InfoDisclosureTab,
+} from "@/components/shared/info-disclosure";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
@@ -93,6 +98,10 @@ export interface EventCardProps {
    *  spine's column, beside the card from 640px and above it below. Set with
    *  `hideDetailChevron` and `detailOpen`; unset, the card is the timeline's. */
   pageAside?: React.ReactNode;
+  /** The event page's T3 heading words ("Event explanation"): with
+   *  `pageAside`, the explanation stands open without its panel, under the
+   *  (i) and these words. */
+  pageExplanationHeading?: string;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -123,6 +132,7 @@ export function EventCard({
   caption,
   infoAction,
   pageAside,
+  pageExplanationHeading,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -158,8 +168,10 @@ export function EventCard({
   const registry = useReceiptRegistry();
   // Which info section is expanded — the section heading is the button,
   // bridging into the pane below.
-  // The event page (`pageAside`) opens the explanation, and with it the footer, on load.
-  const [openInfoTab, setOpenInfoTab] = useState<string | null>(pageAside != null ? "explanation" : null);
+  const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
+  // The event page's card (`pageAside`): the explanation and the footer stand
+  // open, with no toggle.
+  const pageMode = pageAside != null;
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
@@ -333,14 +345,35 @@ export function EventCard({
           {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
           {detail}
 
-          {/* ── Info sections: the (i) Explanation heading is its own button
-                   at the bottom-left, bridging into the pane beneath with the
-                   footer metadata pinned below. A card without an explainer
-                   keeps the plain (i) for its footer. ── */}
+          {/* ── Info sections: under a hairline, the (i) Explanation button
+                   at the bottom-left opens the pane beneath, drawn with no
+                   panel, with the footer metadata pinned below. A card
+                   without an explainer keeps the plain (i) for its footer. ── */}
           {(hasExplainer || txHash) && (
             <div className="px-4 pb-3 pt-1">
-              {infoTabs.length > 0 ? (
+              {/* The event page: the explanation stands open with no panel,
+                  under a hairline and the (i) with its heading words. */}
+              {pageMode && infoTabs.length > 0 ? (
+                <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
+                  <div className="flex items-center gap-2">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
+                      <svg className="h-5 w-5 text-rb-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
+                      </svg>
+                      {pageExplanationHeading}
+                    </h3>
+                    {infoActionNode}
+                  </div>
+                  {infoTabs.map((t) => (
+                    <div key={t.key} className="pb-3 pt-2 text-sm">
+                      {t.content}
+                    </div>
+                  ))}
+                  {footerNode}
+                </div>
+              ) : infoTabs.length > 0 ? (
                 <InfoTabsDisclosure
+                  bare
                   anatomy="T3"
                   tabs={infoTabs}
                   openTab={openInfoTab}
@@ -349,7 +382,7 @@ export function EventCard({
                   rowExtra={infoActionNode}
                 />
               ) : (
-                <InfoDisclosure footer={footerNode} rowExtra={infoActionNode} defaultOpen={pageAside != null}>
+                <InfoDisclosure bare footer={footerNode} rowExtra={infoActionNode} defaultOpen={pageMode}>
                   {null}
                 </InfoDisclosure>
               )}
@@ -394,7 +427,7 @@ export function EventCard({
           the first event card stands for the spine's row height. */}
       <div
         data-skel-section="detail-event"
-        className={`flex w-full ${pageAside != null ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
+        className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
           muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
         }`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
@@ -405,7 +438,7 @@ export function EventCard({
             so the spine and the card body reflow together. On the event page the
             column holds `pageAside`, stacked above the card below sm, where the row
             drops its side padding so the paragraph and the card share one width. */}
-        {pageAside != null ? (
+        {pageMode ? (
           <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
             {pageAside}
           </div>

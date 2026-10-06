@@ -18,7 +18,8 @@
 //   P2  L4 ON THE PAGE — every L4 sentence of the block is a bullet of the
 //       opened card's Explanation, in order.
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
-//       opened card, in order.
+//       opened card, in order; a Collateral or Debt line by its after figures, which
+//       close the open ledger.
 //   P4  L1 ON THE PAGE — the L1 line's words and figures are on the event's
 //       row (the header and the spine; on the event page, the header).
 //
@@ -148,9 +149,10 @@ try {
     await card.waitFor({ timeout: 60_000 });
     // The ledgers land with the flows panel: the copy waits for the cells.
     await page.waitForTimeout(3000);
-    // The event page opens T3 on load; a closed one is opened here.
+    // The event page's T3 stands open with no button; a card with a closed
+    // (i) button is opened here.
     const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
-    if ((await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
+    if ((await t3.count()) > 0 && (await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
     const copyBtn = page.locator("[data-copy-for-llm]").first();
     await copyBtn.waitFor({ timeout: 30_000 });
     await copyBtn.click();
@@ -189,10 +191,9 @@ try {
     check(`${label}: its L5 = the export's L5 for "${title}"`, title !== "" && appendix.includes(l5), l5.slice(0, 120));
 
     // P2
-    // The event page opens the Collateral and Debt ledgers (ui-jobs 236); a
-    // closed cell is its closing line, the figures L2 states.
-    const openLedger = page.locator('[data-ledger-toggle][aria-expanded="true"]');
-    for (let i = await openLedger.count(); i > 0; i--) await openLedger.first().click();
+    // The event page's Collateral and Debt ledgers stand open with no toggle
+    // (ui-jobs 236): each closes on the after figures, so P3 reads a ledger
+    // line of L2 from its after side.
     const t2 = await card.innerText();
     const bullets = section(copy, "L4")
       .slice(1)
@@ -205,10 +206,28 @@ try {
     );
 
     // P3
+    const LEDGER = /^- (Collateral|Debt):/;
+    const NUM = /[−+]?\$?[\d,]+(?:\.\d+)?%?/g;
     const figures = section(copy, "L2")
       .slice(1)
-      .flatMap((l) => l.match(/[−+]?\$?[\d,]+(?:\.\d+)?%?/g) ?? []);
-    const missing2 = inOrder(t2, figures);
+      .flatMap((l) =>
+        LEDGER.test(l)
+          ? (l
+              .replace(/\([^)]*[a-z][^)]*\)/g, "")
+              .replace(/[−+]?\$?[\d,]+(?:\.\d+)?%?\s*→\s*/g, "")
+              .match(NUM) ?? [])
+          : (l.match(NUM) ?? []),
+      );
+    // The panels above the Explanation, whose prose repeats figures.
+    const panels = await card.evaluate((el) => {
+      const c = el.cloneNode(true);
+      c.querySelectorAll('[data-anatomy="T3"]').forEach((n) => n.remove());
+      document.body.appendChild(c);
+      const text = c.innerText;
+      c.remove();
+      return text;
+    });
+    const missing2 = inOrder(panels, figures);
     check(`${label}: L2's figures are on the card (${figures.length})`, !missing2, missing2 ?? "");
 
     // P4: the row (spine and header; the event page's header states the

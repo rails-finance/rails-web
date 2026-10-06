@@ -7,7 +7,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
-import { LiquityEventHeader, liquityOperationLabel, type EventPageNav } from "./liquity-event-header";
+import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail } from "./liquity-event-detail";
 import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { CopyForLlm, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
@@ -18,6 +18,7 @@ import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
+import { PAGE_WORDS } from "@/lib/liquity/event-templates";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import { useParams } from "next/navigation";
 
@@ -43,9 +44,9 @@ export interface LiquityEventCardProps {
    *  redemption P/L in the header and explainer. */
   currentPrice?: number;
   /** The event page's card (rails-ops TO-DO-ui-jobs 236): opened with no
-   *  chevron, its ledgers open, the page controls in the header's time slot,
-   *  and `aside` in the spine's column. Unset, the card is the timeline's. */
-  page?: EventPageNav & { aside: React.ReactNode };
+   *  chevron, its ledgers and T3 open with no toggles, and `aside` in the
+   *  spine's column. Unset, the card is the timeline's. */
+  page?: { aside: React.ReactNode };
 }
 
 export function LiquityEventCard({
@@ -294,7 +295,7 @@ export function LiquityEventCard({
             txHash={event.txHash}
             blockNumber={event.blockNumber}
             eventNumber={eventNumber}
-            page={page}
+            page={!!page}
           />
         }
         detail={
@@ -315,7 +316,14 @@ export function LiquityEventCard({
         learnMore={<LearnMore inline content={prose.L5.content} />}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
-        {...(page ? { hideDetailChevron: true, detailOpen: true, pageAside: page.aside } : {})}
+        {...(page
+          ? {
+              hideDetailChevron: true,
+              detailOpen: true,
+              pageAside: page.aside,
+              pageExplanationHeading: PAGE_WORDS.explanation_heading,
+            }
+          : {})}
       />
     </LiquityLedgerProvider>
   );

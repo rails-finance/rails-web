@@ -1,8 +1,8 @@
 // The Liquity V2 event page's facts (rails-ops TO-DO-ui-jobs 236): where the
-// event stands in the Trove's history, and the paragraph beside its card. The
-// page (server, for the metadata description) and its client view both read
-// them here, so the two say the same thing. The words are the strings file's
-// `page_words` (content/liquity-v2/event-prose.yaml).
+// event stands in the Trove's history, the holder's name, and the metadata
+// description. The page (server) and its client view both read them here.
+// The words are the strings file's `page_words`
+// (content/liquity-v2/event-prose.yaml).
 
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { liquityTroveHistory } from "@/lib/liquity/event-prose-position";
@@ -61,8 +61,19 @@ export function troveHolder(trove: { owner?: string | null; lastOwner?: string |
 
 const short = (hex: string) => (hex.length > 12 ? `${hex.slice(0, 6)}…${hex.slice(-4)}` : hex);
 
-/** The paragraph beside the card, and its timeline link's words. */
-export function eventPageParagraph(o: {
+/** The holder as the page names it: the ENS name, else the short address. */
+export function holderName(owner: string | null, ownerEns: string | null): string {
+  return ownerEns || (owner ? short(owner) : CONTEXT_WORDS.owner_unknown);
+}
+
+/** The side column's "18 of 148". */
+export function eventOf(n: number, total: number): string {
+  return fillText(PAGE_WORDS.event_of, { n, total });
+}
+
+/** The page's metadata description: the Trove, its holder, the event's place
+ *  and day, what the figures are, and the timeline sentence. */
+export function eventPageDescription(o: {
   collSymbol: string;
   troveId: string;
   owner: string | null;
@@ -71,10 +82,10 @@ export function eventPageParagraph(o: {
   n: number;
   total: number;
   timestamp: number;
-}): { text: string; link: string } {
-  const owner = o.ownerEns || (o.owner ? short(o.owner) : CONTEXT_WORDS.owner_unknown);
+}): string {
+  const owner = holderName(o.owner, o.ownerEns);
   const holder = o.lastOwner ? fillText(PAGE_WORDS.last_held_by, { owner }) : fillText(PAGE_WORDS.held_by, { owner });
-  const text = fillText(PAGE_WORDS.paragraph, {
+  const text = fillText(PAGE_WORDS.description, {
     coll_symbol: o.collSymbol,
     trove: short(o.troveId),
     holder,
@@ -82,5 +93,5 @@ export function eventPageParagraph(o: {
     total: o.total,
     day: formatDateLong(o.timestamp),
   });
-  return { text, link: PAGE_WORDS.timeline_link };
+  return `${text} ${PAGE_WORDS.timeline_link}`;
 }

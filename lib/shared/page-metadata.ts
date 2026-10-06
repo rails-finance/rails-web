@@ -312,7 +312,7 @@ export function eventMetadata(opts: {
    *  log sweeps — see `lib/vaults/event-share-card.ts`. */
   image?: "dynamic" | "explorer";
   /** The page's description of the event, in place of the generic one
-   *  (the Liquity V2 event page's paragraph). */
+   *  (the Liquity V2 event page's `page_words.description`). */
   description?: string;
 }): Metadata {
   const entry = protocolForSession(opts.session);

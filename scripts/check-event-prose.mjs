@@ -44,6 +44,8 @@ const READERS = [
   "components/protocol/liquity/event-prose-render.tsx",
   "components/protocol/liquity/liquity-event-header.tsx",
   "components/protocol/liquity/liquity-event-detail.tsx",
+  "components/protocol/liquity/liquity-event-card.tsx",
+  "components/protocol/liquity/liquity-event-page-aside.tsx",
 ];
 /** Files that may hold no prose of their own. */
 const NO_PROSE = [

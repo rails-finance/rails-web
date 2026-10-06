@@ -51,6 +51,8 @@ export interface InfoDisclosureTriggerProps {
    *  are part of the click target rather than dead text beside it. */
   children?: React.ReactNode;
   className?: string;
+  /** No pill fill (the event card's register). */
+  bare?: boolean;
 }
 
 /**
@@ -65,10 +67,20 @@ export interface InfoDisclosureTriggerProps {
  */
 export const InfoDisclosureTrigger = forwardRef<HTMLButtonElement, InfoDisclosureTriggerProps>(
   function InfoDisclosureTrigger(
-    { open, onToggle, label = "details", warning = false, surface = "background", ariaControls, children, className },
+    {
+      open,
+      onToggle,
+      label = "details",
+      warning = false,
+      surface = "background",
+      ariaControls,
+      children,
+      className,
+      bare,
+    },
     ref,
   ) {
-    const surfaceBg = surface === "raised" ? "bg-raised" : "bg-background";
+    const surfaceBg = bare ? "" : surface === "raised" ? "bg-raised" : "bg-background";
     return (
       <button
         ref={ref}
@@ -77,7 +89,7 @@ export const InfoDisclosureTrigger = forwardRef<HTMLButtonElement, InfoDisclosur
         aria-expanded={open}
         aria-controls={ariaControls}
         aria-label={open ? `Hide ${label}` : `Show ${label}`}
-        className={`group/info inline-flex cursor-pointer items-center gap-1 rounded-full p-1 ${surfaceBg}${
+        className={`group/info inline-flex cursor-pointer items-center gap-1 ${bare ? "rounded-md py-1" : "rounded-full p-1"} ${surfaceBg}${
           className ? ` ${className}` : ""
         }`}
       >
@@ -139,6 +151,9 @@ export interface InfoDisclosureProps {
    *  while the panel opens below. Listing headers use it for the recency
    *  stamp. */
   rowExtra?: React.ReactNode;
+  /** The event card's register (rails-ops TO-DO-ui-jobs 236): a hairline
+   *  above, no fill and no rounded box on the pill or the open panel. */
+  bare?: boolean;
 }
 
 export function InfoDisclosure({
@@ -152,8 +167,10 @@ export function InfoDisclosure({
   label = "details",
   surface = "background",
   rowExtra,
+  bare,
 }: InfoDisclosureProps) {
   const surfaceBg = surface === "raised" ? "bg-raised" : "bg-background";
+  const hairline = bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : "";
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
   const open = isControlled ? openProp : internalOpen;
@@ -190,12 +207,13 @@ export function InfoDisclosure({
       label={label}
       warning={warning}
       surface={surface}
+      bare={bare}
     />
   );
 
   if (!open) {
     return (
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className ?? ""}`}>
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${hairline} ${className ?? ""}`}>
         {trigger}
         {rowExtra}
       </div>
@@ -206,12 +224,12 @@ export function InfoDisclosure({
     // The info panel is editorial — narrated figures and footer chrome, never a
     // stat surface — so it's exempt from the dev provenance-coverage tripwire
     // (a <Prov> inside still registers; the exemption only silences the scan).
-    <div className={`rounded-xl ${surfaceBg} ${className ?? ""}`} data-prov-exempt="">
+    <div className={`${bare ? hairline : `rounded-xl ${surfaceBg}`} ${className ?? ""}`} data-prov-exempt="">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {trigger}
         {rowExtra}
       </div>
-      {children && <div className="px-3 pb-3 pt-1">{children}</div>}
+      {children && <div className={bare ? "pb-3 pt-1" : "px-3 pb-3 pt-1"}>{children}</div>}
       {footer}
     </div>
   );
@@ -257,6 +275,10 @@ export interface InfoTabsDisclosureProps {
    *  set on its heading-button and its pane: "T3" on an event card, "C3" on a
    *  position card. */
   anatomy?: string;
+  /** The event card's register (rails-ops TO-DO-ui-jobs 236): a hairline above
+   *  the row, the (i) button and the open pane drawn with no fill and no
+   *  rounded box. Unset, the panel register. */
+  bare?: boolean;
 }
 
 /**
@@ -278,9 +300,12 @@ export function InfoTabsDisclosure({
   rowExtra,
   className,
   anatomy,
+  bare,
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
+  const pane = bare ? "" : `mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}`;
+  const paneBody = bare ? "pb-3 pt-2 text-sm" : "px-3 pb-3 pt-3 text-sm";
   // Escape closes the most recently opened pane and hands focus back to the
   // open section's (i) button (use-escape-close.ts).
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -291,7 +316,7 @@ export function InfoTabsDisclosure({
   );
 
   return (
-    <div className={className}>
+    <div className={`${bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
       {/* With a `rowExtra` (a tall risk strip) the row grows past the buttons'
           own height; centring would float the open button away from the pane it
           is supposed to be a tab of, and the `after:` connector can't span the
@@ -315,13 +340,18 @@ export function InfoTabsDisclosure({
               }}
               aria-expanded={active}
               aria-label={active ? `Hide ${t.label.toLowerCase()}` : `Show ${t.label.toLowerCase()}`}
-              className={`group/info relative inline-flex cursor-pointer items-center gap-1 rounded-lg bg-background p-1 ${
-                // The open button becomes the pane's tab: square bottom corners
-                // plus an ::after strip that paints the button's background
-                // across the gap down into the pane — the physical connection.
-                active
-                  ? "rounded-b-none after:absolute after:inset-x-0 after:top-full after:h-1.5 after:bg-background"
-                  : ""
+              className={`group/info relative inline-flex cursor-pointer items-center gap-1 ${
+                bare
+                  ? "rounded-md py-1"
+                  : // The open button becomes the pane's tab: square bottom
+                    // corners plus an ::after strip that paints the button's
+                    // background across the gap down into the pane — the
+                    // physical connection.
+                    `rounded-lg bg-background p-1 ${
+                      active
+                        ? "rounded-b-none after:absolute after:inset-x-0 after:top-full after:h-1.5 after:bg-background"
+                        : ""
+                    }`
               }`}
             >
               <svg
@@ -357,13 +387,9 @@ export function InfoTabsDisclosure({
         // visible. Hidden content still registers its <Prov> values.
         // data-prov-exempt: the pane is editorial (explanations, footer) or
         // receipts chrome — never a stat surface the coverage tripwire owns.
-        <div
-          className={open ? `mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}` : "hidden"}
-          data-prov-exempt=""
-          data-anatomy={anatomy}
-        >
+        <div className={open ? pane : "hidden"} data-prov-exempt="" data-anatomy={anatomy}>
           {tabs.map((t) => (
-            <div key={t.key} className={open?.key === t.key ? "px-3 pb-3 pt-3 text-sm" : "hidden"}>
+            <div key={t.key} className={open?.key === t.key ? paneBody : "hidden"}>
               {t.content}
             </div>
           ))}
@@ -371,12 +397,8 @@ export function InfoTabsDisclosure({
         </div>
       ) : (
         open && (
-          <div
-            className={`mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}`}
-            data-prov-exempt=""
-            data-anatomy={anatomy}
-          >
-            <div className="px-3 pb-3 pt-3 text-sm">{open.content}</div>
+          <div className={pane} data-prov-exempt="" data-anatomy={anatomy}>
+            <div className={paneBody}>{open.content}</div>
             {footer}
           </div>
         )

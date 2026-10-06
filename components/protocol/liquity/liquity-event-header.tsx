@@ -8,12 +8,11 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
-import { L1_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
+import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabelShort, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
-import { AlertTriangle, ChevronLeft, ChevronRight, GitCommitVertical } from "lucide-react";
-import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
@@ -96,61 +95,23 @@ export interface LiquityEventHeaderProps {
    * trove's openTrove. */
   eventNumber?: number;
   /** The event page's card (rails-ops TO-DO-ui-jobs 236): the time slot
-   *  states the date, the time and the number whatever the Display menu says,
-   *  with the neighbouring events' links either side of the number (null at
-   *  the first or last event) and a link to the card in the timeline. */
-  page?: EventPageNav;
+   *  states the date, the time and the number whatever the Display menu
+   *  says. */
+  page?: boolean;
 }
 
-export interface EventPageNav {
-  previousHref: string | null;
-  nextHref: string | null;
-  timelineHref: string;
-}
-
-const PAGE_ICON =
-  "-my-2 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-rb-500 transition-colors focus-ring sm:-my-1 sm:size-6";
-const PAGE_ICON_LIVE = "cursor-pointer hover:bg-rb-100 hover:text-foreground dark:hover:bg-rb-800";
-
-/** A previous or next event control: a link, or a disabled one at the end. */
-function PageStep({ href, label, next }: { href: string | null; label: string; next?: boolean }) {
-  const icon = next ? <ChevronRight size={12} aria-hidden /> : <ChevronLeft size={12} aria-hidden />;
-  const data = next ? { "data-event-next": "" } : { "data-event-prev": "" };
-  return href ? (
-    <Link href={href} aria-label={label} title={label} className={`${PAGE_ICON} ${PAGE_ICON_LIVE}`} {...data}>
-      {icon}
-    </Link>
-  ) : (
-    <span role="link" aria-label={label} aria-disabled="true" className={`${PAGE_ICON} opacity-40`} {...data}>
-      {icon}
-    </span>
-  );
-}
-
-/** The event page's time slot: "See in timeline", the date and time, and the
- *  number between its neighbours. */
-function PageMeta({ page, timestamp, counter }: { page: EventPageNav; timestamp: number; counter: ReactNode }) {
+/** The event page's time slot: the date, the time and the number. */
+function PageMeta({ timestamp, counter }: { timestamp: number; counter: ReactNode }) {
   const time = formatTimestamp(timestamp);
   return (
-    <span className="inline-flex items-center gap-1" data-event-page-meta="">
-      <a
-        href={page.timelineHref}
-        aria-label={PAGE_WORDS.in_timeline}
-        title={PAGE_WORDS.in_timeline}
-        className={`${PAGE_ICON} ${PAGE_ICON_LIVE}`}
-        data-event-in-timeline=""
-      >
-        <GitCommitVertical size={14} aria-hidden />
-      </a>
+    <span className="inline-flex items-center gap-2" data-event-page-meta="">
       <span className="text-xs">
         {shortDate(timestamp)} {shortDateYear(timestamp)}
       </span>
       <span className="text-xs text-rb-500" title={`${formatDate(timestamp)} ${time} UTC`}>
         {time}
       </span>
-      <PageStep href={page.previousHref} label={PAGE_WORDS.previous} />
       {counter}
-      <PageStep href={page.nextHref} label={PAGE_WORDS.next} next />
     </span>
   );
 }
@@ -207,7 +168,7 @@ export function LiquityEventHeader({
         <span className="ml-auto inline-flex items-center gap-2">
           {groupChip}
           {page ? (
-            <PageMeta page={page} timestamp={timestamp} counter={counter} />
+            <PageMeta timestamp={timestamp} counter={counter} />
           ) : (
             <>
               {showTimestamps && (
@@ -696,7 +657,7 @@ export function LiquityEventHeader({
             )}
             {groupChip}
             {page ? (
-              <PageMeta page={page} timestamp={timestamp} counter={counter} />
+              <PageMeta timestamp={timestamp} counter={counter} />
             ) : (
               <>
                 {timestamp > 0 && (

@@ -138,8 +138,8 @@ export function T2Skeleton({ stats = [], data }: { stats?: string[]; data?: Reco
   );
 }
 
-/** Whether a ledger cell starts open: the event page's card opens its
- *  Collateral and Debt ledgers (rails-ops TO-DO-ui-jobs 236). */
+/** The event page's card (rails-ops TO-DO-ui-jobs 236): its ledger cells
+ *  stand open with no toggle, the name's line a heading. */
 export const LedgerOpenContext = createContext(false);
 
 /** A T2 cell that can open into its side's ledger (anatomy T2.1). Closed, the
@@ -177,8 +177,10 @@ export function LedgerCell({
 }) {
   const src = useContext(EventLedgerContext);
   const has = ledger !== undefined ? ledger != null : side != null && !!src?.has(side);
-  const openFirst = useContext(LedgerOpenContext);
-  const [open, setOpen] = useState(openFirst);
+  const fixedOpen = useContext(LedgerOpenContext);
+  const [openState, setOpen] = useState(false);
+  const open = fixedOpen || openState;
+  const toggles = has && !fixedOpen;
   const [col, setCol] = useState<Col>("tokens");
   const [unit, setUnit] = useState<string | null>(null);
   const id = useId();
@@ -199,8 +201,8 @@ export function LedgerCell({
     if (typeof window !== "undefined" && (window.getSelection()?.toString().length ?? 0) > 0) return;
     setOpen((v) => !v);
   };
-  const line = has ? { "data-ledger-first": "", onClick: onLine } : {};
-  const toggle = has ? (
+  const line = toggles ? { "data-ledger-first": "", onClick: onLine } : {};
+  const toggle = toggles ? (
     <button
       type="button"
       className={TOGGLE}
@@ -246,7 +248,7 @@ export function LedgerCell({
     );
   return (
     <div
-      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${has ? LINE_HOVER : ""} ${className}`}
+      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${toggles ? LINE_HOVER : ""} ${className}`}
       {...data}
       {...(side ? { "data-ledger-cell": side } : {})}
       {...(ledgerCard ? { "data-ledger-span": "" } : {})}
@@ -254,7 +256,11 @@ export function LedgerCell({
     >
       {isOpen ? (
         <>
-          <div className={`mb-1.5 flex cursor-pointer items-start ${TOGGLE_ROOM}`} data-ledger-row="head" {...line}>
+          <div
+            className={`mb-1.5 flex items-start ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+            data-ledger-row="head"
+            {...line}
+          >
             {nameRow}
           </div>
           <ColContext.Provider value={{ col, offer: setUnit }}>
@@ -292,7 +298,7 @@ export function LedgerCell({
         // The figures keep to the name's line where they fit, else they take
         // the next line; the toggle stays at the name's line's right end.
         <div
-          className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${has ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+          className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
           data-ledger-row="closed"
           {...line}
         >
@@ -302,7 +308,7 @@ export function LedgerCell({
       ) : (
         <>
           <div
-            className={`mb-1.5 flex items-start ${has ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+            className={`mb-1.5 flex items-start ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
             data-ledger-row="closed"
             {...line}
           >
