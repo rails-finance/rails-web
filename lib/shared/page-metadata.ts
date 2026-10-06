@@ -311,7 +311,7 @@ export function eventMetadata(opts: {
    *  there is nothing an image route could read without running the page's own
    *  log sweeps — see `lib/vaults/event-share-card.ts`. */
   image?: "dynamic" | "explorer";
-  /** The page's own description of the event, in place of the generic one
+  /** The page's description of the event, in place of the generic one
    *  (the Liquity V2 event page's paragraph). */
   description?: string;
 }): Metadata {
