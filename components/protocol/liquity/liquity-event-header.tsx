@@ -9,15 +9,13 @@ import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
-import { usePreferences } from "@/lib/shared/preferences-context";
-import { formatRatio, ratioLabelShort, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { formatDate } from "@/lib/date";
-import { formatTimestamp, formatUsd, shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   collChangeProv,
   debtChangeProv,
@@ -67,12 +65,6 @@ function getOperationStyle(operation: string, ctx: LiquityContext): OperationSty
  *  The phone spine view's caption uses it. */
 export function liquityOperationLabel(ctx: LiquityContext): string {
   return liquityL1Label(ctx);
-}
-
-function formatNumber(n: number): string {
-  if (Math.abs(n) < 0.01) return "0";
-  if (Math.abs(n) >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 // Actor role (owner / redeemer / liquidator / batch_manager) is still threaded
@@ -131,13 +123,10 @@ export function LiquityEventHeader({
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
-  const { showTimestamps, showEventNumbers, showCollateralRatio, showTimelineValues } = useTimelineDisplay();
+  const { showTimestamps, showEventNumbers, showTimelineValues } = useTimelineDisplay();
   // A redemption's lozenges move onto the spine node's flanks in the phone
   // spine view (SpineColumn's `warningLegs`); the opened card drops them.
   const spineFlankHide = showTimelineValues && !title ? "mspine:max-sm:hidden" : "";
-  const { prefs } = usePreferences();
-  const ratioMode = prefs.ratioMode;
-  const crColor = useLiquityRatioColorClass();
 
   const groupChip = ctx.blockGrouping?.isGrouped ? (
     <span
@@ -232,7 +221,7 @@ export function LiquityEventHeader({
 
   // ── Provenance threading (zero-cost when the inspector is off) ──────────────
   // Chain deltas point at the branch TroveManager (via the shared builders
-  // above); the per-event CR is derived from the price at this event's block.
+  // above).
   const collSym = ctx.collateralType ?? "collateral";
   const debtSym = ctx.assetType ?? "BOLD";
   // The header renders the compact form; the exact figure — every decimal
@@ -260,48 +249,6 @@ export function LiquityEventHeader({
     ) : (
       <>{node}</>
     );
-  const eventPrice = ctx.collateralPrice ?? 0;
-  const derivedCr =
-    stateAfter.collateralRatio === 0 && eventPrice > 0 && stateAfter.debt > 0
-      ? ((stateAfter.coll * eventPrice) / stateAfter.debt) * 100
-      : 0;
-  const crShown = stateAfter.collateralRatio > 0 ? stateAfter.collateralRatio : derivedCr;
-  const crIsDerived = stateAfter.collateralRatio === 0 && derivedCr > 0;
-  const wrapCr = (node: ReactNode) =>
-    crIsDerived ? (
-      <Prov
-        info={{
-          kind: "chain-derived",
-          summary:
-            "Collateral ratio at this event — the collateral's dollar value divided by the debt, at Liquity's price for this block.",
-          formula: "collateral × price ÷ debt × 100",
-          inputs: [
-            {
-              label: "collateral",
-              value: `${formatNumber(stateAfter.coll)} ${collSym}`,
-              kind: "chain",
-              note: "from log",
-            },
-            {
-              label: "price",
-              value: formatUsd(eventPrice),
-              kind: "chain-derived",
-              pclass: "oracle",
-              note: "on-chain oracle @ event block",
-            },
-            { label: "debt", value: `${formatNumber(stateAfter.debt)} ${debtSym}`, kind: "chain", note: "from log" },
-            ...(blockNumber != null
-              ? [{ label: "block", value: String(blockNumber), kind: "chain" as const, note: "event block" }]
-              : []),
-          ],
-        }}
-      >
-        {node}
-      </Prov>
-    ) : (
-      node
-    );
-
   const cluster = (
     <>
       {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
@@ -711,22 +658,8 @@ export function LiquityEventHeader({
     <>
       <div className="pl-5 pt-4 pb-3">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {/* The collateral ratio stands in the opened card's grid (ui-jobs 290). */}
           {cluster}
-
-          {/* Right side: CR (rate only on rate-change operations). The delegate
-              row keeps its header minimal (Delegate · rate · fee · manager),
-              so the trailing CR/LTV + APR are suppressed there — the rate
-              already shows in the delegate pill and CR lives in the grid. */}
-          <span className="inline-flex items-center gap-1.5">
-            {showCollateralRatio &&
-              crShown > 0 &&
-              ctx.operation !== "setInterestBatchManager" &&
-              wrapCr(
-                <span className={`text-xs ${crColor(crShown, ctx.collateralType)}`}>
-                  {formatRatio(crShown, ratioMode, 0)} {ratioLabelShort(ratioMode)}
-                </span>,
-              )}
-          </span>
           {meta}
         </div>
       </div>

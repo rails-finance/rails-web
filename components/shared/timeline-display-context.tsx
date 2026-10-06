@@ -41,8 +41,8 @@ export interface TimelineDisplayState {
   /** When true, event-card headers show the per-event interest-rate badge
    * (Aave supply/borrow APR). Off by default — surfaced on demand. */
   showInterestRates: boolean;
-  /** When true, Liquity event-card headers show the trailing collateral-ratio
-   * (CR / LTV) chip. Off by default — surfaced on demand. */
+  /** When true, Polaris event-card headers show the trailing collateral-ratio
+   * chip. Off by default — surfaced on demand. */
   showCollateralRatio: boolean;
   /** When true, consecutive passive/third-party events (liquidation bursts,
    * auction slices, redemption touches) collapse into one expandable run row.

@@ -2,7 +2,8 @@
 
 // Liquity V1 event detail (the opened card, T2) — the Liquity V2 grid: the
 // Trove's collateral (with its USD value at this block), its debt (with what
-// the event added or burned itemised) and the ETH price at this block.
+// the event added or burned itemised), its collateral ratio before → after and
+// the ETH price at this block.
 //
 // Before and after are the captured TroveUpdated absolutes, formatted from
 // their decimal strings (lib/liquity-v1/event-figures.ts), so consecutive cards
@@ -42,6 +43,7 @@ import {
   atBlockPriceProv,
   eventPriceProv,
   collUsdAtBlockProv,
+  ratioAtBlockProv,
   borrowingFeeProv,
   lusdReceivedProv,
   reserveProv,
@@ -62,6 +64,7 @@ import {
   fmtPct,
   fmtUsd,
   fmtUsdSigned,
+  ratioOf,
   redemptionSplit,
   sidesOf,
 } from "@/lib/liquity-v1/event-figures";
@@ -282,15 +285,18 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
     );
   }
 
+  // ── Collateral ratio, both sides at this block's price ──
+  const crBefore = isOpen ? null : ratioOf(s.collBefore, s.debtBefore, price);
+  const crAfter = ends ? null : ratioOf(s.collAfter, s.debtAfter, price);
+  const crBeforeStr = crBefore != null ? fmtPct(crBefore) : null;
+  const crAfterStr = crAfter != null ? fmtPct(crAfter) : null;
+
   const forensics = isLiq ? buildV1LiquidationForensics(ctx, coords) : undefined;
 
   return (
     <>
       <div className="px-5 py-2">
-        {/* Collateral, Debt and the ETH price each take the full width (ui-jobs
-            289: no Collateral ratio cell; the ratio stands in the header and
-            the explanation). */}
-        <div className="grid grid-cols-1 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
           <LedgerCell label="Collateral" side="collateral">
             <Transition
               before={collBeforeStr}
@@ -355,6 +361,48 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
               <StatSubline>unchanged</StatSubline>
             ) : null}
           </LedgerCell>
+
+          <StatCard label="Collateral ratio">
+            {crBeforeStr == null && crAfterStr == null ? (
+              ends ? (
+                <StateTransition>
+                  <ClosedLabel />
+                </StateTransition>
+              ) : (
+                <span className="text-sm font-semibold text-rb-500">
+                  {price == null ? readPending ? <PendingBar /> : "…" : "N/A"}
+                </span>
+              )
+            ) : (
+              <Transition
+                before={crBeforeStr ?? ""}
+                after={crAfterStr ?? ""}
+                showBefore={crBeforeStr != null && crBeforeStr !== crAfterStr}
+                closed={ends}
+                provBefore={
+                  price != null
+                    ? ratioAtBlockProv(coords, {
+                        coll: ctx.collBefore,
+                        debt: ctx.debtBefore,
+                        priceUsd: price,
+                        side: "before",
+                      })
+                    : undefined
+                }
+                provAfter={
+                  price != null
+                    ? ratioAtBlockProv(coords, {
+                        coll: ctx.collAfter,
+                        debt: ctx.debtAfter,
+                        priceUsd: price,
+                        side: "after",
+                      })
+                    : undefined
+                }
+              />
+            )}
+            <StatSubline>minimum 110%</StatSubline>
+          </StatCard>
 
           <StatCard label="ETH price">
             {price != null ? (

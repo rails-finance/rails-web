@@ -12,10 +12,6 @@ export function ratioLabel(mode: RatioMode): string {
   return mode === "ltv" ? "Loan-to-Value" : "Collateral Ratio";
 }
 
-export function ratioLabelShort(mode: RatioMode): string {
-  return mode === "ltv" ? "LTV" : "CR";
-}
-
 // Convert a CR% value (e.g. 150 means 150%) to the display string for the chosen mode.
 // LTV% = 10000 / CR%  (because LTV = debt/coll = 1 / (CR as ratio))
 export function formatRatio(cr: number, mode: RatioMode, decimals = 1): string {

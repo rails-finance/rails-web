@@ -39,8 +39,6 @@ import {
   ctrlWaking,
 } from "@/lib/shared/ui-grammar";
 import { formatDate, formatDateRange, formatDateShortYear, formatDayMonth, formatDuration } from "@/lib/date";
-import { usePreferences } from "@/lib/shared/preferences-context";
-import { ratioLabel } from "@/lib/shared/ratio-format";
 import { lifetimeFiguresKnown } from "@/lib/shared/timeline-opening-balance";
 import { loadedDaysStatement, segmentStatement } from "@/lib/shared/timeline-segments";
 import { TimelineNavigatorPanel, type TimelineMonthReach } from "@/components/shared/timeline-navigator";
@@ -259,10 +257,6 @@ export function TimelineActivityHeader({
 export interface TimelineDisplayItem {
   key: TimelineDisplayKey;
   label: string;
-  /** Keep `label` as declared. Only `showCollateralRatio` has a dynamic
-   *  label (the reader's CR/LTV preference, for Liquity V2); an explorer whose
-   *  chip states CR only sets this so its menu says what its chip says. */
-  fixedLabel?: boolean;
   /** Open a group of its own under a rule. */
   separatorBefore?: boolean;
 }
@@ -305,11 +299,9 @@ export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
-/** The Liquity V2 trove page's own display menu — its richer grammar (the two
- *  USD switches, the collateral-ratio chip) on
- *  top of the chain-truth base, in the V2 menu's original order. `showCollateralRatio`'s label is
- *  resolved dynamically below (Collateral Ratio vs Loan-to-Value, the user's
- *  ratio-mode preference) — the string here is just the CR-mode fallback.
+/** The Liquity V2 trove page's display menu: the two USD switches on top of
+ *  the chain-truth base, in the V2 menu's original order. The card header
+ *  carries no ratio, so the menu has no ratio switch (ui-jobs 290).
  *  Collapse-runs is NOT listed: ChainTruthTimeline appends it itself whenever
  *  the page passes `runs`. */
 export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
@@ -317,19 +309,18 @@ export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showUsdStable", label: "USD for stablecoins" },
   { key: "showUsdOther", label: "USD for other tokens" },
-  { key: "showCollateralRatio", label: "Collateral Ratio" },
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
-/** The Polaris CDP page's own display menu — the Liquity V2 preset less the
- *  USD switches: the oracle-at-block lane prices the ratio chip. The ratio item
- *  keeps its label: the Polaris chip states CR only, never LTV, so the menu
- *  says what the chip says. No collapse item: the CDP timeline passes no
+/** The Polaris CDP page's display menu: the chain-truth base plus the
+ *  Collateral Ratio switch for the header's ratio chip, priced by the
+ *  oracle-at-block lane. The chip states CR only, never LTV, so the label is
+ *  fixed. No collapse item: the CDP timeline passes no
  *  `runs` (rails-ops TO-DO-polaris-v2-parity §1.4, measured 2026-09-10). */
 export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showCollateralRatio", label: "Collateral Ratio", fixedLabel: true },
+  { key: "showCollateralRatio", label: "Collateral Ratio" },
   { key: "showEventNumbers", label: "Event numbers" },
 ];
 
@@ -339,13 +330,6 @@ export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
 export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] }) {
   const display = useTimelineDisplay() as TimelineDisplayState & Record<string, boolean>;
   const tvDisabled = useTimelineValuesDisabled();
-  // Only the Liquity preset carries a `showCollateralRatio` whose label moves
-  // with the reader's CR/LTV preference (ratioLabel) — every other item's
-  // label is the fixed string the preset declares (`fixedLabel` on a ratio
-  // item that states CR only, as Polaris's does).
-  const { prefs } = usePreferences();
-  const labelFor = (it: TimelineDisplayItem) =>
-    it.key === "showCollateralRatio" && !it.fixedLabel ? ratioLabel(prefs.ratioMode) : it.label;
   // "Open all market notes" reads ticked only while the markers are on, and
   // is greyed while they are off: there is nothing for it to open.
   const isOn = (key: TimelineDisplayKey) =>
@@ -353,16 +337,16 @@ export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] })
   const selected = new Set(items.filter((it) => isOn(it.key)).map((it) => it.key));
   const options: FilterOption[] = items.map((it) =>
     it.key === "showTimelineValues"
-      ? { key: it.key, label: labelFor(it), disabled: tvDisabled.disabled, title: tvDisabled.reason }
+      ? { key: it.key, label: it.label, disabled: tvDisabled.disabled, title: tvDisabled.reason }
       : it.key === "openAllMarketNotes"
         ? {
             key: it.key,
-            label: labelFor(it),
+            label: it.label,
             separatorBefore: it.separatorBefore,
             disabled: !display.showMarketNotes,
             title: display.showMarketNotes ? undefined : "Turn on market notes first",
           }
-        : { key: it.key, label: labelFor(it), separatorBefore: it.separatorBefore },
+        : { key: it.key, label: it.label, separatorBefore: it.separatorBefore },
   );
   return (
     <FilterDropdown
