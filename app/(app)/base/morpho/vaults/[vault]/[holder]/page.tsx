@@ -411,7 +411,7 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
           {/* Smart-back returns the reader wherever they came from; a fresh tab
               lands on the vault section's listing. The price and recency strip
               sits in the holder's address row, Back stands alone, and Tools
-              closes the row. The share is quoted in the vault's own asset. */}
+              closes the row. The share is quoted in the vault's asset. */}
           <DetailTopRow
             session="morpho-base"
             fallbackHref={baseVaultsListingHref()}

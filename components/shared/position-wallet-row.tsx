@@ -135,7 +135,7 @@ export function PositionWalletRow({
   ) : null;
   return (
     // The address, its chevron and the kind label keep their width. The strip
-    // sits at the right end of their line when it fits and takes its own line
+    // sits at the right end of their line when it fits and takes a line
     // below, right-aligned, when it does not (ui-jobs 272); Tools stays at the
     // first line's right. The wallet starts on the card content's line
     // (CARD_INSET_START); Tools stays at the page edge.
