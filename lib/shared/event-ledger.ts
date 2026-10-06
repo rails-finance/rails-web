@@ -133,13 +133,19 @@ export function bucketSeg(b: FlowBucket): FlowSegment {
 }
 
 /** The event's legs on a line (its act; the interest accrued since the
- *  last event is not), in tokens and USD; null where it has none. */
-function eventPart(ev: FocusEvent | null, key: string, symbol?: string): { amount: number; usd: number } | null {
+ *  last event is not, unless `accrual`, which reads that alone), in tokens
+ *  and USD; null where it has none. */
+function eventPart(
+  ev: FocusEvent | null,
+  key: string,
+  symbol?: string,
+  accrual = false,
+): { amount: number; usd: number } | null {
   let amount = 0;
   let usd = 0;
   let act = false;
   for (const l of ev?.legs ?? []) {
-    if (l.bucket !== key || l.accrual) continue;
+    if (l.bucket !== key || !!l.accrual !== accrual) continue;
     if (symbol != null && l.symbol !== symbol) continue;
     act = true;
     amount += l.amount ?? 0;
@@ -164,6 +170,7 @@ export function tokenLedger({
   sum,
   usd,
   symbolFilter,
+  accrualLabel,
 }: {
   model: FlowModel;
   side: FlowSide;
@@ -173,6 +180,10 @@ export function tokenLedger({
   usd: { lines: UsdLine[]; dollars: number; before: number | null } | null;
   /** Read only the event's legs in this token (a side by asset). */
   symbolFilter?: string;
+  /** Where the family counts the accrual since the last event in the event's
+   *  move (Liquity V2's debt): a line the accrual alone moved splits into its
+   *  earlier part and this row, which the function names by the line's key. */
+  accrualLabel?: (key: string) => string;
 }): Ledger {
   const scale = 10 ** sum.decimals;
   const bucketOf = (k: string) => model.buckets.find((b) => b.key === k);
@@ -195,13 +206,20 @@ export function tokenLedger({
     tokens: units == null ? null : { units, text: signedTokens(units, sum.decimals) },
     usd: dollars == null ? null : { dollars, text: signedUsd(dollars) },
   });
+  const accrualLines: { key: string; before: string; label: string }[] = [];
   for (const l of sum.lines) {
     const b = bucketOf(l.key);
     const u = usdOf.get(l.key);
     const seg = l.kind === "interest" ? null : b ? bucketSeg(b) : (u?.seg ?? null);
     const words = ledgerWords(b, l.label);
     const lineUsd = usd ? (u?.dollars ?? 0) : null;
-    const part = l.kind === "interest" ? null : eventPart(ev, l.key, symbolFilter);
+    let part = l.kind === "interest" ? null : eventPart(ev, l.key, symbolFilter);
+    let eventLabel = words.event;
+    if (!part && accrualLabel && l.kind !== "interest") {
+      part = eventPart(ev, l.key, symbolFilter, true);
+      eventLabel = accrualLabel(l.key);
+      if (part) accrualLines.push({ key: l.key, before: words.before, label: eventLabel });
+    }
     const sign = l.kind === "out" ? -1 : 1;
     const evUnits = part ? sign * Math.round(part.amount * scale) : 0;
     if (part && evUnits !== 0) {
@@ -212,7 +230,7 @@ export function tokenLedger({
           row(l.key, l.key, words.before, "before", seg, beforeUnits, lineUsd == null ? null : lineUsd - (evUsd ?? 0)),
         );
       } else evUsd = lineUsd;
-      rows.push(row(`${l.key}#event`, l.key, words.event, "event", seg, evUnits, evUsd));
+      rows.push(row(`${l.key}#event`, l.key, eventLabel, "event", seg, evUnits, evUsd));
     } else
       rows.push(row(l.key, l.key, words.plain, l.kind === "interest" ? "interest" : "flow", seg, l.units, lineUsd));
   }
@@ -232,12 +250,46 @@ export function tokenLedger({
         ),
       );
     }
+  let before = sum.before;
+  if (accrualLabel && ev?.sides) {
+    // The accrual counts in the event's move: the before is the balance the
+    // previous event recorded, and the event's rows (in bold) add from it to
+    // the after. A unit or two of rounding between them goes to the accrual's
+    // row, from its earlier part.
+    const units = (r: LedgerRow) => r.tokens?.units ?? 0;
+    const recorded = Math.round(Math.max(0, sum.held - ev.sides[side].amount) * scale);
+    const moved = rows.reduce((a, r) => a + (r.role === "event" ? units(r) : 0), 0);
+    const gap = sum.total.units - recorded - moved;
+    const set = (r: LedgerRow, n: number) => (r.tokens = { units: n, text: signedTokens(n, sum.decimals) });
+    if (gap !== 0 && Math.abs(gap) <= 2)
+      for (const a of accrualLines) {
+        const at = rows.findIndex((r) => r.line === a.key && (r.role === "before" || r.role === "flow"));
+        if (at < 0) continue;
+        const earlier = rows[at];
+        const acc = rows.find((r) => r.line === a.key && r.role === "event");
+        // An accrual adds to the debt: rounding never turns its row negative.
+        if ((acc ? units(acc) : 0) + gap < 0) break;
+        if (acc) set(acc, units(acc) + gap);
+        else
+          rows.splice(
+            at + 1,
+            0,
+            row(`${a.key}#event`, a.key, a.label, "event", earlier.seg, gap, earlier.usd ? 0 : null),
+          );
+        set(earlier, units(earlier) - gap);
+        earlier.role = "before";
+        earlier.label = a.before;
+        if (units(earlier) === 0 && !earlier.usd?.dollars) rows.splice(at, 1);
+        break;
+      }
+    before = recorded !== sum.total.units ? fmtTokens(recorded / scale, sum.decimals) : null;
+  }
   return {
     side,
     symbol: sum.symbol,
     decimals: sum.decimals,
     rows,
-    tokens: { before: sum.before, after: sum.total.amount, units: sum.total.units },
+    tokens: { before, after: sum.total.amount, units: sum.total.units },
     usd: usd ? usdTotal(usd.dollars, usd.before) : null,
   };
 }

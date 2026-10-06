@@ -48,7 +48,9 @@ import {
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { liquityBeforeAmounts, liquityEventSafety } from "@/lib/liquity/event-safety";
-import { exactCollAfter } from "@/lib/liquity/utils/interest-calculator";
+import { exactCollAfter, exactDebtAfter } from "@/lib/liquity/utils/interest-calculator";
+import { isLiquityEvent } from "@/lib/shared/types/activity";
+import { LQ } from "@/lib/shared/liquity-flows";
 import {
   accrualNoun,
   batchFeeAfter,
@@ -101,7 +103,21 @@ export interface LiquityL2 {
   isLiquidation: boolean;
   price: number;
   coll: { before: number; after: number; beforeUsd: number; afterUsd: number };
-  debt: { before: number; after: number; upfrontFee: number };
+  /** `before`: the debt recorded at the previous event, as the Debt ledger's
+   *  closing line states it. `accrued`: the accrual since then comes to a
+   *  printed figure; `accrualMove`: it is the whole move ("+8,580.12
+   *  interest = 667,073.79"). */
+  debt: {
+    before: number;
+    after: number;
+    upfrontFee: number;
+    accrued: boolean;
+    accrualMove: boolean;
+    /** The accrual as printed: with the replay, the printed move less the
+     *  event's other rows, so it is the sum of the ledger's "since last
+     *  event" rows. */
+    accrualShown: number;
+  };
   cr: { before: number; after: number };
   rate: { before: number; after: number; yearly: number; yearlyFee: number };
   accrual: LiquityAccrual;
@@ -1054,6 +1070,9 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   };
 }
 
+/** The replay's debt buckets that lower the debt. */
+const DEBT_OUT = new Set<string>([LQ.repaid, LQ.debtRedeemed, LQ.debtLiquidated]);
+
 /** Events a third party sends: its gas is not the owner's. */
 const PASSIVE = new Set(["redeemCollateral", "liquidate", "applyPendingDebt"]);
 
@@ -1089,9 +1108,24 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
   }
   const collAfter = exactCollAfter(ctx);
   const afterUsd = collAfter * price;
-  const beforeUsd = isLiquidation && liquidation ? beforeColl * liquidation.price : beforeColl * price;
+  // The cells' befores are the balances the previous event recorded, as the
+  // ledgers' closing lines state them (the replay's, where the page has it).
+  const ledgerColl = input.ledger?.sides?.collateral;
+  const collBefore = ledgerColl ? Math.max(0, ledgerColl.held - ledgerColl.amount) : beforeColl;
+  const beforeUsd = isLiquidation && liquidation ? collBefore * liquidation.price : collBefore * price;
   let afterCr = stateAfter.collateralRatio;
   if (afterCr === 0 && price > 0 && stateAfter.debt > 0) afterCr = (afterUsd / stateAfter.debt) * 100;
+
+  // The debt's: the accrual since the previous event is part of this event's
+  // move, as the ledger counts it; with no replay, the previous event's after.
+  const debtAfter = exactDebtAfter(ctx);
+  const ledgerDebt = input.ledger?.sides?.debt;
+  const prevCtx = previousEvent && isLiquityEvent(previousEvent) ? previousEvent.context.data : null;
+  const recordedBefore = ledgerDebt
+    ? Math.max(0, ledgerDebt.held - ledgerDebt.amount)
+    : prevCtx?.stateAfter
+      ? exactDebtAfter(prevCtx)
+      : beforeDebt;
 
   const batchFee = batchFeeAfter(ctx, input.ledger);
   const rateAfter = stateAfter.annualInterestRate;
@@ -1123,8 +1157,15 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     isRedemption,
     isLiquidation,
     price,
-    coll: { before: beforeColl, after: collAfter, beforeUsd, afterUsd },
-    debt: { before: beforeDebt, after: stateAfter.debt, upfrontFee: op?.debtIncreaseFromUpfrontFee ?? 0 },
+    coll: { before: collBefore, after: collAfter, beforeUsd, afterUsd },
+    debt: {
+      before: recordedBefore,
+      after: debtAfter,
+      upfrontFee: op?.debtIncreaseFromUpfrontFee ?? 0,
+      accrued: false,
+      accrualMove: false,
+      accrualShown: 0,
+    },
     cr: { before: beforeCr, after: afterCr },
     rate: { before: stateBefore.annualInterestRate, after: rateAfter, yearly, yearlyFee },
     accrual,
@@ -1134,6 +1175,25 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     redeemer: isRedemption && ctx.redeemer ? ctx.redeemer : null,
     lines: [],
   };
+
+  // The accrual is the whole move where nothing else moved the debt; a move
+  // under half a cent still prints as one, as the ledger's row does.
+  const cents = Math.round(fig.debt.after * 100) - Math.round(fig.debt.before * 100);
+  const accrualCents = Math.round(accrual.total * 100);
+  let shown = accrualCents;
+  // As the ledger prints it: a cent or two of rounding between the recorded
+  // balances and the event's rows goes to the accrual's row, never below 0.
+  if (ledgerDebt && input.ledger?.legs.some((l) => l.accrual && l.symbol === ledgerDebt.symbol)) {
+    let act = 0;
+    for (const l of input.ledger.legs)
+      if (!l.accrual && l.symbol === ledgerDebt.symbol && l.amount != null)
+        act += (DEBT_OUT.has(l.bucket) ? -1 : 1) * Math.round(l.amount * 100);
+    if (Math.abs(cents - act - accrualCents) <= 2 && cents - act >= 0) shown = cents - act;
+  }
+  fig.debt.accrualMove =
+    !isClose && !isLiquidation && cents !== 0 && Math.abs(fig.debt.after - fig.debt.before - accrual.total) < 0.005;
+  fig.debt.accrualShown = (fig.debt.accrualMove ? cents : shown) / 100;
+  fig.debt.accrued = fig.debt.accrualShown !== 0;
 
   // ── The lines, as the cells print them ──
   const fc = (n: number) => (n === 0 ? "0" : ledgerFigure(n, input.collDecimals ?? null, fmtColl(n)));
@@ -1154,20 +1214,24 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     }
     lines.push(collLine);
 
-    const dShowBefore = isClose
-      ? fig.debt.before !== fig.debt.after
-      : fig.debt.before !== 0 && fig.debt.before !== fig.debt.after;
-    const dAfter = isClose ? L2_WORDS.closed : fd(fig.debt.after);
-    let debtLine = `${L2_WORDS.debt}: ${arrow(dShowBefore ? fd(fig.debt.before) : null, dAfter)} ${debtSym}`;
-    const debtUsd = !isClose && fig.debt.after > 0 && usdShown(sw, debtSym, fig.debt.after, fig.debt.after);
-    if (debtUsd)
-      debtLine += ` (${arrow(dShowBefore ? fmtUsdWhole(fig.debt.before) : null, fmtUsdWhole(fig.debt.after))})`;
-    const sub: string[] = [];
-    if (accrual.total > 0.01)
-      sub.push(fillText(L2_WORDS.incl, { accrued_total: accrual.total, accrual_noun: accrualNoun(accrual) }));
-    if (fig.debt.upfrontFee > 0)
-      sub.push(`${accrual.total > 0.01 ? "+" : ""}${fillText(L2_WORDS.fee, { upfront_fee: fig.debt.upfrontFee })}`);
-    if (sub.length) debtLine += ` (${sub.join(" ")})`;
+    const d = fig.debt;
+    const dShowBefore = isClose ? fd(d.before) !== fd(d.after) : d.before !== 0 && fd(d.before) !== fd(d.after);
+    const dAfter = isClose ? L2_WORDS.closed : fd(d.after);
+    const noun = accrualNoun(accrual);
+    let debtLine: string;
+    if (d.accrualMove) {
+      const move = fillText(L2_WORDS.accrual_move, { accrued_total: d.accrualShown, accrual_noun: noun });
+      debtLine = `${L2_WORDS.debt}: ${move} = ${dAfter} ${debtSym}`;
+      if (usdShown(sw, debtSym, d.after, d.after)) debtLine += ` (${fmtUsdWhole(d.after)})`;
+    } else {
+      debtLine = `${L2_WORDS.debt}: ${arrow(dShowBefore ? fd(d.before) : null, dAfter)} ${debtSym}`;
+      const debtUsd = !isClose && d.after > 0 && usdShown(sw, debtSym, d.after, d.after);
+      if (debtUsd) debtLine += ` (${arrow(dShowBefore ? fmtUsdWhole(d.before) : null, fmtUsdWhole(d.after))})`;
+      const sub: string[] = [];
+      if (d.upfrontFee > 0) sub.push(fillText(L2_WORDS.fee, { upfront_fee: d.upfrontFee }));
+      if (d.accrued) sub.push(fillText(L2_WORDS.accrual_since, { accrued_total: d.accrualShown, accrual_noun: noun }));
+      if (sub.length) debtLine += ` (${sub.join(" · ")})`;
+    }
     lines.push(debtLine);
 
     const crHasChange = fig.cr.before !== 0 && fig.cr.before !== fig.cr.after;

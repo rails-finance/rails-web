@@ -495,8 +495,23 @@ L2_words:
     Interest Rate
   price: |-
     {coll_symbol} price
-  incl: |-
-    incl. +{accrued_total} {accrual_noun}
+  # The Debt cell and line where the whole move is the accrual: "+8,580.12
+  # interest = 667,073.79".
+  accrual_move: |-
+    +{accrued_total} {accrual_noun}
+  # The Debt cell's sub-line where the owner acted and interest accrued: the
+  # figure is the ledger's "since last event" line.
+  accrual_in_ledger: |-
+    with {accrual_noun}, in the ledger
+  # L2's Debt line, the same case.
+  accrual_since: |-
+    +{accrued_total} {accrual_noun} since the last event is in the ledger
+  # The Debt ledger's rows for the accrual since the previous event; the
+  # earlier accrual is "Interest before", "Batch management fees before".
+  ledger_interest_since: |-
+    Interest since last event
+  ledger_batch_fee_since: |-
+    Batch management fees since last event
   interest: |-
     interest
   interest_and_fees: |-

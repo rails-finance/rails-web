@@ -8,11 +8,19 @@ import { eventCum, eventSideSum, eventTokenSum, type FocusEvent } from "@/lib/sh
 import { dayCloseNote, tokenLedger, type Ledger } from "@/lib/shared/event-ledger";
 import type { FlowModel, FlowSide } from "@/lib/shared/flows-timeline";
 import { usdShown, type UsdSwitches } from "@/lib/shared/usd-display";
+import { LQ } from "@/lib/shared/liquity-flows";
+import { L2_WORDS } from "@/lib/liquity/event-templates";
 
 export interface LiquityEventLedger {
   ledger: Ledger;
   /** The rows stand at the event (false: at its day's close). */
   exact: boolean;
+}
+
+/** The Debt ledger's row for the accrual since the previous event, by its
+ *  line: the interest, or the batch's management fee. */
+export function liquityAccrualLabel(key: string): string {
+  return key === LQ.batchFee ? L2_WORDS.ledger_batch_fee_since : L2_WORDS.ledger_interest_since;
 }
 
 /** One side's ledger as of the event, or null where the replay lacks it. */
@@ -38,6 +46,7 @@ export function liquityEventLedger(
     ev,
     sum,
     usd: rows ? { lines: rows.lines, dollars: rows.total.dollars, before: f.before } : null,
+    ...(cum.exact ? { accrualLabel: liquityAccrualLabel } : {}),
   });
   return { ledger, exact: cum.exact };
 }

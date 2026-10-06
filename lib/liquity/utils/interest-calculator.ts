@@ -63,6 +63,13 @@ export function exactCollChange(ctx: LiquityContext): number {
   return op ? rawAt(op.raw?.collChangeFromOperation, 18, op.collChangeFromOperation) : 0;
 }
 
+/** The operation's debt move (TroveOperation `_debtChangeFromOperation`), at
+ *  the log's precision. */
+export function exactDebtChange(ctx: LiquityContext): number {
+  const op = ctx.troveOperation;
+  return op ? rawAt(op.raw?.debtChangeFromOperation, 18, op.debtChangeFromOperation) : 0;
+}
+
 /** The trove's debt before an event, at the log's precision. */
 export function exactDebtBefore(ctx: LiquityContext): number {
   return rawAt(ctx.stateBefore?.raw?.debt, 18, ctx.stateBefore?.debt ?? 0);

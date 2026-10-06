@@ -39,6 +39,7 @@ const READERS = [
   GENERATOR,
   LOADER,
   "lib/liquity/event-markdown.ts",
+  "lib/liquity/event-ledgers.ts",
   "lib/liquity/accrual.ts",
   "lib/liquity/event-page.ts",
   "components/protocol/liquity/event-prose-render.tsx",

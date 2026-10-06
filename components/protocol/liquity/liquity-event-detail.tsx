@@ -3,7 +3,7 @@
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { accrualNoun, type BatchFeeAfter, type LiquityAccrual } from "@/lib/liquity/accrual";
-import { wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
+import { fillText, wordsAround, type LiquityEventProse, type LiquityL2 } from "@/lib/liquity/event-prose";
 import { L2_WORDS } from "@/lib/liquity/event-templates";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
@@ -33,7 +33,6 @@ import {
   scalingOf,
   fieldSumSeg,
   collChangeProv,
-  debtChangeProv,
   rateAfterProv,
   upfrontFeeProv,
   eventPriceProv,
@@ -83,79 +82,62 @@ const formatUsd = fmtUsdWhole;
 // ── Metric components ───────────────────────────────────────────────
 
 function DebtMetric({
-  before,
-  after,
+  debt,
   isClose,
-  isLiquidation,
-  upfrontFee,
   accrual,
   accrualProv,
   stablecoinSymbol = "BOLD",
   provBefore,
   provAfter,
   feeProv,
-  changeEcho,
 }: {
-  before: number;
-  after: number;
+  /** L2's debt (lib/liquity/event-prose.ts `liquityL2`): the before is the
+   *  debt recorded at the previous event, the Debt ledger's before. */
+  debt: LiquityL2["debt"];
   isClose: boolean;
-  isLiquidation: boolean;
-  upfrontFee?: number;
   accrual: LiquityAccrual;
-  /** Receipt for the "incl. +N interest" sub-line. */
+  /** Receipt for the accrual's figure. */
   accrualProv?: Provenance;
   stablecoinSymbol?: string;
   provBefore?: Provenance;
   provAfter?: Provenance;
   /** Receipt for the "N fee" sub-line — the TroveOperation log's upfront fee. */
   feeProv?: FigureProv;
-  changeEcho?: ChangeProv;
 }) {
-  // `showBefore`: draw the `before →` half (never a bare "0 →" on an open).
-  // `changed`: the T2 change-colour rule, which an open's new debt meets too.
-  const showBefore = isClose ? before !== after : before !== 0 && before !== after;
-  const changed = before !== after;
-  const totalAccruedFees = accrual.total;
-
-  // The arrow doubles as a toggle (see DeltaToggle). The header headline and
-  // timeline spine both show the borrowed/repaid *principal*; the fee-inclusive
-  // total debt change (principal + fee + interest = after − before) is the one
-  // thing they don't surface, so clicking swaps `before →` for `+delta =`.
-  // When the parent found it indistinguishable from the header's change figure
-  // (changeEcho — no interest/redist separating them at display precision), it
-  // ECHOES into that receipt so the locator pulse reaches it; otherwise it's a
-  // genuinely different derived figure and carries its own (derived) provenance.
-  const delta = after - before;
+  // One form (ui-jobs 285): before → after, the accrual since the previous
+  // event in the ledger, named under the figures; where the accrual is the
+  // whole move, "+8,580.12 interest = 667,073.79". `showBefore`: draw the
+  // `before →` half (never a bare "0 →" on an open).
+  const { before, after, upfrontFee, accrued, accrualMove, accrualShown } = debt;
   const dec = useLedgerDecimals("debt");
   const fd = (n: number) => ledgerFigure(n, dec, toLocaleStringHelper(n));
-  const deltaStr = `${delta >= 0 ? "+" : "−"}${fd(Math.abs(delta))}`;
-  const deltaProv: Provenance = {
-    kind: "derived",
-    summary: `Trove debt (${stablecoinSymbol}) change at this event — the debt after minus the debt before, including any interest and fee.`,
-    via: "after − before",
-    formula: "after debt − before debt",
-  };
-  const deltaNode = changeEcho ? (
-    <Prov echo info={changeEcho.info} value={changeEcho.value} symbol={changeEcho.symbol}>
-      {deltaStr}
-    </Prov>
-  ) : (
-    <P info={deltaProv}>{deltaStr}</P>
-  );
+  const showBefore = isClose ? fd(before) !== fd(after) : before !== 0 && fd(before) !== fd(after);
+  const changed = fd(before) !== fd(after);
+  const noun = accrualNoun(accrual);
+  const moveWords = wordsAround(L2_WORDS.accrual_move, ["accrued_total"], { accrual_noun: noun });
 
   // The debt's USD at its $1 face, as the cell's ledger counts it, where the
   // Display menu's "USD for stablecoins" shows it.
   const usdShown = useUsdShown();
   const debtUsd = !isClose && after > 0 && usdShown(stablecoinSymbol, after, after);
-  const inclWords = wordsAround(L2_WORDS.incl, ["accrued_total"], { accrual_noun: accrualNoun(accrual) });
   const feeWords = wordsAround(L2_WORDS.fee, ["upfront_fee"]);
+  const inLedger = accrued && !accrualMove;
   return (
     <LedgerCell label={L2_WORDS.debt} side="debt">
       <div>
         <StateTransition>
           <ClosedTokens>
-            {showBefore && (
-              <DeltaToggle before={<P info={provBefore}>{fd(before)}</P>} delta={isClose ? null : deltaNode} />
+            {accrualMove ? (
+              <span className="inline-flex items-center gap-1" data-debt-accrual-move="">
+                <span className="text-sm font-semibold text-foreground tabular-nums">
+                  {moveWords[0]}
+                  <P info={accrualProv}>{fmtAccrued(accrualShown)}</P>
+                  {moveWords[1]}
+                </span>
+                <span className="text-sm font-semibold text-rb-500">=</span>
+              </span>
+            ) : (
+              showBefore && <DeltaToggle before={<P info={provBefore}>{fd(before)}</P>} delta={null} />
             )}
             {isClose ? (
               <>
@@ -171,7 +153,7 @@ function DebtMetric({
           {debtUsd && (
             <ClosedUsd
               before={
-                showBefore ? (
+                showBefore && !accrualMove ? (
                   <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(before), "before")}>
                     {formatUsd(before)}
                   </P>
@@ -183,26 +165,20 @@ function DebtMetric({
             />
           )}
         </StateTransition>
-        {((upfrontFee !== undefined && upfrontFee > 0) || totalAccruedFees > 0.01) && (
+        {(upfrontFee > 0 || inLedger) && (
           <StatSubline changed={changed}>
-            {totalAccruedFees > 0.01 && (
+            {upfrontFee > 0 && (
               <span>
-                {inclWords[0]}
-                <P info={accrualProv}>{fmtAccrued(totalAccruedFees)}</P>
-                {inclWords[1]}
+                {feeWords[0]}
+                <P info={feeProv?.info} value={feeProv?.value}>
+                  {toLocaleStringHelper(upfrontFee)}
+                </P>
+                {feeWords[1]}
               </span>
             )}
-            {upfrontFee !== undefined && upfrontFee > 0 && (
-              <>
-                {totalAccruedFees > 0.01 && <span> +</span>}
-                <span>
-                  {feeWords[0]}
-                  <P info={feeProv?.info} value={feeProv?.value}>
-                    {toLocaleStringHelper(upfrontFee)}
-                  </P>
-                  {feeWords[1]}
-                </span>
-              </>
+            {upfrontFee > 0 && inLedger && <span> · </span>}
+            {inLedger && (
+              <span data-debt-accrual-in-ledger="">{fillText(L2_WORDS.accrual_in_ledger, { accrual_noun: noun })}</span>
             )}
           </StatSubline>
         )}
@@ -521,7 +497,6 @@ export function LiquityEventDetail({
   // the ratio before at this event's price (lib/liquity/event-prose.ts `liquityL2`).
   const { isClose, isLiquidation, isRedemption, rateOnly: isBatchManagerOp, showGrid } = l2;
   const collPrice = l2.price;
-  const upfrontFee = troveOperation?.debtIncreaseFromUpfrontFee;
   const beforeDebt = l2.debt.before;
   const beforeColl = l2.coll.before;
   const beforeInterestRate = l2.rate.before;
@@ -574,18 +549,15 @@ export function LiquityEventDetail({
   const opDebtChange = troveOperation ? Math.abs(troveOperation.debtChangeFromOperation) : 0;
   const isCloseRecon = isClose && !!troveOperation && stateBefore.debt === 0 && stateBefore.coll === 0;
 
-  // The delta toggle's `after − before` figure usually IS the header's change
-  // figure — they only part when accrued interest (or a redistribution share)
-  // wedges between them. When they agree to display precision (debt renders
-  // 2dp, collateral 4dp), the delta ECHOES the header's change receipt so the
-  // locator pulse reaches it; when they genuinely differ, it keeps its own
-  // derived after − before receipt.
+  // The collateral's delta toggle's `after − before` figure usually IS the
+  // header's change figure — they part only when a redistribution share
+  // wedges between them. When they agree to display precision (4dp), the
+  // delta ECHOES the header's change receipt so the locator pulse reaches it;
+  // else it keeps its own derived after − before receipt. The Debt cell has
+  // no toggle (ui-jobs 285).
   const collCp = collChangeProv(ctx, coords);
-  const debtCp = debtChangeProv(ctx, coords);
   const collDeltaEcho =
     collCp && Math.abs(Math.abs(l2.coll.after - beforeColl) - Math.abs(collCp.change)) < 0.00005 ? collCp : undefined;
-  const debtDeltaEcho =
-    debtCp && Math.abs(Math.abs(stateAfter.debt - beforeDebt) - Math.abs(debtCp.change)) < 0.005 ? debtCp : undefined;
 
   const collAfterProv: Provenance = {
     kind: "chain",
@@ -700,70 +672,57 @@ export function LiquityEventDetail({
               ),
               inputs: [{ label: "asset", value: collSym, kind: "chain" }],
             };
+  // The debt before is the one the trove's previous event recorded (L2,
+  // ui-jobs 285); a redemption, a liquidation and a close log only the after,
+  // so it is the after less this event's move, the accrual included.
   const debtBeforeProv: Provenance =
-    isRedemption && troveOperation
+    (isRedemption && troveOperation) || (isLiquidation && liquidation) || isCloseRecon
       ? {
           kind: "derived",
-          summary: "Debt before this redemption — the debt left after the redemption plus the debt redeemed.",
-          formula: "debt after + debt redeemed",
+          summary: `Debt (${debtSym}) before this event — the debt the trove's previous event recorded. This event logs only the debt after, so it is that less this event's move: the operation, any upfront fee and the ${accrualNoun(accrual)} accrued since the previous event.`,
+          formula: "debt after − operation − upfront fee − accrual since the previous event",
           inputs: [
             {
               label: "debt after",
-              value: `${toLocaleStringHelper(stateAfter.debt)} ${debtSym}`,
+              value: `${toLocaleStringHelper(l2.debt.after)} ${debtSym}`,
               kind: "chain",
               note: "this event",
             },
             {
-              label: "debt redeemed",
+              label: "operation",
               value: `${toLocaleStringHelper(opDebtChange)} ${debtSym}`,
               kind: "chain",
               note: "operation Δ",
             },
+            {
+              label: "accrual",
+              value: `${fmtAccrued(accrual.total)} ${debtSym}`,
+              kind: accrual.source === "rate" ? "derived" : "chain",
+              note: "since the previous event",
+            },
           ],
         }
-      : isLiquidation && liquidation
+      : batchedDebtBefore
         ? {
-            kind: "derived",
-            summary:
-              "Debt before liquidation — the part the Stability Pool paid off plus the part shared out to other troves.",
-            formula: "debtOffsetBySP + debtRedistributed",
+            kind: "chain-derived",
+            pclass: "indexed",
+            summary: `Debt (${debtSym}) before this event — the trove's share of its delegate batch's total debt, as the contract logged it at the trove's previous change.`,
             contract: tmContract,
-            via: "Liquidation event",
+            via: `${streamVia()} · previous BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
+            inputs: [{ label: "asset", value: debtSym, kind: "chain" }],
           }
-        : isCloseRecon
-          ? {
-              kind: "derived",
-              summary:
-                "Debt before close — closing repays all of a trove's debt, so this is the amount the close repaid.",
-              formula: "|operation debt change|",
-              contract: tmContract,
-              via: "TroveOperation log",
-            }
-          : batchedDebtBefore
-            ? {
-                kind: "chain-derived",
-                pclass: "indexed",
-                summary: `Debt (${debtSym}) before this event — the trove's share of its delegate batch's total debt, as the contract logged it at the trove's previous change.`,
-                contract: tmContract,
-                via: `${streamVia()} · previous BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
-                inputs: [{ label: "asset", value: debtSym, kind: "chain" }],
-              }
-            : {
-                kind: "chain",
-                summary: `Debt (${debtSym}) before this event — the debt the contract logged at the trove's previous change.`,
-                contract: tmContract,
-                via: `${streamVia()} · ${originSeg(
-                  stateBefore.origin?.debt,
-                  { event: "TroveUpdated", param: "_debt", scale: 18, raw: stateBefore.raw?.debt },
-                  true,
-                )}`,
-                scaling: scalingOf(
-                  stateBefore.origin?.debt,
-                  { scale: 18, raw: stateBefore.raw?.debt },
-                  { token: debtSym },
-                ),
-                inputs: [{ label: "asset", value: debtSym, kind: "chain" }],
-              };
+        : {
+            kind: "chain",
+            summary: `Debt (${debtSym}) before this event — the debt the contract logged at the trove's previous change.`,
+            contract: tmContract,
+            via: `${streamVia()} · ${originSeg(
+              stateBefore.origin?.debt,
+              { event: "TroveUpdated", param: "_debt", scale: 18, raw: stateBefore.raw?.debt },
+              true,
+            )}`,
+            scaling: scalingOf(stateBefore.origin?.debt, { scale: 18, raw: stateBefore.raw?.debt }, { token: debtSym }),
+            inputs: [{ label: "asset", value: debtSym, kind: "chain" }],
+          };
   const rateBeforeProv: Provenance = {
     kind: "chain",
     summary: `Annual interest rate before this event — the rate the contract logged for the trove at its previous change.`,
@@ -934,18 +893,14 @@ export function LiquityEventDetail({
                 changeEcho={collDeltaEcho}
               />
               <DebtMetric
-                before={beforeDebt}
-                after={stateAfter.debt}
+                debt={l2.debt}
                 isClose={isClose}
-                isLiquidation={isLiquidation}
-                upfrontFee={upfrontFee}
                 accrual={accrual}
                 accrualProv={accrualProv}
                 stablecoinSymbol={ctx.assetType}
                 provBefore={debtBeforeProv}
                 provAfter={debtAfterProv}
                 feeProv={feeP}
-                changeEcho={debtDeltaEcho}
               />
               <CollateralRatioMetric
                 before={beforeCollRatio}

@@ -530,8 +530,9 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
  *  a transaction that touches the Trove twice (two redemptions, a leave and
  *  an adjust) runs the first card's sum on to the second event. Each side's
  *  USD just before and after the event is its recorded balance at its price,
- *  less its legs (the interest stays in the before: it had built up by the
- *  block). */
+ *  less its legs. Liquity V2's debt counts the interest and management fee
+ *  accrued since the previous event as part of the event's move, so its before
+ *  is the debt recorded at the previous event (ui-jobs 285); V1 has none. */
 export function liquityFocusEvents(
   events: LiquityFlowEvent[],
   collSymbol: string,
@@ -544,7 +545,7 @@ export function liquityFocusEvents(
     for (const l of r.legs) {
       const sign = OUT_BUCKETS.has(l.bucket) ? -1 : 1;
       if (COLL_BUCKETS.has(l.bucket)) collMove += sign * l.amount;
-      else if (l.bucket !== LQ.interest && l.bucket !== LQ.batchFee) debtMove += sign * l.amount;
+      else if (family === "v2" || (l.bucket !== LQ.interest && l.bucket !== LQ.batchFee)) debtMove += sign * l.amount;
     }
     const collAfter = Math.max(0, r.ev.collAfter);
     const debtAfter = Math.max(0, r.ev.debtAfter);

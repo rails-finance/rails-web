@@ -215,6 +215,9 @@ try {
           ? (l
               .replace(/\([^)]*[a-z][^)]*\)/g, "")
               .replace(/[−+]?\$?[\d,]+(?:\.\d+)?%?\s*→\s*/g, "")
+              // "+8,580.12 interest = 667,073.79": the move is the ledger's
+              // "since last event" row, the after closes it (ui-jobs 285).
+              .replace(/[−+][\d,]+(?:\.\d+)? [a-z ]+ = /g, "")
               .match(NUM) ?? [])
           : (l.match(NUM) ?? []),
       );

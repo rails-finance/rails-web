@@ -539,6 +539,54 @@ for (const [name, events, symbols, open, v1] of [
   });
 }
 
+for (const [name, events, symbols, open] of [
+  ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true],
+  ["V2 rETH, liquidated", LIQUIDATED, ["rETH", "BOLD"], false],
+  ["V2 wstETH, zombie", ZOMBIE, ["wstETH", "BOLD"], true],
+] as const) {
+  test(`${name}: the Debt ledger states the accrual since the last event as a row, from the debt the previous event recorded`, () => {
+    // ui-jobs 285: the closing line's before is the previous event's recorded
+    // debt, and the interest (and batch fee) since then is a row of the
+    // event's; the before and the event's rows add to the after.
+    const ev = events as LiquityFlowEvent[];
+    const [coll, debt] = symbols as unknown as [string, string];
+    const m = model(ev, [coll, debt], open, 4000, false);
+    const focus = liquityFocusEvents(ev, coll, debt);
+    const replayed = replayLiquity(ev);
+    const label = (k: string) => `${k} since last event`;
+    let rowsSeen = 0;
+    replayed.forEach((r, k) => {
+      const f = focus.find((x) => x.id === r.ev.id)!;
+      const cum = eventCum(m, focus, f.id)!;
+      if (!cum.exact) return;
+      const sum = eventTokenSum(m, focus, "debt", cum, f.id)!;
+      const l = tokenLedger({ model: m, side: "debt", ev: f, sum, usd: null, accrualLabel: label });
+      assert.ok(ledgerAdds(l).tokens, `${name} ${f.id}: the rows add to the total`);
+      const prev = k > 0 ? Math.max(0, replayed[k - 1].ev.debtAfter) : 0;
+      const before = l.tokens!.before ?? l.tokens!.after;
+      assert.equal(before, fmtTokens(prev, 2), `${name} ${f.id}: the before is the previous event's recorded debt`);
+      const accrual = l.rows.filter((x) => x.label.endsWith(" since last event"));
+      for (const a of accrual) {
+        rowsSeen++;
+        assert.equal(a.role, "event");
+        assert.ok(a.line === LQ.interest || a.line === LQ.batchFee, `${name} ${f.id}: ${a.line}`);
+        const legs = f.legs.filter((x) => x.bucket === a.line && x.accrual);
+        const amt = Math.round(legs.reduce((s, x) => s + (x.amount ?? 0), 0) * 100);
+        assert.ok(a.tokens!.units >= 0 && Math.abs(a.tokens!.units - amt) <= 2, `${name} ${f.id}: the accrual's legs`);
+      }
+      if (accrual.length > 0) {
+        const moved = l.rows.reduce((s, x) => s + (x.role === "event" ? x.tokens!.units : 0), 0);
+        assert.equal(
+          Math.round(prev * 100) + moved,
+          sum.total.units,
+          `${name} ${f.id}: before + the event's rows = after`,
+        );
+      }
+    });
+    assert.ok(rowsSeen > 0, `${name}: some accrual rows (${rowsSeen})`);
+  });
+}
+
 test("a Trove's day: the card's collateral at the day's last event is the bars' figure that day", () => {
   const m = model(REDEEMED, ["WETH", "BOLD"], true);
   const focus = liquityFocusEvents(REDEEMED, "WETH", "BOLD");

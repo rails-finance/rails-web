@@ -29,7 +29,17 @@ import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 
 /** One side's ledger as of the event. */
-function LiquityLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: string; eventTs: number }) {
+function LiquityLedger({
+  side,
+  eventId,
+  eventTs,
+  accrualLabel,
+}: {
+  side: FlowSide;
+  eventId: string;
+  eventTs: number;
+  accrualLabel?: (key: string) => string;
+}) {
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
   const usdShown = useUsdShown();
@@ -48,6 +58,7 @@ function LiquityLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: st
     ev,
     sum,
     usd: rows ? { lines: rows.lines, dollars: rows.total.dollars, before: f.before } : null,
+    ...(accrualLabel && cum.exact ? { accrualLabel } : {}),
   });
   const at = `this event (${dayStamp(eventTs)})`;
   const held: FlowSegment = {
@@ -72,14 +83,18 @@ function LiquityLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: st
 }
 
 /** The card's ledgers, where the page ties its timeline to the Lifetime
- *  flows panel and the replay states the event's sides. */
+ *  flows panel and the replay states the event's sides. `accrualLabel`
+ *  (Liquity V2): the Debt ledger states the accrual since the previous event
+ *  as a row of the event's (lib/shared/event-ledger.ts `tokenLedger`). */
 export function LiquityLedgerProvider({
   eventId,
   eventTs,
+  accrualLabel,
   children,
 }: {
   eventId: string;
   eventTs: number;
+  accrualLabel?: (key: string) => string;
   children: ReactNode;
 }) {
   const focus = useFlowFocus();
@@ -95,14 +110,16 @@ export function LiquityLedgerProvider({
         : has
           ? {
               has: () => true,
-              render: (side) => <LiquityLedger side={side} eventId={eventId} eventTs={eventTs} />,
+              render: (side) => (
+                <LiquityLedger side={side} eventId={eventId} eventTs={eventTs} accrualLabel={accrualLabel} />
+              ),
               decimals: (side) =>
                 focus?.model && cum
                   ? (eventTokenSum(focus.model, focus.events, side, cum, eventId)?.decimals ?? null)
                   : null,
             }
           : null,
-    [pending, has, eventId, eventTs, focus?.model, focus?.events, cum],
+    [pending, has, eventId, eventTs, accrualLabel, focus?.model, focus?.events, cum],
   );
   return <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>;
 }

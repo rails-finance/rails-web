@@ -16,6 +16,7 @@ import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
+import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
 import { PAGE_WORDS } from "@/lib/liquity/event-templates";
@@ -284,7 +285,7 @@ export function LiquityEventCard({
     ) : undefined;
 
   const card = (
-    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>
       <EventCard
         avatar={avatarOverride ?? avatarSlot}
         iconColumn={iconSlot}
