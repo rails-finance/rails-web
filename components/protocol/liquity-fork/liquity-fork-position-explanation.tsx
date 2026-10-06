@@ -88,10 +88,12 @@ export function LiquityForkClosedExplanation({
           <>
             The liquidation cleared the <AmountText value={seizure.debt} /> {debtSymbol} it still owed and took{" "}
             {forkCollAmount(seizure.coll - (seizure.surplus ?? 0))} {collateralSymbol} of its collateral
-            {seizure.surplus ? (
+            {/* With the head read, the surplus bullet below states the
+                leftover and where it went. */}
+            {seizure.surplus && !surplus ? (
               <>
                 {" "}
-                (the other {forkCollAmount(seizure.surplus)} {collateralSymbol} came back to the owner as surplus)
+                (the other {forkCollAmount(seizure.surplus)} {collateralSymbol} went to the surplus pool for the owner)
               </>
             ) : null}{" "}
             —{" "}
