@@ -4,9 +4,10 @@
 //
 //   P1  COPY = EXPORT — the Copy for LLM block equals the committed export's
 //       block for the event (exports/liquity-v2/ethereum/<troveId>.md),
-//       character for character, the URL and the L5 aside: the export names
-//       the modal and prints it once at the end, and that text equals the
-//       copy's L5.
+//       character for character, three things aside: the URL; the L5, which
+//       the export names and prints once at the end (that text must equal the
+//       copy's); and the dollar figures on a line that says "today", which
+//       the page reads at today's price and the export at its pinned one.
 //   P2  L4 ON THE PAGE — every L4 sentence of the block is a bullet of the
 //       opened card's Explanation, in order.
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
@@ -121,8 +122,16 @@ try {
     const copy = await page.evaluate(() => navigator.clipboard.readText());
 
     // P1
-    const expected = block.replace(/ · https:\/\/rails\.finance\/\S+/, " · <url>");
-    const got = copy.replace(/ · https?:\/\/[^/\s]+\/\S+/, " · <url>");
+    // The page reads today's price live and the export its pinned one
+    // (fixtures.json), so a line that says "today" is compared without its
+    // dollar figures.
+    const today = (t) =>
+      t
+        .split("\n")
+        .map((l) => (/\btoday\b/.test(l) ? l.replace(/[−+]?\$[\d,]+/g, "$…") : l))
+        .join("\n");
+    const expected = today(block.replace(/ · https:\/\/rails\.finance\/\S+/, " · <url>"));
+    const got = today(copy.replace(/ · https?:\/\/[^/\s]+\/\S+/, " · <url>"));
     const l5 = section(got, "L5 ·").join("\n");
     const title = /\*\*L5 · (.*)\*\*/.exec(l5)?.[1] ?? "";
     const gotRef = got.replace(/\*\*L5 · [\s\S]*?(?=\n\n\*\*Footer\*\*)/, `**L5** ${title} (below)`);
