@@ -198,8 +198,8 @@ export function liquityEconomicsExplanation(
         {atToday !== null && currentPrice && (
           <>
             {" "}
-            The same {collateralSymbol} repriced at today&apos;s {usd(currentPrice)} is worth {usd(atToday)}, which
-            makes it {signed(redemption.totalDebtCleared - atToday)} at today&apos;s value.
+            The same {collateralSymbol} repriced at the latest block&apos;s {usd(currentPrice)} is worth {usd(atToday)},
+            which makes it {signed(redemption.totalDebtCleared - atToday)} at that price.
           </>
         )}
         {feesReceivedColl > 0 && (
@@ -284,7 +284,7 @@ export function liquityRedemptionOutcome(
     ? {
         kind: "derived",
         summary:
-          "Redemption net outcome at today's value — the BOLD debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at Liquity's current price.",
+          "Redemption net outcome at the latest block's price — the BOLD debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at Liquity's price at the latest block.",
         via: "added up across the trove's redemptions",
         formula: "debt cleared − collateral lost × current price",
         inputs: [
@@ -329,7 +329,7 @@ export function liquityRedemptionOutcome(
             <Prov info={opportunityPLProv} value={formatExact(opportunityPL)}>
               <span className="font-medium tabular-nums">{signed(opportunityPL)}</span>
             </Prov>{" "}
-            at today&apos;s oracle price
+            at the latest block&apos;s price
           </>
         )}
       </span>
