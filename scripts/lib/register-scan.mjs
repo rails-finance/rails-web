@@ -265,15 +265,17 @@ export const INSTANCE_MARKER = /\b(this|its|it|the position|the trove|the vault|
 // out of the tripwire's scope.
 export const STRUCTURAL_INTERP = /collateralType|symbol|stablecoin|protocolName|assetName|cfg\.|p\.|"|’|rsquo/;
 
-/** A strings module's sentence templates (lib/<proto>/event-templates.ts):
- *  each `text: "…"` before its L5 modals, with `{placeholder}` as the
- *  interpolation. The modals are Layer 2 and out of this scope. */
+/** A protocol's strings file's sentence templates
+ *  (content/<proto>/event-prose.yaml): each `text: |-` block scalar before its
+ *  L5 modals, with `{placeholder}` as the interpolation. The modals are Layer 2
+ *  and out of this scope. */
 export function extractTemplateUnits(src) {
-  const end = src.indexOf("export const L5");
-  const body = end < 0 ? src : src.slice(0, end);
+  const lines = src.split("\n");
+  const start = Math.max(0, lines.indexOf("shared_sentences:"));
+  const end = lines.indexOf("L5:");
   const out = [];
-  for (const m of body.matchAll(/\btext:\s*"((?:[^"\\]|\\.)*)"/g))
-    out.push({ raw: m[1], line: body.slice(0, m.index).split("\n").length });
+  for (let i = start; i < (end < 0 ? lines.length : end) - 1; i++)
+    if (/^\s+text: \|-$/.test(lines[i])) out.push({ raw: lines[i + 1].trim(), line: i + 2 });
   return out;
 }
 
@@ -314,7 +316,7 @@ export function normalizeUnitText(raw) {
 /** Run the Tier-A detector over one file's source → [{ line, text }]. */
 export function genericRuleHits(src, file = "") {
   const hits = [];
-  const units = file.endsWith("event-templates.ts") ? extractTemplateUnits(src) : extractCopyUnits(src);
+  const units = file.endsWith("event-prose.yaml") ? extractTemplateUnits(src) : extractCopyUnits(src);
   for (const u of units) {
     const t = normalizeUnitText(u.raw);
     if (t.length < 35) continue;
@@ -341,7 +343,7 @@ export const GENERIC_ALLOWLIST = {
     "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",
   ],
   // The no-change-adjust mode's moral (zero-delta bot retries).
-  "lib/liquity/event-templates.ts": ["Each attempt costs the sender only gas."],
+  "content/liquity-v2/event-prose.yaml": ["Each attempt costs the sender only gas."],
   // §5.3 forward path after cancelling a withdrawal request.
   "lib/maple/explainer-clauses.tsx": ["A new request would join the back of the line."],
 };
@@ -357,10 +359,14 @@ export function discoverGenericCopyFiles(ROOT) {
     if (!entry.isDirectory()) continue;
     const f = path.join(libDir, entry.name, "explainer-clauses.tsx");
     if (fs.existsSync(f)) files.push(f);
-    // A protocol whose event strings live apart from the logic.
-    const t = path.join(libDir, entry.name, "event-templates.ts");
-    if (fs.existsSync(t)) files.push(t);
   }
+  // A protocol whose event strings live in a strings file a writer edits.
+  const contentDir = path.join(ROOT, "content");
+  if (fs.existsSync(contentDir))
+    for (const entry of fs.readdirSync(contentDir, { withFileTypes: true })) {
+      const t = path.join(contentDir, entry.name, "event-prose.yaml");
+      if (entry.isDirectory() && fs.existsSync(t)) files.push(t);
+    }
   const shared = path.join(ROOT, "lib", "shared", "liquity-fork-explainer-clauses.tsx");
   if (fs.existsSync(shared)) files.push(shared);
   const protoDir = path.join(ROOT, "components", "protocol");

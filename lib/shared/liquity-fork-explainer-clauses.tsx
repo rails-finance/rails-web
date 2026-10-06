@@ -1306,7 +1306,7 @@ function liquidationRoute(
 }
 
 /** The collateral surplus the owner can claim, and the owner's loss after it —
- *  Liquity V2's forward path (lib/liquity/event-templates.ts, the
+ *  Liquity V2's forward path (content/liquity-v2/event-prose.yaml, the
  *  destructive liquidation's liq.surplus). The surplus figure echoes the detail
  *  grid; its dollar value and the loss need the priced block. */
 function liquidationSurplus(

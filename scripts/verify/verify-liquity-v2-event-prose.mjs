@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 // Liquity V2 event prose: one generator, every surface (rails-ops
-// TO-DO-ui-jobs 273). On the event page of each sampled event:
+// TO-DO-ui-jobs 273, 278). The script first runs the exports for the fixtures
+// (scripts/exports-liquity-v2.mjs --fixtures-only) into a temporary folder,
+// so the block it compares against is the live generator's. On the event page
+// of each sampled event:
 //
-//   P1  COPY = EXPORT — the Copy for LLM block equals the committed export's
-//       block for the event (exports/liquity-v2/ethereum/<troveId>.md),
-//       character for character, three things aside: the URL; the L5, which
-//       the export names and prints once at the end (that text must equal the
-//       copy's); and the dollar figures on a line that says "today", which
-//       the page reads at today's price and the export at its pinned one.
+//   P0  MANIFEST — the block's hash equals the committed manifest's
+//       (scripts/exports/liquity-v2-ethereum.manifest.json); a string or a
+//       history that changed since the manifest was written fails here, and
+//       `pnpm exports:liquity-v2` rewrites it.
+//   P1  COPY = EXPORT — the Copy for LLM block equals the export's block for
+//       the event, character for character, three things aside: the URL; the
+//       L5, which the export names and prints once at the end (that text must
+//       equal the copy's); and the dollar figures on a line that says
+//       "today", which the page reads at today's price and the export at its
+//       pinned one.
 //   P2  L4 ON THE PAGE — every L4 sentence of the block is a bullet of the
 //       opened card's Explanation, in order.
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
@@ -21,17 +28,24 @@
 // (default 14) of those.
 //
 //   BASE=http://localhost:3000 node scripts/verify/verify-liquity-v2-event-prose.mjs
+//
+// EXPORTS=<dir> reads an export run already made (its ethereum/ folder)
+// instead of making one.
 
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve as resolvePath } from "node:path";
+import { dirname, join, resolve as resolvePath } from "node:path";
 
 const ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), "../..");
 const { chromium } = createRequire(ROOT + "/")("playwright");
 const BASE = (process.env.BASE ?? "http://localhost:3000").replace(/\/$/, "");
 const MAX = Number(process.env.MAX ?? 14);
-const DIR = resolvePath(ROOT, "exports/liquity-v2/ethereum");
+const FIXTURES = resolvePath(ROOT, "scripts/exports/liquity-v2-fixtures.json");
+const MANIFEST = resolvePath(ROOT, "scripts/exports/liquity-v2-ethereum.manifest.json");
 const STORY = "102247037494986730506041632222868001124387697185626929998095238518734059870154";
 
 let pass = 0;
@@ -41,9 +55,28 @@ const check = (name, ok, detail = "") => {
   ok ? pass++ : fail++;
 };
 
-// ── The committed exports ────────────────────────────────────────────────────
+// ── The exports, from the live generator ─────────────────────────────────────
 
-const fixtures = JSON.parse(readFileSync(resolvePath(DIR, "fixtures.json"), "utf8")).fixtures;
+const tmp = process.env.EXPORTS ? null : mkdtempSync(join(tmpdir(), "liquity-v2-exports-"));
+if (tmp) {
+  const run = spawnSync(
+    process.execPath,
+    [resolvePath(ROOT, "scripts/exports-liquity-v2.mjs"), "--fixtures-only", "--out", tmp],
+    { stdio: ["ignore", "ignore", "inherit"], env: { ...process.env, BASE } },
+  );
+  if (run.status !== 0) {
+    console.log("FAIL  the exports ran (scripts/exports-liquity-v2.mjs --fixtures-only)");
+    process.exit(1);
+  }
+}
+const DIR = resolvePath(tmp ?? process.env.EXPORTS, "ethereum");
+process.on("exit", () => tmp && rmSync(tmp, { recursive: true, force: true }));
+
+const fixtures = JSON.parse(readFileSync(FIXTURES, "utf8")).fixtures;
+const manifest = new Map(
+  JSON.parse(readFileSync(MANIFEST, "utf8")).fixtures.flatMap((f) => f.events.map((e) => [e.id, e.block])),
+);
+const hash = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 /** Each event block printed in full, by trove and number. */
 function blocks(troveId) {
   const md = readFileSync(resolvePath(DIR, `${troveId}.md`), "utf8");
@@ -121,6 +154,14 @@ try {
     await copyBtn.click();
     const copy = await page.evaluate(() => navigator.clipboard.readText());
 
+    // P0
+    const want = manifest.get(e.id);
+    check(
+      `${label}: the block's hash = the manifest's`,
+      want === hash(block),
+      want ? `manifest ${want}, generator ${hash(block)}; run pnpm exports:liquity-v2` : "not in the manifest",
+    );
+
     // P1
     // The page reads today's price live and the export its pinned one
     // (fixtures.json), so a line that says "today" is compared without its
@@ -142,7 +183,7 @@ try {
         ? `at ${i}: export «${a.slice(i, i + 60)}» copy «${b.slice(i, i + 60)}»`
         : "";
     };
-    check(`${label}: Copy for LLM = the committed export`, gotRef === expected, firstDiff(expected, gotRef));
+    check(`${label}: Copy for LLM = the generator's export`, gotRef === expected, firstDiff(expected, gotRef));
     check(`${label}: its L5 = the export's L5 for "${title}"`, title !== "" && appendix.includes(l5), l5.slice(0, 120));
 
     // P2

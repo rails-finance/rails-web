@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["scripts/**/*.mjs", "scripts/verify/**/*.mjs", "scripts/verify/**/*.ts"],
+  "entry": ["scripts/**/*.mjs", "scripts/verify/**/*.mjs", "scripts/verify/**/*.ts", "scripts/yaml-loader.cjs"],
   "project": [
     "app/**/*.{ts,tsx}",
     "components/**/*.{ts,tsx}",

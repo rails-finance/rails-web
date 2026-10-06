@@ -1,0 +1,434 @@
+#!/usr/bin/env node
+// check:prose — a protocol's strings file and the code that reads it agree
+// (rails-ops TO-DO-ui-jobs 278). For Liquity V2, content/liquity-v2/event-prose.yaml
+// against lib/liquity/event-prose.ts (the generator) and the files that print
+// its words:
+//
+//   1. The file parses, and every section and field the loader types is there,
+//      each string one non-empty line.
+//   2. Every id the code reads exists: template ids, the variants the
+//      generator picks, the sentence ids it says (each in a template of the
+//      case that says it, or shared and listed in that template's order),
+//      every word id (L1_WORDS.x, L2_WORDS.x, …, an L1 group's `word`), every
+//      fragment, every modal and FAQ link id.
+//   3. Every placeholder in every string is one the code supplies there: a
+//      template's sentences and L1 against the values the generator sets for
+//      that template (read from its `v.name =` lines), a word against the
+//      values its fillText / wordsAround call passes, a modal against its
+//      fillWords calls; each placeholder has a rounding, and a `{name|rounding}`
+//      names a rounding that exists.
+//   4. No prose outside the file: the generator, the Markdown, the loader and
+//      the renderer hold no string literal that reads as words.
+//
+// Each failure names the file, the template or string id, and the placeholder.
+
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolvePath(dirname(fileURLToPath(import.meta.url)), "..");
+const { parseContent } = createRequire(import.meta.url)("./yaml-loader.cjs");
+const read = (rel) => readFileSync(resolvePath(ROOT, rel), "utf8");
+
+const DATA = "content/liquity-v2/event-prose.yaml";
+const GENERATOR = "lib/liquity/event-prose.ts";
+const LOADER = "lib/liquity/event-templates.ts";
+/** Files that print the file's words, scanned for the ids they read. */
+const READERS = [
+  GENERATOR,
+  LOADER,
+  "lib/liquity/event-markdown.ts",
+  "lib/liquity/accrual.ts",
+  "components/protocol/liquity/event-prose-render.tsx",
+  "components/protocol/liquity/liquity-event-header.tsx",
+  "components/protocol/liquity/liquity-event-detail.tsx",
+];
+/** Files that may hold no prose of their own. */
+const NO_PROSE = [
+  GENERATOR,
+  LOADER,
+  "lib/liquity/event-markdown.ts",
+  "lib/liquity/event-prose-position.ts",
+  "components/protocol/liquity/event-prose-render.tsx",
+];
+
+const failures = [];
+const fail = (msg) => failures.push(`${DATA}: ${msg}`);
+const failIn = (file, msg) => failures.push(`${file}: ${msg}`);
+
+// ── 1. Parse and shape ───────────────────────────────────────────────────────
+
+let d;
+try {
+  d = parseContent(read(DATA));
+} catch (e) {
+  console.log(`FAIL  ${DATA} does not parse:\n${e.message}`);
+  process.exit(1);
+}
+
+const WORD_SECTIONS = ["L1_words", "L2_words", "context_words", "footer_words", "copy_words", "L5_words", "fragments"];
+const isLine = (s) => typeof s === "string" && s.trim() !== "" && !s.includes("\n");
+const str = (where, s) => {
+  if (!isLine(s)) fail(`${where} is not a one-line string (${JSON.stringify(s)})`);
+  return isLine(s);
+};
+const obj = (where, o) => {
+  const ok = o != null && typeof o === "object" && !Array.isArray(o);
+  if (!ok) fail(`${where} is missing or not a section of ids`);
+  return ok;
+};
+
+for (const k of ["roundings", "placeholders", ...WORD_SECTIONS, "shared_sentences", "L5"]) obj(k, d?.[k]);
+if (!Array.isArray(d?.templates)) fail("templates is missing or not a list");
+if (failures.length) report();
+
+for (const [k, v] of Object.entries(d.roundings)) str(`roundings.${k}`, v);
+for (const [k, v] of Object.entries(d.placeholders)) {
+  if (!obj(`placeholders.${k}`, v)) continue;
+  str(`placeholders.${k}.means`, v.means);
+  if (!(v.rounding in d.roundings)) fail(`placeholders.${k}: rounding "${v.rounding}" is not in roundings`);
+}
+for (const sec of WORD_SECTIONS) for (const [k, v] of Object.entries(d[sec])) str(`${sec}.${k}`, v);
+const sentenceShape = (where, s) => {
+  if (!obj(where, s)) return;
+  str(`${where}.when`, s.when);
+  str(`${where}.text`, s.text);
+};
+for (const [k, s] of Object.entries(d.shared_sentences)) sentenceShape(`shared_sentences.${k}`, s);
+
+const templates = new Map();
+for (const [i, t] of d.templates.entries()) {
+  const where = `templates[${i}]${t?.id ? ` (${t.id})` : ""}`;
+  if (!obj(where, t)) continue;
+  if (typeof t.id !== "string") fail(`${where}: no id`);
+  else if (templates.has(t.id)) fail(`${where}: the id is used twice`);
+  templates.set(t.id, t);
+  str(`${t.id}.title`, t.title);
+  str(`${t.id}.when`, t.when);
+  if (!(t.L5 in d.L5)) fail(`${t.id}: L5 "${t.L5}" is not a modal in L5`);
+  if (obj(`${t.id}.variants`, t.variants))
+    for (const [k, v] of Object.entries(t.variants)) str(`${t.id}.variants.${k}`, v);
+  if (obj(`${t.id}.sentences`, t.sentences))
+    for (const [k, s] of Object.entries(t.sentences)) sentenceShape(`${t.id}.sentences.${k}`, s);
+  if (!Array.isArray(t.L1) || !t.L1.every(Array.isArray)) fail(`${t.id}.L1 is not a list of groups`);
+  for (const key of ["order", "list"]) {
+    if (key === "list" && t.list === undefined) continue;
+    if (!Array.isArray(t[key])) {
+      fail(`${t.id}.${key} is not a list of sentence ids`);
+      continue;
+    }
+    for (const id of t[key])
+      if (!(id in (t.sentences ?? {})) && !(id in d.shared_sentences))
+        fail(`${t.id}.${key}: "${id}" is neither its sentence nor a shared one`);
+  }
+  for (const id of Object.keys(t.sentences ?? {}))
+    if (!t.order?.includes(id) && !t.list?.includes(id)) fail(`${t.id}: sentence "${id}" is in neither order nor list`);
+}
+
+const faqSrc = read("components/transaction-timeline/explanation/shared/faqUrls.ts");
+const faqBlock = faqSrc.slice(faqSrc.indexOf("export const FAQ_URLS"), faqSrc.indexOf("} as const"));
+const FAQ_IDS = new Set([...faqBlock.matchAll(/^\s+([A-Z_]+):/gm)].map((m) => m[1]));
+for (const [k, m] of Object.entries(d.L5)) {
+  const w = `L5.${k}`;
+  if (!obj(w, m)) continue;
+  str(`${w}.title`, m.title);
+  str(`${w}.intro`, m.intro);
+  if (m.intro_delegated !== undefined) str(`${w}.intro_delegated`, m.intro_delegated);
+  (m.extraParagraphs ?? []).forEach((p, i) => str(`${w}.extraParagraphs[${i}]`, p));
+  if (m.detailsHeading !== undefined) str(`${w}.detailsHeading`, m.detailsHeading);
+  (m.details ?? []).forEach((x, i) => {
+    str(`${w}.details[${i}].bold`, x?.bold);
+    str(`${w}.details[${i}].text`, x?.text);
+    if (x?.text_delegated !== undefined) str(`${w}.details[${i}].text_delegated`, x.text_delegated);
+  });
+  if (m.video) for (const f of ["label", "url", "description"]) str(`${w}.video.${f}`, m.video[f]);
+  (m.links ?? []).forEach((l, i) => {
+    str(`${w}.links[${i}].label`, l?.label);
+    if (l?.faq !== undefined) {
+      if (!FAQ_IDS.has(l.faq)) fail(`${w}.links[${i}]: faq "${l.faq}" is not in FAQ_URLS`);
+    } else if (!/^https:\/\//.test(l?.url ?? "")) fail(`${w}.links[${i}]: neither a faq id nor an https url`);
+  });
+}
+
+// ── 2. Every id the code reads ───────────────────────────────────────────────
+
+const gen = read(GENERATOR);
+const fnStart = gen.indexOf("export function liquityEventProse(");
+const switchStart = gen.indexOf("switch (t.id) {", fnStart);
+const sameBlock = gen.indexOf("// Same block", switchStart);
+const fnEnd = gen.indexOf("\n}\n", sameBlock);
+if (fnStart < 0 || switchStart < 0 || sameBlock < 0 || fnEnd < 0)
+  failIn(GENERATOR, "the check cannot find liquityEventProse's switch (its markers moved)");
+
+// Template ids.
+for (const m of gen.matchAll(/"(liquity2\.[a-z_.]+)"/g))
+  if (!templates.has(m[1])) failIn(GENERATOR, `reads template "${m[1]}", which ${DATA} lacks`);
+
+// Variants: the literal pairs pick() returns, and the three it builds.
+const picked = [...gen.matchAll(/id: "(liquity2\.[a-z_.]+)", variant: "([a-z_]+)"/g)].map((m) => [m[1], m[2]]);
+const today = /function redemptionToday[\s\S]*?\): ("[a-z_]+"(?: \| "[a-z_]+")*) \| null/.exec(gen);
+for (const v of today ? [...today[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [])
+  picked.push(["liquity2.redemption", v]);
+// `${c}_${d}`: add or withdraw, borrow or repay.
+if (/variant: `\$\{c\}_\$\{d\}`/.test(gen))
+  for (const c of ["add", "withdraw"])
+    for (const dd of ["borrow", "repay"]) picked.push(["liquity2.adjust.combined", `${c}_${dd}`]);
+// The transfer's variant is the log's transferType.
+if (/ctx\.transfer \? ctx\.transfer\.transferType/.test(gen))
+  for (const v of ["transfer", "mint", "burn"]) picked.push(["liquity2.transfer", v]);
+for (const [id, v] of picked)
+  if (templates.has(id) && !(v in (templates.get(id).variants ?? {})))
+    failIn(GENERATOR, `picks variant "${v}" of ${id}, which ${DATA} lacks`);
+
+/** The sentence ids a template can say. */
+const sayable = (t) =>
+  [...(t.order ?? []), ...(t.list ?? [])].filter((id) => id in (t.sentences ?? {}) || id in d.shared_sentences);
+
+/** Each `sp.say(…)` in a stretch of source: its literal ids, a template
+ *  literal as a pattern. */
+function saidIn(src) {
+  const out = [];
+  for (const m of src.matchAll(/sp\.say\(|liqDistance\(/g)) {
+    let depth = 0;
+    let j = m.index + m[0].length - 1;
+    for (; j < src.length; j++) {
+      if (src[j] === "(") depth++;
+      else if (src[j] === ")" && --depth === 0) break;
+    }
+    const args = src.slice(m.index + m[0].length, j);
+    const first = args.split(/,\s*\{/)[0];
+    // A literal compared against (`variant === "raised"`) is a variant, not an id.
+    for (const s of first.matchAll(/(?<![=!]== )"([a-z_.]+)"|`([^`]+)`/g)) {
+      if (s[1]) out.push({ id: s[1] });
+      else
+        out.push({
+          pattern: new RegExp(`^${s[2].replace(/\./g, "\\.").replace(/\$\{[^}]+\}/g, "[a-z_]+")}$`),
+          raw: s[2],
+        });
+    }
+  }
+  return out;
+}
+const checkSaid = (said, ts, where) => {
+  for (const s of said) {
+    const ok = ts.some((t) => (s.id ? sayable(t).includes(s.id) : sayable(t).some((id) => s.pattern.test(id))));
+    if (!ok)
+      failIn(
+        GENERATOR,
+        `${where} says "${s.id ?? s.raw}", which no template there (${ts.map((t) => t.id).join(", ")}) has in its order`,
+      );
+  }
+};
+
+// The switch, case by case: consecutive labels share a body.
+const body = gen.slice(switchStart, sameBlock);
+const cases = [];
+{
+  const re = /case "(liquity2\.[a-z_.]+)":|default:/g;
+  let m;
+  let labels = [];
+  let lastEnd = -1;
+  const marks = [];
+  while ((m = re.exec(body))) marks.push({ at: m.index, end: re.lastIndex, id: m[1] ?? null });
+  for (let i = 0; i < marks.length; i++) {
+    labels.push(marks[i].id);
+    const next = marks[i + 1];
+    const between = body.slice(marks[i].end, next ? next.at : body.length);
+    if (between.trim() === "" && next) continue;
+    cases.push({ ids: labels.filter(Boolean), isDefault: labels.includes(null), src: between });
+    labels = [];
+    lastEnd = marks[i].end;
+  }
+  void lastEnd;
+}
+const allTemplates = [...templates.values()];
+for (const c of cases) {
+  const ts = c.isDefault
+    ? [templates.get("liquity2.fallback")].filter(Boolean)
+    : c.ids.map((id) => templates.get(id)).filter(Boolean);
+  checkSaid(saidIn(c.src), ts, c.isDefault ? "the default case" : `case ${c.ids.join(" / ")}`);
+}
+// Helpers before the switch and the same-block sentence after it: some template says each.
+checkSaid(saidIn(gen.slice(fnStart, switchStart)), allTemplates, "a helper of liquityEventProse");
+checkSaid(saidIn(gen.slice(sameBlock, fnEnd)), allTemplates, "the same-block step");
+
+// Word ids, in every file that prints them.
+const GROUP = {
+  L1_WORDS: "L1_words",
+  L2_WORDS: "L2_words",
+  CONTEXT_WORDS: "context_words",
+  FOOTER_WORDS: "footer_words",
+  COPY_WORDS: "copy_words",
+};
+const sources = Object.fromEntries(READERS.map((f) => [f, read(f)]));
+for (const [file, src] of Object.entries(sources)) {
+  for (const m of src.matchAll(/\b(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS)\.([a-z_0-9]+)/g))
+    if (!(m[2] in d[GROUP[m[1]]])) failIn(file, `reads ${m[1]}.${m[2]}, which ${DATA} lacks (${GROUP[m[1]]})`);
+  for (const m of src.matchAll(/FILE\.L5_words\.([a-z_0-9]+)/g))
+    if (!(m[1] in d.L5_words)) failIn(file, `reads L5_words.${m[1]}, which ${DATA} lacks`);
+  for (const m of src.matchAll(/"(debt_term\.[a-z_]+)"/g))
+    if (!(m[1] in d.fragments)) failIn(file, `reads fragment "${m[1]}", which ${DATA} lacks`);
+}
+for (const t of allTemplates)
+  for (const g of t.L1 ?? [])
+    for (const p of g)
+      if (p && "word" in p && !(p.word in d.L1_words)) fail(`${t.id}.L1: word "${p.word}" is not in L1_words`);
+
+// ── 3. Placeholders ──────────────────────────────────────────────────────────
+
+const TOKEN = /\{([a-z_0-9]+)(?:\|([a-z_]+))?\}/g;
+const assigned = (src) => new Set([...src.matchAll(/\bv\.([a-z_0-9]+)\s*=(?!=)/g)].map((m) => m[1]));
+const common = new Set([...assigned(gen.slice(fnStart, switchStart)), ...assigned(gen.slice(sameBlock, fnEnd))]);
+const supplied = new Map();
+for (const c of cases) {
+  const names = assigned(c.src);
+  const ids = c.isDefault ? ["liquity2.fallback"] : c.ids;
+  for (const id of ids) supplied.set(id, new Set([...common, ...names]));
+}
+
+function placeholders(where, text, allowed, needsRounding = true) {
+  for (const m of text.matchAll(TOKEN)) {
+    const [tok, name, rounding] = m;
+    if (!allowed.has(name)) fail(`${where}: ${tok} is not a value the code supplies there`);
+    if (rounding && !(rounding in d.roundings))
+      fail(`${where}: ${tok} names rounding "${rounding}", which is not in roundings`);
+    if (needsRounding && !rounding && !(name in d.placeholders))
+      fail(`${where}: ${tok} has no entry in placeholders (its rounding and meaning)`);
+  }
+}
+
+for (const t of allTemplates) {
+  const allowed = supplied.get(t.id);
+  if (!allowed) {
+    fail(`${t.id}: no case of liquityEventProse's switch says it`);
+    continue;
+  }
+  for (const [id, s] of Object.entries(t.sentences ?? {}))
+    if (isLine(s?.text)) placeholders(`${t.id}.sentences.${id}`, s.text, allowed);
+  for (const id of [...(t.order ?? []), ...(t.list ?? [])])
+    if (!(id in (t.sentences ?? {})) && isLine(d.shared_sentences[id]?.text))
+      placeholders(`shared_sentences.${id} (said by ${t.id})`, d.shared_sentences[id].text, allowed);
+  for (const g of t.L1 ?? [])
+    for (const p of g) {
+      if (!p || !("figure" in p)) continue;
+      const tok = `{${p.figure}}`;
+      if (!allowed.has(p.figure)) fail(`${t.id}.L1: ${tok} is not a value the code supplies there`);
+      if (p.symbol && !allowed.has(p.symbol)) fail(`${t.id}.L1: {${p.symbol}} is not a value the code supplies there`);
+      if (p.rounding && !(p.rounding in d.roundings))
+        fail(`${t.id}.L1: ${tok} names rounding "${p.rounding}", which is not in roundings`);
+      if (!p.rounding && !(p.figure in d.placeholders)) fail(`${t.id}.L1: ${tok} has no entry in placeholders`);
+    }
+}
+
+/** The keys of the object literal that follows `at` in `src`. */
+function objectKeys(src, at) {
+  const open = src.indexOf("{", at);
+  let depth = 0;
+  let j = open;
+  for (; j < src.length; j++) {
+    if (src[j] === "{") depth++;
+    else if (src[j] === "}" && --depth === 0) break;
+  }
+  const inner = src.slice(open + 1, j);
+  // Top-level keys only: blank out nested braces and parens.
+  let flat = "";
+  let nest = 0;
+  for (const ch of inner) {
+    if (ch === "{" || ch === "(") nest++;
+    if (nest === 0) flat += ch;
+    if (ch === "}" || ch === ")") nest--;
+  }
+  return [...flat.matchAll(/(?:^|,)\s*([a-z_0-9]+)\s*(?=[:,]|$)/g)].map((m) => m[1]);
+}
+
+// Words: the values each call passes.
+const wordSupply = new Map(); // "L2_words.incl" → Set
+const addSupply = (key, names) => {
+  const s = wordSupply.get(key) ?? new Set();
+  names.forEach((n) => s.add(n));
+  wordSupply.set(key, s);
+};
+for (const src of Object.values(sources)) {
+  for (const m of src.matchAll(
+    /fillText\(\s*(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS)\.([a-z_0-9]+),/g,
+  ))
+    addSupply(`${GROUP[m[1]]}.${m[2]}`, objectKeys(src, m.index + m[0].length));
+  for (const m of src.matchAll(/wordsAround\(\s*(L2_WORDS|L1_WORDS)\.([a-z_0-9]+),\s*\[([^\]]*)\](,\s*\{)?/g)) {
+    const names = [...m[3].matchAll(/"([a-z_0-9]+)"/g)].map((x) => x[1]);
+    if (m[4]) names.push(...objectKeys(src, m.index + m[0].length - 1));
+    addSupply(`${GROUP[m[1]]}.${m[2]}`, names);
+  }
+}
+for (const sec of WORD_SECTIONS.filter((s) => s !== "fragments" && s !== "L5_words"))
+  for (const [k, v] of Object.entries(d[sec])) {
+    if (!isLine(v) || !/\{/.test(v)) continue;
+    const allowed = wordSupply.get(`${sec}.${k}`);
+    if (!allowed) fail(`${sec}.${k} has placeholders, and no fillText or wordsAround call fills it`);
+    else placeholders(`${sec}.${k}`, v, allowed, false);
+  }
+for (const [k, v] of Object.entries(d.fragments))
+  if (isLine(v)) placeholders(`fragments.${k}`, v, new Set(["x"]), false);
+
+// Modals: the values the loader's fillWords calls pass.
+const loader = sources[LOADER];
+const modalNames = new Set();
+for (const m of loader.matchAll(/fillWords\(/g)) objectKeys(loader, m.index).forEach((n) => modalNames.add(n));
+for (const [k, v] of Object.entries(d.L5_words)) if (isLine(v)) placeholders(`L5_words.${k}`, v, modalNames, false);
+for (const [k, m] of Object.entries(d.L5)) {
+  if (!m || typeof m !== "object") continue;
+  const strings = [
+    ["title", m.title],
+    ["intro", m.intro],
+    ["intro_delegated", m.intro_delegated],
+    ...(m.extraParagraphs ?? []).map((p, i) => [`extraParagraphs[${i}]`, p]),
+    ["detailsHeading", m.detailsHeading],
+    ...(m.details ?? []).flatMap((x, i) => [
+      [`details[${i}].bold`, x?.bold],
+      [`details[${i}].text`, x?.text],
+      [`details[${i}].text_delegated`, x?.text_delegated],
+    ]),
+    ...(m.links ?? []).map((l, i) => [`links[${i}].label`, l?.label]),
+  ];
+  // Only the intros are filled (modal() in the loader); a brace elsewhere would print as typed.
+  for (const [f, s] of strings) {
+    if (!isLine(s) || !/\{/.test(s)) continue;
+    if (f === "intro" || f === "intro_delegated") placeholders(`L5.${k}.${f}`, s, modalNames, false);
+    else fail(`L5.${k}.${f}: has a placeholder, and the code fills only a modal's intro`);
+  }
+}
+
+// ── 4. No prose outside the file ─────────────────────────────────────────────
+
+/** Source with comments blanked, line breaks kept. */
+const stripComments = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")).replace(/(^|[^:"'`\\])\/\/.*$/gm, (_, p) => p);
+const PROSE = [/(?<![\w-])[A-Za-z]{2,} [a-z]{2,}(?![\w-])/, /(?<![\w-])[A-Z][a-z]{2,}(?![\w-])/];
+for (const file of NO_PROSE) {
+  const lines = stripComments(read(file)).split("\n");
+  lines.forEach((line, i) => {
+    if (
+      /^\s*(import|export \* from)\b|\bthrow new Error\(|\bconsole\.|"use client"|\b(className|rel|target)=/.test(line)
+    )
+      return;
+    for (const m of line.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g)) {
+      const text = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{[^}]*\}/g, " ");
+      if (PROSE.some((re) => re.test(text)))
+        failIn(file, `line ${i + 1} holds a string that reads as prose (${m[0].slice(0, 70)}); move it to ${DATA}`);
+    }
+  });
+}
+
+report();
+
+function report() {
+  if (failures.length === 0) {
+    console.log(
+      `PASS  ${DATA}: ${templates.size} templates, ${Object.keys(d.shared_sentences).length} shared sentences, ${Object.keys(d.L5).length} modals; every id the code reads is there, every placeholder is supplied, no prose outside the file`,
+    );
+    process.exit(0);
+  }
+  for (const f of failures) console.log(`FAIL  ${f}`);
+  console.log(`\n${failures.length} problem${failures.length === 1 ? "" : "s"}`);
+  process.exit(1);
+}

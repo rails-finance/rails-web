@@ -1,7 +1,7 @@
 {
   "today": {
     "date": "2026-10-06",
-    "note": "The redemption's \"today\" sentence reads these prices, so a regeneration matches the committed exports; `pnpm exports:liquity-v2 --today` re-reads them and today's date.",
+    "note": "The redemption's \"today\" sentence reads these prices, so a regeneration matches the committed manifest (liquity-v2-ethereum.manifest.json); `pnpm exports:liquity-v2 --today` re-reads them and today's date.",
     "prices": {
       "WETH": 2690.4,
       "wstETH": 3365.974128625988,

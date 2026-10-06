@@ -224,8 +224,8 @@ export function liquityEconomicsContent(opts: { isBatched?: boolean } = {}): Lea
 }
 
 // ── Liquity V2 — Event-card modals ───────────────────────────────────────────
-// Moved to lib/liquity/event-templates.ts (`L5`), with the rest of an event's
-// strings.
+// Moved to content/liquity-v2/event-prose.yaml (`L5`), with the rest of an
+// event's strings.
 
 // Generic Aave V4 fallback — the "never empty" floor for any Aave event without
 // a dedicated modal (supply / withdraw / borrow / repay / collateral_toggle).
@@ -3229,7 +3229,7 @@ export function mapleEventFallbackContent(): LearnMoreContent {
 // MCR, batch delegation); what differs — the protocol name, the stablecoin,
 // the docs links — is passed in.
 //
-// Quick Links, as Liquity V2's modals carry them (lib/liquity/event-templates.ts
+// Quick Links, as Liquity V2's modals carry them (content/liquity-v2/event-prose.yaml
 // `L5`): one link per QUESTION the card raises, not one link for the
 // whole protocol. `docsByTopic` carries those, read and verified against
 // Ebisu's (ebisu.gitbook.io/ebisu-money) and Asymmetry's (docs.asymmetry.finance)

@@ -25,6 +25,7 @@ import {
 } from "@/lib/liquity/event-prose";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
+import { COPY_WORDS } from "@/lib/liquity/event-templates";
 import {
   collChangeProv,
   debtChangeProv,
@@ -200,7 +201,7 @@ export function CopyForLlm({ build }: { build: () => string }) {
       type="button"
       className={`${CTRL_GHOST} ${CTRL_OFF} inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs`}
       data-copy-for-llm=""
-      aria-label={copied ? "Copied" : "Copy this event as Markdown for an AI assistant"}
+      aria-label={copied ? COPY_WORDS.copied : COPY_WORDS.button_label}
       onClick={(e) => {
         e.stopPropagation();
         void copy();
@@ -208,7 +209,7 @@ export function CopyForLlm({ build }: { build: () => string }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       {copied ? <Check size={12} /> : <Copy size={12} />}
-      {copied ? "Copied" : "Copy for LLM"}
+      {copied ? COPY_WORDS.copied : COPY_WORDS.button}
     </button>
   );
 }

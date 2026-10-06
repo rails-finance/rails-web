@@ -35,7 +35,7 @@ export { UsersGlyph };
 type OperationStyle = { label: string; color: string; bg: string; badge: boolean };
 
 // The label is the generator's (lib/liquity/event-prose.ts `liquityL1Label`,
-// words from lib/liquity/event-templates.ts), so the Copy for LLM line and the
+// words from content/liquity-v2/event-prose.yaml), so the Copy for LLM line and the
 // exports print the header's word; this decides only how it looks.
 function getOperationStyle(operation: string, ctx: LiquityContext): OperationStyle {
   const label = liquityL1Label(ctx);

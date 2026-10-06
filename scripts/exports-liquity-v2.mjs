@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Liquity V2 event prose: the test exports, the coverage sweep and the
-// template catalogue (rails-ops TO-DO-ui-jobs 273; the prose project's brief of
-// 5 Oct 2026). Everything is written by the generator the page runs
-// (lib/liquity/event-prose.ts, its strings in lib/liquity/event-templates.ts),
-// so a string on the site comes out here character for character.
+// manifest (rails-ops TO-DO-ui-jobs 273, 278). Everything is written by the
+// generator the page runs (lib/liquity/event-prose.ts, its strings in
+// content/liquity-v2/event-prose.yaml), so a string on the site comes out here
+// character for character.
 //
 //   BASE=http://localhost:3000 pnpm exports:liquity-v2   (a dev server must be serving BASE)
 //
 // reads each fixture trove's whole history through a running dev server's
-// /api routes, and writes, under exports/liquity-v2/:
+// /api routes, and writes, under --out (default exports/liquity-v2/, which git
+// ignores):
 //
 //   ethereum/<troveId>.md    the position's card, then each event as its Copy
 //                            for LLM block, oldest first; a run of more than
@@ -21,87 +22,55 @@
 //   ethereum/coverage.json   every template and variant, its live examples
 //                            among the fixtures and the sweep list, and the
 //                            variants and sentences with none
-//   catalogue.md             every template from the code: its condition,
-//                            variants, L1, L4 and L5 strings with their
-//                            placeholders and roundings
+//   catalogue.md             a reader's view of the strings file: every
+//                            template, its condition, variants, L1, L4 and L5
+//                            strings with their placeholders and roundings
 //
-// The fixtures and the sweep list are exports/liquity-v2/ethereum/fixtures.json,
+// and the committed manifest, scripts/exports/liquity-v2-ethereum.manifest.json:
+// per fixture event its id, template, variant, version and the hash of its
+// block, and the coverage counts. A regeneration that changes no output leaves
+// it byte for byte; a change to a string or to a trove's history shows there.
+// verify-liquity-v2-event-prose.mjs fails on a stale one.
+//
+// The fixtures and the sweep list are scripts/exports/liquity-v2-fixtures.json,
 // each trove with the reason it is there. "Today" is pinned in that file (the
-// date and the oracle prices the redemption's "today" sentence reads), so a
-// regeneration differs only where a template or the history did:
+// date and the oracle prices the redemption's "today" sentence reads):
 //
-//   --today      re-read today's oracle prices and date into fixtures.json
-//   --catalogue  write only the catalogue (no server needed)
+//   --today          re-read today's oracle prices and date into the fixtures
+//   --catalogue      write only the catalogue (no server needed)
+//   --fixtures-only  skip the sweep; writes no coverage and no manifest
+//   --out <dir>      write the exports there
 
-import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { withTypeStripping } from "./lib/strip-types.mjs";
+
+withTypeStripping(import.meta.url);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "..");
-
-// TypeScript with `@/` aliases: re-exec once with type stripping and a
-// resolver (the verifiers' pattern), JSON imports given their attribute.
-if (!process.execArgv.includes("--experimental-strip-types")) {
-  const hook = `
-    import { existsSync } from "node:fs";
-    const ROOT = ${JSON.stringify(new URL("file://" + ROOT + "/").href)};
-    const EXT = [".ts", ".tsx", "/index.ts", "/index.tsx", ".mjs", ".js"];
-    export async function resolve(spec, ctx, next) {
-      let s = spec;
-      if (s.startsWith("@/")) s = new URL(s.slice(2), ROOT).href;
-      if (s.startsWith(".") || s.startsWith("file:")) {
-        const base = s.startsWith("file:") ? s : new URL(s, ctx.parentURL).href;
-        if (base.endsWith(".json")) {
-          const r = await next(base, ctx);
-          return { ...r, importAttributes: { type: "json" } };
-        }
-        if (!/\\.(ts|tsx|mjs|js)$/.test(base)) {
-          for (const e of EXT) if (existsSync(new URL(base + e))) return next(base + e, ctx);
-        }
-        return next(base, ctx);
-      }
-      return next(spec, ctx);
-    }`;
-  const register = `import{register}from'node:module';register(${JSON.stringify(
-    "data:text/javascript," + encodeURIComponent(hook),
-  )},import.meta.url);`;
-  const r = spawnSync(
-    process.execPath,
-    [
-      "--experimental-strip-types",
-      "--disable-warning=ExperimentalWarning",
-      "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
-      "--import",
-      "data:text/javascript," + encodeURIComponent(register),
-      fileURLToPath(import.meta.url),
-      ...process.argv.slice(2),
-    ],
-    { stdio: "inherit", env: process.env },
-  );
-  process.exit(r.status ?? 1);
-}
-
-const OUT = resolvePath(ROOT, "exports/liquity-v2");
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const outAt = argv.indexOf("--out");
+const OUT = outAt >= 0 ? resolvePath(argv[outAt + 1]) : resolvePath(ROOT, "exports/liquity-v2");
 const CHAIN_DIR = resolvePath(OUT, "ethereum");
-const FIXTURES = resolvePath(CHAIN_DIR, "fixtures.json");
+const FIXTURES = resolvePath(ROOT, "scripts/exports/liquity-v2-fixtures.json");
+const MANIFEST = resolvePath(ROOT, "scripts/exports/liquity-v2-ethereum.manifest.json");
+const STRINGS = "content/liquity-v2/event-prose.yaml";
 const BASE = (process.env.BASE ?? "http://localhost:3000").replace(/\/$/, "");
 const SITE = "https://rails.finance";
-const args = new Set(process.argv.slice(2));
 
 const prose = await import("../lib/liquity/event-prose.ts");
 const templates = await import("../lib/liquity/event-templates.ts");
 const md = await import("../lib/liquity/event-markdown.ts");
-const ledgers = await import("../lib/liquity/event-ledgers.ts");
-const flows = await import("../lib/shared/liquity-flows.ts");
-const timeline = await import("../lib/shared/flows-timeline.ts");
+const positionProse = await import("../lib/liquity/event-prose-position.ts");
 const summary = await import("../lib/liquity/trove-to-markdown.ts");
-const { isLiquityEvent } = await import("../lib/shared/types/event-shape.ts");
 
 mkdirSync(CHAIN_DIR, { recursive: true });
 writeFileSync(resolvePath(OUT, "catalogue.md"), catalogue());
-console.log("wrote exports/liquity-v2/catalogue.md");
+console.log(`wrote ${resolvePath(OUT, "catalogue.md")}`);
 if (args.has("--catalogue")) process.exit(0);
 
 const fixtures = JSON.parse(readFileSync(FIXTURES, "utf8"));
@@ -145,14 +114,7 @@ async function history(branch, troveId) {
     for (const e of page.events ?? []) seen.set(e.id, e);
     if (!page.pagination?.hasMore) break;
   }
-  const logIndex = (e) => {
-    const n = Number(e.id.split("_").pop());
-    return Number.isFinite(n) ? n : 0;
-  };
-  // The trove page's order: block, time, then the log's index in the block.
-  return [...seen.values()]
-    .filter(isLiquityEvent)
-    .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp || logIndex(a) - logIndex(b));
+  return positionProse.liquityTroveHistory([...seen.values()]);
 }
 
 // ── One position ─────────────────────────────────────────────────────────────
@@ -164,48 +126,15 @@ async function position(branch, troveId) {
     daily(branch),
   ]);
   const trove = trovesResp.data?.[0] ?? null;
-  const collSym = trove?.collateralType ?? branch;
-  const debtSym = events[0]?.context.data.assetType || "BOLD";
-  const priceToday = fixtures.today.prices[branch];
-  const flowEvents = flows.liquityV2FlowEvents(events);
-  const tl = flows.liquityFlowTimeline(flowEvents, {
-    collSymbol: collSym,
-    debtSymbol: debtSym,
-    surplusClaimed: false,
-    now: todayTs,
+  const rows = positionProse.liquityPositionProse({
+    branch,
+    troveId,
+    events,
+    trove,
     dailyColl: obs,
-    live: trove?.status === "open" ? { price: priceToday ?? null } : null,
-  });
-  const model = tl ? timeline.buildFlowModel(tl) : null;
-  const focusEvents = flows.liquityFocusEvents(flowEvents, collSym, debtSym);
-  const owner = trove ? (trove.status === "open" ? trove.owner : trove.lastOwner) : null;
-  const rows = events.map((event, i) => {
-    const previousEvent = i > 0 ? events[i - 1] : undefined;
-    const p = prose.liquityEventProse({
-      ctx: event.context.data,
-      event,
-      previousEvent,
-      currentEvent: event,
-      currentPrice: priceToday,
-      ledger: focusEvents.find((e) => e.id === event.id) ?? null,
-      collDecimals: model ? ledgers.liquityEventDecimals(model, focusEvents, event.id, "collateral") : null,
-      debtDecimals: model ? ledgers.liquityEventDecimals(model, focusEvents, event.id, "debt") : null,
-    });
-    const l3 = model
-      ? {
-          collateral: ledgers.liquityEventLedger(
-            model,
-            focusEvents,
-            event.id,
-            "collateral",
-            prose.DEFAULT_USD_SWITCHES,
-          ),
-          debt: ledgers.liquityEventLedger(model, focusEvents, event.id, "debt", prose.DEFAULT_USD_SWITCHES),
-        }
-      : null;
-    const url = `${SITE}/ethereum/liquity-v2/trove/${branch}/${troveId}/event/${encodeURIComponent(event.id)}`;
-    const c = { troveId, owner, n: i + 1, total: events.length, url, timestamp: event.timestamp };
-    return { event, p, l3, c };
+    priceToday: fixtures.today.prices[branch],
+    now: todayTs,
+    site: SITE,
   });
   return { trove, events, rows, branch, troveId };
 }
@@ -295,9 +224,11 @@ function positionMarkdown(pos, why) {
 
 const coverage = new Map(); // template:variant → examples
 const sentenceSeen = new Map(); // sentence id → count
+const variantCount = new Map(); // template:variant → events
 const consider = (pos) => {
   for (const r of pos.rows) {
     const k = `${r.p.template.id}:${r.p.template.variant}`;
+    variantCount.set(k, (variantCount.get(k) ?? 0) + 1);
     const list = coverage.get(k) ?? [];
     // Keep two: the first seen, then the one with the largest debt moved.
     const ex = {
@@ -315,13 +246,34 @@ const consider = (pos) => {
   }
 };
 
+/** The hash of an event's block as the export prints it (its L5 named, not
+ *  printed): sha256, the first 16 hex. */
+const blockHash = (r) =>
+  createHash("sha256")
+    .update(md.liquityEventMarkdown(r.p, r.c, r.l3, "ref"))
+    .digest("hex")
+    .slice(0, 16);
+
+const manifestFixtures = [];
 for (const f of fixtures.fixtures) {
   const pos = await position(f.branch, f.troveId);
   writeFileSync(resolvePath(CHAIN_DIR, `${f.troveId}.md`), positionMarkdown(pos, f.why));
   writeFileSync(resolvePath(CHAIN_DIR, `${f.troveId}.json`), JSON.stringify(pos.rows.map(sidecar), null, 2) + "\n");
   consider(pos);
+  manifestFixtures.push({
+    branch: f.branch,
+    troveId: f.troveId,
+    events: pos.rows.map((r) => ({
+      id: r.event.id,
+      template: r.p.template.id,
+      variant: r.p.template.variant,
+      version: r.p.template.version,
+      block: blockHash(r),
+    })),
+  });
   console.log(`wrote ${f.branch} ${f.troveId.slice(0, 8)}…: ${pos.rows.length} events`);
 }
+if (args.has("--fixtures-only")) process.exit(0);
 for (const f of fixtures.sweep ?? []) {
   const pos = await position(f.branch, f.troveId);
   consider(pos);
@@ -356,6 +308,50 @@ console.log(
   `coverage: ${variants.length - cov.variants_with_no_example.length}/${variants.length} variants have a live example; none for ${cov.variants_with_no_example.join(", ") || "—"}`,
 );
 
+// ── The manifest ─────────────────────────────────────────────────────────────
+// Fixed key order, one event or variant per line, so a regeneration that
+// changes nothing changes no byte.
+
+{
+  const j = JSON.stringify;
+  const list = (items, indent) =>
+    items.length ? `[\n${items.map((x) => `${indent}  ${x}`).join(",\n")}\n${indent}]` : "[]";
+  const fixtureLines = manifestFixtures.map(
+    (f) =>
+      `{\n      "branch": ${j(f.branch)},\n      "troveId": ${j(f.troveId)},\n      "events": ${list(
+        f.events.map(
+          (e) =>
+            `{ "id": ${j(e.id)}, "template": ${j(e.template)}, "variant": ${j(e.variant)}, "version": ${j(e.version)}, "block": ${j(e.block)} }`,
+        ),
+        "      ",
+      )}\n    }`,
+  );
+  const variantLines = variants.map(
+    (v) =>
+      `{ "template": ${j(v.template)}, "variant": ${j(v.variant)}, "events": ${variantCount.get(`${v.template}:${v.variant}`) ?? 0} }`,
+  );
+  const text = [
+    "{",
+    `  "protocol": "liquity-v2",`,
+    `  "chain": "ethereum",`,
+    `  "today": ${j(fixtures.today.date)},`,
+    `  "strings": ${j(STRINGS)},`,
+    `  "block_hash": "sha256 of the event's block as the export prints it (L5 by reference), first 16 hex",`,
+    `  "fixtures": ${list(fixtureLines, "  ")},`,
+    `  "coverage": {`,
+    `    "troves": ${[...fixtures.fixtures, ...(fixtures.sweep ?? [])].length},`,
+    `    "variants": ${list(variantLines, "    ")},`,
+    `    "variants_with_no_example": ${list(cov.variants_with_no_example.map(j), "    ")},`,
+    `    "sentences_with_no_example": ${list(cov.sentences_with_no_example.map(j), "    ")}`,
+    "  }",
+    "}",
+    "",
+  ].join("\n");
+  JSON.parse(text);
+  writeFileSync(MANIFEST, text);
+  console.log(`wrote ${MANIFEST.slice(ROOT.length + 1)}`);
+}
+
 // ── The catalogue ────────────────────────────────────────────────────────────
 
 function catalogue() {
@@ -368,6 +364,7 @@ function catalogue() {
     L2_WORDS,
     FOOTER_WORDS,
     CONTEXT_WORDS,
+    COPY_WORDS,
     FRAGMENTS,
     L5,
   } = templates;
@@ -380,8 +377,8 @@ function catalogue() {
   const out = [
     "# Liquity V2 event templates",
     "",
-    "Generated from `lib/liquity/event-templates.ts` by `pnpm exports:liquity-v2`; do not edit by hand.",
-    "Send changes as edits to this file: each string keeps its id, and a placeholder keeps its `{name}`.",
+    `A reader's view of \`${STRINGS}\`, written by \`pnpm exports:liquity-v2 --catalogue\`.`,
+    `Edit the strings in \`${STRINGS}\`: each string keeps its id, and a placeholder keeps its \`{name}\`.`,
     "`{name|rounding}` prints a placeholder at another rounding for that sentence alone.",
     'Prices are at the event unless a sentence names "today".',
     "",
@@ -417,6 +414,7 @@ function catalogue() {
     "|---|---|",
     ...Object.entries(CONTEXT_WORDS).map(([k, v]) => `| context.${k} | ${v} |`),
     ...Object.entries(FOOTER_WORDS).map(([k, v]) => `| footer.${k} | ${v} |`),
+    ...Object.entries(COPY_WORDS).map(([k, v]) => `| copy.${k} | ${v} |`),
     "",
     "## Fragments",
     "",

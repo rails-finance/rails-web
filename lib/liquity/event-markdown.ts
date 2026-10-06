@@ -7,6 +7,7 @@
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { contextHeader, footerLine, type LiquityEventContext, type LiquityEventProse } from "@/lib/liquity/event-prose";
 import { ledgerMarkdown, type LiquityEventLedger } from "@/lib/liquity/event-ledgers";
+import { COPY_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 
 export interface LiquityEventLedgers {
   collateral: LiquityEventLedger | null;
@@ -32,7 +33,7 @@ export function learnMoreMarkdown(c: LearnMoreContent): string[] {
     );
   if (c.video) paras.push(`${c.video.description} ${c.video.label}`);
   const out = paras.join("\n\n").split("\n");
-  if (c.links?.length) out.push(`Links: ${c.links.map((l) => l.label).join(" · ")}`);
+  if (c.links?.length) out.push(`${COPY_WORDS.links} ${c.links.map((l) => l.label).join(" · ")}`);
   return out;
 }
 
@@ -50,8 +51,8 @@ export function liquityEventMarkdown(
   const out: string[] = [...contextHeader(p, c), "", `**L1** ${p.L1}`];
   if (p.L2 && p.L2.lines.length) out.push("", "**L2**", ...p.L2.lines.map((l) => `- ${l}`));
   const tables: string[][] = [];
-  if (ledgers?.collateral) tables.push(ledgerMarkdown(ledgers.collateral, "Collateral", c.timestamp));
-  if (ledgers?.debt) tables.push(ledgerMarkdown(ledgers.debt, "Debt", c.timestamp));
+  if (ledgers?.collateral) tables.push(ledgerMarkdown(ledgers.collateral, L2_WORDS.collateral, c.timestamp));
+  if (ledgers?.debt) tables.push(ledgerMarkdown(ledgers.debt, L2_WORDS.debt, c.timestamp));
   if (tables.length) {
     out.push("", "**L3**");
     tables.forEach((t, i) => out.push(...(i > 0 ? ["", ...t] : t)));
@@ -59,7 +60,7 @@ export function liquityEventMarkdown(
   const bullets = [...p.L4, ...p.list];
   if (bullets.length) out.push("", "**L4**", ...bullets.map((s) => `- ${s.text}`));
   if (l5 === "full") out.push("", l5Heading(p.L5.content.title), ...learnMoreMarkdown(p.L5.content));
-  else out.push("", `**L5** ${p.L5.content.title} (below)`);
-  out.push("", `**Footer** ${footerLine(p)}`);
+  else out.push("", `**L5** ${p.L5.content.title} ${COPY_WORDS.below}`);
+  out.push("", `**${COPY_WORDS.footer}** ${footerLine(p)}`);
   return out.join("\n");
 }

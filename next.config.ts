@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 type Redirect = Awaited<ReturnType<NonNullable<NextConfig["redirects"]>>>[number];
@@ -140,6 +141,16 @@ const nextConfig: NextConfig = {
   // framer-motion into each route's own chunks instead of the vendor-chunk split,
   // sidestepping the unwritten-chunk bug. (Drop once on a Next that emits it.)
   transpilePackages: ["framer-motion"],
+  // Content files (content/<protocol>/*.yaml, the strings a prose writer
+  // edits) are parsed at build time into the module's data.
+  webpack(config: { module: { rules: unknown[] } }) {
+    config.module.rules.push({
+      test: /\.yaml$/,
+      type: "javascript/auto",
+      use: [{ loader: path.join(process.cwd(), "scripts/yaml-loader.cjs") }],
+    });
+    return config;
+  },
   async redirects() {
     return [
       // Legacy explorer paths — collapsed to a single hop to the new canonical

@@ -1,8 +1,9 @@
 // The Liquity V2 event prose generator: one event in, its five levels out as
 // data (BRIEF 5 Oct 2026; rails-ops TO-DO-ui-jobs 273). The card's header,
 // opened grid, explanation and "?" modal, the Copy for LLM block, the test
-// exports and the catalogue all read what this returns; the strings come from
-// lib/liquity/event-templates.ts and nowhere else.
+// exports and the JSON route all read what this returns; the strings come from
+// content/liquity-v2/event-prose.yaml (loaded by lib/liquity/event-templates.ts)
+// and nowhere else.
 //
 //   L1  the header line          L4  the explanation's sentences (and list)
 //   L2  the opened card's grid   L5  the "?" modal
@@ -193,7 +194,7 @@ const num = (v: ProseValue): number => (typeof v === "number" ? v : Number(v));
 /** A collateral figure at the ledger's decimals. */
 const collAt = (n: number, dec: number | null) => ledgerFigure(n, dec, fmtColl(n));
 
-/** Each rounding, as ROUNDINGS (event-templates.ts) describes it. */
+/** Each rounding, as the file's `roundings` (ROUNDINGS) describes it. */
 const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEnv) => string> = {
   coll: (v, _n, env) => collAt(num(v), env.collDecimals),
   coll_trim: (v, _n, env) => {
@@ -1172,7 +1173,7 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
       : stateAfter.debt === 0
         ? L2_WORDS.not_applicable
         : `${fig.cr.after.toFixed(2)}%`;
-    lines.push(`Collateral Ratio: ${arrow(crHasChange ? `${fig.cr.before.toFixed(2)}%` : null, crAfter)}`);
+    lines.push(`${L2_WORDS.collateral_ratio}: ${arrow(crHasChange ? `${fig.cr.before.toFixed(2)}%` : null, crAfter)}`);
   }
   if (fig.showGrid) {
     const r = fig.rate;
@@ -1237,10 +1238,10 @@ export function contextHeader(p: LiquityEventProse, c: LiquityEventContext): str
   return [
     fillText(CONTEXT_WORDS.title, { title: p.title, utc: utcStamp(c.timestamp) }),
     fillText(CONTEXT_WORDS.position, {
-      chain: c.chain ?? "Ethereum",
+      chain: c.chain ?? CONTEXT_WORDS.chain_default,
       coll_symbol: String(p.values.coll_symbol),
       trove,
-      owner: c.owner ? short(c.owner) : "unknown",
+      owner: c.owner ? short(c.owner) : CONTEXT_WORDS.owner_unknown,
     }),
     fillText(CONTEXT_WORDS.event, { n: String(c.n), total: String(c.total), tx, url: c.url }),
     fillText(CONTEXT_WORDS.prices, { coll_symbol: String(p.values.coll_symbol) }),

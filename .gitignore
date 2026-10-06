@@ -74,3 +74,7 @@ scripts/redemption-stats.mjs
 # Scratch playwright/SQL probes living beside the verify suite — session tools,
 # never committed (their durable siblings live in scripts/verify/, added by name).
 /scripts/.probe-*
+
+# Rendered exports (scripts/exports-liquity-v2.mjs): written on demand, never
+# committed. The fixture list and manifest that pin them live in scripts/exports/.
+/exports/
