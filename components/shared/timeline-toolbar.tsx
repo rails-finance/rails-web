@@ -277,13 +277,18 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
   { key: "openAllMarketNotes", label: "Open all market notes" },
 ];
 
+/** "Transaction hashes": every family's number pill can show the short hash
+ *  (event-number-pill.tsx, ui-jobs 294), so every preset carries it. */
+export const TX_HASH_ITEM: TimelineDisplayItem = { key: "showTxHashes", label: "Transaction hashes" };
+
 /** Display flags the chain-state timeline exposes: the ones with a render path
  *  on every family's cards (Morpho, MakerDAO, Aave V3 + Spark, the Liquity
- *  forks, Liquity V1). USD and timestamps always show, so Timeline values is
- *  the one item. ChainTruthTimeline appends Collapse-runs
+ *  forks, Liquity V1). USD and timestamps always show, so Timeline values and
+ *  Transaction hashes are the items. ChainTruthTimeline appends Collapse-runs
  *  whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
+  TX_HASH_ITEM,
 ];
 
 /** The Polaris CDP page's display menu: the chain-truth base plus the
@@ -294,6 +299,7 @@ export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
 export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
+  TX_HASH_ITEM,
 ];
 
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of

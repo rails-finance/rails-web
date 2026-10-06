@@ -170,7 +170,6 @@ export function CompoundEventCard({
     <CompoundLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
-        txHashLabel="Transaction"
         iconColumn={iconSlot}
         header={
           <CompoundEventHeader

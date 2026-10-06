@@ -195,7 +195,7 @@ async function eventIds(page) {
 }
 
 // The copy-link control is the event menu's "Copy link to event page" row, the
-// ⋮ at the end of the Explanation's row (ui-jobs 281).
+// ⋮ at the foot of the open Explanation (T6).
 const COPY_LINK = '[data-menu-item="copy-link"]';
 
 async function copyEventLink(page) {
@@ -365,6 +365,10 @@ async function revealFirstCardCopyLink(page) {
     .first()
     .click()
     .catch(() => {});
+  // The ⋮ is in T6, the foot of the open Explanation: open it first.
+  const t3Toggle = firstCard.locator('[data-t3-toggle][aria-expanded="false"]').first();
+  await t3Toggle.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+  if ((await t3Toggle.count()) > 0) await t3Toggle.click().catch(() => {});
   await firstCard
     .locator("[data-event-menu] > button")
     .first()
@@ -506,8 +510,7 @@ async function verifyFamilyOnce(
 
   // ── Check 1: the position page's copy-link ──────────────────────────
   // The copy-link control is a row of the event menu (EventCardMenu), the ⋮
-  // after the transaction hash at the end of the Explanation's row, inside
-  // the card's detail panel. Getting to it needs TWO clicks: open the card,
+  // at the foot of the open Explanation, inside the card's detail panel. Getting to it needs TWO clicks: open the card,
   // then open the menu.
   //
   // Two attempts, each in a fresh context: on a live page the first card can
@@ -1087,10 +1090,15 @@ await verifyLiquityMarkdown(liquityV2Subject);
 /** Liquity V2's raw Markdown per event (ui-jobs 287): `<event page>.md`
  *  answers 200 `text/markdown`, `noindex`, the page as its canonical `Link`,
  *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404.
- *  The event page's actions row (ui-jobs 291) holds View in timeline,
- *  Etherscan, View as Markdown (a new tab, at the route), Copy link and Copy
- *  for LLM; the page and the timeline card draw no ⋮, and each one's number
- *  pill links to the other. For the event the family's checks above read. */
+ *  The event page's actions row (ui-jobs 291, 294) holds View in timeline,
+ *  Etherscan, View as Markdown (a new tab, at the route), Copy link, Copy
+ *  transaction hash and Copy for LLM; the facts table has the Transaction
+ *  row; the page and the timeline card draw no ⋮, and each one's number pill
+ *  links to the other. With Display's "Transaction hashes" on (ui-jobs 294)
+ *  the timeline card's pill reads the short hash, its aria-label the number,
+ *  and the event page's pill still reads the number. Neither the card's nor
+ *  the page's Explanation row carries the hash. For the event the family's
+ *  checks above read. */
 async function verifyLiquityMarkdown(subject) {
   if (!subject) return;
   const name = "liquity-v2";
@@ -1125,7 +1133,10 @@ async function verifyLiquityMarkdown(subject) {
   const COPY_LLM = `${ACTIONS} [data-menu-item="copy-for-llm"]`;
   const COPY_LINK_BTN = `${ACTIONS} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${ACTIONS} [data-menu-item="view-markdown"]`;
-  const WANT = ["view-timeline", "view-explorer", "view-markdown", "copy-link", "copy-for-llm"];
+  const COPY_HASH = `${ACTIONS} [data-menu-item="copy-tx-hash"]`;
+  const WANT = ["view-timeline", "view-explorer", "view-markdown", "copy-link", "copy-tx-hash", "copy-for-llm"];
+  const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
+  const SHORT_HASH = /^0x[0-9a-f]{4}\u2026[0-9a-f]{4}$/i;
   {
     const { ctx, page, errors } = await open(1280, link);
     await page
@@ -1137,7 +1148,7 @@ async function verifyLiquityMarkdown(subject) {
       els.map((e) => e.getAttribute("data-menu-item")),
     );
     check(
-      `${name} event page: the actions row holds the five items in order`,
+      `${name} event page: the actions row holds the six items in order`,
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
@@ -1177,6 +1188,35 @@ async function verifyLiquityMarkdown(subject) {
         .catch(() => null);
     }
     check(`${name} event page: Copy link copies the page's URL`, copiedLink === link, copiedLink ?? "no copy");
+    const copiedHash = await page
+      .click(COPY_HASH, { timeout: 5000 })
+      .then(() => page.waitForSelector(`${COPY_HASH}[data-copied]`, { timeout: 1500 }))
+      .then(() => page.evaluate(() => navigator.clipboard.readText()))
+      .catch(() => null);
+    check(
+      `${name} event page: Copy transaction hash copies the event's hash`,
+      !!copiedHash && /^0x[0-9a-f]{64}$/i.test(copiedHash) && (!TX_ID || copiedHash.toLowerCase() === TX_ID),
+      copiedHash ?? "no copy",
+    );
+    const factHash = await page
+      .locator("[data-event-page-facts] [data-tx-hash]")
+      .first()
+      .evaluate((el) => ({
+        text: el.textContent,
+        title: el.getAttribute("title"),
+        th: el.closest("tr")?.querySelector("th")?.textContent,
+      }))
+      .catch(() => null);
+    check(
+      `${name} event page: the facts table's Transaction row holds the full hash`,
+      !!factHash &&
+        factHash.th === "Transaction" &&
+        /^0x[0-9a-f]{64}$/i.test(factHash.text ?? "") &&
+        factHash.title === factHash.text,
+      JSON.stringify(factHash),
+    );
+    const pageT3Hash = await page.locator('[data-anatomy="T3"] [data-tx-hash]').count();
+    check(`${name} event page: the Explanation row carries no hash`, pageT3Hash === 0, `${pageT3Hash} found`);
     const copied = await page
       .click(COPY_LLM, { timeout: 10000 })
       .then(() => page.waitForSelector(`${COPY_LLM}[data-copied]`, { timeout: 20000 }))
@@ -1206,6 +1246,77 @@ async function verifyLiquityMarkdown(subject) {
     const isOpen = await card.locator('[data-anatomy="T2"]').count();
     check(`${name} timeline card: no event menu (card ${isOpen ? "open" : "closed"})`, menus === 0, `${menus} found`);
     check(`${name} timeline card: no page error`, errors.length === 0, errors.join("; "));
+
+    // Display's "Transaction hashes" (ui-jobs 294): the pill reads the short
+    // hash, the full hash in its title, the number in its aria-label.
+    const pill = card.locator('[data-event-number-link="page"]').first();
+    const number = await pill.getAttribute("data-event-number").catch(() => null);
+    const trigger = page.locator('button[aria-label="Display"][title="Choose what each timeline row shows"]').first();
+    await trigger.click().catch(() => {});
+    const item = page.locator("button.overlay-item", { hasText: /^Transaction hashes$/i }).first();
+    const offered = await item
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    check(`${name} timeline: the Display menu offers Transaction hashes`, offered);
+    if (offered) {
+      const wasOn = (await item.locator(".bg-rb-500").count()) > 0;
+      check(`${name} timeline: Transaction hashes is off by default`, !wasOn);
+      if (!wasOn) await item.click();
+      await trigger.click().catch(() => {});
+      await page.waitForTimeout(300);
+      const read = await pill
+        .evaluate((el) => ({
+          text: el.textContent,
+          title: el.getAttribute("title"),
+          aria: el.getAttribute("aria-label"),
+        }))
+        .catch(() => null);
+      check(
+        `${name} timeline card: with Transaction hashes on, the pill reads the short hash`,
+        !!read && SHORT_HASH.test(read.text ?? ""),
+        JSON.stringify(read),
+      );
+      check(
+        `${name} timeline card: the pill's title is the full hash`,
+        !!read && /^0x[0-9a-f]{64}$/i.test(read.title ?? "") && (!TX_ID || read.title.toLowerCase() === TX_ID),
+        read?.title ?? "",
+      );
+      check(
+        `${name} timeline card: the pill's aria-label keeps the number`,
+        !!read && read.aria === `View event page, event ${number}`,
+        read?.aria ?? "",
+      );
+      const href = await pill.getAttribute("href").catch(() => null);
+      check(`${name} timeline card: the hash pill links to the event page`, href === pagePath, href ?? "none");
+      const t3Hash = await page.locator('[data-anatomy="T3"] [data-tx-hash]').count();
+      check(`${name} timeline: no Explanation row carries a hash`, t3Hash === 0, `${t3Hash} found`);
+    }
+    await ctx.close();
+  }
+  {
+    // The event page's pill reads the number with Transaction hashes on.
+    const { ctx, page } = await open(1280, link);
+    // Runs after `open`'s init script, which rewrites the key on every load.
+    await ctx.addInitScript(() => {
+      try {
+        const k = "timeline-display-v3";
+        const cur = JSON.parse(localStorage.getItem(k) ?? "{}");
+        localStorage.setItem(k, JSON.stringify({ ...cur, showTxHashes: true }));
+      } catch {}
+    });
+    await page.reload(NAV);
+    const pill = page.locator('[data-event-number-link="timeline"]').first();
+    await pill.waitFor({ timeout: 120000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+    const read = await pill
+      .evaluate((el) => ({ text: el.textContent, n: el.getAttribute("data-event-number") }))
+      .catch(() => null);
+    check(
+      `${name} event page: with Transaction hashes on, the pill reads the number`,
+      !!read && read.text === read.n,
+      JSON.stringify(read),
+    );
     await ctx.close();
   }
 }

@@ -196,7 +196,6 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
         explainerLabel="Plain English"
         explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
         txHash={event.txHash}
-        txHashLabel="Transaction"
         learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
         persistKey={`pwn:${event.id}`}
       />

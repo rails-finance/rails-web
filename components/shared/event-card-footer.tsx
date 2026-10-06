@@ -12,7 +12,7 @@ export interface EventCardFooterProps {
 
 /** T6, the foot of the open explanation: the "?" at the bottom right, as C4
  *  sits at the foot of C3 (rails-ops TO-DO-ui-jobs 281), with the event menu
- *  left of it. The transaction hash is on T3's row. */
+ *  left of it. */
 export function EventCardFooter({ extra, menu, learnMore }: EventCardFooterProps) {
   if (extra == null && menu == null && learnMore == null) return null;
   return (

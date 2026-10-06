@@ -5,7 +5,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
-import { TxHashBadge } from "@/components/shared/tx-hash-badge";
+import { EventTxHashContext } from "@/components/shared/event-number-pill";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
@@ -63,11 +63,9 @@ export interface EventCardProps {
   /** How the teaser reads: "bullet" (default) keeps the leading • glyph; "prose"
    *  renders it as a plain lead paragraph with no glyph. */
   explainerTeaserVariant?: "bullet" | "prose";
-  /** Transaction hash: the hash at the right end of T3's row, and the event
-   *  menu. */
+  /** Transaction hash: the event menu, and the header's number pill when
+   *  Display's "Transaction hashes" is on (ui-jobs 294). */
   txHash?: string;
-  /** A word before the hash ("Transaction"). Unset changes nothing. */
-  txHashLabel?: string;
   /** Content before the footer's "?" (a family's gas where it has no price
    *  row in T2). */
   footerExtra?: React.ReactNode;
@@ -129,7 +127,6 @@ export function EventCard({
   explainerTeaser: explainerTeaserProp,
   explainerTeaserVariant = "bullet",
   txHash,
-  txHashLabel,
   footerExtra,
   learnMore,
   hideDetailChevron,
@@ -249,14 +246,13 @@ export function EventCard({
   ) : undefined;
 
   // The (i) row's right end, before its chevron and reachable with the
-  // explanation closed: the card's action, then the transaction hash.
-  const infoActionNode =
-    infoAction || txHash ? (
-      <div className="flex shrink-0 items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
-        {infoAction && <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>}
-        {txHash && <TxHashBadge txHash={txHash} label={txHashLabel} />}
-      </div>
-    ) : undefined;
+  // explanation closed: the card's action. The transaction hash is on the
+  // number pill (Display) and the event page's aside (ui-jobs 294).
+  const infoActionNode = infoAction ? (
+    <div className="flex shrink-0 items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
+      <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>
+    </div>
+  ) : undefined;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   const contentTiers = (
@@ -292,7 +288,9 @@ export function EventCard({
               for the chevron when present — see the `.evt-meta` rules in
               app/globals.css. */}
           <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
-            <div className={`flex-1 min-w-0${showChevron ? "" : " pr-5"}`}>{header}</div>
+            <div className={`flex-1 min-w-0${showChevron ? "" : " pr-5"}`}>
+              <EventTxHashContext.Provider value={txHash ?? null}>{header}</EventTxHashContext.Provider>
+            </div>
             {showChevron && (
               <div
                 className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"

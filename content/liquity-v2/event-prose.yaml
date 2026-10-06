@@ -612,6 +612,10 @@ action_words:
     Copy link
   copy_link_hint: |-
     Copy this page's address
+  copy_hash: |-
+    Copy transaction hash
+  copy_hash_hint: |-
+    Copy the transaction's hash
 
 # ── The event page: the side column beside the card ──
 # The column holds the paragraph, a table of facts the card does not show, and
@@ -643,6 +647,8 @@ page_words:
     {n|count} of {total|count}
   block: |-
     Block
+  transaction: |-
+    Transaction
   copy_trove: |-
     Copy the Trove id
   copied: |-

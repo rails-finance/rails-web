@@ -180,7 +180,6 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
         explainerLabel="Plain English"
         explainerTeaser={mapleExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
-        txHashLabel="Transaction"
         learnMore={<LearnMore inline content={mapleLearnMoreContent(ctx)} />}
         persistKey={`maple:${event.id}`}
       />
