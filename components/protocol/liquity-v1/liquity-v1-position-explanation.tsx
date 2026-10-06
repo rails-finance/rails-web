@@ -416,7 +416,7 @@ export function LiquityV1ClosedEpochExplanation({
   if (redeemed && backFig && surplus && !claimed && surplus.claimable > DUST) {
     bullets.push(
       <span key="claim-how">
-        The owner&apos;s wallet claims the surplus in one transaction, which pays out the whole balance.
+        The owner&apos;s wallet claims it with claimCollateral(), which pays the whole balance.
       </span>,
     );
   }
@@ -433,13 +433,10 @@ export function LiquityV1ClosedEpochExplanation({
       <span key="surplus">
         {surplus.claimed ? (
           <>
-            The{" "}
             <Prov info={surplusClaimableProv(surplus)}>
-              <H>
-                <AmountText value={surplus.surplus} /> ETH
-              </H>
+              <AmountText value={surplus.surplus} /> ETH
             </Prov>{" "}
-            left in the surplus pool was claimed by the owner
+            left over, claimed by the owner
             {surplus.claimed.timestamp != null && <> on {formatDate(surplus.claimed.timestamp)}</>}.
           </>
         ) : (
@@ -449,8 +446,7 @@ export function LiquityV1ClosedEpochExplanation({
                 <AmountText value={surplus.claimable} /> ETH
               </H>
             </Prov>{" "}
-            is still in the surplus pool, waiting for the owner to claim it: the owner&apos;s wallet claims it in one
-            transaction, which pays out the whole balance.
+            left over in the surplus pool, claimable by the owner&apos;s wallet with claimCollateral().
           </>
         )}
       </span>,

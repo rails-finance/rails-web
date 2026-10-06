@@ -149,33 +149,40 @@ export function CollSurplusClaimCard({
       {d.symbol}
     </H>
   );
+  // Brief bullets, figure first (explanation-copy-charter §4).
   const lead = (
     <>
-      The owner claimed {amountEcho} from {pool}: the collateral left over when this Trove was {credit}
-      {d.creditAt != null ? ` on ${formatDate(d.creditAt)}` : ""}.
+      {amountEcho} claimed by the owner from {pool}
     </>
   );
   const rest = [
+    <>
+      Left over when this Trove was {credit}
+      {d.creditAt != null ? ` on ${formatDate(d.creditAt)}` : ""}
+    </>,
     others && d.paid != null ? (
       <>
-        The pool pays out the owner&apos;s whole balance at once, so this claim paid{" "}
         <H>
           <Prov info={claimPaidProv(d, at)} value={fig(d.paid)} echo>
             {fig(d.paid)}
           </Prov>{" "}
           {d.symbol}
         </H>{" "}
-        in all: {amountEcho} for this Trove and{" "}
+        paid in all, the owner&apos;s whole balance in the pool
+      </>
+    ) : d.paid != null ? (
+      <>This Trove&apos;s surplus was the owner&apos;s whole balance in the pool</>
+    ) : null,
+    others ? (
+      <>
         <H>
           <Prov info={claimOthersProv(d, others.value)} value={formatExact(others.value)} echo>
             {fig(others.value)}
           </Prov>{" "}
           {d.symbol}
         </H>{" "}
-        the owner&apos;s other Troves had left there.
+        of it left over from the owner&apos;s other Troves
       </>
-    ) : d.paid != null ? (
-      <>The pool pays out the owner&apos;s whole balance at once; this Trove&apos;s surplus was all of it.</>
     ) : null,
   ].filter((n) => n != null);
 
