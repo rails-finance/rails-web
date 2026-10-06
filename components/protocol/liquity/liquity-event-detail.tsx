@@ -553,7 +553,7 @@ export function LiquityEventDetail({
   // header's change figure — they part only when a redistribution share
   // wedges between them. When they agree to display precision (4dp), the
   // delta ECHOES the header's change receipt so the locator pulse reaches it;
-  // else it keeps its own derived after − before receipt. The Debt cell has
+  // else it keeps its derived after − before receipt. The Debt cell has
   // no toggle (ui-jobs 285).
   const collCp = collChangeProv(ctx, coords);
   const collDeltaEcho =
