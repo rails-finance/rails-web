@@ -202,8 +202,15 @@ async function expandCard(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
-  await clickable.click();
-  await page.waitForTimeout(200);
+  const card = cardFor(page, n);
+  const before = (await card.boundingBox())?.height ?? 0;
+  // A click that lands before React has attached the handler is swallowed, so
+  // click again until the card has grown.
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await clickable.click();
+    await page.waitForTimeout(500);
+    if (((await card.boundingBox())?.height ?? 0) > before + 20) return;
+  }
 }
 
 // Since the event card's ledger cells (4494fc8, 46c1397) a side's total over

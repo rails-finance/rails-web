@@ -3,7 +3,7 @@
 // Scaffold of verify-polaris-equity.mjs. Checks (rails-ops
 // TO-DO-polaris-v2-parity §1.4 and §1.5):
 //
-//   (a) usdp/8's display menu offers exactly the two labels and NOT
+//   (a) usdp/8's display menu offers the two labels and no
 //       "Collapse like events" (no run card: measured, 0 no-change touches).
 //   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
 //       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
@@ -316,7 +316,7 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers exactly the two labels, then the two market-note items, and no collapse item",
+    "a. usdp/8's display menu offers the two labels, then the two market-note items, and no collapse item",
     menu.length === 4 &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
       NOTE_LABELS.every((l, i) => menu[2 + i] === l) &&

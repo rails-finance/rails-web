@@ -194,7 +194,6 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
       // state one figure; otherwise at this block's OSM price.
       ...(ctx.eventType === "frob" && flowPrice != null && inkAfter != null && inkAfter > 1e-9 && collLedger.ledger
         ? {
-            usdAlways: true,
             usd: {
               value: inkAfter * flowPrice,
               prov: flowValueProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: flowPrice }),
@@ -202,7 +201,6 @@ export function MakerDAOEventDetail({ ctx, txHash, blockNumber, eventId }: Maker
           }
         : ctx.eventType === "frob" && price != null && inkAfter != null && inkAfter > 1e-9
           ? {
-              usdAlways: true,
               usd: {
                 value: inkAfter * price,
                 prov: grabSeizedUsdProv(collSym, coords, { amount: fmt(String(inkAfter)), priceUsd: price }),

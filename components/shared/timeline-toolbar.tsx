@@ -280,8 +280,8 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
 /** Display flags the chain-state timeline exposes: the ones with a render path
  *  on every family's cards (Morpho, MakerDAO, Aave V3 + Spark, the Liquity
  *  forks, Liquity V1). USD and timestamps always show, so Timeline values is
- *  the one item. Collapse-runs is NOT listed: ChainTruthTimeline appends it
- *  itself whenever the page passes `runs`. */
+ *  the one item. ChainTruthTimeline appends Collapse-runs
+ *  whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
 ];

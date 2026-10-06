@@ -351,11 +351,6 @@ export interface ChainTruthStat {
      *  3.60%"). Default: none. */
     after?: string;
   };
-  /** Show the USD chip whatever the timeline's USD switches say. */
-  usdAlways?: boolean;
-  /** The token amount the USD chip prices, where `value` is formatted (the
-   *  stablecoin rule reads its price as usd ÷ amount). */
-  usdAmount?: number;
   /** The account side this cell states, where the card offers its ledger
    *  (components/shared/event-ledger.tsx): the cell carries the toggle that
    *  opens it. */
@@ -824,7 +819,7 @@ export function ChainTruthDetail({
           );
         // A ledger cell keeps its tokens' before → after on one line.
         const Tokens = s.ledger ? ClosedTokens : Fragment;
-        const usdOn = s.usd && (s.usdAlways || usdShown(s.usd.value));
+        const usdOn = s.usd && usdShown(s.usd.value);
         return (
           <div key={i} className={s.ledger ? "contents" : "h-full"}>
             {wrap(

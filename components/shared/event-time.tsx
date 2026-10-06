@@ -28,7 +28,7 @@ export const EventDayMarkContext = createContext<ReactNode>(null);
  * lets this render on the server (see formatTimestamp). Nothing on the row
  * says so, because a "UTC" on every row of a 200-row list is noise; the zone
  * is stated in this title, which names the UTC day — the fact most at risk
- * near midnight, where a reader's own zone would put the event on the other
+ * near midnight, where a reader's zone would put the event on the other
  * side of the date.
  */
 export function EventTime({ ts }: { ts: number }) {

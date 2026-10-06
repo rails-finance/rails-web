@@ -350,8 +350,6 @@ export function liquityForkStateStats(
                 },
               }
             : {}),
-          // The Display menu's USD switches govern it (lib/shared/usd-display.ts).
-          usdAmount: Number(ctx.collAfter),
         }
       : {}),
   });
@@ -431,7 +429,6 @@ export function liquityForkStateStats(
     ...(Number(ctx.debtAfter) > 0
       ? {
           usd: { value: Number(ctx.debtAfter), prov: faceUsdProv(debtSymbol, fmt(ctx.debtAfter), "after") },
-          usdAmount: Number(ctx.debtAfter),
           ...(Number(ctx.debtBefore) > 0
             ? {
                 usdBefore: {
