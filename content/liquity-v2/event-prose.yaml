@@ -584,7 +584,8 @@ copy_words:
 
 # ── The event menu: the ⋮ at the right end of the price row ──
 # Each row is a title and the line under it; a copy row's line reads `copied`
-# for a moment after the copy. The last row, Copy for LLM, reads copy_words.
+# for a moment after the copy. Copy for LLM reads copy_words; View as Markdown,
+# after it, opens the text Copy for LLM copies, at the event page's URL with .md.
 menu_words:
   menu: |-
     Event menu
@@ -602,6 +603,10 @@ menu_words:
     Copy link to event page
   copy_link_hint: |-
     Copy the page's address
+  view_markdown: |-
+    View as Markdown
+  view_markdown_hint: |-
+    Open this event as Markdown
 
 # ── The event page: the side column beside the card ──
 # The column holds the paragraph, a table of facts the card does not show, and

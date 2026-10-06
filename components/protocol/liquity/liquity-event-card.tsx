@@ -20,7 +20,7 @@ import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
 import { COPY_WORDS, MENU_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
-import type { EventMenuWords } from "@/components/shared/event-card-menu";
+import { eventMarkdownHref, ViewMarkdownItem, type EventMenuWords } from "@/components/shared/event-card-menu";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -59,6 +59,8 @@ const menuWords: EventMenuWords = {
   view_explorer_hint: MENU_WORDS.view_explorer_hint,
   copy_link: MENU_WORDS.copy_link,
   copy_link_hint: MENU_WORDS.copy_link_hint,
+  view_markdown: MENU_WORDS.view_markdown,
+  view_markdown_hint: MENU_WORDS.view_markdown_hint,
   copied: COPY_WORDS.copied,
 };
 
@@ -322,7 +324,14 @@ export function LiquityEventCard({
         learnMore={<LearnMore inline content={prose.L5.content} />}
         explanationHeading={PAGE_WORDS.explanation_heading}
         menuWords={menuWords}
-        menuExtra={buildMarkdown ? <CopyForLlmItem build={buildMarkdown} /> : undefined}
+        menuExtra={
+          shareHref ? (
+            <>
+              {buildMarkdown && <CopyForLlmItem href={eventMarkdownHref(shareHref)} build={buildMarkdown} />}
+              <ViewMarkdownItem href={eventMarkdownHref(shareHref)} words={menuWords} />
+            </>
+          ) : undefined
+        }
         menuInDetail={priceRow}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}

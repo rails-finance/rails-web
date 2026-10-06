@@ -55,6 +55,7 @@ const NO_PROSE = [
   "lib/liquity/event-markdown.ts",
   "lib/liquity/event-prose-position.ts",
   "lib/liquity/event-page.ts",
+  "lib/liquity/event-page-markdown.ts",
   "components/protocol/liquity/event-prose-render.tsx",
 ];
 
