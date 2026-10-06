@@ -16,8 +16,8 @@
     },
     {
       "branch": "wstETH",
-      "troveId": "68987158102518200846647913975832515106313551880257520999456440979572808474566",
-      "why": "Batched: batch manager rate changes with and without the upfront fee (TO-DO-ui-jobs 239), the header's \"Debt +\" and its split into interest, management fee and upfront fee."
+      "troveId": "95454835085469209577386185673556155573868184376693155701578140993575321892731",
+      "why": "Closed on 2025-06-09 and quiet since: opened into a batch, left it, three redemptions (the last with a \"today\" line), then the owner closed the trove."
     },
     {
       "branch": "WETH",

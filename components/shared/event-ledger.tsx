@@ -228,7 +228,7 @@ export function LedgerCell({
     </button>
   ) : null;
   const nameRow = (
-    <span className="flex min-h-5 shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
+    <span className="flex min-h-5 max-w-full shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
       {side && <SideSwatch side={side} />}
       {label}
     </span>
