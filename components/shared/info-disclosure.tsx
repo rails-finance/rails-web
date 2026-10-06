@@ -288,9 +288,11 @@ export interface InfoTabsDisclosureProps {
 
 /** The row's tones: muted at rest, foreground while either half of the
  *  toggle is hovered or the toggle has keyboard focus, so the (i), the words
- *  and the chevron change as one control. */
+ *  and the chevron change as one control; foreground while the pane is open
+ *  (ui-jobs 289). */
 const ROW_TONE =
   "text-rb-500 duration-200 group-has-[[data-t3-toggle]:hover]/t3row:text-foreground group-has-[[data-t3-toggle]:focus-visible]/t3row:text-foreground";
+const ROW_TONE_OPEN = "text-foreground duration-200";
 
 /**
  * The event card's info affordance: each section heading is its own button —
@@ -317,7 +319,8 @@ export function InfoTabsDisclosure({
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
   const pane = bare ? "" : `mt-1.5 rounded-xl bg-background ${openIndex === 0 ? "rounded-tl-none" : ""}`;
-  const paneBody = bare ? "pb-3 pt-2 text-sm" : "px-3 pb-3 pt-3 text-sm";
+  // A bare pane's first bullet stands a margin below the heading row (ui-jobs 289).
+  const paneBody = bare ? "pb-3 pt-5 text-sm" : "px-3 pb-3 pt-3 text-sm";
   // Escape closes the most recently opened pane and hands focus back to the
   // open section's (i) button (use-escape-close.ts).
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -328,6 +331,7 @@ export function InfoTabsDisclosure({
   );
 
   const first = tabs[0];
+  const tone = first && open?.key === first.key ? ROW_TONE_OPEN : ROW_TONE;
   const toggleFirst = (e: React.MouseEvent) => {
     e.stopPropagation();
     onOpenTabChange(open?.key === first.key ? null : first.key);
@@ -358,14 +362,14 @@ export function InfoTabsDisclosure({
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch rounded-md py-1 text-left"
           >
             <svg
-              className={`h-5 w-5 shrink-0 transition-colors ${ROW_TONE}`}
+              className={`h-5 w-5 shrink-0 transition-colors ${tone}`}
               viewBox="0 0 20 20"
               fill="currentColor"
               aria-hidden="true"
             >
               <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
             </svg>
-            <span className={`truncate text-sm font-semibold transition-colors ${ROW_TONE}`} data-t3-heading="">
+            <span className={`truncate text-sm font-semibold transition-colors ${tone}`} data-t3-heading="">
               {heading}
             </span>
           </button>
@@ -380,7 +384,7 @@ export function InfoTabsDisclosure({
             className="flex cursor-pointer items-center self-stretch py-1 pl-1"
           >
             <svg
-              className={`h-3 w-3 ${ROW_TONE} transition-[color,transform] ${open?.key === first.key ? "rotate-180" : ""}`}
+              className={`h-3 w-3 ${tone} transition-[color,transform] ${open?.key === first.key ? "rotate-180" : ""}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

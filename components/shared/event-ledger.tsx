@@ -71,6 +71,9 @@ type Col = "tokens" | "usd";
 /** The opened cell's column switch: which column shows, and the ledger's
  *  offer of one (its token's name, where it has a USD column). */
 const ColContext = createContext<{ col: Col; offer: (unit: string | null) => void } | null>(null);
+/** False inside a closed cell that opens into a ledger: its USD stands in the
+ *  ledger's column, so the closed line states tokens alone (ui-jobs 289). */
+const ClosedUsdContext = createContext(true);
 
 /** A cell narrower than 28rem (a phone's, a tablet's beside the spine),
  *  where the two number columns take turns. */
@@ -144,8 +147,8 @@ export const LedgerOpenContext = createContext(false);
 
 /** A T2 cell that can open into its side's ledger (anatomy T2.1). Closed, the
  *  cell is one row, the ledger's closing line on its own: the side's swatch
- *  and name, its figures at the right (before → after in tokens, USD after
- *  a thin divider), and the toggle at the first line's right end where the side
+ *  and name, its figures at the right (before → after in tokens; USD after a
+ *  thin divider only where the side has no ledger), and the toggle at the first line's right end where the side
  *  has a ledger. Opened, the first line stays (swatch, name, toggle) and the
  *  ledger's rows stand under it above a rule and the closing line, so the
  *  toggle stays where the pointer pressed it and the cell grows downward. `ledger`, where given, is the cell's ledger
@@ -303,7 +306,9 @@ export function LedgerCell({
           {...line}
         >
           {nameRow}
-          <div className="flex flex-1 flex-col items-end text-right">{children}</div>
+          <div className="flex flex-1 flex-col items-end text-right">
+            <ClosedUsdContext.Provider value={!has}>{children}</ClosedUsdContext.Provider>
+          </div>
         </div>
       ) : (
         <>
@@ -314,7 +319,7 @@ export function LedgerCell({
           >
             {nameRow}
           </div>
-          {children}
+          <ClosedUsdContext.Provider value={!has}>{children}</ClosedUsdContext.Provider>
         </>
       )}
       {toggle}
@@ -331,8 +336,10 @@ export function ClosedTokens({ children }: { children: ReactNode }) {
  *  side's dollars before → after the event (the after alone where no before
  *  is given). In a cell narrower than 36rem (a tablet's or a phone's) tokens
  *  and dollars do not share a line: the dollars take the line under the
- *  tokens, set right, with no divider. */
+ *  tokens, set right, with no divider. A cell that opens into a ledger draws
+ *  none: the ledger's USD column states them (ui-jobs 289). */
 export function ClosedUsd({ before, after }: { before?: ReactNode; after: ReactNode }) {
+  if (!useContext(ClosedUsdContext)) return null;
   return (
     <span
       className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"

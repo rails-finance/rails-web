@@ -214,8 +214,12 @@ try {
     // P3
     const LEDGER = /^- (Collateral|Debt):/;
     const NUM = /[−+]?\$?[\d,]+(?:\.\d+)?%?/g;
+    // The collateral ratio's line has no cell on the card (ui-jobs 289); the
+    // header and the Explanation state the ratio.
+    const RATIO = /^- Collateral ratio:/i;
     const figures = section(copy, "L2")
       .slice(1)
+      .filter((l) => !RATIO.test(l))
       .flatMap((l) =>
         LEDGER.test(l)
           ? (l

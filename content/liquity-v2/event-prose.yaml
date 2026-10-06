@@ -562,6 +562,12 @@ footer_words:
     Gas {gas}
   gas_run: |-
     Gas across {run_count} transactions {gas}
+  gas_unit_usd: |-
+    USD
+  gas_unit_eth: |-
+    ETH
+  gas_press: |-
+    {gas_line}, in {unit}. Press for {next_unit}
   tx: |-
     tx {tx}
   block: |-

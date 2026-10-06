@@ -251,12 +251,32 @@ async function expandCard(page, n) {
   await page.waitForTimeout(200);
 }
 
-// Since the event card's ledger cells (4494fc8, 46c1397) the dollars sit on the
-// closed Collateral and Debt cells: before → after on the cell's one line, the
-// last figure being the side's total after the transaction.
+// Since the event card's ledger cells (4494fc8, 46c1397) a side's total over
+// several assets sits on the closed cell; a cell that opens into a ledger
+// states one asset's dollars on the ledger's closing line (ui-jobs 289).
 const closedUsd = (side) =>
   `[data-ledger-cell="${side}"] [data-ledger-row="closed"] span.prov-locate-box:has-text("$")`;
 const usdChipSel = closedUsd("collateral");
+
+/** The side's dollars after the transaction: the closed cell's figure where
+ *  the cell states one (a side's total over several assets, or a cell with no
+ *  ledger), else the opened ledger's closing line (ui-jobs 289: a cell that
+ *  opens into a ledger states its dollars there). Returns the figure's text,
+ *  and leaves the ledger as it found it. */
+async function sideUsdText(card, side) {
+  const closed = card.locator(closedUsd(side));
+  if (await closed.count()) return (await closed.last().innerText()).trim();
+  const cell = card.locator(`[data-ledger-cell="${side}"]`).first();
+  const toggle = cell.locator("[data-ledger-toggle]");
+  if (!(await toggle.count())) return "";
+  await toggle.click();
+  const usd = cell.locator('[data-ledger-row="total"] [data-ledger-usd]').last();
+  await usd.waitFor({ timeout: 10000 }).catch(() => {});
+  const text = (await usd.count()) ? (await usd.innerText()).trim() : "";
+  await toggle.click();
+  await card.page().waitForTimeout(200);
+  return /\$/.test(text) ? text : "";
+}
 
 /** An Aave V3 Ethereum card reads its balances when it opens (rails-ops
  *  TO-DO-ui-jobs §19), and its USD chips arrive with that answer: wait for it
@@ -338,9 +358,8 @@ async function runProtocol(proto, wallet, cases) {
     const card = cardFor(page, num);
     await positionStateSettled(proto, card);
 
-    const chip = card.locator(usdChipSel).last();
-    check(`${proto}: priced ordinary (#${num}, block ${block}) USD chip renders`, (await chip.count()) > 0);
-    const text = (await chip.count()) > 0 ? (await chip.innerText()).trim() : "";
+    const text = await sideUsdText(card, "collateral");
+    check(`${proto}: priced ordinary (#${num}, block ${block}) USD figure renders`, text !== "");
     if (text) {
       check(
         `${proto}: priced ordinary chip amount ≈ expected`,
@@ -361,8 +380,13 @@ async function runProtocol(proto, wallet, cases) {
       );
     }
 
-    // Receipt: formula + valued operands, no "Untraced input" anywhere.
+    // Receipt: formula + valued operands, no "Untraced input" anywhere. A
+    // figure that stands in the ledger is read with the ledger open.
+    const ledgerToggle = card.locator('[data-ledger-cell="collateral"] [data-ledger-toggle]').first();
+    const inLedger = (await card.locator(usdChipSel).count()) === 0 && (await ledgerToggle.count()) > 0;
+    if (inLedger) await ledgerToggle.click();
     const panelText = text ? await openReceiptFor(page, card, text) : null;
+    if (inLedger) await ledgerToggle.click();
     check(
       `${proto}: USD chip receipt states the total collateral after, valued at the oracle's price at this block`,
       !!panelText &&
@@ -374,15 +398,21 @@ async function runProtocol(proto, wallet, cases) {
     // The Display switches. A side's total is stated in dollars only (the
     // assets add only there), so the Collateral cell's total stays with both
     // switches off; the dollars after a single asset's tokens (the divider
-    // component, `data-ledger-closed-usd`) leave and return.
+    // component, `data-ledger-closed-usd`) stand only in a cell with no ledger
+    // (ui-jobs 289: a ledger's USD column states them), and leave and return.
+    check(
+      `${proto}: a closed cell with a ledger states no USD after its tokens`,
+      (await card.locator("[data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]").count()) === 0,
+    );
     const asset = card.locator("[data-ledger-closed-usd]");
     const assetOn = await asset.count();
+    const totalOn = await card.locator(usdChipSel).count();
     await setDisplayFlag(page, "USD for stablecoins", false);
     await setDisplayFlag(page, "USD for other tokens", false);
     check(
-      `${proto}: asset dollars disappear with both USD switches off; the side's total stays`,
-      (await asset.count()) === 0 && (await card.locator(usdChipSel).count()) > 0,
-      `${assetOn} asset figure(s) with the switches on`,
+      `${proto}: asset dollars disappear with both USD switches off; a side's total stays`,
+      (await asset.count()) === 0 && (await card.locator(usdChipSel).count()) === totalOn,
+      `${assetOn} asset figure(s) and ${totalOn} total(s) with the switches on`,
     );
     await setDisplayFlag(page, "USD for stablecoins", true);
     await setDisplayFlag(page, "USD for other tokens", true);
@@ -398,7 +428,7 @@ async function runProtocol(proto, wallet, cases) {
     await positionStateSettled(proto, card);
 
     const legs = [];
-    for (const side of ["collateral", "debt"]) if ((await card.locator(closedUsd(side)).count()) > 0) legs.push(side);
+    for (const side of ["collateral", "debt"]) if ((await sideUsdText(card, side)) !== "") legs.push(side);
     check(
       `${proto}: liquidation (#${num}, block ${block}) has dollars on BOTH legs' cells`,
       legs.length === 2,

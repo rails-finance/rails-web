@@ -4,11 +4,12 @@ import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { accrualNoun, type BatchFeeAfter, type LiquityAccrual } from "@/lib/liquity/accrual";
 import { fillText, wordsAround, type LiquityEventProse, type LiquityL2 } from "@/lib/liquity/event-prose";
-import { L2_WORDS } from "@/lib/liquity/event-templates";
+import { FOOTER_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
-import { formatRatio, ratioLabel, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
+import { GAS_UNITS, type GasUnit } from "@/lib/shared/preferences";
+import { Fuel } from "lucide-react";
 import {
   TransitionArrow,
   DeltaToggle,
@@ -179,7 +180,9 @@ function DebtMetric({
             )}
             {upfrontFee > 0 && inLedger && <span> · </span>}
             {inLedger && (
-              <span data-debt-accrual-in-ledger="">{fillText(L2_WORDS.accrual_in_ledger, { accrual_noun: noun })}</span>
+              <span className="text-rb-500" data-debt-accrual-in-ledger="">
+                {fillText(L2_WORDS.accrual_in_ledger, { accrual_noun: noun })}
+              </span>
             )}
           </StatSubline>
         )}
@@ -391,73 +394,48 @@ function InterestRateMetric({
   );
 }
 
-function CollateralRatioMetric({
-  before,
-  after,
-  afterDebt,
-  isClose,
-  collateralType,
-  provBefore,
-  provAfter,
-}: {
-  before: number;
-  after: number;
-  afterDebt: number;
-  isClose: boolean;
-  collateralType: string;
-  provBefore?: Provenance;
-  provAfter?: Provenance;
-}) {
-  const { prefs } = usePreferences();
-  const mode = prefs.ratioMode;
-  const crColor = useLiquityRatioColorClass();
-  const hasChange = before !== 0 && before !== after;
-  const changed = before !== after;
-
-  // Delta in the displayed mode's own units (percentage points). CR is linear
-  // so the delta is just after − before; LTV is 1/CR, so we diff the converted
-  // values (`10000/cr`) rather than the raw CR. Disabled on close and when the
-  // after side is N/A (debt fully repaid → no meaningful ratio to diff).
-  const beforeDisp = mode === "ltv" ? 10000 / before : before;
-  const afterDisp = mode === "ltv" ? 10000 / after : after;
-  const ratioDelta = afterDisp - beforeDisp;
-  const ratioDeltaStr = `${ratioDelta >= 0 ? "+" : "−"}${Math.abs(ratioDelta).toFixed(2)}%`;
-  const ratioCanToggle = !isClose && afterDebt !== 0 && isFinite(afterDisp);
-  const deltaProv: Provenance = {
-    kind: "derived",
-    summary: `${ratioLabel(mode)} change at this event, in percentage points — the ratio after minus the ratio before.`,
-    via: "after − before",
-    formula: mode === "ltv" ? "(10000 ÷ after) − (10000 ÷ before)" : "after − before",
-  };
-
+/** The gas the owner paid: a fuel-pump icon and one figure, in USD or ETH. A
+ *  press switches the unit, kept in the preferences so every card follows
+ *  (ui-jobs 289). A cost with no USD figure reads in ETH. */
+export function LiquityGas({ footer }: { footer: LiquityEventProse["footer"] }) {
+  const { prefs, update } = usePreferences();
+  const cost = footer.gasCost;
+  if (!cost) return null;
+  const units = GAS_UNITS.filter((u) => u !== "usd" || cost.usd > 0);
+  const unit: GasUnit = units.includes(prefs.gasUnit) ? prefs.gasUnit : units[0];
+  const next = units[(units.indexOf(unit) + 1) % units.length];
+  const figure = (u: GasUnit) =>
+    u === "usd"
+      ? cost.usd < 0.01
+        ? "< $0.01"
+        : `$${cost.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : `${cost.eth < 0.001 ? cost.eth.toFixed(6) : cost.eth.toFixed(4)} ETH`;
+  const unitWord = (u: GasUnit) => (u === "usd" ? FOOTER_WORDS.gas_unit_usd : FOOTER_WORDS.gas_unit_eth);
+  const gasLine =
+    footer.gasRun != null
+      ? fillText(FOOTER_WORDS.gas_run, { run_count: footer.gasRun, gas: figure(unit) })
+      : fillText(FOOTER_WORDS.gas, { gas: figure(unit) });
+  const label =
+    units.length > 1
+      ? fillText(FOOTER_WORDS.gas_press, { gas_line: gasLine, unit: unitWord(unit), next_unit: unitWord(next) })
+      : gasLine;
   return (
-    <StatCard label={ratioLabel(mode)}>
-      <StateTransition>
-        {hasChange && (
-          <DeltaToggle
-            before={<P info={provBefore}>{formatRatio(before, mode, 2)}</P>}
-            delta={ratioCanToggle ? <P info={deltaProv}>{ratioDeltaStr}</P> : null}
-          />
-        )}
-        {isClose ? (
-          <ClosedLabel text={L2_WORDS.closed} />
-        ) : afterDebt === 0 ? (
-          <span className="text-sm font-semibold text-rb-500">{L2_WORDS.not_applicable}</span>
-        ) : (
-          <P info={provAfter}>
-            <span
-              className={
-                changed
-                  ? `text-sm font-semibold ${crColor(after, collateralType)}`
-                  : "text-sm font-semibold text-rb-500"
-              }
-            >
-              {formatRatio(after, mode, 2)}
-            </span>
-          </P>
-        )}
-      </StateTransition>
-    </StatCard>
+    <button
+      type="button"
+      className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md text-xs tabular-nums text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
+      aria-label={label}
+      title={label}
+      data-gas=""
+      data-gas-unit={unit}
+      onClick={(e) => {
+        e.stopPropagation();
+        update({ gasUnit: next });
+      }}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <Fuel size={14} aria-hidden className="shrink-0" />
+      <span>{figure(unit)}</span>
+    </button>
   );
 }
 
@@ -503,10 +481,8 @@ export function LiquityEventDetail({
   const beforeDebt = l2.debt.before;
   const beforeColl = l2.coll.before;
   const beforeInterestRate = l2.rate.before;
-  const beforeCollRatio = l2.cr.before;
   const afterCollInUsd = l2.coll.afterUsd;
   const beforeCollAtEventUsd = l2.coll.beforeUsd;
-  const afterCollRatio = l2.cr.after;
 
   // ── Provenance ──────────────────────────────────────────────────────────────
   // The AFTER value is what this event records; the BEFORE value is the trove's
@@ -777,33 +753,6 @@ export function LiquityEventDetail({
           ],
         }
       : undefined;
-  const crAfterProv: Provenance = {
-    kind: "chain-derived",
-    summary:
-      "Collateral ratio after this event — the collateral's dollar value divided by the debt, at Liquity's price for this block.",
-    formula: "collateral × price ÷ debt × 100",
-    inputs: [
-      {
-        label: "collateral",
-        value: `${toLocaleStringHelper(stateAfter.coll)} ${collSym}`,
-        kind: "chain",
-        note: "after",
-      },
-      ...priceInput,
-      { label: "debt", value: `${toLocaleStringHelper(stateAfter.debt)} ${debtSym}`, kind: "chain", note: "after" },
-    ],
-  };
-  const crBeforeProv: Provenance = {
-    kind: "chain-derived",
-    summary:
-      "Collateral ratio before this event — the collateral's dollar value divided by the debt before this event, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
-    formula: "collateral × price ÷ debt × 100",
-    inputs: [
-      { label: "collateral", value: `${toLocaleStringHelper(beforeColl)} ${collSym}`, kind: "chain", note: "before" },
-      ...priceInput,
-      { label: "debt", value: `${toLocaleStringHelper(beforeDebt)} ${debtSym}`, kind: "chain", note: "before" },
-    ],
-  };
   const accrualProv: Provenance =
     accrual.source === "ledger"
       ? {
@@ -881,7 +830,10 @@ export function LiquityEventDetail({
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
+            // Collateral, Debt and the Interest Rate each take the full width
+            // (ui-jobs 289: no Collateral Ratio cell; the ratio stands in the
+            // header and the explanation).
+            <div className="grid grid-cols-1 gap-2.5">
               <CollateralMetric
                 collateralType={ctx.collateralType}
                 before={beforeColl}
@@ -904,15 +856,6 @@ export function LiquityEventDetail({
                 provBefore={debtBeforeProv}
                 provAfter={debtAfterProv}
                 feeProv={feeP}
-              />
-              <CollateralRatioMetric
-                before={beforeCollRatio}
-                after={afterCollRatio}
-                afterDebt={stateAfter.debt}
-                isClose={isClose}
-                collateralType={ctx.collateralType}
-                provBefore={crBeforeProv}
-                provAfter={crAfterProv}
               />
               <InterestRateMetric
                 before={beforeInterestRate}
@@ -961,11 +904,7 @@ export function LiquityEventDetail({
           interest-rate events, so no standalone "Batched" badge here.) */}
       {collPrice > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
-          {prose.footer.gas && (
-            <span className="text-xs text-rb-500" data-gas="">
-              {prose.footer.gas}
-            </span>
-          )}
+          <LiquityGas footer={prose.footer} />
           {l2.redemption &&
             (() => {
               // P/L reconciles with the header's Cleared / Took: debt cleared

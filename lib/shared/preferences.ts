@@ -2,6 +2,10 @@
 
 export type Theme = "dark" | "light";
 export type RatioMode = "cr" | "ltv";
+/** The unit an event card's gas figure reads in; a press on the figure
+ *  switches it (ui-jobs 289). */
+export const GAS_UNITS = ["usd", "eth"] as const;
+export type GasUnit = (typeof GAS_UNITS)[number];
 
 /** Liquity V2 collateral branches. Each branch has its own MCR (110% on WETH,
  *  120% on wstETH/rETH) so the user-editable risk thresholds need their own
@@ -42,6 +46,7 @@ export interface UserPreferences {
   expandedEvents: string[]; // txHash list, FIFO capped at MAX_EXPANDED
   theme: Theme;
   ratioMode: RatioMode; // Display collateral health as Collateral Ratio (CR) or Loan-to-Value (LTV)
+  gasUnit: GasUnit; // The unit an event card's gas figure reads in
   hideClosedPositions: boolean; // Hide closed/liquidated positions from selectors and the protocol nav
   priceStripMinimized: boolean; // Collapse the floating price strip to a small icon
   liquityV2: LiquityV2Preferences; // Per-branch risk thresholds
@@ -75,6 +80,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   expandedEvents: [],
   theme: "dark",
   ratioMode: "cr",
+  gasUnit: "usd",
   hideClosedPositions: false,
   priceStripMinimized: false,
   liquityV2: DEFAULT_LIQUITY_V2_PREFERENCES,
@@ -132,6 +138,7 @@ export function loadPreferences(): UserPreferences {
     return {
       ...DEFAULT_PREFERENCES,
       ...parsed,
+      gasUnit: GAS_UNITS.includes(parsed.gasUnit) ? parsed.gasUnit : DEFAULT_PREFERENCES.gasUnit,
       liquityV2: normaliseLiquityV2(parsed.liquityV2),
       aaveV4: normaliseAaveV4(parsed.aaveV4),
     };

@@ -138,7 +138,15 @@ export interface LiquityEventProse {
   /** A liquidation's payout legs, under the bullets. */
   list: ProseSentence[];
   L5: { key: L5Key; content: LearnMoreContent };
-  footer: { gas: string | null; tx: string; block: number };
+  footer: {
+    gas: string | null;
+    /** The gas the owner paid, for the card's gas figure (ui-jobs 289). */
+    gasCost: { eth: number; usd: number } | null;
+    /** The no-change run's transaction count where the gas covers a run. */
+    gasRun: number | null;
+    tx: string;
+    block: number;
+  };
   values: Record<string, ProseValue>;
 }
 
@@ -1050,12 +1058,12 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   }
 
   const { L4, list } = sp.out();
-  const gas =
-    event.gas && event.gas.gasCostEth > 0 && !PASSIVE.has(ctx.operation)
-      ? ctx.noChangeRun
-        ? fillText(FOOTER_WORDS.gas_run, { run_count: ctx.noChangeRun.count, gas: formatGasCost(event.gas) })
-        : fillText(FOOTER_WORDS.gas, { gas: formatGasCost(event.gas) })
-      : null;
+  const paid = event.gas && event.gas.gasCostEth > 0 && !PASSIVE.has(ctx.operation) ? event.gas : null;
+  const gas = paid
+    ? ctx.noChangeRun
+      ? fillText(FOOTER_WORDS.gas_run, { run_count: ctx.noChangeRun.count, gas: formatGasCost(paid) })
+      : fillText(FOOTER_WORDS.gas, { gas: formatGasCost(paid) })
+    : null;
 
   return {
     template: { id: t.id, variant, version: templateVersion(t) },
@@ -1065,7 +1073,13 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     L4,
     list,
     L5: { key: t.L5, content: l5For(t.L5, ctx) },
-    footer: { gas, tx: event.txHash, block: event.blockNumber },
+    footer: {
+      gas,
+      gasCost: paid ? { eth: paid.gasCostEth, usd: paid.gasCostUsd } : null,
+      gasRun: ctx.noChangeRun?.count ?? null,
+      tx: event.txHash,
+      block: event.blockNumber,
+    },
     values,
   };
 }

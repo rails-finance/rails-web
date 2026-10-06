@@ -364,12 +364,18 @@ export function EventCard({
           {(hasExplainer || txHash) && (
             <div className="px-4 pb-3 pt-1">
               {/* The event page: the explanation stands open with no panel,
-                  under a hairline and the (i) with its heading words. */}
+                  under a hairline and the (i) with its heading words, in the
+                  foreground as the timeline's row is while open (ui-jobs 289). */}
               {pageMode && infoTabs.length > 0 ? (
                 <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
                   <div className="flex items-center gap-2">
-                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-rb-500" data-t3-heading="">
-                      <svg className="h-5 w-5 text-rb-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
+                      <svg
+                        className="h-5 w-5 text-foreground"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
                         <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
                       </svg>
                       {explanationHeading}
@@ -377,7 +383,7 @@ export function EventCard({
                     <div className="ml-auto">{infoActionNode}</div>
                   </div>
                   {infoTabs.map((t) => (
-                    <div key={t.key} className="pb-3 pt-2 text-sm">
+                    <div key={t.key} className="pb-3 pt-5 text-sm">
                       {t.content}
                     </div>
                   ))}

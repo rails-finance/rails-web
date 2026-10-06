@@ -8,7 +8,7 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
-import { LiquityEventDetail } from "./liquity-event-detail";
+import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { CopyForLlmItem, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -286,8 +286,7 @@ export function LiquityEventCard({
   // and the event menu stand in T2's price row (LiquityEventDetail); a card
   // that draws no price row keeps both in the footer.
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
-  const footerExtra =
-    prose.footer.gas && !priceRow ? <span className="text-xs text-rb-500">{prose.footer.gas}</span> : undefined;
+  const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
 
   const card = (
     <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>

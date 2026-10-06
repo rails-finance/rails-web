@@ -640,20 +640,26 @@ for (const fx of FIXTURES) {
     );
 
     if (fx.deep) {
-      // The closed cells' dollars (a side holding one reserve) follow
-      // Display's two USD switches.
-      const chipSel = '[data-position-state="ready"] [data-ledger-closed-usd]';
+      // A closed cell that opens into a ledger states no dollars after its
+      // tokens: the ledger's USD column does (ui-jobs 289). A cell with no
+      // ledger keeps them, and they follow Display's two USD switches.
+      const ledgerUsdSel =
+        '[data-position-state="ready"] [data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]';
+      const chipSel =
+        '[data-position-state="ready"] [data-ledger-cell]:not(:has([data-ledger-toggle])) [data-ledger-closed-usd]';
       await setDisplayFlag(page, "USD for stablecoins", true);
       await setDisplayFlag(page, "USD for other tokens", true);
       check(
-        `${fx.label}: USD shows in the closed cells with both USD switches on`,
-        (await card.locator(chipSel).count()) > 0,
+        `${fx.label}: a closed cell with a ledger states no USD after its tokens`,
+        (await card.locator(ledgerUsdSel).count()) === 0,
       );
-      await setDisplayFlag(page, "USD for stablecoins", false);
-      await setDisplayFlag(page, "USD for other tokens", false);
-      check(`${fx.label}: USD leaves when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
-      await setDisplayFlag(page, "USD for stablecoins", true);
-      await setDisplayFlag(page, "USD for other tokens", true);
+      if ((await card.locator(chipSel).count()) > 0) {
+        await setDisplayFlag(page, "USD for stablecoins", false);
+        await setDisplayFlag(page, "USD for other tokens", false);
+        check(`${fx.label}: USD leaves when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
+        await setDisplayFlag(page, "USD for stablecoins", true);
+        await setDisplayFlag(page, "USD for other tokens", true);
+      }
       if (a) {
         const hfReceipt = await receiptText(
           page,
