@@ -1,15 +1,14 @@
 "use client";
 
 // The Liquity V2 event page's client half (rails-ops TO-DO-ui-jobs 236): the
-// sub-nav the trove page has, a header with the position's summary, the
-// previous and next events and "See in timeline", then the event's card
-// opened at full width. The card is the timeline's `LiquityEventCard`, fed
-// the replay the trove page feeds it (lib/liquity/event-prose-position.ts is
-// the same path for the exports), so its levels and Copy for LLM are the
-// timeline's. No Lifetime flows panel, no timeline.
+// sub-nav the trove page has, then the event's card in its page mode (the
+// previous and next events and "See in timeline" in its header) with a
+// paragraph in the spine's column (lib/liquity/event-page.ts). The card is
+// the timeline's `LiquityEventCard`, fed the replay the trove page feeds it
+// (lib/liquity/event-prose-position.ts is the same path for the exports), so
+// its levels and Copy for LLM are the timeline's.
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TroveSummary } from "@/types/api/trove";
 import type { OraclePricesData } from "@/types/api/oracle";
@@ -19,13 +18,10 @@ import { FlowFocusContext, useFlowFocusRoot, useFlowFocusValue } from "@/compone
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useWalletContext } from "@/components/nav/wallet-context";
-import { liquityTroveHistory } from "@/lib/liquity/event-prose-position";
+import { eventPageParagraph, eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
-import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
-import { liveFromTroveState, viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
-import type { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -34,7 +30,6 @@ import { EventNotFoundNotice } from "@/components/shared/chain-truth-timeline";
 import { EventDateContext } from "@/components/shared/event-time";
 import { EventShareProvider } from "@/components/shared/event-share-context";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
-import { setCardOpen } from "@/lib/shared/card-open-store";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
@@ -52,8 +47,6 @@ export interface EventViewProps {
   prices: OraclePricesData | null;
 }
 
-const BURN = "0x0000000000000000000000000000000000000000";
-
 export default function EventView({
   collateralType,
   troveId,
@@ -67,8 +60,8 @@ export default function EventView({
   const trovePath = `/ethereum/liquity-v2/trove/${collateralType}/${troveId}`;
   const eventPath = (id: string) => `${trovePath}/event/${encodeURIComponent(id)}`;
 
-  // A closed Trove's owner is the burn address; the wallet is `lastOwner`.
-  const owner = trove?.owner && trove.owner.toLowerCase() !== BURN ? trove.owner : trove?.lastOwner;
+  const holder = troveHolder(trove);
+  const owner = holder.address ?? undefined;
   const { setWallets } = useWalletContext();
   useEffect(() => {
     if (!owner) return;
@@ -76,18 +69,8 @@ export default function EventView({
     setWallets([lower], { [lower]: trove?.ownerEns ?? null });
   }, [owner, trove?.ownerEns, setWallets]);
 
-  // The trove page's order: block, time, log index, then a stable sort by
-  // time (useTimelineEvents), which numbers the events.
-  const liquityEvents = useMemo(
-    () => liquityTroveHistory(events ?? []).sort((a, b) => a.timestamp - b.timestamp),
-    [events],
-  );
-  const at = liquityEvents.findIndex((e) => e.id === eventId);
-  const event = at >= 0 ? liquityEvents[at] : undefined;
-  const previous = at > 0 ? liquityEvents[at - 1] : undefined;
-  const next = at >= 0 && at + 1 < liquityEvents.length ? liquityEvents[at + 1] : undefined;
-  const total = totalEvents ?? liquityEvents.length;
-  const offset = totalEvents != null ? Math.max(0, totalEvents - liquityEvents.length) : 0;
+  const place = useMemo(() => eventPagePlace(events ?? [], eventId, totalEvents), [events, eventId, totalEvents]);
+  const { events: liquityEvents, event, previous, next, n, total } = place;
 
   // A liquidated Trove's surplus, read at the head as the trove page reads it:
   // the liquidation's prose and the replay's surplus line take it.
@@ -139,22 +122,6 @@ export default function EventView({
   const flowFocus = useFlowFocusValue(useFlowFocusRoot(focusEvents), flowTimeline);
   const troveMeta = useMemo(() => ({ owner: owner ?? null, total }), [owner, total]);
 
-  // The header's figures are the trove card's: an open Trove's debt and
-  // collateral at the head (the trove page's one chain read), the index's
-  // otherwise.
-  const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
-  useEffect(() => {
-    if (!open) return;
-    const ac = new AbortController();
-    fetch(`/api/trove/state/${collateralType}/${troveId}`, { signal: ac.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<TroveStateResponse>) : null))
-      .then((res) => {
-        if (res?.success && res.data) setLiveState(res.data);
-      })
-      .catch(() => {});
-    return () => ac.abort();
-  }, [open, collateralType, troveId]);
-
   if (!trove || !events) {
     return (
       <div className="py-8">
@@ -205,11 +172,20 @@ export default function EventView({
       })
     : undefined;
 
-  // Opened on its first mount: written during render, before the card's
-  // mount effect reads it (the timeline's pinned mode does the same).
-  if (event) setCardOpen(`liquity-v2:${event.id}`, true);
+  const timelineHref = `${trovePath}?at=${encodeURIComponent(eventId)}`;
+  const paragraph = event
+    ? eventPageParagraph({
+        collSymbol: trove.collateralType,
+        troveId,
+        owner: holder.address,
+        ownerEns: trove.ownerEns ?? null,
+        lastOwner: holder.last,
+        n,
+        total,
+        timestamp: event.timestamp,
+      })
+    : null;
 
-  const navLink = "text-blue-600 hover:underline dark:text-blue-400";
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -232,37 +208,6 @@ export default function EventView({
           tools={false}
         />
 
-        <header className="space-y-3" data-event-page-header="">
-          <LiquityPositionCard
-            protocol="liquity-v2"
-            v={viewFromTroveSummary(trove, prices)}
-            live={liveFromTroveState(trove, liveState, prices)}
-            receipts
-            showActivityMeta="counts"
-          />
-          <nav className="flex flex-wrap items-center justify-between gap-3 text-sm" aria-label="Events">
-            <span className="flex items-center gap-4">
-              {previous ? (
-                <Link href={eventPath(previous.id)} className={navLink} data-event-prev="">
-                  &larr; Previous event
-                </Link>
-              ) : (
-                <span className="text-rb-500">First event</span>
-              )}
-              {next ? (
-                <Link href={eventPath(next.id)} className={navLink} data-event-next="">
-                  Next event &rarr;
-                </Link>
-              ) : (
-                <span className="text-rb-500">Latest event</span>
-              )}
-            </span>
-            <a href={`${trovePath}?at=${encodeURIComponent(eventId)}`} className={navLink} data-event-in-timeline="">
-              See in timeline &rarr;
-            </a>
-          </nav>
-        </header>
-
         {event ? (
           <CollSurplusCtx.Provider value={surplusState}>
             <LiquityTroveMetaContext.Provider value={troveMeta}>
@@ -276,8 +221,24 @@ export default function EventView({
                         isFirst
                         isLast
                         previousEvent={previous}
-                        eventNumber={offset + at + 1}
+                        eventNumber={n}
                         currentPrice={currentPrice}
+                        page={{
+                          previousHref: previous ? eventPath(previous.id) : null,
+                          nextHref: next ? eventPath(next.id) : null,
+                          timelineHref,
+                          aside: paragraph && (
+                            <p
+                              className="pb-4 pt-3 text-sm leading-relaxed text-rb-500 sm:pb-0 sm:pr-6"
+                              data-event-page-paragraph=""
+                            >
+                              {paragraph.text}{" "}
+                              <a href={timelineHref} className="text-blue-600 hover:underline dark:text-blue-400">
+                                {paragraph.link}
+                              </a>
+                            </p>
+                          ),
+                        }}
                       />
                     </UnreadTokensProvider>
                   </div>

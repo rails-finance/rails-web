@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { loadTroveHistory, loadTroveTail } from "@/lib/liquity/trove-page-data";
+import { loadTroveHistory } from "@/lib/liquity/trove-page-data";
+import { eventPageParagraph, eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { truncateTroveId } from "@/lib/liquity/share-card";
 import EventView from "./event-view";
 
@@ -16,28 +17,43 @@ export const dynamic = "force-dynamic";
 
 // NOT reused from the parent (`../../page`'s own `generateMetadata`) — this
 // segment names the EVENT, which the parent's metadata knows nothing about.
-// `loadTroveTail` is the same `cache()`-wrapped read the page body and the
-// opengraph-image call, so finding the event here costs no second backend
-// round trip within one request.
+// `loadTroveHistory` is the same `cache()`-wrapped read the page body makes,
+// so finding the event here costs no second backend round trip within one
+// request. The description is the paragraph beside the card.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
   const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
   const decoded = decodeEventId(eventId);
-  const tail = await loadTroveTail(collateralType, troveId);
-  const event = tail.events?.find((e) => e.id === decoded) ?? null;
+  const history = await loadTroveHistory(collateralType, troveId);
+  const event = history.events?.find((e) => e.id === decoded) ?? null;
+  const place = eventPagePlace(history.events ?? [], decoded, history.hasMore ? history.totalEvents : null);
+  const holder = troveHolder(history.trove);
+  const paragraph =
+    place.event && history.trove
+      ? eventPageParagraph({
+          collSymbol: history.trove.collateralType,
+          troveId,
+          owner: holder.address,
+          ownerEns: history.trove.ownerEns ?? null,
+          lastOwner: holder.last,
+          n: place.n,
+          total: place.total,
+          timestamp: place.event.timestamp,
+        })
+      : null;
   return eventMetadata({
     session: "liquity-v2",
     subject: truncateTroveId(troveId),
     market: `${collateralDisplay}/BOLD`,
     canonicalPath: `/ethereum/liquity-v2/trove/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    description: paragraph ? `${paragraph.text} ${paragraph.link}` : undefined,
   });
 }
 
-// The event page (rails-ops TO-DO-ui-jobs 236): the position's summary, the
-// previous and next events, and this event's card opened. The card's ledgers
-// replay the Trove's history, so the read is the history; the page draws one
-// event of it.
+// The event page (rails-ops TO-DO-ui-jobs 236): this event's card in its page
+// mode and the paragraph beside it. The card's ledgers replay the Trove's
+// history, so the read is the history; the page draws one event of it.
 export default async function LiquityV2EventPage({ params }: Props) {
   const { collateralType, troveId, eventId } = await params;
   const history = await loadTroveHistory(collateralType, troveId);

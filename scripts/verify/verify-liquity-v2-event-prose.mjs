@@ -20,7 +20,7 @@
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
 //       opened card, in order.
 //   P4  L1 ON THE PAGE — the L1 line's words and figures are on the event's
-//       row (the header and the spine).
+//       row (the header and the spine; on the event page, the header).
 //
 // Samples: the brief's #17 (redemption) and #18 (withdraw) on trove
 // 102247…0154, each other fixture's last event, and the first event printed
@@ -187,6 +187,10 @@ try {
     check(`${label}: its L5 = the export's L5 for "${title}"`, title !== "" && appendix.includes(l5), l5.slice(0, 120));
 
     // P2
+    // The event page opens the Collateral and Debt ledgers (ui-jobs 236); a
+    // closed cell is its closing line, the figures L2 states.
+    const openLedger = page.locator('[data-ledger-toggle][aria-expanded="true"]');
+    for (let i = await openLedger.count(); i > 0; i--) await openLedger.first().click();
     const t2 = await card.innerText();
     const bullets = section(copy, "L4")
       .slice(1)
@@ -205,7 +209,8 @@ try {
     const missing2 = inOrder(t2, figures);
     check(`${label}: L2's figures are on the card (${figures.length})`, !missing2, missing2 ?? "");
 
-    // P4: the row (spine and header), with the timeline values on.
+    // P4: the row (spine and header; the event page's header states the
+    // spine's values), with the timeline values on.
     const row = page.locator('[data-skel-section="detail-event"]').first();
     const rowText = norm((await row.innerText()).replace(/\n/g, " "));
     const l1 = /\*\*L1\*\* (.*)/.exec(copy)?.[1] ?? "";

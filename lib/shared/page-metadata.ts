@@ -311,15 +311,20 @@ export function eventMetadata(opts: {
    *  there is nothing an image route could read without running the page's own
    *  log sweeps — see `lib/vaults/event-share-card.ts`. */
   image?: "dynamic" | "explorer";
+  /** The page's own description of the event, in place of the generic one
+   *  (the Liquity V2 event page's paragraph). */
+  description?: string;
 }): Metadata {
   const entry = protocolForSession(opts.session);
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
   const base = [label, opts.market, noun, shortSubject(opts.subject)].filter(Boolean).join(" ");
   const title = opts.event ? `${base} · ${opts.event.actionLabel}` : base;
-  const description = opts.event
-    ? `One on-chain event from this ${label} ${noun.toLowerCase()}, replayed by Rails: ${opts.event.actionLabel} on ${formatEventStamp(opts.event.timestamp)}, with a receipt on every number.`
-    : `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's own on-chain events, with a receipt on every number.`;
+  const description = opts.description
+    ? opts.description
+    : opts.event
+      ? `One on-chain event from this ${label} ${noun.toLowerCase()}, replayed by Rails: ${opts.event.actionLabel} on ${formatEventStamp(opts.event.timestamp)}, with a receipt on every number.`
+      : `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's own on-chain events, with a receipt on every number.`;
   return {
     title,
     description,

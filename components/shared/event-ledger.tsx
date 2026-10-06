@@ -138,6 +138,10 @@ export function T2Skeleton({ stats = [], data }: { stats?: string[]; data?: Reco
   );
 }
 
+/** Whether a ledger cell starts open: the event page's card opens its
+ *  Collateral and Debt ledgers (rails-ops TO-DO-ui-jobs 236). */
+export const LedgerOpenContext = createContext(false);
+
 /** A T2 cell that can open into its side's ledger (anatomy T2.1). Closed, the
  *  cell is one row, the ledger's closing line on its own: the side's swatch
  *  and name, its figures at the right (before → after in tokens, USD after
@@ -173,7 +177,8 @@ export function LedgerCell({
 }) {
   const src = useContext(EventLedgerContext);
   const has = ledger !== undefined ? ledger != null : side != null && !!src?.has(side);
-  const [open, setOpen] = useState(false);
+  const openFirst = useContext(LedgerOpenContext);
+  const [open, setOpen] = useState(openFirst);
   const [col, setCol] = useState<Col>("tokens");
   const [unit, setUnit] = useState<string | null>(null);
   const id = useId();

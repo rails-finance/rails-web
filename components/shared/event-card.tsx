@@ -89,6 +89,10 @@ export interface EventCardProps {
   /** A control at the right of the open card's (i) row (the Aave and
    *  Liquity families' calculator). */
   infoAction?: React.ReactNode;
+  /** The event page's card (rails-ops TO-DO-ui-jobs 236): what stands in the
+   *  spine's column, beside the card from 640px and above it below. Set with
+   *  `hideDetailChevron` and `detailOpen`; unset, the card is the timeline's. */
+  pageAside?: React.ReactNode;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -118,6 +122,7 @@ export function EventCard({
   muted,
   caption,
   infoAction,
+  pageAside,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -388,7 +393,7 @@ export function EventCard({
           the first event card stands for the spine's row height. */}
       <div
         data-skel-section="detail-event"
-        className={`flex w-full items-start relative ${scale.cardRounded}${
+        className={`flex w-full ${pageAside != null ? "flex-col sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
           muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
         }`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
@@ -396,10 +401,17 @@ export function EventCard({
         {showAvatar && avatar}
         {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
             header there). Matches the sm breakpoint the card's own detail grid uses,
-            so the spine and the card body reflow together. */}
-        <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
-          {iconColumn}
-        </div>
+            so the spine and the card body reflow together. On the event page the
+            column holds `pageAside`, stacked above the card below sm. */}
+        {pageAside != null ? (
+          <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
+            {pageAside}
+          </div>
+        ) : (
+          <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
+            {iconColumn}
+          </div>
+        )}
         {contentTiers}
       </div>
     </ProvReceiptsScope>

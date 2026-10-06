@@ -8,16 +8,17 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
-import { L1_WORDS } from "@/lib/liquity/event-templates";
+import { L1_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabelShort, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, GitCommitVertical } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { formatDate } from "@/lib/date";
-import { formatUsd } from "@/lib/shared/format-event";
+import { formatTimestamp, formatUsd, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   collChangeProv,
   debtChangeProv,
@@ -94,9 +95,74 @@ export interface LiquityEventHeaderProps {
    * Stable regardless of asc/desc display order — event #1 is always the
    * trove's openTrove. */
   eventNumber?: number;
+  /** The event page's card (rails-ops TO-DO-ui-jobs 236): the time slot
+   *  states the date, the time and the number whatever the Display menu says,
+   *  with the neighbouring events' links either side of the number (null at
+   *  the first or last event) and a link to the card in the timeline. */
+  page?: EventPageNav;
 }
 
-export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventNumber }: LiquityEventHeaderProps) {
+export interface EventPageNav {
+  previousHref: string | null;
+  nextHref: string | null;
+  timelineHref: string;
+}
+
+const PAGE_ICON =
+  "-my-2 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-rb-500 transition-colors focus-ring sm:-my-1 sm:size-6";
+const PAGE_ICON_LIVE = "cursor-pointer hover:bg-rb-100 hover:text-foreground dark:hover:bg-rb-800";
+
+/** A previous or next event control: a link, or a disabled one at the end. */
+function PageStep({ href, label, next }: { href: string | null; label: string; next?: boolean }) {
+  const icon = next ? <ChevronRight size={12} aria-hidden /> : <ChevronLeft size={12} aria-hidden />;
+  const data = next ? { "data-event-next": "" } : { "data-event-prev": "" };
+  return href ? (
+    <Link href={href} aria-label={label} title={label} className={`${PAGE_ICON} ${PAGE_ICON_LIVE}`} {...data}>
+      {icon}
+    </Link>
+  ) : (
+    <span role="link" aria-label={label} aria-disabled="true" className={`${PAGE_ICON} opacity-40`} {...data}>
+      {icon}
+    </span>
+  );
+}
+
+/** The event page's time slot: "See in timeline", the date and time, and the
+ *  number between its neighbours. */
+function PageMeta({ page, timestamp, counter }: { page: EventPageNav; timestamp: number; counter: ReactNode }) {
+  const time = formatTimestamp(timestamp);
+  return (
+    <span className="inline-flex items-center gap-1" data-event-page-meta="">
+      <a
+        href={page.timelineHref}
+        aria-label={PAGE_WORDS.in_timeline}
+        title={PAGE_WORDS.in_timeline}
+        className={`${PAGE_ICON} ${PAGE_ICON_LIVE}`}
+        data-event-in-timeline=""
+      >
+        <GitCommitVertical size={14} aria-hidden />
+      </a>
+      <span className="text-xs">
+        {shortDate(timestamp)} {shortDateYear(timestamp)}
+      </span>
+      <span className="text-xs text-rb-500" title={`${formatDate(timestamp)} ${time} UTC`}>
+        {time}
+      </span>
+      <PageStep href={page.previousHref} label={PAGE_WORDS.previous} />
+      {counter}
+      <PageStep href={page.nextHref} label={PAGE_WORDS.next} next />
+    </span>
+  );
+}
+
+export function LiquityEventHeader({
+  ctx,
+  timestamp,
+  txHash,
+  blockNumber,
+  eventNumber,
+  page,
+}: LiquityEventHeaderProps) {
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
@@ -118,7 +184,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
   ) : null;
 
   const counter =
-    eventNumber != null && showEventNumbers ? (
+    eventNumber != null && (showEventNumbers || page) ? (
       <span
         className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] bg-sunken text-rb-500"
         aria-label={`Event ${eventNumber}`}
@@ -140,12 +206,18 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
         )}
         <span className="ml-auto inline-flex items-center gap-2">
           {groupChip}
-          {showTimestamps && (
-            <span className="text-xs ">
-              {new Date(timestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC" })}
-            </span>
+          {page ? (
+            <PageMeta page={page} timestamp={timestamp} counter={counter} />
+          ) : (
+            <>
+              {showTimestamps && (
+                <span className="text-xs ">
+                  {new Date(timestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC" })}
+                </span>
+              )}
+              {counter}
+            </>
           )}
-          {counter}
         </span>
       </div>
     );
@@ -174,7 +246,11 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
     "adjustZombieTrove",
     "adjustUnredeemableZombieTrove",
   ]);
-  const hideVal = useHeaderValueHideClass({ isPassive: PASSIVE_OPS.has(ctx.operation) });
+  // The event page has no spine to carry the values, so its header states them.
+  const spineHide = useHeaderValueHideClass({ isPassive: PASSIVE_OPS.has(ctx.operation) });
+  const hideVal = page ? "" : spineHide;
+  // The redemption and liquidation pills the spine draws from 640px.
+  const spinePillHide = page ? "" : "sm:hidden mspine:max-sm:hidden ";
 
   // ── Provenance threading (zero-cost when the inspector is off) ──────────────
   // Chain deltas point at the branch TroveManager (via the shared builders
@@ -342,7 +418,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             // its opened card drops them while timeline values are on.
             <>
               <span
-                className={`sm:hidden mspine:max-sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+                className={`${spinePillHide}inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
               >
                 {style.label}
               </span>
@@ -385,7 +461,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
             // (rb-500); the red spine alone carries the critical valence.
             <>
               <span
-                className={`sm:hidden mspine:max-sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+                className={`${spinePillHide}inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
               >
                 {style.label}
               </span>
@@ -619,12 +695,18 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               </span>
             )}
             {groupChip}
-            {timestamp > 0 && (
-              <span className="text-xs ">
-                <EventTime ts={timestamp} />
-              </span>
+            {page ? (
+              <PageMeta page={page} timestamp={timestamp} counter={counter} />
+            ) : (
+              <>
+                {timestamp > 0 && (
+                  <span className="text-xs ">
+                    <EventTime ts={timestamp} />
+                  </span>
+                )}
+                {counter}
+              </>
             )}
-            {counter}
           </span>
         </div>
       </div>

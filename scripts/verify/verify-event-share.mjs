@@ -92,7 +92,8 @@ import { fileURLToPath } from "node:url";
  *  read from the checkout this script sits in, not the working directory. */
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const IN_TIMELINE = 'a:has-text("View in timeline"), a:has-text("See in timeline")';
+// The Liquity V2 event page's control is an icon named by its aria-label.
+const IN_TIMELINE = 'a:has-text("View in timeline"), a:has-text("See in timeline"), a[aria-label="See in timeline"]';
 const BASE = process.env.BASE ?? "http://localhost:3101";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ?? path.join(os.tmpdir(), "rails-share-events");

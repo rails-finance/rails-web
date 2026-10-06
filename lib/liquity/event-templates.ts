@@ -102,6 +102,7 @@ interface ProseFile {
   context_words: Words;
   footer_words: Words;
   copy_words: Words;
+  page_words: Words;
   L5_words: Words;
   fragments: Words;
   shared_sentences: Record<string, SentenceTemplate>;
@@ -124,6 +125,8 @@ export const CONTEXT_WORDS = FILE.context_words;
 export const FOOTER_WORDS = FILE.footer_words;
 /** The Copy for LLM control and the block's own words. */
 export const COPY_WORDS = FILE.copy_words;
+/** The event page's paragraph and its card's page controls. */
+export const PAGE_WORDS = FILE.page_words;
 /** Parts of a sentence the generator joins. */
 export const FRAGMENTS = FILE.fragments;
 /** Sentences more than one template says. */
