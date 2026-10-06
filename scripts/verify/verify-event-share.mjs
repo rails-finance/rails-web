@@ -95,7 +95,7 @@ import { fileURLToPath } from "node:url";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 // The Liquity V2 event page's control is an icon named by its aria-label.
-const IN_TIMELINE = 'a:has-text("View in timeline"), a:has-text("See in timeline"), a[aria-label="See in timeline"]';
+const IN_TIMELINE = 'a:has-text("View in timeline")';
 const BASE = process.env.BASE ?? "http://localhost:3101";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ?? path.join(os.tmpdir(), "rails-share-events");
@@ -275,7 +275,7 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
     .catch(() => {});
   const detailOpen = await detailPanel.count();
   check(`${label} @${width}: detail panel open`, detailOpen > 0);
-  // "See in timeline" on the Liquity V2 event page (ui-jobs 236).
+  // "View in timeline" in the Liquity V2 event page's actions row (ui-jobs 291).
   const viewInTimeline = page.locator(IN_TIMELINE).first();
   const href = await viewInTimeline.getAttribute("href").catch(() => null);
   const subjectSearch = new URL(url).search;
@@ -1141,6 +1141,8 @@ async function verifyLiquityMarkdown(subject) {
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
+    const asideLinks = await page.locator('[data-event-page-side] a:has-text("View in timeline")').count();
+    check(`${name} event page: the aside has one View in timeline link`, asideLinks === 1, `${asideLinks} found`);
     const timelineHref = await page.locator(`${ACTIONS} [data-menu-item="view-timeline"]`).getAttribute("href");
     check(
       `${name} event page: View in timeline links to the ?at= landing`,

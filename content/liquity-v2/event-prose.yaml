@@ -647,8 +647,6 @@ page_words:
     Copy the Trove id
   copied: |-
     Copied
-  in_timeline: |-
-    See in timeline
   previous: |-
     Previous event
   next: |-

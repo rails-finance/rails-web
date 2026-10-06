@@ -6,7 +6,7 @@
 // Markdown, Copy link, Copy for LLM; ui-jobs 291, words in `action_words`),
 // the paragraph with the timeline link, a
 // table of the facts the card does not show (branch, Trove id, holder, the
-// event's place, block), and the previous, next and timeline links. The words
+// event's place, block), and the previous and next links. The words
 // are the strings file's `page_words` (content/liquity-v2/event-prose.yaml).
 // The table is identity and position, no figure that carries a receipt, so
 // the provenance tripwire passes over it.
@@ -208,9 +208,6 @@ export function LiquityEventPageAside(p: LiquityEventPageAsideProps) {
       <div className="flex flex-wrap gap-x-4 gap-y-1" data-event-page-links="">
         <Step href={p.previousHref} label={PAGE_WORDS.previous} data={{ "data-event-prev": "" }} />
         <Step href={p.nextHref} label={PAGE_WORDS.next} data={{ "data-event-next": "" }} />
-        <a href={p.timelineHref} aria-label={PAGE_WORDS.in_timeline} className={LINK} data-event-in-timeline="">
-          {PAGE_WORDS.in_timeline}
-        </a>
       </div>
     </div>
   );
