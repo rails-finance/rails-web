@@ -1199,9 +1199,9 @@ function AaveV4SpokeTowerBlock({
               held debt. */}
                 <p className="leading-relaxed">
                   These figures add up every event on this spoke. What left the position (withdrawals, repayments,
-                  liquidations) is valued at its price when it left, and what is still held at today&apos;s price.
-                  Deposited and Borrowed are set so each side balances, so a price change while a token was held shows
-                  in them.
+                  liquidations) is valued at its price when it left, and what is still held at the latest block&apos;s
+                  price. Deposited and Borrowed are set so each side balances, so a price change while a token was held
+                  shows in them.
                   {totals.unpricedSymbols.length > 0 && (
                     <>
                       {" "}
@@ -1252,7 +1252,7 @@ function AaveV4SpokeTowerBlock({
                       {fig(totals.liquidatedCollUsd)} against {fig(totals.liquidatedDebtUsd)} at the prices of the day,
                       a net {fmtSignedUsd(liqNet.atTimeUsd).display} to the borrower, the bonus the liquidators kept
                       {liqNet.todayUsd != null && (
-                        <> ({fmtSignedUsd(liqNet.todayUsd).display} at today&apos;s prices)</>
+                        <> ({fmtSignedUsd(liqNet.todayUsd).display} at the latest block&apos;s prices)</>
                       )}
                       .
                     </span>

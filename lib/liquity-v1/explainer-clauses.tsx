@@ -584,8 +584,8 @@ export function liquityV1EventSlots(
                       >
                         {fmtUsdSigned(today)}
                       </Fig>{" "}
-                      at today&rsquo;s ETH price of {fmtUsd(currentPrice as number)}, the difference from having held
-                      that ETH
+                      at the latest block&rsquo;s ETH price of {fmtUsd(currentPrice as number)}, the difference from
+                      having held that ETH
                     </>
                   )}
                   .

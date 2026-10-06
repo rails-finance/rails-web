@@ -682,7 +682,7 @@ export function llamalendFlowTimeline(events: LlamalendFlowEvent[], o: Llamalend
         side: "collateral",
         why:
           r.priceFrom === "today"
-            ? `${o.collSymbol} priced at today's oracle read: the oracle at this block is not stored yet, and the page reads the latest ${LLAMALEND_PRICE_READS} such event blocks.`
+            ? `${o.collSymbol} priced at the latest block's oracle price: the oracle at this block is not stored yet, and the page reads the latest ${LLAMALEND_PRICE_READS} such event blocks.`
             : `${o.collSymbol} priced at the nearest priced row: the oracle at this block is not stored yet, and the page reads the latest ${LLAMALEND_PRICE_READS} such event blocks.`,
         held: true,
       });

@@ -56,7 +56,7 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
             ? `${n(p.nearest + p.today, "One event takes", "events take")} the nearest recorded price in time, with no feed price read at ${p.nearest + p.today === 1 ? "its block" : "their blocks"}. `
             : ""}
           Polaris is not in the daily price store, so between events the collateral keeps the price of its latest event,
-          and today&apos;s is the feed&apos;s live price, the one the position card values it at.
+          and the last stop takes the feed&apos;s price at the latest block, the one the position card values it at.
         </p>
       )}
     </div>

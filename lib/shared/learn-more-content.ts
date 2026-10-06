@@ -205,7 +205,7 @@ export function liquityEconomicsContent(opts: { isBatched?: boolean } = {}): Lea
       },
       {
         bold: "Redemption outcome",
-        text: "a redemption clears debt at $1 face and takes collateral for it at the oracle price of that moment. The first figure sets the debt cleared against the collateral's value at each redemption's own price; the second reprices the same collateral at today's price. A rise in the collateral since makes the second figure larger, a fall makes it smaller.",
+        text: "a redemption clears debt at $1 face and takes collateral for it at the oracle price of that moment. The first figure sets the debt cleared against the collateral's value at each redemption's own price; the second reprices the same collateral at the latest block's price. A rise in the collateral since makes the second figure larger, a fall makes it smaller.",
       },
       {
         bold: "Liquidation reserve",

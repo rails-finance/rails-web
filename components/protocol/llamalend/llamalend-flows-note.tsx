@@ -109,7 +109,7 @@ export function LlamalendFlowsNote({ facts, collSymbol, debtSymbol }: LlamalendF
           <p>
             {count(p.row, "One event takes", "events take")} the oracle price at its block; the{" "}
             {count(p.nearest + p.today, "other takes", "others take")} the nearest price read
-            {p.today > 0 ? ", or today's" : ""}. A price more than 30 days old is stated as such.
+            {p.today > 0 ? ", or the latest block's" : ""}. A price more than 30 days old is stated as such.
           </p>
         )}
       </ExplainMore>

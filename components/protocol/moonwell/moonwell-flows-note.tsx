@@ -61,7 +61,7 @@ export function MoonwellFlowsNote({ facts }: { facts: MoonwellFlowsFacts | null 
             ? `${n(facts.priced, "One row is", "rows are")} valued at the oracle price at its block; ${n(facts.nearest, "one has", "have")} no price recorded at its block and ${facts.nearest === 1 ? "takes" : "take"} the nearest priced row's price on its market. `
             : "Every row is valued at the oracle price at its block. "}
           {facts.between === "store"
-            ? "Between events each market is valued at Moonwell's oracle price at the end of each day; today's is the live read's."
+            ? "Between events each market is valued at Moonwell's oracle price at the end of each day; the last stop takes the oracle's price at the latest block."
             : "The daily oracle prices did not load, so between events each market keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}

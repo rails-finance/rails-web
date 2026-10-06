@@ -99,7 +99,7 @@ export function AaveV3BaseFlowsNote({
         <p>
           {other > 0 ? pricingWords(p, brand) : "Every flow is valued at the oracle price at its block. "}
           {facts.between === "store"
-            ? `Between events each reserve is valued at ${brand}'s oracle price at the end of each day; today's is the oracle's now.`
+            ? `Between events each reserve is valued at ${brand}'s oracle price at the end of each day; the last stop takes the oracle's price at the latest block.`
             : "The daily oracle prices did not load, so between events each reserve keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}

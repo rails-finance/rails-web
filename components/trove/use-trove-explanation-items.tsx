@@ -435,7 +435,7 @@ function buildOpenItems({
     );
     items.push(
       <span key="spot-price" className="text-rb-500">
-        That worth is priced at today&rsquo;s{" "}
+        That worth is priced at the latest block&rsquo;s{" "}
         <Prov info={priceProv}>
           <HighlightableValue type="currentPrice" state="after" value={currentPrice}>
             {formatUsdValue(currentPrice)}

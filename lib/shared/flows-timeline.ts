@@ -356,7 +356,7 @@ export interface FlowTimeline {
 export interface FlowWords {
   /** The solid segment of the supplied side ("Still supplied"). */
   held?: string;
-  /** The date label at the last stop ("Today, live prices"). */
+  /** The date label at the last stop ("At the latest block's price"). */
   live?: string;
   /** The supplied side's balancing item, for a bar whose dollar axis is a
    *  fixed rate, where everything past what came in is interest. Unset, each

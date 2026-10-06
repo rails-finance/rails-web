@@ -503,7 +503,7 @@ export const redemptionNetProv = (
   summary:
     vals.when === "redemption"
       ? "Net outcome at the redemption price — the debt cancelled, counted at $1 per LUSD, less the ETH the redeemer took, valued at the PriceFeed price at this block."
-      : "Net outcome at today's price — the debt cancelled, counted at $1 per LUSD, less the ETH the redeemer took, valued at the PriceFeed price now.",
+      : "Net outcome at the latest block's price — the debt cancelled, counted at $1 per LUSD, less the ETH the redeemer took, valued at the PriceFeed price at the latest block.",
   formula: "debt cancelled − ETH taken × price",
   inputs: [
     { label: "debt cancelled", value: vals.debt, kind: "chain" },

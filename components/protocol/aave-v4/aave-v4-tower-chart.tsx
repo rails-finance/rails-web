@@ -59,7 +59,7 @@ import type { Provenance } from "@/components/shared/provenance";
 // a USD total, a breakdown row in the asset's units reading "no price source",
 // and a "(partial)" total that names it.
 const HOLDING_PRICE_NOTE =
-  "the live price: Aave's oracle where it covers the asset, an off-chain market price otherwise";
+  "the latest block's price: Aave's oracle where it covers the asset, an off-chain market price otherwise";
 const OUTFLOW_PRICE_NOTE =
   "each outflow at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value the tokens left at";
 
@@ -125,8 +125,8 @@ const flowUsdHintProv = (symbol: string): Provenance => ({
 });
 const currentUsdHintProv = (symbol: string, source: AaveV4PriceSource | null): Provenance => ({
   kind: "derived",
-  summary: `${symbol} value in USD — the row's token balance at the live price, so it is what the balance is worth now.`,
-  formula: "amount × live price",
+  summary: `${symbol} value in USD — the row's token balance at the latest block's price.`,
+  formula: "amount × latest block's price",
   inputs: [livePriceInput(source)],
 });
 /** The token amount beside a single-asset flow row's USD figure. */
