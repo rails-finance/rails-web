@@ -205,7 +205,7 @@ export default function EventView({
       })
     : undefined;
 
-  // Opened on its first mount: written during render, before the card's own
+  // Opened on its first mount: written during render, before the card's
   // mount effect reads it (the timeline's pinned mode does the same).
   if (event) setCardOpen(`liquity-v2:${event.id}`, true);
 

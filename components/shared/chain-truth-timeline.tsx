@@ -1120,7 +1120,7 @@ function ChainTruthTimelineBody({
   // render window if it is a windowed prefix's job to reveal it, then — once
   // its wrapper row is actually in the DOM — open its detail panel, scroll it
   // into view (centered) and give it the fade highlight. A target inside a
-  // COLLAPSED run has no row of its own until its folder opens: the effect
+  // COLLAPSED run has no row until its folder opens: the effect
   // opens that folder and looks again.
   useEffect(() => {
     if (!pendingLandingId) return;
