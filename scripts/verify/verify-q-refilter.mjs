@@ -15,12 +15,15 @@
 //
 // TWO THINGS ROTTED HERE, and they failed in opposite directions.
 //
-// The selector. Every owner/wallet pill on every surface is now the one shared
+// The selector. Every owner/wallet pill on a listing is the shared
 // `components/shared/wallet-pill.tsx`, whose button reads
-// `aria-label="Filter positions by wallet <label>"`. Liquity V2's trove detail
-// page used to render its own row labelled "Filter troves by owner", and that
-// string no longer exists anywhere in the repo — the locator matched nothing and
-// timed out. It is re-pinned to the shared label below.
+// `aria-label="Filter positions by wallet <label>"`. The Aave V4 arm still clicks
+// that button. Liquity V2's trove detail page stopped rendering it with ui-jobs
+// 271 (5 Oct): the owner there is the address menu in
+// `components/shared/wallet-menu.tsx`, a `[data-wallet-menu]` wrapper around a
+// `button[aria-haspopup="menu"]` whose `[role=menu]` ends in a "View its
+// positions" row that calls `router.push(listingHref)`. The Liquity V2 arm opens
+// that menu and clicks the row.
 //
 // The counts. A listing selector that matches nothing reads as "zero wallets",
 // and "zero wallets, all of them the filtered one" is trivially true — the shape
@@ -43,6 +46,8 @@ let failures = 0;
 
 // The shared WalletPill's filter button, on listing rows and detail pages alike.
 const WALLET_FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
+// The owner's address menu trigger on a position page (wallet-menu.tsx).
+const OWNER_MENU_TRIGGER = '[data-wallet-menu] button[aria-haspopup="menu"]';
 // Both listings page at 20 rows; anything at or above this is a populated
 // listing rather than a half-painted one.
 const MIN_LISTING_ROWS = 5;
@@ -169,7 +174,7 @@ const V4_ROW = "a[href*='/ethereum/aave-v4/spoke/']";
 
 // ---------------------------------------------------------------------------
 // Liquity V2: (3) fresh load + in-app nav FROM A DIFFERENT PAGE (a trove detail
-// page's owner pill, via router.push) both filter correctly; (4) nav back clears.
+// page's owner address menu, via router.push) both filter correctly; (4) nav back clears.
 // ---------------------------------------------------------------------------
 const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
 {
@@ -181,23 +186,21 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
 
   // Visit a trove detail page and grab its owner address via the owner pill.
   await page.goto(`${BASE}${troveHref}`, { waitUntil: "networkidle", timeout: 240_000 });
-  const ownerBtn = page.locator(WALLET_FILTER_BTN).first();
-  const ownerBtnCount = await page
-    .locator(WALLET_FILTER_BTN)
-    .first()
+  const ownerTrigger = page.locator(OWNER_MENU_TRIGGER).first();
+  const ownerBtnCount = await ownerTrigger
     .waitFor({ state: "attached", timeout: 60_000 })
-    .then(() => page.locator(WALLET_FILTER_BTN).count())
+    .then(() => page.locator(OWNER_MENU_TRIGGER).count())
     .catch(() => 0);
-  ok("liquity-v2: trove detail page has an owner-filter pill", ownerBtnCount > 0, `${ownerBtnCount} matched`);
+  ok("liquity-v2: trove detail page has the owner's address menu", ownerBtnCount > 0, `${ownerBtnCount} matched`);
 
-  // The five checks below all hang off that pill. Skipping them quietly when it
+  // The five checks below all hang off that menu. Skipping them quietly when it
   // is missing is how this file could report "1 failure" for a rot that had
   // actually disabled most of its coverage, so the absence is stated as its own
   // finding and the arm ends.
   if (ownerBtnCount === 0) {
     console.log(
-      `[NO EVIDENCE] liquity-v2: no ${WALLET_FILTER_BTN} on ${troveHref} — the in-app nav arm never ran.` +
-        " Re-read components/shared/wallet-pill.tsx for the current label before trusting this run.",
+      `[NO EVIDENCE] liquity-v2: no ${OWNER_MENU_TRIGGER} on ${troveHref} — the in-app nav arm never ran.` +
+        " Re-read components/shared/wallet-menu.tsx for the current trigger before trusting this run.",
     );
     failures++;
   } else {
@@ -207,9 +210,12 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
     // assertion below compares display identity to display identity (an
     // ENS-named owner made an older hex-only grep fail on a correctly filtered
     // page, 2026-08-10).
-    const ownerLabel = (await ownerBtn.getAttribute("aria-label")).trim();
+    const ownerDisplay = (await ownerTrigger.locator("[data-wallet-label]").first().innerText()).trim();
+    const ownerLabel = ownerDisplay;
     const markerBefore = await page.evaluate(() => window.__verifyMarker || (window.__verifyMarker = Math.random()));
-    await ownerBtn.click();
+    await ownerTrigger.click();
+    await page.locator("[role=menu]").first().waitFor({ state: "visible", timeout: 10_000 });
+    await page.locator('[role=menu] [role=menuitem]:has-text("View its positions")').first().click();
     await page.waitForTimeout(1500);
     const markerAfter = await page.evaluate(() => window.__verifyMarker);
     ok(
@@ -222,13 +228,26 @@ const V2_ROW = "a[href*='/ethereum/liquity-v2/trove/']";
     ok("liquity-v2: URL updated to carry q after in-app owner click", !!qParam, url.toString());
     ok("liquity-v2: landed on the listing route", url.pathname === "/ethereum/liquity-v2");
 
-    // The filtered listing's OWN pills are the evidence: every row must carry
-    // the same owner identity the detail page showed. Reading the whole body
+    // The filtered listing's own cards are the evidence: every card must carry
+    // the same owner identity the detail page showed. Since ui-jobs 246 a
+    // Liquity V2 listing card shows its owner as inert text (no pill), a span
+    // titled with the address, so those spans are read. Reading the whole body
     // for a substring of the address would pass on an unfiltered listing that
     // merely happens to contain that owner somewhere.
     const cardCountFiltered = (await rows(page, "liquity-v2 filtered rows", V2_ROW, "href", 1)).length;
-    const filteredPills = await rows(page, "liquity-v2 filtered pills", WALLET_FILTER_BTN, "aria-label", 1);
-    const distinctOwners = new Set(filteredPills.map((l) => l.trim()));
+    const OWNER_TEXT = `${V2_ROW} span[title*="0x"]`;
+    await page
+      .locator(OWNER_TEXT)
+      .first()
+      .waitFor({ state: "attached", timeout: 60_000 })
+      .catch(() => {});
+    const filteredOwners = await page.$$eval(OWNER_TEXT, (els) => els.map((el) => el.textContent.trim()));
+    ok(
+      "liquity-v2 filtered owners: selector matched ≥1 (" + OWNER_TEXT + ")",
+      filteredOwners.length >= 1,
+      `${filteredOwners.length} matched`,
+    );
+    const distinctOwners = new Set(filteredOwners);
     ok(
       "liquity-v2: in-app SPA nav to ?q=<owner> shows a listing of THAT owner and nobody else",
       distinctOwners.size === 1 && distinctOwners.has(ownerLabel),
