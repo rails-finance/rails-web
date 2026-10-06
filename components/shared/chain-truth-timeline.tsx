@@ -212,7 +212,7 @@ const USER_SCROLL_EVENTS = ["wheel", "touchstart", "keydown"] as const;
  *  Not a 404: the window a windowed family served, an id from another
  *  position, or a typo are all the same reader-facing fact — "not among
  *  what's here" — so the wording never guesses which. */
-function EventNotFoundNotice({ id, chainId }: { id: string; chainId: ChainId }) {
+export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: ChainId }) {
   const hashMatch = TX_HASH_IN_ID.exec(id);
   return (
     <div className={`${NOTICE_TEXT} border-b border-rb-200 pb-3 dark:border-rb-800`}>
@@ -315,6 +315,9 @@ export interface TimelineRunSpec {
       /** Each member's event number, in run order: an `asOneEvent` row numbers
        *  itself by the logs it draws. */
       eventNumbers: number[];
+      /** The member a `?at=` landing wants opened in place: the folder holding
+       *  it opens (`renderRunFolders`). */
+      landingId?: string;
     },
   ) => ReactNode;
 }
@@ -865,6 +868,11 @@ function ChainTruthTimelineBody({
   // multi-event view.
   const [pendingLandingId, setPendingLandingId] = useState<string | null>(null);
   const [landingNotFoundId, setLandingNotFoundId] = useState<string | null>(null);
+  // A `?at=` target inside a collapsed run: the run's folder holding it opens
+  // (`landingId` on the spec's render), and the DOM step below retries until
+  // the member's card has mounted.
+  const [landingRunMember, setLandingRunMember] = useState<string | null>(null);
+  const [landingTries, setLandingTries] = useState(0);
   // Applied at most once per mount — a visitor toggling filters afterward
   // must not re-trigger the landing off a stale `at=` the hook already
   // dropped from the address bar.
@@ -1111,11 +1119,9 @@ function ChainTruthTimelineBody({
   // `revealEvent` has made the target visible, find it in `rows`, grow the
   // render window if it is a windowed prefix's job to reveal it, then — once
   // its wrapper row is actually in the DOM — open its detail panel, scroll it
-  // into view (centered) and give it the fade highlight. A target buried
-  // inside a COLLAPSED run has no row of its own to find here (the run only
-  // mounts its members once expanded) — a known gap for a later pass; this
-  // effect simply never resolves the pending id for that case rather than
-  // looping or throwing.
+  // into view (centered) and give it the fade highlight. A target inside a
+  // COLLAPSED run has no row of its own until its folder opens: the effect
+  // opens that folder and looks again.
   useEffect(() => {
     if (!pendingLandingId) return;
     const idx = rows.findIndex((r) => {
@@ -1131,7 +1137,15 @@ function ChainTruthTimelineBody({
       return;
     }
     const el = document.getElementById(`event-${pendingLandingId}`);
-    if (!el) return;
+    if (!el) {
+      // Inside a collapsed run the member mounts once its folder opens: name
+      // it to the run, then look again (bounded, ~5 s).
+      const row = rows[idx];
+      if (row.kind !== "run" || landingTries > 50) return;
+      setLandingRunMember(pendingLandingId);
+      const t = setTimeout(() => setLandingTries((n) => n + 1), 100);
+      return () => clearTimeout(t);
+    }
     clickToOpenIfClosed(pendingLandingId);
     let reduced = false;
     try {
@@ -1164,7 +1178,7 @@ function ChainTruthTimelineBody({
     }
     // `folders` is in the deps because a landing inside a served folder has
     // to re-run once the members mount: the row exists before the card does.
-  }, [pendingLandingId, rows, windowSize, landedFolderId, folders]);
+  }, [pendingLandingId, rows, windowSize, landedFolderId, folders, landingTries]);
 
   // Any filter/sort/date change produces a fresh `displayedEvents` reference —
   // reset the window to the top so the user sees the head of the new list.
@@ -2099,6 +2113,7 @@ function ChainTruthTimelineBody({
                               }),
                             ),
                             eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
+                            landingId: landingRunMember ?? undefined,
                           }),
                           marked,
                         )}

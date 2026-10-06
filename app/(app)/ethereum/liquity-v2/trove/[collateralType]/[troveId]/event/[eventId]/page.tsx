@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
-import { loadTroveTail } from "@/lib/liquity/trove-page-data";
+import { loadTroveHistory, loadTroveTail } from "@/lib/liquity/trove-page-data";
 import { truncateTroveId } from "@/lib/liquity/share-card";
-import TrovePage from "../../page";
+import EventView from "./event-view";
 
 interface Props {
   params: Promise<{ collateralType: string; troveId: string; eventId: string }>;
@@ -15,9 +16,9 @@ export const dynamic = "force-dynamic";
 
 // NOT reused from the parent (`../../page`'s own `generateMetadata`) — this
 // segment names the EVENT, which the parent's metadata knows nothing about.
-// `loadTroveTail` is the same `cache()`-wrapped read the parent page and its
-// own opengraph-image already call, so finding the event here costs no
-// second backend round trip within one request.
+// `loadTroveTail` is the same `cache()`-wrapped read the page body and the
+// opengraph-image call, so finding the event here costs no second backend
+// round trip within one request.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
   const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
@@ -33,14 +34,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-// THIN: renders the exact same parent trove page, same params — the nested
-// `event/[eventId]` segment sits inside the same `[troveId]` layout, so every
-// provider still wraps it, and `TroveView` (this page's client half) never
-// learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `params` here carries an extra
-// `eventId` key the parent's own `Props` type doesn't declare; passing the same promise through is still
-// structurally valid (the parent only reads `collateralType`/`troveId` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the position's summary, the
+// previous and next events, and this event's card opened. The card's ledgers
+// replay the Trove's history, so the read is the history; the page draws one
+// event of it.
 export default async function LiquityV2EventPage({ params }: Props) {
-  return TrovePage({ params });
+  const { collateralType, troveId, eventId } = await params;
+  const history = await loadTroveHistory(collateralType, troveId);
+  if (history.missing) notFound();
+  return (
+    <EventView
+      key={`${collateralType}:${troveId}:${eventId}`}
+      collateralType={collateralType}
+      troveId={troveId}
+      eventId={decodeEventId(eventId)}
+      trove={history.trove}
+      events={history.events}
+      totalEvents={history.hasMore ? history.totalEvents : null}
+      prices={history.prices}
+    />
+  );
 }

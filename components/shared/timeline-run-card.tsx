@@ -4,7 +4,7 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator, Folder, FolderOpen } from "lucide-react";
 
@@ -171,6 +171,10 @@ export interface TimelineRunCardProps {
   readingLine?: boolean;
 }
 
+/** True on the folder holding the event a `?at=` landing wants opened in
+ *  place (`renderRunFolders` provides it): the folder opens as if clicked. */
+export const RunLandingContext = createContext(false);
+
 /** Roughly three member rows — what the skeleton reserves while a served
  *  folder's members are in flight, measured off a closed event card's own
  *  header panel (`px-5 pt-4 pb-3` around one row) plus the list's gap. */
@@ -217,6 +221,10 @@ export function TimelineRunCard({
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
+  const landing = useContext(RunLandingContext);
+  useEffect(() => {
+    if (landing) setOwnOpen(true);
+  }, [landing]);
   // The members read fires once and only once — the provider caches the
   // answer, so re-opening is a map lookup and a collapse mid-flight loses
   // nothing.

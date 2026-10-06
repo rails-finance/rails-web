@@ -28,6 +28,7 @@
 import type { ReactNode } from "react";
 import { ArrowDownLeft, ArrowLeftRight, Send, TriangleAlert } from "lucide-react";
 import { CHUNK_TARGET, chunkByTransaction } from "@/lib/shared/timeline-chunks";
+import { RunLandingContext } from "@/components/shared/timeline-run-card";
 
 /** What one folder knows about its place in the run: a stable key, the run's
  *  spine-terminus flags scoped to the OUTERMOST folders, and the members'
@@ -49,7 +50,7 @@ export interface RunFolderMeta {
  */
 export function renderRunFolders<E extends { id: string; txHash: string }>(
   run: E[],
-  meta: { isFirst: boolean; isLast: boolean; children: ReactNode[] },
+  meta: { isFirst: boolean; isLast: boolean; children: ReactNode[]; landingId?: string },
   minRun: number,
   folderOf: (events: E[], folder: RunFolderMeta) => ReactNode,
 ): ReactNode {
@@ -59,17 +60,22 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
   // wrapper row. The run's spine-terminus flags land on its outermost folders.
   return (
     <>
-      {chunks.map((chunk, i) =>
-        folderOf(
-          chunk.map((m) => m.event),
-          {
-            key: `chunk_${chunk[0].event.id}`,
-            isFirst: meta.isFirst && i === 0,
-            isLast: meta.isLast && i === chunks.length - 1,
-            children: chunk.map((m) => m.child),
-          },
-        ),
-      )}
+      {chunks.map((chunk, i) => (
+        <RunLandingContext.Provider
+          key={`chunk_${chunk[0].event.id}`}
+          value={meta.landingId != null && chunk.some((m) => m.event.id === meta.landingId)}
+        >
+          {folderOf(
+            chunk.map((m) => m.event),
+            {
+              key: `chunk_${chunk[0].event.id}`,
+              isFirst: meta.isFirst && i === 0,
+              isLast: meta.isLast && i === chunks.length - 1,
+              children: chunk.map((m) => m.child),
+            },
+          )}
+        </RunLandingContext.Provider>
+      ))}
     </>
   );
 }

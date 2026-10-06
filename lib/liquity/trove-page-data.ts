@@ -160,3 +160,39 @@ export const loadTroveTail = cache(async (collateralType: string, troveId: strin
     clearTimeout(timer);
   }
 });
+
+/** The server's page size: the timeline route serves at most this many rows a read. */
+const HISTORY_PAGE = 1_000;
+
+/**
+ * The event page's read (`event/[eventId]`): the tail, and where its timeline
+ * page stopped short (`hasMore`), the rest of the history in pages of 1,000,
+ * as the trove page's Lifetime flows read does. The card's ledgers replay the
+ * whole history, and the backend serves no event without it. `totalEvents`
+ * and `hasMore` stay the tail's, so the event's number is the trove page's.
+ * Shares `loadTroveTail`'s per-request cache with `generateMetadata`.
+ */
+export const loadTroveHistory = cache(async (collateralType: string, troveId: string): Promise<TroveTail> => {
+  const tail = await loadTroveTail(collateralType, troveId);
+  if (!tail.hasMore || !tail.trove || !tail.events) return tail;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TAIL_FETCH_TIMEOUT_MS);
+  try {
+    const readerIp = await readerIpFromHeaders();
+    const base = `/api/trove/${encodeURIComponent(collateralType)}/${encodeURIComponent(troveId)}`;
+    const seen = new Map(tail.events.map((e) => [e.id, e]));
+    for (let offset = HISTORY_PAGE; offset <= 10_000; offset += HISTORY_PAGE) {
+      const page = await getJson<FetchTroveTimelineResult>(
+        `${base}/timeline?limit=${HISTORY_PAGE}&offset=${offset}`,
+        controller.signal,
+        readerIp,
+      );
+      if (page == null) return tail;
+      for (const e of page.events ?? []) seen.set(e.id, e);
+      if (!page.pagination?.hasMore) return { ...tail, events: [...seen.values()] };
+    }
+    return tail;
+  } finally {
+    clearTimeout(timer);
+  }
+});

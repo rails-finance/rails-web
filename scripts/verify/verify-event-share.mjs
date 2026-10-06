@@ -92,6 +92,7 @@ import { fileURLToPath } from "node:url";
  *  read from the checkout this script sits in, not the working directory. */
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+const IN_TIMELINE = 'a:has-text("View in timeline"), a:has-text("See in timeline")';
 const BASE = process.env.BASE ?? "http://localhost:3101";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ?? path.join(os.tmpdir(), "rails-share-events");
@@ -257,7 +258,8 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
     .catch(() => {});
   const detailOpen = await detailPanel.count();
   check(`${label} @${width}: detail panel open`, detailOpen > 0);
-  const viewInTimeline = page.locator('a:has-text("View in timeline")');
+  // "See in timeline" on the Liquity V2 event page (ui-jobs 236).
+  const viewInTimeline = page.locator(IN_TIMELINE).first();
   const href = await viewInTimeline.getAttribute("href").catch(() => null);
   const subjectSearch = new URL(url).search;
   const expectedHref = `${positionPath}?at=${encodeURIComponent(expectedId)}${subjectSearch ? `&${subjectSearch.slice(1)}` : ""}`;
@@ -608,8 +610,8 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
   // check's failure, not the run's — record it and move on to the next
   // family rather than taking the whole table down with an uncaught error.
   const followed = await viewPage
-    .waitForSelector('a:has-text("View in timeline")', { timeout: 60000 })
-    .then(() => viewPage.click('a:has-text("View in timeline")', { timeout: 60000 }))
+    .waitForSelector(IN_TIMELINE, { timeout: 60000 })
+    .then(() => viewPage.click(IN_TIMELINE, { timeout: 60000 }))
     .then(() => viewPage.waitForLoadState("domcontentloaded"))
     .then(() => null)
     .catch((e) => String(e).split("\n")[0]);
