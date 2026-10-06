@@ -9,7 +9,8 @@ export type TimelineDisplayKey =
   | "showCollateralRatio"
   | "collapseRuns"
   | "showMarketNotes"
-  | "openAllMarketNotes";
+  | "openAllMarketNotes"
+  | "showTxHashes";
 
 export interface TimelineDisplayState {
   /** When true, the SpineColumn surfaces flanking values along the timeline
@@ -38,6 +39,10 @@ export interface TimelineDisplayState {
   /** "Open all market notes" in Display: every note shows its header row in
    * place of its marker. No effect while `showMarketNotes` is off. */
   openAllMarketNotes: boolean;
+  /** "Transaction hashes" in Display (ui-jobs 294): each timeline card's
+   *  number pill shows its transaction's short hash in place of the number.
+   *  Off by default. The event page's pill keeps the number. */
+  showTxHashes: boolean;
   /** The reader's saved phone view: true for the spine view (the phone's
    *  "Timeline | List" switch), false for the list. Read only on a phone, on
    *  a page whose timeline opted in (components/shared/mobile-spine.tsx). */
@@ -58,6 +63,7 @@ const DEFAULTS = {
   collapseRuns: true,
   showMarketNotes: true,
   openAllMarketNotes: false,
+  showTxHashes: false,
   mobileSpine: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading

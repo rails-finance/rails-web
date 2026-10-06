@@ -6,10 +6,20 @@
 // Outside a timeline (no share href: a simulator shell, the home page's live
 // example) it is the plain pill. `data-event-number` carries the number (a
 // range's first) for the verifiers.
+//
+// With Display's "Transaction hashes" on (ui-jobs 294) a timeline pill shows
+// its transaction's short hash, the full hash in its title; the aria-label
+// keeps the number. The event page's pill always shows the number.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createContext, useContext } from "react";
 import { useEventShareHref } from "@/components/shared/event-share-context";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { shortAddr } from "@/lib/shared/format-event";
+
+/** The card's transaction hash, provided by `EventCard` around its header. */
+export const EventTxHashContext = createContext<string | null>(null);
 
 /** The pill's shape, shared with the boundary card's row-range pill. */
 export const EVENT_NUMBER_PILL = "inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500";
@@ -44,6 +54,8 @@ export function EventNumberPill({
 }) {
   const shareHref = useEventShareHref();
   const pathname = usePathname();
+  const txHash = useContext(EventTxHashContext);
+  const { showTxHashes } = useTimelineDisplay();
   const range = last != null && last !== number;
   const text = range ? `${number}–${last}` : String(number);
   const which = range ? `events ${number} to ${last}` : `event ${number}`;
@@ -62,13 +74,17 @@ export function EventNumberPill({
   }
   const onPage = pathname != null && decoded(pathname) === decoded(shareHref.split("?")[0]);
   const action = onPage ? "View in timeline" : "View event page";
+  // Mono text gives every short hash one width, so the pills line up from
+  // card to card.
+  const hash = !onPage && showTxHashes && txHash ? txHash : null;
   return (
     <Link
       href={onPage ? timelineHrefOf(shareHref) : shareHref}
-      className={`${EVENT_NUMBER_PILL} ${LINKED}`}
+      className={`${EVENT_NUMBER_PILL} ${LINKED}${hash ? " font-mono" : ""}`}
       aria-label={`${action}, ${which}`}
-      title={action}
+      title={hash ?? action}
       data-event-number={number}
+      data-event-tx-hash={hash ?? undefined}
       data-event-number-link={onPage ? "timeline" : "page"}
       data-prov-exempt=""
       // The header toggles the card on click and on Enter; the pill's click
@@ -76,7 +92,7 @@ export function EventNumberPill({
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      {text}
+      {hash ? shortAddr(hash) : text}
     </Link>
   );
 }

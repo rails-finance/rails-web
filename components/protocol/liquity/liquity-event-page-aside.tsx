@@ -3,10 +3,10 @@
 // The Liquity V2 event page's side column (rails-ops TO-DO-ui-jobs 236), in
 // the spine's place beside the card: the event's title (the header's words and
 // amounts, large, ui-jobs 286), the actions row (the timeline, Etherscan, the
-// Markdown, Copy link, Copy for LLM; ui-jobs 291, words in `action_words`),
-// the paragraph with the timeline link, a
+// Markdown, Copy link, Copy transaction hash, Copy for LLM; ui-jobs 291 and
+// 294, words in `action_words`), the paragraph with the timeline link, a
 // table of the facts the card does not show (branch, Trove id, holder, the
-// event's place, block), and the previous and next links. The words
+// event's place, block, transaction), and the previous and next links. The words
 // are the strings file's `page_words` (content/liquity-v2/event-prose.yaml).
 // The table is identity and position, no figure that carries a receipt, so
 // the provenance tripwire passes over it.
@@ -136,6 +136,16 @@ function EventActions({ txHash, timelineHref }: { txHash: string; timelineHref: 
           {copied === "link" ? COPY_WORDS.copied : ACTION_WORDS.copy_link}
         </button>
       )}
+      <button
+        type="button"
+        className={ACTION}
+        title={ACTION_WORDS.copy_hash_hint}
+        data-menu-item="copy-tx-hash"
+        data-copied={copied === "hash" ? "" : undefined}
+        onClick={() => copy("hash", txHash)}
+      >
+        {copied === "hash" ? COPY_WORDS.copied : ACTION_WORDS.copy_hash}
+      </button>
       {mdHref && build && <CopyForLlmButton href={mdHref} build={build} className={ACTION} />}
     </div>
   );
@@ -202,6 +212,16 @@ export function LiquityEventPageAside(p: LiquityEventPageAsideProps) {
               {PAGE_WORDS.block}
             </th>
             <td className={`${TD} font-mono text-xs leading-5`}>{p.blockNumber}</td>
+          </tr>
+          <tr>
+            <th scope="row" className={TH}>
+              {PAGE_WORDS.transaction}
+            </th>
+            <td className={TD}>
+              <span className="block min-w-0 truncate font-mono text-xs leading-5" title={p.txHash} data-tx-hash="">
+                {p.txHash}
+              </span>
+            </td>
           </tr>
         </tbody>
       </table>

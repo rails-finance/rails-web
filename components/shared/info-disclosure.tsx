@@ -340,9 +340,9 @@ export function InfoTabsDisclosure({
   return (
     <div className={`${bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
       {heading && first ? (
-        // The event card's row. `rowExtra` (the card's action, the hash and
-        // its copy control) sits between the two halves of the toggle as a
-        // sibling, so no control nests in another. The chevron is a second
+        // The event card's row. `rowExtra` (the card's action) sits between
+        // the two halves of the toggle as a sibling, so no control nests in
+        // another. The chevron is a second
         // press area for the same toggle, out of the tab order: Tab reaches
         // the toggle, then the controls in `rowExtra`.
         <div className="group/t3row flex items-center gap-2">
