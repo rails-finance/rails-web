@@ -3,7 +3,7 @@
 // ledgers and decimals, then liquityEventProse. The test exports
 // (scripts/exports-liquity-v2.mjs) and the JSON route
 // (app/api/liquity-v2/event-prose/route.ts) call it with what they read; it
-// reads nothing itself.
+// reads nothing.
 
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";

@@ -552,7 +552,7 @@ footer_words:
   block: |-
     block {block}
 
-# ── Copy for LLM: the control and the block's own words ──
+# ── Copy for LLM: the control and the block's words ──
 copy_words:
   button: |-
     Copy for LLM
@@ -687,7 +687,7 @@ shared_sentences:
 #   L1         the header line: groups of words (an L1_words id) and figures (a
 #              placeholder, with the token symbol after it); a group whose figure
 #              the event lacks is left out
-#   sentences  its own sentences, each with `when` and `text`
+#   sentences  its sentences, each with `when` and `text`
 #   order      the order the explanation says them in, shared sentences included
 #   list       a liquidation's payout legs, said as a list under the sentences
 templates:

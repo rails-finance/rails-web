@@ -198,7 +198,7 @@ function saidIn(src) {
     }
     const args = src.slice(m.index + m[0].length, j);
     const first = args.split(/,\s*\{/)[0];
-    // A literal compared against (`variant === "raised"`) is a variant, not an id.
+    // A literal compared against (`variant === "raised"`) is a variant.
     for (const s of first.matchAll(/(?<![=!]== )"([a-z_.]+)"|`([^`]+)`/g)) {
       if (s[1]) out.push({ id: s[1] });
       else
