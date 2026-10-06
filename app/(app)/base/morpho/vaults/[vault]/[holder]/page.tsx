@@ -51,18 +51,15 @@ import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-econom
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
-import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { RecencyStamp } from "@/components/shared/recency-stamp";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { assetText } from "@/lib/shared/vault-amount-text";
 import { vaultHolderMaxWithdrawProv, type MorphoVaultCoords } from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { aaveVaultPositionContent } from "@/lib/shared/learn-more-content";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
-import { RailHeader } from "@/components/shared/rail-header";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { MORPHO_BASE_METAMORPHO_FACTORIES } from "@/lib/morpho-base/vault-catalog";
 import { isMorphoBaseRosterVault } from "@/lib/morpho-base/vault-roster";
@@ -411,24 +408,17 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
-          <div className="mb-4">
-            <RailHeader session="morpho-base" venue="position" />
-          </div>
-          {/* Smart-back returns the reader wherever they came from; the
-              fallback — a fresh tab, a pasted link — is the position listing
-              under the vault roster. */}
-          {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
-              the chain head and its age, and the holding's assets at their
-              current prices — the share, quoted in the vault's own asset —
-              with the page's instruments in Tools at the right end. */}
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
-            <div className="flex min-w-0 items-center gap-2">
-              <DetailBackButton fallbackHref={baseVaultsListingHref()} compact />
-              <RecencyStamp />
-              <LatestPrices assets={shareAssets} reason={ORACLE_USD_REASON["morpho-base"]} />
-            </div>
-            <ToolsMenu />
-          </div>
+          {/* Smart-back returns the reader wherever they came from; a fresh tab
+              lands on the vault section's listing. The price and recency strip
+              sits in the holder's address row, Back stands alone, and Tools
+              closes the row. The share is quoted in the vault's own asset. */}
+          <DetailTopRow
+            session="morpho-base"
+            fallbackHref={baseVaultsListingHref()}
+            assets={shareAssets}
+            priceReason={ORACLE_USD_REASON["morpho-base"]}
+            owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
+          />
           <h1 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
             <span className="font-mono">{subject}</span>
             <span className="ml-2 text-base font-normal text-rb-500">in {vaultName}</span>

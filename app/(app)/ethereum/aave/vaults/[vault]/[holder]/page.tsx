@@ -39,11 +39,9 @@ import { VaultFlowsTower } from "@/components/vaults/vault-flows-tower";
 import { VaultPositionCard } from "@/components/vaults/vault-position-card";
 import { VaultContextStrip, VaultContextStripStandalone } from "@/components/vaults/vault-context-strip";
 import { RiskFooterStrip } from "@/components/shared/risk-footer-strip";
-import { DetailBackButton } from "@/components/shared/detail-back-row";
+import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { RecencyStamp } from "@/components/shared/recency-stamp";
-import { ToolsMenu } from "@/components/shared/tools-menu";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
 import { shareText } from "@/lib/shared/vault-amount-text";
 import { cooldownSentence } from "@/lib/aave-vaults/cooldown-words";
@@ -66,7 +64,6 @@ import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
-import { RailHeader } from "@/components/shared/rail-header";
 import { BlockRef } from "@/components/shared/block-ref";
 
 // Every figure is a call at the head with the holder in the path — nothing
@@ -426,26 +423,17 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
-          <div className="mb-4">
-            <RailHeader session="aave-vaults" venue="position" />
-          </div>
-          {/* Smart-back returns the reader wherever they came from; the
-              fallback — a fresh tab, a pasted link — is the section's own
-              listing on this chain, which is where a position was opened from.
-              No session: the Vaults section has no roster entry to derive one
-              (rails-ops decision 0017). */}
-          {/* The one thin row of "latest" (rails-ops TO-DO-ui-jobs 48): back,
-              the chain head and its age, and the holding's assets at their
-              current prices — the share, quoted in the vault's own asset —
-              with the page's instruments in Tools at the right end. */}
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2" data-back-row>
-            <div className="flex min-w-0 items-center gap-2">
-              <DetailBackButton fallbackHref={ethereumVaultsListingHref()} compact />
-              <RecencyStamp />
-              <LatestPrices assets={shareAssets} reason={ORACLE_USD_REASON["aave-vaults"]} />
-            </div>
-            <ToolsMenu />
-          </div>
+          {/* Smart-back returns the reader wherever they came from; a fresh tab
+              lands on the vault section's listing. The price and recency strip
+              sits in the holder's address row, Back stands alone, and Tools
+              closes the row. The share is quoted in the vault's own asset. */}
+          <DetailTopRow
+            session="aave-vaults"
+            fallbackHref={ethereumVaultsListingHref()}
+            assets={shareAssets}
+            priceReason={ORACLE_USD_REASON["aave-vaults"]}
+            owner={{ wallet: lookup.address, filterProtocol: null, bookmarkProtocol: null }}
+          />
           <h1
             className="text-2xl font-semibold text-foreground"
             data-vault-page={address}
