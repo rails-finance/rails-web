@@ -141,6 +141,7 @@ export function ProvenanceInfoTabs({
 
   return (
     <InfoTabsDisclosure
+      bare
       tabs={tabs}
       openTab={openTab}
       rowExtra={rowExtra}
