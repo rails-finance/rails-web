@@ -134,31 +134,34 @@ export function PositionWalletRow({
     )
   ) : null;
   return (
-    // The address, its chevron and the kind label keep their width. The strip
-    // sits at the right end of their line when it fits and takes a line
-    // below, right-aligned, when it does not (ui-jobs 272); Tools stays at the
-    // first line's right. The wallet starts on the card content's line
-    // (CARD_INSET_START); Tools stays at the page edge.
+    // The row wraps: the address, its chevron and the kind label keep their
+    // width, Tools stays at the first line's right, and below sm the strip
+    // takes the line under them, flush right (ui-jobs 272). From sm up the
+    // strip sits before Tools on the address line, and wraps right-aligned
+    // when the row is too narrow for both. DOM order is address, strip,
+    // Tools. The wallet starts on the card content's line (CARD_INSET_START);
+    // Tools stays at the page edge.
     <div
-      className={`flex min-h-7 items-start justify-between gap-2 ${CARD_INSET_START}`}
+      className={`flex min-h-7 flex-wrap items-start gap-x-2 gap-y-1.5 ${CARD_INSET_START}`}
       data-position-wallet-row=""
       data-anatomy="H13"
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-        <span className="flex min-h-7 min-w-0 items-center gap-2 text-xs text-rb-500">
-          {pill && owner.prefix}
-          {pill && (owner.wrap ? owner.wrap(pill) : pill)}
-          {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
-          {owner.extra}
+      <span className="flex min-h-7 min-w-0 flex-auto basis-0 items-center gap-2 text-xs sm:basis-auto text-rb-500">
+        {pill && owner.prefix}
+        {pill && (owner.wrap ? owner.wrap(pill) : pill)}
+        {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
+        {owner.extra}
+      </span>
+      {strip && (
+        <span
+          className="order-last flex min-h-7 basis-full shrink-0 items-center justify-end gap-1 sm:order-none sm:ml-auto sm:basis-auto sm:gap-2"
+          data-position-strip=""
+        >
+          {strip}
         </span>
-        {strip && (
-          <span className="ml-auto flex min-h-7 shrink-0 items-center gap-1 sm:gap-2" data-position-strip="">
-            {strip}
-          </span>
-        )}
-      </div>
+      )}
       {tools !== false && (
-        <span className="flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
+        <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
       )}
     </div>
   );
