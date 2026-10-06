@@ -21,7 +21,7 @@ import {
   useEventCum,
   type EventLedgerSource,
 } from "@/components/shared/event-ledger";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
 import { tokenLedger } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -43,7 +43,6 @@ export function useMakerLedgerCells(): { debt: boolean } | null {
 function MakerLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: string; eventTs: number }) {
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
-  const usdShown = useUsdShown();
   const model = focus?.model;
   const ev = focus?.events.find((e) => e.id === eventId) ?? null;
   if (!model || !cum || !ev?.sides || !focus) return null;
@@ -51,7 +50,7 @@ function MakerLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: stri
   if (!sum) return null;
   const f = ev.sides[side];
   // The debt at its $1 face: its USD is its token amount.
-  const usd = usdShown(f.symbol, side === "debt" ? f.held : f.after, f.held);
+  const usd = usdShown(side === "debt" ? f.held : f.after);
   const rows = usd ? eventSideSum(model, side, cum, f.after) : null;
   const ledger = tokenLedger({
     model,

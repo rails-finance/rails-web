@@ -64,7 +64,7 @@ import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/l
 import { getBatchManagerByAddress, getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { formatDate, formatMonthDay } from "@/lib/date";
 import { formatGasCost } from "@/lib/shared/format-event";
-import { usdShown, type UsdSwitches } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 
 // ── Output ───────────────────────────────────────────────────────────────────
 
@@ -166,12 +166,7 @@ export interface LiquityProseInput {
   /** When the owner claimed a liquidation's surplus: undefined while unclaimed
    *  or unknown, null when claimed but undated. */
   surplusClaimedAt?: number | null;
-  /** The timeline's USD switches; the defaults where absent. */
-  usd?: UsdSwitches;
 }
-
-/** The Display menu's defaults: USD for other tokens on, for stablecoins off. */
-export const DEFAULT_USD_SWITCHES: UsdSwitches = { showUsdStable: false, showUsdOther: true, usdSplit: true };
 
 // ── Rounding ─────────────────────────────────────────────────────────────────
 
@@ -1095,7 +1090,6 @@ const PASSIVE = new Set(["redeemCollateral", "liquidate", "applyPendingDebt"]);
 /** The opened card's figures and their Markdown lines. */
 export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): LiquityL2 {
   const { ctx, previousEvent, currentPrice } = input;
-  const sw = input.usd ?? DEFAULT_USD_SWITCHES;
   const { stateBefore, stateAfter, troveOperation: op, liquidation } = ctx;
   const isClose = ctx.operation === "closeTrove";
   const isLiquidation = ctx.operation === "liquidate";
@@ -1220,10 +1214,9 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
       : fig.coll.before !== 0 && fig.coll.before !== fig.coll.after;
     const cAfter = isClose ? L2_WORDS.closed : fc(fig.coll.after);
     let collLine = `${L2_WORDS.collateral}: ${arrow(cShowBefore ? fc(fig.coll.before) : null, cAfter)} ${collSym}`;
-    const usdAfterShown =
-      !isClose && fig.coll.after > 0 && afterUsd > 0 && usdShown(sw, collSym, afterUsd, fig.coll.after);
+    const usdAfterShown = !isClose && fig.coll.after > 0 && afterUsd > 0 && usdShown(afterUsd);
     if (usdAfterShown) {
-      const beforeKnown = cShowBefore && beforeUsd > 0 && usdShown(sw, collSym, beforeUsd, fig.coll.before);
+      const beforeKnown = cShowBefore && beforeUsd > 0 && usdShown(beforeUsd);
       collLine += ` (${arrow(beforeKnown ? fmtUsdWhole(beforeUsd) : null, fmtUsdWhole(afterUsd))})`;
     }
     lines.push(collLine);
@@ -1236,10 +1229,10 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     if (d.accrualMove) {
       const move = fillText(L2_WORDS.accrual_move, { accrued_total: d.accrualShown, accrual_noun: noun });
       debtLine = `${L2_WORDS.debt}: ${move} = ${dAfter} ${debtSym}`;
-      if (usdShown(sw, debtSym, d.after, d.after)) debtLine += ` (${fmtUsdWhole(d.after)})`;
+      if (usdShown(d.after)) debtLine += ` (${fmtUsdWhole(d.after)})`;
     } else {
       debtLine = `${L2_WORDS.debt}: ${arrow(dShowBefore ? fd(d.before) : null, dAfter)} ${debtSym}`;
-      const debtUsd = !isClose && d.after > 0 && usdShown(sw, debtSym, d.after, d.after);
+      const debtUsd = !isClose && d.after > 0 && usdShown(d.after);
       if (debtUsd) debtLine += ` (${arrow(dShowBefore ? fmtUsdWhole(d.before) : null, fmtUsdWhole(d.after))})`;
       const sub: string[] = [];
       if (d.upfrontFee > 0) sub.push(fillText(L2_WORDS.fee, { upfront_fee: d.upfrontFee }));

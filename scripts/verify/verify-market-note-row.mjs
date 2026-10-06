@@ -315,7 +315,7 @@ async function displayMenuOffers(page, label) {
   for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
     await trigger.click();
     opened = await page
-      .getByRole("button", { name: /^Timestamps \(UTC\)$/i })
+      .getByRole("button", { name: /^Timeline values$/i })
       .waitFor({ state: "visible", timeout: 2500 })
       .then(() => true)
       .catch(() => false);

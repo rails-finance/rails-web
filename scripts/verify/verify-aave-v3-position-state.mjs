@@ -269,10 +269,8 @@ async function openCard(page, fx) {
     .first()
     // A wallet with thousands of events paints its count late on a cold route.
     .waitFor({ state: "visible", timeout: 240000 });
-  // Display's "USD for stablecoins" is off by default; the lines below are
-  // held to their USD figure on every reserve, so it goes on (the rule for a
-  // pegged stablecoin is verify-usd-display.ts).
-  await setDisplayFlag(page, "USD for stablecoins", true);
+  // USD shows beside every priced amount, a pegged stablecoin's included
+  // (the rule is verify-usd-display.ts).
   let card = null;
   for (let i = 0; i < 25 && !card; i++) {
     const hits = page.locator(`[data-event-id*="${fx.tx}"]`);
@@ -322,33 +320,6 @@ async function waitForAnswer(card) {
   if (await card.locator('[data-position-state="ready"]').count()) return "ready";
   if (await card.locator('[data-position-state="unavailable"]').count()) return "unavailable";
   return "none";
-}
-
-/** The Display menu's toggle (verify-historic-usd-pills' own driver). */
-async function setDisplayFlag(page, label, wantOn) {
-  const countSpan = page.getByText(COUNT_LINE).first();
-  const row = countSpan.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-  );
-  const trigger = row.locator("div.relative.inline-flex.items-center > button").last();
-  const item = page.getByRole("button", { name: new RegExp(`^${label}$`, "i") });
-  let opened = false;
-  for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
-    await trigger.click();
-    opened = await item
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) await page.waitForTimeout(700);
-  }
-  if (!opened) throw new Error(`Display menu never offered "${label}"`);
-  const isOn = await item
-    .locator("span")
-    .first()
-    .evaluate((el) => el.className.includes("bg-rb-500"))
-    .catch(() => false);
-  if (isOn !== wantOn) await item.click();
-  await countSpan.click();
 }
 
 /** The receipt behind a card value, through the page's inspector. */
@@ -642,24 +613,13 @@ for (const fx of FIXTURES) {
     if (fx.deep) {
       // A closed cell that opens into a ledger states no dollars after its
       // tokens: the ledger's USD column does (ui-jobs 289). A cell with no
-      // ledger keeps them, and they follow Display's two USD switches.
+      // ledger keeps them.
       const ledgerUsdSel =
         '[data-position-state="ready"] [data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]';
-      const chipSel =
-        '[data-position-state="ready"] [data-ledger-cell]:not(:has([data-ledger-toggle])) [data-ledger-closed-usd]';
-      await setDisplayFlag(page, "USD for stablecoins", true);
-      await setDisplayFlag(page, "USD for other tokens", true);
       check(
         `${fx.label}: a closed cell with a ledger states no USD after its tokens`,
         (await card.locator(ledgerUsdSel).count()) === 0,
       );
-      if ((await card.locator(chipSel).count()) > 0) {
-        await setDisplayFlag(page, "USD for stablecoins", false);
-        await setDisplayFlag(page, "USD for other tokens", false);
-        check(`${fx.label}: USD leaves when both USD switches are off`, (await card.locator(chipSel).count()) === 0);
-        await setDisplayFlag(page, "USD for stablecoins", true);
-        await setDisplayFlag(page, "USD for other tokens", true);
-      }
       if (a) {
         const hfReceipt = await receiptText(
           page,

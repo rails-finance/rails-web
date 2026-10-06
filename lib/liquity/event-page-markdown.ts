@@ -15,7 +15,7 @@ import { liquityFlowTimeline, liquityFocusEvents, liquityV2FlowEvents } from "@/
 import { buildFlowModel } from "@/lib/shared/flows-timeline";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
-import { DEFAULT_USD_SWITCHES, liquityEventProse } from "@/lib/liquity/event-prose";
+import { liquityEventProse } from "@/lib/liquity/event-prose";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
 
 export interface EventPageMarkdownInput {
@@ -85,8 +85,8 @@ export function liquityEventPageMarkdown(input: EventPageMarkdownInput): string 
   });
   const ledgers = model
     ? {
-        collateral: liquityEventLedger(model, focusEvents, event.id, "collateral", DEFAULT_USD_SWITCHES),
-        debt: liquityEventLedger(model, focusEvents, event.id, "debt", DEFAULT_USD_SWITCHES),
+        collateral: liquityEventLedger(model, focusEvents, event.id, "collateral"),
+        debt: liquityEventLedger(model, focusEvents, event.id, "debt"),
       }
     : null;
   return liquityEventMarkdown(

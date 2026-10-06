@@ -22,7 +22,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   AssetLedgers,
@@ -322,7 +322,6 @@ export function FlowMomentCard({
   // ── The open card: each side as an event card's ledger cell ────────────
   // Per asset: what its last event left (Held / Owed), the interest since,
   // and the asset's total line; the side's USD total under several assets.
-  const usdShown = useUsdShown();
   const focus = useFlowFocus();
   /** The largest running total of the side's flows by the moment, in the
    *  asset's token: an event's ledger prints the asset at decimals sized to
@@ -485,7 +484,7 @@ export function FlowMomentCard({
           )
         : s.assets.map((a) => (a.usd != null ? Math.round(a.usd) : null));
     const built = s.assets.map((a, i) => ({ a, ...assetLedger(side, a, shares[i]) }));
-    const shownFor = (a: MomentAsset) => a.usd != null && usdShown(a.symbol, a.usd, a.tokens);
+    const shownFor = (a: MomentAsset) => a.usd != null && usdShown(a.usd);
     const sideTotal =
       multi && usd != null
         ? { before: null, after: wholeUsd(usd, unitOf(model, side)), dollars: Math.round(usd) }

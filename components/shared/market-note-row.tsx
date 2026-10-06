@@ -81,7 +81,6 @@ import {
 } from "@/components/shared/state-transition";
 import { StepMark } from "@/components/shared/step-mark";
 import { EventDateContext, EventTime } from "@/components/shared/event-time";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -542,7 +541,6 @@ export function LiveNoteGroupRow({
   nodeControl?: ReactNode;
 }) {
   const scale = useTimelineScale();
-  const { showTimestamps } = useTimelineDisplay();
   return (
     <div
       data-live-note-group={group.notes.length}
@@ -556,7 +554,7 @@ export function LiveNoteGroupRow({
       <div className="min-w-0 grow rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">
           <span className="text-xs font-medium text-rb-500">{LIVE_GROUP_TITLE}</span>
-          {showTimestamps && <span className="ml-auto text-xs text-rb-500">Now</span>}
+          <span className="ml-auto text-xs text-rb-500">Now</span>
         </div>
         {group.notes.map((note) => (
           <LiveNoteLine key={note.id} note={note} />
@@ -652,11 +650,8 @@ function elapsedFigure(note: MarketNote, text: string, prov: Provenance): NoteFi
 
 /** The row's time, where a card states its own: the date of the stretch's
  *  later end, on the timeline's day-stamp rule, or "Now" on a live note, whose
- *  later end is the price read at the chain head. Hidden with the timeline's
- *  timestamps, like a card's. */
+ *  later end is the price read at the chain head. */
 function NoteTime({ note, datePrefix }: { note: MarketNote; datePrefix: string | null }) {
-  const { showTimestamps } = useTimelineDisplay();
-  if (!showTimestamps) return null;
   if (note.live) {
     return (
       <span className="evt-meta ml-auto inline-flex items-center gap-2">

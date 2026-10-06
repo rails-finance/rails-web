@@ -56,7 +56,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import { fetchLiquityForkPosition, type LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_FORK_FOLDER_REGISTER, liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
-import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { AsymmetryEventCard } from "@/components/protocol/asymmetry/asymmetry-event-card";
@@ -583,7 +583,7 @@ export default function AsymmetryTroveDetail({
                 );
               })()}
             <ChainTruthTimeline
-              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               csvExportCeiling={INDEX_ROW_CEILING}
               // Matches `AsymmetryEventCard`'s own
               // `persistKey={`asymmetry:${event.id}`}` — lets pinned mode (the

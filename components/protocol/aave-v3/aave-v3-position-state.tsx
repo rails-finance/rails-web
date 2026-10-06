@@ -40,7 +40,6 @@ import {
 } from "@/components/shared/state-transition";
 import { ClosedTokens, ClosedUsd } from "@/components/shared/event-ledger";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
 import { fmtPositionAmount, fmtPositionUsd } from "@/components/shared/position-row";
@@ -253,7 +252,6 @@ export function ClosedSide({
    *  where the block's read has none. */
   usd: { before: Figure | null; after: Figure; change: Figure | null } | null;
 }) {
-  const usdShown = useUsdShown();
   const legOf = (r: AaveV3PositionStateReserve) => (side === "supply" ? r.supply : r.debt);
   const rows = state.reserves.filter((r) => r.decimals != null && legHeld(legOf(r)));
   const afterProvOf = (r: AaveV3PositionStateReserve): Provenance => {
@@ -288,7 +286,7 @@ export function ClosedSide({
     const sign = moved.sign < 0 ? "−" : "+";
     const uAfter = exactUsd(state, r, side, "after", coords);
     const uBefore = moved.sign !== 0 ? exactUsd(state, r, side, "before", coords) : undefined;
-    const usdOn = (uAfter != null || uBefore != null) && usdShown(sym, uAfter?.value ?? null, Number(after));
+    const usdOn = uAfter != null || uBefore != null;
     return (
       <div className="flex flex-col items-end" data-receipt-total={side}>
         <StateTransition>

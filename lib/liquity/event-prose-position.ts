@@ -12,12 +12,7 @@ import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { liquityFlowTimeline, liquityFocusEvents, liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
 import { buildFlowModel } from "@/lib/shared/flows-timeline";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
-import {
-  DEFAULT_USD_SWITCHES,
-  liquityEventProse,
-  type LiquityEventContext,
-  type LiquityEventProse,
-} from "@/lib/liquity/event-prose";
+import { liquityEventProse, type LiquityEventContext, type LiquityEventProse } from "@/lib/liquity/event-prose";
 import type { LiquityEventLedgers } from "@/lib/liquity/event-markdown";
 
 type LiquityEvent = BaseActivityEvent & { context: { protocol: "liquity-v2-troves"; data: LiquityContext } };
@@ -88,8 +83,8 @@ export function liquityPositionProse(input: LiquityPositionInput): LiquityProseR
     });
     const l3 = model
       ? {
-          collateral: liquityEventLedger(model, focusEvents, event.id, "collateral", DEFAULT_USD_SWITCHES),
-          debt: liquityEventLedger(model, focusEvents, event.id, "debt", DEFAULT_USD_SWITCHES),
+          collateral: liquityEventLedger(model, focusEvents, event.id, "collateral"),
+          debt: liquityEventLedger(model, focusEvents, event.id, "debt"),
         }
       : null;
     const url = `${input.site}/ethereum/liquity-v2/trove/${branch}/${troveId}/event/${encodeURIComponent(event.id)}`;

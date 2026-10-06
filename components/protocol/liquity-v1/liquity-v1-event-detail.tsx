@@ -30,7 +30,7 @@ import {
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LedgerCell, PendingBar } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
@@ -198,7 +198,6 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
     split?.full || ctx.eventType === "liquidation" ? wallet : null,
   );
   const price = liquityV1EventPrice(ctx, read);
-  const usdShown = useUsdShown();
 
   const isOpen = ctx.eventType === "openTrove";
   const isClose = ctx.eventType === "closeTrove";
@@ -310,7 +309,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                 <P info={collDeltaProv(coords, { after: ctx.collAfter, before: ctx.collBefore })}>{collDeltaStr}</P>
               }
               beforeExtra={
-                (isRedemption || isLiq) && usdBefore != null && usdShown(COLLATERAL_SYMBOL, usdBefore, s.collBefore) ? (
+                (isRedemption || isLiq) && usdBefore != null && usdShown(usdBefore) ? (
                   <P
                     info={collUsdAtBlockProv(coords, {
                       coll: ctx.collBefore,
@@ -323,7 +322,7 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                 ) : undefined
               }
               afterExtra={
-                usdAfter != null && usdShown(COLLATERAL_SYMBOL, usdAfter, s.collAfter) ? (
+                usdAfter != null && usdShown(usdAfter) ? (
                   <P
                     info={collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price as number, side: "after" })}
                   >

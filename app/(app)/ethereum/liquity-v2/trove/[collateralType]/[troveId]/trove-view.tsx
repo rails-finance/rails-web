@@ -54,7 +54,7 @@ import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import type { MobileSpineConfig } from "@/components/shared/mobile-spine";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { priceGapNotesFor, livePriceGapNote } from "@/lib/shared/market-note";
-import { TimelineActivityHeader, LIQUITY_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromLimit } from "@/lib/shared/timeline-boundary";
 import { TIMELINE_WINDOW_EVENTS } from "@/lib/shared/timeline-opening-balance";
@@ -712,7 +712,7 @@ export default function TroveView({
               liveNotes={liveNotes}
               liveNotesPending={isOpen && !!branch && liveOraclePending}
               runs={LIQUITY_TIMELINE_RUNS}
-              displayItems={LIQUITY_DISPLAY_ITEMS}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               mobileSpine={LIQUITY_MOBILE_SPINE}
               emptyLabel="No transaction history available"
               toolbarLeading={

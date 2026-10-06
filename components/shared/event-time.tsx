@@ -3,7 +3,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import { formatTimestamp } from "@/lib/shared/format-event";
-import { useTimelineDisplay } from "./timeline-display-context";
 
 /**
  * Optional date prefix for the next event's timestamp.
@@ -28,16 +27,13 @@ export const EventDayMarkContext = createContext<ReactNode>(null);
  * The clock is UTC — a block timestamp IS a UTC instant, and it is also what
  * lets this render on the server (see formatTimestamp). Nothing on the row
  * says so, because a "UTC" on every row of a 200-row list is noise; the zone
- * is stated in the two places a reader can act on it: the display menu item
- * that turns these on ("Timestamps (UTC)"), and this title, which also names
- * the UTC day — the fact most at risk near midnight, where a reader's own
- * zone would put the event on the other side of the date.
+ * is stated in this title, which names the UTC day — the fact most at risk
+ * near midnight, where a reader's own zone would put the event on the other
+ * side of the date.
  */
 export function EventTime({ ts }: { ts: number }) {
   const datePrefix = useContext(EventDateContext);
   const mark = useContext(EventDayMarkContext);
-  const { showTimestamps } = useTimelineDisplay();
-  if (!showTimestamps) return mark ? <>{mark}</> : null;
   const time = formatTimestamp(ts);
   return (
     <>

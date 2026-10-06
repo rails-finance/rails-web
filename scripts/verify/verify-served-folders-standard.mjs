@@ -221,7 +221,7 @@ async function menuLabels(page) {
   });
   if (!tagged) return null;
   const trigger = page.locator("button[data-verify-timeline-display]");
-  const anchor = page.getByRole("button", { name: /^Timestamps \(UTC\)$/i }).first();
+  const anchor = page.getByRole("button", { name: /^Timeline values$/i }).first();
   for (let attempt = 0; attempt < 8; attempt++) {
     await trigger.click().catch(() => {});
     const open = await anchor

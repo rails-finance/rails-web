@@ -10,7 +10,8 @@ import type { ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DeltaToggle } from "@/components/shared/state-transition";
-import { useTimelineDisplay, useUsdShown } from "@/components/shared/timeline-display-context";
+import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { ExactTip } from "@/components/shared/amount-text";
 import { formatTinyNonZero } from "@/lib/utils/format";
 
@@ -84,7 +85,6 @@ export function PositionRow({
   formatAmount?: (v: string | number | undefined) => string;
 }) {
   const { showTickerLabels } = useTimelineDisplay();
-  const usdShown = useUsdShown();
   const afterN = parseFloat(amount) || 0;
   // The arrow doubles as a toggle: clicking `before →` swaps it for the change
   // `+delta =`, this asset's balance change in token units.
@@ -130,7 +130,7 @@ export function PositionRow({
         </span>
       )}
       {showTickerLabels && <span className="text-xs">{ticker}</span>}
-      {usd != null && usdShown(symbol, usd.value, amount) && (
+      {usd != null && usdShown(usd.value) && (
         <span className="text-xs flex font-bold items-center text-rb-500 border-l-2 border-r-2 ml-0.5 border-rb-500 rounded-sm px-1 py-0">
           <Prov info={usd.prov} value={usd.exact}>
             {fmtPositionUsd(usd.value)}

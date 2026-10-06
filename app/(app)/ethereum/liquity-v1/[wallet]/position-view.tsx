@@ -37,7 +37,7 @@ import {
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_V1_REDEMPTION_RUNS } from "@/lib/liquity-v1/timeline-runs";
-import { CHAIN_TRUTH_USD_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
+import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -622,7 +622,7 @@ export default function LiquityV1TroveView({
               />
             )}
             <ChainTruthTimeline
-              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               csvExportCeiling={INDEX_ROW_CEILING}
               // Matches `LiquityV1EventCard`'s own `persistKey={`liquity-v1:${event.id}`}`
               // — lets pinned mode (the per-event share route) force a landed

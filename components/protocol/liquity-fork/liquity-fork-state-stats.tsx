@@ -427,8 +427,7 @@ export function liquityForkStateStats(
       ctx.debtDelta,
     ),
     ...(debtSub ? { sub: debtSub } : {}),
-    // The debt's USD at its $1 face, as the cell's ledger counts it; the
-    // Display menu's "USD for stablecoins" governs it.
+    // The debt's USD at its $1 face, as the cell's ledger counts it.
     ...(Number(ctx.debtAfter) > 0
       ? {
           usd: { value: Number(ctx.debtAfter), prov: faceUsdProv(debtSymbol, fmt(ctx.debtAfter), "after") },

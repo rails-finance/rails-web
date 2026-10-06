@@ -44,7 +44,7 @@ import {
   ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -777,7 +777,6 @@ export function ChainTruthDetail({
   symbolText?: boolean;
 }) {
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
-  const usdShown = useUsdShown();
   const unreadOf = useUnreadTokenOf();
   const ledgerSrc = useContext(EventLedgerContext);
   // A ledger cell's closed figures stand at the decimals its opened ledger
@@ -825,7 +824,7 @@ export function ChainTruthDetail({
           );
         // A ledger cell keeps its tokens' before → after on one line.
         const Tokens = s.ledger ? ClosedTokens : Fragment;
-        const usdOn = s.usd && (s.usdAlways || usdShown(s.symbol, s.usd.value, s.usdAmount ?? s.value));
+        const usdOn = s.usd && (s.usdAlways || usdShown(s.usd.value));
         return (
           <div key={i} className={s.ledger ? "contents" : "h-full"}>
             {wrap(

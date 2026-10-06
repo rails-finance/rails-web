@@ -15,13 +15,7 @@ import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-su
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { useMenuCopied } from "@/components/shared/event-card-menu";
-import {
-  liquityEventProse,
-  DEFAULT_USD_SWITCHES,
-  type EchoKey,
-  type LiquityEventProse,
-  type ProseSentence,
-} from "@/lib/liquity/event-prose";
+import { liquityEventProse, type EchoKey, type LiquityEventProse, type ProseSentence } from "@/lib/liquity/event-prose";
 import { liquityEventDecimals, liquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { liquityEventMarkdown } from "@/lib/liquity/event-markdown";
 import { COPY_WORDS } from "@/lib/liquity/event-templates";
@@ -164,8 +158,8 @@ export function useLiquityEventMarkdown(
     const ledgers =
       model && events
         ? {
-            collateral: liquityEventLedger(model, events, event.id, "collateral", DEFAULT_USD_SWITCHES),
-            debt: liquityEventLedger(model, events, event.id, "debt", DEFAULT_USD_SWITCHES),
+            collateral: liquityEventLedger(model, events, event.id, "collateral"),
+            debt: liquityEventLedger(model, events, event.id, "debt"),
           }
         : null;
     return liquityEventMarkdown(

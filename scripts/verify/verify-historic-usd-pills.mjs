@@ -172,51 +172,6 @@ function resolveEventNumber(events, { block, eventType, symbol }, label) {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-/** Open the toolbar's "Display" eye-menu and toggle the named item on/off
- *  (idempotent target state), then close the menu. */
-async function setDisplayFlag(page, label, wantOn) {
-  // The eye-menu trigger is the LAST FilterDropdown's own direct-child
-  // <button> in the toolbar's control row (the "Types of event" dropdown is
-  // the only other one wired the same way, and it always renders first) —
-  // located via the "N events" count span, which anchors that row
-  // unambiguously. The `>` direct-child combinator is load-bearing: once the
-  // panel is open its rows are ALSO <button>s inside the same wrapper div,
-  // and a plain descendant `button` selector's `.last()` would grab the
-  // panel's last row instead of the trigger (misfires the wrong toggle).
-  const countSpan = page.getByText(/^\d+ events?$/).first();
-  await countSpan.waitFor({ state: "visible", timeout: 30000 });
-  const row = countSpan.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-  );
-  const trigger = row.locator("div.relative.inline-flex.items-center > button").last();
-  const item = page.getByRole("button", { name: new RegExp(`^${label}$`, "i") });
-  // A click that lands before React has attached the handler is swallowed and
-  // the menu never opens — on a small, fast-painting wallet that is the common
-  // case, not the rare one. Retry until the panel is actually up; each failed
-  // attempt left the menu closed, so re-clicking opens rather than toggles.
-  let opened = false;
-  for (let attempt = 0; attempt < 6 && !opened; attempt += 1) {
-    await trigger.click();
-    opened = await item
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) await page.waitForTimeout(700);
-  }
-  if (!opened) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
-  // multi-select items carry no aria-pressed; read the checkbox dot instead
-  // (filled bg-rb-500 = on).
-  const isOn = await item
-    .locator("span")
-    .first()
-    .evaluate((el) => el.className.includes("bg-rb-500"))
-    .catch(() => false);
-  if (isOn !== wantOn) await item.click();
-  // Close by clicking outside the dropdown — it has no Escape handler, only
-  // a mousedown-outside listener; the count span is a safe neutral target.
-  await countSpan.click();
-}
-
 /** Grow the render window until every event is painted. The cap counts PRESSES,
  *  and one press paints `TIMELINE_PAGE_ROWS` (lib/shared/timeline-opening-balance.ts)
  *  — halve that constant and a fixed cap reaches half as far, so the cap is set
@@ -338,8 +293,6 @@ async function openTimeline(proto, wallet) {
     .first()
     .waitFor({ state: "visible", timeout: 60000 });
 
-  await setDisplayFlag(page, "USD for stablecoins", true);
-  await setDisplayFlag(page, "USD for other tokens", true);
   await showAll(page);
   return page;
 }
@@ -403,19 +356,6 @@ async function runProtocol(proto, wallet, cases) {
       `${proto}: a closed cell with a ledger states no USD after its tokens`,
       (await card.locator("[data-ledger-cell]:has([data-ledger-toggle]) [data-ledger-closed-usd]").count()) === 0,
     );
-    const asset = card.locator("[data-ledger-closed-usd]");
-    const assetOn = await asset.count();
-    const totalOn = await card.locator(usdChipSel).count();
-    await setDisplayFlag(page, "USD for stablecoins", false);
-    await setDisplayFlag(page, "USD for other tokens", false);
-    check(
-      `${proto}: asset dollars disappear with both USD switches off; a side's total stays`,
-      (await asset.count()) === 0 && (await card.locator(usdChipSel).count()) === totalOn,
-      `${assetOn} asset figure(s) and ${totalOn} total(s) with the switches on`,
-    );
-    await setDisplayFlag(page, "USD for stablecoins", true);
-    await setDisplayFlag(page, "USD for other tokens", true);
-    check(`${proto}: asset dollars return with both USD switches back on`, (await asset.count()) === assetOn);
   }
 
   // ── Priced liquidation: both legs + forensics ───────────────────────

@@ -26,7 +26,7 @@ import {
   dayStamp,
   useEventCum,
 } from "@/components/shared/event-ledger";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import type { Provenance } from "@/components/shared/provenance";
 import { formatUsdValue } from "@/lib/utils/format";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -283,7 +283,6 @@ function SideLedger({
   eventTs?: number;
 }) {
   const focus = useFlowFocus();
-  const usdShown = useUsdShown();
   const model = focus?.model;
   if (!model || !focus) return null;
   if (facts.held == null)
@@ -317,7 +316,7 @@ function SideLedger({
     const priceOf = (sym: string) => bySum.balances.find((x) => x.symbol === sym);
     const shownFor = (sym: string) => {
       const b = priceOf(sym);
-      return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
+      return usdShown(b?.price != null ? b.amount * b.price : null);
     };
     const single = assetTokenSum(bySum);
     if (single) {

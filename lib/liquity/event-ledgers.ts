@@ -7,7 +7,7 @@
 import { eventCum, eventSideSum, eventTokenSum, type FocusEvent } from "@/lib/shared/flow-focus";
 import { dayCloseNote, tokenLedger, type Ledger } from "@/lib/shared/event-ledger";
 import type { FlowModel, FlowSide } from "@/lib/shared/flows-timeline";
-import { usdShown, type UsdSwitches } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 import { LQ } from "@/lib/shared/liquity-flows";
 import { L2_WORDS } from "@/lib/liquity/event-templates";
 
@@ -29,7 +29,6 @@ export function liquityEventLedger(
   events: FocusEvent[],
   eventId: string,
   side: FlowSide,
-  sw: UsdSwitches,
 ): LiquityEventLedger | null {
   const cum = eventCum(model, events, eventId);
   const ev = events.find((e) => e.id === eventId) ?? null;
@@ -38,7 +37,7 @@ export function liquityEventLedger(
   if (!sum) return null;
   const f = ev.sides[side];
   // The debt at its $1 face: its USD is its token amount.
-  const usd = usdShown(sw, f.symbol, side === "debt" ? f.held : f.after, f.held);
+  const usd = usdShown(side === "debt" ? f.held : f.after);
   const rows = usd ? eventSideSum(model, side, cum, f.after) : null;
   const ledger = tokenLedger({
     model,

@@ -65,7 +65,7 @@ import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
-import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { CaptureSourceProvider } from "@/lib/shared/capture-source";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
@@ -736,7 +736,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                       folderRegister={AAVE_V3_FOLDER_REGISTER}
                       readFolderMembers={readFolderMembers}
                       segments={segments}
-                      displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+                      displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                       toolbarLeading={
                         <TimelineActivityHeader
                           events={headerStamps}

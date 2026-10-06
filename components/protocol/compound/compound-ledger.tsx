@@ -23,7 +23,7 @@ import {
   useEventCum,
   type EventLedgerSource,
 } from "@/components/shared/event-ledger";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { assetTokenSum, eventAssetSum, eventSideSum, eventSideSumByAsset } from "@/lib/shared/flow-focus";
 import { assetLedgers, dollarLedger, tokenLedger } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -44,7 +44,6 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
   const focus = useFlowFocus();
   const rp = useContext(CompoundFlowReplayContext);
   const cum = useEventCum(eventId);
-  const usdShown = useUsdShown();
   const model = focus?.model;
   if (!model || !focus || !rp || !cum) return null;
   const at = `this event (${dayStamp(eventTs)})`;
@@ -65,7 +64,7 @@ function CompoundSideLedger({ side, eventId, eventTs }: { side: FlowSide; eventI
   if (bySum) {
     const shownFor = (sym: string) => {
       const b = bySum.balances.find((x) => x.symbol === sym);
-      return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
+      return usdShown(b?.price != null ? b.amount * b.price : null);
     };
     const single = assetTokenSum(bySum);
     if (single) {

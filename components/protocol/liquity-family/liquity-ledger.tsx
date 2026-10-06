@@ -5,8 +5,7 @@
 // Collateral and Debt cells each open into the side's flows as of the event,
 // in the side's token (the collateral token, the
 // stablecoin), landing on what the Trove held or owed then. USD follows the
-// timeline's Display switches ("USD for other tokens" for the collateral,
-// "USD for stablecoins" for the debt). The figures come from the Trove's
+// timeline's USD rule (lib/shared/usd-display.ts). The figures come from the Trove's
 // replay (lib/shared/liquity-flows.ts `liquityFocusEvents`); the rows from
 // lib/shared/event-ledger.ts; the cells from components/shared/event-ledger.tsx.
 
@@ -22,7 +21,7 @@ import {
   useEventCum,
   type EventLedgerSource,
 } from "@/components/shared/event-ledger";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { eventSideSum, eventTokenSum } from "@/lib/shared/flow-focus";
 import { tokenLedger } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -42,7 +41,6 @@ function LiquityLedger({
 }) {
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
-  const usdShown = useUsdShown();
   const model = focus?.model;
   const ev = focus?.events.find((e) => e.id === eventId) ?? null;
   if (!model || !cum || !ev?.sides || !focus) return null;
@@ -50,7 +48,7 @@ function LiquityLedger({
   if (!sum) return null;
   const f = ev.sides[side];
   // The debt at its $1 face: its USD is its token amount.
-  const usd = usdShown(f.symbol, side === "debt" ? f.held : f.after, f.held);
+  const usd = usdShown(side === "debt" ? f.held : f.after);
   const rows = usd ? eventSideSum(model, side, cum, f.after) : null;
   const ledger = tokenLedger({
     model,

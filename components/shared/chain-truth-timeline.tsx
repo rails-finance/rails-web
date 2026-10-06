@@ -545,7 +545,7 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
   const tip = `${props.tl.totalCount}:${props.tl.servedRowCount ?? props.tl.sortedEvents.length}`;
   return (
     <SingleWalletProvider value={true}>
-      <TimelineDisplayProvider usdSplit={props.displayItems?.some((i) => i.key === "showUsdStable") ?? false}>
+      <TimelineDisplayProvider>
         <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
           <ChainTruthTimelineBody {...props} />
         </FolderMembersProvider>

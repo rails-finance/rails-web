@@ -89,7 +89,7 @@ import {
 } from "@/lib/spark/economics";
 import { sparkEconomicsExplanation, sparkEconomicsContent } from "@/lib/spark/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { TimelineActivityHeader, CHAIN_TRUTH_USD_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
+import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
@@ -869,7 +869,7 @@ export default function SparkPositionDetail({
               // The USD-values toggle joins the chain-state items: the detail
               // grid renders after-balance USD chips off the captured
               // oracle-at-block prices (mig 092).
-              displayItems={CHAIN_TRUTH_USD_DISPLAY_ITEMS}
+              displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               // Tenure-first header (the V4 spoke treatment): when the account
               // started, how long it has run, how fresh the latest activity is.
               toolbarLeading={

@@ -124,7 +124,7 @@ export function LiquityEventHeader({
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
-  const { showTimestamps, showTimelineValues } = useTimelineDisplay();
+  const { showTimelineValues } = useTimelineDisplay();
   // A redemption's lozenges move onto the spine node's flanks in the phone
   // spine view (SpineColumn's `warningLegs`); the opened card drops them.
   const spineFlankHide = showTimelineValues && !title ? "mspine:max-sm:hidden" : "";
@@ -163,11 +163,9 @@ export function LiquityEventHeader({
             <PageMeta timestamp={timestamp} counter={counter} />
           ) : (
             <>
-              {showTimestamps && (
-                <span className="text-xs ">
-                  {new Date(timestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC" })}
-                </span>
-              )}
+              <span className="text-xs ">
+                {new Date(timestamp * 1000).toLocaleDateString("en-GB", { timeZone: "UTC" })}
+              </span>
               {counter}
             </>
           )}

@@ -277,35 +277,13 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
   { key: "openAllMarketNotes", label: "Open all market notes" },
 ];
 
-/** Display flags the chain-state timeline (Morpho + MakerDAO) exposes — only the
- *  ones with a render path on these pared-down cards (no USD/ratio layers). Shared so the two can't drift. */
+/** Display flags the chain-state timeline exposes: the ones with a render path
+ *  on every family's cards (Morpho, MakerDAO, Aave V3 + Spark, the Liquity
+ *  forks, Liquity V1). USD and timestamps always show, so Timeline values is
+ *  the one item. Collapse-runs is NOT listed: ChainTruthTimeline appends it
+ *  itself whenever the page passes `runs`. */
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-];
-
-/** The chain-state items + the two USD switches (stablecoins, other tokens;
- *  lib/shared/usd-display.ts) — for the explorers whose index carries
- *  per-event oracle-at-block prices (Aave V3 + Spark, server mig 092; the
- *  Liquity V2 forks' branch price at the block): their detail grids render
- *  the after-balance USD chip, so the flags have a render path there. Order mirrors the V4 spoke menu. */
-export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimestamps", label: "Timestamps (UTC)" },
-  { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showUsdStable", label: "USD for stablecoins" },
-  { key: "showUsdOther", label: "USD for other tokens" },
-];
-
-/** The Liquity V2 trove page's display menu: the two USD switches on top of
- *  the chain-truth base, in the V2 menu's original order. The card header
- *  carries no ratio, so the menu has no ratio switch (ui-jobs 290).
- *  Collapse-runs is NOT listed: ChainTruthTimeline appends it itself whenever
- *  the page passes `runs`. */
-export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimestamps", label: "Timestamps (UTC)" },
-  { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showUsdStable", label: "USD for stablecoins" },
-  { key: "showUsdOther", label: "USD for other tokens" },
 ];
 
 /** The Polaris CDP page's display menu: the chain-truth base plus the
@@ -314,7 +292,6 @@ export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
  *  fixed. No collapse item: the CDP timeline passes no
  *  `runs` (rails-ops TO-DO-polaris-v2-parity §1.4, measured 2026-09-10). */
 export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
 ];

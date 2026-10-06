@@ -20,7 +20,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { DeltaToggle, StateTransition, changeTone } from "@/components/shared/state-transition";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import {
@@ -121,7 +121,6 @@ function SideLedger({
 }) {
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
-  const usdShown = useUsdShown();
   const ctx = useContext(CTokenLedgerContext);
   const brand = ctx?.brand ?? "the protocol";
   const receipt = ctx?.receipt;
@@ -141,7 +140,7 @@ function SideLedger({
     );
   const shownFor = (sym: string) => {
     const b = sum.balances.find((x) => x.symbol === sym);
-    return usdShown(sym, b?.price != null ? b.amount * b.price : null, b?.amount ?? null);
+    return usdShown(b?.price != null ? b.amount * b.price : null);
   };
   const totalProv = heldProv(side, at, brand, false, receipt, words);
   const totalBeforeProv = heldProv(side, at, brand, true, receipt, words);
@@ -207,7 +206,6 @@ function ClosedSide({
   receipt?: string;
   words?: CTokenLedgerData["words"];
 }) {
-  const usdShown = useUsdShown();
   const at = atWords(eventTs);
   const assets = state.balances[side];
   const moved = state.moved[side];
@@ -220,7 +218,7 @@ function ClosedSide({
     const fmt = (v: number) => (decimals != null && v < 1e6 ? fmtTokens(v, decimals) : fmtPositionAmount(v));
     const changed = moved && fmt(a.before) !== fmt(a.amount);
     const usd = a.price != null ? a.amount * a.price : null;
-    const usdOn = usd != null && usdShown(a.symbol, usd, a.amount);
+    const usdOn = usd != null && usdShown(usd);
     return (
       <StateTransition>
         <ClosedTokens>

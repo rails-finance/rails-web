@@ -1,50 +1,38 @@
-// verify-usd-display — the timeline Display rule for USD values
-// (lib/shared/usd-display.ts): stablecoins off by default, other tokens on, a
-// stablecoin more than 1% off $1 at the event shown anyway, and a page
-// without the two switches following the one for other tokens. The Liquity
-// family's stables (BOLD, ebUSD, USDaf, BD) count as stablecoins.
+// verify-usd-display — the timeline's USD rule (lib/shared/usd-display.ts): a
+// USD value shows beside every amount the timeline prices, stablecoins
+// included, and only an amount with no price shows none. DEPEG_BAND stays
+// exported for the off-par colouring.
 // ----------------------------------------------------------------------------
 // OFFLINE.
 //
 //   npx tsx --test scripts/verify/verify-usd-display.ts
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { usdShown } from "@/lib/shared/usd-display";
+import { DEPEG_BAND, usdShown } from "@/lib/shared/usd-display";
 
-const DEFAULTS = { showUsdStable: false, showUsdOther: true, usdSplit: true };
-
-test("defaults: a pegged stablecoin hides its USD, another token shows it", () => {
-  assert.equal(usdShown(DEFAULTS, "USDT", 11_826, "11829"), false, "11,829 USDT at $0.9997");
-  assert.equal(usdShown(DEFAULTS, "usdc", 1_000, 1_000), false, "any case");
-  assert.equal(usdShown(DEFAULTS, "WETH", 3_900, 1), true);
+test("a priced stablecoin shows its USD at par", () => {
+  assert.equal(usdShown(11_826), true, "11,829 USDT at $0.9997");
+  assert.equal(usdShown(1_000), true, "1,000 USDC at $1");
+  assert.equal(usdShown(100), true, "100 DAI");
 });
 
-test("a stablecoin more than 1% off $1 shows its USD whatever the switch", () => {
-  assert.equal(usdShown(DEFAULTS, "USDC", 870, 1_000), true, "USDC at $0.87");
-  assert.equal(usdShown(DEFAULTS, "USDC", 991, 1_000), false, "0.9% off stays hidden");
-  assert.equal(usdShown(DEFAULTS, "EURC", 1_137, 1_000), true, "a euro stable is not a dollar");
-  assert.equal(usdShown(DEFAULTS, "USDC", null, 1_000), false, "no price: no depeg to show");
-  assert.equal(usdShown(DEFAULTS, "USDC", 0, 0), false);
+test("a priced stablecoin shows its USD off par", () => {
+  assert.equal(usdShown(870), true, "USDC at $0.87");
+  assert.equal(usdShown(1_137), true, "a euro stable");
 });
 
-test("the switches", () => {
-  assert.equal(usdShown({ ...DEFAULTS, showUsdStable: true }, "DAI", 100, 100), true);
-  assert.equal(usdShown({ ...DEFAULTS, showUsdOther: false }, "WBTC", 60_000, 1), false);
-  const off = { showUsdStable: false, showUsdOther: false, usdSplit: true };
-  assert.equal(usdShown(off, "USDC", 870, 1_000), true, "a depeg still shows");
+test("any other priced token shows its USD", () => {
+  assert.equal(usdShown(3_900), true, "WETH");
+  assert.equal(usdShown(60_000), true, "WBTC");
+  assert.equal(usdShown(1_070), true, "a dollar share above $1.01");
 });
 
-test("a page without the two switches follows the one for other tokens", () => {
-  const single = { showUsdStable: false, showUsdOther: true, usdSplit: false };
-  assert.equal(usdShown(single, "BOLD", 1_000, 1_000), true);
-  assert.equal(usdShown({ ...single, showUsdOther: false }, "WETH", 3_900, 1), false);
+test("an amount with no price shows none", () => {
+  assert.equal(usdShown(null), false);
+  assert.equal(usdShown(undefined), false);
+  assert.equal(usdShown(Number.NaN), false);
 });
 
-test("the Liquity family: its stables and dollar-share collateral follow the stablecoin rule", () => {
-  for (const s of ["BOLD", "ebUSD", "USDaf", "BD"])
-    assert.equal(usdShown(DEFAULTS, s, 1_000, 1_000), false, `${s} at $1 hides its USD`);
-  assert.equal(usdShown(DEFAULTS, "sUSDS", 1_070, 1_000), true, "a dollar share above $1.01 shows it");
-  assert.equal(usdShown(DEFAULTS, "scrvUSD", 1_090, 1_000), true);
-  assert.equal(usdShown(DEFAULTS, "wstETH", 4_800, 1), true, "collateral follows USD for other tokens");
-  assert.equal(usdShown({ ...DEFAULTS, showUsdOther: false }, "weETH", 4_200, 1), false);
+test("DEPEG_BAND stays exported at 1%", () => {
+  assert.equal(DEPEG_BAND, 0.01);
 });

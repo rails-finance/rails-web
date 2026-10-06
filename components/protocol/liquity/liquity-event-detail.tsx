@@ -26,7 +26,7 @@ import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { useUsdShown } from "@/components/shared/timeline-display-context";
+import { usdShown } from "@/lib/shared/usd-display";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   streamVia,
@@ -118,10 +118,8 @@ function DebtMetric({
   const noun = accrualNoun(accrual);
   const moveWords = wordsAround(L2_WORDS.accrual_move, ["accrued_total"], { accrual_noun: noun });
 
-  // The debt's USD at its $1 face, as the cell's ledger counts it, where the
-  // Display menu's "USD for stablecoins" shows it.
-  const usdShown = useUsdShown();
-  const debtUsd = !isClose && after > 0 && usdShown(stablecoinSymbol, after, after);
+  // The debt's USD at its $1 face, as the cell's ledger counts it.
+  const debtUsd = !isClose && after > 0 && usdShown(after);
   const feeWords = wordsAround(L2_WORDS.fee, ["upfront_fee"]);
   const inLedger = accrued && !accrualMove;
   return (
@@ -219,14 +217,11 @@ function CollateralMetric({
   const showBefore = isClose ? before !== after : before !== 0 && before !== after;
   const changed = before !== after;
   // The opened card states the collateral's USD value at this event's oracle
-  // price where that price is known and the Display menu's USD switches show
-  // it (lib/shared/usd-display.ts: "USD for other tokens", on by default; a
-  // dollar share follows "USD for stablecoins" and shows past 1% off $1).
+  // price where that price is known (lib/shared/usd-display.ts).
   // Before → after, both at this event's price, as the cell's ledger totals
   // them (`beforeInUsd`: the collateral before × the price at this block).
-  const usdShown = useUsdShown();
-  const beforeUsdKnown = showBefore && beforeInUsd > 0 && usdShown(collateralType, beforeInUsd, before);
-  const afterUsdShown = usdShown(collateralType, afterInUsd, after);
+  const beforeUsdKnown = showBefore && beforeInUsd > 0 && usdShown(beforeInUsd);
+  const afterUsdShown = usdShown(afterInUsd);
 
   // Same arrow-as-toggle as Debt: `before →` ⟷ `+delta =` (delta in collateral
   // units). Disabled on close, where the "after" is the CLOSED label, not a
