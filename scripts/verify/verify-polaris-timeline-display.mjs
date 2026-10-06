@@ -105,7 +105,7 @@ const pct1 = (pct) => {
 };
 const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
-const MENU_LABELS = ["Timeline values", "Collateral Ratio"];
+const MENU_LABELS = ["Timeline values", "Collateral Ratio", "Transaction hashes"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -316,10 +316,10 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers the two labels, then the two market-note items, and no collapse item",
-    menu.length === 4 &&
+    "a. usdp/8's display menu offers the three labels, then the two market-note items, and no collapse item",
+    menu.length === 5 &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
-      NOTE_LABELS.every((l, i) => menu[2 + i] === l) &&
+      NOTE_LABELS.every((l, i) => menu[3 + i] === l) &&
       !menu.includes("collapse like events"),
     JSON.stringify(menu),
   );
