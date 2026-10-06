@@ -2,8 +2,8 @@
 
 // A Liquity-family Trove event's ledgers (rails-ops
 // reference/lifetime-flows-scrubber.md, "The event card's sum"): the card's
-// Collateral and Debt cells each open into the side's flows as of the end of
-// the event's transaction, in the side's token (the collateral token, the
+// Collateral and Debt cells each open into the side's flows as of the event,
+// in the side's token (the collateral token, the
 // stablecoin), landing on what the Trove held or owed then. USD follows the
 // timeline's Display switches ("USD for other tokens" for the collateral,
 // "USD for stablecoins" for the debt). The figures come from the Trove's

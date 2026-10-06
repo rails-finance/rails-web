@@ -427,19 +427,18 @@ for (const [name, events, symbols, open, v1] of [
     const [coll, debt] = symbols as unknown as [string, string];
     const m = model(ev, [coll, debt], open, 4000, v1);
     const focus = liquityFocusEvents(ev, coll, debt, v1 ? "v1" : "v2");
-    const replayed = replayLiquity(ev);
-    const lastOfTx = new Map<string, LiquityFlowEvent>();
-    for (const r of replayed) lastOfTx.set(r.ev.tx ?? r.ev.id, r.ev);
+    const byId = new Map(replayLiquity(ev).map((r) => [r.ev.id, r.ev]));
     let redeemedLines = 0;
     for (const f of focus) {
       const cum = eventCum(m, focus, f.id)!;
-      const tx = lastOfTx.get(f.tx ?? f.id)!;
+      // Each sum closes at its event's recorded balance.
+      const at = byId.get(f.id)!;
       for (const side of ["collateral", "debt"] as const) {
         const sum = eventTokenSum(m, focus, side, cum, f.id);
         assert.ok(sum, `${name} ${f.id} ${side}: a token sum`);
         assert.equal(sum.symbol, side === "collateral" ? coll : debt);
         const scale = 10 ** sum.decimals;
-        const recorded = Math.max(0, side === "collateral" ? tx.collAfter : tx.debtAfter);
+        const recorded = Math.max(0, side === "collateral" ? at.collAfter : at.debtAfter);
         assert.equal(sum.total.units, Math.round(recorded * scale), `${name} ${f.id} ${side}: the recorded balance`);
         const printed = sum.lines.reduce((a, l) => a + l.units, 0);
         assert.equal(printed, sum.total.units, `${name} ${f.id} ${side}: token lines add to the total`);
@@ -462,6 +461,25 @@ for (const [name, events, symbols, open, v1] of [
     if (name.includes("redeemed")) assert.ok(redeemedLines > 0, "Taken by redemptions in tokens");
   });
 }
+
+test("V2 WETH: a transaction that redeems the Trove twice: each card's sum runs from its before to its after", () => {
+  // Two consecutive redemptions moved into one transaction (wstETH 6898…4566's
+  // 0x013d31a5… redeemed it at log 11 and again at log 36).
+  const at = REDEEMED.findIndex((e, k) => k > 0 && e.kind === "redemption" && REDEEMED[k - 1].kind === "redemption");
+  assert.ok(at > 0, "two consecutive redemptions");
+  const first = REDEEMED[at - 1];
+  const ev = REDEEMED.map((e, k) => (k === at ? { ...e, ts: first.ts, block: first.block, tx: first.tx } : e));
+  const m = model(ev, ["WETH", "BOLD"], true, 4000, false);
+  const focus = liquityFocusEvents(ev, "WETH", "BOLD");
+  for (const e of [ev[at - 1], ev[at]]) {
+    const cum = eventCum(m, focus, e.id)!;
+    assert.ok(cum.exact, `${e.id}: exact`);
+    const sum = eventTokenSum(m, focus, "collateral", cum, e.id)!;
+    const scale = 10 ** sum.decimals;
+    assert.equal(sum.total.units, Math.round(e.collAfter * scale), `${e.id}: closes at its recorded balance`);
+    assert.equal(sum.before, fmtTokens(e.collBefore!, sum.decimals), `${e.id}: opens at its recorded before`);
+  }
+});
 
 for (const [name, events, symbols, open, v1] of [
   ["V2 WETH, redeemed", REDEEMED, ["WETH", "BOLD"], true, false],

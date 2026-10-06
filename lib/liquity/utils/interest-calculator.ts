@@ -44,6 +44,25 @@ export function exactDebtAfter(ctx: LiquityContext): number {
   return rawAt(ctx.stateAfter?.raw?.debt, 18, ctx.stateAfter?.debt ?? 0);
 }
 
+/** The trove's collateral after an event, at the log's precision. The float
+ *  is rounded to four places, so a figure printed at three from it can land
+ *  a unit above the chain's (208.5715 for 208.571495 prints 208.572). */
+export function exactCollAfter(ctx: LiquityContext): number {
+  return rawAt(ctx.stateAfter?.raw?.coll, 18, ctx.stateAfter?.coll ?? 0);
+}
+
+/** The trove's collateral before an event, at the log's precision. */
+export function exactCollBefore(ctx: LiquityContext): number {
+  return rawAt(ctx.stateBefore?.raw?.coll, 18, ctx.stateBefore?.coll ?? 0);
+}
+
+/** The operation's collateral move (TroveOperation `_collChangeFromOperation`),
+ *  at the log's precision. */
+export function exactCollChange(ctx: LiquityContext): number {
+  const op = ctx.troveOperation;
+  return op ? rawAt(op.raw?.collChangeFromOperation, 18, op.collChangeFromOperation) : 0;
+}
+
 /** The trove's debt before an event, at the log's precision. */
 export function exactDebtBefore(ctx: LiquityContext): number {
   return rawAt(ctx.stateBefore?.raw?.debt, 18, ctx.stateBefore?.debt ?? 0);

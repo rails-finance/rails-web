@@ -525,41 +525,32 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
 
 /** The Trove's events as the event cards' sums read them (lib/shared/flow-focus.ts):
  *  each event's legs in USD at its price, ascending in the replay's order,
- *  the same legs the day rows add up. Each side's USD just before and once
- *  the event's transaction had run is the transaction's last recorded
- *  balance at that event's price, less the transaction's legs (the interest
- *  stays in the before: it had built up by the block). */
+ *  the same legs the day rows add up. Each card states its row's recorded
+ *  balances, so each sum closes at its event and carries no `tx`: with one,
+ *  a transaction that touches the Trove twice (two redemptions, a leave and
+ *  an adjust) runs the first card's sum on to the second event. Each side's
+ *  USD just before and after the event is its recorded balance at its price,
+ *  less its legs (the interest stays in the before: it had built up by the
+ *  block). */
 export function liquityFocusEvents(
   events: LiquityFlowEvent[],
   collSymbol: string,
   debtSymbol: string,
   family: LiquityFamily = "v2",
 ): FocusEvent[] {
-  const replayed = replayLiquity(events);
-  const byTx = new Map<string, LiquityReplayed[]>();
-  for (const r of replayed) {
-    const k = r.ev.tx ?? r.ev.id;
-    const list = byTx.get(k);
-    if (list) list.push(r);
-    else byTx.set(k, [r]);
-  }
-  return replayed.map((r) => {
-    const tx = byTx.get(r.ev.tx ?? r.ev.id) ?? [r];
-    const lastOf = tx[tx.length - 1];
+  return replayLiquity(events).map((r) => {
     let collMove = 0;
     let debtMove = 0;
-    for (const t of tx)
-      for (const l of t.legs) {
-        const sign = OUT_BUCKETS.has(l.bucket) ? -1 : 1;
-        if (COLL_BUCKETS.has(l.bucket)) collMove += sign * l.amount;
-        else if (l.bucket !== LQ.interest && l.bucket !== LQ.batchFee) debtMove += sign * l.amount;
-      }
-    const collAfter = Math.max(0, lastOf.ev.collAfter);
-    const debtAfter = Math.max(0, lastOf.ev.debtAfter);
+    for (const l of r.legs) {
+      const sign = OUT_BUCKETS.has(l.bucket) ? -1 : 1;
+      if (COLL_BUCKETS.has(l.bucket)) collMove += sign * l.amount;
+      else if (l.bucket !== LQ.interest && l.bucket !== LQ.batchFee) debtMove += sign * l.amount;
+    }
+    const collAfter = Math.max(0, r.ev.collAfter);
+    const debtAfter = Math.max(0, r.ev.debtAfter);
     return {
       id: r.ev.id,
       ts: r.ev.ts,
-      ...(r.ev.tx ? { tx: r.ev.tx } : {}),
       legs: r.legs.map((l) =>
         COLL_BUCKETS.has(l.bucket)
           ? { bucket: l.bucket, usd: l.amount * r.price, amount: l.amount, symbol: collSymbol }
@@ -573,8 +564,8 @@ export function liquityFocusEvents(
       ),
       sides: {
         collateral: {
-          before: Math.max(0, collAfter - collMove) * lastOf.price,
-          after: collAfter * lastOf.price,
+          before: Math.max(0, collAfter - collMove) * r.price,
+          after: collAfter * r.price,
           amount: collMove,
           symbol: collSymbol,
           held: collAfter,

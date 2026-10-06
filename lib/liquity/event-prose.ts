@@ -48,6 +48,7 @@ import {
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { liquityBeforeAmounts, liquityEventSafety } from "@/lib/liquity/event-safety";
+import { exactCollAfter } from "@/lib/liquity/utils/interest-calculator";
 import {
   accrualNoun,
   batchFeeAfter,
@@ -566,9 +567,10 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   }
   if (stateAfter) {
     v.debt_after = stateAfter.debt;
-    v.coll_after = stateAfter.coll;
+    const collAfter = exactCollAfter(ctx);
+    v.coll_after = collAfter;
     v.rate_after = stateAfter.annualInterestRate;
-    if (price > 0) v.coll_after_usd = stateAfter.coll * price;
+    if (price > 0) v.coll_after_usd = collAfter * price;
   }
   if (stateBefore) {
     v.debt_before = stateBefore.debt;
@@ -1085,7 +1087,8 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     else if (isRedemption && op && beforeColl * price > 0 && beforeDebt > 0)
       beforeCr = ((beforeColl * price) / beforeDebt) * 100;
   }
-  const afterUsd = stateAfter.coll * price;
+  const collAfter = exactCollAfter(ctx);
+  const afterUsd = collAfter * price;
   const beforeUsd = isLiquidation && liquidation ? beforeColl * liquidation.price : beforeColl * price;
   let afterCr = stateAfter.collateralRatio;
   if (afterCr === 0 && price > 0 && stateAfter.debt > 0) afterCr = (afterUsd / stateAfter.debt) * 100;
@@ -1109,7 +1112,7 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
       plHistoric,
       plToday: plToday != null && Math.abs(plToday - plHistoric) > 0.01 ? plToday : null,
       showPl: cleared > 0.01,
-      claimable: ctx.isZombieTrove && stateAfter.debt === 0 && stateAfter.coll > 0 ? stateAfter.coll : null,
+      claimable: ctx.isZombieTrove && stateAfter.debt === 0 && collAfter > 0 ? collAfter : null,
     };
   }
 
@@ -1120,7 +1123,7 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     isRedemption,
     isLiquidation,
     price,
-    coll: { before: beforeColl, after: stateAfter.coll, beforeUsd, afterUsd },
+    coll: { before: beforeColl, after: collAfter, beforeUsd, afterUsd },
     debt: { before: beforeDebt, after: stateAfter.debt, upfrontFee: op?.debtIncreaseFromUpfrontFee ?? 0 },
     cr: { before: beforeCr, after: afterCr },
     rate: { before: stateBefore.annualInterestRate, after: rateAfter, yearly, yearlyFee },

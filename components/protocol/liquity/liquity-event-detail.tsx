@@ -583,7 +583,7 @@ export function LiquityEventDetail({
   const collCp = collChangeProv(ctx, coords);
   const debtCp = debtChangeProv(ctx, coords);
   const collDeltaEcho =
-    collCp && Math.abs(Math.abs(stateAfter.coll - beforeColl) - Math.abs(collCp.change)) < 0.00005 ? collCp : undefined;
+    collCp && Math.abs(Math.abs(l2.coll.after - beforeColl) - Math.abs(collCp.change)) < 0.00005 ? collCp : undefined;
   const debtDeltaEcho =
     debtCp && Math.abs(Math.abs(stateAfter.debt - beforeDebt) - Math.abs(debtCp.change)) < 0.005 ? debtCp : undefined;
 
@@ -923,7 +923,7 @@ export function LiquityEventDetail({
               <CollateralMetric
                 collateralType={ctx.collateralType}
                 before={beforeColl}
-                after={stateAfter.coll}
+                after={l2.coll.after}
                 beforeInUsd={beforeCollAtEventUsd}
                 afterInUsd={afterCollInUsd}
                 isClose={isClose}

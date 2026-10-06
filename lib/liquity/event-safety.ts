@@ -13,6 +13,7 @@ import { isLiquityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { RUNWAY_SHARE } from "@/lib/shared/market-note";
+import { exactCollAfter, exactCollBefore, exactCollChange } from "@/lib/liquity/utils/interest-calculator";
 
 export interface LiquityEventSafety {
   /** This event's oracle price (a liquidation's: the price it ran at). */
@@ -61,22 +62,24 @@ export function liquityBeforeAmounts(ctx: LiquityContext): { coll: number; debt:
     ctx.operation === "redeemCollateral" ||
     ctx.operation === "adjustZombieTrove" ||
     ctx.operation === "adjustUnredeemableZombieTrove";
+  // The collateral at the log's precision: printed at the ledger's decimals,
+  // as the ledger's replay reads it.
   if (isRedemption && op && stateAfter) {
     return {
       debt: stateAfter.debt + Math.abs(op.debtChangeFromOperation),
-      coll: stateAfter.coll + Math.abs(op.collChangeFromOperation),
+      coll: exactCollAfter(ctx) + Math.abs(exactCollChange(ctx)),
     };
   }
   if (ctx.operation === "closeTrove" && op && stateBefore && stateBefore.debt === 0 && stateBefore.coll === 0) {
-    return { debt: Math.abs(op.debtChangeFromOperation), coll: Math.abs(op.collChangeFromOperation) };
+    return { debt: Math.abs(op.debtChangeFromOperation), coll: Math.abs(exactCollChange(ctx)) };
   }
-  return { coll: stateBefore?.coll ?? 0, debt: stateBefore?.debt ?? 0 };
+  return { coll: stateBefore ? exactCollBefore(ctx) : 0, debt: stateBefore?.debt ?? 0 };
 }
 
 export function liquityEventSafety(ctx: LiquityContext, previousEvent?: BaseActivityEvent): LiquityEventSafety {
   const price = ctx.operation === "liquidate" && ctx.liquidation ? ctx.liquidation.price : (ctx.collateralPrice ?? 0);
   const { coll: collBefore, debt: debtBefore } = liquityBeforeAmounts(ctx);
-  const collAfter = ctx.stateAfter?.coll ?? 0;
+  const collAfter = exactCollAfter(ctx);
   const debtAfter = ctx.stateAfter?.debt ?? 0;
   const mcr = branchMcr(ctx.collateralType) ?? 0;
   const cr = (c: number, d: number) => (price > 0 && c > 0 && d > 0 ? ((c * price) / d) * 100 : null);

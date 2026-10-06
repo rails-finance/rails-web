@@ -11,7 +11,7 @@ import { usdShown, type UsdSwitches } from "@/lib/shared/usd-display";
 
 export interface LiquityEventLedger {
   ledger: Ledger;
-  /** The rows stand at the event's transaction (false: at its day's close). */
+  /** The rows stand at the event (false: at its day's close). */
   exact: boolean;
 }
 
