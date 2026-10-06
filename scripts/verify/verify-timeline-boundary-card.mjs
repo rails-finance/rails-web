@@ -530,14 +530,14 @@ const RETIRED = [
   "This list is capped",
 ];
 
-/** Row numbers on, light theme — set before any script of the page runs. */
+/** Light theme, run-collapsing off — set before any script of the page runs. */
 const INIT = `
   try {
     const k = "timeline-display-v3";
     const cur = JSON.parse(localStorage.getItem(k) || "{}");
-    // Row numbers on; run-collapsing off, so every row's pill is in the DOM
-    // (a collapsed run draws one row for its members and no member pills).
-    localStorage.setItem(k, JSON.stringify({ ...cur, showEventNumbers: true, collapseRuns: false }));
+    // Run-collapsing off, so every row's pill is in the DOM (a collapsed run
+    // draws one row for its members and no member pills).
+    localStorage.setItem(k, JSON.stringify({ ...cur, collapseRuns: false }));
     localStorage.setItem("theme", "light");
   } catch {}
 `;
@@ -557,12 +557,12 @@ async function settle(page) {
   );
   // HYDRATION, not just paint: the count line is server-rendered, and a press
   // before React has attached its handlers is lost (the pre-hydration click
-  // window). The row-number pills only render after the display flag is
-  // restored from storage in an effect — so a pill (or the card itself, on a
-  // list with no rows) is the sign the page is live.
+  // window). A row-number pill (or the card itself, on a list with no rows)
+  // is the sign the rows have drawn; the `data-ctrl-waking` wait below is the
+  // hydration gate.
   await page.waitForFunction(
     () =>
-      document.querySelector('span[aria-label^="Event "]') != null ||
+      document.querySelector("[data-event-number]") != null ||
       document.querySelector('[data-figure="timeline-boundary"]') != null ||
       document.querySelector('[data-boundary-row="cut"]') != null,
     { timeout: 180_000 },
@@ -790,7 +790,7 @@ async function readPage(page) {
       siblings = kids.length;
       position = kids.indexOf(card);
     }
-    const pills = [...root.querySelectorAll('span[aria-label^="Event "]')].map((s) => Number(s.textContent));
+    const pills = [...root.querySelectorAll("[data-event-number]")].map((s) => Number(s.textContent));
     const body = document.body.textContent ?? "";
     const wrap = document.querySelector("[data-vault-timeline-rows]");
     // Any control past the cut: the retired toolbar cloud (aria-labelled

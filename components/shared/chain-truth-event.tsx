@@ -33,6 +33,7 @@ import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-p
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Icon } from "@/components/icons/icon";
 import { EventTime } from "@/components/shared/event-time";
+import { EventNumberPill } from "@/components/shared/event-number-pill";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import {
@@ -43,7 +44,7 @@ import {
   ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
-import { useTimelineDisplay, useUsdShown } from "@/components/shared/timeline-display-context";
+import { useUsdShown } from "@/components/shared/timeline-display-context";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -497,13 +498,10 @@ export function ChainTruthRow({
    *  its number range here: the badge reads "7–8". */
   eventNumberLast?: number;
 }) {
-  // Display flags (off-by-default ones are opt-in, matching Liquity / Aave):
-  //  • showEventNumbers — the chronological badge.
-  //  • The moved amounts follow the shared header hide-class: on the spine (≥md,
-  //    Timeline values on), hidden here; otherwise rendered here.
+  // The moved amounts follow the shared header hide-class: on the spine (≥md,
+  // Timeline values on), hidden here; otherwise rendered here.
   // Timestamps gate inside <EventTime>. px-5 pt-4 pb-3 matches the Aave header so
   // the row sits inset from the card edge (and aligns with the detail's px-5).
-  const { showEventNumbers } = useTimelineDisplay();
   const unreadOf = useUnreadTokenOf();
   // `externalActor` is deliberately NOT passive. It used to be: the spine
   // replaced the token flow with a lone glyph on a third-party action, so there
@@ -717,21 +715,7 @@ export function ChainTruthRow({
           beside the card's chevron, the label and amounts beneath. */}
       <span className="evt-meta ml-auto flex items-center gap-2 tabular-nums">
         <EventTime ts={timestamp} />
-        {showEventNumbers && eventNumber != null && (
-          <span
-            className="inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500"
-            aria-label={
-              eventNumberLast != null && eventNumberLast !== eventNumber
-                ? `Events ${eventNumber} to ${eventNumberLast}`
-                : `Event ${eventNumber}`
-            }
-            data-prov-exempt=""
-          >
-            {eventNumberLast != null && eventNumberLast !== eventNumber
-              ? `${eventNumber}–${eventNumberLast}`
-              : eventNumber}
-          </span>
-        )}
+        {eventNumber != null && <EventNumberPill number={eventNumber} last={eventNumberLast} />}
       </span>
     </div>
   );

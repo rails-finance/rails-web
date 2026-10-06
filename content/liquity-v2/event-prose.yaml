@@ -588,31 +588,30 @@ copy_words:
   footer: |-
     Footer
 
-# ── The event menu: the ⋮ at the right end of the price row ──
-# Each row is a title and the line under it; a copy row's line reads `copied`
-# for a moment after the copy. Copy for LLM reads copy_words; View as Markdown,
-# after it, opens the text Copy for LLM copies, at the event page's URL with .md.
-menu_words:
-  menu: |-
-    Event menu
-  heading: |-
-    Event
-  view_page: |-
-    View event page
-  view_page_hint: |-
-    Open this event's page
-  view_explorer: |-
-    View on Etherscan
-  view_explorer_hint: |-
-    Open the transaction's logs
-  copy_link: |-
-    Copy link to event page
-  copy_link_hint: |-
-    Copy the page's address
+# ── The event page's actions: the row under the side column's title ──
+# The links, then the copy buttons; a copy button reads copy_words.copied for a
+# moment after the copy. Copy for LLM reads copy_words; View as Markdown opens
+# the text Copy for LLM copies, at the event page's URL with .md. A `_hint` is
+# the control's tooltip; `label` names the row for a screen reader.
+action_words:
+  label: |-
+    Event actions
+  in_timeline: |-
+    View in timeline
+  in_timeline_hint: |-
+    Open this event in the Trove's timeline
+  explorer: |-
+    Etherscan
+  explorer_hint: |-
+    Open the transaction's logs on Etherscan
   view_markdown: |-
     View as Markdown
   view_markdown_hint: |-
     Open this event as Markdown
+  copy_link: |-
+    Copy link
+  copy_link_hint: |-
+    Copy this page's address
 
 # ── The event page: the side column beside the card ──
 # The column holds the paragraph, a table of facts the card does not show, and

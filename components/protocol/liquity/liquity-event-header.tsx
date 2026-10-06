@@ -4,6 +4,7 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
+import { EventNumberPill } from "@/components/shared/event-number-pill";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
@@ -123,7 +124,7 @@ export function LiquityEventHeader({
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
-  const { showTimestamps, showEventNumbers, showTimelineValues } = useTimelineDisplay();
+  const { showTimestamps, showTimelineValues } = useTimelineDisplay();
   // A redemption's lozenges move onto the spine node's flanks in the phone
   // spine view (SpineColumn's `warningLegs`); the opened card drops them.
   const spineFlankHide = showTimelineValues && !title ? "mspine:max-sm:hidden" : "";
@@ -137,16 +138,7 @@ export function LiquityEventHeader({
     </span>
   ) : null;
 
-  const counter =
-    eventNumber != null && (showEventNumbers || page) ? (
-      <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] bg-sunken text-rb-500"
-        aria-label={`Event ${eventNumber}`}
-        data-prov-exempt=""
-      >
-        {eventNumber}
-      </span>
-    ) : null;
+  const counter = eventNumber != null ? <EventNumberPill number={eventNumber} /> : null;
 
   if (!stateAfter || !stateBefore) {
     if (title) {

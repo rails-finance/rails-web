@@ -3,10 +3,9 @@
 // The page's side of the Liquity V2 event prose (lib/liquity/event-prose.ts):
 // the hook that runs the generator against the page's replay, the sentence
 // renderer that bolds a figure or attaches its receipt without changing a
-// character, and the Copy for LLM row of the event menu.
+// character, and the Copy for LLM button of the event page's actions row.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { Check, Copy } from "lucide-react";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { Prov } from "@/components/shared/provenance";
@@ -15,7 +14,6 @@ import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useSurplusClaimFor } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { useMenuCopied } from "@/components/shared/event-card-menu";
 import {
   liquityEventProse,
@@ -185,24 +183,31 @@ export function useLiquityEventMarkdown(
   };
 }
 
-/** "Copy for LLM": a row of the event menu, on the timeline card and the
- *  event page. It copies the event's raw Markdown route (`href`, the page's
- *  URL with `.md`), so a copy taken before the page's replay lands is the
- *  whole text; where the read fails it copies the page's build. */
-export function CopyForLlmItem({ href, build }: { href: string; build: () => string }) {
+/** The event's Copy for LLM build (`useLiquityEventMarkdown`), from the card
+ *  (`LiquityEventCard`) to the event page's side column, which renders inside
+ *  it. Null outside the event page or before the build can run. */
+export const LiquityEventMarkdownContext = createContext<(() => string) | null>(null);
+
+/** "Copy for LLM", on the event page's actions row. It copies the event's raw
+ *  Markdown route (`href`, the page's URL with `.md`), so a copy taken before
+ *  the page's replay lands is the whole text; where the read fails it copies
+ *  the page's build. */
+export function CopyForLlmButton({ href, build, className }: { href: string; build: () => string; className: string }) {
   const [copied, copy] = useMenuCopied();
   const read = () =>
     fetch(href, { cache: "no-store" })
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
       .catch(() => build());
   return (
-    <ToolsMenuItem
-      item="copy-for-llm"
-      icon={copied ? <Check size={16} /> : <Copy size={16} />}
-      title={COPY_WORDS.button}
-      subtitle={copied ? COPY_WORDS.copied : COPY_WORDS.button_label}
-      copied={copied != null}
+    <button
+      type="button"
+      className={className}
+      title={COPY_WORDS.button_label}
+      data-menu-item="copy-for-llm"
+      data-copied={copied ? "" : undefined}
       onClick={() => copy("llm", read())}
-    />
+    >
+      {copied ? COPY_WORDS.copied : COPY_WORDS.button}
+    </button>
   );
 }

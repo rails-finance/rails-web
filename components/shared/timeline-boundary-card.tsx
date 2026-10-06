@@ -33,7 +33,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
 import { StatCard } from "@/components/shared/state-transition";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
+import { EVENT_NUMBER_PILL } from "@/components/shared/event-number-pill";
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { actionLabel } from "@/lib/shared/event-filter-helpers";
 import { formatCompact, shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -49,8 +49,8 @@ const n = (v: number) => v.toLocaleString("en-US");
  *  with the dates on the rows above it. */
 const rowDate = (unix: number) => `${shortDate(unix)} ${shortDateYear(unix)}`;
 
-/** The row-number pill, as the rows draw it (chain-truth-event.tsx). */
-const PILL = "inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500";
+/** The row-number pill, as the rows draw it (event-number-pill.tsx). */
+const PILL = EVENT_NUMBER_PILL;
 
 function longDate(unix: number): string {
   return formatDate(unix);
@@ -172,7 +172,6 @@ export function TimelineBoundaryCard({
   isLast,
 }: TimelineBoundaryCardProps) {
   const chainId = useChainId();
-  const { showEventNumbers } = useTimelineDisplay();
   // Open at rest: the body is the statement the card exists to make, and a
   // reader who has scrolled to the end of the list is here for it. Still a
   // row, so it closes like one.
@@ -221,12 +220,12 @@ export function TimelineBoundaryCard({
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       <span className="shrink-0 text-sm font-medium text-rb-500">{label}</span>
-      {/* The same slot, the same register and the same pill gate as the rows'
+      {/* The same slot, the same register and the same pill as the rows'
           date, time and number — so the span aligns with the dates above it
           and the range pill lines up with the row-number pills. */}
       <span className="evt-meta ml-auto flex items-center gap-2 tabular-nums">
         <span className="text-xs text-rb-500">{span}</span>
-        {showEventNumbers && range && (
+        {range && (
           <span className={PILL} aria-label={`Rows ${range}`} data-boundary-range={range}>
             {range}
           </span>

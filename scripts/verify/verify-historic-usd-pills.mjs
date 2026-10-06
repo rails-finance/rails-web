@@ -231,20 +231,20 @@ async function showAll(page) {
   }
 }
 
-/** Locator for the card containing event number N's badge (only rendered
- *  once "Event numbers" is on) — scoped to the card's own `data-event-id`
- *  element so assertions never leak into a neighboring card. It used to climb
+/** Locator for the card containing event number N's badge — scoped to the
+ *  card's own `data-event-id` element so assertions never leak into a
+ *  neighboring card. It used to climb
  *  to the nearest `items-start relative` ancestor, which since 7778cf09 is the
  *  header row (`.evt-has-chev`), not the card: every chip and forensics check
  *  below then read an open card as empty. */
 function cardFor(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   return badge.locator("xpath=ancestor::*[@data-event-id][1]");
 }
 
 /** Expand event N's card by clicking its header's click-to-toggle area. */
 async function expandCard(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
   await clickable.click();
@@ -327,7 +327,7 @@ async function openReceiptFor(page, card, valueText) {
 const browser = await chromium.launch();
 const pageErrors = [];
 
-/** Open a wallet's position page with event numbers and both USD switches on, every
+/** Open a wallet's position page with both USD switches on, every
  *  event painted. */
 async function openTimeline(proto, wallet) {
   const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
@@ -338,7 +338,6 @@ async function openTimeline(proto, wallet) {
     .first()
     .waitFor({ state: "visible", timeout: 60000 });
 
-  await setDisplayFlag(page, "Event Numbers", true);
   await setDisplayFlag(page, "USD for stablecoins", true);
   await setDisplayFlag(page, "USD for other tokens", true);
   await showAll(page);

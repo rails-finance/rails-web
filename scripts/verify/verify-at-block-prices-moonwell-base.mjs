@@ -213,14 +213,14 @@ async function showAll(page, max = 25) {
  *  own `items-start relative` div, which the Aave verifier scopes to, holds
  *  no detail here). */
 function cardFor(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   return badge.locator(
     'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " min-w-0 ") and contains(concat(" ", normalize-space(@class), " "), " grow ")][1]',
   );
 }
 
 async function expandCard(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   await badge.scrollIntoViewIfNeeded();
   const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
@@ -323,7 +323,6 @@ async function openWalletPage(w, evts) {
   // browser, so the toggle below still expands its runs.
   await p.goto(`${BASE}${X.page(w)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await p.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
-  await setDisplayFlag(p, "Event Numbers", true);
   // A collapsed ×N run renders no individual badge — the MAMO cascade is
   // hundreds of like liquidations in a row, so runs stay expanded here. The
   // item is offered only where a run forms: required on the cascade wallet,
@@ -334,10 +333,8 @@ async function openWalletPage(w, evts) {
   // window offsets it), so the DOM number of API index i is offset + i + 1,
   // with the offset read off the newest badge rather than assumed.
   const badgeNumbers = await p
-    .locator('[aria-label^="Event "]')
-    .evaluateAll((els) =>
-      els.map((e) => Number((e.getAttribute("aria-label") ?? "").slice(6))).filter(Number.isFinite),
-    );
+    .locator("[data-event-number]")
+    .evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-event-number"))).filter(Number.isFinite));
   const off = badgeNumbers.length ? Math.max(...badgeNumbers) - evts.length : 0;
   console.log(`      ${badgeNumbers.length} numbered cards in the DOM; numbering offset ${off}`);
   return { page: p, domN: (n) => off + n };

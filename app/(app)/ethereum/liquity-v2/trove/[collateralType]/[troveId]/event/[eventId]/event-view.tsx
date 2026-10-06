@@ -232,6 +232,7 @@ export default function EventView({
                               n={n}
                               total={total}
                               blockNumber={event.blockNumber}
+                              txHash={event.txHash}
                               previousHref={previous ? eventPath(previous.id) : null}
                               nextHref={next ? eventPath(next.id) : null}
                               timelineHref={timelineHref}

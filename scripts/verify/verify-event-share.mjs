@@ -8,8 +8,9 @@
 //
 // What it holds, per family:
 //   1. The position page's card carries a copy-link control (the event
-//      menu's "Copy link to event page"); the
-//      clipboard receives an absolute URL of the form
+//      menu's "Copy link to event page"; on Liquity V2, which has no menu,
+//      the header's number pill, a link to the event page); the
+//      clipboard (the pill's href) receives an absolute URL of the form
 //      `<origin>/<position path>/event/<encoded id>`, and decoding the last
 //      segment gives an id that is in the page's own `data-event-id` set.
 //   2. Opening that URL in a FRESH context renders exactly one event card,
@@ -202,6 +203,15 @@ async function copyEventLink(page) {
   await page.click(COPY_LINK);
   await page.waitForSelector(`${COPY_LINK}[data-copied]`, { timeout: 5000 });
   return page.evaluate(() => navigator.clipboard.readText());
+}
+
+// The header's number pill, a link to the event page (ui-jobs 291).
+const PILL_LINK = '[data-event-id] [data-event-number-link="page"]';
+
+/** Check 1 on a family with no event menu: the first card's number pill. */
+async function firstCardPill(page) {
+  await page.waitForSelector(PILL_LINK, { timeout: 60000 }).catch(() => {});
+  return (await page.locator(PILL_LINK).count()) > 0;
 }
 
 /** Fetch a URL and report its status, content-type and cache-control —
@@ -436,7 +446,10 @@ async function verifyFamily(name, opts) {
   }
 }
 
-async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHref, eventImage = "dynamic" }) {
+async function verifyFamilyOnce(
+  name,
+  { listingPath, rowHrefRe, skip, subjectHref, eventImage = "dynamic", linkFrom = "menu" },
+) {
   if (FAMILIES_FILTER && !FAMILIES_FILTER.has(name)) return null;
   // A family whose route is built but cannot be exercised end to end yet
   // states why here rather than being left out of the table; the run reports
@@ -503,6 +516,11 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
   // same steps), so one retry separates a flake from a missing control. A
   // failed attempt leaves a screenshot and a state dump so the next flake
   // explains itself instead of being re-run blind.
+  //
+  // Liquity V2 (`linkFrom: "pill"`) has no event menu (ui-jobs 291): the
+  // first card's number pill is the link, read without opening the card, and
+  // the copy-link button is on the event page's side column
+  // (`verifyLiquityMarkdown`).
   let posCtx = null;
   let posPage = null;
   let positionPath = null;
@@ -511,7 +529,7 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
     if (posCtx) await posCtx.close();
     ({ ctx: posCtx, page: posPage } = await open(1280, `${BASE}${rowHref}`));
     positionPath = await posPage.evaluate(() => window.location.pathname);
-    hasCopyBtn = await revealFirstCardCopyLink(posPage);
+    hasCopyBtn = linkFrom === "pill" ? await firstCardPill(posPage) : await revealFirstCardCopyLink(posPage);
     if (!hasCopyBtn) {
       const state = await firstCardState(posPage);
       await mkdir(SCREENSHOT_DIR, { recursive: true });
@@ -520,7 +538,14 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
       console.log(`  check 1 attempt ${attempt} found no copy-link — ${JSON.stringify(state)} (${shot})`);
     }
   }
-  if (!check(`${name}: position page has an event copy-link control`, hasCopyBtn)) {
+  if (
+    !check(
+      linkFrom === "pill"
+        ? `${name}: position page's first card has a number pill linking to the event page`
+        : `${name}: position page has an event copy-link control`,
+      hasCopyBtn,
+    )
+  ) {
     await posCtx.close();
     return null;
   }
@@ -530,7 +555,10 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
   const posToolbar = await posPage.locator("[data-timeline-total]").count();
   check(`${name}: position page draws the toolbar's count line`, posToolbar > 0, `${posToolbar} found`);
   const idsOnPage = await eventIds(posPage);
-  const link = await copyEventLink(posPage);
+  const link =
+    linkFrom === "pill"
+      ? `${BASE}${await posPage.locator(PILL_LINK).first().getAttribute("href")}`
+      : await copyEventLink(posPage);
   const linkUrl = new URL(link);
   check(`${name}: clipboard holds an absolute URL`, link.startsWith(BASE), link);
   const m = linkUrl.pathname.match(/^(.*)\/event\/([^/]+)$/);
@@ -1052,14 +1080,17 @@ await verifyFamily("spark", {
 const liquityV2Subject = await verifyFamily("liquity-v2", {
   listingPath: "/ethereum/liquity-v2",
   rowHrefRe: /^\/ethereum\/liquity-v2\/trove\//,
+  linkFrom: "pill",
 });
 await verifyLiquityMarkdown(liquityV2Subject);
 
 /** Liquity V2's raw Markdown per event (ui-jobs 287): `<event page>.md`
  *  answers 200 `text/markdown`, `noindex`, the page as its canonical `Link`,
- *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404;
- *  the menu's View as Markdown row links there in a new tab, on the timeline
- *  card and the event page. For the event the family's checks above copied. */
+ *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404.
+ *  The event page's actions row (ui-jobs 291) holds View in timeline,
+ *  Etherscan, View as Markdown (a new tab, at the route), Copy link and Copy
+ *  for LLM; the page and the timeline card draw no ⋮, and each one's number
+ *  pill links to the other. For the event the family's checks above read. */
 async function verifyLiquityMarkdown(subject) {
   if (!subject) return;
   const name = "liquity-v2";
@@ -1088,48 +1119,91 @@ async function verifyLiquityMarkdown(subject) {
   const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
   check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
 
-  const COPY_LLM = '[data-menu-item="copy-for-llm"]';
-  const VIEW_MD = '[data-menu-item="view-markdown"]';
-  const surfaces = [
-    { where: "event page", url: link, scope: "" },
-    {
-      where: "timeline card",
-      url: `${BASE}${positionPath}?at=${encodeURIComponent(decodedId)}`,
-      scope: `[data-event-id="${decodedId}"] `,
-    },
-  ];
-  for (const { where, url, scope } of surfaces) {
-    const { ctx, page, errors } = await open(1280, url);
-    const trigger = page.locator(`${scope}[data-event-menu] > button`).first();
-    await trigger.waitFor({ state: "attached", timeout: 120000 }).catch(() => {});
-    // The trigger is in the server's HTML before hydration; a click then opens
-    // nothing, so the menu is asked again until its rows are there.
-    for (let i = 0; i < 40 && (await page.locator(COPY_LLM).count()) === 0; i++) {
-      await trigger.click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(250);
-    }
-    const items = await page.$$eval("[data-menu-item]", (els) => els.map((e) => e.getAttribute("data-menu-item")));
+  // The event page's actions row under the side column's title (ui-jobs
+  // 291): the links, then the copy buttons.
+  const ACTIONS = "[data-event-page-actions]";
+  const COPY_LLM = `${ACTIONS} [data-menu-item="copy-for-llm"]`;
+  const COPY_LINK_BTN = `${ACTIONS} [data-menu-item="copy-link"]`;
+  const VIEW_MD = `${ACTIONS} [data-menu-item="view-markdown"]`;
+  const WANT = ["view-timeline", "view-explorer", "view-markdown", "copy-link", "copy-for-llm"];
+  {
+    const { ctx, page, errors } = await open(1280, link);
+    await page
+      .locator(COPY_LLM)
+      .first()
+      .waitFor({ state: "attached", timeout: 120000 })
+      .catch(() => {});
+    const items = await page.$$eval(`${ACTIONS} [data-menu-item]`, (els) =>
+      els.map((e) => e.getAttribute("data-menu-item")),
+    );
     check(
-      `${name} ${where}: View as Markdown follows Copy for LLM`,
-      items.indexOf("view-markdown") === items.indexOf("copy-for-llm") + 1 && items.includes("copy-for-llm"),
+      `${name} event page: the actions row holds the five items in order`,
+      JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
+    );
+    const timelineHref = await page.locator(`${ACTIONS} [data-menu-item="view-timeline"]`).getAttribute("href");
+    check(
+      `${name} event page: View in timeline links to the ?at= landing`,
+      timelineHref === `${positionPath}?at=${encodeURIComponent(decodedId)}`,
+      timelineHref ?? "",
     );
     const row = page.locator(VIEW_MD).first();
     const href = await row.getAttribute("href").catch(() => null);
     const target = await row.getAttribute("target").catch(() => null);
-    check(`${name} ${where}: View as Markdown links to the route`, href === mdPath, href ?? "");
-    check(`${name} ${where}: View as Markdown opens a new tab`, target === "_blank", target ?? "");
+    check(`${name} event page: View as Markdown links to the route`, href === mdPath, href ?? "");
+    check(`${name} event page: View as Markdown opens a new tab`, target === "_blank", target ?? "");
+    const menus = await page.locator("[data-event-menu]").count();
+    check(`${name} event page: no event menu`, menus === 0, `${menus} found`);
+    const pillHref = await page
+      .locator('[data-event-number-link="timeline"]')
+      .first()
+      .getAttribute("href")
+      .catch(() => null);
+    check(
+      `${name} event page: the number pill links to the timeline`,
+      pillHref === `${positionPath}?at=${encodeURIComponent(decodedId)}`,
+      pillHref ?? "none",
+    );
+    // Hydration: the buttons are in the server's HTML; a click before React
+    // attaches is lost, so the copy is pressed until it confirms.
+    let copiedLink = null;
+    for (let i = 0; i < 20 && copiedLink == null; i++) {
+      copiedLink = await page
+        .click(COPY_LINK_BTN, { timeout: 5000 })
+        .then(() => page.waitForSelector(`${COPY_LINK_BTN}[data-copied]`, { timeout: 1500 }))
+        .then(() => page.evaluate(() => navigator.clipboard.readText()))
+        .catch(() => null);
+    }
+    check(`${name} event page: Copy link copies the page's URL`, copiedLink === link, copiedLink ?? "no copy");
     const copied = await page
       .click(COPY_LLM, { timeout: 10000 })
       .then(() => page.waitForSelector(`${COPY_LLM}[data-copied]`, { timeout: 20000 }))
       .then(() => page.evaluate(() => navigator.clipboard.readText()))
       .catch(() => null);
     check(
-      `${name} ${where}: Copy for LLM copies the route's body`,
+      `${name} event page: Copy for LLM copies the route's body`,
       copied === body,
       copied == null ? "no copy" : `${copied.length} vs ${body.length} characters`,
     );
-    check(`${name} ${where}: no page error`, errors.length === 0, errors.join("; "));
+    check(`${name} event page: no page error`, errors.length === 0, errors.join("; "));
+    await ctx.close();
+  }
+  {
+    // The timeline card: no ⋮ closed or open; the pill links to the page.
+    const { ctx, page, errors } = await open(1280, `${BASE}${positionPath}?at=${encodeURIComponent(decodedId)}`);
+    const card = page.locator(`[data-event-id="${decodedId}"]`).first();
+    await card.waitFor({ timeout: 120000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    const pillHref = await card
+      .locator('[data-event-number-link="page"]')
+      .first()
+      .getAttribute("href")
+      .catch(() => null);
+    check(`${name} timeline card: the number pill links to the event page`, pillHref === pagePath, pillHref ?? "none");
+    const menus = await page.locator("[data-event-menu]").count();
+    const isOpen = await card.locator('[data-anatomy="T2"]').count();
+    check(`${name} timeline card: no event menu (card ${isOpen ? "open" : "closed"})`, menus === 0, `${menus} found`);
+    check(`${name} timeline card: no page error`, errors.length === 0, errors.join("; "));
     await ctx.close();
   }
 }

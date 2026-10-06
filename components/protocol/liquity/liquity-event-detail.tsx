@@ -43,7 +43,6 @@ import {
   type FigureProv,
 } from "@/lib/liquity/event-provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { useEventMenuSlot } from "@/components/shared/event-card-menu";
 
 const tmContractOf = (addr?: string) => ({ name: "TroveManager", address: addr });
 
@@ -537,8 +536,6 @@ export function LiquityEventDetail({
 }: LiquityEventDetailProps) {
   const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
   const l2 = prose.L2;
-  // The event menu, at the price row's right end (EventCard `menuInDetail`).
-  const eventMenu = useEventMenuSlot();
 
   if (!stateBefore || !stateAfter || !l2) {
     return null;
@@ -1002,7 +999,7 @@ export function LiquityEventDetail({
           details body. */}
 
       {/* The price row: the gas the owner paid, the redemption P/L (net
-          outcome), the historic collateral price, then the event menu. P/L
+          outcome), the historic collateral price. P/L
           reconciles with the Cleared / Reduced figures in the header: debt
           cleared minus the value of collateral given up, at the
           redemption-time price and (when available) at today's price.
@@ -1050,7 +1047,6 @@ export function LiquityEventDetail({
               {formatUsd(collPrice)}
             </P>
           </PriceChipShell>
-          {eventMenu}
         </div>
       )}
     </>

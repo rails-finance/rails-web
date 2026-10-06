@@ -10,7 +10,7 @@ import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
-import { CopyForLlmItem, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import { LiquityEventMarkdownContext, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -19,8 +19,7 @@ import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liqu
 import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
-import { COPY_WORDS, MENU_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
-import { eventMarkdownHref, ViewMarkdownItem, type EventMenuWords } from "@/components/shared/event-card-menu";
+import { PAGE_WORDS } from "@/lib/liquity/event-templates";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -48,21 +47,6 @@ export interface LiquityEventCardProps {
    *  spine's column. Unset, the card is the timeline's. */
   page?: { aside: React.ReactNode };
 }
-
-/** The event menu's words, from the strings file. */
-const menuWords: EventMenuWords = {
-  menu: MENU_WORDS.menu,
-  heading: MENU_WORDS.heading,
-  view_page: MENU_WORDS.view_page,
-  view_page_hint: MENU_WORDS.view_page_hint,
-  view_explorer: MENU_WORDS.view_explorer,
-  view_explorer_hint: MENU_WORDS.view_explorer_hint,
-  copy_link: MENU_WORDS.copy_link,
-  copy_link_hint: MENU_WORDS.copy_link_hint,
-  view_markdown: MENU_WORDS.view_markdown,
-  view_markdown_hint: MENU_WORDS.view_markdown_hint,
-  copied: COPY_WORDS.copied,
-};
 
 export function LiquityEventCard({
   event,
@@ -285,8 +269,10 @@ export function LiquityEventCard({
 
   const liquityTeaser = prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : null;
   // Gas (owner-paid events only; the generator leaves a third party's out)
-  // and the event menu stand in T2's price row (LiquityEventDetail); a card
-  // that draws no price row keeps both in the footer.
+  // stands in T2's price row (LiquityEventDetail); a card that draws no price
+  // row keeps it in the footer. The card has no event menu: the header's
+  // number pill links to the event page, whose side column carries the
+  // actions (ui-jobs 291).
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
 
@@ -322,16 +308,7 @@ export function LiquityEventCard({
         footerExtra={footerExtra}
         learnMore={<LearnMore inline content={prose.L5.content} />}
         explanationHeading={PAGE_WORDS.explanation_heading}
-        menuWords={menuWords}
-        menuExtra={
-          shareHref ? (
-            <>
-              {buildMarkdown && <CopyForLlmItem href={eventMarkdownHref(shareHref)} build={buildMarkdown} />}
-              <ViewMarkdownItem href={eventMarkdownHref(shareHref)} words={menuWords} />
-            </>
-          ) : undefined
-        }
-        menuInDetail={priceRow}
+        eventMenu={false}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
         {...(page
@@ -344,5 +321,13 @@ export function LiquityEventCard({
       />
     </LiquityLedgerProvider>
   );
-  return page ? <LedgerOpenContext.Provider value>{card}</LedgerOpenContext.Provider> : card;
+  // The event page's side column renders inside the card and reads the Copy
+  // for LLM build from here.
+  return page ? (
+    <LedgerOpenContext.Provider value>
+      <LiquityEventMarkdownContext.Provider value={buildMarkdown}>{card}</LiquityEventMarkdownContext.Provider>
+    </LedgerOpenContext.Provider>
+  ) : (
+    card
+  );
 }

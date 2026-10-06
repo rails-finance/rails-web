@@ -5,6 +5,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatExact } from "@/lib/utils/format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { EventTime } from "@/components/shared/event-time";
+import { EventNumberPill } from "@/components/shared/event-number-pill";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
@@ -134,7 +135,7 @@ export function AaveV4EventHeader({
   // than replacing it (SpineColumn `externalParty`), so the amount hands off to
   // the flank exactly as an owner-acted row's does. See chain-truth-event.tsx.
   const hideVal = useHeaderValueHideClass({ isPassive: ctx.eventType === "liquidation" });
-  const { showEventNumbers, showInterestRates, showTickerLabels } = useTimelineDisplay();
+  const { showInterestRates, showTickerLabels } = useTimelineDisplay();
   // The symbol beside each icon, under the Display menu's ticker-label toggle
   // (the same switch the opened card's rows follow).
   const ticker = (sym?: string | null) =>
@@ -156,16 +157,7 @@ export function AaveV4EventHeader({
       </span>
     ) : null;
 
-  const counter =
-    eventNumber != null && showEventNumbers ? (
-      <span
-        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] bg-sunken text-rb-500"
-        aria-label={`Event ${eventNumber}`}
-        data-prov-exempt=""
-      >
-        {eventNumber}
-      </span>
-    ) : null;
+  const counter = eventNumber != null ? <EventNumberPill number={eventNumber} /> : null;
 
   return (
     <div className="pl-5 pt-4 pb-3">

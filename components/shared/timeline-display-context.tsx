@@ -9,7 +9,6 @@ export type TimelineDisplayKey =
   | "showTickerLabels"
   | "showUsdStable"
   | "showUsdOther"
-  | "showEventNumbers"
   | "showInterestRates"
   | "showCollateralRatio"
   | "collapseRuns"
@@ -35,9 +34,6 @@ export interface TimelineDisplayState {
   showUsdOther: boolean;
   /** The page's Display menu offers the two USD switches. */
   usdSplit: boolean;
-  /** When true, each timeline row displays its 1-based chronological number —
-   * the position in the WHOLE history, not in the drawn list. */
-  showEventNumbers: boolean;
   /** When true, event-card headers show the per-event interest-rate badge
    * (Aave supply/borrow APR). Off by default — surfaced on demand. */
   showInterestRates: boolean;
@@ -75,7 +71,6 @@ const DEFAULTS = {
   showTickerLabels: false,
   showUsdStable: false,
   showUsdOther: true,
-  showEventNumbers: false,
   showInterestRates: false,
   showCollateralRatio: false,
   collapseRuns: true,
@@ -116,13 +111,18 @@ function markSpineView(on: boolean) {
 }
 
 /** A stored preference from before the two USD switches: a reader who hid
- *  every USD value ("USD values" off) keeps both off. The retired bar
- *  switches (`showChangeBars`, `showBalanceBars`) are dropped. */
+ *  every USD value ("USD values" off) keeps both off. The retired switches
+ *  (`showChangeBars`, `showBalanceBars`, `showEventNumbers`) are dropped. */
 function migrate(
-  parsed: Partial<typeof DEFAULTS> & { showUsdValues?: boolean; showChangeBars?: boolean; showBalanceBars?: boolean },
+  parsed: Partial<typeof DEFAULTS> & {
+    showUsdValues?: boolean;
+    showChangeBars?: boolean;
+    showBalanceBars?: boolean;
+    showEventNumbers?: boolean;
+  },
 ): Partial<typeof DEFAULTS> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { showUsdValues, showChangeBars, showBalanceBars, ...rest } = parsed;
+  const { showUsdValues, showChangeBars, showBalanceBars, showEventNumbers, ...rest } = parsed;
   if (showUsdValues === false && rest.showUsdOther === undefined)
     return { ...rest, showUsdOther: false, showUsdStable: false };
   return rest;

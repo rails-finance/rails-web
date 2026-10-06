@@ -153,12 +153,9 @@ try {
     // (i) button is opened here.
     const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
     if ((await t3.count()) > 0 && (await t3.getAttribute("aria-expanded")) !== "true") await t3.click();
-    // Copy for LLM is the last row of the event menu, the ⋮ at the end of
-    // the price row, or in T6 on a card without one (ui-jobs 281).
-    const menuBtn = page.locator('[data-anatomy="T2"] [data-event-menu] > button').first();
-    await menuBtn.waitFor({ timeout: 30_000 });
-    await menuBtn.click();
-    const copyBtn = page.locator('[data-menu-item="copy-for-llm"]').first();
+    // Copy for LLM is the last button of the actions row under the side
+    // column's title (ui-jobs 291).
+    const copyBtn = page.locator('[data-event-page-actions] [data-menu-item="copy-for-llm"]').first();
     await copyBtn.waitFor({ timeout: 30_000 });
     await copyBtn.click();
     await page.locator('[data-menu-item="copy-for-llm"][data-copied]').first().waitFor({ timeout: 5_000 });

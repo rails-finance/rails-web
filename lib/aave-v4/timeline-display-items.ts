@@ -3,7 +3,7 @@
 // full set, unlike the chain-state tier's pared-down CHAIN_TRUTH_DISPLAY_ITEMS
 // in timeline-toolbar.tsx). Order matches the retired
 // AaveV4TimelineDisplayToggle: Timestamps, Timeline values, USD values (now
-// two: stablecoins, other tokens), Interest rate, Event numbers.
+// two: stablecoins, other tokens), Interest rate.
 //
 // Lives in its own file (not timeline-toolbar.tsx) since that file is shared
 // across every explorer.
@@ -16,5 +16,4 @@ export const AAVE_V4_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showUsdStable", label: "USD for stablecoins" },
   { key: "showUsdOther", label: "USD for other tokens" },
   { key: "showInterestRates", label: "Interest rate" },
-  { key: "showEventNumbers", label: "Event numbers" },
 ];

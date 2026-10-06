@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useContext, useId } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
-import { EventCardMenu, EventMenuSlot, type EventMenuWords } from "@/components/shared/event-card-menu";
+import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { TxHashBadge } from "@/components/shared/tx-hash-badge";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import {
@@ -64,7 +64,7 @@ export interface EventCardProps {
    *  renders it as a plain lead paragraph with no glyph. */
   explainerTeaserVariant?: "bullet" | "prose";
   /** Transaction hash: the hash at the right end of T3's row, and the event
-   *  menu (`menuInDetail`). */
+   *  menu. */
   txHash?: string;
   /** A word before the hash ("Transaction"). Unset changes nothing. */
   txHashLabel?: string;
@@ -74,15 +74,9 @@ export interface EventCardProps {
   /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), alone at the
    *  right end of the footer (T6). */
   learnMore?: React.ReactNode;
-  /** The event menu's words, where a family's strings file has them. */
-  menuWords?: EventMenuWords;
-  /** The family's rows at the end of the event menu (Liquity V2's Copy for
-   *  LLM). */
-  menuExtra?: React.ReactNode;
-  /** The family's `detail` draws a price row that places the event menu at
-   *  its right end (`useEventMenuSlot`). Unset, the menu stands in T6 before
-   *  the "?". */
-  menuInDetail?: boolean;
+  /** The event menu (⋮) in T6 before the "?". Liquity V2 turns it off: its
+   *  event page's aside carries the actions (ui-jobs 291). */
+  eventMenu?: boolean;
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
    *  the only dismiss action is an explicit close button. */
@@ -145,9 +139,7 @@ export function EventCard({
   infoAction,
   pageAside,
   explanationHeading = "Event explanation",
-  menuWords,
-  menuExtra,
-  menuInDetail,
+  eventMenu = true,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -248,11 +240,12 @@ export function EventCard({
         ]
       : []),
   ];
-  const menuNode = txHash ? (
-    <EventCardMenu txHash={txHash} shareHref={shareHref} words={menuWords} extra={menuExtra} />
-  ) : null;
   const footerNode = txHash ? (
-    <EventCardFooter extra={footerExtra} menu={menuInDetail ? undefined : menuNode} learnMore={learnMore} />
+    <EventCardFooter
+      extra={footerExtra}
+      menu={eventMenu ? <EventCardMenu txHash={txHash} shareHref={shareHref} /> : undefined}
+      learnMore={learnMore}
+    />
   ) : undefined;
 
   // The (i) row's right end, before its chevron and reachable with the
@@ -293,7 +286,7 @@ export function EventCard({
           }}
         >
           {/* The header's right-hand cluster: the expand chevron only (the
-              share control is in the event menu, event-card-menu.tsx). Below sm the cluster
+              event's link is the header's number pill, event-number-pill.tsx). Below sm the cluster
               leaves the flex row for the header's top-right corner and the
               header's `.evt-meta` row lines up beside it, reserving width
               for the chevron when present — see the `.evt-meta` rules in
@@ -355,7 +348,7 @@ export function EventCard({
               treatment is a separate design call; this fixes the
               accessibility gap without it. */}
           {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
-          {menuInDetail ? <EventMenuSlot.Provider value={menuNode}>{detail}</EventMenuSlot.Provider> : detail}
+          {detail}
 
           {/* ── Info sections: under a hairline, the (i) Explanation button
                    at the bottom-left opens the pane beneath, drawn with no

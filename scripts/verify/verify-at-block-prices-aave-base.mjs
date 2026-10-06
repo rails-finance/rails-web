@@ -157,14 +157,14 @@ async function showAll(page, max = 25) {
 /** The whole card — header panel and the detail panel that mounts beside it
  *  (EventCard's `min-w-0 grow` content tier). */
 function cardFor(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   return badge.locator(
     'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " min-w-0 ") and contains(concat(" ", normalize-space(@class), " "), " grow ")][1]',
   );
 }
 
 async function expandCard(page, n) {
-  const badge = page.locator(`[aria-label="Event ${n}"]`);
+  const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   await badge.scrollIntoViewIfNeeded();
   const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
@@ -297,14 +297,11 @@ async function openPage(x, wallet, events) {
   // `?folders=0` is for, and the browser's own toggle still applies to it.
   await page.goto(`${BASE}${x.page(wallet)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
-  await setDisplayFlag(page, "Event Numbers", true);
   await setDisplayFlag(page, "Collapse like events", false, { optional: true });
   await showAll(page, 25);
   const badgeNumbers = await page
-    .locator('[aria-label^="Event "]')
-    .evaluateAll((els) =>
-      els.map((e) => Number((e.getAttribute("aria-label") ?? "").slice(6))).filter(Number.isFinite),
-    );
+    .locator("[data-event-number]")
+    .evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-event-number"))).filter(Number.isFinite));
   const offset = badgeNumbers.length ? Math.max(...badgeNumbers) - events.length : 0;
   console.log(`      ${badgeNumbers.length} numbered cards in the DOM; numbering offset ${offset}`);
   return { page, domN: (n) => offset + n };

@@ -658,7 +658,8 @@ body {
    in the header's top-right corner (event-card.tsx's `.evt-has-chev`) so the
    two read as one line: [ 27 Aug '26 18:43 ▾ ] with the label and amounts
    beneath (Miles, 2026-09-02). The padding keeps the meta clear of the
-   chevron's box (its 12px glyph + p-1 = 20px, plus 8px of air). Above sm
+   chevron's box (its 12px glyph + p-1 = 20px, inset by its mr-5 = 20px, plus
+   8px of air), so the number pill, a link, takes its own taps. Above sm
    nothing here applies and the row is exactly what it was.
 
    The share control does not reach this corner — it renders in the footer,
@@ -671,7 +672,7 @@ body {
     justify-content: flex-end;
   }
   .evt-has-chev .evt-meta {
-    padding-right: 1.75rem;
+    padding-right: 3rem;
   }
 }
 

@@ -471,8 +471,8 @@ function AaveTimelineRow({
   shareUnit: string;
   assetSymbol: string;
   vaultAddress: string;
-  /** This row's place in the WHOLE history, 1-based and chronological — the
-   *  badge the display menu's "Event numbers" reveals. */
+  /** This row's place in the WHOLE history, 1-based and chronological: the
+   *  header's number pill. */
   eventNumber: number;
   isFirst: boolean;
   isLast: boolean;

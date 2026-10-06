@@ -129,16 +129,6 @@ async function main() {
   try {
     const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, extraHTTPHeaders: bypassHeaders() });
     const url = `${BASE}${PAGE_PATH}`;
-    // Turn the chronological badge on before the page mounts — it is a display
-    // preference, off by default, and the numbering is one of the things under
-    // test. Seeded through the same key the toolbar writes.
-    await page.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ showEventNumbers: true }));
-      } catch {
-        /* private mode — the number checks then skip rather than fail */
-      }
-    });
     // A protocol whose deepest position is shallower than the page's own
     // TIMELINE_WINDOW_EVENTS can never window in production, so the page's own
     // request would come back with `cutoffBlock: null` and the browser half of
@@ -254,17 +244,14 @@ async function main() {
     // Numbering runs over the WHOLE history. The oldest event on the page is
     // number `older + 1`, and that expectation comes from the API's own count
     // of the summarised half — nothing the page computed. Read from the badge's
-    // aria-label so a formatting change cannot make the check vacuous.
+    // `data-event-number` so a formatting change cannot make the check vacuous.
     //
     // ⚠️ WAIT FOR THEM. The count line is server-rendered, so it can reach its
-    // ready form before hydration; the badge is a stored display preference,
-    // and the server renders the default (off). Read at that moment the page
-    // holds no badge, and this check reported 0 on a page that drew them a
-    // moment later (2026-09-21, preview). The wait swallows its timeout so a
-    // page that never draws them is still a red check, not a crash.
-    await page.waitForSelector('[aria-label^="Event "]', { timeout: 30_000 }).catch(() => {});
-    const badges = await page.$$eval('[aria-label^="Event "]', (els) =>
-      els.map((el) => Number((el.getAttribute("aria-label") ?? "").replace("Event ", ""))),
+    // ready form before the rows draw. The wait swallows its timeout so a page
+    // that never draws them is still a red check, not a crash.
+    await page.waitForSelector("[data-event-number]", { timeout: 30_000 }).catch(() => {});
+    const badges = await page.$$eval("[data-event-number]", (els) =>
+      els.map((el) => Number(el.getAttribute("data-event-number"))),
     );
     assert(badges.length > 0, "the chronological badges render", `${badges.length} found`);
     if (badges.length > 0) {

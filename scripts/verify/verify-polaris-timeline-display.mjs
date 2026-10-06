@@ -3,7 +3,7 @@
 // Scaffold of verify-polaris-equity.mjs. Checks (rails-ops
 // TO-DO-polaris-v2-parity §1.4 and §1.5):
 //
-//   (a) usdp/8's display menu offers exactly the four labels and NOT
+//   (a) usdp/8's display menu offers exactly the three labels and NOT
 //       "Collapse like events" (no run card: measured, 0 no-change touches).
 //   (c) Collateral Ratio on: usdp/8 row #1's chip and its last row's chip
 //       read the restated `${pct1(cr)} CR`, neither red; usdp/175's
@@ -105,7 +105,7 @@ const pct1 = (pct) => {
 };
 const chipText = (pct) => `${pct1(pct)} CR`;
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
-const MENU_LABELS = ["Timestamps (UTC)", "Timeline values", "Collateral Ratio", "Event numbers"];
+const MENU_LABELS = ["Timestamps (UTC)", "Timeline values", "Collateral Ratio"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -316,10 +316,10 @@ try {
   // rule (rails-ops TO-DO-ui-jobs item 118).
   const NOTE_LABELS = ["market notes", "open all market notes"];
   check(
-    "a. usdp/8's display menu offers exactly the four labels, then the two market-note items, and no collapse item",
-    menu.length === 6 &&
+    "a. usdp/8's display menu offers exactly the three labels, then the two market-note items, and no collapse item",
+    menu.length === 5 &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
-      NOTE_LABELS.every((l, i) => menu[4 + i] === l) &&
+      NOTE_LABELS.every((l, i) => menu[3 + i] === l) &&
       !menu.includes("collapse like events"),
     JSON.stringify(menu),
   );

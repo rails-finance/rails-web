@@ -282,21 +282,18 @@ export const MARKET_NOTE_ITEMS: TimelineDisplayItem[] = [
 export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
-  { key: "showEventNumbers", label: "Event numbers" },
 ];
 
 /** The chain-state items + the two USD switches (stablecoins, other tokens;
  *  lib/shared/usd-display.ts) — for the explorers whose index carries
  *  per-event oracle-at-block prices (Aave V3 + Spark, server mig 092; the
  *  Liquity V2 forks' branch price at the block): their detail grids render
- *  the after-balance USD chip, so the flags have a render path there. Order mirrors the V4 spoke menu (USD before Event
- *  numbers). */
+ *  the after-balance USD chip, so the flags have a render path there. Order mirrors the V4 spoke menu. */
 export const CHAIN_TRUTH_USD_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showUsdStable", label: "USD for stablecoins" },
   { key: "showUsdOther", label: "USD for other tokens" },
-  { key: "showEventNumbers", label: "Event numbers" },
 ];
 
 /** The Liquity V2 trove page's display menu: the two USD switches on top of
@@ -309,7 +306,6 @@ export const LIQUITY_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showUsdStable", label: "USD for stablecoins" },
   { key: "showUsdOther", label: "USD for other tokens" },
-  { key: "showEventNumbers", label: "Event numbers" },
 ];
 
 /** The Polaris CDP page's display menu: the chain-truth base plus the
@@ -321,7 +317,6 @@ export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
   { key: "showTimestamps", label: "Timestamps (UTC)" },
   { key: "showTimelineValues", label: "Timeline values" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
-  { key: "showEventNumbers", label: "Event numbers" },
 ];
 
 /** The shared display "eye" menu — one FilterDropdown over a chosen subset of

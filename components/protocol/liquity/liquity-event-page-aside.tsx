@@ -2,21 +2,29 @@
 
 // The Liquity V2 event page's side column (rails-ops TO-DO-ui-jobs 236), in
 // the spine's place beside the card: the event's title (the header's words and
-// amounts, large, ui-jobs 286), the paragraph with the timeline link, a
+// amounts, large, ui-jobs 286), the actions row (the timeline, Etherscan, the
+// Markdown, Copy link, Copy for LLM; ui-jobs 291, words in `action_words`),
+// the paragraph with the timeline link, a
 // table of the facts the card does not show (branch, Trove id, holder, the
 // event's place, block), and the previous, next and timeline links. The words
 // are the strings file's `page_words` (content/liquity-v2/event-prose.yaml).
 // The table is identity and position, no figure that carries a receipt, so
 // the provenance tripwire passes over it.
 
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
-import { PAGE_WORDS } from "@/lib/liquity/event-templates";
+import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
+import { useEventShareHref } from "@/components/shared/event-share-context";
+import { CopyForLlmButton, LiquityEventMarkdownContext } from "@/components/protocol/liquity/event-prose-render";
+import { useChainId } from "@/lib/shared/chain-context";
+import { explorerUrl } from "@/lib/shared/chains";
+import { ACTION_WORDS, COPY_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
 import { eventOf, holderName } from "@/lib/liquity/event-page";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 
 const LINK = "text-blue-600 hover:underline dark:text-blue-400";
+const ACTION = `${LINK} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm`;
 const TH = "w-24 py-1.5 pr-3 text-left align-top font-normal text-rb-500";
 const TD = "min-w-0 py-1.5 align-top text-foreground";
 
@@ -32,6 +40,7 @@ export interface LiquityEventPageAsideProps {
   n: number;
   total: number;
   blockNumber: number;
+  txHash: string;
   /** Null at the first or last event. */
   previousHref: string | null;
   nextHref: string | null;
@@ -74,12 +83,73 @@ function CopyTroveId({ troveId }: { troveId: string }) {
   );
 }
 
+/** The row under the title: the links, then the copy buttons. Each item
+ *  carries `data-menu-item`, the names the ⋮ menu's rows had, for the
+ *  verifiers. */
+function EventActions({ txHash, timelineHref }: { txHash: string; timelineHref: string }) {
+  const chainId = useChainId();
+  const shareHref = useEventShareHref();
+  const build = useContext(LiquityEventMarkdownContext);
+  const [copied, copy] = useMenuCopied();
+  const mdHref = shareHref ? eventMarkdownHref(shareHref) : null;
+  return (
+    <div
+      role="group"
+      aria-label={ACTION_WORDS.label}
+      className="flex flex-wrap gap-x-4 gap-y-1"
+      data-event-page-actions=""
+    >
+      <a href={timelineHref} className={ACTION} title={ACTION_WORDS.in_timeline_hint} data-menu-item="view-timeline">
+        {ACTION_WORDS.in_timeline}
+      </a>
+      <a
+        href={explorerUrl(chainId, "tx-logs", txHash)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={ACTION}
+        title={ACTION_WORDS.explorer_hint}
+        data-menu-item="view-explorer"
+      >
+        {ACTION_WORDS.explorer}
+      </a>
+      {mdHref && (
+        <a
+          href={mdHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={ACTION}
+          title={ACTION_WORDS.view_markdown_hint}
+          data-menu-item="view-markdown"
+        >
+          {ACTION_WORDS.view_markdown}
+        </a>
+      )}
+      {shareHref && (
+        <button
+          type="button"
+          className={ACTION}
+          title={ACTION_WORDS.copy_link_hint}
+          data-menu-item="copy-link"
+          data-copied={copied === "link" ? "" : undefined}
+          onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
+        >
+          {copied === "link" ? COPY_WORDS.copied : ACTION_WORDS.copy_link}
+        </button>
+      )}
+      {mdHref && build && <CopyForLlmButton href={mdHref} build={build} className={ACTION} />}
+    </div>
+  );
+}
+
 export function LiquityEventPageAside(p: LiquityEventPageAsideProps) {
   const holderHref = p.owner ? listingHrefForWallet("liquity-v2", p.owner) : null;
   const holder = holderName(p.owner, p.ownerEns);
   return (
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
-      <div className="pb-2">{p.title}</div>
+      <div className="space-y-2 pb-2">
+        {p.title}
+        <EventActions txHash={p.txHash} timelineHref={p.timelineHref} />
+      </div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {PAGE_WORDS.paragraph}{" "}
         <a href={p.timelineHref} className={LINK}>
