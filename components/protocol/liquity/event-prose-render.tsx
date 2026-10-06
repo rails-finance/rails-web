@@ -185,10 +185,16 @@ export function useLiquityEventMarkdown(
   };
 }
 
-/** "Copy for LLM": the last row of the event menu, on the timeline card and
- *  the event page. */
-export function CopyForLlmItem({ build }: { build: () => string }) {
+/** "Copy for LLM": a row of the event menu, on the timeline card and the
+ *  event page. It copies the event's raw Markdown route (`href`, the page's
+ *  URL with `.md`), so a copy taken before the page's replay lands is the
+ *  whole text; where the read fails it copies the page's build. */
+export function CopyForLlmItem({ href, build }: { href: string; build: () => string }) {
   const [copied, copy] = useMenuCopied();
+  const read = () =>
+    fetch(href, { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
+      .catch(() => build());
   return (
     <ToolsMenuItem
       item="copy-for-llm"
@@ -196,7 +202,7 @@ export function CopyForLlmItem({ build }: { build: () => string }) {
       title={COPY_WORDS.button}
       subtitle={copied ? COPY_WORDS.copied : COPY_WORDS.button_label}
       copied={copied != null}
-      onClick={() => copy("llm", build())}
+      onClick={() => copy("llm", read())}
     />
   );
 }

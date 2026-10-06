@@ -5,12 +5,12 @@
 // the "?", on the timeline card and the event page. The position card's menu
 // (C17, `ToolsMenu` variant `card`) with the event's rows: open the event page
 // (not on that page), open the explorer, copy the page's link, then the
-// family's rows (`extra`, Liquity V2's Copy for LLM). A copy row shows a tick
-// and "Copied" for a moment, as C17's rows do.
+// family's rows (`extra`, Liquity V2's Copy for LLM and View as Markdown). A
+// copy row shows a tick and "Copied" for a moment, as C17's rows do.
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Link2 } from "lucide-react";
+import { ArrowUpRight, FileText, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ExplorerMark } from "@/components/shared/explorer-mark";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -29,6 +29,9 @@ export interface EventMenuWords {
   view_explorer_hint: string;
   copy_link: string;
   copy_link_hint: string;
+  /** A family's raw Markdown row (`ViewMarkdownItem`), where it has one. */
+  view_markdown: string;
+  view_markdown_hint: string;
   copied: string;
 }
 
@@ -40,6 +43,8 @@ export const EVENT_MENU_WORDS: EventMenuWords = {
   view_explorer_hint: "Open the transaction's logs",
   copy_link: "Copy link to event page",
   copy_link_hint: "Copy the page's address",
+  view_markdown: "View as Markdown",
+  view_markdown_hint: "Open this event as Markdown",
   copied: "Copied",
 };
 
@@ -51,11 +56,25 @@ export function useEventMenuSlot(): ReactNode {
   return useContext(EventMenuSlot);
 }
 
+/** The clipboard write for a text that arrives later (a fetch): a
+ *  `ClipboardItem` holding the promise, created inside the click so Safari
+ *  keeps the gesture; where the browser has no `ClipboardItem` or refuses it,
+ *  the text is written once it lands. */
+function writeLater(value: Promise<string>): Promise<void> {
+  if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+    const blob = value.then((t) => new Blob([t], { type: "text/plain" }));
+    return navigator.clipboard
+      .write([new ClipboardItem({ "text/plain": blob })])
+      .catch(() => value.then((t) => navigator.clipboard.writeText(t)));
+  }
+  return value.then((t) => navigator.clipboard.writeText(t));
+}
+
 /** A copy row's moment of confirmation, keyed by row. */
-export function useMenuCopied(): [string | null, (key: string, value: string) => void] {
+export function useMenuCopied(): [string | null, (key: string, value: string | Promise<string>) => void] {
   const [copied, setCopied] = useState<string | null>(null);
-  const copy = (key: string, value: string) => {
-    navigator.clipboard.writeText(value).then(
+  const copy = (key: string, value: string | Promise<string>) => {
+    (typeof value === "string" ? navigator.clipboard.writeText(value) : writeLater(value)).then(
       () => {
         setCopied(key);
         setTimeout(() => setCopied(null), 1500);
@@ -64,6 +83,30 @@ export function useMenuCopied(): [string | null, (key: string, value: string) =>
     );
   };
   return [copied, copy];
+}
+
+/** The menu's close, for a family's row in `extra`. */
+const EventMenuClose = createContext<() => void>(() => {});
+
+/** The event's raw Markdown path: the event page's path with `.md`. */
+export function eventMarkdownHref(shareHref: string): string {
+  return `${shareHref.split("?")[0]}.md`;
+}
+
+/** "View as Markdown": opens the event's raw Markdown in a new tab. */
+export function ViewMarkdownItem({ href, words }: { href: string; words: EventMenuWords }) {
+  const close = useContext(EventMenuClose);
+  return (
+    <ToolsMenuItem
+      item="view-markdown"
+      icon={<FileText size={16} />}
+      title={words.view_markdown}
+      subtitle={words.view_markdown_hint}
+      href={href}
+      external
+      onClick={close}
+    />
+  );
 }
 
 export function EventCardMenu({
@@ -121,7 +164,7 @@ export function EventCardMenu({
               onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
             />
           )}
-          {extra}
+          <EventMenuClose.Provider value={close}>{extra}</EventMenuClose.Provider>
         </>
       )}
     </ToolsMenu>

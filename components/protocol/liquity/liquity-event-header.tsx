@@ -640,9 +640,9 @@ export function LiquityEventHeader({
         stateAfter.annualInterestRate > 0 && <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
     </>
   );
-  // `evt-meta`: the header's own first row below sm (app/globals.css). Its
-  // 24px line puts the icon, date, time and number on the card chevron's
-  // centre line, and its direct children sit on one middle (ui-jobs 289).
+  // `evt-meta`: the header's first row below sm (app/globals.css). Its 24px
+  // line puts the icon, date, time and number on the card chevron's centre
+  // line, and its direct children sit on one middle (ui-jobs 289).
   const meta = (
     <span className="evt-meta ml-auto inline-flex min-h-6 items-center gap-2">
       {ctx.operation === "redeemCollateral" && ctx.isZombieTrove && (

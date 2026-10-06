@@ -151,6 +151,22 @@ const nextConfig: NextConfig = {
     });
     return config;
   },
+  // A Liquity V2 event's raw Markdown (rails-ops TO-DO-ui-jobs 287): the public
+  // path `…/event/<eventId>.md` is served by the route handler under the
+  // event's segment, since an App Router segment cannot carry a suffix. Before
+  // the file system, so the `[eventId]` page never takes the path.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/ethereum/liquity-v2/trove/:collateralType/:troveId/event/:eventId([^/]+)\\.md",
+          destination: "/ethereum/liquity-v2/trove/:collateralType/:troveId/event/:eventId/markdown",
+        },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   async redirects() {
     return [
       // Legacy explorer paths — collapsed to a single hop to the new canonical

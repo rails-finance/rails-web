@@ -1049,10 +1049,90 @@ await verifyFamily("spark", {
   listingPath: "/ethereum/spark",
   rowHrefRe: /^\/ethereum\/spark\/0x[0-9a-fA-F]{40}/,
 });
-await verifyFamily("liquity-v2", {
+const liquityV2Subject = await verifyFamily("liquity-v2", {
   listingPath: "/ethereum/liquity-v2",
   rowHrefRe: /^\/ethereum\/liquity-v2\/trove\//,
 });
+await verifyLiquityMarkdown(liquityV2Subject);
+
+/** Liquity V2's raw Markdown per event (ui-jobs 287): `<event page>.md`
+ *  answers 200 `text/markdown`, `noindex`, the page as its canonical `Link`,
+ *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404;
+ *  the menu's View as Markdown row links there in a new tab, on the timeline
+ *  card and the event page. For the event the family's checks above copied. */
+async function verifyLiquityMarkdown(subject) {
+  if (!subject) return;
+  const name = "liquity-v2";
+  const { positionPath, decodedId, link } = subject;
+  const pagePath = new URL(link).pathname;
+  const mdPath = `${pagePath}.md`;
+  const res = await fetch(`${BASE}${mdPath}`);
+  const body = await res.text();
+  check(`${name}: ${mdPath.slice(-24)} answers 200`, res.status === 200, String(res.status));
+  check(
+    `${name}: Markdown route's content type is text/markdown; charset=utf-8`,
+    (res.headers.get("content-type") ?? "") === "text/markdown; charset=utf-8",
+    res.headers.get("content-type") ?? "",
+  );
+  check(
+    `${name}: Markdown route says X-Robots-Tag: noindex`,
+    (res.headers.get("x-robots-tag") ?? "") === "noindex",
+    res.headers.get("x-robots-tag") ?? "",
+  );
+  check(
+    `${name}: Markdown route's Link names the event page as canonical`,
+    (res.headers.get("link") ?? "") === `<${BASE}${pagePath}>; rel="canonical"`,
+    res.headers.get("link") ?? "",
+  );
+  check(`${name}: Markdown body opens with the context header`, body.startsWith("# Liquity V2 · "), body.slice(0, 60));
+  const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
+  check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
+
+  const COPY_LLM = '[data-menu-item="copy-for-llm"]';
+  const VIEW_MD = '[data-menu-item="view-markdown"]';
+  const surfaces = [
+    { where: "event page", url: link, scope: "" },
+    {
+      where: "timeline card",
+      url: `${BASE}${positionPath}?at=${encodeURIComponent(decodedId)}`,
+      scope: `[data-event-id="${decodedId}"] `,
+    },
+  ];
+  for (const { where, url, scope } of surfaces) {
+    const { ctx, page, errors } = await open(1280, url);
+    const trigger = page.locator(`${scope}[data-event-menu] > button`).first();
+    await trigger.waitFor({ state: "attached", timeout: 120000 }).catch(() => {});
+    // The trigger is in the server's HTML before hydration; a click then opens
+    // nothing, so the menu is asked again until its rows are there.
+    for (let i = 0; i < 40 && (await page.locator(COPY_LLM).count()) === 0; i++) {
+      await trigger.click({ timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(250);
+    }
+    const items = await page.$$eval("[data-menu-item]", (els) => els.map((e) => e.getAttribute("data-menu-item")));
+    check(
+      `${name} ${where}: View as Markdown follows Copy for LLM`,
+      items.indexOf("view-markdown") === items.indexOf("copy-for-llm") + 1 && items.includes("copy-for-llm"),
+      JSON.stringify(items),
+    );
+    const row = page.locator(VIEW_MD).first();
+    const href = await row.getAttribute("href").catch(() => null);
+    const target = await row.getAttribute("target").catch(() => null);
+    check(`${name} ${where}: View as Markdown links to the route`, href === mdPath, href ?? "");
+    check(`${name} ${where}: View as Markdown opens a new tab`, target === "_blank", target ?? "");
+    const copied = await page
+      .click(COPY_LLM, { timeout: 10000 })
+      .then(() => page.waitForSelector(`${COPY_LLM}[data-copied]`, { timeout: 20000 }))
+      .then(() => page.evaluate(() => navigator.clipboard.readText()))
+      .catch(() => null);
+    check(
+      `${name} ${where}: Copy for LLM copies the route's body`,
+      copied === body,
+      copied == null ? "no copy" : `${copied.length} vs ${body.length} characters`,
+    );
+    check(`${name} ${where}: no page error`, errors.length === 0, errors.join("; "));
+    await ctx.close();
+  }
+}
 
 // ── sweep batch a ────────────────────────────────────────────────────────
 await verifyFamily("compound-v3", {
