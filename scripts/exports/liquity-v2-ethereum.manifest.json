@@ -10,7 +10,7 @@
       "troveId": "102247037494986730506041632222868001124387697185626929998095238518734059870154",
       "events": [
         { "id": "0x3eb152af8bd09cffcc5316d33d8b8ef31ab498dc70d854bb94c688e8410eec87_190", "template": "liquity2.open", "variant": "self", "version": "c7929c88", "block": "c0b46e70d248d502" },
-        { "id": "0xbc328c81c1cb63d52420f462eef2b49d59c7cd47067b36048b78a56505a9c251_396", "template": "liquity2.delegation.join", "variant": "default", "version": "3aad3cb3", "block": "2265358dac45a7e3" },
+        { "id": "0xbc328c81c1cb63d52420f462eef2b49d59c7cd47067b36048b78a56505a9c251_396", "template": "liquity2.delegation.join", "variant": "default", "version": "83a26d03", "block": "2b48f1bc1086e1cc" },
         { "id": "0x605b1e84025f79e17e80bd79056667a06ad535a2119adaa42258537e8ca74fa3_124", "template": "liquity2.delegation.rate_update", "variant": "kept", "version": "e43654c1", "block": "42c30bd4951f1b5e" },
         { "id": "0xf72e8512e99ab32c5bd28b8b81509cbb4d3668ed4ee83a2b44e482bc3769bbd6_21", "template": "liquity2.delegation.rate_update", "variant": "lowered", "version": "e43654c1", "block": "aaef43dcad3ab378" },
         { "id": "0xd84bd7d961cc4a8568544ca11087d4fcaf671736ebc4aeaa427c4de5a8d88e61_22", "template": "liquity2.delegation.rate_update", "variant": "lowered", "version": "e43654c1", "block": "7d73aac6bec4b194" },

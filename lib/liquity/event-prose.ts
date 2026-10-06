@@ -797,7 +797,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       } else sp.say("join.what_plain");
       if (upfront > 0) {
         // The fee is charged on the debt with its accrual: that debt, then
-        // the fee that took it to the debt after.
+        // the fee that brought it to the debt after.
         if (accrual && accrual.total > 0.01) {
           v.debt_accrued_before = stateAfter.debt - upfront;
           v.accrual_noun = accrualNoun(accrual);

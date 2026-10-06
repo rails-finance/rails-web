@@ -1380,7 +1380,7 @@ templates:
         when: |-
           joining charged an upfront fee
         text: |-
-          An upfront fee of {upfront_fee} {debt_symbol} took it to {debt_after} {debt_symbol}: joining a batch charges the upfront fee, 7 days of interest on the debt at the branch’s average rate.
+          An upfront fee of {upfront_fee} {debt_symbol} brought it to {debt_after} {debt_symbol}: joining a batch charges the upfront fee, 7 days of interest on the debt at the branch’s average rate.
       join.coll:
         when: |-
           the trove holds collateral
