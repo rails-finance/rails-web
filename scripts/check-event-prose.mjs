@@ -78,6 +78,7 @@ const WORD_SECTIONS = [
   "context_words",
   "footer_words",
   "copy_words",
+  "menu_words",
   "page_words",
   "L5_words",
   "fragments",
@@ -274,11 +275,14 @@ const GROUP = {
   CONTEXT_WORDS: "context_words",
   FOOTER_WORDS: "footer_words",
   COPY_WORDS: "copy_words",
+  MENU_WORDS: "menu_words",
   PAGE_WORDS: "page_words",
 };
 const sources = Object.fromEntries(READERS.map((f) => [f, read(f)]));
 for (const [file, src] of Object.entries(sources)) {
-  for (const m of src.matchAll(/\b(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS|PAGE_WORDS)\.([a-z_0-9]+)/g))
+  for (const m of src.matchAll(
+    /\b(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS|MENU_WORDS|PAGE_WORDS)\.([a-z_0-9]+)/g,
+  ))
     if (!(m[2] in d[GROUP[m[1]]])) failIn(file, `reads ${m[1]}.${m[2]}, which ${DATA} lacks (${GROUP[m[1]]})`);
   for (const m of src.matchAll(/FILE\.L5_words\.([a-z_0-9]+)/g))
     if (!(m[1] in d.L5_words)) failIn(file, `reads L5_words.${m[1]}, which ${DATA} lacks`);
@@ -366,7 +370,7 @@ const addSupply = (key, names) => {
 };
 for (const src of Object.values(sources)) {
   for (const m of src.matchAll(
-    /fillText\(\s*(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS|PAGE_WORDS)\.([a-z_0-9]+),/g,
+    /fillText\(\s*(L1_WORDS|L2_WORDS|CONTEXT_WORDS|FOOTER_WORDS|COPY_WORDS|MENU_WORDS|PAGE_WORDS)\.([a-z_0-9]+),/g,
   ))
     addSupply(`${GROUP[m[1]]}.${m[2]}`, objectKeys(src, m.index + m[0].length));
   for (const m of src.matchAll(/wordsAround\(\s*(L2_WORDS|L1_WORDS)\.([a-z_0-9]+),\s*\[([^\]]*)\](,\s*\{)?/g)) {

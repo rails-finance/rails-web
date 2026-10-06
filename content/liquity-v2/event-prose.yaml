@@ -582,6 +582,31 @@ copy_words:
   footer: |-
     Footer
 
+# ── The event menu: the ⋮ at the right end of the explanation's row ──
+# Each row is a title and the line under it; a copy row's line reads `copied`
+# for a moment after the copy. The last row, Copy for LLM, reads copy_words.
+menu_words:
+  menu: |-
+    Event menu
+  heading: |-
+    Event
+  copy_hash: |-
+    Copy event hash
+  copy_hash_hint: |-
+    Copy the transaction hash
+  view_page: |-
+    View event page
+  view_page_hint: |-
+    Open this event's page
+  view_explorer: |-
+    View on Etherscan
+  view_explorer_hint: |-
+    Open the transaction's logs
+  copy_link: |-
+    Copy link to event page
+  copy_link_hint: |-
+    Copy the page's address
+
 # ── The event page: the side column beside the card ──
 # The column holds the paragraph, a table of facts the card does not show, and
 # the previous, next and timeline links. The metadata description is

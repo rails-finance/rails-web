@@ -10,7 +10,7 @@ import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail } from "./liquity-event-detail";
 import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
-import { CopyForLlm, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import { CopyForLlmItem, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -19,9 +19,8 @@ import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liqu
 import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
-import { PAGE_WORDS } from "@/lib/liquity/event-templates";
-import { decodeEventId } from "@/lib/shared/page-metadata";
-import { useParams } from "next/navigation";
+import { COPY_WORDS, MENU_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
+import type { EventMenuWords } from "@/components/shared/event-card-menu";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -50,6 +49,21 @@ export interface LiquityEventCardProps {
   page?: { aside: React.ReactNode };
 }
 
+/** The event menu's words, from the strings file. */
+const menuWords: EventMenuWords = {
+  menu: MENU_WORDS.menu,
+  heading: MENU_WORDS.heading,
+  copy_hash: MENU_WORDS.copy_hash,
+  copy_hash_hint: MENU_WORDS.copy_hash_hint,
+  view_page: MENU_WORDS.view_page,
+  view_page_hint: MENU_WORDS.view_page_hint,
+  view_explorer: MENU_WORDS.view_explorer,
+  view_explorer_hint: MENU_WORDS.view_explorer_hint,
+  copy_link: MENU_WORDS.copy_link,
+  copy_link_hint: MENU_WORDS.copy_link_hint,
+  copied: COPY_WORDS.copied,
+};
+
 export function LiquityEventCard({
   event,
   addressDisplay = "full",
@@ -68,10 +82,6 @@ export function LiquityEventCard({
   const wallet = event.wallet;
   const prose = useLiquityEventProse(event, previousEvent, currentPrice);
   const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
-  // Copy for LLM sits on the event page.
-  const routeParams = useParams<{ eventId?: string | string[] }>();
-  const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
-  const onEventPage = rawEventId != null && decodeEventId(rawEventId) === event.id;
   const shareHref = useEventShareHref();
   const buildMarkdown = useLiquityEventMarkdown(prose, event, eventNumber, shareHref);
 
@@ -274,15 +284,12 @@ export function LiquityEventCard({
   );
 
   const liquityTeaser = prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : null;
-  // The footer: gas (owner-paid events only; the generator leaves a third
-  // party's out), then Copy for LLM on the event page.
+  // Gas (owner-paid events only; the generator leaves a third party's out)
+  // stands in T2's price row (LiquityEventDetail); a card that draws no price
+  // row keeps it in the footer.
+  const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra =
-    prose.footer.gas || (onEventPage && buildMarkdown) ? (
-      <>
-        {prose.footer.gas && <span className="text-xs text-rb-500">{prose.footer.gas}</span>}
-        {onEventPage && buildMarkdown && <CopyForLlm build={buildMarkdown} />}
-      </>
-    ) : undefined;
+    prose.footer.gas && !priceRow ? <span className="text-xs text-rb-500">{prose.footer.gas}</span> : undefined;
 
   const card = (
     <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>
@@ -315,6 +322,9 @@ export function LiquityEventCard({
         txHash={event.txHash}
         footerExtra={footerExtra}
         learnMore={<LearnMore inline content={prose.L5.content} />}
+        explanationHeading={PAGE_WORDS.explanation_heading}
+        menuWords={menuWords}
+        menuExtra={buildMarkdown ? <CopyForLlmItem build={buildMarkdown} /> : undefined}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
         {...(page
@@ -322,7 +332,6 @@ export function LiquityEventCard({
               hideDetailChevron: true,
               detailOpen: true,
               pageAside: page.aside,
-              pageExplanationHeading: PAGE_WORDS.explanation_heading,
             }
           : {})}
       />

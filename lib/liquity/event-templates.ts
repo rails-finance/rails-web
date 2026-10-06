@@ -102,6 +102,7 @@ interface ProseFile {
   context_words: Words;
   footer_words: Words;
   copy_words: Words;
+  menu_words: Words;
   page_words: Words;
   L5_words: Words;
   fragments: Words;
@@ -125,6 +126,8 @@ export const CONTEXT_WORDS = FILE.context_words;
 export const FOOTER_WORDS = FILE.footer_words;
 /** The Copy for LLM control and the block's own words. */
 export const COPY_WORDS = FILE.copy_words;
+/** The event card's ⋮ menu. */
+export const MENU_WORDS = FILE.menu_words;
 /** The event page's paragraph and its card's page controls. */
 export const PAGE_WORDS = FILE.page_words;
 /** Parts of a sentence the generator joins. */

@@ -1654,9 +1654,9 @@ function ChainTruthTimelineBody({
   // Every event row's own share href — right on the position page and on the
   // event page itself, since `positionPath` above already strips the latter's
   // `/event/…` suffix. Wrapping here (rather than inside each family's card
-  // composer) is what makes the copy-link control need no per-family edit at
-  // all — see `CopyEventLink` in `event-card-footer.tsx`, which `EventCard`
-  // reads this href into and passes down to; it draws nothing where there is
+  // composer) is what makes the event menu's page rows need no per-family
+  // edit at all — see `EventCardMenu` in `event-card-menu.tsx`, which
+  // `EventCard` reads this href into; it draws no page rows where there is
   // none.
   const shareHrefFor = (id: string) =>
     `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;

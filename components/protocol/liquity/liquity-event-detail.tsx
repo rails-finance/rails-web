@@ -949,15 +949,20 @@ export function LiquityEventDetail({
           there by generateLiquidateItems, so it no longer appears in the
           details body. */}
 
-      {/* Historic collateral price pill, sharing its row with the redemption
-          P/L (net outcome) on the left. P/L reconciles with the Cleared /
-          Reduced figures in the header: debt cleared minus the value of
-          collateral given up, at the redemption-time price and (when
-          available) at today's price. (Batch membership is conveyed by the
-          "Delegate" treatment on interest-rate events, so no standalone
-          "Batched" badge here.) */}
+      {/* Historic collateral price pill, sharing its row with the gas the
+          owner paid and the redemption P/L (net outcome), left of it. P/L
+          reconciles with the Cleared / Reduced figures in the header: debt
+          cleared minus the value of collateral given up, at the
+          redemption-time price and (when available) at today's price.
+          (Batch membership is conveyed by the "Delegate" treatment on
+          interest-rate events, so no standalone "Batched" badge here.) */}
       {collPrice > 0 && (
-        <div className="flex items-center gap-2 px-4 py-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
+          {prose.footer.gas && (
+            <span className="text-xs text-rb-500" data-gas="">
+              {prose.footer.gas}
+            </span>
+          )}
           {l2.redemption &&
             (() => {
               // P/L reconciles with the header's Cleared / Took: debt cleared

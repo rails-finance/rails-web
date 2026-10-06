@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useContext, useId } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
+import { EventCardMenu, type EventMenuWords } from "@/components/shared/event-card-menu";
+import { TxHashBadge } from "@/components/shared/tx-hash-badge";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
@@ -61,15 +63,22 @@ export interface EventCardProps {
   /** How the teaser reads: "bullet" (default) keeps the leading • glyph; "prose"
    *  renders it as a plain lead paragraph with no glyph. */
   explainerTeaserVariant?: "bullet" | "prose";
-  /** Transaction hash — enables shared footer with Etherscan + TxHashBadge */
+  /** Transaction hash: the hash and the event menu at the right end of T3's
+   *  row. */
   txHash?: string;
-  /** A word before the footer's hash ("Transaction"). Unset changes nothing. */
+  /** A word before the hash ("Transaction"). Unset changes nothing. */
   txHashLabel?: string;
-  /** Extra content in the footer row (e.g., Liquity collateral price) */
+  /** Content before the footer's "?" (a family's gas where it has no price
+   *  row in T2). */
   footerExtra?: React.ReactNode;
-  /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), rendered at the
-   *  right end of the footer row — the same row as the tx links. */
+  /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), alone at the
+   *  right end of the footer (T6). */
   learnMore?: React.ReactNode;
+  /** The event menu's words, where a family's strings file has them. */
+  menuWords?: EventMenuWords;
+  /** The family's rows at the end of the event menu (Liquity V2's Copy for
+   *  LLM). */
+  menuExtra?: React.ReactNode;
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
    *  the only dismiss action is an explicit close button. */
@@ -98,10 +107,9 @@ export interface EventCardProps {
    *  spine's column, beside the card from 640px and above it below. Set with
    *  `hideDetailChevron` and `detailOpen`; unset, the card is the timeline's. */
   pageAside?: React.ReactNode;
-  /** The event page's T3 heading words ("Event explanation"): with
-   *  `pageAside`, the explanation stands open without its panel, under the
-   *  (i) and these words. */
-  pageExplanationHeading?: string;
+  /** The words after T3's (i): the button's on the timeline, the heading's
+   *  on the event page. A family's strings file can replace the default. */
+  explanationHeading?: string;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -132,14 +140,14 @@ export function EventCard({
   caption,
   infoAction,
   pageAside,
-  pageExplanationHeading,
+  explanationHeading = "Event explanation",
+  menuWords,
+  menuExtra,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
   const showAvatar = !singleWallet && !!avatar;
-  // Read here, at the card shell level, and passed down to `EventCardFooter`
-  // — the footer is where the share control renders, but this shell is what
-  // knows whether a share href exists at all (outside a timeline, it doesn't).
+  // The event page's path, for the event menu: null outside a timeline.
   const shareHref = useEventShareHref();
 
   const [detailOpenInternal, setDetailOpenInternal] = useState(false);
@@ -235,22 +243,22 @@ export function EventCard({
         ]
       : []),
   ];
-  const footerNode = txHash ? (
-    <EventCardFooter
-      txHash={txHash}
-      txHashLabel={txHashLabel}
-      extra={footerExtra}
-      learnMore={learnMore}
-      shareHref={shareHref ?? undefined}
-    />
-  ) : undefined;
+  const footerNode = txHash ? <EventCardFooter extra={footerExtra} learnMore={learnMore} /> : undefined;
 
-  // The (i) row's right end: the card's action, level with the (i).
-  const infoActionNode = infoAction ? (
-    <div className="-my-2 ml-auto flex items-center self-center sm:my-0" onClick={(e) => e.stopPropagation()}>
-      {infoAction}
-    </div>
-  ) : undefined;
+  // The (i) row's right end, reachable with the explanation closed: the
+  // card's action, then the transaction hash and the event menu.
+  const infoActionNode =
+    infoAction || txHash ? (
+      <div className="ml-auto flex items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
+        {infoAction && <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>}
+        {txHash && (
+          <>
+            <TxHashBadge txHash={txHash} label={txHashLabel} />
+            <EventCardMenu txHash={txHash} shareHref={shareHref} words={menuWords} extra={menuExtra} />
+          </>
+        )}
+      </div>
+    ) : undefined;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   const contentTiers = (
@@ -279,9 +287,8 @@ export function EventCard({
             }
           }}
         >
-          {/* The header's right-hand cluster: the expand chevron only — the
-              share control moved into the footer (2026-09-11; see
-              `CopyEventLink` in event-card-footer.tsx). Below sm the cluster
+          {/* The header's right-hand cluster: the expand chevron only (the
+              share control is in the event menu, event-card-menu.tsx). Below sm the cluster
               leaves the flex row for the header's top-right corner and the
               header's `.evt-meta` row lines up beside it, reserving width
               for the chevron when present — see the `.evt-meta` rules in
@@ -360,7 +367,7 @@ export function EventCard({
                       <svg className="h-5 w-5 text-rb-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
                       </svg>
-                      {pageExplanationHeading}
+                      {explanationHeading}
                     </h3>
                     {infoActionNode}
                   </div>
@@ -375,6 +382,7 @@ export function EventCard({
                 <InfoTabsDisclosure
                   bare
                   anatomy="T3"
+                  heading={explanationHeading}
                   tabs={infoTabs}
                   openTab={openInfoTab}
                   onOpenTabChange={setOpenInfoTab}

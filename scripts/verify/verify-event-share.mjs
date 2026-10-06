@@ -7,7 +7,8 @@
 // each with a vault block of its own at the foot of this file.
 //
 // What it holds, per family:
-//   1. The position page's card footer carries a copy-link control; the
+//   1. The position page's card carries a copy-link control (the event
+//      menu's "Copy link to event page"); the
 //      clipboard receives an absolute URL of the form
 //      `<origin>/<position path>/event/<encoded id>`, and decoding the last
 //      segment gives an id that is in the page's own `data-event-id` set.
@@ -192,9 +193,14 @@ async function eventIds(page) {
   return page.$$eval("[data-event-id]", (els) => els.map((e) => e.getAttribute("data-event-id")));
 }
 
+// The copy-link control is the event menu's "Copy link to event page" row, the
+// ⋮ at the end of the Explanation's row (ui-jobs 281).
+const COPY_LINK = '[data-menu-item="copy-link"]';
+
 async function copyEventLink(page) {
-  await page.click('button[aria-label="Copy a link to this event"]');
-  await page.waitForSelector('button[aria-label="Link copied"]', { timeout: 5000 });
+  if ((await page.locator(COPY_LINK).count()) === 0) await page.locator("[data-event-menu] > button").first().click();
+  await page.click(COPY_LINK);
+  await page.waitForSelector(`${COPY_LINK}[data-copied]`, { timeout: 5000 });
   return page.evaluate(() => navigator.clipboard.readText());
 }
 
@@ -339,8 +345,8 @@ async function pickWorkingSubject(hrefs, rowHrefRe) {
   return candidates[0];
 }
 
-/** Check 1's two clicks: open the first event card, then its Explanation
- *  disclosure, and report whether the copy-link control is now on the page. */
+/** Check 1's two clicks: open the first event card, then its event menu, and
+ *  report whether the copy-link row is now on the page. */
 async function revealFirstCardCopyLink(page) {
   await page.waitForSelector('[data-event-id] [role="button"]', { timeout: 60000 }).catch(() => {});
   const firstCard = page.locator("[data-event-id]").first();
@@ -350,12 +356,12 @@ async function revealFirstCardCopyLink(page) {
     .click()
     .catch(() => {});
   await firstCard
-    .locator('button[aria-label="Show explanation"], button[aria-label="Show details"]')
+    .locator("[data-event-menu] > button")
     .first()
     .click({ timeout: 15000 })
     .catch(() => {});
-  await page.waitForSelector('button[aria-label="Copy a link to this event"]', { timeout: 15000 }).catch(() => {});
-  return (await page.locator('button[aria-label="Copy a link to this event"]').count()) > 0;
+  await page.waitForSelector(COPY_LINK, { timeout: 15000 }).catch(() => {});
+  return (await page.locator(COPY_LINK).count()) > 0;
 }
 
 /** What the first card looks like right now — logged when check 1 fails. */
@@ -485,12 +491,11 @@ async function verifyFamilyOnce(name, { listingPath, rowHrefRe, skip, subjectHre
   }
   console.log(`  subject: ${rowHref}${subjectHref ? " (pinned)" : ""}`);
 
-  // ── Check 1: the position page's footer copy-link ───────────────────
-  // The copy-link control sits in EventCardFooter, which — like the tx-hash
-  // badge and explorer mark beside it — is inside the card's "Explanation"
-  // info-disclosure panel (InfoTabsDisclosure's `footer` prop), which is
-  // itself nested inside the card's own detail panel. Getting to it needs
-  // TWO clicks: open the card, then open its (i) Explanation disclosure.
+  // ── Check 1: the position page's copy-link ──────────────────────────
+  // The copy-link control is a row of the event menu (EventCardMenu), the ⋮
+  // after the transaction hash at the end of the Explanation's row, inside
+  // the card's detail panel. Getting to it needs TWO clicks: open the card,
+  // then open the menu.
   //
   // Two attempts, each in a fresh context: on a live page the first card can
   // re-key under the click when the head replay lands (Liquity V2 failed

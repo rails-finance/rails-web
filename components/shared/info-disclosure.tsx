@@ -279,6 +279,9 @@ export interface InfoTabsDisclosureProps {
    *  the row, the (i) button and the open pane drawn with no fill and no
    *  rounded box. Unset, the panel register. */
   bare?: boolean;
+  /** Words after the (i), before the chevron ("Event explanation" on an
+   *  event card), shown on every tab's button. */
+  heading?: string;
 }
 
 /**
@@ -301,6 +304,7 @@ export function InfoTabsDisclosure({
   className,
   anatomy,
   bare,
+  heading,
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
@@ -362,6 +366,11 @@ export function InfoTabsDisclosure({
               >
                 <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
               </svg>
+              {heading && (
+                <span className="ml-0.5 text-sm font-semibold text-foreground" data-t3-heading="">
+                  {heading}
+                </span>
+              )}
               <svg
                 className={`mr-0.5 h-3 w-3 text-rb-500 transition-[color,transform] duration-200 group-hover/info:text-foreground ${
                   active ? "rotate-180" : ""
