@@ -98,6 +98,9 @@ export interface LiquityEventHeaderProps {
    *  states the date, the time and the number whatever the Display menu
    *  says. */
   page?: boolean;
+  /** The event page's title (ui-jobs 286): the words and amounts alone, large,
+   *  in an h1; the page-mode header then shows the word and the time slot. */
+  title?: boolean;
 }
 
 /** The event page's time slot: the date, the time and the number. */
@@ -123,6 +126,7 @@ export function LiquityEventHeader({
   blockNumber,
   eventNumber,
   page,
+  title,
 }: LiquityEventHeaderProps) {
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
   const style = getOperationStyle(ctx.operation, ctx);
@@ -130,7 +134,7 @@ export function LiquityEventHeader({
   const { showTimestamps, showEventNumbers, showCollateralRatio, showTimelineValues } = useTimelineDisplay();
   // A redemption's lozenges move onto the spine node's flanks in the phone
   // spine view (SpineColumn's `warningLegs`); the opened card drops them.
-  const spineFlankHide = showTimelineValues ? "mspine:max-sm:hidden" : "";
+  const spineFlankHide = showTimelineValues && !title ? "mspine:max-sm:hidden" : "";
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
   const crColor = useLiquityRatioColorClass();
@@ -156,6 +160,13 @@ export function LiquityEventHeader({
     ) : null;
 
   if (!stateAfter || !stateBefore) {
+    if (title) {
+      return (
+        <h1 className="text-2xl font-normal leading-tight text-rb-500" data-event-page-title="">
+          {style.label}
+        </h1>
+      );
+    }
     return (
       <div className="flex items-center gap-2">
         {style.badge ? (
@@ -207,11 +218,17 @@ export function LiquityEventHeader({
     "adjustZombieTrove",
     "adjustUnredeemableZombieTrove",
   ]);
-  // The event page has no spine to carry the values, so its header states them.
+  // The event page has no spine to carry the values, so its title states them.
   const spineHide = useHeaderValueHideClass({ isPassive: PASSIVE_OPS.has(ctx.operation) });
-  const hideVal = page ? "" : spineHide;
+  const hideVal = page || title ? "" : spineHide;
   // The redemption and liquidation pills the spine draws from 640px.
-  const spinePillHide = page ? "" : "sm:hidden mspine:max-sm:hidden ";
+  const spinePillHide = page || title ? "" : "sm:hidden mspine:max-sm:hidden ";
+  // The title's sizes; the header's otherwise.
+  const TXT = title ? "text-2xl" : "text-sm";
+  const GAP = title ? "gap-2.5" : "gap-1.5";
+  const AMT = title ? "font-normal text-foreground" : "font-bold text-foreground";
+  const ICON = title ? 40 : 16;
+  const PILL = title ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs";
 
   // ── Provenance threading (zero-cost when the inspector is off) ──────────────
   // Chain deltas point at the branch TroveManager (via the shared builders
@@ -285,59 +302,191 @@ export function LiquityEventHeader({
       node
     );
 
-  return (
+  const cluster = (
     <>
-      <div className="pl-5 pt-4 pb-3">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
-            <>
-              <span className="text-sm text-rb-500">{style.label}</span>
+      {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
+        <>
+          <span className={`${TXT} text-rb-500`}>{style.label}</span>
+          <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
+          {ctx.batchManager && (
+            <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
+          )}
+          {/* The debt's move since the trove's previous event: interest, the
+            management fee and any upfront fee, split in the explanation.
+            The spine carries no value on a rate change, so the figure
+            stays at every width (no hideVal). */}
+          {hasDebtChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+              <span className="text-rb-500">{L1_WORDS.debt}</span>
+              {debtCp ? (
+                <Prov value={debtCp.value} symbol={debtCp.symbol} info={debtCp.info}>
+                  <span className={AMT}>
+                    <ExactTip
+                      text={`${debtChange > 0 ? "+" : "−"}${fmtHeaderMagnitude(Math.abs(debtChange), debtSym)}`}
+                      exact={formatExact(Math.abs(debtChange))}
+                      symbol={debtSym}
+                    />
+                  </span>
+                </Prov>
+              ) : null}
+              <TokenChipIcon symbol={debtSym} size={ICON} />
+            </span>
+          )}
+        </>
+      ) : ctx.operation === "setInterestBatchManager" ? (
+        <>
+          <span className={`${TXT} text-rb-500`}>{style.label}</span>
+          {stateAfter.annualInterestRate > 0 && <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
+          {ctx.batchManager && (
+            <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
+          )}
+        </>
+      ) : ctx.operation === "openTrove" || ctx.operation === "openTroveAndJoinBatch" ? (
+        <>
+          <span className={`inline-block ${PILL} rounded-full font-bold ${style.bg} ${style.color}`}>
+            {style.label}
+          </span>
+          {hasCollChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+              <span className="text-rb-500">{L1_WORDS.supply}</span>
+              {wrapColl(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                    exact={formatExact(Math.abs(collChange))}
+                    symbol={ctx.collateralType}
+                  />
+                </span>,
+              )}
+              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+            </span>
+          )}
+          {hasDebtChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+              <span className="text-rb-500">{L1_WORDS.borrow}</span>
+              {wrapDebt(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                    exact={formatExact(Math.abs(debtChange))}
+                    symbol={ctx.assetType ?? "BOLD"}
+                  />
+                </span>,
+              )}
+              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+            </span>
+          )}
+          {stateAfter.annualInterestRate > 0 &&
+            (ctx.operation === "openTroveAndJoinBatch" ? (
               <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
-              {ctx.batchManager && (
-                <span className="text-sm font-bold text-pink-500">{getBatchManagerName(ctx.batchManager)}</span>
+            ) : (
+              <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />
+            ))}
+        </>
+      ) : ctx.operation === "redeemCollateral" ? (
+        // The dotted spine carries a "REDEMPTION" pill on desktop, so the
+        // header badge is mobile-only here. The freed space lets the two
+        // facts that matter read with labels — the debt it cleared, then
+        // the collateral it took — as the explanation tells them. The
+        // phone spine view draws both lozenges on the node's flanks, so
+        // its opened card drops them while timeline values are on.
+        <>
+          <span
+            className={`${spinePillHide}inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+          >
+            {style.label}
+          </span>
+          {hasDebtChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
+              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
+              {wrapDebt(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                    exact={formatExact(Math.abs(debtChange))}
+                    symbol={ctx.assetType ?? "BOLD"}
+                  />
+                </span>,
               )}
-              {/* The debt's move since the trove's previous event: interest, the
-                  management fee and any upfront fee, split in the explanation.
-                  The spine carries no value on a rate change, so the figure
-                  stays at every width (no hideVal). */}
-              {hasDebtChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">{L1_WORDS.debt}</span>
-                  {debtCp ? (
-                    <Prov value={debtCp.value} symbol={debtCp.symbol} info={debtCp.info}>
-                      <span className="font-bold text-foreground">
-                        <ExactTip
-                          text={`${debtChange > 0 ? "+" : "−"}${fmtHeaderMagnitude(Math.abs(debtChange), debtSym)}`}
-                          exact={formatExact(Math.abs(debtChange))}
-                          symbol={debtSym}
-                        />
-                      </span>
-                    </Prov>
-                  ) : null}
-                  <TokenChipIcon symbol={debtSym} size={16} />
-                </span>
+              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+            </span>
+          )}
+          {hasCollChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
+              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.took}</span>
+              {wrapColl(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                    exact={formatExact(Math.abs(collChange))}
+                    symbol={ctx.collateralType}
+                  />
+                </span>,
               )}
-            </>
-          ) : ctx.operation === "setInterestBatchManager" ? (
-            <>
-              <span className="text-sm text-rb-500">{style.label}</span>
-              {stateAfter.annualInterestRate > 0 && (
-                <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
+              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+            </span>
+          )}
+        </>
+      ) : ctx.operation === "liquidate" ? (
+        // The dotted spine carries a critical "LIQUIDATION" pill on desktop,
+        // so the header badge is mobile-only here. The freed space lets the
+        // facts read with labels — collateral liquidated, debt cleared —
+        // mirroring the redemption header grammar. Labels stay neutral
+        // (rb-500); the red spine alone carries the critical valence.
+        <>
+          <span
+            className={`${spinePillHide}inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+          >
+            {style.label}
+          </span>
+          {hasCollChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+              <span className="text-rb-500">{L1_WORDS.liquidated}</span>
+              {wrapColl(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                    exact={formatExact(Math.abs(collChange))}
+                    symbol={ctx.collateralType}
+                  />
+                </span>,
               )}
-              {ctx.batchManager && (
-                <span className="text-sm font-bold text-pink-500">{getBatchManagerName(ctx.batchManager)}</span>
+              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+            </span>
+          )}
+          {hasDebtChange && (
+            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+              <span className="text-rb-500">{L1_WORDS.cleared}</span>
+              {wrapDebt(
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                    exact={formatExact(Math.abs(debtChange))}
+                    symbol={ctx.assetType ?? "BOLD"}
+                  />
+                </span>,
               )}
-            </>
-          ) : ctx.operation === "openTrove" || ctx.operation === "openTroveAndJoinBatch" ? (
-            <>
-              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${style.bg} ${style.color}`}>
-                {style.label}
-              </span>
-              {hasCollChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">{L1_WORDS.supply}</span>
-                  {wrapColl(
-                    <span className="font-bold text-foreground">
+              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+            </span>
+          )}
+        </>
+      ) : style.badge ? (
+        <span
+          className={`inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+        >
+          {style.label}
+        </span>
+      ) : style.label.includes(" + ") ? (
+        // Combined action: "Withdraw + Repay" etc — show with values and token icons
+        <>
+          {(() => {
+            const [collAction, debtAction] = style.label.split(" + ");
+            return (
+              <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+                <span className="text-rb-500">{collAction}</span>
+                {hasCollChange &&
+                  wrapColl(
+                    <span className={AMT}>
                       <ExactTip
                         text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
                         exact={formatExact(Math.abs(collChange))}
@@ -345,14 +494,11 @@ export function LiquityEventHeader({
                       />
                     </span>,
                   )}
-                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                </span>
-              )}
-              {hasDebtChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">{L1_WORDS.borrow}</span>
-                  {wrapDebt(
-                    <span className="font-bold text-foreground">
+                <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+                <span className="text-rb-500">{debtAction}</span>
+                {hasDebtChange &&
+                  wrapDebt(
+                    <span className={AMT}>
                       <ExactTip
                         text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
                         exact={formatExact(Math.abs(debtChange))}
@@ -360,271 +506,210 @@ export function LiquityEventHeader({
                       />
                     </span>,
                   )}
-                  <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-                </span>
-              )}
-              {stateAfter.annualInterestRate > 0 &&
-                (ctx.operation === "openTroveAndJoinBatch" ? (
-                  <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
-                ) : (
-                  <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />
-                ))}
-            </>
-          ) : ctx.operation === "redeemCollateral" ? (
-            // The dotted spine carries a "REDEMPTION" pill on desktop, so the
-            // header badge is mobile-only here. The freed space lets the two
-            // facts that matter read with labels — the debt it cleared, then
-            // the collateral it took — as the explanation tells them. The
-            // phone spine view draws both lozenges on the node's flanks, so
-            // its opened card drops them while timeline values are on.
-            <>
-              <span
-                className={`${spinePillHide}inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-              >
-                {style.label}
+                <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
               </span>
-              {hasDebtChange && (
-                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
-                  {wrapDebt(
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
-                        exact={formatExact(Math.abs(debtChange))}
-                        symbol={ctx.assetType ?? "BOLD"}
-                      />
-                    </span>,
-                  )}
-                  <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-                </span>
-              )}
-              {hasCollChange && (
-                <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.took}</span>
-                  {wrapColl(
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
-                        exact={formatExact(Math.abs(collChange))}
-                        symbol={ctx.collateralType}
-                      />
-                    </span>,
-                  )}
-                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                </span>
-              )}
-            </>
-          ) : ctx.operation === "liquidate" ? (
-            // The dotted spine carries a critical "LIQUIDATION" pill on desktop,
-            // so the header badge is mobile-only here. The freed space lets the
-            // facts read with labels — collateral liquidated, debt cleared —
-            // mirroring the redemption header grammar. Labels stay neutral
-            // (rb-500); the red spine alone carries the critical valence.
+            );
+          })()}
+        </>
+      ) : (
+        <span className={`${TXT} text-rb-500`}>{style.label}</span>
+      )}
+
+      {/* Debt change (skip for open trove, redemption, liquidation, delegate, and combined — shown inline or n/a).
+        Also skip rate changes: a rate adjustment moves no principal — the only thing that makes
+        `hasDebtChange` true is the fee-inclusive upfront fee, which rides the detail's "incl. … fee"
+        line, not the header. The header keeps just the label and the new-rate pill. A batch manager's
+        rate update labels its debt move in its own branch above. */}
+      {hasDebtChange &&
+        !style.label.includes(" + ") &&
+        ctx.operation !== "openTrove" &&
+        ctx.operation !== "openTroveAndJoinBatch" &&
+        ctx.operation !== "redeemCollateral" &&
+        ctx.operation !== "liquidate" &&
+        ctx.operation !== "adjustTroveInterestRate" &&
+        ctx.operation !== "setBatchManagerAnnualInterestRate" &&
+        ctx.operation !== "setInterestBatchManager" && (
+          <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+            {wrapDebt(
+              <span className={AMT}>
+                <ExactTip
+                  text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
+                  exact={formatExact(Math.abs(debtChange))}
+                  symbol={ctx.assetType ?? "BOLD"}
+                />
+              </span>,
+            )}
+            <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+          </span>
+        )}
+
+      {/* Collateral change (skip for open trove, redemption, liquidation, delegate, combined, and rate change) */}
+      {hasCollChange &&
+        !style.label.includes(" + ") &&
+        ctx.operation !== "openTrove" &&
+        ctx.operation !== "openTroveAndJoinBatch" &&
+        ctx.operation !== "redeemCollateral" &&
+        ctx.operation !== "liquidate" &&
+        ctx.operation !== "adjustTroveInterestRate" &&
+        ctx.operation !== "setBatchManagerAnnualInterestRate" &&
+        ctx.operation !== "setInterestBatchManager" && (
+          <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+            {wrapColl(
+              <span className={AMT}>
+                <ExactTip
+                  text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
+                  exact={formatExact(Math.abs(collChange))}
+                  symbol={ctx.collateralType}
+                />
+              </span>,
+            )}
+            <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+          </span>
+        )}
+
+      {/* A liquidated neighbour's redistribution this adjust applied: its own
+        part of the row in the caution tone, so inherited debt never reads
+        as part of a repayment or a borrow. No token moved for it. */}
+      {redist && (
+        <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+          <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.from_liquidation}</span>
+          {redistDebtCp && (
             <>
-              <span
-                className={`${spinePillHide}inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-              >
-                {style.label}
-              </span>
-              {hasCollChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">{L1_WORDS.liquidated}</span>
-                  {wrapColl(
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
-                        exact={formatExact(Math.abs(collChange))}
-                        symbol={ctx.collateralType}
-                      />
-                    </span>,
-                  )}
-                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
+              <Prov value={redistDebtCp.value} symbol={redistDebtCp.symbol} info={redistDebtCp.info}>
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(redistDebtCp.change, ctx.assetType ?? "BOLD")}
+                    exact={redistDebtCp.value}
+                    symbol={ctx.assetType ?? "BOLD"}
+                  />
                 </span>
-              )}
-              {hasDebtChange && (
-                <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">{L1_WORDS.cleared}</span>
-                  {wrapDebt(
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
-                        exact={formatExact(Math.abs(debtChange))}
-                        symbol={ctx.assetType ?? "BOLD"}
-                      />
-                    </span>,
-                  )}
-                  <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-                </span>
-              )}
+              </Prov>
+              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
             </>
-          ) : style.badge ? (
+          )}
+          {redistDebtCp && redistCollCp && (
+            <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.and}</span>
+          )}
+          {redistCollCp && (
+            <>
+              <Prov value={redistCollCp.value} symbol={redistCollCp.symbol} info={redistCollCp.info}>
+                <span className={AMT}>
+                  <ExactTip
+                    text={fmtHeaderMagnitude(redistCollCp.change, ctx.collateralType)}
+                    exact={redistCollCp.value}
+                    symbol={ctx.collateralType}
+                  />
+                </span>
+              </Prov>
+              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+            </>
+          )}
+        </span>
+      )}
+
+      {/* Claimable collateral surplus — on a liquidation where the trove's
+        collateral value exceeded its debt, the remainder is returned to
+        the owner and remains claimable. Mirrors the prod liquidation
+        header (and the redemption "claimable" treatment in the detail). */}
+      {ctx.operation === "liquidate" &&
+        ctx.liquidation &&
+        ctx.liquidation.collSurplus > 0 &&
+        (surplusClaim ? (
+          // Claimed since (the head read): the pill keeps what the
+          // liquidation left claimable, muted, and says when it was claimed.
+          <span
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
+            title="Claimable at the liquidation; the owner has since claimed it"
+          >
+            <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
+            <TokenChipIcon symbol={ctx.collateralType} size={16} />
+            {L1_WORDS.claimed}
+            {surplusClaim.timestamp != null && <> {formatDate(surplusClaim.timestamp)}</>}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+            <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
+            <TokenChipIcon symbol={ctx.collateralType} size={16} />
+            {L1_WORDS.claimable}
+          </span>
+        ))}
+
+      {/* Interest rate — single pill. The label already says it's a rate,
+        so no second "% APR" is needed in the trailing cluster below. */}
+      {(ctx.operation === "adjustTroveInterestRate" || ctx.operation === "removeFromBatch") &&
+        stateAfter.annualInterestRate > 0 && <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
+    </>
+  );
+  // `evt-meta`: the header's own first row below sm (app/globals.css).
+  const meta = (
+    <span className="evt-meta ml-auto inline-flex items-center gap-2">
+      {ctx.operation === "redeemCollateral" && ctx.isZombieTrove && (
+        <span
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold rounded bg-caution-500/15 text-caution-600 dark:text-caution-400"
+          title={
+            stateAfter.debt === 0
+              ? "Zombie trove fully redeemed — debt cleared, collateral now claimable"
+              : "Zombie trove — debt below the minimum, redeemable until restored"
+          }
+        >
+          <AlertTriangle className="w-3 h-3" />
+          <span className="hidden md:inline">{L1_WORDS.zombie}</span>
+        </span>
+      )}
+      {groupChip}
+      {page ? (
+        <PageMeta timestamp={timestamp} counter={counter} />
+      ) : (
+        <>
+          {timestamp > 0 && (
+            <span className="text-xs ">
+              <EventTime ts={timestamp} />
+            </span>
+          )}
+          {counter}
+        </>
+      )}
+    </span>
+  );
+
+  // The event page's title (ui-jobs 286): the header's words and amounts,
+  // large, as the side column's h1.
+  if (title) {
+    return (
+      <h1
+        className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xl font-normal leading-tight"
+        data-event-page-title=""
+      >
+        {cluster}
+      </h1>
+    );
+  }
+
+  // On the event page the amounts sit in the title; the header keeps the word.
+  if (page) {
+    return (
+      <div className="pl-5 pt-4 pb-3">
+        <div className="flex items-center gap-1.5 flex-wrap" data-event-page-header="">
+          {style.badge ? (
             <span
               className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
             >
               {style.label}
             </span>
-          ) : style.label.includes(" + ") ? (
-            // Combined action: "Withdraw + Repay" etc — show with values and token icons
-            <>
-              {(() => {
-                const [collAction, debtAction] = style.label.split(" + ");
-                return (
-                  <span className="inline-flex items-center gap-1.5 text-sm">
-                    <span className="text-rb-500">{collAction}</span>
-                    {hasCollChange &&
-                      wrapColl(
-                        <span className="font-bold text-foreground">
-                          <ExactTip
-                            text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
-                            exact={formatExact(Math.abs(collChange))}
-                            symbol={ctx.collateralType}
-                          />
-                        </span>,
-                      )}
-                    <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                    <span className="text-rb-500">{debtAction}</span>
-                    {hasDebtChange &&
-                      wrapDebt(
-                        <span className="font-bold text-foreground">
-                          <ExactTip
-                            text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
-                            exact={formatExact(Math.abs(debtChange))}
-                            symbol={ctx.assetType ?? "BOLD"}
-                          />
-                        </span>,
-                      )}
-                    <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-                  </span>
-                );
-              })()}
-            </>
           ) : (
             <span className="text-sm text-rb-500">{style.label}</span>
           )}
+          {meta}
+        </div>
+      </div>
+    );
+  }
 
-          {/* Debt change (skip for open trove, redemption, liquidation, delegate, and combined — shown inline or n/a).
-              Also skip rate changes: a rate adjustment moves no principal — the only thing that makes
-              `hasDebtChange` true is the fee-inclusive upfront fee, which rides the detail's "incl. … fee"
-              line, not the header. The header keeps just the label and the new-rate pill. A batch manager's
-              rate update labels its debt move in its own branch above. */}
-          {hasDebtChange &&
-            !style.label.includes(" + ") &&
-            ctx.operation !== "openTrove" &&
-            ctx.operation !== "openTroveAndJoinBatch" &&
-            ctx.operation !== "redeemCollateral" &&
-            ctx.operation !== "liquidate" &&
-            ctx.operation !== "adjustTroveInterestRate" &&
-            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
-            ctx.operation !== "setInterestBatchManager" && (
-              <span className="inline-flex items-center gap-1.5 text-sm">
-                {wrapDebt(
-                  <span className="font-bold text-foreground">
-                    <ExactTip
-                      text={fmtHeaderMagnitude(Math.abs(debtChange), ctx.assetType ?? "BOLD")}
-                      exact={formatExact(Math.abs(debtChange))}
-                      symbol={ctx.assetType ?? "BOLD"}
-                    />
-                  </span>,
-                )}
-                <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-              </span>
-            )}
-
-          {/* Collateral change (skip for open trove, redemption, liquidation, delegate, combined, and rate change) */}
-          {hasCollChange &&
-            !style.label.includes(" + ") &&
-            ctx.operation !== "openTrove" &&
-            ctx.operation !== "openTroveAndJoinBatch" &&
-            ctx.operation !== "redeemCollateral" &&
-            ctx.operation !== "liquidate" &&
-            ctx.operation !== "adjustTroveInterestRate" &&
-            ctx.operation !== "setBatchManagerAnnualInterestRate" &&
-            ctx.operation !== "setInterestBatchManager" && (
-              <span className="inline-flex items-center gap-1.5 text-sm">
-                {wrapColl(
-                  <span className="font-bold text-foreground">
-                    <ExactTip
-                      text={fmtHeaderMagnitude(Math.abs(collChange), ctx.collateralType)}
-                      exact={formatExact(Math.abs(collChange))}
-                      symbol={ctx.collateralType}
-                    />
-                  </span>,
-                )}
-                <TokenChipIcon symbol={ctx.collateralType} size={16} />
-              </span>
-            )}
-
-          {/* A liquidated neighbour's redistribution this adjust applied: its own
-              part of the row in the caution tone, so inherited debt never reads
-              as part of a repayment or a borrow. No token moved for it. */}
-          {redist && (
-            <span className="inline-flex items-center gap-1.5 text-sm">
-              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.from_liquidation}</span>
-              {redistDebtCp && (
-                <>
-                  <Prov value={redistDebtCp.value} symbol={redistDebtCp.symbol} info={redistDebtCp.info}>
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(redistDebtCp.change, ctx.assetType ?? "BOLD")}
-                        exact={redistDebtCp.value}
-                        symbol={ctx.assetType ?? "BOLD"}
-                      />
-                    </span>
-                  </Prov>
-                  <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
-                </>
-              )}
-              {redistDebtCp && redistCollCp && (
-                <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.and}</span>
-              )}
-              {redistCollCp && (
-                <>
-                  <Prov value={redistCollCp.value} symbol={redistCollCp.symbol} info={redistCollCp.info}>
-                    <span className="font-bold text-foreground">
-                      <ExactTip
-                        text={fmtHeaderMagnitude(redistCollCp.change, ctx.collateralType)}
-                        exact={redistCollCp.value}
-                        symbol={ctx.collateralType}
-                      />
-                    </span>
-                  </Prov>
-                  <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                </>
-              )}
-            </span>
-          )}
-
-          {/* Claimable collateral surplus — on a liquidation where the trove's
-              collateral value exceeded its debt, the remainder is returned to
-              the owner and remains claimable. Mirrors the prod liquidation
-              header (and the redemption "claimable" treatment in the detail). */}
-          {ctx.operation === "liquidate" &&
-            ctx.liquidation &&
-            ctx.liquidation.collSurplus > 0 &&
-            (surplusClaim ? (
-              // Claimed since (the head read): the pill keeps what the
-              // liquidation left claimable, muted, and says when it was claimed.
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
-                title="Claimable at the liquidation; the owner has since claimed it"
-              >
-                <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
-                <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                {L1_WORDS.claimed}
-                {surplusClaim.timestamp != null && <> {formatDate(surplusClaim.timestamp)}</>}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
-                <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
-                <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                {L1_WORDS.claimable}
-              </span>
-            ))}
-
-          {/* Interest rate — single pill. The label already says it's a rate,
-              so no second "% APR" is needed in the trailing cluster below. */}
-          {(ctx.operation === "adjustTroveInterestRate" || ctx.operation === "removeFromBatch") &&
-            stateAfter.annualInterestRate > 0 && <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
+  return (
+    <>
+      <div className="pl-5 pt-4 pb-3">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {cluster}
 
           {/* Right side: CR (rate only on rate-change operations). The delegate
               row keeps its header minimal (Delegate · rate · fee · manager),
@@ -640,35 +725,7 @@ export function LiquityEventHeader({
                 </span>,
               )}
           </span>
-          {/* `evt-meta`: the header's own first row below sm (app/globals.css). */}
-          <span className="evt-meta ml-auto inline-flex items-center gap-2">
-            {ctx.operation === "redeemCollateral" && ctx.isZombieTrove && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold rounded bg-caution-500/15 text-caution-600 dark:text-caution-400"
-                title={
-                  stateAfter.debt === 0
-                    ? "Zombie trove fully redeemed — debt cleared, collateral now claimable"
-                    : "Zombie trove — debt below the minimum, redeemable until restored"
-                }
-              >
-                <AlertTriangle className="w-3 h-3" />
-                <span className="hidden md:inline">{L1_WORDS.zombie}</span>
-              </span>
-            )}
-            {groupChip}
-            {page ? (
-              <PageMeta timestamp={timestamp} counter={counter} />
-            ) : (
-              <>
-                {timestamp > 0 && (
-                  <span className="text-xs ">
-                    <EventTime ts={timestamp} />
-                  </span>
-                )}
-                {counter}
-              </>
-            )}
-          </span>
+          {meta}
         </div>
       </div>
     </>

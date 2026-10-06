@@ -593,12 +593,11 @@ function LedgerRows({
           aria-label={`${name} total`}
           className={`col-span-2 flex min-w-0 flex-wrap items-center gap-x-3 py-1 ${hideTok ? "@max-md:col-span-1" : ""}`}
         >
-          {/* A narrow cell showing USD names the group at the line's start,
-              where the token column would close it. */}
+          {/* A narrow cell showing USD marks the group at the line's start with
+              the asset's icon, where the token column would close it. */}
           {hideTok && cols.unit && ledger.symbol && (
-            <span className="hidden items-center gap-1.5 font-semibold text-foreground @max-md:inline-flex">
+            <span className="hidden items-center @max-md:inline-flex">
               <LedgerIcon symbol={ledger.symbol} />
-              <span aria-hidden>{ledger.symbol}</span>
             </span>
           )}
           {cols.tokens ? (
@@ -634,20 +633,10 @@ function LedgerRows({
           )}
         </span>
         {cols.unit && (
-          // The asset's icon, then its symbol once per group (some icons are
-          // alike at 14px).
-          <span
-            className={`flex items-center gap-1.5 self-end whitespace-nowrap py-1 font-semibold text-foreground ${hideTok}`}
-            data-ledger-unit-cell=""
-          >
-            {total && ledger.symbol && (
-              <>
-                <LedgerIcon symbol={ledger.symbol} />
-                <span aria-hidden data-ledger-total-symbol="">
-                  {ledger.symbol}
-                </span>
-              </>
-            )}
+          // The asset's icon; its tip and accessible name carry the symbol
+          // (ui-jobs 286).
+          <span className={`flex items-center self-end whitespace-nowrap py-1 ${hideTok}`} data-ledger-unit-cell="">
+            {total && ledger.symbol && <LedgerIcon symbol={ledger.symbol} />}
           </span>
         )}
         {cols.tokens && cols.usd && (

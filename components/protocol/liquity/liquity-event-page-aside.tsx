@@ -1,14 +1,15 @@
 "use client";
 
 // The Liquity V2 event page's side column (rails-ops TO-DO-ui-jobs 236), in
-// the spine's place beside the card: the paragraph with the timeline link, a
+// the spine's place beside the card: the event's title (the header's words and
+// amounts, large, ui-jobs 286), the paragraph with the timeline link, a
 // table of the facts the card does not show (branch, Trove id, holder, the
 // event's place, block), and the previous, next and timeline links. The words
 // are the strings file's `page_words` (content/liquity-v2/event-prose.yaml).
 // The table is identity and position, no figure that carries a receipt, so
 // the provenance tripwire passes over it.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { PAGE_WORDS } from "@/lib/liquity/event-templates";
@@ -20,6 +21,8 @@ const TH = "w-24 py-1.5 pr-3 text-left align-top font-normal text-rb-500";
 const TD = "min-w-0 py-1.5 align-top text-foreground";
 
 export interface LiquityEventPageAsideProps {
+  /** The page's h1: `LiquityEventHeader` with `title`. */
+  title: ReactNode;
   collSymbol: string;
   troveId: string;
   /** The holder's wallet; a closed Trove's is its last owner (`last`). */
@@ -76,6 +79,7 @@ export function LiquityEventPageAside(p: LiquityEventPageAsideProps) {
   const holder = holderName(p.owner, p.ownerEns);
   return (
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
+      <div className="pb-2">{p.title}</div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {PAGE_WORDS.paragraph}{" "}
         <a href={p.timelineHref} className={LINK}>
