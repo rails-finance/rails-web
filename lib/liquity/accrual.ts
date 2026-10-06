@@ -16,6 +16,7 @@ import { isLiquityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import { LQ } from "@/lib/shared/liquity-flows";
+import { L2_WORDS } from "@/lib/liquity/event-templates";
 import {
   batchFeeInForce,
   calculateAccruedInterest,
@@ -163,5 +164,23 @@ export function batchRateDebtMove(
 
 /** "interest" or "interest and fees", as the debt line names its accrual. */
 export function accrualNoun(a: LiquityAccrual): string {
-  return a.batched ? "interest and fees" : "interest";
+  return a.batched ? L2_WORDS.interest_and_fees : L2_WORDS.interest;
+}
+
+/** The batch's annual management fee (percent) in force after this event,
+ *  and where it is read: the event's BatchUpdated log, else the ledger's
+ *  rate in force (rate + fee) less the trove's rate. Null where the trove is
+ *  not batched or neither states it. */
+export interface BatchFeeAfter {
+  fee: number;
+  source: "log" | "ledger";
+}
+
+export function batchFeeAfter(ctx: LiquityContext, ledger?: FocusEvent | null): BatchFeeAfter | null {
+  if (!ctx.isInBatch) return null;
+  const logged = ctx.batchUpdate?.annualManagementFee;
+  if (logged != null) return { fee: logged, source: "log" };
+  if (ledger?.rate == null) return null;
+  const fee = Math.round((ledger.rate - exactRateAfter(ctx)) * 1e6) / 1e6;
+  return fee > 0 ? { fee, source: "ledger" } : null;
 }

@@ -35,9 +35,8 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
 import { EventLedgerContext, LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
-import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
-import type { Ledger, LedgerRow } from "@/lib/shared/event-ledger";
+import { dayCloseNote, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import {
   flowAssetProv,
@@ -54,7 +53,7 @@ export const SIDE_HUE: Record<FlowSide, string> = {
   collateral: "var(--color-blue-500)",
   debt: "var(--color-green-400)",
 };
-export const dayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
+export const dayStamp = ledgerDayStamp;
 export const SIDE_NAME: Record<FlowSide, string> = { collateral: "Collateral", debt: "Debt" };
 
 /** The event's running totals, where the page's flow model holds its day. */
@@ -795,8 +794,7 @@ export function DayCloseNote({ cum, eventTs }: { cum: EventCum; eventTs?: number
   if (cum.exact) return null;
   return (
     <p className="mt-2 text-sm text-rb-500" data-ledger-day-close="">
-      The page does not hold every event of {eventTs != null ? dayStamp(eventTs) : "this day"}, so the rows stand at the
-      close of that day.
+      {dayCloseNote(eventTs)}
     </p>
   );
 }

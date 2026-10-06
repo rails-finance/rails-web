@@ -2,9 +2,9 @@
 
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
-import { accrualNoun, type LiquityAccrual } from "@/lib/liquity/accrual";
-import { liquityEventSafety } from "@/lib/liquity/event-safety";
-import { useBatchFeeAfter, useLiquityAccrual, type BatchFeeAfter } from "./use-liquity-accrual";
+import { accrualNoun, type BatchFeeAfter, type LiquityAccrual } from "@/lib/liquity/accrual";
+import { wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
+import { L2_WORDS } from "@/lib/liquity/event-templates";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -147,8 +147,10 @@ function DebtMetric({
   // Display menu's "USD for stablecoins" shows it.
   const usdShown = useUsdShown();
   const debtUsd = !isClose && after > 0 && usdShown(stablecoinSymbol, after, after);
+  const inclWords = wordsAround(L2_WORDS.incl, ["accrued_total"], { accrual_noun: accrualNoun(accrual) });
+  const feeWords = wordsAround(L2_WORDS.fee, ["upfront_fee"]);
   return (
-    <LedgerCell label="Debt" side="debt">
+    <LedgerCell label={L2_WORDS.debt} side="debt">
       <div>
         <StateTransition>
           <ClosedTokens>
@@ -157,7 +159,7 @@ function DebtMetric({
             )}
             {isClose ? (
               <>
-                <ClosedLabel />
+                <ClosedLabel text={L2_WORDS.closed} />
                 <TokenChipIcon symbol={stablecoinSymbol} size={16} />
               </>
             ) : (
@@ -185,17 +187,20 @@ function DebtMetric({
           <StatSubline changed={changed}>
             {totalAccruedFees > 0.01 && (
               <span>
-                incl. +<P info={accrualProv}>{fmtAccrued(totalAccruedFees)}</P> {accrualNoun(accrual)}
+                {inclWords[0]}
+                <P info={accrualProv}>{fmtAccrued(totalAccruedFees)}</P>
+                {inclWords[1]}
               </span>
             )}
             {upfrontFee !== undefined && upfrontFee > 0 && (
               <>
                 {totalAccruedFees > 0.01 && <span> +</span>}
                 <span>
+                  {feeWords[0]}
                   <P info={feeProv?.info} value={feeProv?.value}>
                     {toLocaleStringHelper(upfrontFee)}
-                  </P>{" "}
-                  fee
+                  </P>
+                  {feeWords[1]}
                 </span>
               </>
             )}
@@ -268,7 +273,7 @@ function CollateralMetric({
 
   const afterUsd = !isClose && after > 0 && afterInUsd > 0 && afterUsdShown;
   return (
-    <LedgerCell label="Collateral" side="collateral">
+    <LedgerCell label={L2_WORDS.collateral} side="collateral">
       <StateTransition>
         <ClosedTokens>
           {showBefore && (
@@ -276,7 +281,7 @@ function CollateralMetric({
           )}
           {isClose ? (
             <>
-              <ClosedLabel />
+              <ClosedLabel text={L2_WORDS.closed} />
               <TokenChipIcon symbol={collateralType} size={16} />
             </>
           ) : (
@@ -354,8 +359,12 @@ function InterestRateMetric({
     ],
   });
 
+  const yearlyWords = wordsAround(L2_WORDS.yearly_interest, ["yearly_interest"], { debt_symbol: stablecoinSymbol });
+  const feeWords = wordsAround(L2_WORDS.yearly_fee, ["batch_fee_rate", "yearly_fee"], {
+    debt_symbol: stablecoinSymbol,
+  });
   return (
-    <StatCard label="Interest Rate">
+    <StatCard label={L2_WORDS.interest_rate}>
       <StateTransition>
         {hasChange && (
           <>
@@ -369,9 +378,9 @@ function InterestRateMetric({
           </>
         )}
         {isClose ? (
-          <ClosedLabel />
+          <ClosedLabel text={L2_WORDS.closed} />
         ) : !hasAfterValue ? (
-          <span className="text-sm font-semibold text-rb-500">N/A</span>
+          <span className="text-sm font-semibold text-rb-500">{L2_WORDS.not_applicable}</span>
         ) : (
           <P info={provAfter} value={afterExact}>
             <span className={`text-sm font-semibold ${changeTone(changed)}`}>
@@ -386,15 +395,19 @@ function InterestRateMetric({
         // batched trove's debt also carries the batch's management fee: the
         // line says whether the figure includes it, and states the fee.
         <StatSubline changed={changed}>
-          <P info={yearlyProv("interest", after)}>{toLocaleStringHelper(yearlyCost)}</P> {stablecoinSymbol} / year
-          interest
-          {batched && !batchFee ? ", excl. management fee" : null}
+          {yearlyWords[0]}
+          <P info={yearlyProv("interest", after)}>{toLocaleStringHelper(yearlyCost)}</P>
+          {yearlyWords[1]}
+          {batched && !batchFee ? L2_WORDS.excl_fee : null}
         </StatSubline>
       )}
       {!isClose && batched && batchFee && yearlyFee > 0.01 && (
         <StatSubline changed={changed}>
-          + <P info={batchFeeProv}>{fmtRateNum(batchFee.fee)}%</P> management fee ·{" "}
-          <P info={yearlyProv("fee", batchFee.fee)}>{toLocaleStringHelper(yearlyFee)}</P> {stablecoinSymbol} / year
+          {feeWords[0]}
+          <P info={batchFeeProv}>{fmtRateNum(batchFee.fee)}%</P>
+          {feeWords[1]}
+          <P info={yearlyProv("fee", batchFee.fee)}>{toLocaleStringHelper(yearlyFee)}</P>
+          {feeWords[2]}
         </StatSubline>
       )}
     </StatCard>
@@ -450,9 +463,9 @@ function CollateralRatioMetric({
           />
         )}
         {isClose ? (
-          <ClosedLabel />
+          <ClosedLabel text={L2_WORDS.closed} />
         ) : afterDebt === 0 ? (
-          <span className="text-sm font-semibold text-rb-500">N/A</span>
+          <span className="text-sm font-semibold text-rb-500">{L2_WORDS.not_applicable}</span>
         ) : (
           <P info={provAfter}>
             <span
@@ -484,6 +497,8 @@ export interface LiquityEventDetailProps {
   /** Live oracle price for this collateral — drives the "today" leg of the
    * redemption P/L shown alongside the historic price pill. */
   currentPrice?: number;
+  /** The generator's levels (lib/liquity/event-prose.ts): the grid's figures. */
+  prose: LiquityEventProse;
 }
 
 export function LiquityEventDetail({
@@ -492,83 +507,28 @@ export function LiquityEventDetail({
   blockNumber,
   previousEvent,
   currentEvent,
-  currentPrice,
+  prose,
 }: LiquityEventDetailProps) {
-  const { stateBefore, stateAfter, troveOperation, liquidation, redemption } = ctx;
-  const accrual = useLiquityAccrual(ctx, previousEvent, currentEvent);
-  const batchFee = useBatchFeeAfter(ctx, currentEvent);
+  const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
+  const l2 = prose.L2;
 
-  if (!stateBefore || !stateAfter) {
+  if (!stateBefore || !stateAfter || !l2) {
     return null;
   }
+  const { accrual, batchFee } = l2;
 
-  const isClose = ctx.operation === "closeTrove";
-  const isLiquidation = ctx.operation === "liquidate";
-  const isRedemption =
-    ctx.operation === "redeemCollateral" ||
-    ctx.operation === "adjustZombieTrove" ||
-    ctx.operation === "adjustUnredeemableZombieTrove";
-  const isBatchManagerOp = ctx.operation === "setBatchManagerAnnualInterestRate";
-  const collPrice = ctx.collateralPrice ?? 0;
-
-  // Upfront fee
+  // The grid's figures: before rebuilt where the event logs only the after,
+  // the ratio before at this event's price (lib/liquity/event-prose.ts `liquityL2`).
+  const { isClose, isLiquidation, isRedemption, rateOnly: isBatchManagerOp, showGrid } = l2;
+  const collPrice = l2.price;
   const upfrontFee = troveOperation?.debtIncreaseFromUpfrontFee;
-
-  // Reconstruct before state
-  let beforeDebt = stateBefore.debt;
-  let beforeColl = stateBefore.coll;
-  let beforeCollInUsd = stateBefore.collateralInUsd;
-  let beforeInterestRate = stateBefore.annualInterestRate;
-  let beforeCollRatio = stateBefore.collateralRatio;
-
-  if (isClose && troveOperation && stateBefore.debt === 0 && stateBefore.coll === 0) {
-    beforeDebt = Math.abs(troveOperation.debtChangeFromOperation);
-    beforeColl = Math.abs(troveOperation.collChangeFromOperation);
-    beforeCollInUsd = beforeColl * collPrice;
-  }
-
-  if (isLiquidation && liquidation) {
-    beforeDebt = liquidation.debtOffsetBySP + liquidation.debtRedistributed;
-    beforeColl =
-      liquidation.collSentToSP +
-      liquidation.collRedistributed +
-      liquidation.collSurplus +
-      liquidation.collGasCompensation;
-    beforeCollInUsd = beforeColl * liquidation.price;
-    if (beforeCollInUsd > 0 && beforeDebt > 0) {
-      beforeCollRatio = (beforeCollInUsd / beforeDebt) * 100;
-    }
-  }
-
-  if (isRedemption && troveOperation) {
-    const debtChange = Math.abs(troveOperation.debtChangeFromOperation);
-    const collChange = Math.abs(troveOperation.collChangeFromOperation);
-    beforeDebt = stateAfter.debt + debtChange;
-    beforeColl = stateAfter.coll + collChange;
-    beforeCollInUsd = beforeColl * collPrice;
-    if (beforeCollInUsd > 0 && beforeDebt > 0) {
-      beforeCollRatio = (beforeCollInUsd / beforeDebt) * 100;
-    }
-  }
-
-  const afterCollInUsd = stateAfter.coll * collPrice;
-  // The collateral before the event at this event's price (a liquidation's at
-  // the price it ran at), as the ledger's total states it.
-  const beforeCollAtEventUsd = isLiquidation && liquidation ? beforeCollInUsd : beforeColl * collPrice;
-
-  // Derived-CR fallback: the API source fills collateralRatio; the chain source
-  // leaves it 0 but sets collateralPrice, so recompute CR from price ONLY when
-  // absent (fires solely on the chain source — API rows are unchanged).
-  let afterCollRatio = stateAfter.collateralRatio;
-  if (afterCollRatio === 0 && collPrice > 0 && stateAfter.debt > 0)
-    afterCollRatio = (afterCollInUsd / stateAfter.debt) * 100;
-  // The ratio before, at THIS event's price (lib/liquity/event-safety.ts):
-  // the logged before-ratio is at the previous event's price, which would
-  // mix the market's move into the owner's act.
-  const safety = liquityEventSafety(ctx, previousEvent);
-  if (!isLiquidation && safety.crBefore != null) beforeCollRatio = safety.crBefore;
-
-  const showGrid = beforeDebt > 0 || stateAfter.debt > 0 || isClose;
+  const beforeDebt = l2.debt.before;
+  const beforeColl = l2.coll.before;
+  const beforeInterestRate = l2.rate.before;
+  const beforeCollRatio = l2.cr.before;
+  const afterCollInUsd = l2.coll.afterUsd;
+  const beforeCollAtEventUsd = l2.coll.beforeUsd;
+  const afterCollRatio = l2.cr.after;
 
   // ── Provenance ──────────────────────────────────────────────────────────────
   // The AFTER value is what this event records; the BEFORE value is the trove's
@@ -1020,7 +980,7 @@ export function LiquityEventDetail({
       {isRedemption && ctx.redeemer && (
         <div className="px-5 py-2">
           <span className="text-xs text-rb-500">
-            Redeemed by:{" "}
+            {L2_WORDS.redeemed_by}{" "}
             <Prov info={addrProv}>
               <LinkedAddress address={ctx.redeemer} />
             </Prov>
@@ -1043,45 +1003,33 @@ export function LiquityEventDetail({
           "Batched" badge here.) */}
       {collPrice > 0 && (
         <div className="flex items-center gap-2 px-4 py-2">
-          {ctx.operation === "redeemCollateral" &&
+          {l2.redemption &&
             (() => {
-              const debtChange = troveOperation
-                ? troveOperation.debtChangeFromOperation +
-                  troveOperation.debtIncreaseFromRedist +
-                  troveOperation.debtIncreaseFromUpfrontFee
-                : stateAfter.debt - stateBefore.debt;
-              const collChange = troveOperation
-                ? troveOperation.collChangeFromOperation + troveOperation.collIncreaseFromRedist
-                : stateAfter.coll - stateBefore.coll;
-              const showClaimable = ctx.isZombieTrove && stateAfter.debt === 0 && stateAfter.coll > 0;
-              const debtCleared = Math.abs(debtChange);
-              const collLost = Math.abs(collChange);
-              const plHistoric = debtCleared - collLost * collPrice;
-              const plToday = currentPrice ? debtCleared - collLost * currentPrice : null;
-              const showPl = debtCleared > 0.01;
-              // Only surface "today" when it diverges from the historic figure.
-              const showToday = plToday != null && Math.abs(plToday - plHistoric) > 0.01;
+              // P/L reconciles with the header's Cleared / Took: debt cleared
+              // less the collateral given up, at the redemption's price and,
+              // where it reads differently, at today's.
+              const { claimable, showPl, plHistoric, plToday } = l2.redemption;
               const plStr = (n: number) => `${n >= 0 ? "+" : "−"}${formatUsd(Math.abs(n))}`;
               const plColor = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
-              if (!showClaimable && !showPl) return null;
+              if (claimable == null && !showPl) return null;
               return (
                 <div className="inline-flex items-center gap-4 flex-wrap text-xs">
-                  {showClaimable && (
+                  {claimable != null && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="font-bold text-foreground">{stateAfter.coll.toFixed(4)}</span>
+                      <span className="font-bold text-foreground">{claimable.toFixed(4)}</span>
                       <TokenChipIcon symbol={ctx.collateralType} size={14} />
-                      <span className="font-semibold text-green-600 dark:text-green-400">claimable</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">{L2_WORDS.claimable}</span>
                     </span>
                   )}
                   {showPl && (
                     <span className="inline-flex items-center gap-1.5">
-                      <span className="text-rb-500">P/L</span>
+                      <span className="text-rb-500">{L2_WORDS.pl}</span>
                       <span className={`font-bold ${plColor(plHistoric)}`}>{plStr(plHistoric)}</span>
-                      {showToday && (
+                      {plToday != null && (
                         <>
-                          <span className="text-rb-500">or</span>
-                          <span className={`font-bold ${plColor(plToday!)}`}>{plStr(plToday!)}</span>
-                          <span className="text-rb-500">today</span>
+                          <span className="text-rb-500">{L2_WORDS.or}</span>
+                          <span className={`font-bold ${plColor(plToday)}`}>{plStr(plToday)}</span>
+                          <span className="text-rb-500">{L2_WORDS.today}</span>
                         </>
                       )}
                     </span>

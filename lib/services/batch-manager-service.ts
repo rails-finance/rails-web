@@ -1,4 +1,4 @@
-import { BatchManager, BatchManagerData, BatchManagerSearchResult } from "@/types/batch-manager";
+import type { BatchManager, BatchManagerData, BatchManagerSearchResult } from "@/types/batch-manager";
 import { isAddress } from "viem";
 import batchManagersData from "@/data/batch-managers.json";
 import { assertValidBatchManagerAddresses } from "@/lib/liquity/batch-managers";

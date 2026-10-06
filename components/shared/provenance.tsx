@@ -16,6 +16,8 @@
 // `via`, a `formula`, and `inputs` — what a derived value is derived FROM, each
 // input tagged by its own kind and copyable.
 
+import { shiftDecimal } from "@/lib/utils/format";
+export { shiftDecimal };
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import {
@@ -109,17 +111,6 @@ export interface ProvScaling {
   why: string;
   /** Appended to the result (e.g. "%"). */
   unit?: string;
-}
-
-/** Move the decimal point of an integer string `places` to the left — exact
- *  string arithmetic, so the result carries every digit the raw has. */
-export function shiftDecimal(raw: string, places: number): string {
-  const neg = raw.startsWith("-");
-  const digits = (neg ? raw.slice(1) : raw).replace(/^0+/, "") || "0";
-  const padded = digits.padStart(places + 1, "0");
-  const int = padded.slice(0, padded.length - places);
-  const frac = padded.slice(padded.length - places).replace(/0+$/, "");
-  return `${neg ? "-" : ""}${int}${frac ? `.${frac}` : ""}`;
 }
 
 const SUPERSCRIPT_DIGITS = "⁰¹²³⁴⁵⁶⁷⁸⁹";

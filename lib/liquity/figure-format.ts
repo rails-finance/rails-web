@@ -1,6 +1,6 @@
 // The Liquity V2 opened card's figure formats, in one place. The card's T2 grid
 // (components/protocol/liquity/liquity-event-detail.tsx) writes its figures
-// through these, and the T3 explanation (lib/liquity/explainer-clauses.tsx)
+// through these, and the T3 explanation (lib/liquity/event-prose.ts)
 // writes any figure that echoes the grid through the same function, so the two
 // read alike at a glance (the T3 echo-colour rule, rails-ops
 // standards/detail-page-anatomy.md, "The disclosure ladder").

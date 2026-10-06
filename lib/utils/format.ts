@@ -223,3 +223,14 @@ export const formatExactFromString = (s: string | null | undefined, fallback: nu
   const out = formatExactDecimal(trimmed ? `${int}.${trimmed}` : int);
   return out === "-0" ? "0" : out;
 };
+
+/** Move the decimal point of an integer string `places` to the left — exact
+ *  string arithmetic, so the result carries every digit the raw has. */
+export function shiftDecimal(raw: string, places: number): string {
+  const neg = raw.startsWith("-");
+  const digits = (neg ? raw.slice(1) : raw).replace(/^0+/, "") || "0";
+  const padded = digits.padStart(places + 1, "0");
+  const int = padded.slice(0, padded.length - places);
+  const frac = padded.slice(padded.length - places).replace(/0+$/, "");
+  return `${neg ? "-" : ""}${int}${frac ? `.${frac}` : ""}`;
+}

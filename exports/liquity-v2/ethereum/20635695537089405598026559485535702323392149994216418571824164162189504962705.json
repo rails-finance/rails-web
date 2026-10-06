@@ -1,0 +1,370 @@
+[
+  {
+    "n": 1,
+    "id": "0x6680fba44be34f4b7ea25db9b64c12b592fac9fc4226653a2d8e54104f0245a7_381",
+    "utc": "26 Jul 2025 10:27",
+    "block": 23002722,
+    "tx": "0x6680fba44be34f4b7ea25db9b64c12b592fac9fc4226653a2d8e54104f0245a7",
+    "template": {
+      "id": "liquity2.open",
+      "variant": "self",
+      "version": "c7929c88"
+    },
+    "levels": {
+      "L1": "Open · Supply 4 WETH · Borrow 7K BOLD · 5.00%",
+      "L2": [
+        "Collateral: 4.0000 WETH ($15,013)",
+        "Debt: 7,006.96 BOLD (6.96 fee)",
+        "Collateral Ratio: 214.27%",
+        "Interest Rate: 5.00% · 350.35 BOLD / year interest",
+        "WETH price: $3,753"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "WETH",
+          "rows": [
+            [
+              "This deposit",
+              "4.0000",
+              "$15,013"
+            ]
+          ],
+          "total": [
+            "0.0000",
+            "4.0000",
+            "$15,013"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "This borrow",
+              "7,000.00",
+              null
+            ],
+            [
+              "This upfront fee",
+              "6.96",
+              null
+            ]
+          ],
+          "total": [
+            "0.00",
+            "7,006.96",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "This trove opened, depositing 4.0000 WETH as collateral and borrowing 7,000 BOLD against it.",
+        "A one-time borrowing fee of 6.96 BOLD was added to the debt, equivalent to 7 days of average interest.",
+        "Its total initial debt stands at 7,007 BOLD, including that fee.",
+        "A 0.0375 ETH liquidation reserve is set aside on open and returned when the trove closes.",
+        "At the price at the time, that collateral is worth $15,013 (WETH at $3,753).",
+        "The trove opened at a 214.27% (LTV 46.67%) collateral ratio.",
+        "Liquidation would now come at WETH $1,927, 49% below that price.",
+        "It accrues interest at 5.00% a year, added to the debt as it accrues."
+      ],
+      "L5": "open"
+    },
+    "values": {
+      "coll_symbol": "WETH",
+      "debt_symbol": "BOLD",
+      "label": "Open",
+      "block": 23002722,
+      "min_debt": 2000,
+      "price_at_event": 3753.36693323,
+      "coll_change": 4,
+      "debt_change": 7006.96,
+      "mcr": 1.1,
+      "cr_after": 214.26500339692487,
+      "liq_price_after": 1926.9140000000002,
+      "liq_distance_after": 0.48661720682294873,
+      "debt_after": 7006.96,
+      "coll_after": 4,
+      "rate_after": 5,
+      "coll_after_usd": 15013.46773292,
+      "debt_before": 0,
+      "rate_before": 0,
+      "upfront_fee": 6.96,
+      "accrued_total": 0,
+      "accrued_fee": 0,
+      "principal": 7000
+    },
+    "sentences": [
+      {
+        "text": "This trove opened, depositing 4.0000 WETH as collateral and borrowing 7,000 BOLD against it.",
+        "sentence_id": "open.what",
+        "uses": [
+          "coll_after",
+          "coll_symbol",
+          "principal",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "A one-time borrowing fee of 6.96 BOLD was added to the debt, equivalent to 7 days of average interest.",
+        "sentence_id": "open.fee",
+        "uses": [
+          "upfront_fee",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "Its total initial debt stands at 7,007 BOLD, including that fee.",
+        "sentence_id": "open.debt_fee",
+        "uses": [
+          "debt_after",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "A 0.0375 ETH liquidation reserve is set aside on open and returned when the trove closes.",
+        "sentence_id": "open.reserve",
+        "uses": []
+      },
+      {
+        "text": "At the price at the time, that collateral is worth $15,013 (WETH at $3,753).",
+        "sentence_id": "open.value",
+        "uses": [
+          "coll_after_usd",
+          "coll_symbol",
+          "price_at_event"
+        ]
+      },
+      {
+        "text": "The trove opened at a 214.27% (LTV 46.67%) collateral ratio.",
+        "sentence_id": "open.cr",
+        "uses": [
+          "cr_after"
+        ]
+      },
+      {
+        "text": "Liquidation would now come at WETH $1,927, 49% below that price.",
+        "sentence_id": "liq.after",
+        "uses": [
+          "coll_symbol",
+          "liq_price_after",
+          "liq_distance_after"
+        ]
+      },
+      {
+        "text": "It accrues interest at 5.00% a year, added to the debt as it accrues.",
+        "sentence_id": "open.rate",
+        "uses": [
+          "rate_after"
+        ]
+      }
+    ]
+  },
+  {
+    "n": 2,
+    "id": "0xbf20880a760fb46cb3760663814f92c639ef985b2d1d838a4be55eb962772816_787",
+    "utc": "5 Feb 2026 15:25",
+    "block": 24391507,
+    "tx": "0xbf20880a760fb46cb3760663814f92c639ef985b2d1d838a4be55eb962772816",
+    "template": {
+      "id": "liquity2.liquidation",
+      "variant": "destructive",
+      "version": "19c2425b"
+    },
+    "levels": {
+      "L1": "Liquidation · Liquidated 4 WETH · Cleared 7.2K BOLD · 0.1069 WETH claimable",
+      "L2": [
+        "Collateral: 3.9800 → 0 WETH",
+        "Debt: 7,193.37 → 0 BOLD (incl. +186.41 interest)",
+        "Collateral Ratio: 107.90% → N/A",
+        "Interest Rate: 5.00% → N/A",
+        "WETH price: $1,950"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "WETH",
+          "rows": [
+            [
+              "Deposited",
+              "4.0000",
+              "$15,013"
+            ],
+            [
+              "This liquidation",
+              "−3.8931",
+              "−$7,592"
+            ],
+            [
+              "This liquidation",
+              "−0.1069",
+              "−$208"
+            ],
+            [
+              "Market move",
+              null,
+              "−$7,213"
+            ]
+          ],
+          "total": [
+            "4.0000",
+            "0.0000",
+            "$0"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "Borrowed",
+              "7,000.00",
+              null
+            ],
+            [
+              "Interest",
+              "186.41",
+              null
+            ],
+            [
+              "Upfront fees",
+              "6.96",
+              null
+            ],
+            [
+              "This liquidation",
+              "−7,193.37",
+              null
+            ]
+          ],
+          "total": [
+            "7,193.37",
+            "0.00",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "This trove was liquidated: its collateral ratio had dropped to 107.90% (LTV 92.68%), below the 110% liquidation line for WETH.",
+        "Its 7,193 BOLD of debt was cleared.",
+        "3.9800 WETH of collateral was liquidated, worth $7,762 at the price at the time.",
+        "The collateral’s value exceeded the debt, so 0.1069 WETH of surplus ($208.47) remains claimable by the borrower.",
+        "After that surplus, the borrower’s estimated loss was about $359.72.",
+        "The Stability Pool received 3.8731 WETH ($7,553.09).",
+        "The liquidator received 0.0375 WETH in gas compensation.",
+        "The liquidator received 0.1844 WETH ($359.67) as the 5% liquidation incentive.",
+        "The trove NFT was burned in the liquidation."
+      ],
+      "L5": "liquidation"
+    },
+    "values": {
+      "coll_symbol": "WETH",
+      "debt_symbol": "BOLD",
+      "label": "Liquidation",
+      "block": 24391507,
+      "min_debt": 2000,
+      "price_at_event": 1950.1437,
+      "coll_change": 4,
+      "debt_change": 7193.37,
+      "mcr": 1.1,
+      "cr_before_same_price": 107.89876233253676,
+      "liq_price_before": 1988.117336683417,
+      "liq_distance_before": -0.019474159128789248,
+      "price_prev": 3753.36693323,
+      "price_change": -0.48042916275127245,
+      "debt_after": 0,
+      "coll_after": 0,
+      "rate_after": 0,
+      "coll_after_usd": 0,
+      "debt_before": 7006.96,
+      "rate_before": 5,
+      "accrued_total": 186.41065667127532,
+      "accrued_fee": 0,
+      "debt_cleared": 7193.37,
+      "coll_liquidated": 3.98,
+      "coll_liquidated_usd": 7761.5572,
+      "liquidation_price": 1950.14,
+      "cr_at_liquidation": 107.89876233253676,
+      "coll_surplus": 0.1069,
+      "coll_surplus_usd": 208.469966,
+      "est_loss": 359.7172340000003,
+      "coll_to_sp": 3.8731,
+      "coll_to_sp_usd": 7553.0872340000005,
+      "incentive_coll": 0.18443214333329913,
+      "incentive_usd": 359.6685,
+      "surplus_l1": "0.1069 WETH claimable"
+    },
+    "sentences": [
+      {
+        "text": "This trove was liquidated: its collateral ratio had dropped to 107.90% (LTV 92.68%), below the 110% liquidation line for WETH.",
+        "sentence_id": "liq.what",
+        "uses": [
+          "cr_at_liquidation",
+          "mcr",
+          "coll_symbol"
+        ]
+      },
+      {
+        "text": "Its 7,193 BOLD of debt was cleared.",
+        "sentence_id": "liq.debt",
+        "uses": [
+          "debt_cleared",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "3.9800 WETH of collateral was liquidated, worth $7,762 at the price at the time.",
+        "sentence_id": "liq.coll",
+        "uses": [
+          "coll_liquidated",
+          "coll_symbol",
+          "coll_liquidated_usd"
+        ]
+      },
+      {
+        "text": "The collateral’s value exceeded the debt, so 0.1069 WETH of surplus ($208.47) remains claimable by the borrower.",
+        "sentence_id": "liq.surplus",
+        "uses": [
+          "coll_surplus",
+          "coll_symbol",
+          "coll_surplus_usd"
+        ]
+      },
+      {
+        "text": "After that surplus, the borrower’s estimated loss was about $359.72.",
+        "sentence_id": "liq.loss",
+        "uses": [
+          "est_loss"
+        ]
+      },
+      {
+        "text": "The Stability Pool received 3.8731 WETH ($7,553.09).",
+        "sentence_id": "liq.leg.sp",
+        "uses": [
+          "coll_to_sp",
+          "coll_symbol",
+          "coll_to_sp_usd"
+        ]
+      },
+      {
+        "text": "The liquidator received 0.0375 WETH in gas compensation.",
+        "sentence_id": "liq.leg.gas_weth",
+        "uses": []
+      },
+      {
+        "text": "The liquidator received 0.1844 WETH ($359.67) as the 5% liquidation incentive.",
+        "sentence_id": "liq.leg.incentive",
+        "uses": [
+          "incentive_coll",
+          "coll_symbol",
+          "incentive_usd"
+        ]
+      },
+      {
+        "text": "The trove NFT was burned in the liquidation.",
+        "sentence_id": "liq.leg.nft",
+        "uses": []
+      }
+    ]
+  }
+]

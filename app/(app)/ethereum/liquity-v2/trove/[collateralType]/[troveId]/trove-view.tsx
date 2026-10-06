@@ -47,6 +47,7 @@ import { CollSurplusClaimCard } from "@/components/protocol/liquity-family/coll-
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
+import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { UsersGlyph } from "@/components/protocol/liquity/liquity-event-header";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
@@ -523,6 +524,11 @@ export default function TroveView({
     [branch, isOpen, liveOracle, tl.sortedEvents],
   );
   const liveNotes = useMemo(() => (liveNote ? [liveNote] : []), [liveNote]);
+  // What an event's Copy for LLM header names about the trove.
+  const troveMeta = useMemo(
+    () => ({ owner: effectiveOwner ?? null, total: totalEvents ?? liquityEvents.length }),
+    [effectiveOwner, totalEvents, liquityEvents.length],
+  );
 
   if (loading) {
     // Only an SSR miss reaches this now — a seeded view never renders the
@@ -693,58 +699,60 @@ export default function TroveView({
         })()}
 
         <CollSurplusCtx.Provider value={surplusState}>
-          <ChainTruthTimeline
-            // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
-            // — lets pinned mode (the per-event share route) force a landed
-            // card's detail panel open on its first mount.
-            persistKeyPrefix="liquity-v2"
-            closed={troveData.status !== "open"}
-            tl={tlWithGlyph}
-            boundary={boundary}
-            notes={notes}
-            liveNotes={liveNotes}
-            liveNotesPending={isOpen && !!branch && liveOraclePending}
-            runs={LIQUITY_TIMELINE_RUNS}
-            displayItems={LIQUITY_DISPLAY_ITEMS}
-            mobileSpine={LIQUITY_MOBILE_SPINE}
-            emptyLabel="No transaction history available"
-            toolbarLeading={
-              <TimelineActivityHeader
-                events={liquityEvents}
-                closed={troveData.status !== "open"}
-                firstAt={troveData.activity?.createdAt}
-              />
-            }
-            renderCard={(event, meta) => {
-              if (isCollSurplusClaimEvent(event))
+          <LiquityTroveMetaContext.Provider value={troveMeta}>
+            <ChainTruthTimeline
+              // Matches `LiquityEventCard`'s own `persistKey={`liquity-v2:${event.id}`}`
+              // — lets pinned mode (the per-event share route) force a landed
+              // card's detail panel open on its first mount.
+              persistKeyPrefix="liquity-v2"
+              closed={troveData.status !== "open"}
+              tl={tlWithGlyph}
+              boundary={boundary}
+              notes={notes}
+              liveNotes={liveNotes}
+              liveNotesPending={isOpen && !!branch && liveOraclePending}
+              runs={LIQUITY_TIMELINE_RUNS}
+              displayItems={LIQUITY_DISPLAY_ITEMS}
+              mobileSpine={LIQUITY_MOBILE_SPINE}
+              emptyLabel="No transaction history available"
+              toolbarLeading={
+                <TimelineActivityHeader
+                  events={liquityEvents}
+                  closed={troveData.status !== "open"}
+                  firstAt={troveData.activity?.createdAt}
+                />
+              }
+              renderCard={(event, meta) => {
+                if (isCollSurplusClaimEvent(event))
+                  return (
+                    <CollSurplusClaimCard
+                      event={event}
+                      isFirst={meta.isFirst}
+                      isLast={meta.isLast}
+                      eventNumber={meta.eventNumber}
+                      persistPrefix="liquity-v2"
+                    />
+                  );
+                if (!isLiquityEvent(event)) return null;
+                // previousEvent is always the temporally-older event, regardless
+                // of display order, so explainer deltas (interest accrued,
+                // time-since-last) stay correct.
+                const idx = sortedIndex.get(event.id);
+                const previousEvent = idx != null && idx > 0 ? tl.sortedEvents[idx - 1] : undefined;
                 return (
-                  <CollSurplusClaimCard
+                  <LiquityEventCard
                     event={event}
+                    addressDisplay="hidden"
                     isFirst={meta.isFirst}
                     isLast={meta.isLast}
+                    previousEvent={previousEvent}
                     eventNumber={meta.eventNumber}
-                    persistPrefix="liquity-v2"
+                    currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
                   />
                 );
-              if (!isLiquityEvent(event)) return null;
-              // previousEvent is always the temporally-older event, regardless
-              // of display order, so explainer deltas (interest accrued,
-              // time-since-last) stay correct.
-              const idx = sortedIndex.get(event.id);
-              const previousEvent = idx != null && idx > 0 ? tl.sortedEvents[idx - 1] : undefined;
-              return (
-                <LiquityEventCard
-                  event={event}
-                  addressDisplay="hidden"
-                  isFirst={meta.isFirst}
-                  isLast={meta.isLast}
-                  previousEvent={previousEvent}
-                  eventNumber={meta.eventNumber}
-                  currentPrice={prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData]}
-                />
-              );
-            }}
-          />
+              }}
+            />
+          </LiquityTroveMetaContext.Provider>
         </CollSurplusCtx.Provider>
       </div>
       <ProvInspectorLayer />

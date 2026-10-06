@@ -105,7 +105,32 @@ function statusLabel(status: TroveSummary["status"]): string {
 }
 
 export function troveToMarkdown(args: TroveMarkdownArgs): string {
-  const { trove, liveState, prices, debtInFront, trovesAhead, events, generatedAt } = args;
+  const { trove, events } = args;
+  const ct = trove.collateralType;
+  // The notes as the PAGE places them: anchored against this same event list,
+  // so a note the timeline drops is absent here too, and the annotation below
+  // lands on the row the note renders beside on screen. A LIVE note has no
+  // anchor by definition (its later end is the chain head, past every event's
+  // block) — `anchorMarketNotes` would silently drop it, so it is appended to
+  // the listed set directly rather than routed through the same call, and it
+  // never reaches `timelineTable`'s per-row annotations.
+  const anchoredNotes = anchorMarketNotes(args.notes ?? [], events, "asc");
+  const noteList = [...anchoredNotes.values()].flat();
+  const allNotes = [...noteList, ...(args.liveNotes ?? [])];
+  const lines = troveSummaryMarkdown(args, allNotes);
+
+  // ── Market notes, then the activity timeline ──
+  lines.push(...marketNotesSection(allNotes));
+  lines.push(...timelineTable(events, ct, anchoredNotes));
+
+  return lines.join("\n");
+}
+
+/** The position's card as Markdown: the header, the headlines and the
+ *  lifetime, without the market notes and the timeline. The test exports
+ *  (scripts/exports-liquity-v2.mjs) open each position with it. */
+export function troveSummaryMarkdown(args: TroveMarkdownArgs, allNotes: MarketNote[] = []): string[] {
+  const { trove, events, generatedAt } = args;
   const ct = trove.collateralType;
   const lines: string[] = [];
 
@@ -126,17 +151,6 @@ export function troveToMarkdown(args: TroveMarkdownArgs): string {
   lines.push(`- **Trove ID:** ${trove.id}`);
   lines.push("");
 
-  // The notes as the PAGE places them: anchored against this same event list,
-  // so a note the timeline drops is absent here too, and the annotation below
-  // lands on the row the note renders beside on screen. A LIVE note has no
-  // anchor by definition (its later end is the chain head, past every event's
-  // block) — `anchorMarketNotes` would silently drop it, so it is appended to
-  // the listed set directly rather than routed through the same call, and it
-  // never reaches `timelineTable`'s per-row annotations.
-  const anchoredNotes = anchorMarketNotes(args.notes ?? [], events, "asc");
-  const noteList = [...anchoredNotes.values()].flat();
-  const allNotes = [...noteList, ...(args.liveNotes ?? [])];
-
   // ── Status-specific headline block ──
   const headlines = trove.status === "open" ? openHeadlines(args) : closedOrLiquidatedHeadlines(trove);
   // (a) The headline block ends with its own blank line; the notes line is its
@@ -156,12 +170,7 @@ export function troveToMarkdown(args: TroveMarkdownArgs): string {
       (trove.activity?.redemptionCount ? ` · **Redemptions:** ${trove.activity.redemptionCount}` : ""),
   );
   lines.push("");
-
-  // ── Market notes, then the activity timeline ──
-  lines.push(...marketNotesSection(allNotes));
-  lines.push(...timelineTable(events, ct, anchoredNotes));
-
-  return lines.join("\n");
+  return lines;
 }
 
 /** (a) One line in the headline block — that notes exist, and where to read

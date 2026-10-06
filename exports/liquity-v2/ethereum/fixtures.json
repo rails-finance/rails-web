@@ -1,0 +1,90 @@
+{
+  "today": {
+    "date": "2026-10-06",
+    "note": "The redemption's \"today\" sentence reads these prices, so a regeneration matches the committed exports; `pnpm exports:liquity-v2 --today` re-reads them and today's date.",
+    "prices": {
+      "WETH": 2690.4,
+      "wstETH": 3365.974128625988,
+      "rETH": 3146.423448626136
+    }
+  },
+  "fixtures": [
+    {
+      "branch": "WETH",
+      "troveId": "102247037494986730506041632222868001124387697185626929998095238518734059870154",
+      "why": "Story position (the brief's worked examples): opened, joined batch manager ARM, six batch rate changes, 134 redemptions in runs (the grouping), a withdrawal (#18) between them, left the batch, then three adjustments."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "68987158102518200846647913975832515106313551880257520999456440979572808474566",
+      "why": "Batched: batch manager rate changes with and without the upfront fee (TO-DO-ui-jobs 239), the header's \"Debt +\" and its split into interest, management fee and upfront fee."
+    },
+    {
+      "branch": "WETH",
+      "troveId": "20635695537089405598026559485535702323392149994216418571824164162189504962705",
+      "why": "Liquidated: an open, then a liquidation with no other event between."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "3153168971978305609833590192352679801290655652341563847756631982187701498246",
+      "why": "Fully redeemed: a redemption that cleared all the debt and left a zero-debt zombie trove."
+    },
+    {
+      "branch": "WETH",
+      "troveId": "100029870456066749533999330917390318716871964554860354972196062018214605061862",
+      "why": "Closed: redemptions against an owner-set rate, then the owner closed the trove."
+    },
+    {
+      "branch": "WETH",
+      "troveId": "2493737407646210683630552410763600720099219058734565031714846576392459927131",
+      "why": "Opened straight into a batch: one event, the open's join-batch variant."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "10851767869639799745630534548176706472384436299647911680437434736210555500720",
+      "why": "Dust: an automated manager's adjustments, with runs of zero-change touches the server collapses into one row, and frequent owner rate changes."
+    }
+  ],
+  "sweep": [
+    {
+      "branch": "WETH",
+      "troveId": "102956212846628069938374125048301918588408265243502680445602522290411675190709",
+      "why": "Liquidated after 122 events: redistributions and adjustments around a liquidation."
+    },
+    {
+      "branch": "rETH",
+      "troveId": "19392756892012588507808147823032851071198051944268422940534038614966657095964",
+      "why": "rETH, liquidated after 45 redemptions."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "110817435187070138313010031165110181015501606444916310630590671201872417481671",
+      "why": "wstETH, liquidated after 66 events."
+    },
+    {
+      "branch": "rETH",
+      "troveId": "89153408423356317498441219019190060814792756931025781950331537913435309054117",
+      "why": "rETH zombie after 290 redemptions."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "1979880184128274785905334194165202416487628875253881879683376279708506385915",
+      "why": "wstETH zombie at zero debt, still touched afterwards."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "26244146308537641262439670569871691678767189479044609337562239650880434266541",
+      "why": "wstETH closed after 220 redemptions."
+    },
+    {
+      "branch": "WETH",
+      "troveId": "63057230469027224650801948896960448993603220929759359322728122838179148151263",
+      "why": "WETH closed after 129 redemptions."
+    },
+    {
+      "branch": "wstETH",
+      "troveId": "48155643574682199246965747600986830151117553149983828519323299836183986087031",
+      "why": "wstETH zombie with debt left."
+    }
+  ]
+}

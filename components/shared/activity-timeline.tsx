@@ -12,7 +12,8 @@
 // shim can be replaced with the verbatim 1200-line file.
 
 import { createContext, useContext, useState, useRef } from "react";
-import { formatTinyNonZero } from "@/lib/utils/format";
+import { fmtSpine } from "@/lib/shared/spine-format";
+export { fmtSpine };
 import { Prov, type Provenance } from "@/components/shared/provenance";
 
 /** A receipt identity for a spine flanking value — the SAME info/value/symbol
@@ -63,28 +64,6 @@ export function SingleWalletProvider({ children, value }: { children: React.Reac
 }
 
 // ── Spine value formatter ───────────────────────────────────────────────
-
-/** Compact number for flanking values beside the spine icons */
-export function fmtSpine(v: string | number | undefined, full = false): string {
-  const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
-  if (!n || !isFinite(n)) return "";
-  const a = Math.abs(n);
-  // Opt-in: whole units up to a million, so 8,750 and 8,745 do not read as
-  // 8.8K and 8.7K beside each other.
-  if (full && a >= 1_000 && a < 1_000_000) return Math.round(a).toLocaleString("en-US");
-  if (a >= 1_000_000) return `${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000) {
-    const k = a / 1_000;
-    return a >= 10_000 ? `${Math.round(k)}K` : `${parseFloat(k.toFixed(1))}K`;
-  }
-  if (a >= 1) return a.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  // Trim trailing zeros so sub-1 amounts read like the card header (0.2, not
-  // 0.2000) while still capping precision at 4 decimals.
-  const s = parseFloat(a.toFixed(4)).toString();
-  // Strict chain-state: a non-zero magnitude below 4-dp must not read as "0".
-  if (parseFloat(s) === 0) return formatTinyNonZero(a);
-  return s;
-}
 
 /** Inline spine value cell for 5-column grid rows. When `onChange` is set,
  *  renders a click-to-edit input — used by simulator cards so the spine

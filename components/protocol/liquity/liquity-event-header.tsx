@@ -7,7 +7,8 @@ import { EventTime } from "@/components/shared/event-time";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
-import { TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
+import { liquityL1Label } from "@/lib/liquity/event-prose";
+import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabelShort, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
@@ -33,92 +34,39 @@ export { UsersGlyph };
 
 type OperationStyle = { label: string; color: string; bg: string; badge: boolean };
 
-function getOperationStyle(operation: string, ctx?: LiquityContext): OperationStyle {
+// The label is the generator's (lib/liquity/event-prose.ts `liquityL1Label`,
+// words from lib/liquity/event-templates.ts), so the Copy for LLM line and the
+// exports print the header's word; this decides only how it looks.
+function getOperationStyle(operation: string, ctx: LiquityContext): OperationStyle {
+  const label = liquityL1Label(ctx);
   switch (operation) {
     case "openTrove":
     case "openTroveAndJoinBatch":
       // Soft-tint pill matching the Aave V4 "Enable" header badge — the two
       // "you opened a position" actions now share one visual grammar, on the
       // semantic `positive` token (color-grammar.md §5: the Open/active green).
-      return { label: "Open", color: "text-positive", bg: "bg-positive/20", badge: true };
+      return { label, color: "text-positive", bg: "bg-positive/20", badge: true };
     case "closeTrove":
-      return { label: "Close", color: "", bg: "bg-rb-500/20 dark:bg-rb-500/20", badge: true };
+      return { label, color: "", bg: "bg-rb-500/20 dark:bg-rb-500/20", badge: true };
     case "liquidate":
-      return { label: "Liquidated", color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
-    case "adjustTrove": {
-      // Server-collapsed run of zero-delta touches — one row stands in for
-      // the whole stretch, so the label carries the count. Checked before the
-      // delta splits: a run's SUMMED dust can exceed the display epsilon.
-      if (ctx?.noChangeRun) {
-        return {
-          label: `No change ×${ctx.noChangeRun.count.toLocaleString("en-US")}`,
-          color: "",
-          bg: "",
-          badge: false,
-        };
-      }
-      if (ctx?.troveOperation) {
-        const debtOp = ctx.troveOperation.debtChangeFromOperation;
-        const collOp = ctx.troveOperation.collChangeFromOperation;
-        const hasDebt = Math.abs(debtOp) >= TROVE_DELTA_EPSILON;
-        const hasColl = Math.abs(collOp) >= TROVE_DELTA_EPSILON;
-        // Zero-delta touch (bot keep-alive): nothing moved, so "Adjust" would
-        // claim a change that never happened.
-        if (!hasDebt && !hasColl) {
-          return { label: "No change", color: "", bg: "", badge: false };
-        }
-        if (hasDebt && !hasColl) {
-          return debtOp > 0
-            ? { label: "Borrow", color: "", bg: "", badge: false }
-            : { label: "Repay", color: "", bg: "", badge: false };
-        }
-        if (hasColl && !hasDebt) {
-          return collOp > 0
-            ? { label: "Add", color: "", bg: "", badge: false }
-            : { label: "Withdraw", color: "", bg: "", badge: false };
-        }
-        // Combined: show both actions
-        if (hasColl && hasDebt) {
-          const collLabel = collOp > 0 ? "Add" : "Withdraw";
-          const debtLabel = debtOp > 0 ? "Borrow" : "Repay";
-          return { label: `${collLabel} + ${debtLabel}`, color: "", bg: "", badge: false };
-        }
-      }
-      return { label: "Adjust", color: "", bg: "", badge: false };
-    }
-    case "adjustTroveInterestRate": {
-      if (ctx?.stateBefore && ctx?.stateAfter) {
-        return ctx.stateAfter.annualInterestRate > ctx.stateBefore.annualInterestRate
-          ? { label: "Increase interest rate", color: "", bg: "", badge: false }
-          : { label: "Decrease interest rate", color: "", bg: "", badge: false };
-      }
-      return { label: "Rate change", color: "", bg: "", badge: false };
-    }
+      return { label, color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
     case "applyPendingDebt":
-      return { label: "Apply debt", color: "text-pink-700 dark:text-pink-400", bg: "bg-pink-500/20", badge: true };
+      return { label, color: "text-pink-700 dark:text-pink-400", bg: "bg-pink-500/20", badge: true };
     case "redeemCollateral":
       // A change to the Trove the owner did not make: caution (color-grammar.md §5).
-      return { label: "Redemption", color: "text-white", bg: "bg-caution-500", badge: true };
+      return { label, color: "text-white", bg: "bg-caution-500", badge: true };
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":
-      return { label: "Redeemed", color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
-    case "setInterestBatchManager":
-      return { label: "Delegate", color: "", bg: "", badge: false };
-    case "removeFromBatch":
-      return { label: "Leave delegate", color: "", bg: "", badge: false };
-    case "transferTrove":
-      return { label: "Transfer", color: "", bg: "", badge: false };
-    case "setBatchManagerAnnualInterestRate":
-      return { label: "Interest rate", color: "", bg: "", badge: false };
+      return { label, color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
     default:
-      return { label: operation, color: "", bg: "", badge: false };
+      return { label, color: "", bg: "", badge: false };
   }
 }
 
 /** The event's kind as the header names it ("Withdraw + Repay", "Redemption").
  *  The phone spine view's caption uses it. */
 export function liquityOperationLabel(ctx: LiquityContext): string {
-  return getOperationStyle(ctx.operation, ctx).label;
+  return liquityL1Label(ctx);
 }
 
 function formatNumber(n: number): string {
@@ -317,7 +265,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                   stays at every width (no hideVal). */}
               {hasDebtChange && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">Debt</span>
+                  <span className="text-rb-500">{L1_WORDS.debt}</span>
                   {debtCp ? (
                     <Prov value={debtCp.value} symbol={debtCp.symbol} info={debtCp.info}>
                       <span className="font-bold text-foreground">
@@ -350,7 +298,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               </span>
               {hasCollChange && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">Supply</span>
+                  <span className="text-rb-500">{L1_WORDS.supply}</span>
                   {wrapColl(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -365,7 +313,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               )}
               {hasDebtChange && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">Borrow</span>
+                  <span className="text-rb-500">{L1_WORDS.borrow}</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -400,7 +348,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               </span>
               {hasDebtChange && (
                 <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">Cleared</span>
+                  <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -415,7 +363,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               )}
               {hasCollChange && (
                 <span className={`inline-flex items-center gap-1.5 text-sm ${spineFlankHide}`}>
-                  <span className="text-caution-600 dark:text-caution-400">Took</span>
+                  <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.took}</span>
                   {wrapColl(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -443,7 +391,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               </span>
               {hasCollChange && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">Liquidated</span>
+                  <span className="text-rb-500">{L1_WORDS.liquidated}</span>
                   {wrapColl(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -458,7 +406,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               )}
               {hasDebtChange && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <span className="text-rb-500">Cleared</span>
+                  <span className="text-rb-500">{L1_WORDS.cleared}</span>
                   {wrapDebt(
                     <span className="font-bold text-foreground">
                       <ExactTip
@@ -574,7 +522,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               as part of a repayment or a borrow. No token moved for it. */}
           {redist && (
             <span className="inline-flex items-center gap-1.5 text-sm">
-              <span className="text-caution-600 dark:text-caution-400">From a liquidation</span>
+              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.from_liquidation}</span>
               {redistDebtCp && (
                 <>
                   <Prov value={redistDebtCp.value} symbol={redistDebtCp.symbol} info={redistDebtCp.info}>
@@ -589,7 +537,9 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                   <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={16} />
                 </>
               )}
-              {redistDebtCp && redistCollCp && <span className="text-caution-600 dark:text-caution-400">and</span>}
+              {redistDebtCp && redistCollCp && (
+                <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.and}</span>
+              )}
               {redistCollCp && (
                 <>
                   <Prov value={redistCollCp.value} symbol={redistCollCp.symbol} info={redistCollCp.info}>
@@ -623,14 +573,14 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
               >
                 <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
                 <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                claimable, claimed
+                {L1_WORDS.claimed}
                 {surplusClaim.timestamp != null && <> {formatDate(surplusClaim.timestamp)}</>}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
                 <span>{ctx.liquidation.collSurplus.toFixed(4)}</span>
                 <TokenChipIcon symbol={ctx.collateralType} size={16} />
-                claimable
+                {L1_WORDS.claimable}
               </span>
             ))}
 
@@ -665,7 +615,7 @@ export function LiquityEventHeader({ ctx, timestamp, txHash, blockNumber, eventN
                 }
               >
                 <AlertTriangle className="w-3 h-3" />
-                <span className="hidden md:inline">Zombie</span>
+                <span className="hidden md:inline">{L1_WORDS.zombie}</span>
               </span>
             )}
             {groupChip}

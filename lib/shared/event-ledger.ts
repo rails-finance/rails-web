@@ -32,6 +32,16 @@ import {
   type FlowSide,
   type FlowUnit,
 } from "@/lib/shared/flows-timeline";
+import { shortDate, shortDateYear } from "@/lib/shared/format-event";
+
+/** "5 Jul '25": the day a ledger's rows stand at. */
+export const ledgerDayStamp = (tsSec: number) => `${shortDate(tsSec)} ${shortDateYear(tsSec)}`;
+
+/** Where the page does not hold every event of the day, the rows stand at
+ *  its close; the ledger says so under its rows. */
+export function dayCloseNote(eventTs?: number): string {
+  return `The page does not hold every event of ${eventTs != null ? ledgerDayStamp(eventTs) : "this day"}, so the rows stand at the close of that day.`;
+}
 
 /** A row's part: a kind of flow the event left alone, the earlier movements
  *  of a kind it moved, its movement, an asset's interest, the price's

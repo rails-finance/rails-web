@@ -217,7 +217,7 @@ for (const proto of CONVERTED) {
   const hitsByFile = new Map();
   for (const file of files) {
     const rel = path.relative(ROOT, file);
-    const hits = genericRuleHits(fs.readFileSync(file, "utf8"));
+    const hits = genericRuleHits(fs.readFileSync(file, "utf8"), file);
     hitsByFile.set(rel, hits);
     const allowed = GENERIC_ALLOWLIST[rel] ?? [];
     const fresh = hits.filter((h) => !allowed.some((s) => h.text.includes(s)));

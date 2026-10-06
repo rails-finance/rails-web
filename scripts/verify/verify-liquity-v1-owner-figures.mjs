@@ -131,7 +131,8 @@ console.log("# C. listing marks a life closed by redemption");
 // ── D. Liquity V2's upfront fee copy ───────────────────────────────────────
 console.log("# D. Liquity V2 upfront fee is added to the debt");
 {
-  const src = readFileSync(join(ROOT, "lib/shared/learn-more-content.ts"), "utf8");
+  // The V2 event modals live with the rest of an event's strings.
+  const src = readFileSync(join(ROOT, "lib/liquity/event-templates.ts"), "utf8");
   assert(!/deducted from the borrowed amount/.test(src), "no copy says the upfront fee is deducted");
   assert(
     /7 days of average interest, added to the Trove's debt/.test(src),

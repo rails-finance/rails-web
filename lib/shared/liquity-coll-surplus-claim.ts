@@ -15,7 +15,7 @@
 import type { BaseActivityEvent, CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import type { CollSurplusClaim } from "@/lib/sources/chain/liquity-coll-surplus";
-import { shiftDecimal } from "@/components/shared/provenance";
+import { shiftDecimal } from "@/lib/utils/format";
 
 /** The fields of a surplus read the row needs (the V2-family and V1 hooks'
  *  shapes both carry them). */

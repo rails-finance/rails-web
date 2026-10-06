@@ -67,7 +67,7 @@ if (args.includes("--generic")) {
   let fresh = 0;
   for (const file of discoverGenericCopyFiles(ROOT)) {
     const rel = path.relative(ROOT, file);
-    const hits = genericRuleHits(fs.readFileSync(file, "utf8"));
+    const hits = genericRuleHits(fs.readFileSync(file, "utf8"), file);
     if (!hits.length) continue;
     console.log(`\n${rel}`);
     const allowed = GENERIC_ALLOWLIST[rel] ?? [];

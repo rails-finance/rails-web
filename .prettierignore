@@ -39,6 +39,9 @@ next-env.d.ts
 .prettierignore
 
 # Generated files
+# The event prose exports: written by scripts/exports-liquity-v2.mjs, and a
+# regeneration must match them byte for byte.
+exports
 public/sw.js
 public/workbox-*.js
 

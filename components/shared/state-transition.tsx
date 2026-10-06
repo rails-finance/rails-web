@@ -91,8 +91,8 @@ export function DeltaToggle({
   );
 }
 
-export function ClosedLabel() {
-  return <span className="text-sm font-semibold ">CLOSED</span>;
+export function ClosedLabel({ text = "CLOSED" }: { text?: string }) {
+  return <span className="text-sm font-semibold ">{text}</span>;
 }
 
 /** Equal-size surfaced stat card — the shared building block of the

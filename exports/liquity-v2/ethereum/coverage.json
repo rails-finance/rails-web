@@ -1,0 +1,587 @@
+{
+  "protocol": "liquity-v2",
+  "chain": "ethereum",
+  "today": "2026-10-06",
+  "troves": [
+    "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+    "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+    "WETH/20635695537089405598026559485535702323392149994216418571824164162189504962705",
+    "wstETH/3153168971978305609833590192352679801290655652341563847756631982187701498246",
+    "WETH/100029870456066749533999330917390318716871964554860354972196062018214605061862",
+    "WETH/2493737407646210683630552410763600720099219058734565031714846576392459927131",
+    "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+    "WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709",
+    "rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
+    "wstETH/110817435187070138313010031165110181015501606444916310630590671201872417481671",
+    "rETH/89153408423356317498441219019190060814792756931025781950331537913435309054117",
+    "wstETH/1979880184128274785905334194165202416487628875253881879683376279708506385915",
+    "wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541",
+    "WETH/63057230469027224650801948896960448993603220929759359322728122838179148151263",
+    "wstETH/48155643574682199246965747600986830151117553149983828519323299836183986087031"
+  ],
+  "variants": [
+    {
+      "template": "liquity2.adjust.add_coll",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 146,
+          "utc": "5 Feb 2026 19:55",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x1bf85e8bb41801da691418d80886c5c05b1c05c96296ed2e5b10ad91c5d642d3_483"
+        },
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 2,
+          "utc": "27 May 2026 07:50",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xa257118b384f81023d49e3ec32c4d80910f60509e08c33b29d5c3e37eef0cd0f_3"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.withdraw_coll",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 18,
+          "utc": "1 Sep 2025 09:01",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xb75d3be6740ea1069b83d6d302118ad7dbc5678ea71d74824283b7aa1634e8b3_224"
+        },
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 76,
+          "utc": "12 Sep 2025 10:46",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xeb864db32cb2ed37cb33de5cf2b89f7f48bf33586b4ea82485edc11cc662c65a_341"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.borrow",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 3,
+          "utc": "28 May 2026 06:44",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xe3288f61598bd45fd6f64130218ca121dccd61ef2bdd1a389258a0d530e252b3_1"
+        },
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 219,
+          "utc": "15 Sep 2026 09:25",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/0x99dee5f7bbde46c5b12279adc96629559d6b788ec30826ce761b8087b6520252_1"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.repay",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 148,
+          "utc": "6 Jun 2026 13:31",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x2a440f6541a008e23d3088f88bac08d0ded6884d3238cbe0c1eee4b8a3e158d4_3"
+        },
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 64,
+          "utc": "8 Jul 2026 10:56",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/0x1cbc8fccbaf33db4d580191d34474e6ab594af510213b70894bc4c8eee327e2f_2"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.combined",
+      "variant": "add_borrow",
+      "when": "added collateral and borrowed",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 20,
+          "utc": "24 Jun 2026 22:26",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x734b177227f9a80b31f3fdd0f3720c8bb9c4be8d757f0c8962eec9eaf7000a96_3"
+        },
+        {
+          "trove": "wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541",
+          "n": 3,
+          "utc": "9 Jun 2025 15:18",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541/event/0x2bdcd0010ffd2b68a27ba960ecc732c12486d1a9b89a996cb80eac7c8333eea7_26"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.combined",
+      "variant": "add_repay",
+      "when": "added collateral and repaid",
+      "examples": [
+        {
+          "trove": "WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709",
+          "n": 109,
+          "utc": "28 May 2026 01:43",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709/event/0x0aedb6d311e8996fc67c4d064626e111e3a2be16306ede2c917981b929f9ca84_4"
+        },
+        {
+          "trove": "wstETH/110817435187070138313010031165110181015501606444916310630590671201872417481671",
+          "n": 47,
+          "utc": "1 Feb 2026 22:34",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/110817435187070138313010031165110181015501606444916310630590671201872417481671/event/0x6ab130465b8986ce4c9ee5bfd06cb3ab23dfb19f4d30a70acaac1b19cd6e8bfa_614"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.combined",
+      "variant": "withdraw_borrow",
+      "when": "withdrew collateral and borrowed",
+      "examples": []
+    },
+    {
+      "template": "liquity2.adjust.combined",
+      "variant": "withdraw_repay",
+      "when": "withdrew collateral and repaid",
+      "examples": [
+        {
+          "trove": "WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709",
+          "n": 59,
+          "utc": "24 Dec 2025 01:16",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709/event/0xdf8d9da103f519e61bea2ccd9c22b250399191c2fe6f16367efe78adfaa7a248_664"
+        },
+        {
+          "trove": "rETH/89153408423356317498441219019190060814792756931025781950331537913435309054117",
+          "n": 278,
+          "utc": "17 Mar 2026 21:43",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/rETH/89153408423356317498441219019190060814792756931025781950331537913435309054117/event/0xef474088d37eaa28ab47a9955b510a084745b469dffe0b21c0ec3ff0165cd01e_299"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.no_change",
+      "variant": "single",
+      "when": "one touch",
+      "examples": []
+    },
+    {
+      "template": "liquity2.adjust.no_change",
+      "variant": "run",
+      "when": "a run of touches the server collapsed into one row",
+      "examples": [
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 11,
+          "utc": "13 Jun 2026 06:36",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/nochange-run-25306803-25306803"
+        },
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 65,
+          "utc": "8 Jul 2026 14:01",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/nochange-run-25487403-25488315"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.rate",
+      "variant": "raised",
+      "when": "the rate rose",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 226,
+          "utc": "16 Sep 2026 15:13",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xdf025eed99d45db6df6ab643862186396baab27227ec0f522cfc33cb05dd59e9_4"
+        },
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 257,
+          "utc": "25 Sep 2026 14:55",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/0x19fce8172b0d8613742a78ec9e7425074a0bb6df91fcb0e484de024bea382989_4"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.adjust.rate",
+      "variant": "lowered",
+      "when": "the rate fell",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 272,
+          "utc": "30 Sep 2026 16:18",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x4606d6be5138ca679de014c41a400f04e3370beb67baa10f60c3baedfcb81537_4"
+        },
+        {
+          "trove": "wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720",
+          "n": 33,
+          "utc": "18 Jun 2026 15:28",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/10851767869639799745630534548176706472384436299647911680437434736210555500720/event/0x88a7c4aec86412abe489346456863173c0f3698feb4bf0761d151831d6471e0f_4"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.redemption",
+      "variant": "price_lower_now",
+      "when": "the collateral's price today is below its price at the redemption",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 9,
+          "utc": "1 Sep 2025 01:27",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xd17409a5c82901b49ba08903a92eb3f46132dcd95bcd90959492773d9bcb4b2d_22"
+        },
+        {
+          "trove": "wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541",
+          "n": 222,
+          "utc": "12 Aug 2025 20:17",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541/event/0x1ec6241e21c4fbaf2603b1ba41bf308dd3ab59625d1cda1eeece31bf1da33a6e_5"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.redemption",
+      "variant": "price_higher_now",
+      "when": "the price today is far enough above it that the redeemed collateral would now be worth more than the debt it paid off",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 12,
+          "utc": "24 Jun 2026 11:49",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x013d31a58c168d1a35c75341ad0df3b2b0efd68090920063f5ec8142cef2772d_11"
+        },
+        {
+          "trove": "wstETH/48155643574682199246965747600986830151117553149983828519323299836183986087031",
+          "n": 94,
+          "utc": "25 Jun 2026 14:33",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/48155643574682199246965747600986830151117553149983828519323299836183986087031/event/0x6fc13d0d4fe4b7b7aef5d665521cfd4492218a1e959b3a63132913957b591178_18"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.redemption",
+      "variant": "at_event",
+      "when": "no price today, or one that reads the same, or a rise smaller than the fee",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 236,
+          "utc": "28 Sep 2026 17:13",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x74694542a2e6064f6ed062e3a96a149ac4fc4bcc4c0bbf6c380211c48e5efb03_15"
+        },
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 238,
+          "utc": "28 Sep 2026 17:13",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xa890b369b1f57192bebeec06e7c15d0f0be30d85a2de373a6d8c6b1ee6ad9ebc_21"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.redemption",
+      "variant": "no_detail",
+      "when": "the event carries no redemption log",
+      "examples": []
+    },
+    {
+      "template": "liquity2.delegation.join",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 2,
+          "utc": "15 Jul 2025 10:43",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xbc328c81c1cb63d52420f462eef2b49d59c7cd47067b36048b78a56505a9c251_396"
+        },
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 44,
+          "utc": "24 Aug 2026 21:26",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x1ef607efb36ee43cc6d02ac9fc8e6de9033b91c35d3caa96a5c2cb59b119ca64_12"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.delegation.leave",
+      "variant": "default",
+      "when": "always",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 145,
+          "utc": "13 Oct 2025 11:31",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x35c49ed7856a1903422c1c68331cee8c52ddda83a4e1041c18b04c13c921552e_700"
+        },
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 45,
+          "utc": "27 Aug 2026 15:01",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0x5704128dc8498dd441313c9a6b3a63084bec57874dd860742f029d022e49244e_5"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.delegation.rate_update",
+      "variant": "raised",
+      "when": "the rate rose",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 6,
+          "utc": "22 Aug 2025 14:20",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xc824db7ddd340b9515aaa9edeb8c247c1b24a15ce052fa626cd93293e3bb788a_514"
+        },
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 8,
+          "utc": "26 Aug 2025 04:21",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x281edd15167cb673a3813d44eafae7d087207c73d0719978aa274d9475bf6340_81"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.delegation.rate_update",
+      "variant": "lowered",
+      "when": "the rate fell",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 4,
+          "utc": "7 Aug 2025 12:52",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xf72e8512e99ab32c5bd28b8b81509cbb4d3668ed4ee83a2b44e482bc3769bbd6_21"
+        },
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 5,
+          "utc": "17 Aug 2025 16:18",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0xd84bd7d961cc4a8568544ca11087d4fcaf671736ebc4aeaa427c4de5a8d88e61_22"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.delegation.rate_update",
+      "variant": "kept",
+      "when": "the rate held",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 3,
+          "utc": "24 Jul 2025 13:50",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x605b1e84025f79e17e80bd79056667a06ad535a2119adaa42258537e8ca74fa3_124"
+        },
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 11,
+          "utc": "22 Jun 2026 05:05",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xbae6ad15e564456dd5676ade1fadd634e168ae083a14107906f5270e6e8c1789_4"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.open",
+      "variant": "self",
+      "when": "the owner sets the rate",
+      "examples": [
+        {
+          "trove": "WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+          "n": 1,
+          "utc": "19 May 2025 11:11",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154/event/0x3eb152af8bd09cffcc5316d33d8b8ef31ab498dc70d854bb94c688e8410eec87_190"
+        },
+        {
+          "trove": "wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541",
+          "n": 1,
+          "utc": "19 May 2025 16:23",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541/event/0xd20ba3b355d95d9b68bdb39d138fe7d3583598f14749682a2710554326fe247d_86"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.open",
+      "variant": "join_batch",
+      "when": "opened straight into a batch",
+      "examples": [
+        {
+          "trove": "wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566",
+          "n": 1,
+          "utc": "27 May 2026 07:48",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/68987158102518200846647913975832515106313551880257520999456440979572808474566/event/0xe86cd4ab753b54aa602d67f1c871b2daea35f58ad76e1fd5bbfdd6f17601340e_16"
+        },
+        {
+          "trove": "WETH/2493737407646210683630552410763600720099219058734565031714846576392459927131",
+          "n": 1,
+          "utc": "21 Sep 2026 19:40",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/2493737407646210683630552410763600720099219058734565031714846576392459927131/event/0x18e66ed828e18a1810507198f5d7e5d023cbd47a1ac82ff4187cf046c260d06f_15"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.close",
+      "variant": "repaid",
+      "when": "the close repaid debt",
+      "examples": [
+        {
+          "trove": "WETH/63057230469027224650801948896960448993603220929759359322728122838179148151263",
+          "n": 153,
+          "utc": "17 Jun 2025 07:26",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/63057230469027224650801948896960448993603220929759359322728122838179148151263/event/0x33b1d56893e00dcf7bf77f221bfc03ee54c65111063bbfc4ec1209a6df12ec17_300"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.close",
+      "variant": "zero_debt",
+      "when": "a redemption had already cleared the debt",
+      "examples": [
+        {
+          "trove": "WETH/100029870456066749533999330917390318716871964554860354972196062018214605061862",
+          "n": 6,
+          "utc": "30 Sep 2026 18:14",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/100029870456066749533999330917390318716871964554860354972196062018214605061862/event/0xfd5c0233b86dafaa89e148c6c8ad235d1c0e0bc1c8dbb9d2918fc821ec4f1027_4"
+        },
+        {
+          "trove": "wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541",
+          "n": 224,
+          "utc": "28 Jul 2026 13:26",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/wstETH/26244146308537641262439670569871691678767189479044609337562239650880434266541/event/0x2485fa9bd49087d967e4398400d20bc633987cf83a6ef41096acefbddf9547d4_4"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.liquidation",
+      "variant": "destructive",
+      "when": "this trove was liquidated",
+      "examples": [
+        {
+          "trove": "WETH/20635695537089405598026559485535702323392149994216418571824164162189504962705",
+          "n": 2,
+          "utc": "5 Feb 2026 15:25",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/20635695537089405598026559485535702323392149994216418571824164162189504962705/event/0xbf20880a760fb46cb3760663814f92c639ef985b2d1d838a4be55eb962772816_787"
+        },
+        {
+          "trove": "WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709",
+          "n": 122,
+          "utc": "5 Jun 2026 13:58",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/WETH/102956212846628069938374125048301918588408265243502680445602522290411675190709/event/0x79575e6db82e63b3e36921691e3c4bcdcee3bcd8c000a3052e6093883e17abdf_5"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.liquidation",
+      "variant": "redistribution_gain",
+      "when": "another trove's liquidation redistributed collateral and debt onto this one",
+      "examples": []
+    },
+    {
+      "template": "liquity2.liquidation",
+      "variant": "no_detail",
+      "when": "the event carries no liquidation log",
+      "examples": []
+    },
+    {
+      "template": "liquity2.apply_pending_debt",
+      "variant": "default",
+      "when": "always",
+      "examples": []
+    },
+    {
+      "template": "liquity2.transfer",
+      "variant": "transfer",
+      "when": "a transfer between wallets",
+      "examples": [
+        {
+          "trove": "rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
+          "n": 20,
+          "utc": "16 Mar 2026 05:15",
+          "url": "https://rails.finance/ethereum/liquity-v2/trove/rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964/event/0xd4aad62f4ada1d150f98c1223679a46e3c66601a8aac24a95c16ba3bd284b0d5_298"
+        }
+      ]
+    },
+    {
+      "template": "liquity2.transfer",
+      "variant": "mint",
+      "when": "the NFT's mint",
+      "examples": []
+    },
+    {
+      "template": "liquity2.transfer",
+      "variant": "burn",
+      "when": "the NFT's burn",
+      "examples": []
+    },
+    {
+      "template": "liquity2.transfer",
+      "variant": "no_detail",
+      "when": "no transfer log",
+      "examples": []
+    },
+    {
+      "template": "liquity2.fallback",
+      "variant": "default",
+      "when": "always",
+      "examples": []
+    }
+  ],
+  "variants_with_no_example": [
+    "liquity2.adjust.combined:withdraw_borrow",
+    "liquity2.adjust.no_change:single",
+    "liquity2.redemption:no_detail",
+    "liquity2.liquidation:redistribution_gain",
+    "liquity2.liquidation:no_detail",
+    "liquity2.apply_pending_debt:default",
+    "liquity2.transfer:mint",
+    "liquity2.transfer:burn",
+    "liquity2.transfer:no_detail",
+    "liquity2.fallback:default"
+  ],
+  "sentences_with_no_example": [
+    "redist.debt",
+    "redist.coll",
+    "redist.both",
+    "redist.balance",
+    "rate.moved",
+    "combined.what.withdraw_borrow",
+    "nochange.dust",
+    "nochange.none",
+    "nochange.capped",
+    "accrual.batched",
+    "accrual.batched_fee",
+    "redeem.no_detail",
+    "redeem.zero",
+    "join.what_plain",
+    "join.debt_same",
+    "leave.what",
+    "bru.setter",
+    "open.debt",
+    "open.join_no_fee",
+    "open.join_plain",
+    "liq.no_detail",
+    "liq.gain.what",
+    "liq.gain.received",
+    "liq.gain.received_unpriced",
+    "liq.gain.inherited",
+    "liq.gain.net_pos",
+    "liq.gain.net_neg",
+    "liq.gain.why",
+    "liq.gain.cr",
+    "liq.gain.open",
+    "liq.surplus_claimed",
+    "liq.surplus_claimed_undated",
+    "liq.partial",
+    "liq.leg.gas_comp",
+    "apply.what",
+    "apply.what_coll",
+    "apply.batch",
+    "apply.coll",
+    "apply.coll_unpriced",
+    "apply.rate",
+    "transfer.no_detail",
+    "transfer.mint",
+    "transfer.burn",
+    "transfer.state_unpriced",
+    "fallback.what"
+  ]
+}

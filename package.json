@@ -21,6 +21,7 @@
     "check:og": "node scripts/generate-og.mjs --check",
     "verify:preflight": "node scripts/verify/preflight.mjs",
     "og": "node scripts/generate-og.mjs",
+    "exports:liquity-v2": "node scripts/exports-liquity-v2.mjs",
     "check": "npm run check:prov && npm run check:register && npm run check:receipts && npm run check:parties && npm run check:routes && npm run check:locale && npm run check:exponent && npm run check:og && npm run check:dead && npm run typecheck"
   },
   "dependencies": {

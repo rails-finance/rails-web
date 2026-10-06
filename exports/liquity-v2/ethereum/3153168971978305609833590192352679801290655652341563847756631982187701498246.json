@@ -1,0 +1,643 @@
+[
+  {
+    "n": 1,
+    "id": "0xa8646ddd89c9173169c166887f1d5d14b3176176208a9f23fbfaf33e3d1a8114_221",
+    "utc": "14 Jul 2025 22:57",
+    "block": 22920545,
+    "tx": "0xa8646ddd89c9173169c166887f1d5d14b3176176208a9f23fbfaf33e3d1a8114",
+    "template": {
+      "id": "liquity2.open",
+      "variant": "self",
+      "version": "c7929c88"
+    },
+    "levels": {
+      "L1": "Open · Supply 1.75 wstETH · Borrow 3.5K BOLD · 4.00%",
+      "L2": [
+        "Collateral: 1.7500 wstETH ($6,371)",
+        "Debt: 3,502.32 BOLD (2.32 fee)",
+        "Collateral Ratio: 181.91%",
+        "Interest Rate: 4.00% · 140.09 BOLD / year interest",
+        "wstETH price: $3,641"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "wstETH",
+          "rows": [
+            [
+              "This deposit",
+              "1.7500",
+              "$6,371"
+            ]
+          ],
+          "total": [
+            "0.0000",
+            "1.7500",
+            "$6,371"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "This borrow",
+              "3,500.00",
+              null
+            ],
+            [
+              "This upfront fee",
+              "2.32",
+              null
+            ]
+          ],
+          "total": [
+            "0.00",
+            "3,502.32",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "This trove opened, depositing 1.7500 wstETH as collateral and borrowing 3,500 BOLD against it.",
+        "A one-time borrowing fee of 2.32 BOLD was added to the debt, equivalent to 7 days of average interest.",
+        "Its total initial debt stands at 3,502 BOLD, including that fee.",
+        "A 0.0375 ETH liquidation reserve is set aside on open and returned when the trove closes.",
+        "At the price at the time, that collateral is worth $6,371 (wstETH at $3,641).",
+        "The trove opened at a 181.91% (LTV 54.97%) collateral ratio.",
+        "Liquidation would now come at wstETH $2,402, 34% below that price.",
+        "It accrues interest at 4.00% a year, added to the debt as it accrues."
+      ],
+      "L5": "open"
+    },
+    "values": {
+      "coll_symbol": "wstETH",
+      "debt_symbol": "BOLD",
+      "label": "Open",
+      "block": 22920545,
+      "min_debt": 2000,
+      "price_at_event": 3640.7009920729865,
+      "coll_change": 1.75,
+      "debt_change": 3502.32,
+      "mcr": 1.2,
+      "cr_after": 181.91443462047226,
+      "liq_price_after": 2401.5908571428567,
+      "liq_distance_after": 0.3403493276784013,
+      "debt_after": 3502.32,
+      "coll_after": 1.75,
+      "rate_after": 4,
+      "coll_after_usd": 6371.226736127726,
+      "debt_before": 0,
+      "rate_before": 0,
+      "upfront_fee": 2.32,
+      "accrued_total": 0,
+      "accrued_fee": 0,
+      "principal": 3500
+    },
+    "sentences": [
+      {
+        "text": "This trove opened, depositing 1.7500 wstETH as collateral and borrowing 3,500 BOLD against it.",
+        "sentence_id": "open.what",
+        "uses": [
+          "coll_after",
+          "coll_symbol",
+          "principal",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "A one-time borrowing fee of 2.32 BOLD was added to the debt, equivalent to 7 days of average interest.",
+        "sentence_id": "open.fee",
+        "uses": [
+          "upfront_fee",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "Its total initial debt stands at 3,502 BOLD, including that fee.",
+        "sentence_id": "open.debt_fee",
+        "uses": [
+          "debt_after",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "A 0.0375 ETH liquidation reserve is set aside on open and returned when the trove closes.",
+        "sentence_id": "open.reserve",
+        "uses": []
+      },
+      {
+        "text": "At the price at the time, that collateral is worth $6,371 (wstETH at $3,641).",
+        "sentence_id": "open.value",
+        "uses": [
+          "coll_after_usd",
+          "coll_symbol",
+          "price_at_event"
+        ]
+      },
+      {
+        "text": "The trove opened at a 181.91% (LTV 54.97%) collateral ratio.",
+        "sentence_id": "open.cr",
+        "uses": [
+          "cr_after"
+        ]
+      },
+      {
+        "text": "Liquidation would now come at wstETH $2,402, 34% below that price.",
+        "sentence_id": "liq.after",
+        "uses": [
+          "coll_symbol",
+          "liq_price_after",
+          "liq_distance_after"
+        ]
+      },
+      {
+        "text": "It accrues interest at 4.00% a year, added to the debt as it accrues.",
+        "sentence_id": "open.rate",
+        "uses": [
+          "rate_after"
+        ]
+      }
+    ]
+  },
+  {
+    "n": 2,
+    "id": "0x98bfc65e70ce31fd7220b1d2d47ddf8ab2285637db084ba08db1fd0064e8558c_121",
+    "utc": "15 Jul 2025 05:29",
+    "block": 22922497,
+    "tx": "0x98bfc65e70ce31fd7220b1d2d47ddf8ab2285637db084ba08db1fd0064e8558c",
+    "template": {
+      "id": "liquity2.adjust.add_coll",
+      "variant": "default",
+      "version": "253a022a"
+    },
+    "levels": {
+      "L1": "Add · 2.37 wstETH",
+      "L2": [
+        "Collateral: 1.7500 → 4.1218 wstETH ($6,275 → $14,781)",
+        "Debt: 3,502.32 → 3,502.43 BOLD (incl. +0.10 interest)",
+        "Collateral Ratio: 179.18% → 422.01%",
+        "Interest Rate: 4.00% · 140.1 BOLD / year interest",
+        "wstETH price: $3,586"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "wstETH",
+          "rows": [
+            [
+              "Deposited before",
+              "1.7500",
+              "$6,371"
+            ],
+            [
+              "This deposit",
+              "2.3718",
+              "$8,505"
+            ],
+            [
+              "Market move",
+              null,
+              "−$95"
+            ]
+          ],
+          "total": [
+            "1.7500",
+            "4.1218",
+            "$14,781"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "Borrowed",
+              "3,500.00",
+              null
+            ],
+            [
+              "Interest",
+              "0.11",
+              null
+            ],
+            [
+              "Upfront fees",
+              "2.32",
+              null
+            ]
+          ],
+          "total": [
+            null,
+            "3,502.43",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "The owner added 2.3718 wstETH ($8,505) of collateral to the trove.",
+        "With more collateral behind the same debt, the trove is safer: its collateral ratio rose from 179% to 422%.",
+        "wstETH would now need to fall 72%, to about $1,020, before liquidation, compared with 33% before this deposit.",
+        "Its debt and interest rate are unchanged."
+      ],
+      "L5": "adjust"
+    },
+    "values": {
+      "coll_symbol": "wstETH",
+      "debt_symbol": "BOLD",
+      "label": "Add",
+      "block": 22922497,
+      "min_debt": 2000,
+      "price_at_event": 3585.9636359194665,
+      "coll_change": 2.3718,
+      "mcr": 1.2,
+      "cr_before_same_price": 179.17941144324521,
+      "cr_after": 422.01057307448997,
+      "liq_price_before": 2401.5908571428567,
+      "liq_price_after": 1019.67975156485,
+      "liq_distance_before": 0.3302801977446512,
+      "liq_distance_after": 0.7156469348012792,
+      "price_prev": 3640.7009920729865,
+      "price_change": -0.0150348397939577,
+      "debt_after": 3502.43,
+      "coll_after": 4.1218,
+      "rate_after": 4,
+      "coll_after_usd": 14780.624914532858,
+      "debt_before": 3502.32,
+      "rate_before": 4,
+      "accrued_total": 0.10453654060529516,
+      "accrued_fee": 0,
+      "added": 2.3718,
+      "added_usd": 8505.18855167379
+    },
+    "sentences": [
+      {
+        "text": "The owner added 2.3718 wstETH ($8,505) of collateral to the trove.",
+        "sentence_id": "add.what",
+        "uses": [
+          "added",
+          "coll_symbol",
+          "added_usd"
+        ]
+      },
+      {
+        "text": "With more collateral behind the same debt, the trove is safer: its collateral ratio rose from 179% to 422%.",
+        "sentence_id": "add.safety",
+        "uses": [
+          "cr_before_same_price",
+          "cr_after"
+        ]
+      },
+      {
+        "text": "wstETH would now need to fall 72%, to about $1,020, before liquidation, compared with 33% before this deposit.",
+        "sentence_id": "add.liq_distance",
+        "uses": [
+          "coll_symbol",
+          "liq_distance_after",
+          "liq_price_after",
+          "liq_distance_before"
+        ]
+      },
+      {
+        "text": "Its debt and interest rate are unchanged.",
+        "sentence_id": "add.rest",
+        "uses": []
+      }
+    ]
+  },
+  {
+    "n": 3,
+    "id": "0x4577bb4b2f9b41a74b509d239c49edb7f4eed778163dfefe2d1febe44f953dbe_285",
+    "utc": "15 Jul 2025 05:33",
+    "block": 22922519,
+    "tx": "0x4577bb4b2f9b41a74b509d239c49edb7f4eed778163dfefe2d1febe44f953dbe",
+    "template": {
+      "id": "liquity2.adjust.borrow",
+      "variant": "default",
+      "version": "a271a5df"
+    },
+    "levels": {
+      "L1": "Borrow · 5K BOLD",
+      "L2": [
+        "Collateral: 4.1218 wstETH ($14,781)",
+        "Debt: 3,502.43 → 8,505.74 BOLD (3.32 fee)",
+        "Collateral Ratio: 422.01% → 173.77%",
+        "Interest Rate: 4.00% · 340.23 BOLD / year interest",
+        "wstETH price: $3,586"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "wstETH",
+          "rows": [
+            [
+              "Deposited",
+              "4.1218",
+              "$14,876"
+            ],
+            [
+              "Market move",
+              null,
+              "−$95"
+            ]
+          ],
+          "total": [
+            null,
+            "4.1218",
+            "$14,781"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "Borrowed before",
+              "3,500.00",
+              null
+            ],
+            [
+              "This borrow",
+              "5,000.00",
+              null
+            ],
+            [
+              "Interest",
+              "0.10",
+              null
+            ],
+            [
+              "Upfront fees before",
+              "2.32",
+              null
+            ],
+            [
+              "This upfront fee",
+              "3.32",
+              null
+            ]
+          ],
+          "total": [
+            "3,502.43",
+            "8,505.74",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "The owner borrowed 5,000 BOLD more against the trove.",
+        "With more debt against the same collateral, the trove is less safe: its collateral ratio fell from 422% to 174%.",
+        "wstETH would now need to fall 31%, to about $2,476, before liquidation, compared with 72% before this borrow.",
+        "Borrowing more charged a one-time fee of 3.32 BOLD, equal to 7 days of average interest on the wstETH branch.",
+        "The trove stays above the 120% minimum, and its collateral and interest rate are unchanged."
+      ],
+      "L5": "adjust"
+    },
+    "values": {
+      "coll_symbol": "wstETH",
+      "debt_symbol": "BOLD",
+      "label": "Borrow",
+      "block": 22922519,
+      "min_debt": 2000,
+      "price_at_event": 3585.9636359194665,
+      "debt_change": 5003.32,
+      "mcr": 1.2,
+      "cr_before_same_price": 422.01057307448997,
+      "cr_after": 173.77235742607766,
+      "liq_price_before": 1019.67975156485,
+      "liq_price_after": 2476.3181134455817,
+      "liq_distance_before": 0.7156469348012792,
+      "liq_distance_after": 0.30944137619213863,
+      "price_prev": 3585.9636359194665,
+      "price_change": 0,
+      "debt_after": 8505.74,
+      "coll_after": 4.1218,
+      "rate_after": 4,
+      "coll_after_usd": 14780.624914532858,
+      "debt_before": 3502.43,
+      "rate_before": 4,
+      "upfront_fee": 3.32,
+      "accrued_total": 0.0011728059857594175,
+      "accrued_fee": 0,
+      "borrowed": 5000
+    },
+    "sentences": [
+      {
+        "text": "The owner borrowed 5,000 BOLD more against the trove.",
+        "sentence_id": "borrow.what",
+        "uses": [
+          "borrowed",
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "With more debt against the same collateral, the trove is less safe: its collateral ratio fell from 422% to 174%.",
+        "sentence_id": "borrow.safety",
+        "uses": [
+          "cr_before_same_price",
+          "cr_after"
+        ]
+      },
+      {
+        "text": "wstETH would now need to fall 31%, to about $2,476, before liquidation, compared with 72% before this borrow.",
+        "sentence_id": "borrow.liq_distance",
+        "uses": [
+          "coll_symbol",
+          "liq_distance_after",
+          "liq_price_after",
+          "liq_distance_before"
+        ]
+      },
+      {
+        "text": "Borrowing more charged a one-time fee of 3.32 BOLD, equal to 7 days of average interest on the wstETH branch.",
+        "sentence_id": "fee.borrow",
+        "uses": [
+          "upfront_fee",
+          "debt_symbol",
+          "coll_symbol"
+        ]
+      },
+      {
+        "text": "The trove stays above the 120% minimum, and its collateral and interest rate are unchanged.",
+        "sentence_id": "borrow.margin",
+        "uses": [
+          "mcr"
+        ]
+      }
+    ]
+  },
+  {
+    "n": 4,
+    "id": "0x940e6139d1a47c454c293522bd5c92341f0297bb47481f4276842b914113f75b_275",
+    "utc": "12 Sep 2025 17:44",
+    "block": 23348558,
+    "tx": "0x940e6139d1a47c454c293522bd5c92341f0297bb47481f4276842b914113f75b",
+    "template": {
+      "id": "liquity2.redemption",
+      "variant": "price_lower_now",
+      "version": "c5fdd593"
+    },
+    "levels": {
+      "L1": "Redemption · Cleared 8.6K BOLD · Took 1.53 wstETH",
+      "L2": [
+        "Collateral: 4.1218 → 2.5882 wstETH ($22,840 → $14,342)",
+        "Debt: 8,561.21 → 0 BOLD (incl. +55.47 interest)",
+        "Collateral Ratio: 266.78% → N/A",
+        "Interest Rate: 4.00%",
+        "2.5882 wstETH claimable",
+        "P/L +$63 or +$3,399 today",
+        "wstETH price: $5,541"
+      ],
+      "L3": {
+        "collateral": {
+          "symbol": "wstETH",
+          "rows": [
+            [
+              "Deposited",
+              "4.1218",
+              "$14,876"
+            ],
+            [
+              "This redemption",
+              "−1.5336",
+              "−$8,498"
+            ],
+            [
+              "Market move",
+              null,
+              "$7,964"
+            ]
+          ],
+          "total": [
+            "4.1218",
+            "2.5882",
+            "$14,342"
+          ],
+          "exact": true
+        },
+        "debt": {
+          "symbol": "BOLD",
+          "rows": [
+            [
+              "Borrowed",
+              "8,500.00",
+              null
+            ],
+            [
+              "Interest",
+              "55.57",
+              null
+            ],
+            [
+              "Upfront fees",
+              "5.64",
+              null
+            ],
+            [
+              "This redemption",
+              "−8,561.21",
+              null
+            ]
+          ],
+          "total": [
+            "8,561.21",
+            "0.00",
+            null
+          ],
+          "exact": true
+        }
+      },
+      "L4": [
+        "A redeemer exchanged 8,561 BOLD for this trove’s wstETH, clearing that much debt and taking 1.5336 wstETH ($8,498) of collateral.",
+        "In effect, some collateral was sold at $5,541 to repay debt, and the trove kept a $63 fee, so the owner came out slightly ahead.",
+        "wstETH has since fallen to $3,366 today, so the redeemed wstETH would now be worth $3,399 less than the debt it paid off.",
+        "The trove now holds 0 BOLD of debt and remains open with collateral only, a zero-debt zombie trove.",
+        "With no debt, interest accrual has stopped and the 4.00% rate is inactive.",
+        "It can be closed by withdrawing the remaining collateral, or re-activated by borrowing 2,000 BOLD or more."
+      ],
+      "L5": "redemption"
+    },
+    "values": {
+      "coll_symbol": "wstETH",
+      "debt_symbol": "BOLD",
+      "label": "Redemption",
+      "block": 23348558,
+      "min_debt": 2000,
+      "price_at_event": 5541.1828562935525,
+      "coll_change": 1.5336,
+      "debt_change": 8561.21,
+      "mcr": 1.2,
+      "cr_before_same_price": 266.7806010724041,
+      "liq_price_before": 2492.4673686253573,
+      "liq_distance_before": 0.5501921821990645,
+      "price_prev": 3585.9636359194665,
+      "price_change": 0.5452423445651462,
+      "debt_after": 0,
+      "coll_after": 2.5882,
+      "rate_after": 4,
+      "coll_after_usd": 14341.689468658973,
+      "debt_before": 8505.74,
+      "rate_before": 4,
+      "accrued_total": 55.46909462224721,
+      "accrued_fee": 0,
+      "coll_taken": 1.5336,
+      "debt_cleared": 8561.21,
+      "coll_taken_usd": 8497.958028411793,
+      "redemption_result_usd": 63.25197158820629,
+      "price_today": 3365.974128625988,
+      "redemption_vs_today_usd": 3399.1520763391836
+    },
+    "sentences": [
+      {
+        "text": "A redeemer exchanged 8,561 BOLD for this trove’s wstETH, clearing that much debt and taking 1.5336 wstETH ($8,498) of collateral.",
+        "sentence_id": "redeem.what",
+        "uses": [
+          "debt_cleared",
+          "debt_symbol",
+          "coll_symbol",
+          "coll_taken",
+          "coll_taken_usd"
+        ]
+      },
+      {
+        "text": "In effect, some collateral was sold at $5,541 to repay debt, and the trove kept a $63 fee, so the owner came out slightly ahead.",
+        "sentence_id": "redeem.result",
+        "uses": [
+          "price_at_event",
+          "redemption_result_usd"
+        ]
+      },
+      {
+        "text": "wstETH has since fallen to $3,366 today, so the redeemed wstETH would now be worth $3,399 less than the debt it paid off.",
+        "sentence_id": "redeem.today_lower",
+        "uses": [
+          "coll_symbol",
+          "price_today",
+          "redemption_vs_today_usd"
+        ]
+      },
+      {
+        "text": "The trove now holds 0 BOLD of debt and remains open with collateral only, a zero-debt zombie trove.",
+        "sentence_id": "redeem.zombie_zero",
+        "uses": [
+          "debt_symbol"
+        ]
+      },
+      {
+        "text": "With no debt, interest accrual has stopped and the 4.00% rate is inactive.",
+        "sentence_id": "redeem.zombie_zero_rate",
+        "uses": [
+          "rate_after"
+        ]
+      },
+      {
+        "text": "It can be closed by withdrawing the remaining collateral, or re-activated by borrowing 2,000 BOLD or more.",
+        "sentence_id": "redeem.zombie_zero_next",
+        "uses": [
+          "min_debt",
+          "debt_symbol"
+        ]
+      }
+    ]
+  }
+]

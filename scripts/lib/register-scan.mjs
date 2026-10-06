@@ -265,6 +265,18 @@ export const INSTANCE_MARKER = /\b(this|its|it|the position|the trove|the vault|
 // out of the tripwire's scope.
 export const STRUCTURAL_INTERP = /collateralType|symbol|stablecoin|protocolName|assetName|cfg\.|p\.|"|’|rsquo/;
 
+/** A strings module's sentence templates (lib/<proto>/event-templates.ts):
+ *  each `text: "…"` before its L5 modals, with `{placeholder}` as the
+ *  interpolation. The modals are Layer 2 and out of this scope. */
+export function extractTemplateUnits(src) {
+  const end = src.indexOf("export const L5");
+  const body = end < 0 ? src : src.slice(0, end);
+  const out = [];
+  for (const m of body.matchAll(/\btext:\s*"((?:[^"\\]|\\.)*)"/g))
+    out.push({ raw: m[1], line: body.slice(0, m.index).split("\n").length });
+  return out;
+}
+
 /** Balanced-paren extraction of copy units — clause( / cont( / items.push(
  *  call bodies. NOT line-based: Prettier wraps sentences across lines, and a
  *  wrapped tail line reads as a standalone fragment (the trap that defeated
@@ -300,9 +312,10 @@ export function normalizeUnitText(raw) {
 }
 
 /** Run the Tier-A detector over one file's source → [{ line, text }]. */
-export function genericRuleHits(src) {
+export function genericRuleHits(src, file = "") {
   const hits = [];
-  for (const u of extractCopyUnits(src)) {
+  const units = file.endsWith("event-templates.ts") ? extractTemplateUnits(src) : extractCopyUnits(src);
+  for (const u of units) {
     const t = normalizeUnitText(u.raw);
     if (t.length < 35) continue;
     const interp = [...u.raw.matchAll(/\{([^{}]*)\}/g)].map((x) => x[1]);
@@ -328,7 +341,7 @@ export const GENERIC_ALLOWLIST = {
     "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",
   ],
   // The no-change-adjust mode's moral (zero-delta bot retries).
-  "lib/liquity/explainer-clauses.tsx": ["Each attempt costs the sender only gas."],
+  "lib/liquity/event-templates.ts": ["Each attempt costs the sender only gas."],
   // §5.3 forward path after cancelling a withdrawal request.
   "lib/maple/explainer-clauses.tsx": ["A new request would join the back of the line."],
 };
@@ -344,6 +357,9 @@ export function discoverGenericCopyFiles(ROOT) {
     if (!entry.isDirectory()) continue;
     const f = path.join(libDir, entry.name, "explainer-clauses.tsx");
     if (fs.existsSync(f)) files.push(f);
+    // A protocol whose event strings live apart from the logic.
+    const t = path.join(libDir, entry.name, "event-templates.ts");
+    if (fs.existsSync(t)) files.push(t);
   }
   const shared = path.join(ROOT, "lib", "shared", "liquity-fork-explainer-clauses.tsx");
   if (fs.existsSync(shared)) files.push(shared);

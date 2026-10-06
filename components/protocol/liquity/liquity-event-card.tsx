@@ -9,15 +9,16 @@ import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail } from "./liquity-event-detail";
-import { LiquityEventExplainer, getLiquityExplainerTeaser, liquityLearnMoreContent } from "./liquity-event-explainer";
+import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
+import { CopyForLlm, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
-import { usePreferences } from "@/lib/shared/preferences-context";
-import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
-import { useLiquityAccrual } from "./use-liquity-accrual";
+import { useEventShareHref } from "@/components/shared/event-share-context";
+import { decodeEventId } from "@/lib/shared/page-metadata";
+import { useParams } from "next/navigation";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -57,8 +58,14 @@ export function LiquityEventCard({
 }: LiquityEventCardProps) {
   const ctx = event.context.data;
   const wallet = event.wallet;
-  const { prefs } = usePreferences();
-  const accrual = useLiquityAccrual(ctx, previousEvent, event);
+  const prose = useLiquityEventProse(event, previousEvent, currentPrice);
+  const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
+  // Copy for LLM sits on the event page.
+  const routeParams = useParams<{ eventId?: string | string[] }>();
+  const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
+  const onEventPage = rawEventId != null && decodeEventId(rawEventId) === event.id;
+  const shareHref = useEventShareHref();
+  const buildMarkdown = useLiquityEventMarkdown(prose, event, eventNumber, shareHref);
 
   // Column 1 — Avatar
   const avatarSlot =
@@ -258,17 +265,16 @@ export function LiquityEventCard({
     })()
   );
 
-  const teaserBuild = () =>
-    getLiquityExplainerTeaser(
-      ctx,
-      { txHash: event.txHash, blockNumber: event.blockNumber },
-      prefs.ratioMode,
-      previousEvent,
-      event,
-      currentPrice,
-      accrual,
-    );
-  const liquityTeaser = teaserBuild() ? <InLedgerFigures build={teaserBuild} /> : null;
+  const liquityTeaser = prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : null;
+  // The footer: gas (owner-paid events only; the generator leaves a third
+  // party's out), then Copy for LLM on the event page.
+  const footerExtra =
+    prose.footer.gas || (onEventPage && buildMarkdown) ? (
+      <>
+        {prose.footer.gas && <span className="text-xs text-rb-500">{prose.footer.gas}</span>}
+        {onEventPage && buildMarkdown && <CopyForLlm build={buildMarkdown} />}
+      </>
+    ) : undefined;
 
   return (
     <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
@@ -292,27 +298,14 @@ export function LiquityEventCard({
             previousEvent={previousEvent}
             currentEvent={event}
             currentPrice={currentPrice}
+            prose={prose}
           />
         }
-        explainer={
-          <LiquityEventExplainer
-            ctx={ctx}
-            previousEvent={previousEvent}
-            currentEvent={event}
-            currentPrice={currentPrice}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            // Passive events (redemption/liquidation/pending-debt application) are sent by a
-            // third party — the redeemer or liquidator pays the gas, not the Trove owner — so
-            // attributing this tx's gas to the owner would be misleading; the gas clause is
-            // omitted for them.
-            gas={isPassive ? undefined : event.gas}
-            skipLead
-          />
-        }
+        explainer={<LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />}
         explainerTeaser={liquityTeaser}
         txHash={event.txHash}
-        learnMore={<LearnMore inline content={liquityLearnMoreContent(ctx)} />}
+        footerExtra={footerExtra}
+        learnMore={<LearnMore inline content={prose.L5.content} />}
         persistKey={`liquity-v2:${event.id}`}
         caption={liquityOperationLabel(ctx)}
       />
