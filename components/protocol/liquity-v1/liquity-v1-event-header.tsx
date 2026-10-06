@@ -44,9 +44,9 @@ export function LiquityV1EventHeader({
   const coords: LiquityV1Coords = { txHash, blockNumber };
   const deltas: ChainTruthDelta[] = [];
 
-  // A redemption borrows the V2 grammar: collateral "Cleared", debt "Reduced",
-  // both in the caution orange, magnitudes only (the labels carry direction) —
-  // and the action name rides the spine's REDEMPTION pill, not the row label.
+  // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
+  // "Reduced", both in the caution orange, magnitudes only (the labels carry
+  // direction), and the action name rides the spine's REDEMPTION pill.
   const isRedemption = ctx.eventType === "redemption";
 
   // Opens + owner adjusts get V2's per-axis grammar: each axis its own imperative
@@ -59,7 +59,7 @@ export function LiquityV1EventHeader({
 
   // A liquidation names what happened to each side: the ETH was seized, the
   // debt cleared. A full redemption splits the collateral: the redeemer's
-  // ETH is "Cleared", the rest moved to the CollSurplusPool for the owner.
+  // ETH is "Reduced", the rest moved to the CollSurplusPool for the owner.
   const isLiq = ctx.eventType === "liquidation";
   const split = redemptionSplit(ctx);
   const coll = Number(ctx.collDelta) || 0;
@@ -69,7 +69,7 @@ export function LiquityV1EventHeader({
       value: -split.ethToRedeemer,
       symbol: COLLATERAL_SYMBOL,
       prov: redemptionLegProv(coords, "redeemer", legVals),
-      label: "Cleared",
+      label: "Reduced",
       tone: "caution",
     });
     if (split.ethSurplus > 0)
@@ -90,7 +90,7 @@ export function LiquityV1EventHeader({
         before: ctx.collAfter != null ? Number(ctx.collAfter) - coll : null,
       }),
       ...(isRedemption
-        ? { label: "Cleared", tone: "caution" as const }
+        ? { label: "Reduced", tone: "caution" as const }
         : isLiq
           ? { label: LIQUIDATION_COLL_VERB, tone: "caution" as const }
           : perAxis
@@ -131,13 +131,16 @@ export function LiquityV1EventHeader({
         before: ctx.debtAfter != null ? Number(ctx.debtAfter) - debt : null,
       }),
       ...(isRedemption
-        ? { label: "Reduced", tone: "caution" as const }
+        ? { label: "Cleared", tone: "caution" as const }
         : isLiq
           ? { label: LIQUIDATION_DEBT_VERB, tone: "caution" as const }
           : perAxis
             ? { label: debt > 0 ? DEBT_VERB.borrow : DEBT_VERB.repay, axisVerb: true }
             : {}),
     });
+
+  // A redemption names the debt first.
+  if (isRedemption) deltas.sort((a, b) => Number(b.symbol === DEBT_SYMBOL) - Number(a.symbol === DEBT_SYMBOL));
 
   return (
     <ChainTruthRow

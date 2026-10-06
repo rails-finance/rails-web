@@ -381,9 +381,20 @@ export function legAsAggregate(leg: ServedFolderLeg): RunAggregate | null {
  *  same way. */
 export function folderAggregates(folder: ServedFolder): RunAggregate[] {
   const out: RunAggregate[] = [];
-  for (const leg of folder.legs) {
+  for (const leg of redemptionLegs(folder)) {
     const agg = legAsAggregate(leg);
     if (agg) out.push(agg);
   }
   return out;
+}
+
+/** A redemption folder's legs in the Liquity family's words, as its event
+ *  headers and `RedemptionRunCard` say them: debt first, "Cleared" the debt,
+ *  "Reduced" the collateral. Other folders keep the index's verbs and order. */
+function redemptionLegs(folder: ServedFolder): ServedFolderLeg[] {
+  if (folder.kind !== "redemption") return folder.legs;
+  const verb: Record<string, string> = { debt: "Cleared", collateral: "Reduced" };
+  return [...folder.legs.filter((l) => l.asset === "debt"), ...folder.legs.filter((l) => l.asset !== "debt")].map(
+    (l) => (verb[l.asset] ? { ...l, verb: verb[l.asset] } : l),
+  );
 }

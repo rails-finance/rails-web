@@ -407,6 +407,9 @@ export interface FlowMomentWords {
    *  minutes ÷ 5,256,000,000, `apr` in the terms' hundredths of a percent).
    *  The card states that sum where it would state the rate's straight line. */
   minuteSum?: { start: number; deadline: number | null; principal: number; apr: number };
+  /** The year, in seconds, a face side's rate builds over (365.25 days where
+   *  unset; Liquity V2 and its forks: 365 days). */
+  yearSeconds?: number;
 }
 
 /** A held asset whose price, at some date, is older than the gap allowed. */

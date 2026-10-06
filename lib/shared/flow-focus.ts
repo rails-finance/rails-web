@@ -267,12 +267,15 @@ export function eventTokenSum(
   });
   const move = cum.exact ? ev.sides[side].amount : 0;
   const moved = Math.round(move * scale) !== 0;
+  // A side that held nothing before (an open, a first deposit) states its
+  // after alone.
+  const beforeUnits = Math.round(Math.max(0, held - move) * scale);
   return {
     symbol: ev.sides[side].symbol,
     decimals,
     lines,
     total: { units: totalUnits, amount: fmtTokens(totalUnits / scale, decimals) },
-    before: moved ? fmtTokens(Math.max(0, held - move), decimals) : null,
+    before: moved && beforeUnits !== 0 ? fmtTokens(beforeUnits / scale, decimals) : null,
     move: moved ? move : 0,
     after,
     held,

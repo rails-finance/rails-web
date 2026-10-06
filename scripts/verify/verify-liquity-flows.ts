@@ -563,8 +563,13 @@ for (const [name, events, symbols, open] of [
       const l = tokenLedger({ model: m, side: "debt", ev: f, sum, usd: null, accrualLabel: label });
       assert.ok(ledgerAdds(l).tokens, `${name} ${f.id}: the rows add to the total`);
       const prev = k > 0 ? Math.max(0, replayed[k - 1].ev.debtAfter) : 0;
-      const before = l.tokens!.before ?? l.tokens!.after;
-      assert.equal(before, fmtTokens(prev, 2), `${name} ${f.id}: the before is the previous event's recorded debt`);
+      // A debt that was nothing before (an open) states its after alone.
+      if (Math.round(prev * 100) === 0)
+        assert.equal(l.tokens!.before, null, `${name} ${f.id}: no before where the debt was nothing`);
+      else {
+        const before = l.tokens!.before ?? l.tokens!.after;
+        assert.equal(before, fmtTokens(prev, 2), `${name} ${f.id}: the before is the previous event's recorded debt`);
+      }
       const accrual = l.rows.filter((x) => x.label.endsWith(" since last event"));
       for (const a of accrual) {
         rowsSeen++;

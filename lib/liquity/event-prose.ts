@@ -532,11 +532,12 @@ function redemptionToday(
   return vsToday > 0 ? "price_higher_now" : null;
 }
 
-function l5For(key: L5Key, ctx: LiquityContext): LearnMoreContent {
+function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreContent {
   return L5[key]({
     collateralType: ctx.collateralType,
     delegated: ctx.isInBatch,
     delegateName: ctx.batchManager ? getBatchManagerByAddress(ctx.batchManager)?.name : undefined,
+    zeroDebt: variant === "zero_debt",
   });
 }
 
@@ -794,14 +795,22 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         v.manager_name = getBatchManagerByAddress(mgr)?.name ?? null;
         sp.say("join.what");
       } else sp.say("join.what_plain");
-      if (stateAfter.debt > 0) {
+      if (upfront > 0) {
+        // The fee is charged on the debt with its accrual: that debt, then
+        // the fee that took it to the debt after.
+        if (accrual && accrual.total > 0.01) {
+          v.debt_accrued_before = stateAfter.debt - upfront;
+          v.accrual_noun = accrualNoun(accrual);
+          sp.say("join.debt_fee", { debt_accrued_before: "bold" });
+        }
+        sp.say("join.fee", { ...ECHO_FEE, debt_after: "bold" });
+      } else if (stateAfter.debt > 0) {
         const moved = Math.abs(stateAfter.debt - stateBefore.debt) >= 0.01;
         const b = { debt_before: "bold", debt_after: "bold" } as const;
         if (!moved) sp.say("join.debt_same", b);
         else if (accrual && accrual.total > 0.01) sp.say("join.debt_accrued", b);
         else sp.say("join.debt_moved", b);
       }
-      if (upfront > 0) sp.say("join.fee", ECHO_FEE);
       if (stateAfter.coll > 0) sp.say("join.coll", { coll_after: "bold" });
       if (stateAfter.annualInterestRate > 0) sp.say("join.rate", { rate_after: "rate_after" });
       crPairNow();
@@ -1067,7 +1076,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     L2: stateBefore && stateAfter ? liquityL2(input, accrual!) : null,
     L4,
     list,
-    L5: { key: t.L5, content: l5For(t.L5, ctx) },
+    L5: { key: t.L5, content: l5For(t.L5, ctx, variant) },
     footer: {
       gas,
       gasCost: paid ? { eth: paid.gasCostEth, usd: paid.gasCostUsd } : null,
