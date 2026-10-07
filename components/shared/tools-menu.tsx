@@ -18,8 +18,10 @@
 //
 // The `card` variant is the position card's one menu (ui-jobs 270, 246): a ⋮
 // trigger at the right end of the card's heading (ui-jobs 295), the position's rows
-// (`leading`) first, the export shapes, then the inspector last. Below sm it
-// opens as a sheet with each row full width.
+// (`leading`) first, the export shapes, then "Show provenance", which arms the
+// inspector on the card alone (ui-jobs 284). The `event` and `panel` menus end
+// on the same row for their section where the caller names one (`provScope`).
+// Below sm these open as a sheet with each row full width.
 
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -27,8 +29,8 @@ import { Check, ChevronDown, EllipsisVertical, Wrench } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
-import { provInspector } from "@/components/shared/provenance";
-import { ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { POSITION_CARD_SCOPE, provInspector } from "@/components/shared/provenance";
+import { ProvInspectorToggle, ProvScopeToggle } from "@/components/shared/prov-inspector";
 
 /** One row of the Tools menu: icon, title, one line of subtitle. With `href`
  *  the row is a link (`external` opens it in a new tab). `copied` marks a copy
@@ -120,12 +122,13 @@ export function ToolsMenu({
   leading,
   label,
   heading,
+  provScope,
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
    *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
-   *  right end, the card menu without the inspector, named by `label` and
-   *  `heading`. `panel`: the same for a panel's header (Lifetime flows). */
+   *  right end, the card menu named by `label` and `heading`, its last row
+   *  the event's "Show provenance" (`provScope`). `panel`: the same for a panel's header (Lifetime flows). */
   variant?: "tools" | "card" | "event" | "panel";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
@@ -137,6 +140,9 @@ export function ToolsMenu({
   /** The `event` menu's accessible name and its sheet's heading. */
   label?: string;
   heading?: string;
+  /** The section a menu's last row arms the inspector on (ui-jobs 284), and
+   *  the row's subtitle. The `card` menu's is the position card. */
+  provScope?: { id: string; hint: string };
   /** Flash the trigger as the confirmation for a copy taken from the menu —
    *  the menu closes on action, so the trigger is where the answer lands. */
   copied?: boolean;
@@ -145,14 +151,23 @@ export function ToolsMenu({
   children?: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The event and panel menus: the card menu's trigger and rows, named by
-  // `label` and `heading`, with no inspector.
+  // `label` and `heading`, ending on their section's "Show provenance".
   const eventMenu = variant === "event" || variant === "panel";
   const card = variant === "card" || eventMenu;
+  const scope =
+    provScope ??
+    (variant === "card" ? { id: POSITION_CARD_SCOPE, hint: "Click a value on this card to trace it" } : null);
+  // The trigger's dot: armed page-wide on the Tools menu; armed on this
+  // section, or page-wide, on a ⋮.
+  const armed = useSyncExternalStore(
+    provInspector.subscribe,
+    () => (scope ? provInspector.armedFor(scope.id) : provInspector.getArmed()),
+    () => false,
+  );
   const isPhone = useMediaQuery(PHONE_QUERY);
   const sheet = card && isPhone;
   const close = () => setOpen(false);
@@ -203,16 +218,16 @@ export function ToolsMenu({
           {leading?.(close)}
           {leading && children && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
           {children?.(close)}
-          {!eventMenu && (
+          {scope && (
             <>
-              <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
-              <ProvInspectorToggle variant="menu" onPick={close} />
+              {(leading || children) && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
+              <ProvScopeToggle scope={scope.id} hint={scope.hint} onPick={closeToTrigger} openerRef={triggerRef} />
             </>
           )}
         </>
       ) : (
         <>
-          <ProvInspectorToggle variant="menu" onPick={close} />
+          <ProvInspectorToggle variant="menu" onPick={closeToTrigger} openerRef={triggerRef} />
           {children && (
             <>
               <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
@@ -250,7 +265,7 @@ export function ToolsMenu({
           ) : (
             <EllipsisVertical className="h-4 w-4" aria-hidden="true" />
           )}
-          {!eventMenu && (
+          {scope && (
             <span
               data-prov-armed={armed ? "" : undefined}
               className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${armed ? "bg-green-500" : "bg-transparent"}`}

@@ -69,12 +69,18 @@ const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
 const READING = lifetimeFlowsReadingContent();
 
 /** The ⋮ at the header's right end (ui-jobs 295): How to read these charts,
- *  one text on every explorer (§264), in the modal the "?" opened. */
+ *  one text on every explorer (§264), in the modal the "?" opened; then "Show
+ *  provenance", which arms the inspector on this panel alone (ui-jobs 284). */
 function FlowsMenu({ title }: { title: string }) {
   const [reading, setReading] = useState(false);
   return (
     <>
-      <ToolsMenu variant="panel" label={`${title} menu`} heading={title}>
+      <ToolsMenu
+        variant="panel"
+        label={`${title} menu`}
+        heading={title}
+        provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+      >
         {(close) => (
           <ToolsMenuItem
             item="how-to-read"

@@ -267,7 +267,7 @@ export function EventCard({
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu txHash={txHash} shareHref={shareHref} />
+        <EventCardMenu txHash={txHash} shareHref={shareHref} scopeId={scopeId} />
       </span>
     ) : null;
   useLayoutEffect(() => {

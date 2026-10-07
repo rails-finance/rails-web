@@ -12,10 +12,20 @@
 // `openInspectorHome` leaves the toggle in the DOM and says whether the page
 // has one at all; `armInspector` leaves the tool ARMED and says so, and is
 // idempotent — it reads the armed halo, which outlives the menu that arms it.
+//
+// Scoped arming (rails-ops TO-DO-ui-jobs 284): a section's "Show provenance"
+// (`[data-prov-scope-toggle="<scope>"]`: a row of the position card's ⋮, the
+// Lifetime flows ⋮ or an event's ⋮, or a button in the Liquity V2 event page's
+// actions row) arms that section alone. The Liquity V2 Trove page has no
+// page-level tool: its card menu (C17) carries the card's row, so there
+// `openInspectorHome` and `armInspector` reach that row and the card's values
+// are the targets. `armScope` arms a named section from its control.
 
 export const INSPECTOR = "button.prov-inspect-toggle";
 export const TOOLS_TRIGGER = "[data-tools-menu] > button";
 export const HALO = ".prov-inspect-halo";
+export const SCOPE_TOGGLE = "[data-prov-scope-toggle]";
+const CARD_ROW = '[data-card-menu] [data-prov-scope-toggle="position-card"]';
 
 /** Put the toggle in the DOM: open the Tools menu where the page has one, and
  *  do nothing where the dock already carries the toggle. False means the page
@@ -30,10 +40,10 @@ export async function openInspectorHome(page) {
   // reporting a menu that is there as a page without an inspector.
   for (let i = 0; i < 4; i++) {
     await trigger.click().catch(() => {});
-    const opened = await page.waitForSelector(INSPECTOR, { timeout: 4_000 }).catch(() => null);
+    const opened = await page.waitForSelector(`${INSPECTOR}, ${CARD_ROW}`, { timeout: 4_000 }).catch(() => null);
     if (opened) return true;
   }
-  return Boolean(await page.$(INSPECTOR));
+  return Boolean(await page.$(`${INSPECTOR}, ${CARD_ROW}`));
 }
 
 /** Arm the inspector, from either surface. Already armed is a no-op: the halo
@@ -41,7 +51,36 @@ export async function openInspectorHome(page) {
 export async function armInspector(page) {
   if (await page.$(HALO)) return true;
   if (!(await openInspectorHome(page))) return false;
-  await page.click(INSPECTOR);
+  await page.click((await page.$(INSPECTOR)) ? INSPECTOR : CARD_ROW);
+  await page.waitForSelector(HALO, { timeout: 10_000 }).catch(() => {});
+  return Boolean(await page.$(HALO));
+}
+
+/** Arm one section from its "Show provenance". `menu` is the ⋮ wrapper that
+ *  holds the row (a locator or selector), opened first; without it the
+ *  control is on the page (the event page's actions row). Already armed on
+ *  that section is a no-op. Returns whether the halo shows and the control
+ *  reads pressed. */
+export async function armScope(page, scope, { menu = null } = {}) {
+  const sel = `[data-prov-scope-toggle="${scope}"]`;
+  const pressed = async () =>
+    (await page
+      .locator(sel)
+      .first()
+      .getAttribute("aria-pressed")
+      .catch(() => null)) === "true";
+  if ((await page.$(HALO)) && (await pressed())) return true;
+  if (menu) {
+    const wrap = typeof menu === "string" ? page.locator(menu).first() : menu;
+    for (let i = 0; i < 4 && (await page.locator(sel).count()) === 0; i++) {
+      await wrap
+        .locator(":scope > button")
+        .click()
+        .catch(() => {});
+      await page.waitForSelector(sel, { timeout: 4_000 }).catch(() => {});
+    }
+  }
+  await page.locator(sel).first().click();
   await page.waitForSelector(HALO, { timeout: 10_000 }).catch(() => {});
   return Boolean(await page.$(HALO));
 }

@@ -328,10 +328,9 @@ async function main() {
       label: "liquity-v1 (open/adjust)",
       url: `${BASE}/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1`,
     },
-    {
-      label: "liquity-v2 (own ChangeProv builder, not chainTruthDeltaValue)",
-      url: `${BASE}/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759`,
-    },
+    // Liquity V2 left this list with ui-jobs 284: its Trove page has no
+    // page-level tool (the card's ⋮ arms the card alone) and its events are
+    // inspected on the event page, which draws no spine and so no flank.
     {
       label: "ebisu (liquity fork)",
       url: `${BASE}/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638`,
