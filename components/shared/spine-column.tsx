@@ -33,7 +33,7 @@ export type SpineIcon =
   | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
-  | "none" // A closed group whose members moved no asset (a run of rate changes): no node, the undrawn segment alone
+  | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws its `lead` alone
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
@@ -179,7 +179,7 @@ export interface SpineColumnProps {
    *  to "caution". See color-grammar.md §5. */
   warningTone?: WarningTone;
   /** The kind's name ("Redemption", "Liquidation"). A warning node draws no
-   *  pill (T1 states the word); a named warning row stands on the band. */
+   *  pill (T1 states the word). */
   warningLabel?: string;
   /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
@@ -194,6 +194,9 @@ export interface SpineColumnProps {
    *  group): dotted, in the warning tone or the neutral ink. Every other
    *  line is solid. */
   undrawn?: boolean;
+  /** A group's node (`GroupNode`), drawn on the line above the node stack:
+   *  the group's range and the layers glyph, its one control. */
+  lead?: ReactNode;
   /** Spine color tint — encodes subsystem or event category */
   color?: SpineColor;
   /** The first node on the spine: nothing is drawn above it (a leading mask
@@ -855,6 +858,7 @@ export function SpineColumn({
   warningLegs,
   iconDirection,
   undrawn,
+  lead,
   color = "default",
   isFirst,
   isLast,
@@ -924,12 +928,8 @@ export function SpineColumn({
   // still rides the provenance trace). The ≥sm / <sm hand-off to the card header
   // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
   const spineValues = showTimelineValues;
-  // A named warning event (a redemption, a liquidation) stands on the band
-  // (EventCard, bg-raised), so its masks and the node's halo take that ground; the
-  // phone spine view draws no band.
-  const banded = effectiveIcon === "warning" && !!warningLabel;
-  // Inside a banded group frame the ground is the frame's (`--spine-ground`).
-  const ground = banded && !spineRow ? "var(--surface-raised)" : "var(--spine-ground, var(--background))";
+  // The masks and the node's halo take the page's ground.
+  const ground = "var(--background)";
 
   // The lead-in dot takes a warning event's tone. The line is solid neutral
   // ink, except the dotted segment that means "events not drawn" (a closed
@@ -1298,18 +1298,14 @@ export function SpineColumn({
             </div>
           );
         case "none":
-          // A closed group whose members moved no asset: no node, a slot of
-          // the node's height so the undrawn segment starts where a node
-          // would end.
-          return <div aria-hidden style={{ height: scale.tokenSize }} />;
+          // A group with no asset legs, or the boundary: the group node alone.
+          return null;
       }
     })();
 
     return (
       <div
         className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
-        // EventCard draws the band on a row whose spine carries this.
-        data-spine-adverse={banded ? warningTone : undefined}
         // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
         // its figures re-state the card's, which carries them.
         data-prov-exempt=""
@@ -1321,6 +1317,7 @@ export function SpineColumn({
           {...nodeProps}
         >
           {leadIn}
+          {lead && <div className="flex justify-center pb-1">{lead}</div>}
           {iconContent}
         </div>
         <div className="flex-1 relative">
@@ -1360,6 +1357,7 @@ export function SpineColumn({
         }
       >
         {leadIn}
+        {lead && <div className="flex justify-center pb-1">{lead}</div>}
         {rows.map((row, i) => (
           <div
             key={i}

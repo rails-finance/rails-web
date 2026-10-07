@@ -1,11 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { GroupButton, GroupFrame, groupButtonWords } from "@/components/shared/group-frame";
+import {
+  GroupFrame,
+  GroupNode,
+  GroupNumbersContext,
+  PhoneGroupNode,
+  groupRangeText,
+} from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { UsersGlyph } from "./liquity-event-header";
@@ -110,11 +116,19 @@ export function DelegateAdjustRunCard({
       </span>
     </div>
   );
-  const iconColumn = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
-  const button = (
-    <GroupButton open={open} onClick={toggle} controls={membersId}>
-      {groupButtonWords(count, open)}
-    </GroupButton>
+  const range2 = groupRangeText(useContext(GroupNumbersContext));
+  const nodeLabel = `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`;
+  const nodeProps = { range: range2, label: nodeLabel, open, onToggle: toggle, controls: membersId };
+  // No asset moved, so the node stands alone on the line, with the dotted
+  // segment for the members not drawn while closed.
+  const column = (closed: boolean, last: boolean) => (
+    <SpineColumn
+      icon="none"
+      lead={<GroupNode {...nodeProps} />}
+      undrawn={closed}
+      isFirst={!last && isFirst}
+      isLast={(closed || last) && !!isLast}
+    />
   );
 
   if (spineView) {
@@ -122,43 +136,43 @@ export function DelegateAdjustRunCard({
     const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
     const by = managerName ? ` by ${managerName}` : "";
     const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
+    const phoneNode = <PhoneGroupNode {...nodeProps} />;
     return (
       <GroupFrame
         open={open}
-        banded={false}
-        button={button}
         membersId={membersId}
+        top={phoneNode}
         members={children}
+        bottom={phoneNode}
         closed={
-          <SpineSegment
-            caption={<>Adjusted &middot; {range}</>}
-            spokenCaption={`Adjusted, ${spokenRange}`}
-            label={`${countText}${by}, ${spokenRange}${movement}`}
-            open={spineView.openId === membersId}
-            onToggle={(anchor) => spineView.toggle(membersId, anchor)}
-            iconColumn={iconColumn}
-            card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
-          />
+          <div className="flex flex-col">
+            {phoneNode}
+            <SpineSegment
+              caption={<>Adjusted &middot; {range}</>}
+              spokenCaption={`Adjusted, ${spokenRange}`}
+              label={`${countText}${by}, ${spokenRange}${movement}`}
+              open={spineView.openId === membersId}
+              onToggle={(anchor) => spineView.toggle(membersId, anchor)}
+              iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />}
+              card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
+            />
+          </div>
         }
       />
     );
   }
 
+  const row = (closed: boolean, last: boolean, header: ReactNode) => (
+    <EventCard avatar={null} iconColumn={column(closed, last)} header={header} hideDetailChevron />
+  );
   return (
     <GroupFrame
       open={open}
-      banded={false}
-      button={button}
       membersId={membersId}
+      closed={row(true, false, <div className="pl-5 pt-4 pb-3">{words}</div>)}
+      top={row(false, false, <div className="pl-5 pt-4 pb-3">{words}</div>)}
       members={children}
-      closed={
-        <EventCard
-          avatar={null}
-          iconColumn={iconColumn}
-          header={<div className="pl-5 pt-4 pb-3">{words}</div>}
-          hideDetailChevron
-        />
-      }
+      bottom={row(false, true, <div />)}
     />
   );
 }

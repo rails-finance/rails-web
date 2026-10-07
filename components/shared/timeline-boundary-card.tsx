@@ -27,7 +27,7 @@
 //
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
-import { GroupButton } from "@/components/shared/group-frame";
+import { GroupNode } from "@/components/shared/group-frame";
 import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
@@ -354,17 +354,28 @@ export function TimelineBoundaryCard({
     // under), and the state lines restate the oldest drawn row's own
     // before-figure, whose receipt sits on that row.
     <div data-figure="timeline-boundary" data-prov-exempt="" data-boundary-arm={b.arm}>
-      {/* The group button's form, the layers glyph and the card's words, in
-          place of a node: the one glyph means "events not drawn". It opens
-          and closes the card, as the header does. */}
-      <div className="pl-6 pt-2">
-        <GroupButton open={open} onClick={() => setOpen((v) => !v)}>
-          {label}
-        </GroupButton>
-      </div>
       <EventCard
         avatar={null}
-        iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={isLast} />}
+        // The group node's form in place of a node: the range of the rows it
+        // stands for over the layers glyph, the one glyph that means "events
+        // not drawn". It opens and closes the card, as the header does; its
+        // words are the card's, in its accessible name and title.
+        iconColumn={
+          <SpineColumn
+            icon="none"
+            lead={
+              <GroupNode
+                range={range ? `#${range.split(" – ").reverse().join("–")}` : null}
+                label={label}
+                open={open}
+                onToggle={() => setOpen((v) => !v)}
+              />
+            }
+            undrawn
+            isFirst={isFirst}
+            isLast={isLast}
+          />
+        }
         header={header}
         detail={hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />}
         detailOpen={open}

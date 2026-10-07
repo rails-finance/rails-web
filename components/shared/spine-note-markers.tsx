@@ -57,8 +57,9 @@ const TARGET = 44;
 const GROWTH = 20;
 /** The caption's own padding below it, inside the segment above the gap. */
 const CAPTION_PAD = 10;
-/** A note's line: dotted and neutral, since the account did nothing here. */
-const NOTE_LINE = spineLineKey(true, SPINE_COLORS.default);
+/** A note's line: solid and neutral. The dotted segment means "events not
+ *  drawn" (a closed group, the boundary) and nothing else (ui-jobs 250). */
+const NOTE_LINE = spineLineKey(false, SPINE_COLORS.default);
 
 /** What a gap holds: a note, or the head slot's live notes as one card. The
  *  group takes one marker, one open state and one row, as a note does. */

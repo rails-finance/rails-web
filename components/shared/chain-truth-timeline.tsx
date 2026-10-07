@@ -648,6 +648,7 @@ function ServedFolderRow({
       isFirst={isFirst}
       isLast={isLast}
       summedByIndex
+      eventRange={[folder.ordinalFirst, folder.ordinalFirst + folder.count - 1]}
       readingLine={entry.readingLine}
       forceOpen={forceOpen}
       onOpen={() => folders.open(folder)}

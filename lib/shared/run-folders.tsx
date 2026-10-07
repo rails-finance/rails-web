@@ -29,6 +29,14 @@ import type { ReactNode } from "react";
 import { ArrowDownLeft, ArrowLeftRight, Send, TriangleAlert } from "lucide-react";
 import { CHUNK_TARGET, chunkByTransaction } from "@/lib/shared/timeline-chunks";
 import { RunLandingContext } from "@/components/shared/timeline-run-card";
+import { GroupNumbersContext } from "@/components/shared/group-frame";
+
+/** The lowest and highest of a folder's event numbers, where all are known. */
+function numberRange(ns: (number | null | undefined)[]): [number, number] | null {
+  const known = ns.filter((n): n is number => typeof n === "number");
+  if (known.length === 0 || known.length < ns.length) return null;
+  return [Math.min(...known), Math.max(...known)];
+}
 
 /** What one folder knows about its place in the run: a stable key, the run's
  *  spine-terminus flags scoped to the OUTERMOST folders, and the members'
@@ -50,11 +58,19 @@ export interface RunFolderMeta {
  */
 export function renderRunFolders<E extends { id: string; txHash: string }>(
   run: E[],
-  meta: { isFirst: boolean; isLast: boolean; children: ReactNode[]; landingId?: string },
+  meta: {
+    isFirst: boolean;
+    isLast: boolean;
+    children: ReactNode[];
+    landingId?: string;
+    /** Each member's event number, in run order: the folder's node states
+     *  its range. */
+    eventNumbers?: (number | null | undefined)[];
+  },
   minRun: number,
   folderOf: (events: E[], folder: RunFolderMeta) => ReactNode,
 ): ReactNode {
-  const zipped = run.map((event, i) => ({ event, child: meta.children[i] }));
+  const zipped = run.map((event, i) => ({ event, child: meta.children[i], n: meta.eventNumbers?.[i] }));
   const chunks = chunkByTransaction(zipped, (m) => m.event.txHash, CHUNK_TARGET, minRun);
   // The folders ARE the run's presentation — siblings on the timeline, no
   // wrapper row. The run's spine-terminus flags land on its outermost folders.
@@ -65,15 +81,17 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
           key={`chunk_${chunk[0].event.id}`}
           value={meta.landingId != null && chunk.some((m) => m.event.id === meta.landingId)}
         >
-          {folderOf(
-            chunk.map((m) => m.event),
-            {
-              key: `chunk_${chunk[0].event.id}`,
-              isFirst: meta.isFirst && i === 0,
-              isLast: meta.isLast && i === chunks.length - 1,
-              children: chunk.map((m) => m.child),
-            },
-          )}
+          <GroupNumbersContext.Provider value={numberRange(chunk.map((m) => m.n))}>
+            {folderOf(
+              chunk.map((m) => m.event),
+              {
+                key: `chunk_${chunk[0].event.id}`,
+                isFirst: meta.isFirst && i === 0,
+                isLast: meta.isLast && i === chunks.length - 1,
+                children: chunk.map((m) => m.child),
+              },
+            )}
+          </GroupNumbersContext.Provider>
         </RunLandingContext.Provider>
       ))}
     </>

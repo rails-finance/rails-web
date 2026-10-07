@@ -1,105 +1,137 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import { Layers } from "lucide-react";
+import { useTimelineScale } from "@/components/shared/activity-timeline";
 
 // A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240):
-// a closed group is a row on the spine with its sums as nodes, and a text
-// button with the layers glyph above them shows or hides its members. Open,
-// the button repeats as the group's bottom row. A bracket frame marks the
-// group closed and open; it says "a group" and nothing about tone (the band,
-// `bg-raised`, is the caution and critical surface and is passed separately).
+// a closed group is a row on the spine. Its control is a node on the line:
+// the range of event numbers it holds ("#139–147") over the layers glyph, one
+// button; under it, the group's legs summed as nodes. Open, the members draw
+// as rows and the same node repeats as the group's bottom node. A bracket
+// frame marks the group closed and open; the tone sits on the nodes, the T1
+// word and the dotted segment.
 
-/** The words of the group button: "Show 45 events" closed, "Group 45 events"
- *  open. */
-export function groupButtonWords(count: number, open: boolean): string {
-  return `${open ? "Group" : "Show"} ${count.toLocaleString("en-US")} ${count === 1 ? "event" : "events"}`;
+/** The event numbers a client-grouped folder holds, lowest and highest, for
+ *  its node (`renderRunFolders` provides it). */
+export const GroupNumbersContext = createContext<[number, number] | null>(null);
+
+/** "#139–147", or "#139" for one. */
+export function groupRangeText(range: [number, number] | null): string | null {
+  if (!range) return null;
+  const [lo, hi] = range[0] <= range[1] ? range : [range[1], range[0]];
+  return lo === hi ? `#${lo}` : `#${lo}–${hi}`;
 }
 
-/** The group's one control: the layers glyph and its words. The boundary
- *  card draws the same form with its own words. */
-export function GroupButton({
-  children,
+/** The group's one control, on the spine: the range in the time slot's small
+ *  muted type over the layers glyph. The verb lives in the accessible name
+ *  and the native title ("Show 9 grouped events"); the row shows none. */
+export function GroupNode({
+  range,
+  label,
   open,
-  onClick,
+  onToggle,
   controls,
 }: {
-  children: ReactNode;
-  /** Unset where the button opens no list (the boundary's card). */
+  range: string | null;
+  label: string;
+  /** Unset where the node opens no list (the boundary's card). */
   open?: boolean;
-  onClick: () => void;
+  onToggle: () => void;
   controls?: string;
 }) {
+  const scale = useTimelineScale();
   return (
     <button
       type="button"
       aria-expanded={open}
       aria-controls={open ? controls : undefined}
+      aria-label={label}
+      title={label}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onToggle();
       }}
       data-group-button=""
-      className="inline-flex min-h-8 items-center gap-2 rounded-md px-1 text-sm text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+      // The glyph is the node; the padding, cancelled by the margin, takes
+      // the target to 44px without moving the stack.
+      className="group/gn relative -m-1.5 flex items-center justify-center rounded-full p-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
     >
+      {range && (
+        <span
+          className="absolute bottom-full left-1/2 -translate-x-1/2 whitespace-nowrap px-1 text-xs leading-4 tabular-nums text-rb-500 transition-colors group-hover/gn:text-foreground"
+          style={{ backgroundColor: "var(--background)" }}
+          data-group-range=""
+        >
+          {range}
+        </span>
+      )}
       <Layers
-        size={18}
-        strokeWidth={1.5}
+        size={scale.tokenSize}
+        strokeWidth={1.25}
         absoluteStrokeWidth
         aria-hidden
-        className="text-teal-600 dark:text-teal-500"
+        className="text-rb-500 transition-colors group-hover/gn:text-foreground"
       />
-      {children}
     </button>
+  );
+}
+
+/** The phone spine view's group node: the segment below it is a button of its
+ *  own, so the node stands on the line above it, centred on the spine. */
+export function PhoneGroupNode(props: Parameters<typeof GroupNode>[0]) {
+  return (
+    <div className="relative flex justify-center pt-5 pb-1">
+      {/* The line runs on into the node of the segment below. */}
+      <div aria-hidden className="absolute left-1/2 top-0 -bottom-6 w-px -translate-x-1/2 bg-rb-500" />
+      <div
+        className="relative"
+        style={{ backgroundColor: "var(--background)", boxShadow: "0 0 0 4px var(--background)" }}
+      >
+        <GroupNode {...props} />
+      </div>
+    </div>
   );
 }
 
 /** The bracket frame around a group: a left border with bracket ends, in the
  *  muted border colour (`border-rb-300`, `dark:border-rb-500`). Closed it
- *  holds the button and the summed row; open, the button, the members and
- *  the button again. `banded` puts the caution and critical surface under it
- *  (a group of redemptions or liquidations). */
+ *  holds the group's row; open, the top node row, the members and the bottom
+ *  node row. */
 export function GroupFrame({
   open,
-  banded,
-  button,
   closed,
+  top,
   members,
+  bottom,
   membersId,
 }: {
   open: boolean;
-  banded: boolean;
-  button: ReactNode;
   closed: ReactNode;
+  top: ReactNode;
   members: ReactNode;
+  bottom: ReactNode;
   membersId?: string;
 }) {
   return (
-    <div
-      data-group-frame={open ? "open" : "closed"}
-      // The ground hides the line above reaching into the frame: a group's
-      // spine starts at its nodes.
-      className={`relative rounded-xl ${banded ? "bg-raised" : "bg-background"}`}
-      // The spine's masks, halos and captions inside take the frame's ground.
-      style={banded ? ({ "--spine-ground": "var(--surface-raised)" } as React.CSSProperties) : undefined}
-    >
+    <div data-group-frame={open ? "open" : "closed"} className="relative flex flex-col gap-2 rounded-xl">
       <div
         aria-hidden
         data-group-bracket=""
         className="pointer-events-none absolute inset-y-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
       />
-      <div className="pl-6 pt-2">{button}</div>
       {open ? (
         <>
-          <div id={membersId} className="flex flex-col gap-2 pt-1">
+          {top}
+          <div id={membersId} className="flex flex-col gap-2">
             {members}
           </div>
-          <div className="pl-6 pt-1 pb-2">{button}</div>
+          {bottom}
         </>
       ) : (
-        // The undrawn segment runs on below the nodes inside the frame, and
-        // its overshoot still reaches the next row's node.
-        <div className="pb-8" style={{ "--mspine-extra": "32px" } as React.CSSProperties}>
+        // The dotted segment runs on below the legs inside the frame, and its
+        // overshoot still reaches the next row's node.
+        <div className="pb-6" style={{ "--mspine-extra": "24px" } as React.CSSProperties}>
           {closed}
         </div>
       )}

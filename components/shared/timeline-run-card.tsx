@@ -12,7 +12,13 @@ import { EventCard } from "@/components/shared/event-card";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { GroupButton, GroupFrame, groupButtonWords } from "@/components/shared/group-frame";
+import {
+  GroupFrame,
+  GroupNode,
+  GroupNumbersContext,
+  PhoneGroupNode,
+  groupRangeText,
+} from "@/components/shared/group-frame";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -110,6 +116,9 @@ export interface TimelineRunCardProps {
   /** Not drawn since ui-jobs 250 set B (the group button and the frame mark
    *  a group); the callers' marks are left for the end-of-design pass. */
   folderBadge?: ReactNode;
+  /** The event numbers the group holds, lowest and highest, where the caller
+   *  knows them (a served folder's ordinals). Unset: `GroupNumbersContext`. */
+  eventRange?: [number, number];
   /** Header content drawn before the aggregate pairs: a shape run's summary. */
   lead?: ReactNode;
   /** Extra header content, rendered after the aggregate pairs. */
@@ -200,6 +209,7 @@ export function TimelineRunCard({
   forceOpen,
   summedByIndex,
   readingLine,
+  eventRange,
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
@@ -278,7 +288,23 @@ export function TimelineRunCard({
         .map((agg) => ({ label: agg.verb, value: agg.value, symbol: agg.symbol }))
     : undefined;
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
-  const iconColumn = (
+  // The group's node: its range of event numbers over the layers glyph, the
+  // one control for the members.
+  const numberRange = useContext(GroupNumbersContext);
+  const rangeText = groupRangeText(eventRange ?? numberRange);
+  const nodeLabel = `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`;
+  const node = (
+    <GroupNode
+      range={rangeText}
+      label={nodeLabel}
+      open={open}
+      onToggle={() => !forceOpen && toggle()}
+      controls={membersId}
+    />
+  );
+  /** The closed row's column: the node, then the summed legs, then the dotted
+   *  segment for the members not drawn. */
+  const legsColumn = (withNode: boolean) => (
     <SpineColumn
       {...(adverse
         ? {
@@ -294,10 +320,15 @@ export function TimelineRunCard({
           : netTokens.length > 0
             ? { tokens: netTokens }
             : { icon: "none" as const })}
+      lead={withNode ? node : undefined}
       undrawn
       isFirst={isFirst}
       isLast={!!isLast}
     />
+  );
+  /** An open group's top and bottom rows: the node alone on the line. */
+  const nodeColumn = (last: boolean) => (
+    <SpineColumn icon="none" lead={node} isFirst={!last && isFirst} isLast={last && !!isLast} />
   );
   // T1's word: the shape a served folder names, else the kind ("Redemptions",
   // "Transfers"), in the run's tone.
@@ -428,43 +459,49 @@ export function TimelineRunCard({
     }
   }
 
-  const button = (
-    <GroupButton open={open} onClick={() => !forceOpen && toggle()} controls={membersId}>
-      {groupButtonWords(count, open)}
-    </GroupButton>
-  );
-
-  // ── The phone spine view: the summed row is one segment, captioned with the
-  // kind and the span; a tap opens the summary card (one card open on the
-  // timeline at a time). The members follow as segments of their own.
+  // ── The phone spine view: the node stands on the line above the summed
+  // row, which is one segment captioned with the kind and the span; a tap on
+  // it opens the summary card (one card open on the timeline at a time). Open,
+  // the members follow as segments of their own, and the node repeats below.
   if (spineView) {
     const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
     const spokenSums = legAggs
       .filter((agg) => !unreadOf(undefined, agg.symbol))
       .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
     const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
-    const cardOpen = spineView.openId === membersId;
+    const phoneNode = (
+      <PhoneGroupNode
+        range={rangeText}
+        label={nodeLabel}
+        open={open}
+        onToggle={() => !forceOpen && toggle()}
+        controls={membersId}
+      />
+    );
     return (
       <GroupFrame
         open={open}
-        banded={adverse}
-        button={button}
         membersId={membersId}
+        top={phoneNode}
         members={body}
+        bottom={phoneNode}
         closed={
-          <SpineSegment
-            caption={
-              <>
-                {kindWord} &middot; {range}
-              </>
-            }
-            spokenCaption={`${kindWord}, ${spokenRange}`}
-            label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
-            open={cardOpen}
-            onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
-            iconColumn={iconColumn}
-            card={<div className="rounded-xl bg-raised">{summary}</div>}
-          />
+          <div className="flex flex-col">
+            {phoneNode}
+            <SpineSegment
+              caption={
+                <>
+                  {kindWord} &middot; {range}
+                </>
+              }
+              spokenCaption={`${kindWord}, ${spokenRange}`}
+              label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
+              open={spineView.openId === membersId}
+              onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
+              iconColumn={legsColumn(false)}
+              card={<div className="rounded-xl bg-raised">{summary}</div>}
+            />
+          </div>
         }
       />
     );
@@ -473,20 +510,20 @@ export function TimelineRunCard({
   return (
     <GroupFrame
       open={open}
-      banded={adverse}
-      button={button}
       membersId={membersId}
-      members={body}
       closed={
         <EventCard
           avatar={null}
-          iconColumn={iconColumn}
+          iconColumn={legsColumn(true)}
           header={head}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
           muted={muted}
         />
       }
+      top={<EventCard avatar={null} iconColumn={nodeColumn(false)} header={head} hideDetailChevron muted={muted} />}
+      members={body}
+      bottom={<EventCard avatar={null} iconColumn={nodeColumn(true)} header={<div />} hideDetailChevron />}
     />
   );
 }
