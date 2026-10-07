@@ -26,7 +26,8 @@
 //     does not exist (it would open the paragraph) is dropped — a continuation
 //     attaches to the previous clause or dies with it.
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
+import { ExplainHeading } from "@/components/shared/explain-groups";
 
 /** The one emphasis helper for explainer copy — the charter §3 highlight rule's
  *  render form (semibold + foreground tone against the muted body). Wrap a
@@ -152,6 +153,31 @@ export function composeBullets(clauses: ClauseInput[]): ReactNode[] {
 // matching the bullets' own space-y-2, so the lead reads as the first bullet
 // of one evenly spaced list.
 
+/** A bullet with the heading of the group it sits under (rails-ops
+ *  explanation-copy-charter §4). An explainer whose items carry one draws a
+ *  heading over each run of the same group; plain items stay one list. */
+export interface GroupedItem {
+  node: ReactNode;
+  group: string;
+}
+export type ExplainerItem = ReactNode | GroupedItem;
+
+const isGrouped = (item: ExplainerItem): item is GroupedItem =>
+  item != null && typeof item === "object" && !isValidElement(item) && "group" in item && "node" in item;
+
+function Bullets({ items }: { items: ReactNode[] }) {
+  return (
+    <div className="space-y-2 text-sm text-rb-500">
+      {items.map((item, i) => (
+        <div key={i} className="flex items-baseline gap-2">
+          <span className="shrink-0">•</span>
+          <div className="min-w-0 flex-1 leading-relaxed">{item}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function ProseExplainer({
   paragraph,
   items,
@@ -163,7 +189,7 @@ export function ProseExplainer({
   paragraph?: ReactNode | null;
   /** Bullet items (one composed sentence each — composeBullets). The event
    *  pane's render form: each bullet references a datapoint of the card. */
-  items?: ReactNode[];
+  items?: ExplainerItem[];
   /** An optional short enumeration list appended after the items — genuinely
    *  list-shaped facts (a liquidation's payout legs, a vault population). */
   list?: ReactNode[];
@@ -181,16 +207,19 @@ export function ProseExplainer({
       {paragraph != null && (
         <p className={`text-sm leading-relaxed text-rb-500${hasItems ? " mb-2" : ""}`}>{paragraph}</p>
       )}
-      {hasItems && (
-        <div className="space-y-2 text-sm text-rb-500">
-          {items.map((item, i) => (
-            <div key={i} className="flex items-baseline gap-2">
-              <span className="shrink-0">•</span>
-              <div className="min-w-0 flex-1 leading-relaxed">{item}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {hasItems &&
+        (items.some(isGrouped) ? (
+          runsOf(items).map((run, i) => (
+            <section key={i} className="mt-3 first:mt-0" data-explain-group={run.group}>
+              {run.group && <ExplainHeading>{run.group}</ExplainHeading>}
+              <div className={run.group ? "mt-1" : undefined}>
+                <Bullets items={run.nodes} />
+              </div>
+            </section>
+          ))
+        ) : (
+          <Bullets items={items as ReactNode[]} />
+        ))}
       {hasList && (
         <>
           {listLead != null && <div className="mt-2 text-sm text-rb-500">{listLead}</div>}
@@ -206,6 +235,19 @@ export function ProseExplainer({
       )}
     </div>
   );
+}
+
+/** Consecutive items of the same group, each run under its heading. */
+function runsOf(items: ExplainerItem[]): { group: string; nodes: ReactNode[] }[] {
+  const runs: { group: string; nodes: ReactNode[] }[] = [];
+  for (const item of items) {
+    const group = isGrouped(item) ? item.group : "";
+    const node = isGrouped(item) ? item.node : item;
+    const last = runs[runs.length - 1];
+    if (last && last.group === group) last.nodes.push(node);
+    else runs.push({ group, nodes: [node] });
+  }
+  return runs;
 }
 
 /** Group events by their transaction hash, preserving order within each tx —

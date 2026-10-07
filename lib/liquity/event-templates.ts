@@ -77,6 +77,9 @@ export interface EventTemplate {
   order: string[];
   /** The liquidation's payout legs, said as a list under the bullets. */
   list?: string[];
+  /** Each sentence's group (a `group_words` id): the heading it sits under
+   *  when the explanation is grouped (lib/liquity/event-prose.ts, `grouped`). */
+  groups: Record<string, string[]>;
 }
 
 /** A modal as the file writes it: links by FAQ id or URL; the interest-rate
@@ -105,6 +108,7 @@ interface ProseFile {
   copy_words: Words;
   action_words: Words;
   page_words: Words;
+  group_words: Words;
   L5_words: Words;
   fragments: Words;
   shared_sentences: Record<string, SentenceTemplate>;
@@ -131,6 +135,8 @@ export const COPY_WORDS = FILE.copy_words;
 export const ACTION_WORDS = FILE.action_words;
 /** The event page's paragraph and its card's page controls. */
 export const PAGE_WORDS = FILE.page_words;
+/** The explanation's group headings, in the order the pane shows them. */
+export const GROUP_WORDS = FILE.group_words;
 /** Parts of a sentence the generator joins. */
 export const FRAGMENTS = FILE.fragments;
 /** Sentences more than one template says. */

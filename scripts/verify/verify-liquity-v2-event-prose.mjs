@@ -16,7 +16,9 @@
 //       "today", which the page reads at today's price and the export at its
 //       pinned one.
 //   P2  L4 ON THE PAGE — every L4 sentence of the block is a bullet of the
-//       opened card's Explanation, in order.
+//       opened card's Explanation, in order; a grouped L4's headings
+//       ("**L4 · What happened**") are the pane's group headings, in order
+//       (ui-jobs 282).
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
 //       opened card, in order; a Collateral or Debt line by its after figures, which
 //       close the open ledger.
@@ -134,6 +136,20 @@ const section = (block, level) => {
   return out;
 };
 
+/** L4 as printed: one run under "**L4**", or one per "**L4 · heading**". */
+const l4Runs = (block) => {
+  const runs = [];
+  let cur = null;
+  for (const l of block.split("\n")) {
+    if (l.startsWith("**")) {
+      cur = null;
+      const m = /^\*\*L4(?: · (.*))?\*\*$/.exec(l);
+      if (m) runs.push((cur = { heading: m[1] ?? null, bullets: [] }));
+    } else if (cur && l.startsWith("- ")) cur.bullets.push(l.slice(2));
+  }
+  return runs;
+};
+
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 1280, height: 1800 },
@@ -198,14 +214,28 @@ try {
     // (ui-jobs 236): each closes on the after figures, so P3 reads a ledger
     // line of L2 from its after side.
     const t2 = await card.innerText();
-    const bullets = section(copy, "L4")
-      .slice(1)
-      .map((l) => l.replace(/^- /, ""));
+    const l4 = l4Runs(copy);
+    const bullets = l4.flatMap((r) => r.bullets);
     const missing = inOrder(norm(t2), bullets.map(norm));
     check(
       `${label}: L4 is the card's Explanation (${bullets.length} bullets)`,
       bullets.length > 0 && !missing,
       missing ?? "",
+    );
+    const headings = l4.map((r) => r.heading).filter(Boolean);
+    const paneHeadings = await card
+      .locator('[data-anatomy="T3"] [data-explain-group] > h4')
+      .evaluateAll((els) => els.map((el) => el.textContent.trim()));
+    // Each heading's bullets sit in its section.
+    const underRight = await card.locator('[data-anatomy="T3"] [data-explain-group]').evaluateAll(
+      (els, runs) =>
+        runs.every((r, i) => els[i] && r.bullets.every((b) => els[i].textContent.replace(/\s+/g, " ").includes(b))),
+      l4.filter((r) => r.heading).map((r) => ({ heading: r.heading, bullets: r.bullets.map(norm) })),
+    );
+    check(
+      `${label}: L4's group headings are the pane's (${headings.length ? headings.join(" / ") : "flat"})`,
+      JSON.stringify(headings) === JSON.stringify(paneHeadings) && (headings.length === 0 || underRight),
+      `copy ${JSON.stringify(headings)}, pane ${JSON.stringify(paneHeadings)}${underRight ? "" : ", a bullet sits under another heading"}`,
     );
 
     // P3

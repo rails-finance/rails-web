@@ -668,6 +668,20 @@ page_words:
   explanation_heading: |-
     Event explanation
 
+# ── The explanation's groups: the headings over its bullets ──
+# A template's `groups` puts each of its sentences under one of these. When two
+# or more groups hold two or more bullets each, the explanation shows every
+# group that has a bullet under its heading, in this order, the bullets in the
+# template's `order` within each; otherwise the bullets stand as one list in
+# `order`. Copy for LLM prints each heading as "L4 · {heading}".
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
 # ── Words the L5 modals fill in ──
 L5_words:
   coll_type_unknown: |-
@@ -791,6 +805,7 @@ shared_sentences:
 #   sentences  its sentences, each with `when` and `text`
 #   order      the order the explanation says them in, shared sentences included
 #   list       a liquidation's payout legs, said as a list under the sentences
+#   groups     which group (group_words) each sentence of order and list sits in
 templates:
   - id: liquity2.adjust.add_coll
     title: |-
@@ -841,6 +856,10 @@ templates:
       - add.rest
       - rate.moved
       - same_block
+    groups:
+      happened: [add.what, rate.moved, same_block]
+      adds_up: [redist.debt, redist.coll, redist.both, redist.balance]
+      leaves: [add.safety, add.liq_distance, market.fell, market.rose, add.rest]
 
   - id: liquity2.adjust.withdraw_coll
     title: |-
@@ -897,6 +916,10 @@ templates:
       - withdraw.margin
       - rate.moved
       - same_block
+    groups:
+      happened: [withdraw.what, rate.moved, same_block]
+      adds_up: [redist.debt, redist.coll, redist.both, redist.balance]
+      leaves: [withdraw.safety, withdraw.liq_distance, market.fell, market.rose, withdraw.margin_far, withdraw.margin]
 
   - id: liquity2.adjust.borrow
     title: |-
@@ -954,6 +977,10 @@ templates:
       - borrow.margin
       - rate.moved
       - same_block
+    groups:
+      happened: [borrow.what, rate.moved, same_block]
+      adds_up: [fee.borrow, redist.debt, redist.coll, redist.both, redist.balance]
+      leaves: [borrow.safety, borrow.liq_distance, market.fell, market.rose, borrow.margin_far, borrow.margin]
 
   - id: liquity2.adjust.repay
     title: |-
@@ -1004,6 +1031,10 @@ templates:
       - repay.rest
       - rate.moved
       - same_block
+    groups:
+      happened: [repay.what, rate.moved, same_block]
+      adds_up: [redist.debt, redist.coll, redist.both, redist.balance]
+      leaves: [repay.safety, repay.liq_distance, market.fell, market.rose, repay.rest]
 
   - id: liquity2.adjust.combined
     title: |-
@@ -1088,6 +1119,10 @@ templates:
       - combined.rate
       - rate.moved
       - same_block
+    groups:
+      happened: [combined.what.add_borrow, combined.what.add_repay, combined.what.withdraw_borrow, combined.what.withdraw_repay, rate.moved, same_block]
+      adds_up: [fee.borrow, redist.debt, redist.coll, redist.both, redist.balance]
+      leaves: [combined.safety_rose, combined.safety_fell, combined.liq_distance, market.fell, market.rose, combined.rate]
 
   - id: liquity2.adjust.no_change
     title: |-
@@ -1159,6 +1194,10 @@ templates:
       - nochange.bot
       - nochange.gas
       - same_block
+    groups:
+      happened: [nochange.run, nochange.dust, nochange.none, nochange.bot, same_block]
+      adds_up: [nochange.run_repaid, nochange.gas]
+      leaves: [nochange.at_min, nochange.capped_run, nochange.capped]
 
   - id: liquity2.adjust.rate
     title: |-
@@ -1207,6 +1246,10 @@ templates:
       - rate.coll
       - state.cr
       - same_block
+    groups:
+      happened: [rate.raised, rate.lowered, same_block]
+      adds_up: [accrual.interest, accrual.batched, accrual.batched_fee, rate.fee, state.debt_now]
+      leaves: [rate.coll, state.cr]
 
   - id: liquity2.redemption
     title: |-
@@ -1330,6 +1373,10 @@ templates:
       - redeem.zombie_low_rate
       - redeem.zombie_low_next
       - same_block
+    groups:
+      happened: [redeem.no_detail, redeem.what, redeem.why_batch, redeem.why_owner, same_block]
+      adds_up: [redeem.result, redeem.result_no_fee, redeem.today_lower, redeem.today_higher]
+      leaves: [redeem.zero, redeem.zombie_zero, redeem.zombie_zero_rate, redeem.zombie_zero_next, redeem.zombie_low, redeem.zombie_low_queue, redeem.zombie_low_rate, redeem.zombie_low_next]
 
   - id: liquity2.delegation.join
     title: |-
@@ -1403,6 +1450,10 @@ templates:
       - join.rate
       - state.cr
       - same_block
+    groups:
+      happened: [join.what, join.what_plain, join.rate, same_block]
+      adds_up: [join.debt_accrued, join.debt_moved, join.debt_same, join.debt_fee, join.fee]
+      leaves: [join.coll, state.cr]
 
   - id: liquity2.delegation.leave
     title: |-
@@ -1458,6 +1509,10 @@ templates:
       - leave.rate
       - state.cr
       - same_block
+    groups:
+      happened: [leave.what, leave.what_plain, leave.rate, same_block]
+      adds_up: [leave.fees, leave.fee, state.debt_now]
+      leaves: [leave.coll, state.cr]
 
   - id: liquity2.delegation.rate_update
     title: |-
@@ -1550,6 +1605,10 @@ templates:
       - bru.coll
       - bru.cr
       - same_block
+    groups:
+      happened: [bru.raised, bru.lowered, bru.kept, bru.move, bru.setter, same_block]
+      adds_up: [bru.interest, bru.mgmt, bru.upfront, bru.debt]
+      leaves: [bru.coll, bru.cr]
 
   - id: liquity2.open
     title: |-
@@ -1642,6 +1701,10 @@ templates:
       - open.join_no_fee
       - open.join_plain
       - same_block
+    groups:
+      happened: [open.what, open.value, open.join, open.join_no_fee, open.join_plain, same_block]
+      adds_up: [open.fee, open.debt_fee, open.debt, open.reserve]
+      leaves: [open.cr, liq.after, open.rate]
 
   - id: liquity2.close
     title: |-
@@ -1711,6 +1774,9 @@ templates:
       - close.nft
       - close.nothing
       - same_block
+    groups:
+      happened: [close.repaid, close.zero, close.coll, close.reserve, same_block]
+      leaves: [close.rate, close.cr, close.nft, close.nothing]
 
   - id: liquity2.liquidation
     title: |-
@@ -1876,6 +1942,10 @@ templates:
       - liq.leg.gas_weth
       - liq.leg.incentive
       - liq.leg.nft
+    groups:
+      happened: [liq.no_detail, liq.gain.what, liq.gain.why, liq.what, liq.debt, liq.coll, same_block]
+      adds_up: [liq.gain.received, liq.gain.received_unpriced, liq.gain.inherited, liq.gain.net_pos, liq.gain.net_neg, liq.partial, liq.leg.sp, liq.leg.gas_comp, liq.leg.gas_weth, liq.leg.incentive, liq.leg.nft]
+      leaves: [liq.gain.cr, liq.gain.open, liq.surplus, liq.surplus_claimed, liq.surplus_claimed_undated, liq.loss]
 
   - id: liquity2.apply_pending_debt
     title: |-
@@ -1933,6 +2003,10 @@ templates:
       - apply.rate
       - state.cr
       - same_block
+    groups:
+      happened: [apply.what, apply.what_coll, apply.batch, same_block]
+      adds_up: [state.debt_now]
+      leaves: [apply.coll, apply.coll_unpriced, apply.rate, state.cr]
 
   - id: liquity2.transfer
     title: |-
@@ -1996,6 +2070,9 @@ templates:
       - transfer.state_unpriced
       - transfer.unchanged
       - same_block
+    groups:
+      happened: [transfer.no_detail, transfer.mint, transfer.burn, transfer.move, same_block]
+      leaves: [transfer.state, transfer.state_unpriced, transfer.unchanged]
 
   - id: liquity2.fallback
     title: |-
@@ -2017,6 +2094,8 @@ templates:
     order:
       - fallback.what
       - same_block
+    groups:
+      happened: [fallback.what, same_block]
 
 # ── L5: the "?" modal, one per kind of event ──
 #   title, intro           the heading and first paragraph
