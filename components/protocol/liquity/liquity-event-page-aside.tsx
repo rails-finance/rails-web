@@ -3,8 +3,8 @@
 // The Liquity V2 event page's side column (rails-ops TO-DO-ui-jobs 236), in
 // the spine's place beside the card: the event's title (the header's words and
 // amounts, large, ui-jobs 286), the actions row (the timeline, Etherscan, the
-// Markdown, Copy link, Copy transaction hash, Copy for LLM; ui-jobs 291 and
-// 294, words in `action_words`), the paragraph with the timeline link, a
+// Markdown, Copy link, Copy transaction hash, Copy for LLM, Show provenance;
+// ui-jobs 291, 294 and 284, words in `action_words`), the paragraph with the timeline link, a
 // table of the facts the card does not show (branch, Trove id, holder, the
 // event's place, block, transaction), and the previous and next links. The words
 // are the strings file's `page_words` (content/liquity-v2/event-prose.yaml).
@@ -16,6 +16,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
 import { useEventShareHref } from "@/components/shared/event-share-context";
+import { ProvScopeToggle } from "@/components/shared/prov-inspector";
 import { CopyForLlmButton, LiquityEventMarkdownContext } from "@/components/protocol/liquity/event-prose-render";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -46,6 +47,9 @@ export interface LiquityEventPageAsideProps {
   nextHref: string | null;
   /** The trove page's `?at=` landing. */
   timelineHref: string;
+  /** The event's id: the card's receipts scope, which "Show provenance" arms
+   *  (ui-jobs 284). */
+  eventId: string;
 }
 
 /** A previous or next event link; at the end, a disabled one. */
@@ -86,7 +90,7 @@ function CopyTroveId({ troveId }: { troveId: string }) {
 /** The row under the title: the links, then the copy buttons. Each item
  *  carries `data-menu-item`, the names the ⋮ menu's rows had, for the
  *  verifiers. */
-function EventActions({ txHash, timelineHref }: { txHash: string; timelineHref: string }) {
+function EventActions({ txHash, timelineHref, eventId }: { txHash: string; timelineHref: string; eventId: string }) {
   const chainId = useChainId();
   const shareHref = useEventShareHref();
   const build = useContext(LiquityEventMarkdownContext);
@@ -147,6 +151,13 @@ function EventActions({ txHash, timelineHref }: { txHash: string; timelineHref: 
         {copied === "hash" ? COPY_WORDS.copied : ACTION_WORDS.copy_hash}
       </button>
       {mdHref && build && <CopyForLlmButton href={mdHref} build={build} className={ACTION} />}
+      <ProvScopeToggle
+        variant="plain"
+        scope={eventId}
+        className={ACTION}
+        words={{ show: ACTION_WORDS.show_provenance, hide: ACTION_WORDS.hide_provenance }}
+        title={ACTION_WORDS.provenance_hint}
+      />
     </div>
   );
 }
@@ -158,7 +169,7 @@ export function LiquityEventPageAside(p: LiquityEventPageAsideProps) {
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
       <div className="space-y-2 pb-2">
         {p.title}
-        <EventActions txHash={p.txHash} timelineHref={p.timelineHref} />
+        <EventActions txHash={p.txHash} timelineHref={p.timelineHref} eventId={p.eventId} />
       </div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {PAGE_WORDS.paragraph}{" "}

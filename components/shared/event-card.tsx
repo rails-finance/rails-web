@@ -6,7 +6,7 @@ import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { EventHeadContext, EventTxHashContext } from "@/components/shared/event-number-pill";
-import { useEventShareHref } from "@/components/shared/event-share-context";
+import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
   InfoDisclosure,
@@ -169,6 +169,9 @@ export function EventCard({
   // page-level inspector reads it to pin receipts at the values (the per-card
   // provenance tab retired in its favour).
   const registry = useReceiptRegistry();
+  // The scope's name for scoped arming (ui-jobs 284): the event's id, read from
+  // its share path; a card outside a timeline falls back to the card's key.
+  const scopeId = eventIdFromShareHref(shareHref) ?? cardId;
   // Which info section is expanded — the section heading is the button,
   // bridging into the pane below.
   const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
@@ -445,9 +448,9 @@ export function EventCard({
     const kind = caption ?? captionCtx.kind;
     const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
     return (
-      <ProvReceiptsScope registry={registry}>
+      <ProvReceiptsScope registry={registry} scopeId={scopeId}>
         <SpineSegment
-          wrapperProps={{ "data-skel-section": "detail-event" }}
+          wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
           caption={
             <>
               {kind} &middot; {date}
@@ -470,11 +473,12 @@ export function EventCard({
   }
 
   return (
-    <ProvReceiptsScope registry={registry}>
+    <ProvReceiptsScope registry={registry} scopeId={scopeId}>
       {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. */}
       <div
         data-skel-section="detail-event"
+        data-prov-scope={scopeId}
         className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
           muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
         }`}

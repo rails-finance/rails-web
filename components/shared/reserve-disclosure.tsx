@@ -10,9 +10,9 @@
 // Shared by the Aave V3, Spark, Moonwell, Maple and Compound V2 position
 // cards, the five with a `ReserveStack`-shaped side.
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
-import { provInspector } from "@/components/shared/provenance";
+import { POSITION_CARD_SCOPE, useProvArmedFor } from "@/components/shared/provenance";
 
 export interface ReserveDisclosure {
   /** Whether this side has enough reserves to collapse at all. */
@@ -22,14 +22,15 @@ export interface ReserveDisclosure {
 }
 
 /** One open/closed flag per card side, local to the card. Arming the
- *  provenance inspector force-opens every collapsible side on the page, so
+ *  provenance inspector on the page or on the position card (every caller is
+ *  a position card side; ui-jobs 284) force-opens every collapsible side, so
  *  an armed click can still reach an amount inside a collapsed list — the
  *  simplest route to point 2 of ui-jobs 57: the inspector's own armed flag
  *  (provInspector, provenance.tsx) drives the same `open` a manual toggle
  *  would. */
 export function useReserveDisclosure(count: number): ReserveDisclosure {
   const [openState, setOpenState] = useState(false);
-  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  const armed = useProvArmedFor(POSITION_CARD_SCOPE);
   const collapsible = count >= 2;
   return {
     collapsible,

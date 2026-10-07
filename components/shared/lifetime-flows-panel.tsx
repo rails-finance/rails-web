@@ -25,7 +25,7 @@ import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { FLOWS_SCOPE, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -136,8 +136,9 @@ export function LifetimeFlowsPanel({
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
-    <ProvReceiptsScope registry={registry}>
+    <ProvReceiptsScope registry={registry} scopeId={FLOWS_SCOPE}>
       <section
+        data-prov-scope={FLOWS_SCOPE}
         data-skel-section="detail-economics"
         {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
         data-lifetime-flows-panel=""

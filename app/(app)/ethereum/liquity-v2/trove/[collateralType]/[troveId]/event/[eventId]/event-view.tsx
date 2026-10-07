@@ -236,6 +236,7 @@ export default function EventView({
                               previousHref={previous ? eventPath(previous.id) : null}
                               nextHref={next ? eventPath(next.id) : null}
                               timelineHref={timelineHref}
+                              eventId={event.id}
                             />
                           ),
                         }}

@@ -624,6 +624,12 @@ action_words:
     Copy transaction hash
   copy_hash_hint: |-
     Copy the transaction's hash
+  show_provenance: |-
+    Show provenance
+  hide_provenance: |-
+    Hide provenance
+  provenance_hint: |-
+    Click a value on this event to trace it
 
 # ── The event page: the side column beside the card ──
 # The column holds the paragraph, a table of facts the card does not show, and

@@ -19,7 +19,12 @@
 
 import { CARD_PAD_X } from "@/lib/shared/ui-grammar";
 import type { ReactNode } from "react";
-import { ProvReceiptsScope, ProvUnscoped, useReceiptRegistry } from "@/components/shared/provenance";
+import {
+  POSITION_CARD_SCOPE,
+  ProvReceiptsScope,
+  ProvUnscoped,
+  useReceiptRegistry,
+} from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
@@ -89,6 +94,7 @@ export function PositionCardShell({
     <div
       data-skel-section={receipts ? "detail-card" : "listing-row"}
       data-anatomy={receipts ? "P1" : undefined}
+      data-prov-scope={receipts ? POSITION_CARD_SCOPE : undefined}
       className={`rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised ${CARD_PAD_X} py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500`}
     >
       {children}
@@ -117,7 +123,7 @@ export function PositionCardShell({
     </div>
   );
   return receipts ? (
-    <ProvReceiptsScope registry={registry}>
+    <ProvReceiptsScope registry={registry} scopeId={POSITION_CARD_SCOPE}>
       <PositionCardDisclosureProvider value={disclosure}>{frame}</PositionCardDisclosureProvider>
     </ProvReceiptsScope>
   ) : (

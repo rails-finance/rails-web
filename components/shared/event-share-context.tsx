@@ -23,3 +23,17 @@ export function EventShareProvider({ href, children }: { href: string; children:
 export function useEventShareHref(): string | null {
   return useContext(EventShareContext);
 }
+
+/** The event's id, read back from its share path (`…/event/<encoded id>`):
+ *  the name of the event card's receipts scope (ui-jobs 284), so the card's
+ *  ⋮ and the Liquity V2 event page's actions row arm that event alone. */
+export function eventIdFromShareHref(href: string | null): string | null {
+  if (!href) return null;
+  const m = /\/event\/([^/?#]+)/.exec(href);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
