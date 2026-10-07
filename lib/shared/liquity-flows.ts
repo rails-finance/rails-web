@@ -33,6 +33,7 @@ import { daysFromEvents } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
+import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -691,6 +692,7 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
   const out: LiquityFlowEvent[] = [];
   let fee = 0;
   let prev = { coll: 0, debt: 0, rate: 0 };
+  let prevEvent: BaseActivityEvent | undefined;
   const sorted = [...events].sort(
     (a, b) => a.timestamp - b.timestamp || a.blockNumber - b.blockNumber || logIndex(a.id) - logIndex(b.id),
   );
@@ -714,6 +716,13 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
     // The batch's fee is on its BatchUpdated rows; it stands until the next.
     if (c.batchUpdate) fee = num(c.batchUpdate.annualManagementFee);
     if (!c.isInBatch) fee = 0;
+    // A batch manager's rate change carries no TroveOperation log; inside the
+    // 7-day cooldown its upfront fee is the share of the debt's move that the
+    // event row's split (batchRateDebtMove) names.
+    const upfrontFee = op
+      ? raw18(op.raw?.debtIncreaseFromUpfrontFee, op.debtIncreaseFromUpfrontFee)
+      : (batchRateDebtMove(c, prevEvent, e)?.upfront ?? 0);
+    prevEvent = e;
     out.push({
       id: e.id,
       ts: e.timestamp,
@@ -737,7 +746,7 @@ export function liquityV2FlowEvents(events: BaseActivityEvent[]): LiquityFlowEve
         : {}),
       collOp: op ? raw18(op.raw?.collChangeFromOperation, op.collChangeFromOperation) : null,
       debtOp: op ? raw18(op.raw?.debtChangeFromOperation, op.debtChangeFromOperation) : null,
-      upfrontFee: op ? raw18(op.raw?.debtIncreaseFromUpfrontFee, op.debtIncreaseFromUpfrontFee) : 0,
+      upfrontFee,
       collFromRedist: op ? raw18(op.raw?.collIncreaseFromRedist, op.collIncreaseFromRedist) : 0,
       debtFromRedist: op ? raw18(op.raw?.debtIncreaseFromRedist, op.debtIncreaseFromRedist) : 0,
       surplus: c.liquidation ? num(c.liquidation.collSurplus) : 0,
