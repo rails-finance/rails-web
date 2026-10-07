@@ -6,7 +6,9 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import {
-  GroupCount,
+  GroupChevron,
+  GroupPill,
+  groupPillText,
   GroupFrame,
   GroupNumbersContext,
   groupLabel,
@@ -117,10 +119,18 @@ export function DelegateAdjustRunCard({
       </span>
     </div>
   );
-  const rangeText = groupRangeText(useContext(GroupNumbersContext));
-  const control = (
-    <GroupCount label={groupLabel(count, open, rangeText)} open={open} onToggle={toggle} controls={membersId} />
+  const numberRange = useContext(GroupNumbersContext);
+  const rangeText = groupRangeText(numberRange);
+  const pill = (
+    <GroupPill
+      text={groupPillText(numberRange, count)}
+      label={groupLabel(count, false, rangeText)}
+      open={false}
+      onToggle={toggle}
+      controls={membersId}
+    />
   );
+  const chevron = <GroupChevron label={groupLabel(count, true, rangeText)} onToggle={toggle} controls={membersId} />;
   // No asset moved: no node, the words stand, and the dotted segment marks
   // the members not drawn.
   const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
@@ -133,7 +143,7 @@ export function DelegateAdjustRunCard({
     return (
       <GroupFrame
         open={open}
-        control={control}
+        chevron={chevron}
         membersId={membersId}
         members={children}
         closed={
@@ -148,6 +158,7 @@ export function DelegateAdjustRunCard({
             open={spineView.openId === membersId}
             onToggle={(anchor) => spineView.toggle(membersId, anchor)}
             iconColumn={column}
+            numberSlot={pill}
             card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
           />
         }
@@ -158,12 +169,13 @@ export function DelegateAdjustRunCard({
   return (
     <GroupFrame
       open={open}
-      control={control}
+      chevron={chevron}
       membersId={membersId}
       closed={
         <EventCard
           avatar={null}
           iconColumn={column}
+          numberSlot={pill}
           header={<div className="pl-5 pt-4 pb-3">{words}</div>}
           hideDetailChevron
         />

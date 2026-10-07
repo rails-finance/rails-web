@@ -98,6 +98,10 @@ export function SpineViewProvider({ active, children }: { active: boolean; child
 export interface EventCaption {
   kind: string;
   ts: number;
+  /** The row's event number (and the last of a one-transaction row's range),
+   *  drawn at the row's far left at both widths. */
+  n?: number;
+  nLast?: number;
 }
 
 export const EventCaptionContext = createContext<EventCaption | null>(null);
@@ -206,6 +210,7 @@ export function SpineSegment({
   cardKey,
   captionFor,
   wrapperProps,
+  numberSlot,
 }: {
   /** The caption drawn on the line: "Repay · 6 Feb '26". */
   caption: ReactNode;
@@ -224,6 +229,9 @@ export function SpineSegment({
   /** Colour the caption as the open card's. */
   captionFor?: "open";
   wrapperProps?: React.HTMLAttributes<HTMLDivElement> & Record<`data-${string}`, string | undefined>;
+  /** The row's number column at the far left, level with the first node: the
+   *  event's number, or a group's button (outside the segment's button). */
+  numberSlot?: ReactNode;
 }) {
   const scale = useTimelineScale();
   const reactId = useId();
@@ -250,6 +258,15 @@ export function SpineSegment({
       className={`relative flex w-full flex-col ${scale.cardRounded}`}
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
+      {numberSlot && (
+        <div
+          className="absolute left-0 z-20 flex w-11 justify-center"
+          style={{ top: "calc(var(--card-pad) + 16px)" }}
+          data-number-column=""
+        >
+          {numberSlot}
+        </div>
+      )}
       {onToggle ? (
         // The segment, its flank values and its caption are one button. The
         // glyphs are hidden from screen readers and inert to the pointer.

@@ -6,7 +6,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
-import { EventHeadContext, EventTxHashContext, NumberPill } from "@/components/shared/event-number-pill";
+import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
@@ -290,13 +290,17 @@ export function EventCard({
   // The number column (ui-jobs 250): on the timeline's desktop row the
   // event's number stands in a column of its own, left of the spine; the
   // header's pill hands it here.
-  const numberColumnOn = !pageMode && !spine;
+  // In a timeline card, at both widths: the header draws no number.
+  const numberColumnOn = !pageMode;
   const [num, setNumState] = useState<{ number: number; last?: number } | null>(null);
   const setNum = useCallback(
     (n: { number: number; last?: number } | null) =>
       setNumState((cur) => (cur?.number === n?.number && cur?.last === n?.last ? cur : n)),
     [],
   );
+  // The number the timeline gives the row, else the one the header hands up.
+  const rowNum = captionCtx?.n != null ? { number: captionCtx.n, last: captionCtx.nLast } : num;
+  const numberNode = rowNum ? <PlainNumber number={rowNum.number} last={rowNum.last} /> : null;
   const headRef = useRef<HTMLDivElement>(null);
   const [menuAtEnd, setMenuAtEnd] = useState(false);
   const headMenu =
@@ -515,6 +519,7 @@ export function EventCard({
                 </>
               }
               spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
+              numberSlot={numberSlot ?? numberNode}
               open={spineOpen}
               onToggle={(anchor) => spine.toggle(cardId, anchor)}
               iconColumn={iconColumn}
@@ -564,12 +569,7 @@ export function EventCard({
                 {/* The number column, at the left of the spine's area: the
                     event's number, or a group's control. */}
                 <div className="absolute left-1.5 top-4 z-10 flex w-11 justify-center" data-number-column="">
-                  {numberSlot ??
-                    (num && (
-                      <EventTxHashContext.Provider value={txHash ?? null}>
-                        <NumberPill number={num.number} last={num.last} numberOnly />
-                      </EventTxHashContext.Provider>
-                    ))}
+                  {numberSlot ?? numberNode}
                 </div>
                 <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
               </div>

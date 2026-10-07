@@ -91,16 +91,17 @@ export function EventNumberPill(props: { number: number; last?: number }) {
           transaction hash where Display asks for it (desktop only). */}
       {toColumn && <TxHashLink />}
       {menu}
-      {/* Where the card's column carries the number (>=640px), the header's
-          pill shows only below it, where the column is hidden. */}
-      <NumberPill {...props} className={toColumn ? "sm:hidden" : undefined} />
+      {/* In a timeline card the number stands in the row's column, at both
+          widths; the header draws it only outside one (the event page). */}
+      {!toColumn && <NumberPill {...props} />}
     </>
   );
 }
 
 /** The transaction hash, abbreviated ("0x53e0…fac5"), as a link to the
  *  chain's explorer: "Transaction hashes" in Display, off by default, at
- *  >=640px. A pointer, not a receipt (TO-DO-mobile-timeline decision 13). */
+ *  >=640px; below it the opened card's ⋮ menu carries the explorer link. It
+ *  is a pointer and carries no receipt (TO-DO-mobile-timeline decision 13). */
 function TxHashLink() {
   const txHash = useContext(EventTxHashContext);
   const { showTxHashes } = useTimelineDisplay();
@@ -120,6 +121,22 @@ function TxHashLink() {
     >
       {shortAddr(txHash)}
     </a>
+  );
+}
+
+/** The row's number: muted, no fill, no link (ui-jobs 250 point 3,
+ *  revised); the event page is "Open event page" in the row's ⋮ menu. */
+export function PlainNumber({ number, last }: { number: number; last?: number }) {
+  const range = last != null && last !== number;
+  return (
+    <span
+      className="num-pill"
+      aria-label={range ? `Events ${number} to ${last}` : `Event ${number}`}
+      data-event-number={number}
+      data-prov-exempt=""
+    >
+      {range ? `${number}–${last}` : String(number)}
+    </span>
   );
 }
 

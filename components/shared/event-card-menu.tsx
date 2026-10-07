@@ -22,7 +22,7 @@ import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 const WORDS = {
   menu: "Event menu",
   heading: "Event",
-  view_page: "View event page",
+  view_page: "Open event page",
   view_page_hint: "Open this event's page",
   view_explorer_hint: "Open the transaction's logs",
   copy_link: "Copy link to event page",

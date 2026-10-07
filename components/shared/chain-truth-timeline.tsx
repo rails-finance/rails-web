@@ -1635,6 +1635,11 @@ function ChainTruthTimelineBody({
    *  list, its own share link, and the `?at=` landing target. All three read
    *  the run's FIRST member, which is the row a link to any leg of that
    *  transaction resolves to. Every other run row is returned untouched. */
+  /** A one-transaction row's numbers, lowest and highest, where all are known. */
+  const runNumbers = (ns: number[]): { n?: number; nLast?: number } => {
+    if (ns.length === 0 || ns.some((x) => !x)) return {};
+    return { n: Math.min(...ns), nLast: Math.max(...ns) };
+  };
   const wrapRunRow = (row: TimelineRow & { kind: "run" }, node: ReactNode, marked = false): ReactNode => {
     // Under day marks a run holding a day's last event is found by this, to
     // open it (the rewind's top).
@@ -1643,7 +1648,13 @@ function ChainTruthTimelineBody({
     // The phone spine view's caption, as a single card's (its `caption` prop
     // can name the kind instead).
     return (
-      <EventCaptionContext.Provider value={{ kind: lead.actionLabel, ts: lead.timestamp }}>
+      <EventCaptionContext.Provider
+        value={{
+          kind: lead.actionLabel,
+          ts: lead.timestamp,
+          ...runNumbers(row.events.map((e) => tl.eventNumberOf(e))),
+        }}
+      >
         <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
           <EventDayMarkContext.Provider
             value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
@@ -1690,7 +1701,13 @@ function ChainTruthTimelineBody({
     >
       <EventDayMarkContext.Provider value={opts?.mark ? markFor(event.timestamp, event.id) : null}>
         <EventShareProvider href={shareHrefFor(event.id)}>
-          <EventCaptionContext.Provider value={{ kind: event.actionLabel, ts: event.timestamp }}>
+          <EventCaptionContext.Provider
+            value={{
+              kind: event.actionLabel,
+              ts: event.timestamp,
+              n: opts?.eventNumber ?? (tl.eventNumberOf(event) || undefined),
+            }}
+          >
             {/* The scroll/highlight target for a `?at=` landing (and, in pinned
             mode below, for the lone card) — `id` for `getElementById`,
             `data-event-id` as the brief's documented alternative for anything

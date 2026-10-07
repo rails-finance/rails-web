@@ -27,7 +27,7 @@
 //
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
-import { GroupCount } from "@/components/shared/group-frame";
+import { GroupPill } from "@/components/shared/group-frame";
 import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
@@ -356,12 +356,13 @@ export function TimelineBoundaryCard({
     <div data-figure="timeline-boundary" data-prov-exempt="" data-boundary-arm={b.arm}>
       <EventCard
         avatar={null}
-        // The group's form: the layers glyph and the count in the number
-        // column, the one mark for "events not drawn"; it opens and closes
-        // the card, as the header does, its words in its name and title. The
-        // spine draws the dotted segment alone.
+        // The group's form: the stacked pill with its count ("+52") in the
+        // number column; it opens and closes the card, as the header does,
+        // its words in its name and title. The spine draws the dotted
+        // segment alone.
         numberSlot={
-          <GroupCount
+          <GroupPill
+            text={counted ? `+${n(b.omitted as number)}` : "+"}
             label={range ? `${label}, #${range.split(" – ").reverse().join("–")}` : label}
             open={open}
             onToggle={() => setOpen((v) => !v)}

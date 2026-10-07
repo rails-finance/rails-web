@@ -13,7 +13,9 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
-  GroupCount,
+  GroupChevron,
+  GroupPill,
+  groupPillText,
   GroupFrame,
   GroupNumbersContext,
   groupLabel,
@@ -293,18 +295,23 @@ export function TimelineRunCard({
         .map((agg) => ({ label: agg.verb, value: agg.value, symbol: agg.symbol }))
     : undefined;
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
-  // The group's control: the layers glyph and the count, in the number
-  // column; the range of event numbers rides its name and title.
-  const numberRange = useContext(GroupNumbersContext);
-  const rangeText = groupRangeText(eventRange ?? numberRange);
-  const control = (
-    <GroupCount
-      label={groupLabel(count, open, rangeText)}
-      open={open}
-      onToggle={() => !forceOpen && toggle()}
+  // The group's button: the stacked pill with its newest member's number,
+  // closed; the chevron under the first and the last member's number, open.
+  // The range of event numbers rides the name and the title.
+  const contextRange = useContext(GroupNumbersContext);
+  const numberRange = eventRange ?? contextRange;
+  const rangeText = groupRangeText(numberRange);
+  const onToggle = () => !forceOpen && toggle();
+  const pill = (
+    <GroupPill
+      text={groupPillText(numberRange, count)}
+      label={groupLabel(count, false, rangeText)}
+      open={false}
+      onToggle={onToggle}
       controls={membersId}
     />
   );
+  const chevron = <GroupChevron label={groupLabel(count, true, rangeText)} onToggle={onToggle} controls={membersId} />;
   /** The closed row's column: the node, then the summed legs, then the dotted
    *  segment for the members not drawn. */
   const legsColumn = (
@@ -505,9 +512,9 @@ export function TimelineRunCard({
   }
 
   // ── The phone spine view: the summed row is one segment; a tap opens the
-  // summary card (one card open on the timeline at a time). The control
-  // straddles the frame's corner; open, the members follow as segments,
-  // and the control repeats at the bottom corner.
+  // summary card (one card open on the timeline at a time). The stacked pill
+  // at the row's left opens the members; open, the chevron under the first
+  // and the last member's number closes them.
   if (spineView) {
     const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
     const spokenSums = legAggs
@@ -517,7 +524,7 @@ export function TimelineRunCard({
     return (
       <GroupFrame
         open={open}
-        control={control}
+        chevron={chevron}
         membersId={membersId}
         members={body}
         closed={
@@ -532,6 +539,7 @@ export function TimelineRunCard({
             open={spineView.openId === membersId}
             onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
             iconColumn={legsColumn}
+            numberSlot={pill}
             card={<div className="rounded-xl bg-raised">{summary}</div>}
           />
         }
@@ -542,12 +550,13 @@ export function TimelineRunCard({
   return (
     <GroupFrame
       open={open}
-      control={control}
+      chevron={chevron}
       membersId={membersId}
       closed={
         <EventCard
           avatar={null}
           iconColumn={legsColumn}
+          numberSlot={pill}
           header={head}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
