@@ -45,7 +45,7 @@ export interface MapleEventHeaderProps {
 }
 
 /** The row's words for a share transfer: what the wallet did with shares. */
-const TRANSFER_LABEL = { transfer_in: "Shares received", transfer_out: "Shares sent" } as const;
+export const TRANSFER_LABEL = { transfer_in: "Shares received", transfer_out: "Shares sent" } as const;
 
 export function MapleEventHeader({
   actionLabel,

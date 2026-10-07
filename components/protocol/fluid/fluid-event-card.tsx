@@ -141,24 +141,26 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
     />
   );
 
+  // T1's word, which the phone spine view's caption repeats. A hop of an NFT
+  // round trip inside one transaction says so at T1; the explainer states the
+  // holder it left and came back to.
+  const headLabel = openedBy
+    ? "Open"
+    : transferRoundTrip(sibs, event)
+      ? "Ownership transfer · round trip in this transaction"
+      : event.actionLabel;
+
   // The Collateral and Debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
   return (
     <FluidLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
+        caption={headLabel}
         iconColumn={iconSlot}
         header={
           <FluidEventHeader
-            actionLabel={
-              openedBy
-                ? "Open"
-                : // A hop of an NFT round trip inside one transaction says so at T1;
-                  // the explainer states the holder it left and came back to.
-                  transferRoundTrip(sibs, event)
-                  ? "Ownership transfer · round trip in this transaction"
-                  : event.actionLabel
-            }
+            actionLabel={headLabel}
             ctx={ctx}
             timestamp={event.timestamp}
             txHash={event.txHash}

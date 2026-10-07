@@ -38,7 +38,7 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { AlchemixEventHeader, ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
-import { chainTruthDeltaValue, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import { chainTruthCaption, chainTruthDeltaValue, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
@@ -226,6 +226,7 @@ export function AlchemixEventCard({
     <EventCard
       avatar={null}
       iconColumn={iconSlot}
+      caption={chainTruthCaption(header)}
       header={
         <AlchemixEventHeader
           legs={legs}

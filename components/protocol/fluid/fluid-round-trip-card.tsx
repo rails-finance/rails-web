@@ -99,6 +99,7 @@ export function FluidRoundTripCard({ hops, operates, isFirst, isLast }: FluidRou
   return (
     <EventCard
       avatar={null}
+      caption="Ownership round trip"
       iconColumn={<SpineColumn icon="delegate" iconDirection="up" spine="dotted" isFirst={isFirst} isLast={!!isLast} />}
       header={
         <ChainTruthRow

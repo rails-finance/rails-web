@@ -190,6 +190,7 @@ export function VaultTimelineRow({
   return (
     <EventCard
       avatar={null}
+      caption={KIND_LABEL[event.kind]}
       iconColumn={
         <SpineColumn tokens={tokens.length ? tokens : undefined} icon={icon} isFirst={isFirst} isLast={isLast} />
       }

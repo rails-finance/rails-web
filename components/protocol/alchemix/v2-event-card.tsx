@@ -29,6 +29,7 @@ import {
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
+  chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-event";
@@ -267,13 +268,13 @@ export function AlchemixV2EventCard({
     );
   const stats = detailStats(event, a);
   const line = explainer(event, a);
+  const spec = rowSpec(event, a, showVersion);
   return (
     <EventCard
       avatar={null}
       iconColumn={iconSlot}
-      header={
-        <ChainTruthRow spec={rowSpec(event, a, showVersion)} timestamp={event.timestamp} eventNumber={eventNumber} />
-      }
+      caption={chainTruthCaption(spec)}
+      header={<ChainTruthRow spec={spec} timestamp={event.timestamp} eventNumber={eventNumber} />}
       detail={
         stats.length > 0 ? (
           <>

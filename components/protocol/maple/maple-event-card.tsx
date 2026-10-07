@@ -12,7 +12,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import { flankedLegProv, sharesLegProv, type MapleCoords } from "@/lib/maple/event-provenance";
 import { mapleExplainerTeaser } from "@/lib/maple/explainer-clauses";
-import { MapleEventHeader } from "./maple-event-header";
+import { MapleEventHeader, TRANSFER_LABEL } from "./maple-event-header";
 import { MapleEventDetail } from "./maple-event-detail";
 import { MapleEventExplainer, mapleLearnMoreContent } from "./maple-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -142,6 +142,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
       <EventCard
         avatar={null}
         iconColumn={iconSlot}
+        caption={isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : undefined}
         header={
           <MapleEventHeader
             actionLabel={event.actionLabel}

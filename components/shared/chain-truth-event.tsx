@@ -114,10 +114,6 @@ export interface ChainTruthDelta {
   address?: string;
   prov: Provenance;
   suffix?: string;
-  /** Below sm the spine (and its arrows) is hidden: where the deltas are
-   *  unsigned, this draws the spine's arrow beside the amount there — "out"
-   *  of the wallet into the protocol (→), "in" to the wallet (←). */
-  phoneArrow?: "in" | "out";
   /** Optional leading label (e.g. "Cleared" / "Reduced" on a redemption). When
    *  set, the value renders as a bare magnitude — the label carries the
    *  direction, so no +/− sign is shown. Mirrors the Liquity V2 redemption /
@@ -482,6 +478,16 @@ export function reconstructTransition(args: {
   };
 }
 
+/** The phone spine view's caption for a row: the word T1 states, or, where
+ *  the row drops its verb for per-axis ones (a combined adjust), those verbs
+ *  ("Deposit + Borrow"). Undefined where the row states no word (a custody
+ *  move), so the card's kind stands. */
+export function chainTruthCaption(spec: ChainTruthRowSpec): string | undefined {
+  if (spec.label) return spec.label;
+  const verbs = spec.deltas.flatMap((d) => (d.label ? [d.label] : []));
+  return verbs.length ? verbs.join(" + ") : undefined;
+}
+
 export function ChainTruthRow({
   spec,
   timestamp,
@@ -637,14 +643,6 @@ export function ChainTruthRow({
           </span>
           <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
           {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
-          {d.phoneArrow && spec.unsignedDeltas && (
-            <span
-              className="text-rb-500 sm:hidden"
-              title={d.phoneArrow === "out" ? "Into the protocol" : "Out to the wallet"}
-            >
-              {d.phoneArrow === "out" ? "→" : "←"}
-            </span>
-          )}
         </span>
       </Prov>
     );

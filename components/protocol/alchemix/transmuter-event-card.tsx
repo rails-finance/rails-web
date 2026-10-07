@@ -25,6 +25,7 @@ import {
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
+  chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
@@ -337,12 +338,14 @@ export function TransmuterEventCard({
   const earlyHere = claimLeg ? early : null;
   const stats = detailStats(legs, mytSymbol, earlyHere);
   const lines = explainerLines(legs, mytSymbol, earlyHere);
+  const spec = rowSpec(legs, mytSymbol);
 
   return (
     <EventCard
       avatar={null}
       iconColumn={iconSlot}
-      header={<ChainTruthRow spec={rowSpec(legs, mytSymbol)} timestamp={lead.timestamp} eventNumber={eventNumber} />}
+      caption={chainTruthCaption(spec)}
+      header={<ChainTruthRow spec={spec} timestamp={lead.timestamp} eventNumber={eventNumber} />}
       detail={
         stats.length > 0 ? (
           <>

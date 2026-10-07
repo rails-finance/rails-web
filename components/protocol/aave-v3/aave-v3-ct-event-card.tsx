@@ -13,7 +13,7 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { assetsDeltaProv, swapLegNet, swapLegProv, swapLegSign, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
-import { AaveV3CtEventHeader, isAaveV3LossRow, signedAmount } from "./aave-v3-ct-event-header";
+import { AaveV3CtEventHeader, aaveV3CtLabel, isAaveV3LossRow, signedAmount } from "./aave-v3-ct-event-header";
 import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
 import { useState } from "react";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
@@ -293,6 +293,7 @@ export function AaveV3CtEventCard({
     <EventCard
       avatar={null}
       iconColumn={iconSlot}
+      caption={aaveV3CtLabel(ctx, !!feeOf, chainId)}
       header={
         // The pointer on the header starts the position reads the open card
         // makes (this transaction's and the previous one's), so the state is

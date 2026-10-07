@@ -121,6 +121,14 @@ export interface AaveV4EventHeaderProps {
   externalBy?: string;
 }
 
+/** The word T1 states for the row, which the phone spine view's caption
+ *  repeats: "Enable Supply" where the supply also enabled the collateral. */
+export function aaveV4Label(ctx: AaveV4Context): string {
+  const style = STYLES[ctx.eventType] ?? { label: ctx.eventType };
+  if (ctx.alsoToggledCollateral) return "Enable Supply";
+  return ctx.eventType === "collateral_toggle" ? (ctx.enabled ? "Enable" : "Disable") : style.label;
+}
+
 export function AaveV4EventHeader({
   ctx,
   timestamp,
