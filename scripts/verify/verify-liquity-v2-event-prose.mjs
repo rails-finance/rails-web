@@ -187,12 +187,12 @@ try {
 
     // P1
     // The page reads today's price live and the export its pinned one
-    // (fixtures.json), so a line that says "today" is compared without its
-    // dollar figures.
+    // (fixtures.json), so a line that says "today" or "the latest block's
+    // price" is compared without its dollar figures.
     const today = (t) =>
       t
         .split("\n")
-        .map((l) => (/\btoday\b/.test(l) ? l.replace(/[−+]?\$[\d,]+/g, "$…") : l))
+        .map((l) => (/\btoday\b|latest block/.test(l) ? l.replace(/[−+]?\$[\d,]+/g, "$…") : l))
         .join("\n");
     const expected = today(block.replace(/ · https:\/\/rails\.finance\/\S+/, " · <url>"));
     const got = today(copy.replace(/ · https?:\/\/[^/\s]+\/\S+/, " · <url>"));

@@ -540,10 +540,6 @@ L2_words:
     Redeemed by:
   pl: |-
     P/L
-  or: |-
-    or
-  today: |-
-    today
   claimable: |-
     claimable
   # T2's row under a redemption's price chip, where the redeemed collateral at

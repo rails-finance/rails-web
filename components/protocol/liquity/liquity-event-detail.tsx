@@ -1006,7 +1006,7 @@ export function LiquityEventDetail({
           outcome), the historic collateral price. P/L
           reconciles with the Cleared / Reduced figures in the header: debt
           cleared minus the value of collateral given up, at the
-          redemption-time price and (when available) at today's price.
+          redemption-time price. Today's price is the T2 row below the chip.
           (Batch membership is conveyed by the "Delegate" treatment on
           interest-rate events, so no standalone "Batched" badge here.) */}
       {collPrice > 0 && (
@@ -1015,9 +1015,8 @@ export function LiquityEventDetail({
           {l2.redemption &&
             (() => {
               // P/L reconciles with the header's Cleared / Reduced: debt cleared
-              // less the collateral given up, at the redemption's price and,
-              // where it reads differently, at today's.
-              const { claimable, showPl, plHistoric, plToday } = l2.redemption;
+              // less the collateral given up, at the redemption's price.
+              const { claimable, showPl, plHistoric } = l2.redemption;
               const plStr = (n: number) => `${n >= 0 ? "+" : "−"}${formatUsd(Math.abs(n))}`;
               const plColor = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
               if (claimable == null && !showPl) return null;
@@ -1034,13 +1033,6 @@ export function LiquityEventDetail({
                     <span className="inline-flex items-center gap-1.5">
                       <span className="text-rb-500">{L2_WORDS.pl}</span>
                       <span className={`font-bold ${plColor(plHistoric)}`}>{plStr(plHistoric)}</span>
-                      {plToday != null && (
-                        <>
-                          <span className="text-rb-500">{L2_WORDS.or}</span>
-                          <span className={`font-bold ${plColor(plToday)}`}>{plStr(plToday)}</span>
-                          <span className="text-rb-500">{L2_WORDS.today}</span>
-                        </>
-                      )}
                     </span>
                   )}
                 </div>

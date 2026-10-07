@@ -129,7 +129,6 @@ export interface LiquityL2 {
   batched: boolean;
   redemption: {
     plHistoric: number;
-    plToday: number | null;
     showPl: boolean;
     claimable: number | null;
     /** T2's row under the price chip (ui-jobs 283): where the redeemed
@@ -1208,7 +1207,6 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     const cleared = Math.abs(debtChange);
     const lost = Math.abs(collChange);
     const plHistoric = cleared - lost * price;
-    const plToday = currentPrice ? cleared - lost * currentPrice : null;
     // The row's figures are the redemption log's, as the explanation's
     // "A redeemer exchanged …" sentence states them.
     const r = ctx.redemption;
@@ -1217,7 +1215,6 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     const todaySide = r ? redemptionToday(price, currentPrice, debtCleared, collTaken) : null;
     redemption = {
       plHistoric,
-      plToday: plToday != null && Math.abs(plToday - plHistoric) > 0.01 ? plToday : null,
       showPl: cleared > 0.01,
       claimable: ctx.isZombieTrove && stateAfter.debt === 0 && collAfter > 0 ? collAfter : null,
       today: null,
@@ -1347,14 +1344,11 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
         lines.push(`${redemption.claimable.toFixed(4)} ${collSym} ${L2_WORDS.claimable}`);
       if (redemption.showPl) {
         const pl = (n: number) => `${n >= 0 ? "+" : "−"}${fmtUsdWhole(Math.abs(n))}`;
-        lines.push(
-          `${L2_WORDS.pl} ${pl(redemption.plHistoric)}${
-            redemption.plToday != null ? ` ${L2_WORDS.or} ${pl(redemption.plToday)} ${L2_WORDS.today}` : ""
-          }`,
-        );
+        lines.push(`${L2_WORDS.pl} ${pl(redemption.plHistoric)}`);
       }
     }
     lines.push(`${fillText(L2_WORDS.price, { coll_symbol: collSym })}: ${fmtUsdWhole(price)}`);
+    if (redemption?.today) lines.push(redemption.today);
   }
   fig.lines = lines;
   return fig;
