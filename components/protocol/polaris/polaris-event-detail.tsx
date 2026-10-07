@@ -327,6 +327,7 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
             priceUsd: ctx.priceAtBlock.pethInDebt,
             priceProv: atBlockPriceProv(coords, ctx.priceAtBlock, ctx.market),
             note: "oracle at block",
+            noToday: true,
           },
         ]
       : [];

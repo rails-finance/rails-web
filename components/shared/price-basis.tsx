@@ -108,14 +108,17 @@ export function ThenTodayChip({
   symbol,
   then,
   format,
+  noToday,
 }: {
   symbol: string;
   then: ReactNode;
   format: (n: number) => string;
+  /** The chip's figure is in another unit than the page's Prices chip. */
+  noToday?: boolean;
 }) {
   const ctx = useContext(BasisContext);
   const today = useTodayPrice(symbol);
-  if (!ctx || today == null) return <>{then}</>;
+  if (!ctx || today == null || noToday) return <>{then}</>;
   const side = (b: PriceBasis, figure: ReactNode, word: string) => (
     <button
       type="button"

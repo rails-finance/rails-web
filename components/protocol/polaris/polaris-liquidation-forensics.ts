@@ -208,6 +208,7 @@ export function buildPolarisLiquidationForensics(
             priceUsd: f.priceInDebt,
             priceProv: atBlockPriceProv(coords, ctx.priceAtBlock, market),
             note: "oracle at block",
+            noToday: true,
           },
         ]
       : [],

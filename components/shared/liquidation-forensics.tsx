@@ -67,6 +67,10 @@ export interface AtBlockPricePill {
   priceProv: Provenance;
   /** Source note after the price (default "oracle at block"). */
   note?: string;
+  /** The price is not in dollars (Polaris prices a collateral in its debt
+   *  token): the page's Prices chip states another unit, so the pill has no
+   *  "today" side to offer (ui-jobs 283). */
+  noToday?: boolean;
 }
 
 export interface LiquidationForensicsProps {
@@ -293,6 +297,7 @@ export function AtBlockPriceFootnote({
           <ThenTodayChip
             symbol={pill.symbol}
             format={format}
+            noToday={pill.noToday}
             then={
               <Prov info={pill.priceProv} value={pill.display ?? format(pill.priceUsd)} symbol={pill.symbol}>
                 {pill.display ?? format(pill.priceUsd)}
