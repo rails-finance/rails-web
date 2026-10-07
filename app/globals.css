@@ -714,6 +714,23 @@ body {
     opacity: 1;
     color: var(--foreground);
   }
+  /* T1's reveal (ui-jobs 302): on the event card's header the chevron appears
+     half a second after the pointer enters and hides at once on leave, because
+     the delay sits on the hover state alone. Keyboard focus shows it at once;
+     the rotation starts at once. The position card's rows and the
+     Lifetime flows header keep the instant reveal above. */
+  .disc-row-slow:hover .disc-chev {
+    transition-delay: 500ms, 500ms, 0ms;
+  }
+  .disc-row-slow:focus-visible .disc-chev,
+  .disc-row-slow:has(:focus-visible) .disc-chev {
+    transition-delay: 0ms;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .disc-row-slow:hover .disc-chev {
+    transition-delay: 0ms;
+  }
 }
 
 /* Focus ring */

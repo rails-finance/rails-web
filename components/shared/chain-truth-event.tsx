@@ -550,15 +550,11 @@ export function ChainTruthRow({
   // and the chip's to/from are the verb. Render nothing so no empty span
   // steals a gap.
   null;
-  // The card's chevron follows the action word (ui-jobs 295): the label, or
-  // where the row has none (a combined adjust's per-axis verbs, a custody
-  // row) the first amount. The row's 12px gap is for items; the chevron sits
-  // at a phrase's 6px.
+  // The card's chevron follows everything the head states (ui-jobs 302): the
+  // label, the amounts that show, then the rate pill, parties and notes. The row's 12px gap is for items; the
+  // chevron sits at a phrase's 6px.
   const headChevron = useEventHeadChevron();
   const chevron = headChevron ? <span className="-ml-1.5 inline-flex items-center">{headChevron}</span> : null;
-  // A row with no label whose first amount carries its verb (a per-axis
-  // action verb that stays at every width) takes the chevron after that verb.
-  const verbChevron = labelNode == null && !!spec.deltas[0]?.label && !!spec.deltas[0]?.axisVerb;
   const deltaNodes = spec.deltas.map((d, i) => {
     // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
     // the label carries the direction; unlabeled ones keep the ± sign. A
@@ -604,13 +600,15 @@ export function ChainTruthRow({
       return (
         <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
           {d.label && <span className={toneClass}>{d.label}</span>}
-          {i === 0 && verbChevron && headChevron}
           <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
             <span className="font-semibold tabular-nums text-foreground">
               <ExactTip text={text} exact={exact} symbol={d.symbol} />
             </span>
           </Prov>
-          <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
+          {/* The icon follows its amount: it hands off to the spine with it. */}
+          <span className={`inline-flex items-center ${deltaHide}`}>
+            <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
+          </span>
           {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
         </span>
       );
@@ -644,10 +642,7 @@ export function ChainTruthRow({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       {labelNode}
-      {labelNode != null && chevron}
-      {deltaNodes[0]}
-      {labelNode == null && !verbChevron && chevron}
-      {deltaNodes.slice(1)}
+      {deltaNodes}
 
       {/* Rate pill — a chosen rate, rendered as the Liquity V2 lozenge. Deliberately
           NOT wrapped in hideClass: the ≥sm spine carries moved amounts, not a rate,
@@ -720,6 +715,8 @@ export function ChainTruthRow({
           </span>
         </Prov>
       )}
+
+      {chevron}
 
       {/* `evt-meta`: below sm this span becomes the header's own first row
           (app/globals.css) — date, time and event number right-aligned

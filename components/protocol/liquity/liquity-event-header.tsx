@@ -122,7 +122,7 @@ export function LiquityEventHeader({
   title,
 }: LiquityEventHeaderProps) {
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
-  // The card's chevron, after the action word (ui-jobs 295); none on the
+  // The card's chevron, after everything the head states (ui-jobs 302); none on the
   // event page and in the page's title.
   const chev = useEventHeadChevron();
   const style = getOperationStyle(ctx.operation, ctx);
@@ -243,12 +243,20 @@ export function LiquityEventHeader({
     ) : (
       <>{node}</>
     );
+  // An icon follows its amount: it hides with the amount's spine hand-off.
+  const icon = (symbol: string) =>
+    hideVal ? (
+      <span className={`inline-flex items-center ${hideVal}`}>
+        <TokenChipIcon symbol={symbol} size={ICON} />
+      </span>
+    ) : (
+      <TokenChipIcon symbol={symbol} size={ICON} />
+    );
   const cluster = (
     <>
       {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
         <>
           <span className={`${TXT} text-rb-500`}>{style.label}</span>
-          {chev}
           <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
           {ctx.batchManager && (
             <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
@@ -278,7 +286,6 @@ export function LiquityEventHeader({
       ) : ctx.operation === "setInterestBatchManager" ? (
         <>
           <span className={`${TXT} text-rb-500`}>{style.label}</span>
-          {chev}
           {stateAfter.annualInterestRate > 0 && <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
           {ctx.batchManager && (
             <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
@@ -289,7 +296,6 @@ export function LiquityEventHeader({
           <span className={`inline-block ${PILL} rounded-full font-bold ${style.bg} ${style.color}`}>
             {style.label}
           </span>
-          {chev}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT}`}>
               <span className="text-rb-500">{L1_WORDS.supply}</span>
@@ -302,7 +308,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+              {icon(ctx.collateralType)}
             </span>
           )}
           {hasDebtChange && (
@@ -317,7 +323,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+              {icon(ctx.assetType ?? "BOLD")}
             </span>
           )}
           {stateAfter.annualInterestRate > 0 &&
@@ -340,7 +346,6 @@ export function LiquityEventHeader({
           >
             {style.label}
           </span>
-          {chev}
           {hasDebtChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
               <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
@@ -353,7 +358,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+              {icon(ctx.assetType ?? "BOLD")}
             </span>
           )}
           {hasCollChange && (
@@ -368,7 +373,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+              {icon(ctx.collateralType)}
             </span>
           )}
         </>
@@ -384,7 +389,6 @@ export function LiquityEventHeader({
           >
             {style.label}
           </span>
-          {chev}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT}`}>
               <span className="text-rb-500">{L1_WORDS.liquidated}</span>
@@ -397,7 +401,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+              {icon(ctx.collateralType)}
             </span>
           )}
           {hasDebtChange && (
@@ -412,7 +416,7 @@ export function LiquityEventHeader({
                   />
                 </span>,
               )}
-              <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+              {icon(ctx.assetType ?? "BOLD")}
             </span>
           )}
         </>
@@ -423,7 +427,6 @@ export function LiquityEventHeader({
           >
             {style.label}
           </span>
-          {chev}
         </>
       ) : style.label.includes(" + ") ? (
         // Combined action: "Withdraw + Repay" etc — show with values and token icons
@@ -433,7 +436,6 @@ export function LiquityEventHeader({
             return (
               <span className={`inline-flex items-center ${GAP} ${TXT}`}>
                 <span className="text-rb-500">{collAction}</span>
-                {chev}
                 {hasCollChange &&
                   wrapColl(
                     <span className={AMT}>
@@ -444,7 +446,7 @@ export function LiquityEventHeader({
                       />
                     </span>,
                   )}
-                <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+                {icon(ctx.collateralType)}
                 <span className="text-rb-500">{debtAction}</span>
                 {hasDebtChange &&
                   wrapDebt(
@@ -456,7 +458,7 @@ export function LiquityEventHeader({
                       />
                     </span>,
                   )}
-                <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+                {icon(ctx.assetType ?? "BOLD")}
               </span>
             );
           })()}
@@ -464,7 +466,6 @@ export function LiquityEventHeader({
       ) : (
         <>
           <span className={`${TXT} text-rb-500`}>{style.label}</span>
-          {chev}
         </>
       )}
 
@@ -482,7 +483,7 @@ export function LiquityEventHeader({
         ctx.operation !== "adjustTroveInterestRate" &&
         ctx.operation !== "setBatchManagerAnnualInterestRate" &&
         ctx.operation !== "setInterestBatchManager" && (
-          <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+          <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
             {wrapDebt(
               <span className={AMT}>
                 <ExactTip
@@ -492,7 +493,7 @@ export function LiquityEventHeader({
                 />
               </span>,
             )}
-            <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
+            {icon(ctx.assetType ?? "BOLD")}
           </span>
         )}
 
@@ -506,7 +507,7 @@ export function LiquityEventHeader({
         ctx.operation !== "adjustTroveInterestRate" &&
         ctx.operation !== "setBatchManagerAnnualInterestRate" &&
         ctx.operation !== "setInterestBatchManager" && (
-          <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+          <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
             {wrapColl(
               <span className={AMT}>
                 <ExactTip
@@ -516,7 +517,7 @@ export function LiquityEventHeader({
                 />
               </span>,
             )}
-            <TokenChipIcon symbol={ctx.collateralType} size={ICON} />
+            {icon(ctx.collateralType)}
           </span>
         )}
 
@@ -591,6 +592,8 @@ export function LiquityEventHeader({
         so no second "% APR" is needed in the trailing cluster below. */}
       {(ctx.operation === "adjustTroveInterestRate" || ctx.operation === "removeFromBatch") &&
         stateAfter.annualInterestRate > 0 && <RatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
+
+      {chev}
     </>
   );
   // `evt-meta`: the header's first row below sm (app/globals.css). Its 24px

@@ -158,7 +158,7 @@ export function AaveV4EventHeader({
     ) : null;
 
   const counter = eventNumber != null ? <EventNumberPill number={eventNumber} /> : null;
-  // The card's chevron, after the action word (ui-jobs 295).
+  // The card's chevron, after everything the head states (ui-jobs 302).
   const chev = useEventHeadChevron();
 
   return (
@@ -171,7 +171,6 @@ export function AaveV4EventHeader({
               Enable
             </span>
             <span className="text-sm text-rb-500">Supply</span>
-            {chev}
           </>
         ) : style.badge ? (
           // The dotted spine now carries a "LIQUIDATION" pill on desktop, so the
@@ -184,7 +183,6 @@ export function AaveV4EventHeader({
         ) : (
           <span className="text-sm text-rb-500">{label}</span>
         )}
-        {!ctx.alsoToggledCollateral && chev}
         {ctx.eventType === "liquidation" ? (
           // Liquidation header: the two facts that matter, collateral seized
           // and debt repaid, each as value + token icon: "Seized X ◊ Repaid Y ⬡".
@@ -250,8 +248,9 @@ export function AaveV4EventHeader({
         ) : (
           <>
             {amount > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-sm">
-                <span className={`font-bold text-foreground ${hideVal}`}>
+              // The icon and ticker follow the amount: they hand off with it.
+              <span className={`inline-flex items-center gap-1.5 text-sm ${hideVal}`}>
+                <span className="font-bold text-foreground">
                   <Prov {...aaveV4AmountProv(ctx, coord)}>
                     <ExactTip
                       text={fmtHeaderMagnitude(amount, ctx.reserveSymbol)}
@@ -305,6 +304,7 @@ export function AaveV4EventHeader({
             )}
           </>
         )}
+        {chev}
         {/* `evt-meta`: the header's own first row below sm (app/globals.css). */}
         <span className="evt-meta ml-auto inline-flex items-center gap-2">
           {timestamp > 0 && (

@@ -1,4 +1,4 @@
-// The disclosure grammar (rails-ops TO-DO-ui-jobs 295), on the page.
+// The disclosure grammar (rails-ops TO-DO-ui-jobs 295 and 302), on the page.
 // ---------------------------------------------------------------------------
 // One rule for every disclosure on the detail pages: the chevron sits directly
 // after its heading, and the right end of a row or header holds figures, the
@@ -16,6 +16,13 @@
 // chevron after the words. Aave V3: the event ⋮ in the header before the pill,
 // a press on it opening the menu (rows unchanged) and leaving the card closed,
 // and T6 holding the "?" alone.
+//
+// ui-jobs 302: on the event card header (T1) the chevron comes last in the left
+// cluster, after the verb, the amounts and icons that show and any rate pill;
+// an asset icon hides with its amount while Timeline values is on (≥640 px);
+// the chevron appears 0.5 s after the pointer enters the header and hides at
+// once on leave, keyboard focus shows it at once, the position card's rows keep
+// the instant reveal.
 //
 // Run:  BASE=http://localhost:3109 node scripts/verify/verify-disclosure-grammar.mjs
 
@@ -38,13 +45,19 @@ function check(name, ok, detail = "") {
 
 const browser = await chromium.launch();
 
-async function open(width, path, { touch = false, store = null } = {}) {
+async function open(width, path, { touch = false, store = null, valuesOff = false } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height: 1000 },
     hasTouch: touch,
     isMobile: touch,
     extraHTTPHeaders: bypassHeaders(),
   });
+  if (valuesOff)
+    await ctx.addInitScript(() => {
+      try {
+        localStorage.setItem("timeline-display-v3", JSON.stringify({ showTimelineValues: false }));
+      } catch {}
+    });
   if (store)
     await ctx.addInitScript(
       ([k, v]) => {
@@ -303,7 +316,7 @@ const headerLayout = (card) =>
   await page.waitForTimeout(400);
   const restOp = await chevOpacity(card.locator("[data-evt-head-chev]"));
   await head.hover({ position: { x: 200, y: 20 } });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(800);
   const hoverOp = await chevOpacity(card.locator("[data-evt-head-chev]"));
   check(
     "2f. #148: the header's chevron is hidden until the header is hovered",
@@ -442,6 +455,245 @@ const headerLayout = (card) =>
     `${summary} heading, ${JSON.stringify(rows)}`,
   );
   check("4g. no page error", errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// ── 5. ui-jobs 302: the chevron last, the icon with its amount, the delay ──
+const MAPLE = "/ethereum/maple/0x9ec2d8dd95ee25975ba2a5bb4e9d50dd57b7c87a";
+
+/** A T1 head's visible leaf items, left to right: the words, the icons ("IMG")
+ *  and the chevron ("CHEV"), up to the date. `last` is whether the chevron is
+ *  the last of them on the left cluster (before the right end's date/time). */
+const headItems = (t1) =>
+  t1.evaluate((el) => {
+    const vis = (e) => {
+      const r = e.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
+    };
+    const chev = el.querySelector("[data-evt-head-chev]");
+    const meta = el.querySelector(".evt-meta");
+    const items = [...el.querySelectorAll("span, img")]
+      .filter((e) => vis(e) && !e.querySelector("span, img") && !(meta && meta.contains(e)))
+      .map((e) => {
+        if (chev && chev.contains(e)) return "CHEV";
+        if (e.tagName === "IMG") return e.hasAttribute("data-party-icon") ? "PARTY" : "IMG";
+        return e.textContent.trim();
+      })
+      .filter((t, i, a) => t && !(t === "CHEV" && a[i - 1] === "CHEV"));
+    return { items, chev: !!chev && vis(chev), last: items.length > 0 && items[items.length - 1] === "CHEV" };
+  });
+
+/** Every T1 on the page that has a chevron: [number, words] with the images
+ *  counted, so a family-wide "no icon" and "chevron last" reads in one call. */
+async function allHeads(page) {
+  const heads = page.locator('[data-anatomy="T1"]');
+  const n = Math.min(await heads.count(), 40);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const h = await headItems(heads.nth(i)).catch(() => null);
+    if (h && h.chev) out.push(h);
+  }
+  return out;
+}
+
+async function openFolder(page) {
+  const folder = page.getByText(/^Cleared/).first();
+  if (await folder.count()) await folder.click().catch(() => {});
+  await page.waitForTimeout(2500);
+}
+
+async function waitHeads(page) {
+  await page
+    .locator('[data-anatomy="T1"]')
+    .first()
+    .waitFor({ timeout: 180000 })
+    .catch(() => {});
+  await page.waitForTimeout(3000);
+}
+
+// 5a. Liquity V2 at 1280, Timeline values on.
+{
+  const { ctx, page, errors } = await open(1280, TROVE);
+  await waitHeads(page);
+  await openFolder(page);
+  const { card } = cardWith(page, 148);
+  const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
+  check(
+    "5a. 1280, values on: Repay #148 holds no icon and its chevron is last",
+    !!repay && !repay.items.includes("IMG") && repay.last && repay.items[0] === "Repay",
+    JSON.stringify(repay?.items),
+  );
+  const heads = await allHeads(page);
+  const redemption = heads.find((h) => h.items[0] === "Cleared");
+  check(
+    "5b. 1280, values on: a redemption card reads Cleared … Reduced … then the chevron",
+    !!redemption &&
+      redemption.last &&
+      redemption.items.indexOf("Reduced") > 0 &&
+      redemption.items.indexOf("CHEV") > redemption.items.indexOf("Reduced"),
+    JSON.stringify(redemption?.items),
+  );
+  const first = cardWith(page, 1);
+  await first.card.scrollIntoViewIfNeeded().catch(() => {});
+  const open1 = await headItems(first.card.locator('[data-anatomy="T1"]')).catch(() => null);
+  check(
+    "5c. 1280, values on: the open card's chevron follows the rate pill",
+    !!open1 &&
+      open1.items[0] === "Open" &&
+      open1.last &&
+      !open1.items.includes("IMG") &&
+      /%$/.test(open1.items[open1.items.length - 2] ?? ""),
+    JSON.stringify(open1?.items),
+  );
+  const strays = heads.filter((h) => !h.last);
+  check("5d. 1280, values on: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
+  check("5e. no page error", errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// 5b. Liquity V2 at 1280, Timeline values off: the icon follows its amount.
+{
+  const { ctx, page, errors } = await open(1280, TROVE, { valuesOff: true });
+  await waitHeads(page);
+  await openFolder(page);
+  const { card } = cardWith(page, 148);
+  const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
+  const at = (a, x) => a.indexOf(x);
+  check(
+    "5f. 1280, values off: Repay #148 reads Repay, the amount, the icon, the chevron",
+    !!repay &&
+      repay.last &&
+      repay.items[0] === "Repay" &&
+      at(repay.items, "IMG") === 2 &&
+      at(repay.items, "CHEV") === 3,
+    JSON.stringify(repay?.items),
+  );
+  const heads = await allHeads(page);
+  const strays = heads.filter((h) => !h.last);
+  check("5g. 1280, values off: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
+  check("5h. no page error", errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// 5c. Liquity V2 at 390: amounts and icons show, the chevron last.
+{
+  const { ctx, page, errors } = await open(390, TROVE);
+  await waitHeads(page);
+  const { card } = cardWith(page, 148);
+  await card.scrollIntoViewIfNeeded().catch(() => {});
+  const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
+  check(
+    "5i. 390: Repay #148 reads Repay, the amount, the icon, the chevron",
+    !!repay && repay.last && repay.items[0] === "Repay" && repay.items.includes("IMG"),
+    JSON.stringify(repay?.items),
+  );
+  const heads = await allHeads(page);
+  const strays = heads.filter((h) => !h.last);
+  check("5j. 390: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
+  check("5k. no page error", errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// 5d. Chain-truth families at 1280, values on: no icon beside a hidden amount,
+// the chevron last. A row whose amount never hands off to the spine (Maple's
+// "Shares received") keeps its amount and its icon together.
+const FLUID = "/ethereum/fluid/19428";
+for (const [name, path, strict] of [
+  ["Aave V3", AAVE, true],
+  ["Maple", MAPLE, false],
+  ["Fluid", FLUID, true],
+]) {
+  const { ctx, page, errors } = await open(1280, path);
+  await waitHeads(page);
+  const heads = await allHeads(page);
+  const isAmount = (t) => /^[+−-]?\s?[<\d]/.test(t ?? "");
+  const stray = heads.filter((h) =>
+    strict ? h.items.includes("IMG") : h.items.some((t, i) => t === "IMG" && !isAmount(h.items[i - 1])),
+  );
+  const unlast = heads.filter((h) => !h.last);
+  check(
+    `5l. ${name} 1280, values on: ${heads.length} heads, ${strict ? "no icon in any" : "no icon without its amount"}`,
+    heads.length > 0 && stray.length === 0,
+    JSON.stringify(stray.slice(0, 2)),
+  );
+  check(
+    `5m. ${name} 1280: the chevron is last in every head`,
+    heads.length > 0 && unlast.length === 0,
+    JSON.stringify(unlast.slice(0, 2)),
+  );
+  check(`5n. ${name}: no page error`, errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// 5e. The reveal: a half second on T1, instant on the position card's rows,
+// instant on keyboard focus.
+{
+  const { ctx, page, errors } = await open(1280, TROVE);
+  await waitHeads(page);
+  const { card } = cardWith(page, 148);
+  await card.scrollIntoViewIfNeeded();
+  const head = card.locator('[data-anatomy="T1"] > div').first();
+  const op = () => chevOpacity(card.locator("[data-evt-head-chev]"));
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(600);
+  const rest = await op();
+  await head.hover({ position: { x: 200, y: 20 } });
+  await page.waitForTimeout(150);
+  const early = await op();
+  await page.waitForTimeout(650);
+  const late = await op();
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(250);
+  const left = await op();
+  check(
+    "5o. T1: hidden at rest, still hidden 150 ms after entering, shown by 800 ms, hidden 250 ms after leaving",
+    rest === 0 && early === 0 && late === 1 && left === 0,
+    `${rest} · ${early} · ${late} · ${left}`,
+  );
+  const row = page.locator('[data-card-row="0"]');
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(400);
+  await row.hover();
+  await page.waitForTimeout(250);
+  const rowOp = await chevOpacity(row);
+  check("5p. the position card's row shows its chevron within 250 ms of the pointer", rowOp === 1, `${rowOp}`);
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.activeElement?.blur?.());
+  const focusTarget = card
+    .locator(
+      '[data-anatomy="T1"] [data-event-menu] > button, [data-anatomy="T1"] [role="button"], [data-anatomy="T1"] button',
+    )
+    .first();
+  const hasFocusable = (await focusTarget.count()) > 0;
+  if (hasFocusable) {
+    await page.keyboard.press("Tab");
+    // Walk the tab order until focus sits inside this card's header.
+    let inside = false;
+    for (let i = 0; i < 200 && !inside; i++) {
+      inside = await head.evaluate(
+        (h) =>
+          h.contains(document.activeElement) ||
+          h.closest("[data-skel-section]")?.querySelector('[data-anatomy="T1"]')?.contains(document.activeElement) ||
+          false,
+      );
+      if (!inside) await page.keyboard.press("Tab");
+    }
+    await page.waitForTimeout(250);
+    const focusOp = inside ? await op() : null;
+    check(
+      "5q. keyboard focus in the T1 header shows its chevron within 250 ms",
+      inside && focusOp === 1,
+      `${inside} · ${focusOp}`,
+    );
+  } else {
+    check(
+      "5q. keyboard focus in the T1 header shows its chevron within 250 ms",
+      false,
+      "no focusable control in the header",
+    );
+  }
+  check("5r. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }
 

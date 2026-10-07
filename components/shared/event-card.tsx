@@ -299,7 +299,7 @@ export function EventCard({
         }`}
       >
         <div
-          className={headerToggles ? "group/evt disc-row cursor-pointer" : ""}
+          className={headerToggles ? "group/evt disc-row disc-row-slow cursor-pointer" : ""}
           onClick={() => {
             if (hasDetail && headerToggles) toggleDetail();
           }}
