@@ -24,9 +24,9 @@ import {
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued, fmtRateNum } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
-import { ClosedTokens, LedgerCell } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell, usdAt } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   streamVia,
@@ -261,7 +261,7 @@ function CollateralMetric({
               ? {
                   before: beforeUsdKnown ? <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P> : null,
                   after: <P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>,
-                  price: eventPriceText(afterInUsd / after, collateralType) ?? undefined,
+                  ...usdAt({ price: afterInUsd / after, symbol: collateralType, before, after }),
                 }
               : undefined
           }

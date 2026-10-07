@@ -20,12 +20,13 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { DeltaToggle, StateTransition, changeTone } from "@/components/shared/state-transition";
-import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import {
   AssetLedgers,
   ClosedTokens,
+  usdAt,
   DayCloseNote,
   EventLedgerContext,
   LedgerCell,
@@ -154,6 +155,7 @@ function SideLedger({
       usd: shownFor(single.symbol)
         ? { lines: dollars.lines, dollars: dollars.total.dollars, before: state.heldBefore[side] }
         : null,
+      price: sum.balances.find((x) => x.symbol === single.symbol)?.price ?? null,
     });
     return (
       <>
@@ -229,7 +231,7 @@ function ClosedSide({
                       <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
                     ) : null,
                   after: <Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>,
-                  price: eventPriceText(a.price, a.symbol) ?? undefined,
+                  ...usdAt({ price: a.price, symbol: a.symbol, before: a.before, after: a.amount }),
                 }
               : undefined
           }

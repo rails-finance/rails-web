@@ -37,6 +37,8 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
 import { EventLedgerContext, LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
+import { eventPriceText, offPar, type OffPar } from "@/lib/shared/usd-display";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
 import { dayCloseNote, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
@@ -332,6 +334,27 @@ export interface ClosedUsdFigures {
   after: ReactNode;
   /** The price line, e.g. "At the event\u2019s price, $2,431.20 per ETH". */
   price?: ReactNode;
+  /** The token the figures value, its price at the event and the amounts:
+   *  a dollar stablecoin off par states its price (`offPar`, ui-jobs 283). */
+  at?: UsdAt;
+}
+
+export interface UsdAt {
+  symbol: string;
+  price: number | null | undefined;
+  before?: number | null;
+  after?: number | null;
+}
+
+/** Spread into a cell's `usd`: the price line and what `at` carries. */
+export function usdAt(at: UsdAt): Pick<ClosedUsdFigures, "price" | "at"> {
+  return { price: eventPriceText(at.price, at.symbol) ?? undefined, at };
+}
+
+/** The figures, and the band they take. */
+function useUsdFigures(usd: ClosedUsdFigures | undefined): (ClosedUsdFigures & { off: OffPar | null }) | undefined {
+  if (!usd) return undefined;
+  return { ...usd, off: offPar(usd.at?.price, usd.at?.symbol) };
 }
 
 /** A closed ledger cell's tokens, before → after, kept on one line. `usd` is
@@ -339,8 +362,9 @@ export interface ClosedUsdFigures {
  *  thin divider; in a cell that opens into a ledger the cell's text stays
  *  tokens and the dollars are a rich tooltip on hover and keyboard focus of
  *  the figure (a tap on touch), with the price they stand at (ui-jobs 296). */
-export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: ClosedUsdFigures }) {
+export function ClosedTokens({ children, usd: given }: { children: ReactNode; usd?: ClosedUsdFigures }) {
   const drawn = useContext(ClosedUsdContext);
+  const usd = useUsdFigures(given);
   const tokens = <span className="inline-flex items-center gap-1 whitespace-nowrap">{children}</span>;
   if (!usd) return tokens;
   if (drawn)
@@ -361,11 +385,11 @@ export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: Clo
               <span className="inline-flex items-center gap-1 text-sm font-semibold">
                 {usd.before != null && (
                   <>
-                    {usd.before}
+                    <span className={usd.off?.band ? OFF_PAR_BAND : undefined}>{usd.before}</span>
                     <TransitionArrow size="sm" />
                   </>
                 )}
-                {usd.after}
+                <OffParFigure off={usd.off}>{usd.after}</OffParFigure>
               </span>
               <span className="text-rb-500">{usd.price ?? "At the event\u2019s price"}</span>
             </span>
@@ -384,7 +408,7 @@ export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: Clo
  *  and dollars do not share a line: the dollars take the line under the
  *  tokens, set right, with no divider. A cell that opens into a ledger draws
  *  none: the ledger's USD column states them (ui-jobs 289). */
-function ClosedUsd({ before, after }: ClosedUsdFigures) {
+function ClosedUsd({ before, after, off }: ClosedUsdFigures & { off: OffPar | null }) {
   return (
     <span
       className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
@@ -392,11 +416,11 @@ function ClosedUsd({ before, after }: ClosedUsdFigures) {
     >
       {before != null && (
         <span className="inline-flex items-center gap-1" data-ledger-closed-usd-before="">
-          {before}
+          <span className={off?.band ? OFF_PAR_BAND : undefined}>{before}</span>
           <TransitionArrow size="sm" />
         </span>
       )}
-      {after}
+      <OffParFigure off={off}>{after}</OffParFigure>
     </span>
   );
 }
@@ -552,6 +576,7 @@ function LedgerRows({
   provs?: LedgerProvs;
   daily?: boolean;
 }) {
+  const off = offPar(ledger.price, ledger.symbol);
   const side = ledger.side;
   totalUsdProv = provs?.totalUsd ?? totalUsdProv;
   const { two, hideTok, hideUsd } = cols;
@@ -695,7 +720,9 @@ function LedgerRows({
           <span className={`self-end whitespace-nowrap py-1 text-right ${USD_CELL} ${hideUsd}`} data-ledger-usd="">
             {ledger.usd && (
               <span className="text-rb-500">
-                {totalUsdProv ? <Prov info={totalUsdProv}>{ledger.usd.after}</Prov> : ledger.usd.after}
+                <OffParFigure off={off}>
+                  {totalUsdProv ? <Prov info={totalUsdProv}>{ledger.usd.after}</Prov> : ledger.usd.after}
+                </OffParFigure>
               </span>
             )}
           </span>

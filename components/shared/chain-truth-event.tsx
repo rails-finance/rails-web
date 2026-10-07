@@ -44,7 +44,8 @@ import {
   ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
-import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
+import { offPar, usdShown } from "@/lib/shared/usd-display";
+import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -59,7 +60,7 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
-import { ClosedTokens, LedgerCell } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell, usdAt } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
@@ -848,10 +849,14 @@ export function ChainTruthDetail({
                     {fmtUsdChip(s.usd.value)}
                   </Prov>
                 ),
-                price:
-                  s.symbol && heldAmount > 0
-                    ? (eventPriceText(s.usd.value / heldAmount, s.symbol) ?? undefined)
-                    : undefined,
+                ...(s.symbol && heldAmount > 0
+                  ? usdAt({
+                      price: s.usd.value / heldAmount,
+                      symbol: s.symbol,
+                      before: s.transition ? Number(s.transition.beforeExact) : null,
+                      after: heldAmount,
+                    })
+                  : {}),
               }
             : undefined;
         const tokensWrap = (kids: ReactNode) =>
@@ -935,9 +940,7 @@ export function ChainTruthDetail({
                       // the bordered chip the Liquity V2 / Aave V4 details use
                       // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
                       // receipt; the chip shows whole dollars.
-                      <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
-                        <ValuePill changed={changed}>{fmtUsdChip(s.usd.value)}</ValuePill>
-                      </Prov>
+                      <UsdChip usd={s.usd} amount={heldAmount} symbol={s.symbol} changed={changed} />
                     ))}
                 </StateTransition>
                 {s.interestSincePrevious && (
@@ -973,5 +976,30 @@ export function ChainTruthDetail({
       })}
       {extra != null && <div className="h-full">{extra}</div>}
     </div>
+  );
+}
+
+/** A cell's USD chip with no ledger; a dollar stablecoin off par states its
+ *  price after it (lib/shared/usd-display.ts `offPar`). */
+function UsdChip({
+  usd,
+  amount,
+  symbol,
+  changed,
+}: {
+  usd: { value: number; prov: Provenance };
+  amount: number;
+  symbol: string | undefined;
+  changed: boolean;
+}) {
+  const off = offPar(amount > 0 ? usd.value / amount : null, symbol);
+  return (
+    <OffParFigure off={off}>
+      <Prov info={usd.prov} value={formatUsdValue(usd.value)}>
+        <ValuePill changed={changed}>
+          <span className={off?.band ? OFF_PAR_BAND : undefined}>{fmtUsdChip(usd.value)}</span>
+        </ValuePill>
+      </Prov>
+    </OffParFigure>
   );
 }

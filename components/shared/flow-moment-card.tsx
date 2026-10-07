@@ -23,11 +23,12 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
   AssetLedgers,
   ClosedTokens,
+  usdAt,
   LedgerCell,
   LedgerTable,
   dayStamp,
@@ -551,7 +552,7 @@ export function FlowMomentCard({
                   !multi && a.usd != null && shownFor(a)
                     ? {
                         after: <Prov info={usdProv(a)}>{wholeUsd(a.usd, unitOf(model, side))}</Prov>,
-                        price: eventPriceText(a.price, a.symbol) ?? undefined,
+                        ...usdAt({ price: a.price, symbol: a.symbol, after: a.tokens }),
                       }
                     : undefined
                 }

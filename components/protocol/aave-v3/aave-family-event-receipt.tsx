@@ -329,6 +329,7 @@ function SideLedger({
         usd: shownFor(single.symbol)
           ? { lines: dollars.lines, dollars: dollars.total.dollars, before: facts.heldBefore }
           : null,
+        price: bySum.balances.find((x) => x.symbol === single.symbol)?.price ?? null,
       });
       return (
         <>

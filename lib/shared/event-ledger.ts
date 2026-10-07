@@ -73,6 +73,9 @@ export interface Ledger {
    *  the side, and after. */
   tokens: { before: string | null; after: string; units: number } | null;
   usd: { before: string | null; after: string; dollars: number } | null;
+  /** The token's price at the event, where the builder is given it: the
+   *  off-par stablecoin rule reads it (lib/shared/usd-display.ts). */
+  price?: number | null;
 }
 
 /** A dollar line of the side, as flow-focus prints it. */
@@ -171,6 +174,7 @@ export function tokenLedger({
   usd,
   symbolFilter,
   accrualLabel,
+  price,
 }: {
   model: FlowModel;
   side: FlowSide;
@@ -184,6 +188,8 @@ export function tokenLedger({
    *  move (Liquity V2's debt): a line the accrual alone moved splits into its
    *  earlier part and this row, which the function names by the line's key. */
   accrualLabel?: (key: string) => string;
+  /** The token's price at the event. */
+  price?: number | null;
 }): Ledger {
   const scale = 10 ** sum.decimals;
   const bucketOf = (k: string) => model.buckets.find((b) => b.key === k);
@@ -291,6 +297,7 @@ export function tokenLedger({
     rows,
     tokens: { before, after: sum.total.amount, units: sum.total.units },
     usd: usd ? usdTotal(usd.dollars, usd.before) : null,
+    ...(price != null ? { price } : {}),
   };
 }
 
@@ -398,7 +405,8 @@ export function assetLedgers({
         lines.push({ key: `${side}-${symbol}-market`, label: "Market move", kind: "rest", seg: null, dollars: rest });
       usd = { lines, dollars: assetUsd, before: null };
     }
-    return tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol });
+    const price = sum.balances.find((x) => x.symbol === symbol)?.price ?? null;
+    return tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol, price });
   });
   return { assets, usd: usdTotal(total, heldBefore) };
 }

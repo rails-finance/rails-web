@@ -38,8 +38,7 @@ import {
   TransitionArrow,
   changeTone,
 } from "@/components/shared/state-transition";
-import { ClosedTokens } from "@/components/shared/event-ledger";
-import { eventPriceText } from "@/lib/shared/usd-display";
+import { ClosedTokens, usdAt } from "@/components/shared/event-ledger";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
@@ -307,10 +306,14 @@ export function ClosedSide({
                     ) : (
                       "$0"
                     ),
-                    price:
-                      r.priceBase != null
-                        ? (eventPriceText(Number(humanOf(r.priceBase, 8)), sym) ?? undefined)
-                        : undefined,
+                    ...(r.priceBase != null
+                      ? usdAt({
+                          price: Number(humanOf(r.priceBase, 8)),
+                          symbol: sym,
+                          before: Number(before),
+                          after: Number(after),
+                        })
+                      : {}),
                   }
                 : undefined
             }
