@@ -188,6 +188,10 @@ export interface SpineColumnProps {
    *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
+  /** icon="rate-change": the rate before and after (%), drawn in the right
+   *  flank where a row's leg numbers stand ("4.12% → 3.60%"). Unset, the
+   *  glyph carries an up or down arrow. */
+  rateSpan?: [number, number];
   /** Direction for rate-change arrow or delegate badge */
   iconDirection?: "up" | "down";
   /** The segment below the node stands for events not drawn (a closed
@@ -854,6 +858,7 @@ export function SpineColumn({
   warningTip,
   warningLegs,
   iconDirection,
+  rateSpan,
   undrawn,
   color = "default",
   isFirst,
@@ -1034,8 +1039,31 @@ export function SpineColumn({
               <span />
               <span />
               <RateIcon size={scale.tokenSize} />
-              <DirectionArrow direction={iconDirection ?? "up"} size={Math.round(scale.arrowSize * 0.7)} />
-              <span />
+              {rateSpan ? (
+                spineValues ? (
+                  <span
+                    className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
+                    style={{ gridColumn: "4 / 6" }}
+                    data-spine-rate=""
+                  >
+                    <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
+                    <span className="px-1 font-normal text-rb-500" aria-hidden>
+                      &rarr;
+                    </span>
+                    {rateSpan[1].toFixed(2)}%
+                  </span>
+                ) : (
+                  <>
+                    <span />
+                    <span />
+                  </>
+                )
+              ) : (
+                <>
+                  <DirectionArrow direction={iconDirection ?? "up"} size={Math.round(scale.arrowSize * 0.7)} />
+                  <span />
+                </>
+              )}
             </div>
           );
         case "delegate":

@@ -114,6 +114,12 @@ export function LiquityEventCard({
   const rateUp = isRateChange
     ? (ctx.stateAfter?.annualInterestRate ?? 0) >= (ctx.stateBefore?.annualInterestRate ?? 0)
     : false;
+  // A rate change states its rate before and after, on the flank and in the
+  // phone caption ("Rate 4.12% → 3.60%").
+  const rateSpan: [number, number] | undefined =
+    isRateChange && ctx.stateBefore && ctx.stateAfter
+      ? [ctx.stateBefore.annualInterestRate, ctx.stateAfter.annualInterestRate]
+      : undefined;
   const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
 
   const isRedemption = ctx.operation === "redeemCollateral";
@@ -161,16 +167,12 @@ export function LiquityEventCard({
   ) : isDelegate ? (
     // Delegation reads as an external-party event via the pink +/- glyph badge
     // (color-grammar.md §4b); the spine line itself stays neutral.
-    <SpineColumn
-      icon="delegate"
-      iconDirection={isJoin ? "up" : "down"}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="delegate" iconDirection={isJoin ? "up" : "down"} isFirst={isFirst} isLast={!!isLast} />
   ) : isRateChange ? (
     <SpineColumn
       icon="rate-change"
       iconDirection={rateUp ? "up" : "down"}
+      rateSpan={rateSpan}
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -307,7 +309,7 @@ export function LiquityEventCard({
         explanationHeading={PAGE_WORDS.explanation_heading}
         eventMenu={false}
         persistKey={`liquity-v2:${event.id}`}
-        caption={liquityOperationLabel(ctx)}
+        caption={rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx)}
         {...(page
           ? {
               hideDetailChevron: true,
