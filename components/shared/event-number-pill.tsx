@@ -7,9 +7,11 @@
 // example) it is the plain pill. `data-event-number` carries the number (a
 // range's first) for the verifiers.
 //
-// With Display's "Transaction hashes" on (ui-jobs 294) a timeline pill shows
-// its transaction's short hash, the full hash in its title; the aria-label
-// keeps the number. The event page's pill always shows the number.
+// On the timeline's desktop row the number stands in the card's column left
+// of the spine, and with Display's "Transaction hashes" on its old slot on
+// the right holds the hash as an explorer link (ui-jobs 250). Below 640px the
+// header's pill shows the short hash in the number's place, the full hash in
+// its title, as ui-jobs 294 built it; the aria-label keeps the number. The event page's pill always shows the number.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,6 +19,8 @@ import { createContext, useContext, useLayoutEffect, type ReactNode } from "reac
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortAddr } from "@/lib/shared/format-event";
+import { useChainId } from "@/lib/shared/chain-context";
+import { explorerUrl } from "@/lib/shared/chains";
 
 /** The card's transaction hash, provided by `EventCard` around its header. */
 export const EventTxHashContext = createContext<string | null>(null);
@@ -83,6 +87,9 @@ export function EventNumberPill(props: { number: number; last?: number }) {
   }, [toColumn, number, last]);
   return (
     <>
+      {/* With the number in the card's column, its old slot holds the
+          transaction hash where Display asks for it (desktop only). */}
+      {toColumn && <TxHashLink />}
       {menu}
       {/* Where the card's column carries the number (>=640px), the header's
           pill shows only below it, where the column is hidden. */}
@@ -91,12 +98,41 @@ export function EventNumberPill(props: { number: number; last?: number }) {
   );
 }
 
+/** The transaction hash, abbreviated ("0x53e0…fac5"), as a link to the
+ *  chain's explorer: "Transaction hashes" in Display, off by default, at
+ *  >=640px. A pointer, not a receipt (TO-DO-mobile-timeline decision 13). */
+function TxHashLink() {
+  const txHash = useContext(EventTxHashContext);
+  const { showTxHashes } = useTimelineDisplay();
+  const chainId = useChainId();
+  if (!showTxHashes || !txHash) return null;
+  return (
+    <a
+      href={explorerUrl(chainId, "tx", txHash)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hidden font-mono text-xs text-rb-500 underline-offset-2 hover:text-foreground hover:underline sm:inline"
+      title={txHash}
+      data-event-tx-hash={txHash}
+      data-prov-exempt=""
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {shortAddr(txHash)}
+    </a>
+  );
+}
+
 export function NumberPill({
   number,
   last,
   className,
+  numberOnly,
 }: {
   number: number;
+  /** The column's pill: the number whatever Display says (the hash has its
+   *  own slot). */
+  numberOnly?: boolean;
   /** A row drawing several events ends its range here: "7–8". */
   last?: number;
   className?: string;
@@ -125,7 +161,7 @@ export function NumberPill({
   const action = onPage ? "View in timeline" : "View event page";
   // Mono text gives every short hash one width, so the pills line up from
   // card to card.
-  const hash = !onPage && showTxHashes && txHash ? txHash : null;
+  const hash = !onPage && !numberOnly && showTxHashes && txHash ? txHash : null;
   return (
     <Link
       href={onPage ? timelineHrefOf(shareHref) : shareHref}

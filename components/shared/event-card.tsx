@@ -555,7 +555,7 @@ export function EventCard({
                   {numberSlot ??
                     (num && (
                       <EventTxHashContext.Provider value={txHash ?? null}>
-                        <NumberPill number={num.number} last={num.last} />
+                        <NumberPill number={num.number} last={num.last} numberOnly />
                       </EventTxHashContext.Provider>
                     ))}
                 </div>
