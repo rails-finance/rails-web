@@ -33,7 +33,7 @@ import { DiscChevron } from "@/components/shared/expand-chevron";
 import { Prov, ProvDetached, type Provenance } from "@/components/shared/provenance";
 import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { RevealTip } from "@/components/shared/reveal-tip";
+import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
 import { EventLedgerContext, LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
@@ -372,7 +372,7 @@ export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: Clo
           </ProvDetached>
         }
       >
-        {tokens}
+        <QuietTipsContext.Provider value={true}>{tokens}</QuietTipsContext.Provider>
       </RevealTip>
     </span>
   );
