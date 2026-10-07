@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Folder, FolderOpen, Percent } from "lucide-react";
+import { Percent } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
@@ -120,19 +120,7 @@ export function DelegateAdjustRunCard({
           })}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
-        {/* On mobile the spine column is hidden, so the folder glyph moves
-            into the header — the same hand-off TimelineRunCard's folder makes. */}
-        {!spine && (
-          <span className="sm:hidden relative mr-0.5 inline-flex text-rb-500" aria-hidden>
-            {open ? <FolderOpen size={16} strokeWidth={1.75} /> : <Folder size={16} strokeWidth={1.75} />}
-            <span className="absolute -right-1.5 -bottom-1 inline-flex rounded-full bg-background p-px">
-              {folderMark}
-            </span>
-          </span>
-        )}
-        <span className="text-sm font-medium text-rb-500">
-          Adjusted{!spine && <span className="sm:hidden"> ×{count.toLocaleString("en-US")}</span>}
-        </span>
+        <span className="text-sm font-medium text-rb-500">Adjusted</span>
         {hasMovement && (
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
             <UsersGlyph />
@@ -215,21 +203,7 @@ export function DelegateAdjustRunCard({
         header={headerRow(false)}
         hideDetailChevron
       />
-      {open && (
-        <div className="relative flex flex-col gap-2 ml-1 pl-2 sm:contents">
-          {/* The rail draws with the spine's own dash (1px wide, 6px period);
-              rgb(101 115 140) = rb-500, the spine's default tint. */}
-          <div
-            aria-hidden
-            className="absolute left-0 top-0 bottom-0 w-px sm:hidden"
-            style={{
-              backgroundImage: "linear-gradient(to bottom, rgb(101 115 140) 50%, transparent 50%)",
-              backgroundSize: "1px 6px",
-            }}
-          />
-          {children}
-        </div>
-      )}
+      {open && <>{children}</>}
     </>
   );
 }

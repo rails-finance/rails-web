@@ -6,13 +6,13 @@ import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Calculator, Folder, FolderOpen } from "lucide-react";
+import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { DisclosureChevron, ExpandChevron } from "@/components/shared/expand-chevron";
+import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -187,13 +187,6 @@ const VERB_CLASSES: Record<"caution" | "danger" | "neutral", string> = {
   neutral: "text-rb-500",
 };
 
-/** Mobile header pill per tone (the desktop pill lives on the spine). */
-const PILL_CLASSES: Record<"caution" | "danger" | "neutral", string> = {
-  caution: "bg-caution-500 text-white",
-  danger: "bg-red-500 text-white",
-  neutral: "bg-rb-500 text-white",
-};
-
 export function TimelineRunCard({
   count,
   memberNoun,
@@ -311,52 +304,17 @@ export function TimelineRunCard({
           })}
     >
       <div className="flex items-center gap-1.5 flex-wrap">
-        {/* The dotted spine carries the pill on desktop; on mobile the badge
-            moves into the header, matching the single passive card's hand-off.
-            A folder row carries it too: the corner mark and the tone state the
-            severity, the pill names the kind. */}
-        {!spine && warningLabel && (
-          <span
-            className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PILL_CLASSES[tone]}`}
-          >
-            {warningLabel}
-          </span>
-        )}
-        {/* On mobile the spine column is hidden, so the folder glyph moves
-            into the header — the same hand-off the warning pill makes — and
-            its Finder-style disclosure chevron comes with it: right while
-            closed, down while open, to the folder's left (the spine node
-            carries the same pair on sm+). */}
-        {!spine && folder && (
-          <span
-            className="sm:hidden mr-0.5 inline-flex items-center gap-1 text-rb-500 transition-colors group-hover/run:text-foreground"
-            aria-hidden
-          >
-            <DisclosureChevron isOpen={open} />
-            <span className="relative inline-flex">
-              {open ? <FolderOpen size={16} strokeWidth={1.75} /> : <Folder size={16} strokeWidth={1.75} />}
-              {folderBadge && (
-                <span className="absolute -right-1.5 -bottom-1 inline-flex rounded-full bg-background p-px">
-                  {folderBadge}
-                </span>
-              )}
-            </span>
-          </span>
-        )}
         {/* The row reads as [icon] N [aggregates…] — the verbs beside each
             summed pair already name what happened, so a word naming it again
             was repetition and went, with the "×" beside it, on 2026-09-02
             (next to the Σ glyph it read as arithmetic). The icon reads as
-            "Σ over this folder". Count still moves to the spine pill on sm+;
-            on mobile, where the spine is hidden, it stays in the header —
-            bare, like the spine pill. */}
+            "Σ over this folder". The count rides the spine's folder pill. */}
         {/* data-prov-exempt: the count is an index row count, the "event
             numbers" class, not a chain-state figure. See SpineColumn's folder
             pill, which carries the same stamp for the same reason. */}
         {folder && (
           <span data-prov-exempt="" className="inline-flex items-center gap-1 text-sm font-medium text-rb-500">
             <Calculator size={15} strokeWidth={2} aria-hidden />
-            {!spine && <span className="sm:hidden">{count.toLocaleString("en-US")}</span>}
           </span>
         )}
         {lead}
@@ -537,27 +495,9 @@ export function TimelineRunCard({
       />
       {open &&
         (folder ? (
-          // Mobile containment: a left rail + slight indent holds the
-          // expanded members under their folder. On sm+ the wrapper is
-          // display:contents — the members join the outer flex column (and
-          // its gap) exactly as before, and the rail never draws; there the
-          // containment reads from the spine instead (the folder in the left
-          // flank, the members' nodes to its right).
-          <div className="relative flex flex-col gap-2 ml-1 pl-2 sm:contents">
-            {/* The rail draws with the spine's own dash (1px wide, 6px
-                period) rather than border-dashed, whose dashes are longer
-                and read as a different line. rgb(101 115 140) = rb-500, the
-                spine's default tint. */}
-            <div
-              aria-hidden
-              className="absolute left-0 top-0 bottom-0 w-px sm:hidden"
-              style={{
-                backgroundImage: "linear-gradient(to bottom, rgb(101 115 140) 50%, transparent 50%)",
-                backgroundSize: "1px 6px",
-              }}
-            />
-            {body}
-          </div>
+          // The members join the outer flex column; the spine (the folder in
+          // the left flank, the members' nodes to its right) holds them.
+          <>{body}</>
         ) : (
           body
         ))}

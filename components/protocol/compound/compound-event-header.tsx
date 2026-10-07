@@ -85,14 +85,6 @@ export function CompoundEventHeader({
         address: soleFlowAddress(flows, ctx.assetSymbol),
         prov,
         suffix: ctx.assetSymbol,
-        // The spine's flank direction (compound-event-card DIRECTION): a
-        // supply leaves the wallet, a withdraw arrives in it.
-        phoneArrow:
-          ctx.eventType === "supply" || ctx.eventType === "supply_collateral"
-            ? "out"
-            : ctx.eventType === "withdraw" || ctx.eventType === "withdraw_collateral"
-              ? "in"
-              : undefined,
       });
   }
 
