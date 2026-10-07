@@ -1386,7 +1386,11 @@ function ChainTruthTimelineBody({
       }
       if (runId && !runOpened) {
         runOpened = true;
-        document.querySelector<HTMLElement>(`[data-flow-run="${runId}"] [role="button"]`)?.click();
+        // The group's control (its layers glyph), closed: the row's head
+        // would open the summary card instead of the members.
+        document
+          .querySelector<HTMLElement>(`[data-flow-run="${runId}"] [data-group-button][aria-expanded="false"]`)
+          ?.click();
       }
       if (tries >= 50) {
         // No mark (its last event filtered out): the day's newest drawn
