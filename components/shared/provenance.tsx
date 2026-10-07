@@ -258,6 +258,16 @@ export function ProvUnscoped({ children }: { children: ReactNode }) {
   return <ProvUnscopedCtx.Provider value={true}>{children}</ProvUnscopedCtx.Provider>;
 }
 
+/** A subtree whose figures read as plain text: a tooltip that repeats a
+ *  figure the card already traces registers no second receipt. */
+export function ProvDetached({ children }: { children: ReactNode }) {
+  return (
+    <ProvReceiptsScopeCtx.Provider value={null}>
+      <ProvUnscopedCtx.Provider value={true}>{children}</ProvUnscopedCtx.Provider>
+    </ProvReceiptsScopeCtx.Provider>
+  );
+}
+
 const warnedUnscoped = new Set<string>();
 
 // ── The page-level inspector ─────────────────────────────────────────────────

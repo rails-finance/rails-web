@@ -24,9 +24,9 @@ import {
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued, fmtRateNum } from "@/lib/liquity/figure-format";
 import type { ReactNode } from "react";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
-import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { usdShown } from "@/lib/shared/usd-display";
+import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
 import {
   streamVia,
@@ -126,7 +126,26 @@ function DebtMetric({
     <LedgerCell label={L2_WORDS.debt} side="debt">
       <div>
         <StateTransition>
-          <ClosedTokens>
+          <ClosedTokens
+            usd={
+              debtUsd
+                ? {
+                    before:
+                      showBefore && !accrualMove ? (
+                        <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(before), "before")}>
+                          {formatUsd(before)}
+                        </P>
+                      ) : null,
+                    after: (
+                      <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(after), "after")}>
+                        {formatUsd(after)}
+                      </P>
+                    ),
+                    price: `At its $1 face, $1 per ${stablecoinSymbol}`,
+                  }
+                : undefined
+            }
+          >
             {accrualMove ? (
               <span className="inline-flex items-center gap-1" data-debt-accrual-move="">
                 <span className="text-sm font-semibold text-foreground tabular-nums">
@@ -150,20 +169,6 @@ function DebtMetric({
               </P>
             )}
           </ClosedTokens>
-          {debtUsd && (
-            <ClosedUsd
-              before={
-                showBefore && !accrualMove ? (
-                  <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(before), "before")}>
-                    {formatUsd(before)}
-                  </P>
-                ) : null
-              }
-              after={
-                <P info={faceUsdProv(stablecoinSymbol, toLocaleStringHelper(after), "after")}>{formatUsd(after)}</P>
-              }
-            />
-          )}
         </StateTransition>
         {(upfrontFee > 0 || inLedger) && (
           <StatSubline changed={changed}>
@@ -250,7 +255,17 @@ function CollateralMetric({
   return (
     <LedgerCell label={L2_WORDS.collateral} side="collateral">
       <StateTransition>
-        <ClosedTokens>
+        <ClosedTokens
+          usd={
+            afterUsd
+              ? {
+                  before: beforeUsdKnown ? <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P> : null,
+                  after: <P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>,
+                  price: eventPriceText(afterInUsd / after, collateralType) ?? undefined,
+                }
+              : undefined
+          }
+        >
           {showBefore && (
             <DeltaToggle before={<P info={provBefore}>{fc(before)}</P>} delta={isClose ? null : deltaNode} />
           )}
@@ -265,13 +280,6 @@ function CollateralMetric({
             </P>
           )}
         </ClosedTokens>
-        {afterUsd && (
-          // The USD at this event's price, after a thin divider.
-          <ClosedUsd
-            before={beforeUsdKnown ? <P info={usdProvBefore}>{formatUsd(beforeInUsd)}</P> : null}
-            after={<P info={usdProvAfter}>{formatUsd(afterInUsd)}</P>}
-          />
-        )}
       </StateTransition>
     </LedgerCell>
   );

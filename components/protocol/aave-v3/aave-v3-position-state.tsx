@@ -38,7 +38,8 @@ import {
   TransitionArrow,
   changeTone,
 } from "@/components/shared/state-transition";
-import { ClosedTokens, ClosedUsd } from "@/components/shared/event-ledger";
+import { ClosedTokens } from "@/components/shared/event-ledger";
+import { eventPriceText } from "@/lib/shared/usd-display";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
@@ -290,7 +291,30 @@ export function ClosedSide({
     return (
       <div className="flex flex-col items-end" data-receipt-total={side}>
         <StateTransition>
-          <ClosedTokens>
+          <ClosedTokens
+            usd={
+              usdOn
+                ? {
+                    before: uBefore ? (
+                      <Prov info={uBefore.prov} value={uBefore.exact}>
+                        {fmtPositionUsd(uBefore.value)}
+                      </Prov>
+                    ) : null,
+                    after: uAfter ? (
+                      <Prov info={uAfter.prov} value={uAfter.exact}>
+                        {fmtPositionUsd(uAfter.value)}
+                      </Prov>
+                    ) : (
+                      "$0"
+                    ),
+                    price:
+                      r.priceBase != null
+                        ? (eventPriceText(Number(humanOf(r.priceBase, 8)), sym) ?? undefined)
+                        : undefined,
+                  }
+                : undefined
+            }
+          >
             {moved.sign !== 0 && (
               <DeltaToggle
                 before={
@@ -330,26 +354,6 @@ export function ClosedSide({
               </span>
             </Prov>
           </ClosedTokens>
-          {usdOn && (
-            <ClosedUsd
-              before={
-                uBefore ? (
-                  <Prov info={uBefore.prov} value={uBefore.exact}>
-                    {fmtPositionUsd(uBefore.value)}
-                  </Prov>
-                ) : null
-              }
-              after={
-                uAfter ? (
-                  <Prov info={uAfter.prov} value={uAfter.exact}>
-                    {fmtPositionUsd(uAfter.value)}
-                  </Prov>
-                ) : (
-                  "$0"
-                )
-              }
-            />
-          )}
         </StateTransition>
         {flipNotes}
       </div>

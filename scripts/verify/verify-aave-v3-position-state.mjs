@@ -620,6 +620,22 @@ for (const fx of FIXTURES) {
         `${fx.label}: a closed cell with a ledger states no USD after its tokens`,
         (await card.locator(ledgerUsdSel).count()) === 0,
       );
+      // Its dollars stand in a tooltip on the figure (ui-jobs 296).
+      const usdHost = card.locator("[data-ledger-cell] [data-closed-usd-tip]").first();
+      if (await usdHost.count()) {
+        await usdHost.hover();
+        const tip = await card
+          .locator("[data-ledger-usd-tip]")
+          .first()
+          .innerText({ timeout: 3000 })
+          .catch(() => "");
+        check(
+          `${fx.label}: hovering a closed figure shows its USD and the event's price`,
+          /\$/.test(tip) && /price/.test(tip),
+          tip,
+        );
+        await page.mouse.move(0, 0);
+      }
       if (a) {
         const hfReceipt = await receiptText(
           page,
