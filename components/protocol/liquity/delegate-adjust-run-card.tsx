@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import {
-  GroupChevron,
   GroupPill,
   groupPillText,
   GroupFrame,
@@ -123,14 +122,27 @@ export function DelegateAdjustRunCard({
   const rangeText = groupRangeText(numberRange);
   const pill = (
     <GroupPill
-      text={groupPillText(numberRange, count)}
+      text={groupPillText(numberRange)}
       label={groupLabel(count, false, rangeText)}
       open={false}
       onToggle={toggle}
       controls={membersId}
     />
   );
-  const chevron = <GroupChevron label={groupLabel(count, true, rangeText)} onToggle={toggle} controls={membersId} />;
+  const openPill = (
+    <GroupPill
+      text={groupPillText(numberRange)}
+      label={groupLabel(count, true, rangeText)}
+      open
+      onToggle={toggle}
+      controls={membersId}
+    />
+  );
+  const hide = {
+    title: `Hide ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`,
+    subtitle: rangeText ? `Collapse the group, ${rangeText}` : "Collapse the group",
+    hide: toggle,
+  };
   // No asset moved: no node, the words stand, and the dotted segment marks
   // the members not drawn.
   const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
@@ -143,7 +155,8 @@ export function DelegateAdjustRunCard({
     return (
       <GroupFrame
         open={open}
-        chevron={chevron}
+        openPill={openPill}
+        hide={hide}
         membersId={membersId}
         members={children}
         closed={
@@ -169,7 +182,8 @@ export function DelegateAdjustRunCard({
   return (
     <GroupFrame
       open={open}
-      chevron={chevron}
+      openPill={openPill}
+      hide={hide}
       membersId={membersId}
       closed={
         <EventCard

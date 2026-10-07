@@ -75,10 +75,13 @@ export interface EventCardProps {
   /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), at the right end
    *  of the footer (T6). */
   learnMore?: React.ReactNode;
-  /** The event menu (⋮) at the header's right end, before the number pill
-   *  (ui-jobs 295). Liquity V2 turns it off: its event page's aside carries
-   *  the actions (ui-jobs 291). */
-  eventMenu?: boolean;
+  /** The event menu (⋮) in the header's right slot (ui-jobs 295). "page":
+   *  Liquity V2's, the event page alone (its page's aside carries the other
+   *  actions, ui-jobs 291), and "Hide" inside an open group. */
+  eventMenu?: boolean | "page";
+  /** A group's closed row: the head opens the summary card with no chevron
+   *  drawn (ui-jobs 250). */
+  noChevron?: boolean;
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
    *  the only dismiss action is an explicit close button. */
@@ -151,6 +154,7 @@ export function EventCard({
   pageAside,
   explanationHeading = "Event explanation",
   eventMenu = true,
+  noChevron,
   numberSlot,
   by,
   custody,
@@ -280,11 +284,12 @@ export function EventCard({
   // menu stays with the menu, as the pill's does: its click and its Enter or
   // Space do not reach the header's toggle (Escape still reaches the menu's
   // document listener).
-  const headChevron = showChevron ? (
-    <span className="inline-flex items-center self-center" data-anatomy="T5" data-evt-head-chev="">
-      <DiscChevron isOpen={showDetail} />
-    </span>
-  ) : null;
+  const headChevron =
+    showChevron && !noChevron ? (
+      <span className="inline-flex items-center self-center" data-anatomy="T5" data-evt-head-chev="">
+        <DiscChevron isOpen={showDetail} />
+      </span>
+    ) : null;
   // A header with no number pill (a Fluid round trip) takes the menu at the
   // right end of its row, after the header.
   // The number column (ui-jobs 250): on the timeline's desktop row the
@@ -313,7 +318,7 @@ export function EventCard({
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu txHash={txHash} shareHref={shareHref} scopeId={scopeId} />
+        <EventCardMenu txHash={txHash} shareHref={shareHref} scopeId={scopeId} pageOnly={eventMenu === "page"} />
       </span>
     ) : null;
   useLayoutEffect(() => {
@@ -367,7 +372,7 @@ export function EventCard({
               app/globals.css where the header has its own); below sm it
               stands in the header's top-right corner beside the `.evt-meta`
               row, which reserves its width. */}
-          <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
+          <div className={`relative flex items-start gap-2${showChevron && !noChevron ? " evt-has-chev" : ""}`}>
             <div className={`flex-1 min-w-0 ${menuAtEnd ? "" : "pr-5"}`} ref={headRef}>
               <EventTxHashContext.Provider value={txHash ?? null}>
                 <EventHeadContext.Provider
@@ -382,7 +387,7 @@ export function EventCard({
               </EventTxHashContext.Provider>
             </div>
             {menuAtEnd && <div className="mr-4 mt-3 shrink-0">{headMenu}</div>}
-            {showChevron && (
+            {showChevron && !noChevron && (
               <div
                 className="evt-chev-end absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
                 data-anatomy="T5"
@@ -566,15 +571,22 @@ export function EventCard({
                 className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
                 data-anatomy="L3"
               >
-                {/* The number column, at the left of the spine's area: the
-                    event's number, or a group's control. */}
-                <div className="absolute left-1.5 top-4 z-10 flex w-11 justify-center" data-number-column="">
-                  {numberSlot ?? numberNode}
-                </div>
                 <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
               </div>
             )}
             {contentTiers}
+            {/* The number column, at the left of the spine's area: the
+                event's number, or a group's button. After the card in the
+                DOM, so the keyboard reaches the header first. */}
+            {!pageMode && (
+              <div
+                className="absolute z-10 hidden w-11 justify-center sm:flex"
+                style={{ left: "calc(var(--card-pad) + 6px)", top: "calc(var(--card-pad) + 16px)" }}
+                data-number-column=""
+              >
+                {numberSlot ?? numberNode}
+              </div>
+            )}
           </div>
         </ProvReceiptsScope>
       </PriceBasisProvider>

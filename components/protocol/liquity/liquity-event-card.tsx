@@ -307,7 +307,7 @@ export function LiquityEventCard({
         footerExtra={footerExtra}
         learnMore={<LearnMore inline content={prose.L5.content} />}
         explanationHeading={PAGE_WORDS.explanation_heading}
-        eventMenu={false}
+        eventMenu="page"
         persistKey={`liquity-v2:${event.id}`}
         // A third party's act names who acted: the redeemer, the batch
         // manager moving a delegated Trove's rate.

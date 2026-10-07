@@ -9,9 +9,9 @@
 // its event page's aside carries the actions (ui-jobs 291), reusing
 // `useMenuCopied` and `eventMarkdownHref` from here.
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Link2 } from "lucide-react";
+import { ArrowUpRight, ChevronUp, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ExplorerMark } from "@/components/shared/explorer-mark";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -65,12 +65,20 @@ export function eventMarkdownHref(shareHref: string): string {
   return `${shareHref.split("?")[0]}.md`;
 }
 
+/** An open group around a member row: its collapse, for the member's ⋮
+ *  ("Hide 48 grouped events"). The same handler as the group's pill. */
+export const GroupHideContext = createContext<{ title: string; subtitle: string; hide: () => void } | null>(null);
+
 export function EventCardMenu({
   txHash,
   shareHref,
   scopeId,
+  pageOnly,
 }: {
   txHash: string;
+  /** Liquity V2's rows: the event page alone (the page's aside carries the
+   *  other actions, ui-jobs 291), and "Hide" inside an open group. */
+  pageOnly?: boolean;
   /** The event card's receipts scope (the event's id), which the menu's
    *  "Show provenance" row arms. */
   scopeId: string;
@@ -81,6 +89,7 @@ export function EventCardMenu({
   const chainId = useChainId();
   const pathname = usePathname();
   const [copied, copy] = useMenuCopied();
+  const group = useContext(GroupHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
   const explorerTitle = `View on ${chainMeta(chainId).explorerName}`;
@@ -91,7 +100,7 @@ export function EventCardMenu({
       variant="event"
       label={WORDS.menu}
       heading={WORDS.heading}
-      provScope={{ id: scopeId, hint: WORDS.provenance_hint }}
+      provScope={pageOnly ? undefined : { id: scopeId, hint: WORDS.provenance_hint }}
     >
       {(close) => (
         <>
@@ -105,16 +114,30 @@ export function EventCardMenu({
               onClick={close}
             />
           )}
-          <ToolsMenuItem
-            item="view-explorer"
-            icon={<ExplorerMark chainId={chainId} />}
-            title={explorerTitle}
-            subtitle={WORDS.view_explorer_hint}
-            href={explorerUrl(chainId, "tx-logs", txHash)}
-            external
-            onClick={close}
-          />
-          {shareHref && (
+          {group && (
+            <ToolsMenuItem
+              item="hide-group"
+              icon={<ChevronUp size={16} />}
+              title={group.title}
+              subtitle={group.subtitle}
+              onClick={() => {
+                close();
+                group.hide();
+              }}
+            />
+          )}
+          {!pageOnly && (
+            <ToolsMenuItem
+              item="view-explorer"
+              icon={<ExplorerMark chainId={chainId} />}
+              title={explorerTitle}
+              subtitle={WORDS.view_explorer_hint}
+              href={explorerUrl(chainId, "tx-logs", txHash)}
+              external
+              onClick={close}
+            />
+          )}
+          {shareHref && !pageOnly && (
             <ToolsMenuItem
               item="copy-link"
               icon={copied === "link" ? tick : <Link2 size={16} className="-rotate-45" />}

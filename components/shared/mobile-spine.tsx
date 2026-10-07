@@ -258,15 +258,6 @@ export function SpineSegment({
       className={`relative flex w-full flex-col ${scale.cardRounded}`}
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
-      {numberSlot && (
-        <div
-          className="absolute left-0 z-20 flex w-11 justify-center"
-          style={{ top: "calc(var(--card-pad) + 16px)" }}
-          data-number-column=""
-        >
-          {numberSlot}
-        </div>
-      )}
       {onToggle ? (
         // The segment, its flank values and its caption are one button. The
         // glyphs are hidden from screen readers and inert to the pointer.
@@ -288,6 +279,15 @@ export function SpineSegment({
         </button>
       ) : (
         <div className="flex w-full items-stretch justify-center">{column}</div>
+      )}
+      {numberSlot && (
+        <div
+          className="absolute left-0 z-20 flex w-11 justify-center"
+          style={{ top: "calc(var(--card-pad) + 16px)" }}
+          data-number-column=""
+        >
+          {numberSlot}
+        </div>
       )}
       {open && card && (
         <div

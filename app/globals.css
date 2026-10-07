@@ -427,9 +427,8 @@ body {
   /* The event number on a timeline row (ui-jobs 250 point 3, revised): the
      muted number, no fill, no link. `num-pill-stacked` is a group's: the same
      number with a second pill edge behind it, offset right and down, in the
-     bracket's muted border colour (`--group-edge`); it is the group's button.
-     `group-chevron` is the open group's collapse control under the first and
-     the last member's pill. */
+     bracket's muted border colour (`--group-edge`); it is the group's one
+     toggle, closed on its row and open on its first member's row. */
   .num-pill {
     @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] leading-none tabular-nums text-rb-500;
   }
@@ -440,9 +439,6 @@ body {
     box-shadow:
       3px 3px 0 -1px var(--background),
       3px 3px 0 0 var(--group-edge);
-  }
-  .group-chevron {
-    @apply flex size-8 items-center justify-center rounded-full text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] max-sm:size-11;
   }
   /* Canonical body copy — one treatment so body text stays in parity across
      marketing + product. 16px / normal weight / rb-500 (#687790, set back in

@@ -13,7 +13,6 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
-  GroupChevron,
   GroupPill,
   groupPillText,
   GroupFrame,
@@ -304,14 +303,27 @@ export function TimelineRunCard({
   const onToggle = () => !forceOpen && toggle();
   const pill = (
     <GroupPill
-      text={groupPillText(numberRange, count)}
+      text={groupPillText(numberRange)}
       label={groupLabel(count, false, rangeText)}
       open={false}
       onToggle={onToggle}
       controls={membersId}
     />
   );
-  const chevron = <GroupChevron label={groupLabel(count, true, rangeText)} onToggle={onToggle} controls={membersId} />;
+  const openPill = (
+    <GroupPill
+      text={groupPillText(numberRange)}
+      label={groupLabel(count, true, rangeText)}
+      open
+      onToggle={onToggle}
+      controls={membersId}
+    />
+  );
+  const hide = {
+    title: `Hide ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`,
+    subtitle: rangeText ? `Collapse the group, ${rangeText}` : "Collapse the group",
+    hide: onToggle,
+  };
   /** The closed row's column: the node, then the summed legs, then the dotted
    *  segment for the members not drawn. */
   const legsColumn = (
@@ -524,7 +536,8 @@ export function TimelineRunCard({
     return (
       <GroupFrame
         open={open}
-        chevron={chevron}
+        openPill={openPill}
+        hide={hide}
         membersId={membersId}
         members={body}
         closed={
@@ -550,7 +563,8 @@ export function TimelineRunCard({
   return (
     <GroupFrame
       open={open}
-      chevron={chevron}
+      openPill={openPill}
+      hide={hide}
       membersId={membersId}
       closed={
         <EventCard
@@ -560,6 +574,7 @@ export function TimelineRunCard({
           header={head}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
+          noChevron
           muted={muted}
         />
       }
