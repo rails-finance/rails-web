@@ -52,8 +52,8 @@ export function TroveSummaryStack({
    *  its queue bullets without the branch-debt and queue-share figures. */
   queueDebtTotal?: number | null;
   debtInFrontLoading: boolean;
-  /** The trove page's per-Trove key: the card draws closed/opened (ui-jobs
-   *  209) and the strip below moves into its opened layer. The home hero
+  /** The trove page's per-Trove key: the card's rows open on their own
+   *  chevrons (ui-jobs 209, 295) and the strip below moves into their lines. The home hero
    *  omits it and keeps the strip on the heading row. */
   disclosureKey?: string;
   loadingStatus: { message: string | null; snapshotDate?: number };

@@ -1,35 +1,47 @@
 "use client";
 
-// Progressive disclosure on a position card (rails-ops ui-jobs 209). Opt-in:
-// a card whose shell is given a `disclosureKey` draws closed by default at
-// every width — the header row, the headline figures and the (i) Explanation
-// row — and a chevron at the end of the header's activity meta opens the
-// detail beneath each headline. A card without the key draws as before.
+// Progressive disclosure on a position card (rails-ops ui-jobs 209, 295).
+// Opt-in: a card whose shell is given a `disclosureKey` draws a "Position
+// summary" heading over its headline rows, and each row (Collateral, Debt,
+// the ratio) opens on a chevron after its heading into the lines under
+// it: per-asset lines, captions, the risk strip. The rows that state the
+// position's assets (the first two) open by default; the others start
+// closed. A card without the key draws every line, as before.
 //
-// Two states are remembered per viewer and per position, in the store the
-// timeline's event cards use (lib/shared/card-open-store.ts): whether the
-// card is open, and whether its Explanation is open. They are read through
-// useSyncExternalStore with a closed server snapshot, so the server render
-// and the hydrating render agree (closed), a card that mounts on the client
-// (after a loading skeleton, or on a client navigation) paints in its
-// remembered state at once, and a hydrated card left open settles open
-// straight after hydration. Arming the provenance inspector opens every
-// disclosing card, so an armed click can reach a figure in the detail layer —
-// the rule `useReserveDisclosure` follows.
+// Remembered per viewer and per position, in the store the timeline's event
+// cards use (lib/shared/card-open-store.ts): each row that a viewer moved off
+// its default (`position:<key>:row<i>` for a row opened, `:closed` added for
+// a default-open row closed), and whether the card's Explanation is open.
+// The card-wide key of 209 (`position:<key>`) is dropped on read. Rows are
+// read through useSyncExternalStore with their default as the server
+// snapshot, so the server render and the hydrating render agree. Arming the
+// provenance inspector opens every row, so an armed click can reach a figure
+// in the detail layer, the rule `useReserveDisclosure` follows.
 
-import { createContext, useCallback, useContext, useRef, useSyncExternalStore, type ReactNode } from "react";
-import { ExpandChevron } from "@/components/shared/expand-chevron";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { DiscChevron } from "@/components/shared/expand-chevron";
+import { TipLabel } from "@/components/shared/tip-label";
 import { provInspector } from "@/components/shared/provenance";
+import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
 
 export interface PositionCardDisclosure {
-  open: boolean;
-  toggle: () => void;
+  /** The position's store key. */
+  key: string;
+  /** The provenance inspector is armed: every row stands open. */
+  armed: boolean;
   /** The Explanation row's remembered state, for the shell to restore. */
   explanationOpen: boolean;
   setExplanationOpen: (open: boolean) => void;
-  /** The id of the card's figures, which the header button controls. */
-  regionId: string;
 }
 
 const DisclosureContext = createContext<PositionCardDisclosure | null>(null);
@@ -39,9 +51,10 @@ export function usePositionCardDisclosure(): PositionCardDisclosure | null {
   return useContext(DisclosureContext);
 }
 
-/** The store key for one position: prefixed so it never meets an event id. */
-const storeKey = (key: string) => `position:${key}`;
+/** The store keys for one position: prefixed so they never meet an event id. */
+const cardKey = (key: string) => `position:${key}`;
 const explanationKey = (key: string) => `position:${key}:explanation`;
+const rowKey = (key: string, row: number) => `position:${key}:row${row}`;
 
 const closedOnServer = () => false;
 
@@ -50,17 +63,15 @@ function useStoredOpen(storeId: string | null): boolean {
   return useSyncExternalStore(subscribeCardOpen, () => (storeId ? isCardOpen(storeId) : false), closedOnServer);
 }
 
-/** Open/closed state for a card that opts in with `key`; null without one.
- *  Hooks run either way, so a card can switch the key on and off. */
+/** The state for a card that opts in with `key`; null without one. Hooks run
+ *  either way, so a card can switch the key on and off. */
 export function usePositionCardDisclosureState(key: string | undefined): PositionCardDisclosure | null {
-  const stored = useStoredOpen(key ? storeKey(key) : null);
   const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  // From the key, not useId: the page above the card can render differently
-  // on the server and in the browser, which would move a generated id.
-  const regionId = `position-card-${(key ?? "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
-  const toggle = useCallback(() => {
-    if (key) setCardOpen(storeKey(key), !isCardOpen(storeKey(key)));
+  // The card-wide open flag of ui-jobs 209 has no reader since the rows took
+  // their own: drop it.
+  useEffect(() => {
+    if (key && isCardOpen(cardKey(key))) setCardOpen(cardKey(key), false);
   }, [key]);
   const setExplanationOpen = useCallback(
     (open: boolean) => {
@@ -68,8 +79,10 @@ export function usePositionCardDisclosureState(key: string | undefined): Positio
     },
     [key],
   );
-  if (!key) return null;
-  return { open: stored || armed, toggle, explanationOpen, setExplanationOpen, regionId };
+  return useMemo(
+    () => (key ? { key, armed, explanationOpen, setExplanationOpen } : null),
+    [key, armed, explanationOpen, setExplanationOpen],
+  );
 }
 
 export function PositionCardDisclosureProvider({
@@ -82,51 +95,104 @@ export function PositionCardDisclosureProvider({
   return <DisclosureContext.Provider value={value}>{children}</DisclosureContext.Provider>;
 }
 
-/** Set by `PositionCardHeader` around its row: inside it the chevron is the
- *  row's visible cue, and the row's own button is the control. */
-const HeaderToggleContext = createContext(false);
+/** One headline row's state, read by the `PositionCardDetail`s inside it:
+ *  whether it stands open, and the count of detail blocks it holds (a row
+ *  with none draws no chevron). */
+interface RowState {
+  open: boolean;
+  register: () => () => void;
+}
+const RowContext = createContext<RowState | null>(null);
 
-/** The header chevron. Inside a `PositionCardHeader` it is a cue drawn in the
- *  row the header button covers; outside one (a card whose header is its own)
- *  it stays the button. Renders nothing on a card that has not opted in. */
-export function PositionCardDisclosureToggle() {
+/** One headline row of a disclosing card: the column under its heading. The
+ *  heading is the row's toggle, its chevron directly after the words; the
+ *  figures and the lines under them follow. `index` keys the row's
+ *  remembered state; `defaultOpen` is its state before a viewer moves it.
+ *  On a card that does not disclose the heading is plain text. */
+export function PositionCardRow({
+  index,
+  defaultOpen,
+  label,
+  labelTip,
+  headerIcon,
+  className,
+  children,
+}: {
+  index: number;
+  defaultOpen: boolean;
+  label: string;
+  labelTip?: string;
+  headerIcon?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
   const d = usePositionCardDisclosure();
-  const inHeader = useContext(HeaderToggleContext);
-  if (!d) return null;
-  if (inHeader) {
-    return (
-      <span data-card-chevron="" data-anatomy="C9" aria-hidden="true" className="inline-flex items-center">
-        <ExpandChevron isOpen={d.open} group="card" size={14} />
-      </span>
-    );
-  }
+  const id = d ? rowKey(d.key, index) : null;
+  // A default-open row stores its closing, a default-closed row its opening.
+  const flag = id ? (defaultOpen ? `${id}:closed` : id) : null;
+  const flagged = useSyncExternalStore(subscribeCardOpen, () => (flag ? isCardOpen(flag) : false), closedOnServer);
+  const open = !!d && (d.armed || (defaultOpen ? !flagged : flagged));
+  const [details, setDetails] = useState(0);
+  const register = useCallback(() => {
+    setDetails((n) => n + 1);
+    return () => setDetails((n) => n - 1);
+  }, []);
+  const row = useMemo(() => ({ open, register }), [open, register]);
+  const toggles = !!d && details > 0;
+  const toggle = () => {
+    if (flag) setCardOpen(flag, !flagged);
+  };
+  const toggleData = { "data-card-row-toggle": String(index), "aria-expanded": open };
+  const heading = !toggles ? (
+    <>
+      <TipLabel text={label} tip={labelTip} />
+      {headerIcon}
+    </>
+  ) : labelTip ? (
+    // The heading carries a tip on hover or tap, so the chevron is a second
+    // press area after it.
+    <>
+      <TipLabel text={label} tip={labelTip} />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={label}
+        className="-m-1 inline-flex cursor-pointer items-center rounded-sm p-1 focus-ring"
+        {...toggleData}
+      >
+        <DiscChevron isOpen={open} />
+      </button>
+      {headerIcon}
+    </>
+  ) : (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        className="-my-1 inline-flex cursor-pointer items-center gap-1 rounded-sm py-1 focus-ring"
+        {...toggleData}
+      >
+        {label}
+        <DiscChevron isOpen={open} />
+      </button>
+      {headerIcon}
+    </>
+  );
   return (
-    <button
-      type="button"
-      data-card-disclosure-toggle=""
-      data-anatomy="C9"
-      aria-expanded={d.open}
-      aria-controls={d.regionId}
-      aria-label={d.open ? "Hide position details" : "Show position details"}
-      onClick={d.toggle}
-      className="group/card -my-1 -mr-1 inline-flex cursor-pointer items-center rounded-sm focus-ring"
+    <div
+      className={`${toggles ? "disc-row" : ""} ${className ?? ""}`}
+      data-card-row={index}
+      {...(toggles && open ? { "data-card-row-open": "" } : {})}
     >
-      <ExpandChevron isOpen={d.open} group="card" size={14} />
-    </button>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">{heading}</div>
+      <RowContext.Provider value={row}>{children}</RowContext.Provider>
+    </div>
   );
 }
 
-/** Pointer travel, in px, past which a press is a drag (a text selection) and
- *  not a click on the header. */
-const DRAG_PX = 5;
-
-/** A position card's header row (ui-jobs 265). On a card that discloses, the
- *  whole row toggles the details: one button laid under the row's content
- *  covers it, out to the card's edges, and the content lets pointer events
- *  through to it except on its own controls (links, copy, bookmark, menus),
- *  which stay siblings of the button. The chevron in the row is its visible
- *  cue. A press that travels (a selection drag) does not toggle. On a card
- *  that does not disclose the row is a plain div. */
+/** The card's top row. On a disclosing card (ui-jobs 295) it is the heading
+ *  over the rows: "Position summary" (`PositionSummaryHeading`) on the left,
+ *  the card's ⋮ or the activity meta at the right end. */
 export function PositionCardHeader({
   className,
   spacing,
@@ -141,52 +207,26 @@ export function PositionCardHeader({
   children: ReactNode;
 }) {
   const d = usePositionCardDisclosure();
-  const from = useRef<{ x: number; y: number } | null>(null);
-  if (!d) {
-    return (
-      <div className={`${className} ${spacing ?? ""}`} data-anatomy={anatomy}>
-        {children}
-      </div>
-    );
-  }
   return (
-    // `group/card` sits on the wrapper: the chevron is a sibling of the button,
-    // and hovering the button (under the content) hovers the wrapper, so the
-    // chevron lights (globals.css .expand-chev) and the button tints, the
-    // Lifetime flows bar's hover.
-    <div className={`group/card relative ${spacing ?? ""}`} data-anatomy={anatomy} data-card-header="">
-      <button
-        type="button"
-        data-card-disclosure-toggle=""
-        aria-expanded={d.open}
-        aria-controls={d.regionId}
-        aria-label={d.open ? "Hide position details" : "Show position details"}
-        onPointerDown={(e) => {
-          from.current = { x: e.clientX, y: e.clientY };
-        }}
-        onClick={(e) => {
-          const start = from.current;
-          from.current = null;
-          // A keyboard press has no pointer travel and no selection to read.
-          const moved = start != null && e.detail > 0 && Math.hypot(e.clientX - start.x, e.clientY - start.y) > DRAG_PX;
-          const selected = typeof window !== "undefined" && (window.getSelection()?.toString() ?? "") !== "";
-          if (moved || selected) return;
-          d.toggle();
-        }}
-        className="absolute -inset-x-3 -top-3 -bottom-3 z-0 cursor-pointer rounded-lg transition-colors hover:bg-rb-100 dark:hover:bg-rb-800 focus-ring"
-      />
-      <HeaderToggleContext.Provider value={true}>
-        <div
-          className={`pointer-events-none relative z-[1] ${className} [&_a]:pointer-events-auto [&_button]:pointer-events-auto [&_[role=button]]:pointer-events-auto [&_[role=link]]:pointer-events-auto [&_[tabindex]]:pointer-events-auto`}
-        >
-          {children}
-        </div>
-      </HeaderToggleContext.Provider>
+    <div className={`${className} ${spacing ?? ""}`} data-anatomy={anatomy} {...(d ? { "data-card-header": "" } : {})}>
+      {children}
     </div>
   );
 }
 
-/** The card's figures: the region the header button controls. */
+/** The words "Position summary", the heading of a disclosing card; nothing
+ *  on a card that does not disclose. */
+export function PositionSummaryHeading() {
+  const d = usePositionCardDisclosure();
+  if (!d) return null;
+  return (
+    <h2 className={`${OVERLAY_HEADING} text-rb-500`} data-position-summary="">
+      Position summary
+    </h2>
+  );
+}
+
+/** The card's figures. */
 export function PositionCardRegion({
   className,
   anatomy,
@@ -196,9 +236,8 @@ export function PositionCardRegion({
   anatomy?: string;
   children: ReactNode;
 }) {
-  const d = usePositionCardDisclosure();
   return (
-    <div className={className} data-anatomy={anatomy} id={d?.regionId}>
+    <div className={className} data-anatomy={anatomy}>
       {children}
     </div>
   );
@@ -228,10 +267,13 @@ export function riskColumns(risk: CardRiskColumn | null | undefined, disclosing:
   ];
 }
 
-/** The opened layer beneath a headline: drawn while the card is open, and
- *  always on a card that has not opted in. */
+/** The opened layer beneath a headline: drawn while its row is open, and
+ *  always on a card that has not opted in or outside a row. */
 export function PositionCardDetail({ children }: { children: ReactNode }) {
   const d = usePositionCardDisclosure();
-  if (d && !d.open) return null;
+  const row = useContext(RowContext);
+  const register = row?.register;
+  useEffect(() => (d && register ? register() : undefined), [d, register]);
+  if (d && row && !row.open) return null;
   return <>{children}</>;
 }

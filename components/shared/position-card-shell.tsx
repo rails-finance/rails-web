@@ -65,18 +65,16 @@ export function PositionCardShell({
   /** Fires when the Explanation section opens/closes — passed straight
    *  through, for a surface that persists that state. */
   onExplanationToggle?: (open: boolean) => void;
-  /** Opt in to progressive disclosure (ui-jobs 209): one stable key per
-   *  position. The card then draws closed by default and a chevron in the
-   *  header's activity meta opens it; the Explanation row shows in both
-   *  states, `rowExtra` only while open
-   *  (components/shared/position-card-disclosure.tsx). Both
-   *  the card's state and its Explanation's are remembered under the key, so
+  /** Opt in to progressive disclosure (ui-jobs 209, 295): one stable key per
+   *  position. The card then draws a "Position summary" heading and each
+   *  headline row opens on a chevron
+   *  (components/shared/position-card-disclosure.tsx). The rows' state and
+   *  the Explanation's are remembered under the key, so
    *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
    *  Only meaningful with `receipts`: a listing row never discloses. */
   disclosureKey?: string;
-  /** The foot strip at the right of the Explanation row, in both states
-   *  (ui-jobs 270: transactions, warnings, age and the card's ⋮ menu). Only
-   *  meaningful with `receipts`. */
+  /** The foot strip at the right of the Explanation row (ui-jobs 270:
+   *  transactions, warnings and age). Only meaningful with `receipts`. */
   footerEnd?: ReactNode;
   children: ReactNode;
 }) {
@@ -87,27 +85,23 @@ export function PositionCardShell({
     // inside a listing's row <Link> (which declares the group) — inert everywhere else.
     // data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
     // `receipts` already distinguishes the detail render from the listing row.
-    // data-anatomy (rails-ops reference/app-anatomy.md): P1 on the detail page,
-    // with the card's state, C1 closed or C2 opened, where the card discloses.
+    // data-anatomy (rails-ops reference/app-anatomy.md): P1 on the detail page.
     <div
       data-skel-section={receipts ? "detail-card" : "listing-row"}
-      data-anatomy={receipts ? (disclosure ? `P1 ${disclosure.open ? "C2" : "C1"}` : "P1") : undefined}
+      data-anatomy={receipts ? "P1" : undefined}
       className={`rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised ${CARD_PAD_X} py-4 transition-colors group-hover/listing-row:border-blue-500 dark:group-hover/listing-row:border-blue-500`}
     >
       {children}
-      {/* The (i) Explanation row draws in both states (Miles, 2 Oct): the
-          chevron tucks away the small print and the per-asset lines, never
-          the (i). Inline row content belongs to the opened layer. */}
       {receipts && (
         <ProvenanceInfoTabs
           className="mt-3"
           rowExtra={
             footerEnd ? (
               <>
-                {disclosure && !disclosure.open ? null : rowExtra}
+                {rowExtra}
                 <span className="ml-auto flex items-center gap-2 self-center">{footerEnd}</span>
               </>
-            ) : disclosure && !disclosure.open ? undefined : (
+            ) : (
               rowExtra
             )
           }

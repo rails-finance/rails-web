@@ -33,7 +33,7 @@ import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-p
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Icon } from "@/components/icons/icon";
 import { EventTime } from "@/components/shared/event-time";
-import { EventNumberPill } from "@/components/shared/event-number-pill";
+import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import {
@@ -512,126 +512,140 @@ export function ChainTruthRow({
   // 0xa60d…ddeb` and `400 ◎ to 0x546b…7240` are each ONE phrase, so the chip
   // sits at phrase spacing (the 6px between a figure and its glyph) behind
   // whatever precedes it — the `-ml-1.5` on the chip wrappers below.
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
-      {spec.labelOnSpine ? (
-        // The spine's pill carries "Redemption" on desktop; here it's a
-        // mobile-only badge (the spine is hidden below sm), mirroring V2.
-        <span className="sm:hidden inline-block shrink-0 rounded-full bg-caution-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-caution-600 dark:text-caution-400">
-          {spec.label}
+  const labelNode = spec.labelOnSpine ? (
+    // The spine's pill carries "Redemption" on desktop; here it's a
+    // mobile-only badge (the spine is hidden below sm), mirroring V2.
+    <span className="sm:hidden inline-block shrink-0 rounded-full bg-caution-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-caution-600 dark:text-caution-400">
+      {spec.label}
+    </span>
+  ) : spec.status === "open" && !spec.critical ? (
+    // Opening event — the green "Open" status pill, byte-matched from Liquity
+    // V2's open header (liquity-event-header.tsx). The `positive` token is the
+    // Open/Enable green (app/globals.css). The per-axis delta labels beside it
+    // carry each axis' own verb, so the CDP openers read as V2 does.
+    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-positive/20 text-positive">
+      {spec.label}
+    </span>
+  ) : spec.status === "close" && !spec.critical ? (
+    // Closing event — Liquity V2's neutral "Close" pill (liquity-event-header.tsx).
+    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-rb-500/20 dark:bg-rb-500/20">
+      {spec.label}
+    </span>
+  ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
+    <span
+      className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
+    >
+      {/* The spine's warning triangle is hidden below sm: the row keeps it. */}
+      {spec.critical && (
+        <span className="mr-1 inline-block align-[-1px] sm:hidden" aria-hidden="true">
+          <Icon name="triangle" size={12} />
         </span>
-      ) : spec.status === "open" && !spec.critical ? (
-        // Opening event — the green "Open" status pill, byte-matched from Liquity
-        // V2's open header (liquity-event-header.tsx). The `positive` token is the
-        // Open/Enable green (app/globals.css). The per-axis delta labels beside it
-        // carry each axis' own verb, so the CDP openers read as V2 does.
-        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-positive/20 text-positive">
-          {spec.label}
+      )}
+      {spec.label}
+    </span>
+  ) : // A combined adjust omits the row label — the per-axis delta labels carry
+  // the verbs (V2's grammar) — and a custody row drops it: the spine's plane
+  // and the chip's to/from are the verb. Render nothing so no empty span
+  // steals a gap.
+  null;
+  // The card's chevron follows the action word (ui-jobs 295): the label, or
+  // where the row has none (a combined adjust's per-axis verbs, a custody
+  // row) the first amount. The row's 12px gap is for items; the chevron sits
+  // at a phrase's 6px.
+  const headChevron = useEventHeadChevron();
+  const chevron = headChevron ? <span className="-ml-1.5 inline-flex items-center">{headChevron}</span> : null;
+  // A row with no label whose first amount carries its verb (a per-axis
+  // action verb that stays at every width) takes the chevron after that verb.
+  const verbChevron = labelNode == null && !!spec.deltas[0]?.label && !!spec.deltas[0]?.axisVerb;
+  const deltaNodes = spec.deltas.map((d, i) => {
+    // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
+    // the label carries the direction; unlabeled ones keep the ± sign. A
+    // custody row is bare too: the to/from chip is its direction.
+    // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
+    // keeps the sign from running into the "<" ("− <0.01").
+    const bare = Boolean(d.label) || Boolean(spec.custody);
+    const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
+    const text =
+      bare || spec.unsignedDeltas
+        ? magnitude
+        : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
+    const toneClass = d.tone === "caution" ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
+    // A token whose decimals did not load states no amount, at any width:
+    // the spine draws no flank for it either.
+    const unread = unreadOf(d.address, d.symbol);
+    if (unread)
+      return (
+        <span key={i} className="inline-flex items-center gap-1.5 text-sm" data-not-loaded="">
+          {d.label && <span className={toneClass}>{d.label}</span>}
+          <TokenAmountNotLoaded address={unread.address} label={unread.label} />
         </span>
-      ) : spec.status === "close" && !spec.critical ? (
-        // Closing event — Liquity V2's neutral "Close" pill (liquity-event-header.tsx).
-        <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-rb-500/20 dark:bg-rb-500/20">
-          {spec.label}
-        </span>
-      ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
-        <span
-          className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
-        >
-          {/* The spine's warning triangle is hidden below sm: the row keeps it. */}
-          {spec.critical && (
-            <span className="mr-1 inline-block align-[-1px] sm:hidden" aria-hidden="true">
-              <Icon name="triangle" size={12} />
-            </span>
-          )}
-          {spec.label}
-        </span>
-      ) : // A combined adjust omits the row label — the per-axis delta labels carry
-      // the verbs (V2's grammar) — and a custody row drops it: the spine's plane
-      // and the chip's to/from are the verb. Render nothing so no empty span
-      // steals a gap.
-      null}
-
-      {spec.deltas.map((d, i) => {
-        // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
-        // the label carries the direction; unlabeled ones keep the ± sign. A
-        // custody row is bare too: the to/from chip is its direction.
-        // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
-        // keeps the sign from running into the "<" ("− <0.01").
-        const bare = Boolean(d.label) || Boolean(spec.custody);
-        const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
-        const text =
-          bare || spec.unsignedDeltas
-            ? magnitude
-            : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
-        const toneClass = d.tone === "caution" ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
-        // A token whose decimals did not load states no amount, at any width:
-        // the spine draws no flank for it either.
-        const unread = unreadOf(d.address, d.symbol);
-        if (unread)
-          return (
-            <span key={i} className="inline-flex items-center gap-1.5 text-sm" data-not-loaded="">
-              {d.label && <span className={toneClass}>{d.label}</span>}
-              <TokenAmountNotLoaded address={unread.address} label={unread.label} />
-            </span>
-          );
-        // The header shows the compact form; the exact figure — full pipeline
-        // precision, no re-rounding — rides the trace. Number only: the token
-        // rides as `symbol` (the receipt shows its icon).
-        const exact = chainTruthDeltaValue(d.value, bare);
-        // A delta the spine never draws has nothing to hand off TO, so it keeps
-        // its value at every width — otherwise the figure disappears at ≥sm.
-        // A custody row's spine is the badged token alone, no flank, so every
-        // delta on it stays.
-        const deltaHide = d.noSpineCounterpart || spec.custody ? "" : hideClass;
-        // The ≥sm spine hand-off (hideClass) rides the Prov wrapper itself —
-        // hiding a child would leave the pill box painting an empty lozenge
-        // when the receipt opens with timeline values on.
-        //
-        // A per-axis ACTION VERB (open/adjust) instead follows V2's combined
-        // grammar: the verb word + glyph stay visible at ≥sm and ONLY the value's
-        // lozenge hands off (so a combined adjust reads "Deposit ◊ Borrow ♭" at
-        // desktop, its numbers on the spine — never an empty header). The value
-        // still owns the whole Prov, so the lozenge never paints empty.
-        if (d.axisVerb) {
-          return (
-            <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
-              {d.label && <span className={toneClass}>{d.label}</span>}
-              <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
-                <span className="font-semibold tabular-nums text-foreground">
-                  <ExactTip text={text} exact={exact} symbol={d.symbol} />
-                </span>
-              </Prov>
-              <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
-              {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
-            </span>
-          );
-        }
-        return (
-          <Prov key={i} info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
-            <span className="inline-flex items-center gap-1.5 text-sm">
-              {d.label && <span className={d.muted ? "text-rb-500" : toneClass}>{d.label}</span>}
-              <span className={d.muted ? "tabular-nums text-rb-500" : "font-semibold tabular-nums text-foreground"}>
-                <ExactTip
-                  text={text}
-                  exact={exact}
-                  symbol={d.symbol}
-                  label={d.readableLabel ? readableName(d.value, d.symbol, !bare) : undefined}
-                />
-              </span>
-              <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
-              {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
-              {d.phoneArrow && spec.unsignedDeltas && (
-                <span
-                  className="text-rb-500 sm:hidden"
-                  title={d.phoneArrow === "out" ? "Into the protocol" : "Out to the wallet"}
-                >
-                  {d.phoneArrow === "out" ? "→" : "←"}
-                </span>
-              )}
+      );
+    // The header shows the compact form; the exact figure — full pipeline
+    // precision, no re-rounding — rides the trace. Number only: the token
+    // rides as `symbol` (the receipt shows its icon).
+    const exact = chainTruthDeltaValue(d.value, bare);
+    // A delta the spine never draws has nothing to hand off TO, so it keeps
+    // its value at every width — otherwise the figure disappears at ≥sm.
+    // A custody row's spine is the badged token alone, no flank, so every
+    // delta on it stays.
+    const deltaHide = d.noSpineCounterpart || spec.custody ? "" : hideClass;
+    // The ≥sm spine hand-off (hideClass) rides the Prov wrapper itself —
+    // hiding a child would leave the pill box painting an empty lozenge
+    // when the receipt opens with timeline values on.
+    //
+    // A per-axis ACTION VERB (open/adjust) instead follows V2's combined
+    // grammar: the verb word + glyph stay visible at ≥sm and ONLY the value's
+    // lozenge hands off (so a combined adjust reads "Deposit ◊ Borrow ♭" at
+    // desktop, its numbers on the spine — never an empty header). The value
+    // still owns the whole Prov, so the lozenge never paints empty.
+    if (d.axisVerb) {
+      return (
+        <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+          {d.label && <span className={toneClass}>{d.label}</span>}
+          {i === 0 && verbChevron && headChevron}
+          <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
+            <span className="font-semibold tabular-nums text-foreground">
+              <ExactTip text={text} exact={exact} symbol={d.symbol} />
             </span>
           </Prov>
-        );
-      })}
+          <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
+          {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
+        </span>
+      );
+    }
+    return (
+      <Prov key={i} info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          {d.label && <span className={d.muted ? "text-rb-500" : toneClass}>{d.label}</span>}
+          <span className={d.muted ? "tabular-nums text-rb-500" : "font-semibold tabular-nums text-foreground"}>
+            <ExactTip
+              text={text}
+              exact={exact}
+              symbol={d.symbol}
+              label={d.readableLabel ? readableName(d.value, d.symbol, !bare) : undefined}
+            />
+          </span>
+          <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
+          {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
+          {d.phoneArrow && spec.unsignedDeltas && (
+            <span
+              className="text-rb-500 sm:hidden"
+              title={d.phoneArrow === "out" ? "Into the protocol" : "Out to the wallet"}
+            >
+              {d.phoneArrow === "out" ? "→" : "←"}
+            </span>
+          )}
+        </span>
+      </Prov>
+    );
+  });
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
+      {labelNode}
+      {labelNode != null && chevron}
+      {deltaNodes[0]}
+      {labelNode == null && !verbChevron && chevron}
+      {deltaNodes.slice(1)}
 
       {/* Rate pill — a chosen rate, rendered as the Liquity V2 lozenge. Deliberately
           NOT wrapped in hideClass: the ≥sm spine carries moved amounts, not a rate,

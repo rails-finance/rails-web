@@ -1,7 +1,7 @@
 "use client";
 
-// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281), in T6 before the "?", on
-// the timeline card and the event page. The position card's menu (C17,
+// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281), at the header's right end
+// before the number pill (ui-jobs 295). The position card's menu (C17,
 // `ToolsMenu` variant `card`) with the event's rows: open the event page (not
 // on that page), open the explorer, copy the page's link. A copy row shows a
 // tick and "Copied" for a moment, as C17's rows do. Liquity V2 draws no menu:

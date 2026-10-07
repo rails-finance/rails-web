@@ -470,6 +470,8 @@ export function assetTokenSumFor(sum: AssetSum, symbol: string): TokenSum {
   });
   const move = held - Math.max(0, bal?.before ?? 0);
   const moved = Math.round(move * scale) !== 0;
+  // Same rule as eventTokenSum: a side that held nothing before states its after alone.
+  const beforeUnits = Math.round(Math.max(0, bal?.before ?? 0) * scale);
   const after: Record<string, number> = {};
   for (const l of mine) after[l.key] = amountOf(l);
   return {
@@ -477,7 +479,7 @@ export function assetTokenSumFor(sum: AssetSum, symbol: string): TokenSum {
     decimals,
     lines,
     total: { units: totalUnits, amount: fmtTokens(totalUnits / scale, decimals) },
-    before: moved ? fmtTokens(Math.max(0, bal?.before ?? 0), decimals) : null,
+    before: moved && beforeUnits !== 0 ? fmtTokens(beforeUnits / scale, decimals) : null,
     move: moved ? move : 0,
     after,
     held,

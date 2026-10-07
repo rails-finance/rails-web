@@ -47,6 +47,30 @@ export function DisclosureChevron({
   );
 }
 
+/** The disclosure chevron that follows its heading (rails-ops TO-DO-ui-jobs
+ *  295): pointing down closed, up open. Hidden on a hovering pointer until
+ *  its `.disc-row` is hovered or focused, always shown and muted on a touch
+ *  screen (app/globals.css `.disc-chev`). */
+export function DiscChevron({ isOpen, size = 12, className }: { isOpen: boolean; size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      data-disc-chev=""
+      className={`disc-chev shrink-0 ${isOpen ? "rotate-180" : ""} ${className ?? ""}`}
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 export function ExpandChevron({ isOpen, group, size = 12, className }: ExpandChevronProps) {
   // `group` is unused as a className here but names the group-hover scope the
   // globals.css stroke rule keys off (.group/evt, .group/card, .group/proto).

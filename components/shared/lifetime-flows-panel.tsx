@@ -16,7 +16,9 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { CircleHelp } from "lucide-react";
+import { DiscChevron } from "@/components/shared/expand-chevron";
+import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
@@ -26,7 +28,7 @@ import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
-import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsReadingContent } from "@/lib/shared/learn-more-content";
 import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
@@ -65,6 +67,31 @@ export interface LifetimeFlowsPanelProps {
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
 const READING = lifetimeFlowsReadingContent();
+
+/** The ⋮ at the header's right end (ui-jobs 295): How to read these charts,
+ *  one text on every explorer (§264), in the modal the "?" opened. */
+function FlowsMenu({ title }: { title: string }) {
+  const [reading, setReading] = useState(false);
+  return (
+    <>
+      <ToolsMenu variant="panel" label={`${title} menu`} heading={title}>
+        {(close) => (
+          <ToolsMenuItem
+            item="how-to-read"
+            icon={<CircleHelp size={16} />}
+            title={READING.title}
+            subtitle="The bars, the line and the controls"
+            onClick={() => {
+              close();
+              setReading(true);
+            }}
+          />
+        )}
+      </ToolsMenu>
+      {reading && <LearnMoreModal content={READING} onClose={() => setReading(false)} anatomy="F16" />}
+    </>
+  );
+}
 
 export function LifetimeFlowsPanel({
   scrubber,
@@ -122,8 +149,10 @@ export function LifetimeFlowsPanel({
         style={loading && remembered["detail-economics"] ? { minHeight: remembered["detail-economics"] } : undefined}
       >
         {collapseKey && <script dangerouslySetInnerHTML={{ __html: collapseScript() }} suppressHydrationWarning />}
+        {/* The chevron follows the heading; the ⋮ stands at the right end
+            (ui-jobs 295). */}
         <div
-          className="pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
+          className="disc-row pointer-events-none relative z-10 flex min-h-[28px] items-center justify-between gap-2"
           data-anatomy="F1"
         >
           {collapseKey ? (
@@ -138,22 +167,22 @@ export function LifetimeFlowsPanel({
               aria-expanded={!collapsed}
               aria-controls={bodyId}
               aria-label={collapsed ? `Show ${title}` : `Hide ${title}`}
-              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 rounded-md px-2`}
+              className={`${CTRL_GHOST} ${CTRL_OFF} pointer-events-auto -ml-2 h-7 min-w-0 flex-1 justify-start rounded-md px-2`}
+              data-flows-toggle=""
             >
-              <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <LifetimeFlowsIcon size={14} />
-                  <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <LifetimeFlowsIcon size={14} />
+                <span className={`${OVERLAY_HEADING} truncate`} data-flows-title="">
+                  {title}
                 </span>
-                <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
+                <DiscChevron isOpen={!collapsed} />
               </span>
             </button>
           ) : (
             <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
-          {/* How to read the charts: one text on every explorer (§264). */}
           <div className="pointer-events-auto -mr-1 shrink-0">
-            <LearnMore content={READING} inline anatomy="F16" ariaLabel="How to read these charts" />
+            <FlowsMenu title={title} />
           </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>

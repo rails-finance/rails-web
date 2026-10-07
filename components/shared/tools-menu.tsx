@@ -17,7 +17,7 @@
 // pages had in the dock.
 //
 // The `card` variant is the position card's one menu (ui-jobs 270, 246): a ⋮
-// trigger at the end of the card's foot strip, the position's own rows
+// trigger at the right end of the card's heading (ui-jobs 295), the position's rows
 // (`leading`) first, the export shapes, then the inspector last. Below sm it
 // opens as a sheet with each row full width.
 
@@ -123,10 +123,10 @@ export function ToolsMenu({
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
-   *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ (T2's price row
-   *  or T6), the card menu without the inspector, named by `label` and
-   *  `heading`. */
-  variant?: "tools" | "card" | "event";
+   *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
+   *  right end, the card menu without the inspector, named by `label` and
+   *  `heading`. `panel`: the same for a panel's header (Lifetime flows). */
+  variant?: "tools" | "card" | "event" | "panel";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
   leading?: (close: () => void) => ReactNode;
@@ -149,7 +149,9 @@ export function ToolsMenu({
   const ref = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const eventMenu = variant === "event";
+  // The event and panel menus: the card menu's trigger and rows, named by
+  // `label` and `heading`, with no inspector.
+  const eventMenu = variant === "event" || variant === "panel";
   const card = variant === "card" || eventMenu;
   const isPhone = useMediaQuery(PHONE_QUERY);
   const sheet = card && isPhone;
@@ -224,9 +226,12 @@ export function ToolsMenu({
 
   if (card) {
     const name = eventMenu ? (label ?? "") : "Position menu";
-    const wrapperData = eventMenu
-      ? { "data-event-menu": "" }
-      : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
+    const wrapperData =
+      variant === "panel"
+        ? { "data-panel-menu": "" }
+        : eventMenu
+          ? { "data-event-menu": "" }
+          : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (
       <div ref={ref} className="relative" {...wrapperData}>
         <button

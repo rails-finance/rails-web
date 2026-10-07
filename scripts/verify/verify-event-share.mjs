@@ -195,7 +195,7 @@ async function eventIds(page) {
 }
 
 // The copy-link control is the event menu's "Copy link to event page" row, the
-// ⋮ at the foot of the open Explanation (T6).
+// ⋮ at the header's right end, before the number pill (ui-jobs 295).
 const COPY_LINK = '[data-menu-item="copy-link"]';
 
 async function copyEventLink(page) {
@@ -355,26 +355,21 @@ async function pickWorkingSubject(hrefs, rowHrefRe) {
   return candidates[0];
 }
 
-/** Check 1's two clicks: open the first event card, then its event menu, and
- *  report whether the copy-link row is now on the page. */
+/** Check 1's click: the first card's event menu, in its header, and report
+ *  whether the copy-link row is now on the page. The card stays closed: the
+ *  ⋮'s press does not reach the header's toggle. */
 async function revealFirstCardCopyLink(page) {
-  await page.waitForSelector('[data-event-id] [role="button"]', { timeout: 60000 }).catch(() => {});
+  await page.waitForSelector("[data-event-id] [data-event-head-menu]", { timeout: 60000 }).catch(() => {});
   const firstCard = page.locator("[data-event-id]").first();
-  await firstCard
-    .locator('[role="button"]')
-    .first()
-    .click()
-    .catch(() => {});
-  // The ⋮ is in T6, the foot of the open Explanation: open it first.
-  const t3Toggle = firstCard.locator('[data-t3-toggle][aria-expanded="false"]').first();
-  await t3Toggle.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
-  if ((await t3Toggle.count()) > 0) await t3Toggle.click().catch(() => {});
-  await firstCard
-    .locator("[data-event-menu] > button")
-    .first()
-    .click({ timeout: 15000 })
-    .catch(() => {});
-  await page.waitForSelector(COPY_LINK, { timeout: 15000 }).catch(() => {});
+  // A press before hydration is lost: pressed until the row shows.
+  for (let i = 0; i < 6 && (await page.locator(COPY_LINK).count()) === 0; i++) {
+    await firstCard
+      .locator("[data-event-head-menu] [data-event-menu] > button")
+      .first()
+      .click({ timeout: 15000 })
+      .catch(() => {});
+    await page.waitForSelector(COPY_LINK, { timeout: 2500 }).catch(() => {});
+  }
   return (await page.locator(COPY_LINK).count()) > 0;
 }
 

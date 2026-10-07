@@ -33,7 +33,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
 import { StatCard } from "@/components/shared/state-transition";
-import { EVENT_NUMBER_PILL } from "@/components/shared/event-number-pill";
+import { EVENT_NUMBER_PILL, EventHeadChevron } from "@/components/shared/event-number-pill";
 import { FeedbackModal } from "@/components/shared/feedback-modal";
 import { actionLabel } from "@/lib/shared/event-filter-helpers";
 import { formatCompact, shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -220,6 +220,7 @@ export function TimelineBoundaryCard({
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
       <span className="shrink-0 text-sm font-medium text-rb-500">{label}</span>
+      <EventHeadChevron className="-ml-1.5" />
       {/* The same slot, the same register and the same pill as the rows'
           date, time and number — so the span aligns with the dates above it
           and the range pill lines up with the row-number pills. */}
