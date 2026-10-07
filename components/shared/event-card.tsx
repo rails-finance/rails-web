@@ -544,7 +544,7 @@ export function EventCard({
               >
                 {/* The number column, at the left of the spine's area: the
                     event's number, or a group's control. */}
-                <div className="absolute left-0 top-4 z-10 flex w-11 justify-center" data-number-column="">
+                <div className="absolute left-1.5 top-4 z-10 flex w-11 justify-center" data-number-column="">
                   {numberSlot ??
                     (num && (
                       <EventTxHashContext.Provider value={txHash ?? null}>
