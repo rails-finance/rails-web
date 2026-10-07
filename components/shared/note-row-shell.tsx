@@ -28,14 +28,11 @@ import { useState, type ReactNode } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { SpineColumn, type SpineIcon, type SpineVariant } from "@/components/shared/spine-column";
+import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
 
 export interface NoteRowShellProps {
   /** The spine glyph this row's class wears. */
   icon: SpineIcon;
-  /** Spine line style — dotted for every row this shell draws today: the
-   *  account did nothing here, whichever class the row is. */
-  spine?: SpineVariant;
   /** Spine terminus flags. A row that sits BETWEEN two others is neither, so
    *  both default false; a row in the timeline's head slot passes `isFirst`. */
   isFirst?: boolean;
@@ -62,7 +59,6 @@ export interface NoteRowShellProps {
 
 export function NoteRowShell({
   icon,
-  spine = "dotted",
   isFirst = false,
   isLast = false,
   label,
@@ -86,7 +82,7 @@ export function NoteRowShell({
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
       >
         <div className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center">
-          <SpineColumn icon={icon} spine={spine} isFirst={isFirst} isLast={isLast} />
+          <SpineColumn icon={icon} isFirst={isFirst} isLast={isLast} />
           {nodeControl}
         </div>
         <div className="min-w-0 grow">

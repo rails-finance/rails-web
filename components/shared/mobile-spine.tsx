@@ -236,7 +236,7 @@ export function SpineSegment({
     <span
       aria-hidden={onToggle ? true : undefined}
       className={`block max-w-full truncate px-2 text-xs leading-5 ${lit ? "text-foreground" : "text-rb-500"}`}
-      style={{ backgroundColor: "var(--background)" }}
+      style={{ backgroundColor: "var(--spine-ground, var(--background))" }}
     >
       {caption}
     </span>

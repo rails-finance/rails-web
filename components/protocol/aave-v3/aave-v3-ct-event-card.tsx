@@ -266,7 +266,6 @@ export function AaveV3CtEventCard({
       icon="warning"
       warningTone="critical"
       warningLabel={isLiq ? "Liquidation" : "Written off"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -275,7 +274,6 @@ export function AaveV3CtEventCard({
       icon="swap"
       swapLegs={swapLegs}
       swapAxis={swapAxis}
-      spine="solid"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -283,7 +281,6 @@ export function AaveV3CtEventCard({
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

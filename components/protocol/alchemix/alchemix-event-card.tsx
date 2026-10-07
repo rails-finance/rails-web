@@ -200,7 +200,6 @@ export function AlchemixEventCard({
   const iconSlot = custodyOnly ? (
     <SpineColumn
       tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -214,7 +213,6 @@ export function AlchemixEventCard({
       // told apart by the pill's word. A liquidation stays critical.
       warningTone={adverse ? "critical" : "caution"}
       warningLabel={WARNING_LABEL[(adverse ?? cautioned)!.context.data.eventType]}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

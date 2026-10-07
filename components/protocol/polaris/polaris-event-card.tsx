@@ -92,12 +92,11 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
         icon="warning"
         warningTone="critical"
         warningLabel="Liquidation"
-        spine="dotted"
         isFirst={isFirst}
         isLast={!!isLast}
       />
     ) : ctx.eventType === "transfer" ? (
-      <SpineColumn icon="custody" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="custody" isFirst={isFirst} isLast={!!isLast} />
     ) : tokens.length === 0 ? (
       // An interest-only touch: the log wrote the pending legs in and moved
       // nothing the holder chose.

@@ -327,7 +327,6 @@ export function TransmuterEventCard({
   const iconSlot = custodyOnly ? (
     <SpineColumn
       tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

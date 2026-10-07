@@ -133,7 +133,6 @@ export function LiquityV1EventCard({
       icon="warning"
       warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

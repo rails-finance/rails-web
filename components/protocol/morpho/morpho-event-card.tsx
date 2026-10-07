@@ -98,7 +98,6 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -106,7 +105,6 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

@@ -146,14 +146,12 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
       icon="warning"
       warningTone="critical"
       warningLabel="Default"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : lifecycleIcon ? (
     <SpineColumn
       icon={lifecycleIcon}
-      spine={lifecycleIcon === "extend" ? "solid" : "dotted"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

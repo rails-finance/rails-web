@@ -130,7 +130,6 @@ export function LlamalendEventCard({
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

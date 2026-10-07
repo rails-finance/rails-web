@@ -126,7 +126,6 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -134,7 +133,6 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

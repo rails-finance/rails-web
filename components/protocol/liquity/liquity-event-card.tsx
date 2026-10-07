@@ -155,7 +155,6 @@ export function LiquityEventCard({
       warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
       warningLabel={ctx.operation === "liquidate" ? "Liquidation" : isRedemption ? "Redemption" : undefined}
       warningLegs={warningLegs}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -165,7 +164,6 @@ export function LiquityEventCard({
     <SpineColumn
       icon="delegate"
       iconDirection={isJoin ? "up" : "down"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -173,7 +171,6 @@ export function LiquityEventCard({
     <SpineColumn
       icon="rate-change"
       iconDirection={rateUp ? "up" : "down"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -181,7 +178,7 @@ export function LiquityEventCard({
     // The Trove NFT changed hands; no collateral or BOLD moved. The custody
     // plane in its neutral disc (detail-page-anatomy.md, "The custody row"),
     // the mark Polaris's position transfer wears.
-    <SpineColumn icon="custody" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="custody" isFirst={isFirst} isLast={!!isLast} />
   ) : isNoChangeAdjust(ctx) ? (
     // Zero-delta touch: no flows to draw, but an empty spine slot reads as a
     // rendering hole — mark the event with the neutral "nothing moved" glyph.

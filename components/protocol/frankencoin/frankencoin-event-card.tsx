@@ -168,7 +168,6 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
                   ? "Auction"
                   : "Forced sale"
         }
-        spine="dotted"
         isFirst={isFirst}
         isLast={!!isLast}
       />
@@ -178,7 +177,7 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
       // (nothing moved). Same treatment as makerdao's `give`, fluid's and fx's
       // `transfer`. Covers the mint-time factory→owner handover too ("Owner Set
       // at Mint"), which is the same shape: a party changed, no collateral did.
-      <SpineColumn icon="delegate" iconDirection="up" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
     ) : (
       <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
     );

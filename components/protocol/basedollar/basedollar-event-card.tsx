@@ -183,7 +183,6 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
       icon="warning"
       warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

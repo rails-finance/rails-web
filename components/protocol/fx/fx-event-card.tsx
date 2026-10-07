@@ -126,7 +126,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
           ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
           : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act."
       }
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -136,7 +135,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       warningTone="caution"
       warningLabel="Redemption"
       warningTip="Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act."
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -148,7 +146,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       warningTone="caution"
       warningLabel="Rebalance"
       warningTip="A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act."
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -160,14 +157,13 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     // The glyph is the event's own MEANING, so it wins over the third-party
     // fallback the way a check/cross badge does — that fact is still carried by
     // the dotted spine and the header's from → to chips.
-    <SpineColumn icon="delegate" iconDirection="up" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     // Third-party operate badges the flow pink (color-grammar §4) rather than
     // replacing it — see spine-column's `externalParty`.
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

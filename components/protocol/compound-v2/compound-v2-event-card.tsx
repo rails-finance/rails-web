@@ -134,7 +134,6 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -143,7 +142,6 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
       icon="warning"
       warningTone="critical"
       warningLabel="Seizure"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -151,7 +149,6 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

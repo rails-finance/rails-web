@@ -90,7 +90,6 @@ export function AaveV4EventCard({
       icon="warning"
       warningTone="critical"
       warningLabel="Liquidation"
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -101,7 +100,6 @@ export function AaveV4EventCard({
     <SpineColumn
       tokens={[{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }]}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -109,7 +107,6 @@ export function AaveV4EventCard({
     <SpineColumn
       tokens={[{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt, prov: amountProv }]}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -119,7 +116,6 @@ export function AaveV4EventCard({
         { symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt, prov: amountProv },
       ]}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

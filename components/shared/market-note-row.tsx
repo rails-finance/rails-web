@@ -548,7 +548,7 @@ export function LiveNoteGroupRow({
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
       <div className="relative hidden w-2/5 shrink-0 self-stretch items-stretch justify-center sm:flex">
-        <SpineColumn icon={nodeControl ? "market-open" : "market"} spine="dotted" isFirst={isFirst} isLast={isLast} />
+        <SpineColumn icon={nodeControl ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
         {nodeControl}
       </div>
       <div className="min-w-0 grow rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>

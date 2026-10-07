@@ -118,7 +118,6 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
         icon="warning"
         warningTone="critical"
         warningLabel={isGrab ? "Liquidation" : "Auction"}
-        spine="dotted"
         isFirst={isFirst}
         isLast={!!isLast}
       />
@@ -126,12 +125,11 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
       // An ownership handover is a people event with no token flow — the person
       // glyph with the join badge marks the new owner taking over; dotted spine
       // (nothing moved in the urn).
-      <SpineColumn icon="delegate" iconDirection="up" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
     ) : (
       <SpineColumn
         tokens={tokens}
         externalParty={!!extBy}
-        spine={extBy ? "dotted" : "solid"}
         isFirst={isFirst}
         isLast={!!isLast}
       />

@@ -129,7 +129,6 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

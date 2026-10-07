@@ -187,7 +187,6 @@ export function AsymmetryEventCard({ event, isFirst, isLast, eventNumber }: Asym
       icon="warning"
       warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

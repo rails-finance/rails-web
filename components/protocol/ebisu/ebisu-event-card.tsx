@@ -186,7 +186,6 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
       icon="warning"
       warningTone={isLiq ? "critical" : "caution"}
       warningLabel={isLiq ? "Liquidation" : "Redemption"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />

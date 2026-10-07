@@ -2,10 +2,9 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
+import { ArrowRightToLine, Clock, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
@@ -34,12 +33,9 @@ export type SpineIcon =
   | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
-  | "folder" // A chronological chunk of a longer third-party stretch (lib/shared/timeline-chunks.ts) — disclosure chevron + folder in the LEFT flank, dot on the spine, bare count pill right
+  | "none" // A closed group whose members moved no asset (a run of rate changes): no node, the undrawn segment alone
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
-
-/** Spine line style encoding agency */
-export type SpineVariant = "solid" | "dotted";
 
 /** Spine color tint. The spine line itself carries NO decorative/subsystem
  *  tint — it stays neutral. The only tints are the two §5 adverse tones, the
@@ -182,9 +178,8 @@ export interface SpineColumnProps {
    *  legs' magnitudes, the dotted spine and the lead-in dot take it. Defaults
    *  to "caution". See color-grammar.md §5. */
   warningTone?: WarningTone;
-  /** The kind's name ("Redemption", "Liquidation"). With icon="folder" a
-   *  one-kind folder keeps its kind's tone through it; a warning node draws
-   *  no pill (T1 states the word). */
+  /** The kind's name ("Redemption", "Liquidation"). A warning node draws no
+   *  pill (T1 states the word); a named warning row stands on the band. */
   warningLabel?: string;
   /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
@@ -193,30 +188,12 @@ export interface SpineColumnProps {
    *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
    *  neither, the triangle stands in. */
   warningLegs?: SpineWarningLeg[];
-  /** icon="folder" only — draw the open-folder glyph (the chunk is expanded). */
-  folderOpen?: boolean;
-  /** icon="folder" only — small glyph on the folder's corner: a chunk whose
-   *  members are all one kind wears that kind's mark. */
-  folderMark?: ReactNode;
-  /** icon="folder" only — member count, rendered in a pill on the right
-   *  flank of the spine dot. */
-  folderCount?: number;
-  /** icon="folder" only — clicking the folder node toggles the chunk open,
-   *  the same action as the header. Redundant affordance: the header stays
-   *  the accessible control (focus, aria-expanded), so this one carries no
-   *  tab stop of its own. */
-  onFolderToggle?: () => void;
-  /** icon="folder" only — the folder node and the run header are ONE control
-   *  in two subtrees, so their hover is linked through the run card's
-   *  `useLinkedHover`: `folderLit` draws the node in the hovered tone while
-   *  the pointer is over EITHER surface, and `folderHover` reports this
-   *  node's own enter/leave back up. */
-  folderLit?: boolean;
-  folderHover?: LinkedHoverHandlers;
   /** Direction for rate-change arrow or delegate badge */
   iconDirection?: "up" | "down";
-  /** Spine line style: solid = user-initiated, dotted = passive/external */
-  spine?: SpineVariant;
+  /** The segment below the node stands for events not drawn (a closed
+   *  group): dotted, in the warning tone or the neutral ink. Every other
+   *  line is solid. */
+  undrawn?: boolean;
   /** Spine color tint — encodes subsystem or event category */
   color?: SpineColor;
   /** The first node on the spine: nothing is drawn above it (a leading mask
@@ -876,14 +853,8 @@ export function SpineColumn({
   warningLabel,
   warningTip,
   warningLegs,
-  folderOpen,
-  folderMark,
-  folderCount,
-  onFolderToggle,
-  folderLit,
-  folderHover,
   iconDirection,
-  spine = "solid",
+  undrawn,
   color = "default",
   isFirst,
   isLast,
@@ -903,7 +874,7 @@ export function SpineColumn({
   // card. The folder node keeps its toggle; the phone view's segment is a
   // button already.
   const toggleCtx = useContext(SpineNodeToggleContext);
-  const nodeToggle = !spineRow && !detached && icon !== "folder" ? toggleCtx : null;
+  const nodeToggle = !spineRow && !detached ? toggleCtx : null;
   const nodeProps = nodeToggle
     ? { onClick: nodeToggle.onToggle, ...nodeToggle.hover, "data-spine-node-toggle": "" }
     : {};
@@ -957,17 +928,16 @@ export function SpineColumn({
   // (EventCard, bg-raised), so its masks and the node's halo take that ground; the
   // phone spine view draws no band.
   const banded = effectiveIcon === "warning" && !!warningLabel;
-  const ground = banded && !spineRow ? "var(--surface-raised)" : "var(--background)";
+  // Inside a banded group frame the ground is the frame's (`--spine-ground`).
+  const ground = banded && !spineRow ? "var(--surface-raised)" : "var(--spine-ground, var(--background))";
 
-  // For warning events the spine + lead-in dot inherit the warning tone so the
-  // whole dotted segment reads as caution (orange) / critical (red, liquidation).
-  // A folder that carries a warning pill (a liquidations-only chunk) inherits
-  // it the same way — the danger register survives the move onto the folder.
-  const effectiveColor: SpineColor =
-    effectiveIcon === "warning" || (effectiveIcon === "folder" && warningLabel) ? warningTone : color;
-  const spineRgb = SPINE_COLORS[effectiveColor];
+  // The lead-in dot takes a warning event's tone. The line is solid neutral
+  // ink, except the dotted segment that means "events not drawn" (a closed
+  // group, the boundary), which takes the tone too.
+  const effectiveColor: SpineColor = effectiveIcon === "warning" ? warningTone : color;
+  const isDotted = !!undrawn;
+  const spineRgb = SPINE_COLORS[isDotted ? effectiveColor : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
-  const isDotted = spine === "dotted";
   const spineStyle = isDotted
     ? { backgroundImage: `linear-gradient(to bottom, ${spineRgb} 50%, transparent 50%)`, backgroundSize: "1px 6px" }
     : { backgroundColor: spineRgb };
@@ -982,27 +952,29 @@ export function SpineColumn({
   const spineEl = detached ? (
     // Detached card: spine is bounded by the column itself, no overflow into neighbours.
     <div className={spineClasses} style={{ top: 0, bottom: 0, ...spineStyle }} />
+  ) : isLast ? (
+    // A closed group at the end of the list keeps its undrawn segment, inside
+    // the row.
+    isDotted && <div className={spineClasses} style={{ top: 0, bottom: 8, ...spineStyle }} />
   ) : (
-    !isLast && (
-      // Overshoot past the card bottom just enough to reach into the *next*
-      // icon's halo (where it's masked by var(--background) box-shadow), then
-      // stop. Layout assumes the standard sibling spacing — space-y-2 (8px
-      // gap) + cardPad (4px) + SpineColumn pt-4 (16px) − halo radius (4px) ≈
-      // 24px from this card's bottom to the next halo's top edge; 28px lands
-      // a few px inside the halo for clean masking. Any further (the old
-      // 100px) and the spine bleeds past the next card entirely, leaving a
-      // bare tail visible below the bottom-most event.
-      // The line is also what a market-note marker gap below lengthens
-      // (`useExtendLineAbove`), so it is marked and reads the var: in the
-      // phone spine view as `data-spine-line`, in the list view as
-      // `data-list-line` (item 118's stacked desktop markers).
-      <div
-        className={spineClasses}
-        data-spine-line={spineRow ? "" : undefined}
-        data-list-line={spineRow ? undefined : ""}
-        style={{ top: 0, bottom: SPINE_LINE_OVERSHOOT, ...spineStyle }}
-      />
-    )
+    // Overshoot past the card bottom just enough to reach into the *next*
+    // icon's halo (where it's masked by var(--background) box-shadow), then
+    // stop. Layout assumes the standard sibling spacing — space-y-2 (8px
+    // gap) + cardPad (4px) + SpineColumn pt-4 (16px) − halo radius (4px) ≈
+    // 24px from this card's bottom to the next halo's top edge; 28px lands
+    // a few px inside the halo for clean masking. Any further (the old
+    // 100px) and the spine bleeds past the next card entirely, leaving a
+    // bare tail visible below the bottom-most event.
+    // The line is also what a market-note marker gap below lengthens
+    // (`useExtendLineAbove`), so it is marked and reads the var: in the
+    // phone spine view as `data-spine-line`, in the list view as
+    // `data-list-line` (item 118's stacked desktop markers).
+    <div
+      className={spineClasses}
+      data-spine-line={spineRow ? "" : undefined}
+      data-list-line={spineRow ? undefined : ""}
+      style={{ top: 0, bottom: SPINE_LINE_OVERSHOOT, ...spineStyle }}
+    />
   );
 
   // The tip above: a lead-in line and the pulsing dot above the newest event's
@@ -1325,117 +1297,11 @@ export function SpineColumn({
               <span />
             </div>
           );
-        case "folder":
-          // The folder sits in the LEFT flank — beside the spine, not on it —
-          // so the expanded members' own spine nodes line up to its right and
-          // read as the folder's contents. The spine keeps a plain dot (tinted
-          // with the folder's tone), and the count rides a pill pulled flush
-          // against the dot — the bare number: beside a folder the pill can
-          // only mean "this many inside", so the "×" it used to carry was
-          // noise (Miles, 2026-09-02). The dashed connector that used to join
-          // folder to dot went the same day — the flank position already says
-          // which node the folder belongs to. Two dashed stubs run the dot's
-          // cell top-to-bottom so the through-spine actually MEETS the dot:
-          // the stub starts 4px above the node box — exactly where the
-          // previous card's masked overshoot stops being visible — and ends
-          // at the box bottom where this card's own spine segment begins (on
-          // a terminal collapsed node the lower stub is dropped: no line to
-          // nowhere). The whole node toggles on click, same as the header,
-          // and the two surfaces hover as one: the node lights while the
-          // pointer is over the header and vice versa (`folderLit`, linked
-          // through the run card — Miles, 2026-09-03). No native title on the
-          // node: the linked hover already says "these open together", and a
-          // browser tooltip would be the one hover surface the site does not
-          // otherwise use. No warningLabel pill at this level — a collapsed
-          // run states its
-          // severity through the corner mark and the dot tone, not a repeated
-          // label; single-event spine nodes still carry their own pill above.
-          //
-          // The disclosure mark is a Finder-style chevron to the folder's LEFT
-          // — pointing right while closed, down while open — and it is the
-          // folder's ONLY chevron: the header's trailing ▾ came off folder
-          // rows the same day (Miles, 2026-09-02). Outline grammar: the mark
-          // that says "this opens" sits before the thing it opens.
-          //
-          // The glyph is drawn at the flank's token size, several times the
-          // 16px the same lucide folder has elsewhere on the site — so its
-          // stroke is pinned in absolute pixels rather than scaled with the
-          // box, matching the small icon's weight instead of arriving as a
-          // chunky enlargement of it.
-          return (
-            <div
-              className={`group/folder flex flex-col items-center gap-1${onFolderToggle ? " cursor-pointer" : ""}`}
-              onClick={onFolderToggle}
-              {...folderHover}
-            >
-              <div
-                className="grid grid-rows-1 items-center justify-items-center"
-                style={{ gridTemplateColumns: scale.gridCols }}
-              >
-                {/* pr-5 mirrors SpineVal's left-side cell, so the folder's
-                    right edge lines up with the flank values' right edge on
-                    the rows around it. */}
-                <div
-                  className={`justify-self-end pr-5 transition-colors group-hover/folder:text-foreground ${
-                    folderLit ? "text-foreground" : "text-rb-500"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    <DisclosureChevron isOpen={!!folderOpen} size={14} />
-                    {/* The mark anchors to the glyph itself, inside the
-                        padded cell, so it stays on the folder's corner. */}
-                    <span className="relative inline-flex">
-                      {folderOpen ? (
-                        <FolderOpen size={scale.tokenSize} strokeWidth={1.25} absoluteStrokeWidth />
-                      ) : (
-                        <Folder size={scale.tokenSize} strokeWidth={1.25} absoluteStrokeWidth />
-                      )}
-                      {folderMark && (
-                        <span
-                          className="absolute -bottom-1 -right-1 inline-flex rounded-full p-px"
-                          style={{ backgroundColor: "var(--background)" }}
-                        >
-                          {folderMark}
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                </div>
-                {/* The arrow column stays empty: the folder and the dot are
-                    neighbours, not joined. */}
-                <span />
-                <div className="relative self-stretch flex items-center justify-center">
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 w-px"
-                    style={{
-                      top: -4,
-                      bottom: isLast && !detached ? "50%" : 0,
-                      backgroundImage: `linear-gradient(to bottom, ${spineRgb} 50%, transparent 50%)`,
-                      backgroundSize: "1px 6px",
-                    }}
-                  />
-                  <span className="relative rounded-full" style={{ width: 8, height: 8, backgroundColor: spineRgb }} />
-                </div>
-                {folderCount != null && (
-                  // data-prov-exempt: a folder's member count is an index row
-                  // count, not a chain-state figure — the same "event numbers"
-                  // class PositionCardMeta's cluster is exempted under. It
-                  // matters wherever a timeline is nested inside a page-level
-                  // receipts scope (the Vaults position page), where the
-                  // coverage tripwire would otherwise ask for a receipt for
-                  // "how many rows are in this folder".
-                  <span data-prov-exempt="" className="justify-self-start -ml-2" style={{ gridColumn: "4 / 6" }}>
-                    <span
-                      className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
-                      title={`${folderCount.toLocaleString("en-US")} events grouped in this folder`}
-                    >
-                      {folderCount.toLocaleString("en-US")}
-                    </span>
-                  </span>
-                )}
-              </div>
-            </div>
-          );
+        case "none":
+          // A closed group whose members moved no asset: no node, a slot of
+          // the node's height so the undrawn segment starts where a node
+          // would end.
+          return <div aria-hidden style={{ height: scale.tokenSize }} />;
       }
     })();
 
@@ -1444,6 +1310,9 @@ export function SpineColumn({
         className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
         // EventCard draws the band on a row whose spine carries this.
         data-spine-adverse={banded ? warningTone : undefined}
+        // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
+        // its figures re-state the card's, which carries them.
+        data-prov-exempt=""
       >
         {leadingMask}
         <div
@@ -1456,7 +1325,7 @@ export function SpineColumn({
         </div>
         <div className="flex-1 relative">
           {spineEl}
-          {isLast && !detached && <SpineTrailingMask ground={ground} />}
+          {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
           {tipBelow}
           {captionEl}
         </div>
@@ -1474,6 +1343,7 @@ export function SpineColumn({
   return (
     <div
       className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
+      data-prov-exempt=""
     >
       {leadingMask}
       <div
@@ -1483,8 +1353,8 @@ export function SpineColumn({
           detached
             ? { paddingBottom: hasBadge ? 6 : 0 }
             : {
-                backgroundColor: "var(--background)",
-                boxShadow: "0 0 0 4px var(--background)",
+                backgroundColor: ground,
+                boxShadow: `0 0 0 4px ${ground}`,
                 paddingBottom: hasBadge ? 6 : 0,
               }
         }
@@ -1561,7 +1431,7 @@ export function SpineColumn({
       </div>
       <div className="flex-1 relative">
         {spineEl}
-        {isLast && !detached && <SpineTrailingMask />}
+        {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
         {tipBelow}
         {captionEl}
       </div>

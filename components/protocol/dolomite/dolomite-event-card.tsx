@@ -96,7 +96,6 @@ export function DolomiteEventCard({
       icon="warning"
       warningTone="critical"
       warningLabel={ctx.eventType === "liquidation" ? "Liquidation" : "Seizure"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
@@ -104,7 +103,6 @@ export function DolomiteEventCard({
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />

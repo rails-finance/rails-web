@@ -121,21 +121,19 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
       icon="warning"
       warningTone="critical"
       warningLabel={ctx.eventType === "absorbed" ? "Absorbed" : "Liquidation"}
-      spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : ctx.eventType === "mint" ? (
-    <SpineColumn icon="mint" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="mint" isFirst={isFirst} isLast={!!isLast} />
   ) : ctx.eventType === "transfer" ? (
     // An ownership handover is a people event with no token flow — the person
     // glyph with the join badge marks the new owner taking over.
-    <SpineColumn icon="delegate" iconDirection="up" spine="dotted" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn
       tokens={tokens}
       externalParty={!!extBy}
-      spine={extBy ? "dotted" : "solid"}
       isFirst={isFirst}
       isLast={!!isLast}
     />
