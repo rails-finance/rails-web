@@ -28,6 +28,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { StatCard, StateTransition } from "@/components/shared/state-transition";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { ThenTodayChip } from "@/components/shared/price-basis";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatUsdValue, formatPrice } from "@/lib/utils/format";
 
@@ -286,13 +287,20 @@ export function AtBlockPriceFootnote({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500">
       {pills.map((pill, i) => (
-        <Prov key={i} info={pill.priceProv} value={pill.display ?? format(pill.priceUsd)} symbol={pill.symbol}>
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <TokenChipIcon symbol={pill.symbol} address={pill.address} size={14} />
-            {pill.symbol} {pill.display ?? format(pill.priceUsd)}
-            <span className="text-rb-400">· {pill.note ?? "oracle at block"}</span>
-          </span>
-        </Prov>
+        <span key={i} className="inline-flex items-center gap-1 tabular-nums">
+          <TokenChipIcon symbol={pill.symbol} address={pill.address} size={14} />
+          {pill.symbol} {/* On an event card, the price is the then / today control (ui-jobs 283). */}
+          <ThenTodayChip
+            symbol={pill.symbol}
+            format={format}
+            then={
+              <Prov info={pill.priceProv} value={pill.display ?? format(pill.priceUsd)} symbol={pill.symbol}>
+                {pill.display ?? format(pill.priceUsd)}
+              </Prov>
+            }
+          />
+          <span className="text-rb-400">· {pill.note ?? "oracle at block"}</span>
+        </span>
       ))}
     </div>
   );

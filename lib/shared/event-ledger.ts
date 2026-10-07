@@ -411,6 +411,33 @@ export function assetLedgers({
   return { assets, usd: usdTotal(total, heldBefore) };
 }
 
+/** A token ledger restated at another price (the card set to today, ui-jobs
+ *  283): the flows keep the dollars of their blocks, the total is the tokens
+ *  held at `price`, and Market move takes the difference. Null for a ledger
+ *  in dollars or with no USD. */
+export function ledgerAtPrice(l: Ledger, price: number): Ledger | null {
+  if (!l.tokens || !l.usd || l.decimals == null || !(price > 0)) return null;
+  const scale = 10 ** l.decimals;
+  const dollars = Math.round((l.tokens.units / scale) * price);
+  const moved = l.rows.reduce((a, r) => a + (r.role === "event" ? (r.tokens?.units ?? 0) : 0), 0);
+  const before = l.tokens.before != null ? ((l.tokens.units - moved) / scale) * price : null;
+  const rows = l.rows.filter((r) => r.role !== "market");
+  const market = dollars - rows.reduce((a, r) => a + (r.usd?.dollars ?? 0), 0);
+  if (market !== 0) {
+    const key = l.rows.find((r) => r.role === "market")?.key ?? `${l.side}-${l.symbol ?? "usd"}-market`;
+    rows.push({
+      key,
+      line: key,
+      label: "Market move",
+      role: "market",
+      seg: null,
+      tokens: null,
+      usd: { dollars: market, text: signedUsd(market) },
+    });
+  }
+  return { ...l, rows, usd: usdTotal(dollars, before), price };
+}
+
 /** The rows' sums, for the checks: every column adds to its total. */
 export function ledgerAdds(l: Ledger): { tokens: boolean; usd: boolean } {
   const tok = l.rows.reduce((a, r) => a + (r.tokens?.units ?? 0), 0);

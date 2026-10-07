@@ -1,5 +1,6 @@
 "use client";
 
+import { PriceBasisProvider } from "@/components/shared/price-basis";
 import { useState, useCallback, useEffect, useContext, useId, useLayoutEffect, useRef } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
@@ -448,59 +449,63 @@ export function EventCard({
     const kind = caption ?? captionCtx.kind;
     const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
     return (
-      <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-        <SpineSegment
-          wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
-          caption={
-            <>
-              {kind} &middot; {date}
-            </>
-          }
-          spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
-          open={spineOpen}
-          onToggle={(anchor) => spine.toggle(cardId, anchor)}
-          iconColumn={iconColumn}
-          cardKey={cardId}
-          card={
-            // The opened card states its date in full: the caption above it
-            // drops the time, and the list's once-a-day prefix does not apply
-            // to a card read alone.
-            <EventDateContext.Provider value={date}>{contentTiers}</EventDateContext.Provider>
-          }
-        />
-      </ProvReceiptsScope>
+      <PriceBasisProvider>
+        <ProvReceiptsScope registry={registry} scopeId={scopeId}>
+          <SpineSegment
+            wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
+            caption={
+              <>
+                {kind} &middot; {date}
+              </>
+            }
+            spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
+            open={spineOpen}
+            onToggle={(anchor) => spine.toggle(cardId, anchor)}
+            iconColumn={iconColumn}
+            cardKey={cardId}
+            card={
+              // The opened card states its date in full: the caption above it
+              // drops the time, and the list's once-a-day prefix does not apply
+              // to a card read alone.
+              <EventDateContext.Provider value={date}>{contentTiers}</EventDateContext.Provider>
+            }
+          />
+        </ProvReceiptsScope>
+      </PriceBasisProvider>
     );
   }
 
   return (
-    <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-      {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
+    <PriceBasisProvider>
+      <ProvReceiptsScope registry={registry} scopeId={scopeId}>
+        {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. */}
-      <div
-        data-skel-section="detail-event"
-        data-prov-scope={scopeId}
-        className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
-          muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
-        }`}
-        style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
-      >
-        {showAvatar && avatar}
-        {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
+        <div
+          data-skel-section="detail-event"
+          data-prov-scope={scopeId}
+          className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
+            muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
+          }`}
+          style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+        >
+          {showAvatar && avatar}
+          {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
             header there). Matches the sm breakpoint the card's own detail grid uses,
             so the spine and the card body reflow together. On the event page the
             column holds `pageAside`, stacked above the card below sm, where the row
             drops its side padding so the paragraph and the card share one width. */}
-        {pageMode ? (
-          <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-            {pageAside}
-          </div>
-        ) : (
-          <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
-            {iconColumn}
-          </div>
-        )}
-        {contentTiers}
-      </div>
-    </ProvReceiptsScope>
+          {pageMode ? (
+            <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
+              {pageAside}
+            </div>
+          ) : (
+            <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
+              {iconColumn}
+            </div>
+          )}
+          {contentTiers}
+        </div>
+      </ProvReceiptsScope>
+    </PriceBasisProvider>
   );
 }

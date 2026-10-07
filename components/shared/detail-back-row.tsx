@@ -17,6 +17,7 @@ import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols
 import { RailHeader } from "@/components/shared/rail-header";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { LatestPrices, type LatestPriceAsset, type PricesAt } from "@/components/shared/latest-prices";
+import { usePublishTodayPrices } from "@/components/shared/price-basis";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionWalletRow, type PositionOwner } from "@/components/shared/position-wallet-row";
@@ -157,6 +158,8 @@ export function DetailTopRow({
   // opened scope leaves this trigger's price tracing nothing (rails-ops
   // provenance-receipts-grammar.md §7, the unscoped-sibling gap).
   const registry = useReceiptRegistry();
+  // The event cards' "today" side reads the prices this chip states.
+  usePublishTodayPrices(assets);
   const prices = (bare: boolean) =>
     !closed ? (
       <LatestPrices assets={assets} reason={priceReason} bare={bare} />
@@ -178,7 +181,11 @@ export function DetailTopRow({
       <div className="mb-2.5">
         <RailHeader session={session} venue="position" />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2" data-anatomy="H7" data-back-row>
+      <div
+        className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2"
+        data-anatomy="H7"
+        data-back-row
+      >
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
           <DetailBackButton session={session} wallet={wallet} fallbackHref={fallbackHref} compact={!owner} />
           {/* A page without a wallet row keeps the strip beside Back. */}

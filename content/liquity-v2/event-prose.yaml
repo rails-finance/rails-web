@@ -546,6 +546,12 @@ L2_words:
     today
   claimable: |-
     claimable
+  # T2's row under a redemption's price chip, where the redeemed collateral at
+  # the latest block's price sits on the other side of the debt it paid off.
+  redemption_today_lower: |-
+    At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} less than the debt it paid off
+  redemption_today_higher: |-
+    At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} more than the debt it paid off
   collateral_ratio: |-
     Collateral Ratio
 
@@ -1264,12 +1270,8 @@ templates:
       redeemCollateral, or a zombie trove's adjustZombieTrove / adjustUnredeemableZombieTrove
     L5: redemption
     variants:
-      price_lower_now: |-
-        the collateral's price today is below its price at the redemption
-      price_higher_now: |-
-        the price today is far enough above it that the redeemed collateral would now be worth more than the debt it paid off
       at_event: |-
-        no price today, or one that reads the same, or a rise smaller than the fee
+        the event carries a redemption log
       no_detail: |-
         the event carries no redemption log
     L1:
@@ -1301,16 +1303,6 @@ templates:
           the fee reads under $1
         text: |-
           In effect, some collateral was sold at {price_at_event} to repay the same amount of debt.
-      redeem.today_lower:
-        when: |-
-          variant price_lower_now
-        text: |-
-          {coll_symbol} has since fallen to {price_today} today, so the redeemed {coll_symbol} would now be worth {redemption_vs_today_usd} less than the debt it paid off.
-      redeem.today_higher:
-        when: |-
-          variant price_higher_now
-        text: |-
-          {coll_symbol} has since risen to {price_today} today, so if the trove had kept the redeemed {coll_symbol}, it would now be worth {redemption_vs_today_usd} more than the debt it paid off.
       redeem.why_batch:
         when: |-
           not a zombie, the trove is batched
@@ -1366,8 +1358,6 @@ templates:
       - redeem.what
       - redeem.result
       - redeem.result_no_fee
-      - redeem.today_lower
-      - redeem.today_higher
       - redeem.why_batch
       - redeem.why_owner
       - redeem.zero
@@ -1381,7 +1371,7 @@ templates:
       - same_block
     groups:
       happened: [redeem.no_detail, redeem.what, redeem.why_batch, redeem.why_owner, same_block]
-      adds_up: [redeem.result, redeem.result_no_fee, redeem.today_lower, redeem.today_higher]
+      adds_up: [redeem.result, redeem.result_no_fee]
       leaves: [redeem.zero, redeem.zombie_zero, redeem.zombie_zero_rate, redeem.zombie_zero_next, redeem.zombie_low, redeem.zombie_low_queue, redeem.zombie_low_rate, redeem.zombie_low_next]
 
   - id: liquity2.delegation.join

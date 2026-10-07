@@ -26,6 +26,12 @@ export function eventPriceText(price: number | null | undefined, symbol: string)
   return priceLine("At the event’s price", price, symbol);
 }
 
+/** The same line for a figure at today's price, in item 300's words: "At the
+ *  latest block’s price, $2,713.00 per WETH". */
+export function todayPriceText(price: number | null | undefined, symbol: string): string | null {
+  return priceLine("At the latest block’s price", price, symbol);
+}
+
 function priceLine(lead: string, price: number | null | undefined, symbol: string): string | null {
   if (price == null || !Number.isFinite(price) || price <= 0) return null;
   const digits = price >= 1 ? 2 : price >= 0.01 ? 4 : 6;

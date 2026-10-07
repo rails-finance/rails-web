@@ -45,6 +45,7 @@ import {
   changeTone,
 } from "@/components/shared/state-transition";
 import { offPar, usdShown } from "@/lib/shared/usd-display";
+import { todayUsdProv, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
@@ -789,6 +790,7 @@ export function ChainTruthDetail({
   // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
   const unreadOf = useUnreadTokenOf();
   const ledgerSrc = useContext(EventLedgerContext);
+  const todayOf = useTodayBasisPrices();
   // A ledger cell's closed figures stand at the decimals its opened ledger
   // prints ("1,037.52"); a figure of a million or more keeps its compact form.
   const atLedger = (side: FlowSide | undefined, exact: string, shown: string): string => {
@@ -940,7 +942,13 @@ export function ChainTruthDetail({
                       // the bordered chip the Liquity V2 / Aave V4 details use
                       // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
                       // receipt; the chip shows whole dollars.
-                      <UsdChip usd={s.usd} amount={heldAmount} symbol={s.symbol} changed={changed} />
+                      <UsdChip
+                        usd={s.usd}
+                        amount={heldAmount}
+                        symbol={s.symbol}
+                        today={todayOf(s.symbol)}
+                        changed={changed}
+                      />
                     ))}
                 </StateTransition>
                 {s.interestSincePrevious && (
@@ -979,25 +987,30 @@ export function ChainTruthDetail({
   );
 }
 
-/** A cell's USD chip with no ledger; a dollar stablecoin off par states its
- *  price after it (lib/shared/usd-display.ts `offPar`). */
+/** A cell's USD chip with no ledger: at the event's price, or at the latest
+ *  block's where the card is set to today; a dollar stablecoin off par states
+ *  its price after it (lib/shared/usd-display.ts `offPar`). */
 function UsdChip({
   usd,
   amount,
   symbol,
+  today,
   changed,
 }: {
   usd: { value: number; prov: Provenance };
   amount: number;
   symbol: string | undefined;
+  today: number | null;
   changed: boolean;
 }) {
-  const off = offPar(amount > 0 ? usd.value / amount : null, symbol);
+  const atToday = today != null && symbol != null && amount > 0;
+  const value = atToday ? amount * today : usd.value;
+  const off = offPar(atToday ? today : amount > 0 ? usd.value / amount : null, symbol);
   return (
     <OffParFigure off={off}>
-      <Prov info={usd.prov} value={formatUsdValue(usd.value)}>
+      <Prov info={atToday ? todayUsdProv(`${symbol} held`, symbol) : usd.prov} value={formatUsdValue(value)}>
         <ValuePill changed={changed}>
-          <span className={off?.band ? OFF_PAR_BAND : undefined}>{fmtUsdChip(usd.value)}</span>
+          <span className={off?.band ? OFF_PAR_BAND : undefined}>{fmtUsdChip(value)}</span>
         </ValuePill>
       </Prov>
     </OffParFigure>

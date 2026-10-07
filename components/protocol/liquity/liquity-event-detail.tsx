@@ -5,6 +5,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { accrualNoun, type BatchFeeAfter, type LiquityAccrual } from "@/lib/liquity/accrual";
 import { fillText, wordsAround, type LiquityEventProse, type LiquityL2 } from "@/lib/liquity/event-prose";
 import { FOOTER_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
+import { ThenTodayChip } from "@/components/shared/price-basis";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
@@ -1046,10 +1047,27 @@ export function LiquityEventDetail({
               );
             })()}
           <PriceChipShell bare title={`${ctx.collateralType} price at the time of this event`}>
-            <P info={priceP?.info} value={priceP?.value} icon={<TokenChipIcon symbol={ctx.collateralType} size={14} />}>
-              {formatUsd(collPrice)}
-            </P>
+            <ThenTodayChip
+              symbol={ctx.collateralType}
+              format={formatUsd}
+              then={
+                <P
+                  info={priceP?.info}
+                  value={priceP?.value}
+                  icon={<TokenChipIcon symbol={ctx.collateralType} size={14} />}
+                >
+                  {formatUsd(collPrice)}
+                </P>
+              }
+            />
           </PriceChipShell>
+        </div>
+      )}
+      {/* The redeemed collateral at the latest block's price, under the
+          price chip (ui-jobs 283). */}
+      {collPrice > 0 && l2.redemption?.today && (
+        <div className="px-4 pb-2 text-xs text-rb-500" data-redemption-today="">
+          {l2.redemption.today}
         </div>
       )}
     </>
