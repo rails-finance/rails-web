@@ -79,6 +79,7 @@ export function MorphoEventHeader({
       symbol: ctx.loanSymbol,
       address: soleFlowAddress(flows, ctx.loanSymbol),
       prov: liqClearedValueProv(ctx.loanSymbol, coords, { amount: formatNumber(cleared) }),
+      debtSide: true,
     });
 
   return (

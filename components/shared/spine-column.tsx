@@ -2,7 +2,7 @@
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { ArrowRightToLine, Clock, Layers, LogOut } from "lucide-react";
+import { ArrowRightToLine, Clock, Layers, Lock, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
@@ -145,6 +145,10 @@ export type SpineSwapAxis = "supply" | "debt" | "mixed";
 export interface SpineWarningLeg {
   /** The header's word for the leg ("Cleared"), for the spoken label. */
   label?: string;
+  /** Still the owner's, held for them to claim (Liquity V1's collateral
+   *  surplus): the token with a lock at its corner, no arrow and no number,
+   *  after the legs that left. */
+  locked?: boolean;
   value: number;
   symbol: string;
   address?: string;
@@ -493,6 +497,22 @@ function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
  *  shares the corner with check / cross / the pink external badge under the
  *  same one-corner rule. Neutral rb fill: a transfer is not a loss, not a gain,
  *  and not a verdict about who acted. */
+/** Lock badge: the asset is still the owner's, held for them to claim (a
+ *  collateral surplus). Same corner and neutral disc as the custody badge. */
+function LockBadge({ size }: { size: number }) {
+  const r = Math.round(size * 0.48);
+  return (
+    <div
+      className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center text-white"
+      style={{ width: r, height: r, backgroundColor: "var(--color-rb-500)", border: "2px solid var(--background)" }}
+      role="img"
+      aria-label="Claimable"
+    >
+      <Lock size={Math.round(r * 0.6)} strokeWidth={2.5} aria-hidden />
+    </div>
+  );
+}
+
 function SendBadge({ size }: { size: number }) {
   const r = Math.round(size * 0.48);
   return (
@@ -826,9 +846,21 @@ function WarningLegNodes({
           >
             <span />
             <span />
-            <TokenChipIcon symbol={leg.symbol} address={leg.address} size={scale.tokenSize} filterable={filterable} />
-            <ArrowFromDot direction="right" size={scale.arrowSize} />
-            {txt ? (
+            {leg.locked ? (
+              <div className="relative" data-spine-leg-locked="">
+                <TokenChipIcon
+                  symbol={leg.symbol}
+                  address={leg.address}
+                  size={scale.tokenSize}
+                  filterable={filterable}
+                />
+                <LockBadge size={scale.tokenSize} />
+              </div>
+            ) : (
+              <TokenChipIcon symbol={leg.symbol} address={leg.address} size={scale.tokenSize} filterable={filterable} />
+            )}
+            {leg.locked ? <span /> : <ArrowFromDot direction="right" size={scale.arrowSize} />}
+            {txt && !leg.locked ? (
               <span
                 className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
                 data-spine-leg-value=""

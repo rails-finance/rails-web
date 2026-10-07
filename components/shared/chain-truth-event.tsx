@@ -141,6 +141,14 @@ export interface ChainTruthDelta {
    *  what the omitting card intended by "the header carries this one". Do NOT
    *  set it to paper over a missing row that ought to exist — draw the row. */
   noSpineCounterpart?: boolean;
+  /** The debt side of a redemption's or a liquidation's legs, where its
+   *  label does not say so: the spine draws the debt after the collateral,
+   *  whatever order the head states (ui-jobs 250 point 8). */
+  debtSide?: boolean;
+  /** Still the owner's, held for them to claim (Liquity V1's collateral
+   *  surplus): on a redemption or a liquidation it is a locked node after the
+   *  legs, and the head states it only where the spine draws no numbers. */
+  locked?: boolean;
   /** A figure that is not the position's own (a whole tick's or pool's
    *  total): label and value drawn in the muted tone, so the position's own
    *  change beside it reads first. */
@@ -488,6 +496,12 @@ export function chainTruthCaption(spec: ChainTruthRowSpec): string | undefined {
   return verbs.length ? verbs.join(" + ") : undefined;
 }
 
+/** A leg on the debt side: flagged, or labelled so ("Cleared", "Debt …",
+ *  "Repaid"). */
+const isDebtLeg = (d: ChainTruthDelta) => !!d.debtSide || /^(cleared|debt|repaid|covered)/i.test(d.label ?? "");
+/** The spine's order: the collateral that left, the debt, then what is held. */
+const legRank = (d: ChainTruthDelta) => (d.locked ? 2 : isDebtLeg(d) ? 1 : 0);
+
 export function ChainTruthRow({
   spec,
   timestamp,
@@ -514,20 +528,23 @@ export function ChainTruthRow({
   // leaving it passive would paint the amount twice at ≥sm.
   const hideClass = useHeaderValueHideClass();
   // A redemption or a liquidation: its deltas are the warning spine's legs,
-  // collateral first (the redemption header names the debt first, so its
-  // order turns over). A muted figure (a pool's total) is not the position's
-  // and stays in the head.
+  // collateral first and the debt after, whatever order the head states. A
+  // muted figure (a pool's total) is not the position's and stays in the
+  // head.
   const adverse = !!spec.critical || !!spec.labelOnSpine;
   const legDeltas = adverse ? spec.deltas.filter((d) => !d.muted && !d.noSpineCounterpart) : [];
   const legs: SpineWarningLeg[] | null = adverse
-    ? (spec.labelOnSpine ? [...legDeltas].reverse() : legDeltas).map((d) => ({
-        label: d.label,
-        value: Math.abs(d.value),
-        symbol: d.symbol,
-        address: d.address,
-        // The echo key is the head figure's: bare where labelled.
-        prov: { info: d.prov, value: chainTruthDeltaValue(d.value, Boolean(d.label)), symbol: d.symbol },
-      }))
+    ? [...legDeltas]
+        .sort((a, b) => legRank(a) - legRank(b))
+        .map((d) => ({
+          label: d.label,
+          locked: d.locked,
+          value: Math.abs(d.value),
+          symbol: d.symbol,
+          address: d.address,
+          // The echo key is the head figure's: bare where labelled.
+          prov: { info: d.prov, value: chainTruthDeltaValue(d.value, Boolean(d.label)), symbol: d.symbol },
+        }))
     : null;
   usePublishSpineLegs(legs);
   // The row's 12px gap separates its ITEMS — the label from the amounts, one

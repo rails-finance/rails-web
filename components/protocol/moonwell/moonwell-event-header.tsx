@@ -64,6 +64,7 @@ export function MoonwellEventHeader({
         symbol: ctx.marketSymbol,
         address: soleFlowAddress(flows, ctx.marketSymbol),
         prov: liqDebtRepaidProv(ctx.marketSymbol, coords),
+        debtSide: true,
       });
     const seized = Number(ctx.seizeTokens ?? "0") || 0;
     if (seized !== 0 && ctx.collateralSymbol) {

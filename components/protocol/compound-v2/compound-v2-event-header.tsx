@@ -74,6 +74,7 @@ export function CompoundV2EventHeader({
         symbol: ctx.marketSymbol,
         address: soleFlowAddress(flows, ctx.marketSymbol),
         prov: liqDebtRepaidProv(ctx.marketSymbol, coords, ctx.raw?.amount),
+        debtSide: true,
       });
     const seized = Number(ctx.seizeTokens ?? "0") || 0;
     if (seized !== 0 && ctx.collateralSymbol) {

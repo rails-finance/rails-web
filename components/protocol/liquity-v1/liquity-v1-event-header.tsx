@@ -78,9 +78,9 @@ export function LiquityV1EventHeader({
         symbol: COLLATERAL_SYMBOL,
         prov: redemptionLegProv(coords, "surplus", legVals),
         label: "Surplus",
-        // Still the owner's, claimable: the spine's legs are what left (the
-        // redeemer's ETH, the debt cleared), so the surplus stays in the head.
-        noSpineCounterpart: true,
+        // Still the owner's, claimable: the spine draws it as a locked node
+        // after the legs that left.
+        locked: true,
       });
   } else if (coll !== 0)
     deltas.push({
