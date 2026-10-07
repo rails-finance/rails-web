@@ -30,14 +30,15 @@ import {
 } from "react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { TipLabel } from "@/components/shared/tip-label";
-import { provInspector } from "@/components/shared/provenance";
+import { POSITION_CARD_SCOPE, useProvArmedFor } from "@/components/shared/provenance";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
 
 export interface PositionCardDisclosure {
   /** The position's store key. */
   key: string;
-  /** The provenance inspector is armed: every row stands open. */
+  /** The provenance inspector is armed on the page or on this card: every row
+   *  stands open. */
   armed: boolean;
   /** The Explanation row's remembered state, for the shell to restore. */
   explanationOpen: boolean;
@@ -67,7 +68,9 @@ function useStoredOpen(storeId: string | null): boolean {
  *  either way, so a card can switch the key on and off. */
 export function usePositionCardDisclosureState(key: string | undefined): PositionCardDisclosure | null {
   const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
-  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  // Armed page-wide or on this card (ui-jobs 284); armed on another section
+  // leaves the rows as the reader set them.
+  const armed = useProvArmedFor(POSITION_CARD_SCOPE);
   // The card-wide open flag of ui-jobs 209 has no reader since the rows took
   // their own: drop it.
   useEffect(() => {

@@ -1548,8 +1548,10 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.5); /* teal-400 */
 }
-/* the dock toggle — the picktoggle's grammar sized for the floating strip */
-.prov-inspect-toggle {
+/* the dock toggle — the picktoggle's grammar sized for the floating strip; the
+   scoped row of a ⋮ menu (ui-jobs 284) wears the same */
+.prov-inspect-toggle,
+.prov-scope-toggle {
   appearance: none;
   border: 0;
   background: transparent;
@@ -1565,18 +1567,22 @@ label[for] {
     color 0.15s ease,
     background-color 0.15s ease;
 }
-.prov-inspect-toggle:hover {
+.prov-inspect-toggle:hover,
+.prov-scope-toggle:hover {
   color: var(--foreground);
 }
-.prov-inspect-toggle svg {
+.prov-inspect-toggle svg,
+.prov-scope-toggle svg {
   width: 16px;
   height: 16px;
 }
-.prov-inspect-toggle[aria-pressed="true"] {
+.prov-inspect-toggle[aria-pressed="true"],
+.prov-scope-toggle[aria-pressed="true"] {
   color: rgb(13 148 136); /* teal-600 */
   background: rgb(13 148 136 / 0.1);
 }
-.dark .prov-inspect-toggle[aria-pressed="true"] {
+.dark .prov-inspect-toggle[aria-pressed="true"],
+.dark .prov-scope-toggle[aria-pressed="true"] {
   color: rgb(45 212 191); /* teal-400 */
   background: rgb(45 212 191 / 0.1);
 }

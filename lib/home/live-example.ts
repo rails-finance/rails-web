@@ -44,7 +44,15 @@ export interface HeroTowerEvent {
       assetType: string;
       isInBatch: boolean;
       isZombieTrove: boolean;
-      stateAfter: { coll: number; debt: number; annualInterestRate: number };
+      stateAfter: {
+        coll: number;
+        debt: number;
+        annualInterestRate: number;
+        raw?: { debt?: string; annualInterestRate?: string };
+      };
+      /** A batch manager's rate change only: batchRateDebtMove reads the debt
+       *  before it. */
+      stateBefore?: { debt: number; annualInterestRate: number; raw?: { debt?: string } };
       troveOperation?: {
         collChangeFromOperation: number;
         debtChangeFromOperation: number;

@@ -400,8 +400,8 @@ const headerLayout = (card) =>
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
   check(
-    "4b. a press on it opens the menu, rows unchanged",
-    JSON.stringify(items) === JSON.stringify(["view-page", "view-explorer", "copy-link"]),
+    "4b. a press on it opens the menu, its rows and then Show provenance (ui-jobs 284)",
+    JSON.stringify(items) === JSON.stringify(["view-page", "view-explorer", "copy-link", "show-provenance"]),
     JSON.stringify(items),
   );
   const closed = await card.locator('[data-anatomy="T2"]').count();

@@ -224,6 +224,9 @@ export class ReceiptRegistry {
 
 interface ReceiptsScope {
   registry: ReceiptRegistry;
+  /** The section's name for scoped arming (ui-jobs 284): "position-card",
+   *  "flows", or an event's id. A nested scope without one takes its parent's. */
+  scopeId: string | null;
 }
 const ProvReceiptsScopeCtx = createContext<ReceiptsScope | null>(null);
 
@@ -279,6 +282,13 @@ const warnedUnscoped = new Set<string>();
 // mode armed so the reader can walk value to value; Escape closes the popover
 // first, then the mode. A module singleton, not a context — one page, one
 // tool; the dock toggle and the layer both talk to this store.
+//
+// Scoped arming (ui-jobs 284): `setArmed(true, scope)` arms one section — the
+// position card ("position-card"), Lifetime flows ("flows") or one event (its
+// id) — and only the <Prov>s whose nearest ProvReceiptsScope carries that
+// `scopeId` become targets. The page-level tool arms with no scope, which
+// marks every scoped value. The halo, the exit button and the Escape ladder
+// read `armed` alone, so they behave the same either way.
 
 export interface ProvInspectorPin {
   /** The pinned figure's identity (entryKey) — the popover keys a remount on it. */
@@ -295,14 +305,30 @@ export interface ProvInspectorPin {
 
 export class ProvInspectorStore {
   private armed = false;
+  private scope: string | null = null;
+  private opener: HTMLElement | null = null;
   private pinned: ProvInspectorPin | null = null;
   private tick = 0;
   private listeners = new Set<() => void>();
-  setArmed = (on: boolean) => {
-    if (this.armed === on) return;
+  /** Arm or disarm. `scope` names the one section to arm (null: the whole
+   *  page); `opener` is the control that armed it, which takes focus back when
+   *  the mode is put down (`restoreFocus`). Switching scope while armed
+   *  unpins. */
+  setArmed = (on: boolean, scope: string | null = null, opener: HTMLElement | null = null) => {
+    const nextScope = on ? scope : null;
+    if (this.armed === on && this.scope === nextScope) return;
     this.armed = on;
-    if (!on) this.pinned = null;
+    this.scope = nextScope;
+    this.pinned = null;
+    if (on) this.opener = opener;
     this.emit();
+  };
+  /** Hand focus back to the control that armed the mode, where it is still on
+   *  the page. */
+  restoreFocus = () => {
+    const el = this.opener;
+    this.opener = null;
+    if (el?.isConnected) el.focus({ preventScroll: true });
   };
   pin = (entry: ProvReceiptEntry, registry: ReceiptRegistry, el: HTMLElement) => {
     this.pinned = { key: entryKey(entry), entry, registry, el, tick: ++this.tick };
@@ -320,6 +346,10 @@ export class ProvInspectorStore {
     };
   };
   getArmed = () => this.armed;
+  getScope = () => this.scope;
+  /** Armed for the section `scopeId`: armed page-wide, or armed on it. */
+  armedFor = (scopeId: string | null | undefined) =>
+    this.armed && (this.scope == null || (scopeId != null && this.scope === scopeId));
   getPin = () => this.pinned;
   private emit() {
     this.listeners.forEach((fn) => fn());
@@ -327,6 +357,11 @@ export class ProvInspectorStore {
 }
 
 export const provInspector = new ProvInspectorStore();
+
+/** The scoped-arming names of the position page's sections (ui-jobs 284). An
+ *  event's scope is its id. */
+export const POSITION_CARD_SCOPE = "position-card";
+export const FLOWS_SCOPE = "flows";
 
 /** Wrap a card's content so every <Prov> inside reports into its receipts
  *  panel. The shell owns the registry. In dev the children mount between
@@ -342,16 +377,33 @@ export function ProvReceiptsScope({
   registry,
   children,
   bounds = true,
+  scopeId,
 }: {
   registry: ReceiptRegistry;
   children: ReactNode;
   bounds?: boolean;
+  /** The section's name for scoped arming: "position-card", "flows", or the
+   *  event's id. Absent, a nested scope takes its parent's. */
+  scopeId?: string;
 }) {
-  const value = useMemo(() => ({ registry }), [registry]);
+  const parent = useContext(ProvReceiptsScopeCtx);
+  const id = scopeId ?? parent?.scopeId ?? null;
+  const value = useMemo(() => ({ registry, scopeId: id }), [registry, id]);
   return (
     <ProvReceiptsScopeCtx.Provider value={value}>
       {DEV && bounds ? <ProvCoverageBounds>{children}</ProvCoverageBounds> : children}
     </ProvReceiptsScopeCtx.Provider>
+  );
+}
+
+/** Whether the inspector is armed for the section `scopeId`: armed page-wide,
+ *  or armed on that section. What opens a collapsed thing so an armed click
+ *  can reach the value inside. */
+export function useProvArmedFor(scopeId: string | null | undefined): boolean {
+  return useSyncExternalStore(
+    provInspector.subscribe,
+    () => provInspector.armedFor(scopeId),
+    () => false,
   );
 }
 
@@ -1084,8 +1136,8 @@ export function Prov({
   // re-render only on arm/disarm, never on registry churn. Only scoped values
   // subscribe meaningfully; outside a scope there is no registry to resolve a
   // receipt from, so the tool ignores the span.
-  const inspecting =
-    useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false) && registry != null;
+  // Scoped arming (ui-jobs 284): armed on another section leaves this one inert.
+  const inspecting = useProvArmedFor(scope?.scopeId) && registry != null;
   // Structured capture. `display` = the value as it READS on the card: the
   // rendered text minus decoration (`[data-prov-hidden]` — hover tooltips, token
   // glyphs), whitespace-collapsed. The exact figure comes from the `value` prop,

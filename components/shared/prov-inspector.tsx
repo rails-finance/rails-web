@@ -45,6 +45,7 @@ import { usePriceStripActive } from "@/components/shared/price-strip";
 export function ProvInspectorToggle({
   variant = "dock",
   onPick,
+  openerRef,
 }: {
   /** `dock` — the icon button in the PriceStrip's leading slot. `menu` — a row
    *  of the Tools dropdown, wearing that panel's title/subtitle shape. Same
@@ -53,11 +54,21 @@ export function ProvInspectorToggle({
   variant?: "dock" | "menu";
   /** Called after the click, so the menu that holds the row can close. */
   onPick?: () => void;
+  /** The control focus returns to when the mode is put down: the menu's
+   *  trigger, for the `menu` row. */
+  openerRef?: React.RefObject<HTMLElement | null>;
 }) {
-  const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
+  // The page-level tool is pressed while armed page-wide; armed on one section
+  // (ui-jobs 284), a press widens the mode to the page.
+  const armed = useSyncExternalStore(
+    provInspector.subscribe,
+    () => provInspector.getArmed() && provInspector.getScope() == null,
+    () => false,
+  );
   const label = armed ? "Exit the provenance inspector" : "Provenance inspector — click any value to trace it";
-  const onClick = () => {
-    provInspector.setArmed(!armed);
+  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const opener = variant === "dock" ? e.currentTarget : (openerRef?.current ?? null);
+    provInspector.setArmed(!armed, null, opener);
     onPick?.();
   };
   if (variant === "menu") {
@@ -97,6 +108,91 @@ export function ProvInspectorToggle({
   );
 }
 
+/** Arm the inspector on one section (ui-jobs 284): the position card
+ *  ("position-card"), Lifetime flows ("flows") or one event (its id). Only the
+ *  values inside that section become targets; the halo, the exit button and
+ *  the Escape ladder are the page-level tool's. Pressed while that section is
+ *  armed, where a press puts the mode down. A row of a ⋮ menu (`menu`), or a
+ *  plain button the caller dresses (`plain`, the Liquity V2 event page's
+ *  actions row). */
+export function ProvScopeToggle({
+  scope,
+  variant = "menu",
+  words,
+  hint,
+  title,
+  className,
+  onPick,
+  openerRef,
+}: {
+  scope: string;
+  variant?: "menu" | "plain";
+  /** The control's words; the menu row's default is "Show provenance" /
+   *  "Hide provenance". */
+  words?: { show: string; hide: string };
+  /** The menu row's subtitle at rest: what the row arms ("Trace a value on
+   *  this card"). */
+  hint?: string;
+  /** The `plain` button's tooltip. */
+  title?: string;
+  className?: string;
+  /** Called after the click, so the menu that holds the row can close. */
+  onPick?: () => void;
+  /** The control focus returns to when the mode is put down; where absent,
+   *  the pressed button. */
+  openerRef?: React.RefObject<HTMLElement | null>;
+}) {
+  const pressed = useSyncExternalStore(
+    provInspector.subscribe,
+    () => provInspector.getArmed() && provInspector.getScope() === scope,
+    () => false,
+  );
+  const w = words ?? SCOPE_WORDS;
+  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    provInspector.setArmed(!pressed, scope, openerRef?.current ?? e.currentTarget);
+    onPick?.();
+  };
+  if (variant === "plain") {
+    return (
+      <button
+        type="button"
+        className={className}
+        title={title}
+        aria-pressed={pressed}
+        data-menu-item="show-provenance"
+        data-prov-scope-toggle={scope}
+        onClick={onClick}
+      >
+        {pressed ? w.hide : w.show}
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="prov-scope-toggle prov-inspect-toggle-menu"
+      role="menuitem"
+      aria-pressed={pressed}
+      data-menu-item="show-provenance"
+      data-prov-scope-toggle={scope}
+      onClick={onClick}
+    >
+      <Crosshair aria-hidden />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-foreground">{pressed ? w.hide : w.show}</span>
+        <span className="block text-xs text-rb-500">{pressed ? SCOPE_WORDS.armed_hint : hint}</span>
+      </span>
+    </button>
+  );
+}
+
+/** The scoped row's words, where the caller brings none. */
+const SCOPE_WORDS = {
+  show: "Show provenance",
+  hide: "Hide provenance",
+  armed_hint: "Click a value to trace it · esc exits",
+};
+
 /** Mount once per page (beside the timeline, outside any card). Renders
  *  nothing at rest; owns the armed halo, its close control, the Escape ladder,
  *  and the pinned popover. */
@@ -114,7 +210,10 @@ export function ProvInspectorLayer() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (provInspector.getPin()) provInspector.unpin();
-      else provInspector.setArmed(false);
+      else {
+        provInspector.setArmed(false);
+        provInspector.restoreFocus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -136,7 +235,10 @@ export function ProvInspectorLayer() {
             type="button"
             className="prov-inspect-exit"
             data-prov-chrome=""
-            onClick={() => provInspector.setArmed(false)}
+            onClick={() => {
+              provInspector.setArmed(false);
+              provInspector.restoreFocus();
+            }}
           >
             <X aria-hidden />
             <span>Exit inspector</span>

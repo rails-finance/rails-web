@@ -3,7 +3,8 @@
 // The event card's ⋮ (rails-ops TO-DO-ui-jobs 281), at the header's right end
 // before the number pill (ui-jobs 295). The position card's menu (C17,
 // `ToolsMenu` variant `card`) with the event's rows: open the event page (not
-// on that page), open the explorer, copy the page's link. A copy row shows a
+// on that page), open the explorer, copy the page's link, then "Show
+// provenance", which arms the inspector on this event alone (ui-jobs 284). A copy row shows a
 // tick and "Copied" for a moment, as C17's rows do. Liquity V2 draws no menu:
 // its event page's aside carries the actions (ui-jobs 291), reusing
 // `useMenuCopied` and `eventMarkdownHref` from here.
@@ -27,6 +28,7 @@ const WORDS = {
   copy_link: "Copy link to event page",
   copy_link_hint: "Copy the page's address",
   copied: "Copied",
+  provenance_hint: "Click a value on this event to trace it",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -66,8 +68,12 @@ export function eventMarkdownHref(shareHref: string): string {
 export function EventCardMenu({
   txHash,
   shareHref,
+  scopeId,
 }: {
   txHash: string;
+  /** The event card's receipts scope (the event's id), which the menu's
+   *  "Show provenance" row arms. */
+  scopeId: string;
   /** The event page's path (`useEventShareHref`); null outside a timeline,
    *  where the page rows are left out. */
   shareHref: string | null;
@@ -81,7 +87,12 @@ export function EventCardMenu({
   const tick = <Icon name="check" size={16} />;
 
   return (
-    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading}>
+    <ToolsMenu
+      variant="event"
+      label={WORDS.menu}
+      heading={WORDS.heading}
+      provScope={{ id: scopeId, hint: WORDS.provenance_hint }}
+    >
       {(close) => (
         <>
           {shareHref && !onEventPage && (
