@@ -161,12 +161,7 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
   ) : (
     // Third-party operate badges the flow pink (color-grammar §4) rather than
     // replacing it — see spine-column's `externalParty`.
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   // The Collateral and Debt cells open into their ledgers where the page ties
@@ -175,6 +170,7 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     <FxLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
+        by={extBy ?? undefined}
         iconColumn={iconSlot}
         header={
           <FxEventHeader

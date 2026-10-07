@@ -86,13 +86,7 @@ export function AaveV4EventCard({
       : undefined;
 
   const iconSlot = isLiquidation ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Liquidation"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
   ) : isCollateralToggle ? (
     // The toggle's own check/cross badge is the event's MEANING, so it keeps
     // the icon corner even when a third party flipped it — the dotted spine and
@@ -124,6 +118,7 @@ export function AaveV4EventCard({
   return (
     <EventCard
       avatar={null}
+      by={extBy ?? undefined}
       caption={aaveV4Label(ctx)}
       iconColumn={iconSlot}
       header={

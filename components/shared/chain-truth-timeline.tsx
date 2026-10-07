@@ -629,7 +629,8 @@ function ServedFolderRow({
       aggregates={folderAggregates(folder)}
       tone={entry.tone}
       spineIcon={entry.spineIcon}
-      warningLabel={entry.warningLabel}
+      // A shape run's label is its kind word too (the phone caption's).
+      warningLabel={entry.warningLabel ?? entry.shapeLabel}
       muted={entry.muted}
       folder
       folderBadge={entry.folderBadge}

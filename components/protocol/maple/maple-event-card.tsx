@@ -125,14 +125,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
               : []),
           ];
 
-  const iconSlot = (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
-  );
+  const iconSlot = <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />;
 
   // The pool claim opens into its ledger where the page ties its timeline to
   // the Lifetime flows panel and the panel shows this pool.
@@ -140,6 +133,12 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
     <MapleLedgerProvider eventId={event.id} eventTs={event.timestamp} pool={ctx.pool}>
       <EventCard
         avatar={null}
+        custody={
+          ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
+            ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
+            : undefined
+        }
+        by={extBy ?? undefined}
         iconColumn={iconSlot}
         caption={isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : undefined}
         header={

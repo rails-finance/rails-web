@@ -127,12 +127,7 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
       // (nothing moved in the urn).
       <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
     ) : (
-      <SpineColumn
-        tokens={tokens}
-        externalParty={!!extBy}
-        isFirst={isFirst}
-        isLast={!!isLast}
-      />
+      <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
     );
 
   // The Collateral and Debt cells open into their ledgers where the page ties
@@ -141,6 +136,7 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
     <MakerLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
+        by={extBy ?? undefined}
         iconColumn={iconSlot}
         header={
           <MakerDAOEventHeader

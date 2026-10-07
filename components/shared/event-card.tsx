@@ -110,6 +110,13 @@ export interface EventCardProps {
   /** The words after T3's (i): the button's on the timeline, the heading's
    *  on the event page. A family's strings file can replace the default. */
   explanationHeading?: string;
+  /** The third party who acted (a redeemer, a liquidator, a batch manager,
+   *  a caller on the owner's position): the phone caption and the segment's
+   *  label say "Redemption by 0x1234…abcd". */
+  by?: string;
+  /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
+   *  "Received from 0x…". */
+  custody?: { dir: "to" | "from"; address: string };
   /** What the number column draws in place of the event's number: a group's
    *  control (`GroupCount`), the boundary's. */
   numberSlot?: React.ReactNode;
@@ -145,6 +152,8 @@ export function EventCard({
   explanationHeading = "Event explanation",
   eventMenu = true,
   numberSlot,
+  by,
+  custody,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -487,7 +496,10 @@ export function EventCard({
   );
 
   if (spine && captionCtx) {
-    const kind = caption ?? captionCtx.kind;
+    const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+    const kind = custody
+      ? `${custody.dir === "to" ? "Sent to" : "Received from"} ${short(custody.address)}`
+      : `${caption ?? captionCtx.kind}${by ? ` by ${short(by)}` : ""}`;
     const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
     // The caption states the date once per day, else the time.
     const when = datePrefix || dayMark ? date : formatTimestamp(captionCtx.ts);

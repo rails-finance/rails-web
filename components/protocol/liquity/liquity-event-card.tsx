@@ -309,6 +309,22 @@ export function LiquityEventCard({
         explanationHeading={PAGE_WORDS.explanation_heading}
         eventMenu={false}
         persistKey={`liquity-v2:${event.id}`}
+        // A third party's act names who acted: the redeemer, the batch
+        // manager moving a delegated Trove's rate.
+        by={
+          isRedemption
+            ? ctx.redeemer
+            : ctx.operation === "setBatchManagerAnnualInterestRate"
+              ? ctx.batchManager
+              : undefined
+        }
+        custody={
+          ctx.operation === "transferTrove" && ctx.transfer
+            ? ctx.transfer.toAddress?.toLowerCase() === event.wallet?.toLowerCase()
+              ? { dir: "from", address: ctx.transfer.fromAddress }
+              : { dir: "to", address: ctx.transfer.toAddress }
+            : undefined
+        }
         caption={rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx)}
         {...(page
           ? {

@@ -131,12 +131,7 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
     // glyph with the join badge marks the new owner taking over.
     <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   // T1's word, which the phone spine view's caption repeats. A hop of an NFT
@@ -154,6 +149,7 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
     <FluidLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
+        by={extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined}
         caption={headLabel}
         iconColumn={iconSlot}
         header={

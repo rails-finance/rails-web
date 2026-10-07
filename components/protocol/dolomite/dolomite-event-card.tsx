@@ -100,17 +100,13 @@ export function DolomiteEventCard({
       isLast={!!isLast}
     />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   return (
     <EventCard
       avatar={null}
+      by={extBy ?? undefined}
       iconColumn={iconSlot}
       header={
         <DolomiteEventHeader

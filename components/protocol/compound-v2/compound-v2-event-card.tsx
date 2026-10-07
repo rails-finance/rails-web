@@ -130,33 +130,22 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
             ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Liquidation"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
   ) : isSeizeLoss ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Seizure"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" warningLabel="Seizure" isFirst={isFirst} isLast={!!isLast} />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   return (
     <EventCard
       avatar={null}
+      custody={
+        ctx.counterparty && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out")
+          ? { dir: ctx.eventType === "transfer_out" ? "to" : "from", address: ctx.counterparty }
+          : undefined
+      }
+      by={extBy ?? (isLiq ? ctx.liquidator : undefined) ?? undefined}
       iconColumn={iconSlot}
       header={
         <CompoundV2EventHeader

@@ -270,25 +270,20 @@ export function AaveV3CtEventCard({
       isLast={!!isLast}
     />
   ) : isSwap && !isFlowSwap ? (
-    <SpineColumn
-      icon="swap"
-      swapLegs={swapLegs}
-      swapAxis={swapAxis}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="swap" swapLegs={swapLegs} swapAxis={swapAxis} isFirst={isFirst} isLast={!!isLast} />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   return (
     <EventCard
       avatar={null}
+      custody={
+        ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
+          ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
+          : undefined
+      }
+      by={extBy ?? undefined}
       iconColumn={iconSlot}
       caption={aaveV3CtLabel(ctx, !!feeOf, chainId)}
       header={

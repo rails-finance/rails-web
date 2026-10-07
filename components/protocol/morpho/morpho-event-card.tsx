@@ -94,20 +94,9 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
         ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Liquidation"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   // The Collateral (or Supplied) and Debt cells open into their ledgers where
@@ -116,6 +105,7 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
     <MorphoLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
         avatar={null}
+        by={extBy ?? undefined}
         iconColumn={iconSlot}
         header={
           <MorphoEventHeader

@@ -152,25 +152,15 @@ export function SparkEventCard({
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Liquidation"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
   ) : (
-    <SpineColumn
-      tokens={tokens}
-      externalParty={!!extBy}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );
 
   return (
     <EventCard
       avatar={null}
+      by={extBy ?? undefined}
       iconColumn={iconSlot}
       header={
         // The pointer on the header starts the account reads the open card
