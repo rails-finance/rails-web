@@ -43,7 +43,8 @@ async function load(page, url) {
 // ── The run folder's expectation, read off the served folders ──────────────
 // Since row-cut batch 7 (web 2026-09-28) rails-server groups the fork
 // timelines: the page draws the folders the grouped answer's `rowPlan` names,
-// each carrying its member count and its Cleared / Reduced legs in raw units.
+// each carrying its member count and its debt and collateral legs in raw units.
+// The page words them debt first: "Cleared" the debt, "Reduced" the collateral.
 
 /** fmtSpine + fmtHeaderMagnitude (components/shared/activity-timeline.tsx,
  *  lib/shared/header-values.ts) — the compact form the folder header draws. */
@@ -71,8 +72,8 @@ function redemptionFolders(served) {
     .map((r) => r.folder)
     .sort((a, b) => b.ordinalLast - a.ordinalLast)
     .map((f) => {
-      const leg = (verb) => f.legs.find((l) => l.verb === verb);
-      return { count: f.count, cleared: legValue(leg("Cleared")), reduced: legValue(leg("Reduced")) };
+      const leg = (asset) => f.legs.find((l) => l.asset === asset);
+      return { count: f.count, cleared: legValue(leg("debt")), reduced: legValue(leg("collateral")) };
     });
 }
 
@@ -168,7 +169,7 @@ await run("ebisu individual pill + detail", async (page) => {
 
 // ── 3. Redemption run folder — its header's Σ against the grouped answer ──
 //
-// A redemption run is a FOLDER row: a Σ glyph, the summed Cleared / Reduced
+// A redemption run is a FOLDER row: a Σ glyph, the summed Cleared (debt) / Reduced (collateral)
 // pairs, the folder's date range, and an aria-label naming the members and the
 // toggle ("100 consecutive redemptions — expand the run"), which flips to
 // "collapse the run" once open. The words this check used to look for — a
@@ -216,11 +217,16 @@ await run("asymmetry run folder", async (page) => {
   const reduced = fmtHeaderMagnitude(first.reduced);
   assert(
     figure("Cleared") === cleared,
-    `"Cleared ${cleared}" is the Σ of the folder's own collateral deltas (row says ${figure("Cleared")})`,
+    `"Cleared ${cleared}" is the Σ of the folder's debt deltas (row says ${figure("Cleared")})`,
   );
   assert(
     figure("Reduced") === reduced,
-    `"Reduced ${reduced}" is the Σ of the folder's own debt deltas (row says ${figure("Reduced")})`,
+    `"Reduced ${reduced}" is the Σ of the folder's collateral deltas (row says ${figure("Reduced")})`,
+  );
+
+  assert(
+    text.indexOf("Cleared") >= 0 && text.indexOf("Cleared") < text.indexOf("Reduced"),
+    "the row names the debt first (Cleared before Reduced)",
   );
 
   await row.click();

@@ -69,7 +69,7 @@ export function CompoundV2FlowsNote({ facts }: { facts: CompoundV2FlowsFacts | n
             ? `Before 17 Aug 2020 Compound's oracle priced every market in ETH: ${n(facts.ethEra, "one row", "rows")} from then ${facts.ethEra === 1 ? "is" : "are"} turned into dollars with the same oracle's USDC price at the block. `
             : ""}
           {facts.between === "store"
-            ? "Between events each market is valued at Compound's oracle price at the end of each day (in the ETH years with that day's USDC price); today's is the live read's."
+            ? "Between events each market is valued at Compound's oracle price at the end of each day (in the ETH years with that day's USDC price); the last stop takes the oracle's price at the latest block."
             : "No daily oracle price is recorded for Compound V2, so between events each market keeps the price of its latest priced row, and a price more than 30 days old is stated as such."}
           {facts.fixed.length > 0
             ? ` ${facts.fixed.join(", ")} ${facts.fixed.length === 1 ? "has" : "have"} a fixed price set by governance: the oracle stores a number with no live feed behind it, and Compound values ${facts.fixed.length === 1 ? "it" : "them"} at it.`

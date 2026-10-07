@@ -129,7 +129,7 @@ export interface AaveBaseLeg {
 const UNSURE_WHY: Partial<Record<AaveBasePriceBasis, string>> = {
   day: "priced at the day's close: the oracle price at this block is not stored.",
   nearest: "priced at the nearest priced row: no price is stored for its block or its day.",
-  today: "priced at today's oracle read: no price is stored for its block or its day.",
+  today: "priced at the latest block's oracle price: no price is stored for its block or its day.",
   none: "has no price stored: its flows count at zero.",
 };
 

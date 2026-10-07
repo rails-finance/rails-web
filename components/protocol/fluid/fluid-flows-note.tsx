@@ -76,9 +76,9 @@ function nearestSentence(p: FluidFlowsNoteFacts["pricing"]): string {
   const k = p.nearest + p.today;
   const whose =
     p.nearest > 0 && p.today > 0
-      ? `: ${p.nearest.toLocaleString("en-US")} a liquidation's, ${p.today.toLocaleString("en-US")} today's oracle read`
+      ? `: ${p.nearest.toLocaleString("en-US")} a liquidation's, ${p.today.toLocaleString("en-US")} the latest block's oracle price`
       : p.today > 0
-        ? ", today's oracle read"
+        ? ", the latest block's oracle price"
         : ", a liquidation's";
   const which =
     p.row > 0

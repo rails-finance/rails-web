@@ -85,9 +85,10 @@ interface L5Data {
   title: string;
   intro: string;
   intro_delegated?: string;
+  intro_zero_debt?: string;
   extraParagraphs?: string[];
   detailsHeading?: string;
-  details?: { bold: string; text: string; text_delegated?: string }[];
+  details?: { bold: string; text: string; text_delegated?: string; text_zero_debt?: string }[];
   video?: { label: string; url: string; description: string };
   links?: ({ label: string; faq: keyof typeof FAQ_URLS } | { label: string; url: string })[];
 }
@@ -146,17 +147,21 @@ function fillWords(text: string, values: Record<string, string>): string {
 }
 
 /** The liquidation modal names the branch's minimum; the interest-rate modal
- *  names who controls the trove's rate. */
+ *  names who controls the trove's rate; the close modal knows a close with no
+ *  debt left. */
 export interface L5Options {
   collateralType?: string;
   delegated?: boolean;
   delegateName?: string;
+  zeroDebt?: boolean;
 }
 
 function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
   const d = FILE.L5[key];
   const delegated = key === "interest_rate" && (o.delegated ?? false);
-  let intro = delegated && d.intro_delegated ? d.intro_delegated : d.intro;
+  const zeroDebt = o.zeroDebt ?? false;
+  let intro =
+    delegated && d.intro_delegated ? d.intro_delegated : zeroDebt && d.intro_zero_debt ? d.intro_zero_debt : d.intro;
   if (key === "liquidation") {
     const isETH = o.collateralType === "WETH" || o.collateralType === "ETH";
     intro = fillWords(intro, {
@@ -177,7 +182,7 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
   if (d.details)
     c.details = d.details.map((x) => ({
       bold: x.bold,
-      text: delegated && x.text_delegated ? x.text_delegated : x.text,
+      text: delegated && x.text_delegated ? x.text_delegated : zeroDebt && x.text_zero_debt ? x.text_zero_debt : x.text,
     }));
   if (d.video) c.video = d.video;
   if (d.links)

@@ -536,7 +536,7 @@ export function makerFlowWords(
     basis: {
       collateral: daily
         ? "Each flow is valued at Maker's oracle price at the close of its day, a liquidation at the price at its block."
-        : "Each flow is valued at the nearest recorded Maker oracle price: a liquidation's block, or today's.",
+        : "Each flow is valued at the nearest recorded Maker oracle price: a liquidation's block, or the latest block's.",
       debt: `Debt is counted at ${debtSymbol}'s $1 face.`,
     },
     heldBasis: {

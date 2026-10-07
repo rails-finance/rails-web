@@ -81,7 +81,7 @@ export function RedeemerSummary({ stats, currentPrice }: { stats: RedeemerStats;
         {/* Net outcome */}
         {netPL !== null && (
           <div className="flex items-center gap-1.5 mt-4 pt-3 border-t border-rb-200 dark:border-rb-800 text-xs">
-            <span className="">Net outcome at today&apos;s price:</span>
+            <span className="">Net outcome at the latest block&apos;s price:</span>
             <span className={`font-bold text-foreground`}>
               {netPL >= 0 ? "+" : "−"}
               {formatUsdValue(Math.abs(netPL))}

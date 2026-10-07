@@ -27,7 +27,7 @@ export const LIQUITY_V1_REDEMPTION_RUNS: TimelineRunSpec[] = [
     render: (run, meta) =>
       renderRunFolders(run, meta, MIN_REDEMPTION_RUN, (events, folder) => {
         // Each member's delta is after − before over the emitted absolutes; the
-        // folder carries the summed magnitudes (Cleared ETH / Reduced LUSD).
+        // folder carries the summed magnitudes (Cleared LUSD / Reduced ETH).
         let totalColl = 0;
         let totalDebt = 0;
         for (const e of events) {

@@ -516,7 +516,7 @@ function RedemptionOutcome({
                 {fmtUsdSigned(netToday)}
               </span>
             </P>{" "}
-            at today&apos;s {fmtUsd(currentPrice as number)}
+            at the latest block&apos;s {fmtUsd(currentPrice as number)}
           </>
         )}
       </Row>

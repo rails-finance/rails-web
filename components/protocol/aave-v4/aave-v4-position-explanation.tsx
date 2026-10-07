@@ -367,9 +367,9 @@ function buildSpokePositionItems(
           items.push(
             <span key="liq">
               Liquidation tracks{" "}
-              <span className="text-foreground/90 font-medium">{aaveV4DisplaySymbol(buf.single.symbol)}</span>: from
-              today&rsquo;s <Prov info={CURRENT_PRICE_PROV}>{fmtPrice(buf.single.currentPrice)}</Prov> it would have to
-              fall about{" "}
+              <span className="text-foreground/90 font-medium">{aaveV4DisplaySymbol(buf.single.symbol)}</span>: from the
+              latest block&rsquo;s <Prov info={CURRENT_PRICE_PROV}>{fmtPrice(buf.single.currentPrice)}</Prov> it would
+              have to fall about{" "}
               <H>
                 <Prov info={LIQ_DROP_PROV}>{buf.dropPct.toFixed(0)}%</Prov>
               </H>{" "}

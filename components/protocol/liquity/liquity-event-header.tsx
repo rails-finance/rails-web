@@ -331,7 +331,7 @@ export function LiquityEventHeader({
         // The dotted spine carries a "REDEMPTION" pill on desktop, so the
         // header badge is mobile-only here. The freed space lets the two
         // facts that matter read with labels — the debt it cleared, then
-        // the collateral it took — as the explanation tells them. The
+        // the collateral it reduced — as the explanation tells them. The
         // phone spine view draws both lozenges on the node's flanks, so
         // its opened card drops them while timeline values are on.
         <>
@@ -358,7 +358,7 @@ export function LiquityEventHeader({
           )}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
-              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.took}</span>
+              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.reduced}</span>
               {wrapColl(
                 <span className={AMT}>
                   <ExactTip

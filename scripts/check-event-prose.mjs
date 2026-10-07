@@ -151,12 +151,14 @@ for (const [k, m] of Object.entries(d.L5)) {
   str(`${w}.title`, m.title);
   str(`${w}.intro`, m.intro);
   if (m.intro_delegated !== undefined) str(`${w}.intro_delegated`, m.intro_delegated);
+  if (m.intro_zero_debt !== undefined) str(`${w}.intro_zero_debt`, m.intro_zero_debt);
   (m.extraParagraphs ?? []).forEach((p, i) => str(`${w}.extraParagraphs[${i}]`, p));
   if (m.detailsHeading !== undefined) str(`${w}.detailsHeading`, m.detailsHeading);
   (m.details ?? []).forEach((x, i) => {
     str(`${w}.details[${i}].bold`, x?.bold);
     str(`${w}.details[${i}].text`, x?.text);
     if (x?.text_delegated !== undefined) str(`${w}.details[${i}].text_delegated`, x.text_delegated);
+    if (x?.text_zero_debt !== undefined) str(`${w}.details[${i}].text_zero_debt`, x.text_zero_debt);
   });
   if (m.video) for (const f of ["label", "url", "description"]) str(`${w}.video.${f}`, m.video[f]);
   (m.links ?? []).forEach((l, i) => {
@@ -401,12 +403,14 @@ for (const [k, m] of Object.entries(d.L5)) {
     ["title", m.title],
     ["intro", m.intro],
     ["intro_delegated", m.intro_delegated],
+    ["intro_zero_debt", m.intro_zero_debt],
     ...(m.extraParagraphs ?? []).map((p, i) => [`extraParagraphs[${i}]`, p]),
     ["detailsHeading", m.detailsHeading],
     ...(m.details ?? []).flatMap((x, i) => [
       [`details[${i}].bold`, x?.bold],
       [`details[${i}].text`, x?.text],
       [`details[${i}].text_delegated`, x?.text_delegated],
+      [`details[${i}].text_zero_debt`, x?.text_zero_debt],
     ]),
     ...(m.links ?? []).map((l, i) => [`links[${i}].label`, l?.label]),
   ];

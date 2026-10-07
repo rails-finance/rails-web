@@ -62,8 +62,8 @@ export function FxFlowsNote({ facts, collSymbol, tokenSymbol }: FxFlowsNoteProps
       {p && (
         <p>
           {pricingSentence(p)} No daily price is recorded for f(x), so between events the collateral keeps the price of
-          its latest event, a price more than 30 days old is stated as such, and today&apos;s is the oracle&apos;s
-          anchor price, the one the position card values it at.
+          its latest event, a price more than 30 days old is stated as such, and the last stop takes the oracle&apos;s
+          anchor price at the latest block, the one the position card values it at.
         </p>
       )}
     </div>

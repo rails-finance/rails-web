@@ -89,7 +89,7 @@ async function open(context, url) {
   await page
     .locator('[data-skel-section="detail-economics"]')
     .first()
-    .filter({ hasText: /today.s feed|The PSM/i })
+    .filter({ hasText: /latest block.s feed|The PSM/i })
     .waitFor({ state: "attached", timeout: 15000 })
     .catch(() => {});
   await page.waitForTimeout(500);
@@ -127,14 +127,14 @@ const PIN_8 = {
 const page8 = await open(context, polarisUrl("usdp", "8"));
 const strip8 = outcomeStrip(page8);
 check("1a. usdp/8's economics section carries the PSM-outcome strip", (await strip8.count()) > 0);
-// The strip's at-settle sentence renders from the index alone; its "today's
-// feed" clause lands with the chain overlay a moment later (usdp/8 is the
+// The strip's at-settle sentence renders from the index alone; its "latest
+// block's feed price" clause lands with the chain overlay a moment later (usdp/8 is the
 // heaviest CDP, so "a moment" stretches on a busy server — 2026-09-10 the
 // clause was on the page at 3.4 s and this read had already happened). Wait
 // for the clause itself before reading the text, bounded so a page that never
 // gets it still fails 1e rather than hanging.
 await strip8
-  .filter({ hasText: /today.s feed/ })
+  .filter({ hasText: /latest block.s feed/ })
   .waitFor({ state: "attached", timeout: 20000 })
   .catch(() => {});
 const stripText8 = await stripText(strip8);
@@ -155,12 +155,14 @@ check(
 const chain8 = await api(`/api/chain/polaris/position?market=usdp&id=8`);
 if (check("1d. usdp/8's live overlay answers with a price (precondition)", !chain8.chainStale && !!chain8.price)) {
   const todayExpected = PIN_8.netCollLeg * chain8.price.pethInDebt - PIN_8.netDebtLeg;
-  const m = /,\s*([+−][\d,.]+[MK]?)\s*\S*\s*at today.s feed/.exec(stripText8);
+  const m = /,\s*([+−][\d,.]+[MK]?)\s*\S*\s*at the latest block.s feed price/.exec(stripText8);
   const gotToday = m ? parseSignedCompact(m[1]) : NaN;
   check(
-    `1e. the strip's "today's feed" figure matches netCollLeg × pethInDebt − netDebtLeg (0.5% tolerance)`,
+    `1e. the strip's "latest block's feed price" figure matches netCollLeg × pethInDebt − netDebtLeg (0.5% tolerance)`,
     Number.isFinite(gotToday) && Math.abs(gotToday - todayExpected) <= Math.abs(todayExpected) * 0.005 + 1,
-    m ? `page states ${m[1]} (${gotToday}) vs expected ${todayExpected}` : `no "today's feed" clause in: ${stripText8}`,
+    m
+      ? `page states ${m[1]} (${gotToday}) vs expected ${todayExpected}`
+      : `no "latest block's feed price" clause in: ${stripText8}`,
   );
 }
 check(
@@ -203,7 +205,7 @@ const troveEcon = econSection(pageTrove);
 check("4a. TROVE_B's economics section renders", (await troveEcon.count()) > 0);
 const troveStripText = await stripText(outcomeStrip(pageTrove));
 check(
-  '4c. liquityRedemptionOutcome\'s bullet renders ("… at the time, … at the latest block\'s price")',
+  "4c. liquityRedemptionOutcome's bullet renders (\"… at the time, … at the latest block's price\")",
   /at the time, [+−]\$[\d,.]+ at the latest block.s price/i.test(troveStripText),
   troveStripText,
 );

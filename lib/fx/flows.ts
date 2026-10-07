@@ -651,7 +651,7 @@ export function fxFlowTimeline(rp: FxFlowReplay, o: FxFlowOptions): FlowTimeline
             unsure: [
               {
                 side: "collateral" as const,
-                why: `${o.collSymbol} priced at the ${r.priceFrom === "today" ? "live read today" : "nearest priced row"}: no price is recorded or read at this block.`,
+                why: `${o.collSymbol} priced at the ${r.priceFrom === "today" ? "latest block's price" : "nearest priced row"}: no price is recorded or read at this block.`,
                 held: true,
               },
             ],
@@ -759,7 +759,7 @@ export function fxFlowWords(collSymbol: string): NonNullable<FlowTimeline["words
       debt: "Every figure is in fxUSD, the pool's debt token.",
     },
     heldBasis: {
-      collateral: `the ${collSymbol} the last event left, at the pool oracle's price of that event, in fxUSD; today, the pool's reading at the anchor price.`,
+      collateral: `the ${collSymbol} the last event left, at the pool oracle's price of that event, in fxUSD; at the latest block, the pool's reading at the anchor price.`,
       debt: "the fxUSD the last event left; today, the pool's reading.",
     },
     linePrices: `in fxUSD, with the collateral at the pool oracle's price of its latest event and each balance as its last event left it`,

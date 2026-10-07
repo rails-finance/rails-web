@@ -19,7 +19,7 @@ import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liqu
 import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
-import { PAGE_WORDS } from "@/lib/liquity/event-templates";
+import { L1_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -117,9 +117,9 @@ export function LiquityEventCard({
   const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
 
   const isRedemption = ctx.operation === "redeemCollateral";
-  // A redemption's amounts, worded as the header words them, for the phone
-  // spine view's flanks: debt "Cleared", collateral "Took". The same
-  // change receipts the header's figures trace.
+  // A redemption's amounts, worded and ordered as the header words them, for
+  // the phone spine view's flanks: debt "Cleared" left, collateral "Reduced"
+  // right. The same change receipts the header's figures trace.
   const redemptionLegs = (() => {
     if (!isRedemption) return undefined;
     const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
@@ -128,23 +128,23 @@ export function LiquityEventCard({
     const debtSym = ctx.assetType ?? "BOLD";
     return {
       left:
-        collCp && Math.abs(collCp.change) >= 0.01
-          ? {
-              label: "Took",
-              value: Math.abs(collCp.change),
-              symbol: ctx.collateralType,
-              address: soleFlowAddress(event.flows, ctx.collateralType),
-              prov: collCp,
-            }
-          : undefined,
-      right:
         debtCp && Math.abs(debtCp.change) >= 0.01
           ? {
-              label: "Cleared",
+              label: L1_WORDS.cleared,
               value: Math.abs(debtCp.change),
               symbol: debtSym,
               address: soleFlowAddress(event.flows, debtSym),
               prov: debtCp,
+            }
+          : undefined,
+      right:
+        collCp && Math.abs(collCp.change) >= 0.01
+          ? {
+              label: L1_WORDS.reduced,
+              value: Math.abs(collCp.change),
+              symbol: ctx.collateralType,
+              address: soleFlowAddress(event.flows, ctx.collateralType),
+              prov: collCp,
             }
           : undefined,
     };

@@ -207,6 +207,14 @@ placeholders:
     rounding: debt
     means: |-
       the trove's debt before the event
+  debt_accrued_before:
+    rounding: debt
+    means: |-
+      the trove's debt with what accrued since the previous event, before this event's upfront fee
+  accrual_noun:
+    rounding: text
+    means: |-
+      what accrued: interest, or interest and fees on a batched trove
   debt_after:
     rounding: debt
     means: |-
@@ -470,8 +478,8 @@ L1_words:
     Supply
   cleared: |-
     Cleared
-  took: |-
-    Took
+  reduced: |-
+    Reduced
   debt: |-
     Debt
   from_liquidation: |-
@@ -1220,7 +1228,7 @@ templates:
       - - word: cleared
         - figure: debt_change
           symbol: debt_symbol
-      - - word: took
+      - - word: reduced
         - figure: coll_change
           symbol: coll_symbol
     sentences:
@@ -1363,11 +1371,16 @@ templates:
           the debt held
         text: |-
           Its debt is unchanged at {debt_after} {debt_symbol}.
+      join.debt_fee:
+        when: |-
+          joining charged an upfront fee and more than 0.01 accrued
+        text: |-
+          With {accrued_total} {debt_symbol} of {accrual_noun} accrued since the last operation, its debt stood at {debt_accrued_before} {debt_symbol} when it joined.
       join.fee:
         when: |-
           joining charged an upfront fee
         text: |-
-          An upfront fee of {upfront_fee} {debt_symbol} was added to the debt: joining a batch charges the upfront fee, 7 days of interest at the branch’s average rate.
+          An upfront fee of {upfront_fee} {debt_symbol} brought it to {debt_after} {debt_symbol}: joining a batch charges the upfront fee, 7 days of interest on the debt at the branch’s average rate.
       join.coll:
         when: |-
           the trove holds collateral
@@ -1384,6 +1397,7 @@ templates:
       - join.debt_accrued
       - join.debt_moved
       - join.debt_same
+      - join.debt_fee
       - join.fee
       - join.coll
       - join.rate
@@ -2137,6 +2151,10 @@ L5:
       How Closing a Trove Works
     intro: |-
       Closing a trove repays its entire debt and returns the collateral, ending the position. The trove's NFT is burned once it closes.
+    # A close with no debt left (a redemption cleared it): intro_zero_debt and
+    # text_zero_debt stand in for intro and text.
+    intro_zero_debt: |-
+      Closing a trove returns its collateral and ends the position. The trove's NFT is burned once it closes.
     detailsHeading: |-
       Key concepts:
     details:
@@ -2144,6 +2162,8 @@ L5:
           Full repayment
         text: |-
           closing requires repaying the whole debt — principal plus accrued interest — in BOLD.
+        text_zero_debt: |-
+          closing repays whatever debt is left, in BOLD; a trove whose debt a redemption cleared has nothing to repay.
       - bold: |-
           Liquidation reserve
         text: |-

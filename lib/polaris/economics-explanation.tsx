@@ -38,7 +38,7 @@ export function polarisPsmOutcomeSentence(
     `The net PSM shares, valued at the feed at each settling block, changed the CDP's equity by ` +
     `${signedText(lifetime.psmEffectAtSettle, stable)}`;
   if (todayEffect != null) {
-    s += `; at today's feed the same legs come to ${signedText(todayEffect, stable)}`;
+    s += `; at the latest block's feed price the same legs come to ${signedText(todayEffect, stable)}`;
   }
   if (lifetime.psmRowsUnpriced > 0) {
     s += ` (${lifetime.psmRowsUnpriced} rows carry no price yet)`;
@@ -99,7 +99,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
     todayEffect != null && pethInDebt != null
       ? {
           kind: "chain-derived",
-          summary: `The same PSM legs at today's feed — the net pETH the PSM's shares moved over the CDP's life, priced at the live pETH/${stable} feed, minus the net debt they moved.`,
+          summary: `The same PSM legs at the latest block's feed price — the net pETH the PSM's shares moved over the CDP's life, priced at the pETH/${stable} feed, minus the net debt they moved.`,
           formula: "(collFromPsm − collToPsm) × pethInDebt − (debtFromPsm − debtToPsm)",
           inputs: [
             {
@@ -115,7 +115,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
               note: "debtFromPsm − debtToPsm",
             },
             {
-              label: "today's feed",
+              label: "latest block's feed price",
               value: formatExact(pethInDebt),
               kind: "chain-derived",
               pclass: "oracle",
@@ -143,7 +143,7 @@ export function polarisPsmOutcome(lifetime: PolarisLifetime, stable: string, pet
             <Prov info={todayProv} value={formatExact(todayEffect)}>
               {signed(todayEffect)}
             </Prov>{" "}
-            at today&rsquo;s feed
+            at the latest block&rsquo;s feed price
           </>
         )}
         {lifetime.psmRowsUnpriced > 0 && <>, {lifetime.psmRowsUnpriced} rows not yet priced</>}

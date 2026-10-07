@@ -34,7 +34,8 @@ import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { BaseActivityEvent, LiquityForkPriceAtBlock } from "@/lib/shared/types/event-shape";
 import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 
-const ONE_YEAR_S = 31_557_600;
+/** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
+const ONE_YEAR_S = 31_536_000;
 const DAY_S = 86_400;
 const DUST = 1e-9;
 
@@ -614,6 +615,7 @@ export function liquityFlowWords(
       : `with the collateral at the branch's price on the Trove's latest event by then and the debt at $1 plus the interest built since`,
     moment: {
       face: ["debt"],
+      yearSeconds: ONE_YEAR_S,
       noPrice: {
         collateral: `The branch's daily price for ${collSymbol} is not recorded yet, so the collateral is stated in ${collSymbol} only.`,
       },
