@@ -336,7 +336,7 @@ export function TimelineRunCard({
 
   /** The sums, verb by verb: the summary card's body, and T1's legs where
    *  the spine does not carry them (Timeline values off, a pinned page). */
-  const sums = (hide: string) =>
+  const sums = (hide: string, counts: boolean) =>
     aggregates?.map((agg, i) => {
       const unread = unreadOf(undefined, agg.symbol);
       if (unread)
@@ -369,7 +369,7 @@ export function TimelineRunCard({
             {agg.iconSymbol && agg.iconSymbol !== agg.symbol && (
               <span className="text-xs text-rb-500">{agg.symbol}</span>
             )}
-            {agg.count != null && (
+            {counts && agg.count != null && (
               // data-prov-exempt: a row count, the "event numbers" class.
               <span
                 data-prov-exempt=""
@@ -433,7 +433,7 @@ export function TimelineRunCard({
           </span>
         )}
         {lead}
-        {sums("")}
+        {sums("", true)}
         {extraHeader}
         <span className="ml-auto text-xs text-rb-500">{range}</span>
       </div>
@@ -454,7 +454,7 @@ export function TimelineRunCard({
           {kindWord} {countMark}
         </span>
       )}
-      {sums(hideVal)}
+      {sums(hideVal, false)}
       {extraHeader}
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>

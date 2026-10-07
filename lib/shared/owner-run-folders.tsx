@@ -41,7 +41,7 @@ export function ownerRunEntry(folder: ServedFolder, nounOf: (action: string) => 
       memberNoun: "event",
       tone: "neutral",
       folderBadge: OWNER_RUN_FOLDER_BADGE,
-      shapeLabel: ownerShapeLabel(folder.txCount, folder.shape, nounOf),
+      shapeLabel: ownerShapeLabel(folder.shape, nounOf),
     };
   }
   return {
@@ -51,8 +51,10 @@ export function ownerRunEntry(folder: ServedFolder, nounOf: (action: string) => 
   };
 }
 
-/** A shape run's summary: how many transactions, and one noun per member kind
- *  of one of them, in their order — "12 × deposit + share transfer". */
-export function ownerShapeLabel(txCount: number, shape: string[], nounOf: (action: string) => string): string {
-  return `${txCount.toLocaleString("en-US")} × ${shape.map(nounOf).join(" + ")}`;
+/** A shape run's summary: one noun per member kind of one transaction, in
+ *  their order — "Deposit + share transfer". The row's bracketed count is its
+ *  only count (ui-jobs 250). */
+export function ownerShapeLabel(shape: string[], nounOf: (action: string) => string): string {
+  const words = shape.map(nounOf).join(" + ");
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
