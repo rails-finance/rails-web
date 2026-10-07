@@ -487,7 +487,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     // on its market, else today's: its figures that day rest on that price.
     const why = r.ownPrice
       ? null
-      : "priced at the nearest price read on its market, else the latest block's: the price at this block is not read.";
+      : "priced at the nearest price read on its market, else the latest block's price: no price is read at this block.";
     const unsure =
       why && r.legs.length > 0 ? balances.map((b) => ({ side: b.side, why, symbol: r.ev.symbol, held: true })) : [];
     return {
