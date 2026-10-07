@@ -160,7 +160,7 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
   const dateText = atClose
     ? `At close, ${closeDay}`
     : s.isLive
-      ? (model.words.live ?? "Today, live prices")
+      ? (model.words.live ?? "At the latest block's price")
       : dayStamp(dayStart(model, stop));
   const when = atClose ? `the close on ${closeDay}` : s.isLive ? "now" : `the end of ${dateText}`;
   // The readout states the date alone (Miles, 1 Oct 2026).

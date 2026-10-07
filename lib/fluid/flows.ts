@@ -495,7 +495,7 @@ export function fluidFlowTimeline(events: FluidFlowEvent[], o: FluidFlowOptions)
                 side: "collateral" as const,
                 why:
                   r.priceFrom === "today"
-                    ? `${o.collSymbol} priced at today's oracle read: the oracle price at this block is not stored yet.`
+                    ? `${o.collSymbol} priced at the latest block's oracle price: the oracle price at this block is not stored yet.`
                     : `${o.collSymbol} priced at the nearest priced row: the oracle price at this block is not stored yet.`,
                 held: true,
               },

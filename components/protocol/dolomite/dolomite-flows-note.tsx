@@ -24,7 +24,7 @@ function pricingWords(f: DolomiteFlowsFacts): string {
     parts.push(
       `${p.day === total ? "every row is" : n(p.day, "one row is", "rows are")} valued at Dolomite's oracle price for its market at the end of its day (the last price the core emitted that day), which can differ from the price at its block by how far the price moved within the day`,
     );
-  if (p.live > 0) parts.push(`${n(p.live, "one row from today takes", "rows from today take")} today's live price`);
+  if (p.live > 0) parts.push(`${n(p.live, "one row takes", "rows take")} the oracle's price at the latest block`);
   if (p.carried > 0)
     parts.push(
       `${n(p.carried, "one row has", "rows have")} no price recorded on its day and take the last one before it`,
@@ -140,7 +140,7 @@ export function DolomiteFlowsNote({ facts }: { facts: DolomiteFlowsFacts | null 
         <p>
           {pricingWords(facts)}{" "}
           {facts.between === "store"
-            ? "Between events each market is valued at Dolomite's oracle price at the end of each day; a day with no price recorded on a market keeps the last one, and today's is the live read's."
+            ? "Between events each market is valued at Dolomite's oracle price at the end of each day; a day with no price recorded on a market keeps the last one, and the last stop takes the oracle's price at the latest block."
             : "The daily oracle prices did not load, so between events each market keeps the price of its latest event, and a price more than 30 days old is stated as such."}
         </p>
       )}

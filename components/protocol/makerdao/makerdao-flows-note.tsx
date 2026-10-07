@@ -49,7 +49,7 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
           {p && p.row > 0
             ? `, ${count(p.row, "a liquidation", "liquidations")} at the price at ${p.row === 1 ? "its block" : "their blocks"}`
             : ""}
-          {p && p.today > 0 ? `, ${count(p.today, "an event today", "events today")} at the live price` : ""}
+          {p && p.today > 0 ? `, ${count(p.today, "an event", "events")} at the latest block's price` : ""}
           {p && p["store-near"] > 0
             ? `, and ${count(p["store-near"], "one event", "events")} on a day the store holds no price for at the nearest day's`
             : ""}
@@ -64,8 +64,8 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
           {p && p.row > 0
             ? ` (${count(p.row, "a liquidation", "liquidations")} at ${p.row === 1 ? "its block" : "their blocks"})`
             : ""}
-          : a liquidation&apos;s block or today&apos;s live price. Between events the collateral keeps the price of its
-          latest event, and a price more than 30 days old is stated as such.
+          : a liquidation&apos;s block or the latest block&apos;s price. Between events the collateral keeps the price
+          of its latest event, and a price more than 30 days old is stated as such.
         </p>
       )}
       {facts && facts.liquidations + facts.forks + facts.returned > 0 && (

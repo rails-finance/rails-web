@@ -567,7 +567,7 @@ export function polarisFlowTimeline(rp: PolarisReplay, o: PolarisFlowOptions): F
             unsure: [
               {
                 side: "collateral" as const,
-                why: `${PETH_SYMBOL} priced at the ${r.priceFrom === "today" ? "feed's live price" : "nearest priced row"}: the feed's price at this block is not stored.`,
+                why: `${PETH_SYMBOL} priced at the ${r.priceFrom === "today" ? "feed's price at the latest block" : "nearest priced row"}: the feed's price at this block is not stored.`,
                 held: true,
               },
             ],
@@ -682,7 +682,7 @@ export function polarisFlowWords(stable: string): NonNullable<FlowTimeline["word
       debt: `Every figure is in ${stable}, the market's stablecoin.`,
     },
     heldBasis: {
-      collateral: `the pETH the CDP held after its last event by then, at the feed's price at that event, in ${stable}; today, the live read at the feed's price now.`,
+      collateral: `the pETH the CDP held after its last event by then, at the feed's price at that event, in ${stable}; at the latest block, the feed's price.`,
       debt: `the ${stable} the CDP's last event recorded by then, plus the interest charged on it at the rate its next event charged (after the last, the live read's), to the end of that day.`,
     },
     linePrices: `in ${stable}, with the collateral at the feed's price of its latest event and the debt plus the interest built since`,

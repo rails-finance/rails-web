@@ -379,7 +379,7 @@ export function CombinedFlows({
   const dateText = atClose
     ? `At close, ${closeDay}`
     : head.isLive
-      ? (model.words.live ?? "Today, live prices")
+      ? (model.words.live ?? "At the latest block's price")
       : dayStamp(dayStart(model, cur.stop));
   const when = atClose ? `the close on ${closeDay}` : head.isLive ? "now" : `the end of ${dateText}`;
   // The readout states the date alone (Miles, 1 Oct 2026).

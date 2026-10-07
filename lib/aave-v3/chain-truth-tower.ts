@@ -1326,7 +1326,7 @@ export function computeAaveV3Economics(
 function priceChangeProv(side: "supply" | "debt"): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Price change — the difference between valuing each ${side === "supply" ? "supply, withdrawal, transfer and liquidation" : "borrow, repayment and liquidation"} at the oracle price at its block and valuing what is ${side === "supply" ? "held" : "owed"} now at today's price. In tokens the column adds up without it.`,
+    summary: `Price change — the difference between valuing each ${side === "supply" ? "supply, withdrawal, transfer and liquidation" : "borrow, repayment and liquidation"} at the oracle price at its block and valuing what is ${side === "supply" ? "held" : "owed"} now at the latest block's price. In tokens the column adds up without it.`,
     formula: side === "supply" ? "held now − (in − out)" : "owed now − (in − out)",
     inputs: [
       { label: "flows", kind: "chain-derived", pclass: "oracle", note: "each at its event's oracle price" },
@@ -1334,7 +1334,7 @@ function priceChangeProv(side: "supply" | "debt"): Provenance {
         label: side === "supply" ? "held now" : "owed now",
         kind: "chain-derived",
         pclass: "oracle",
-        note: "at today's oracle price",
+        note: "at the latest block's price",
       },
     ],
   };
