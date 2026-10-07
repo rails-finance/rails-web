@@ -19,8 +19,8 @@ import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/prove
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
-import { EventDateContext } from "@/components/shared/event-time";
-import { shortDate, shortDateYear } from "@/lib/shared/format-event";
+import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
+import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import { SpineLegsContext, SpineNodeToggleContext, useSpineLegsState } from "@/components/shared/spine-column";
 import { useLinkedHover } from "@/hooks/useLinkedHover";
@@ -165,6 +165,11 @@ export function EventCard({
   const spineLegs = useSpineLegsState();
   const spineView = useSpineView();
   const captionCtx = useContext(EventCaptionContext);
+  // The date once (ui-jobs 250): the timeline's prefix for this row, set when
+  // the row above is on another UTC day; a row opening a day under day marks
+  // carries the mark instead.
+  const datePrefix = useContext(EventDateContext);
+  const dayMark = useContext(EventDayMarkContext);
   const reactId = useId();
   const cardId = persistKey ?? reactId;
   const hasPanel = detail != null || !!detailLoading || !!detailError;
@@ -484,6 +489,8 @@ export function EventCard({
   if (spine && captionCtx) {
     const kind = caption ?? captionCtx.kind;
     const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
+    // The caption states the date once per day, else the time.
+    const when = datePrefix || dayMark ? date : formatTimestamp(captionCtx.ts);
     return (
       <SpineLegsContext.Provider value={spineLegs}>
         <PriceBasisProvider>
@@ -492,7 +499,7 @@ export function EventCard({
               wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
               caption={
                 <>
-                  {kind} &middot; {date}
+                  {kind} &middot; {when}
                 </>
               }
               spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
