@@ -17,7 +17,11 @@
 //     inspector is on — that's pointer-click, which we leave untouched (we only
 //     intercept clicks on touch devices, where Prov tracing isn't the gesture).
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+
+/** Inside a tip that already answers a hover (the closed ledger cell's USD
+ *  tip), a nested RevealTip shows its children and opens no second bubble. */
+export const QuietTipsContext = createContext(false);
 
 function useHasHover(): boolean {
   const [hasHover, setHasHover] = useState(true);
@@ -55,6 +59,7 @@ export function RevealTip({
 }) {
   const [open, setOpen] = useState(false);
   const hasHover = useHasHover();
+  const quiet = useContext(QuietTipsContext);
   const ref = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
   // Shift left by however far the bubble would run past the viewport's right
@@ -86,6 +91,23 @@ export function RevealTip({
     return () => document.removeEventListener("pointerdown", onDoc);
   }, [open, hasHover]);
 
+  if (quiet)
+    return (
+      <span className={`inline-flex items-center ${className ?? ""}`}>
+        {label ? (
+          <>
+            <span aria-hidden="true" className="inline-flex items-center [gap:inherit]">
+              {children}
+            </span>
+            <span className="sr-only" data-prov-hidden="">
+              {label}
+            </span>
+          </>
+        ) : (
+          children
+        )}
+      </span>
+    );
   return (
     <span
       ref={ref}
