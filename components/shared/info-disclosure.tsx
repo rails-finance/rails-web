@@ -246,8 +246,8 @@ export function InfoDisclosure({
  */
 export interface InfoDisclosureTab {
   key: string;
-  /** Accessible name for the button ("Explanation") — feeds the aria-label
-   *  only; the icon is the visible identity. */
+  /** The button's noun, as the aria-label reads it: "Show {label}" / "Hide
+   *  {label}" ("position explanation"). The icon is the visible identity. */
   label: string;
   content: React.ReactNode;
 }
@@ -357,9 +357,7 @@ export function InfoTabsDisclosure({
             data-t3-toggle=""
             onClick={toggleFirst}
             aria-expanded={open?.key === first.key}
-            aria-label={
-              open?.key === first.key ? `Hide ${first.label.toLowerCase()}` : `Show ${first.label.toLowerCase()}`
-            }
+            aria-label={`${open?.key === first.key ? "Hide" : "Show"} ${heading.toLowerCase()}`}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch rounded-md py-1 text-left"
           >
             <svg
@@ -403,7 +401,7 @@ export function InfoTabsDisclosure({
                     onOpenTabChange(active ? null : t.key);
                   }}
                   aria-expanded={active}
-                  aria-label={active ? `Hide ${t.label.toLowerCase()}` : `Show ${t.label.toLowerCase()}`}
+                  aria-label={active ? `Hide ${t.label}` : `Show ${t.label}`}
                   className={`group/info relative inline-flex cursor-pointer items-center gap-1 ${
                     bare
                       ? "rounded-md py-1"

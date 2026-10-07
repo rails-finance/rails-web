@@ -341,8 +341,8 @@ const headerLayout = (card) =>
   const t3Gap = await chevGap(t3, "[data-t3-heading]");
   const t3Name = await t3.getAttribute("aria-label").catch(() => null);
   check(
-    "2h. #148: the explanation's chevron follows Event explanation, its name unchanged",
-    t3Gap != null && t3Gap >= 0 && t3Gap <= 8 && t3Name === "Show explanation",
+    "2h. #148: the explanation's chevron follows Event explanation, its name Show event explanation",
+    t3Gap != null && t3Gap >= 0 && t3Gap <= 8 && t3Name === "Show event explanation",
     `${t3Gap}px, ${t3Name}`,
   );
   const menus = await card.locator("[data-event-menu]").count();

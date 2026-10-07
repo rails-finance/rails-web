@@ -432,7 +432,7 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
     await heads.nth(i).click();
     await p2.waitForTimeout(150);
   }
-  const explain = p2.locator('button[aria-label="Show explanation"]');
+  const explain = p2.locator('button[aria-label^="Show"][aria-label$="explanation"]');
   for (let i = (await explain.count()) - 1; i >= 0; i--) {
     await explain.nth(i).scrollIntoViewIfNeeded();
     await explain.nth(i).click();

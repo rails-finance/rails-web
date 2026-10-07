@@ -241,6 +241,7 @@ export function LifetimeFlowsPanel({
             }
             learnMore={learnMore}
             anatomy={FLOWS_ANATOMY}
+            label={`${title} explanation`}
             onExplanationToggle={setInfoOpen}
             rowExtra={flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
           />

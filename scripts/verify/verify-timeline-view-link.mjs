@@ -106,7 +106,7 @@ async function open(width, url) {
 async function openExplanation(page) {
   const link = page.locator('button[aria-label="Copy a link to this view"], button[aria-label="Link copied"]').first();
   if (await link.isVisible().catch(() => false)) return;
-  const trigger = page.locator('button[aria-label="Show explanation"]').first();
+  const trigger = page.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
   if ((await trigger.count()) === 0) return;
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();

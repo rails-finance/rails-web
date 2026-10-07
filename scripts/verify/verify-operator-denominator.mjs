@@ -17,7 +17,7 @@
 //   • a self-anchored lead must state a denominator no smaller than the
 //     external count it then quotes.
 //
-// ⚠️ The pane's control is `button[aria-label="Show explanation"]` — NOT
+// ⚠️ The pane's control is `button[aria-label$="explanation"]` — NOT
 // "Explanation" — and the button has NO textContent (the icon is the visible
 // identity). A wrong selector reports "no explanation control" on every route
 // including known-good ones. If this says the whole roster is broken, suspect
@@ -136,8 +136,8 @@ const CHAINED = /^Of those, /;
 // fx says "The timeline RECORDS n events"; the rest say "has RECORDED n".
 const COUNT_BULLET = /\brecords?\b|\brecorded\b/;
 
-const SHOW = '[aria-label="Show explanation"]';
-const HIDE = '[aria-label="Hide explanation"]';
+const SHOW = '[aria-label^="Show"][aria-label$="explanation"]';
+const HIDE = '[aria-label^="Hide"][aria-label$="explanation"]';
 const ROW = 'a[class~="group/listing-row"]';
 // How many listed positions to try before giving up on a protocol. Third-party
 // action is genuinely rare on some explorers — measured on /ethereum/spark,
