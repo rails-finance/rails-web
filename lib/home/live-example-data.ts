@@ -78,7 +78,16 @@ function toTowerEvent(e: BaseActivityEvent & { context: { data: LiquityContext }
           coll: c.stateAfter.coll,
           debt: c.stateAfter.debt,
           annualInterestRate: c.stateAfter.annualInterestRate,
+          raw: { debt: c.stateAfter.raw?.debt, annualInterestRate: c.stateAfter.raw?.annualInterestRate },
         },
+        stateBefore:
+          c.operation === "setBatchManagerAnnualInterestRate" && c.stateBefore
+            ? {
+                debt: c.stateBefore.debt,
+                annualInterestRate: c.stateBefore.annualInterestRate,
+                raw: { debt: c.stateBefore.raw?.debt },
+              }
+            : undefined,
         troveOperation: c.troveOperation
           ? {
               collChangeFromOperation: c.troveOperation.collChangeFromOperation,
