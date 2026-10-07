@@ -119,7 +119,6 @@ import {
   EventCaptionContext,
   SpineKeyRow,
   SpineViewProvider,
-  useSpineViewActive,
   DEFAULT_SPINE_KEY,
   type SpineKey,
 } from "@/components/shared/mobile-spine";
@@ -798,10 +797,6 @@ function ChainTruthTimelineBody({
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
   const pinnedId = rawEventId != null ? decodeEventId(rawEventId) : null;
-  // The phone spine view is the phone layout, never on a pinned page, which
-  // shows one card open.
-  const spineOptIn = !pinnedId;
-  const spineActive = useSpineViewActive(spineOptIn);
   const chainId = useChainId();
   // The query params that are part of WHICH position this is, not view state:
   // Aave V3's `?market=` (Core vs Prime is a different account), Liquity V1's
@@ -1835,15 +1830,13 @@ function ChainTruthTimelineBody({
     // 70 rows showed 7 of its 9 price-gap notes, and the two absent ones were
     // read as a defect in the rule for a day). The toolbar pill states the
     // whole count throughout; these two say when the list agrees with it.
-    <SpineViewProvider active={spineActive}>
+    <SpineViewProvider>
       <div
         className="space-y-3"
         data-anatomy="P3"
         data-timeline-rows-drawn={Math.min(windowSize, rows.length)}
         data-timeline-rows-loaded={rows.length}
         data-market-notes={marketNoteCount || undefined}
-        data-mview={spineActive ? "spine" : undefined}
-        data-mspine-opt={spineOptIn ? "" : undefined}
       >
         {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder). */}
         <div data-skel-section="detail-timeline-header">
@@ -1929,7 +1922,7 @@ function ChainTruthTimelineBody({
         ) : rows.length > 0 ? (
           <>
             <div className="flex flex-col gap-2">
-              {spineActive && <SpineKeyRow config={spineKey ?? DEFAULT_SPINE_KEY} />}
+              <SpineKeyRow config={spineKey ?? DEFAULT_SPINE_KEY} />
               {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the
@@ -1951,17 +1944,17 @@ function ChainTruthTimelineBody({
               {/* The desktop markers reserve one target for the live notes; the
                 phone spine view draws them as markers above the newest event,
                 under the tip's dot, and reserves nothing while they load. */}
-              {liveSkeletonAtTop && !spineActive && !liveSlotAtTop && (
+              {liveSkeletonAtTop && !liveSlotAtTop && (
                 <div aria-hidden className="hidden sm:block" style={{ height: 28 }} />
               )}
-              {liveSlotAtTop && spineActive && (
+              {liveSlotAtTop && (
                 <SpineNoteGap
                   notes={topNotes}
                   datePrefixFor={headDatePrefix}
                   head={{ tip: liveWindowAtTop ? null : tipSide }}
                 />
               )}
-              {liveSlotAtTop && !spineActive && (
+              {liveSlotAtTop && (
                 <ListNoteGap
                   notes={topNotes}
                   datePrefixFor={headDatePrefix}
@@ -2102,16 +2095,17 @@ function ChainTruthTimelineBody({
                 const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
                 // Markers in the gap below: the phone spine view's, or the
                 // desktop's.
-                const noteRows = spineActive ? (
-                  <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
-                ) : (
-                  <ListNoteGap
-                    notes={rowNotes}
-                    datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
-                    openIds={openNoteIds}
-                    openAll={openAll}
-                    onToggle={toggleNote}
-                  />
+                const noteRows = (
+                  <>
+                    <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
+                    <ListNoteGap
+                      notes={rowNotes}
+                      datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
+                      openIds={openNoteIds}
+                      openAll={openAll}
+                      onToggle={toggleNote}
+                    />
+                  </>
                 );
                 return (
                   <Fragment key={rowKey}>
@@ -2183,18 +2177,15 @@ function ChainTruthTimelineBody({
                     118): notes describe the market, not the account. */}
                 {tl.isFiltered && topNotes.length > 0 && (
                   <div className="flex flex-col gap-2">
-                    {spineActive ? (
-                      <SpineNoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
-                    ) : (
-                      <ListNoteGap
-                        notes={topNotes}
-                        datePrefixFor={headDatePrefix}
-                        openIds={openNoteIds}
-                        openAll={openAll}
-                        onToggle={toggleNote}
-                        head={{ tip: null, above: false, below: false }}
-                      />
-                    )}
+                    <SpineNoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
+                    <ListNoteGap
+                      notes={topNotes}
+                      datePrefixFor={headDatePrefix}
+                      openIds={openNoteIds}
+                      openAll={openAll}
+                      onToggle={toggleNote}
+                      head={{ tip: null, above: false, below: false }}
+                    />
                   </div>
                 )}
                 <div className="py-8 text-center text-sm text-rb-500" data-timeline-empty="">

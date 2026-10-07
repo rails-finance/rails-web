@@ -1,7 +1,7 @@
 "use client";
 
 import { PriceBasisProvider } from "@/components/shared/price-basis";
-import { useState, useCallback, useEffect, useContext, useId, useLayoutEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
@@ -18,7 +18,14 @@ import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
-import { EventCaptionContext, SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
+import {
+  EventCaptionContext,
+  SPINE_LINE_OVERSHOOT,
+  SpineRowContext,
+  isPhoneViewport,
+  spineLineStyle,
+  useSpineView,
+} from "@/components/shared/mobile-spine";
 import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
@@ -85,9 +92,9 @@ export interface EventCardProps {
   /** A group's closed row: its ⋮ carries one item, "Show 48 grouped events",
    *  the only way to open the group (ui-jobs 250, third revision). */
   groupMenu?: { title: string; subtitle: string; show: () => void };
-  /** Suppress the expand/collapse chevron and the header's click-to-toggle
-   *  affordance. Used by the simulator shell where detail is always open and
-   *  the only dismiss action is an explicit close button. */
+  /** The desktop header is not a control and draws no chevron: a
+   *  delegate run's row, whose words stand in T1 and open as the phone's
+   *  card. */
   hideDetailChevron?: boolean;
   /** Stable, globally-unique id for this card. When set (and the detail panel
    *  is uncontrolled), the expanded/collapsed state is persisted to
@@ -103,9 +110,17 @@ export interface EventCardProps {
    *  and inside a folder the dimmed rows read as disabled, not as quieter
    *  (Miles, 2026-09-02). */
   muted?: boolean;
-  /** The phone spine view's caption kind, where the card's label differs from
-   *  the event's `actionLabel` (which the timeline provides by default). */
+  /** The phone caption's kind, where the card's label differs from the
+   *  event's `actionLabel` (which the timeline provides by default). */
   caption?: string;
+  /** A group's whole phone caption ("Redemptions (48) · 1 Oct '25 – 12 Oct
+   *  '25"), in place of the kind and the moment. */
+  phoneCaption?: React.ReactNode;
+  /** The caption as spoken ("Redemptions, 1 October 2025 to …"). */
+  spokenCaption?: string;
+  /** The phone control's full name; unset, the spoken caption and the legs
+   *  the column reports. */
+  label?: string;
   /** A control at the right of the open card's (i) row (the Aave and
    *  Liquity families' calculator). */
   infoAction?: React.ReactNode;
@@ -123,8 +138,8 @@ export interface EventCardProps {
   /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
    *  "Received from 0x…". */
   custody?: { dir: "to" | "from"; address: string };
-  /** What the number column draws in place of the event's number: a group's
-   *  control (`GroupCount`), the boundary's. */
+  /** What the number column draws in place of the event's number: the
+   *  boundary's count. */
   numberSlot?: React.ReactNode;
 }
 
@@ -153,6 +168,9 @@ export function EventCard({
   persistKey,
   muted,
   caption,
+  phoneCaption,
+  spokenCaption,
+  label,
   infoAction,
   pageAside,
   explanationHeading = "Event explanation",
@@ -173,14 +191,11 @@ export function EventCard({
 
   const isControlled = detailOpenProp !== undefined;
 
-  // ── The phone spine view (components/shared/mobile-spine.tsx) ─────────
-  // A card draws as its spine segment and caption, one button; the card
-  // opens under it, one card open on the timeline at a time (a card with no
-  // panel opens to its header). Run and folder rows draw their own segment
-  // (`TimelineRunCard`), so a card that hides its chevron is not one here.
   // A warning event's legs, handed from the header to the spine.
   const spineLegs = useSpineLegsState();
-  const spineView = useSpineView();
+  // The phone's one open card (components/shared/mobile-spine.tsx): null
+  // outside a timeline and on a pinned page.
+  const phoneOpen = useSpineView();
   const captionCtx = useContext(EventCaptionContext);
   // The date once (ui-jobs 250): the timeline's prefix for this row, set when
   // the row above is on another UTC day; a row opening a day under day marks
@@ -190,10 +205,16 @@ export function EventCard({
   const reactId = useId();
   const cardId = persistKey ?? reactId;
   const hasPanel = detail != null || !!detailLoading || !!detailError;
-  const spine = spineView && !hideDetailChevron && captionCtx ? spineView : null;
-  const spineOpen = !!spine && spine.openId === cardId;
+  // The event page's card (`pageAside`): the explanation and the footer stand
+  // open, with no toggle.
+  const pageMode = pageAside != null;
+  // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
+  // as the spine segment, the T1 row as the caption under the node, and the
+  // body opens beneath it.
+  const inTimeline = !pageMode && phoneOpen != null && (captionCtx != null || phoneCaption != null);
 
-  const showDetail = spine ? spineOpen : isControlled ? detailOpenProp : detailOpenInternal;
+  const localOpen = isControlled ? !!detailOpenProp : detailOpenInternal;
+  const showDetail = localOpen || (inTimeline && phoneOpen?.openId === cardId);
 
   // ── Receipts scope — the inspector's per-card roster ──────────────────
   // Every <Prov> value inside this card reports into a per-card registry; the
@@ -206,27 +227,49 @@ export function EventCard({
   // Which info section is expanded — the section heading is the button,
   // bridging into the pane below.
   const [openInfoTab, setOpenInfoTab] = useState<string | null>(null);
-  // The event page's card (`pageAside`): the explanation and the footer stand
-  // open, with no toggle.
-  const pageMode = pageAside != null;
 
   // Restore persisted open state after mount (SSR-safe — no hydration mismatch:
   // first render is always closed, matching the server, then this opens it).
+  // A phone holds one open card and keeps none across loads.
   useEffect(() => {
-    if (persistKey && !isControlled && isCardOpen(persistKey)) {
+    if (persistKey && !isControlled && isCardOpen(persistKey) && !(inTimeline && isPhoneViewport())) {
       setDetailOpenInternal(true);
     }
-  }, [persistKey, isControlled]);
+  }, [persistKey, isControlled, inTimeline]);
 
-  const toggleDetail = useCallback(() => {
-    const next = !showDetail;
-    if (isControlled) {
-      onDetailToggle?.(next);
-    } else {
-      setDetailOpenInternal(next);
-      if (persistKey) setCardOpen(persistKey, next);
-    }
-  }, [showDetail, isControlled, onDetailToggle, persistKey]);
+  const setLocal = useCallback(
+    (next: boolean) => {
+      if (isControlled) {
+        onDetailToggle?.(next);
+      } else {
+        setDetailOpenInternal(next);
+        if (persistKey) setCardOpen(persistKey, next);
+      }
+    },
+    [isControlled, onDetailToggle, persistKey],
+  );
+  const rowRef = useRef<HTMLDivElement>(null);
+  // One toggle for every control. On a phone (read at click time) a timeline
+  // row opens through the one open id, closing any other, and the tapped
+  // segment holds its place on screen.
+  const toggleDetail = useCallback(
+    (anchor?: HTMLElement | null) => {
+      const el = anchor ?? rowRef.current;
+      if (inTimeline && phoneOpen && isPhoneViewport()) {
+        if (!showDetail) {
+          if (el) phoneOpen.toggle(cardId, el);
+          return;
+        }
+        if (phoneOpen.openId === cardId && el) phoneOpen.toggle(cardId, el);
+        if (localOpen) setLocal(false);
+        return;
+      }
+      const next = !showDetail;
+      if (!next && phoneOpen?.openId === cardId && el) phoneOpen.toggle(cardId, el);
+      if (next || localOpen) setLocal(next);
+    },
+    [inTimeline, phoneOpen, showDetail, cardId, localOpen, setLocal],
+  );
 
   // An event naming a token whose decimals did not load (the timeline provides
   // them): the explainer and its teaser give way to one line saying so.
@@ -236,8 +279,9 @@ export function EventCard({
 
   const hasDetail = hasPanel;
   const hasExplainer = explainer != null;
-  // In the spine view the segment is the control, so the header is not one.
-  const headerToggles = !hideDetailChevron && !spine;
+  // The desktop header is the card's control; under 640px a timeline row's
+  // control is the segment's button.
+  const headerToggles = !hideDetailChevron && !pageMode;
   const showChevron = hasDetail && headerToggles;
   // The spine node is a second click target for the header (the folder
   // node's rule): a click on it toggles the card, and hovering it lights the
@@ -245,9 +289,11 @@ export function EventCard({
   const { lit: nodeLit, bind: bindNode } = useLinkedHover<"node">();
   const nodeToggleOn = showChevron && !pageMode;
   const nodeToggle = useMemo(
-    () => (nodeToggleOn ? { onToggle: toggleDetail, hover: bindNode("node") } : null),
+    () => (nodeToggleOn ? { onToggle: () => toggleDetail(), hover: bindNode("node") } : null),
     [nodeToggleOn, toggleDetail, bindNode],
   );
+  // The phone segment's control: every timeline row with a body to open.
+  const phoneToggles = inTimeline && hasDetail;
 
   /* ── Info sections — the headings are the buttons ────────────────── */
   // The story (Explanation, (i) disc): the heading-button expands the shared
@@ -283,23 +329,16 @@ export function EventCard({
   ];
   const footerNode = txHash ? <EventCardFooter extra={footerExtra} learnMore={learnMore} /> : undefined;
 
-  // The header's slots (ui-jobs 295): the chevron after the action word, and
-  // the event menu before the number pill at the right end. A press on the
-  // menu stays with the menu, as the pill's does: its click and its Enter or
-  // Space do not reach the header's toggle (Escape still reaches the menu's
-  // document listener).
+  // The header's chevron slot (ui-jobs 295), after the action word.
   const headChevron =
     showChevron && !noChevron ? (
       <span className="inline-flex items-center self-center" data-anatomy="T5" data-evt-head-chev="">
         <DiscChevron isOpen={showDetail} />
       </span>
     ) : null;
-  // A header with no number pill (a Fluid round trip) takes the menu at the
-  // right end of its row, after the header.
-  // The number column (ui-jobs 250): on the timeline's desktop row the
-  // event's number stands in a column of its own, left of the spine; the
-  // header's pill hands it here.
-  // In a timeline card, at both widths: the header draws no number.
+  // The number column (ui-jobs 250): in a timeline card, at both widths, the
+  // event's number stands in a column at the row's far left; the
+  // header draws no number.
   const numberColumnOn = !pageMode;
   const [num, setNumState] = useState<{ number: number; last?: number } | null>(null);
   const setNum = useCallback(
@@ -310,8 +349,9 @@ export function EventCard({
   // The number the timeline gives the row, else the one the header hands up.
   const rowNum = captionCtx?.n != null ? { number: captionCtx.n, last: captionCtx.nLast } : num;
   const numberNode = rowNum ? <PlainNumber number={rowNum.number} last={rowNum.last} /> : null;
-  const headRef = useRef<HTMLDivElement>(null);
-  const [menuAtEnd, setMenuAtEnd] = useState(false);
+  // The event menu (⋮) at the right end of the T1 row, at both widths: after
+  // the header on desktop, at the caption's right on a phone. A press on it
+  // stays with the menu (Escape still reaches the menu's document listener).
   const headMenu =
     !pageMode && ((eventMenu && txHash) || groupMenu) ? (
       <span
@@ -331,42 +371,73 @@ export function EventCard({
         />
       </span>
     ) : null;
-  useLayoutEffect(() => {
-    const atEnd = headMenu != null && !headRef.current?.querySelector("[data-event-number]");
-    if (atEnd !== menuAtEnd) setMenuAtEnd(atEnd);
-  });
 
   // The (i) row's right end, before its chevron and reachable with the
-  // explanation closed: the card's action. The transaction hash is on the
-  // number pill (Display) and the event page's aside (ui-jobs 294).
+  // explanation closed: the card's action. The transaction hash is in the
+  // header's right slot (Display) and the event page's aside (ui-jobs 294).
   const infoActionNode = infoAction ? (
     <div className="flex shrink-0 items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
       <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>
     </div>
   ) : undefined;
 
+  // ── The phone caption: the T1 row under 640px (mobile decision 16) ─────
+  // "Repay · 6 Jun '26 13:31", the date once per day as the desktop row
+  // states it; a group passes its caption ("Redemptions (48) · 1 Oct '25 – …").
+  const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+  const kind = custody
+    ? `${custody.dir === "to" ? "Sent to" : "Received from"} ${short(custody.address)}`
+    : `${caption ?? captionCtx?.kind ?? ""}${by ? ` by ${short(by)}` : ""}`;
+  const capDate = captionCtx
+    ? (datePrefix ?? (dayMark ? `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}` : null))
+    : null;
+  const captionText =
+    phoneCaption ??
+    (captionCtx ? (
+      <>
+        {kind} &middot; {capDate ? `${capDate} ` : ""}
+        {formatTimestamp(captionCtx.ts)}
+      </>
+    ) : null);
+  const spoken = spokenCaption ?? (captionCtx ? `${kind}, ${formatDate(captionCtx.ts)}` : "");
+  // The legs the column reports, for the phone control's name.
+  const [legs, setLegs] = useState<string | null>(null);
+  // The line the column draws down to the next row, carried behind an opened
+  // body on a phone.
+  const [line, setLine] = useState<string | null>(null);
+  const rowSlot = useMemo(() => ({ setLegs, setLine }), []);
+  const labelId = `${reactId}-label`;
+  const panelId = `${reactId}-card`;
+
   /* ── Content tiers ──────────────────────────────────────────────── */
-  const contentTiers = (
-    <div className="min-w-0 grow">
-      {/* ── Header panel ─────────────────────────────────────────── */}
-      {/* The ring: the header of a day's last event flashes after the Lifetime
-          flows chart's "Show timeline to {date}" or the timeline chip brings it into
-          view (flow-day-mark.tsx). */}
-      <div
-        data-anatomy="T1"
-        className={`overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
-          showDetail ? "rounded-b-none bg-raised" : hasDetail ? `hover:bg-raised${nodeLit ? " bg-raised" : ""}` : ""
-        }`}
-      >
+  // A timeline row's T1 surface is the desktop header's; under 640px it is the
+  // caption on the page's ground.
+  const bp = inTimeline ? "sm:" : "";
+  const t1 = (
+    // The ring: the header of a day's last event flashes after the Lifetime
+    // flows chart's "Show timeline to {date}" or the timeline chip brings it
+    // into view (flow-day-mark.tsx).
+    <div
+      data-anatomy="T1"
+      className={`relative overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
+        showDetail
+          ? `${bp}rounded-b-none ${bp}bg-raised`
+          : showChevron
+            ? `${bp}hover:bg-raised${nodeLit ? ` ${bp}bg-raised` : ""}`
+            : ""
+      }${inTimeline ? " spine-t1" : ""}`}
+    >
+      <div className={`${headMenu ? "pr-[52px]" : ""}${inTimeline ? " max-sm:hidden" : ""}`}>
         <div
-          className={
+          className={`${
             headerToggles ? `group/evt disc-row disc-row-slow cursor-pointer${nodeLit ? " disc-lit" : ""}` : ""
-          }
+          }`}
           onClick={() => {
             if (hasDetail && headerToggles) toggleDetail();
           }}
           role={headerToggles ? "button" : undefined}
           aria-expanded={showChevron ? showDetail : undefined}
+          aria-controls={showChevron && showDetail ? panelId : undefined}
           tabIndex={headerToggles ? 0 : undefined}
           onKeyDown={(e) => {
             if ((e.key === "Enter" || e.key === " ") && hasDetail && headerToggles) {
@@ -376,19 +447,15 @@ export function EventCard({
           }}
         >
           {/* The header places the chevron after its action word
-              (`EventHeadChevron`) and the number pill draws the menu before
-              the number (event-number-pill.tsx). A header with no slot for the
-              chevron gets it at the right end (`.evt-chev-end`, hidden by
-              app/globals.css where the header has its own); below sm it
-              stands in the header's top-right corner beside the `.evt-meta`
-              row, which reserves its width. */}
+              (`EventHeadChevron`). A header with no slot for the chevron gets
+              it at the right end (`.evt-chev-end`, hidden by app/globals.css
+              where the header has its own). */}
           <div className={`relative flex items-start gap-2${showChevron && !noChevron ? " evt-has-chev" : ""}`}>
-            <div className={`flex-1 min-w-0 ${menuAtEnd ? "" : "pr-5"}`} ref={headRef}>
+            <div className={`flex-1 min-w-0 ${headMenu ? "" : "pr-5"}`}>
               <EventTxHashContext.Provider value={txHash ?? null}>
                 <EventHeadContext.Provider
                   value={{
                     chevron: headChevron,
-                    menu: menuAtEnd ? null : headMenu,
                     numberColumn: numberColumnOn ? setNum : undefined,
                   }}
                 >
@@ -396,7 +463,6 @@ export function EventCard({
                 </EventHeadContext.Provider>
               </EventTxHashContext.Provider>
             </div>
-            {menuAtEnd && <div className="mr-4 mt-3 shrink-0">{headMenu}</div>}
             {showChevron && !noChevron && (
               <div
                 className="evt-chev-end absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
@@ -410,188 +476,213 @@ export function EventCard({
           {priceBadge && <div className="flex justify-end px-5 pb-2 -mt-1">{priceBadge}</div>}
         </div>
       </div>
+      {inTimeline && (
+        // Under 640px: the caption centred on the spine, the ⋮ at the row's
+        // right edge.
+        <div className="relative flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
+          <span
+            aria-hidden
+            className={`block max-w-full truncate px-2 text-xs leading-5 ${showDetail ? "text-foreground" : "text-rb-500"}`}
+            style={{ backgroundColor: "var(--background)" }}
+          >
+            {captionText}
+          </span>
+        </div>
+      )}
+      {/* The ⋮, once: the T1 row's right end on desktop, the caption's right
+          on a phone. */}
+      {headMenu && (
+        <div className="pointer-events-auto absolute right-4 top-3 max-sm:right-0 max-sm:top-auto max-sm:bottom-[5px]">
+          {headMenu}
+        </div>
+      )}
+    </div>
+  );
 
-      {/* ── Detail panel — opens and closes instantly (no height
-            animation); mounted only while open. flow-root keeps a first
-            child's top margin inside the panel: let through, it opens a seam
-            of page background under the header. ─────────────────────── */}
-      {showDetail && (
-        <div className="flow-root rounded-b-xl bg-raised" data-anatomy="T2">
-          {detailLoading && (
-            <div className="flex items-center justify-center gap-2 py-8 text-sm ">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
-              </span>
-              Loading&hellip;
-            </div>
+  // The body — opens and closes instantly (no height animation); mounted
+  // only while open. flow-root keeps a first child's top margin inside the
+  // panel: let through, it opens a seam of page background under the header.
+  // On a phone it is the opened card alone, under the caption.
+  const panel = showDetail && (
+    <div
+      id={panelId}
+      role={inTimeline ? "region" : undefined}
+      aria-labelledby={inTimeline ? labelId : undefined}
+      data-spine-card={inTimeline ? cardId : undefined}
+      className={`flow-root rounded-b-xl bg-raised${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
+      data-anatomy="T2"
+    >
+      {inTimeline && headerBars && <div className="sm:hidden">{headerBars}</div>}
+      {detailLoading && (
+        <div className="flex items-center justify-center gap-2 py-8 text-sm ">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-2 animate-ping rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
+          </span>
+          Loading&hellip;
+        </div>
+      )}
+
+      {detailError && !detailLoading && (
+        <div className="flex items-center justify-center gap-2 py-8">
+          <span className="text-sm text-red-500">Failed to load data.</span>
+          {onDetailRetry && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDetailRetry();
+              }}
+              className="text-sm text-blue-500 hover:underline"
+            >
+              Retry
+            </button>
           )}
+        </div>
+      )}
 
-          {detailError && !detailLoading && (
-            <div className="flex items-center justify-center gap-2 py-8">
-              <span className="text-sm text-red-500">Failed to load data.</span>
-              {onDetailRetry && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDetailRetry();
-                  }}
-                  className="text-sm text-blue-500 hover:underline"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          )}
+      {/* `detailLabel` names the pane for a reader moving by heading —
+          sr-only because the pane's content carries the
+          visible structure (rails-ops TO-DO-ui-jobs item 76). */}
+      {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
+      {detail}
 
-          {/* `detailLabel` names the pane for a reader moving by heading —
-              sr-only because the pane's own content already carries the
-              visible structure (rails-ops TO-DO-ui-jobs item 76: the prop
-              was declared and passed by every protocol but never rendered,
-              so the pane opened with no heading at all). A visible
-              treatment is a separate design call; this fixes the
-              accessibility gap without it. */}
-          {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
-          {detail}
-
-          {/* ── Info sections: under a hairline, the (i) Explanation button
-                   at the bottom-left opens the pane beneath, drawn with no
-                   panel, with the footer metadata pinned below. A card
-                   without an explainer keeps the plain (i) for its footer. ── */}
-          {(hasExplainer || txHash) && (
-            <div className="px-4 pb-3 pt-1">
-              {/* The event page: the explanation stands open with no panel,
-                  under a hairline and the (i) with its heading words, in the
-                  foreground as the timeline's row is while open (ui-jobs 289). */}
-              {pageMode && infoTabs.length > 0 ? (
-                <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
-                  <div className="flex items-center gap-2">
-                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
-                      <svg
-                        className="h-5 w-5 text-foreground"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
-                      </svg>
-                      {explanationHeading}
-                    </h3>
-                    <div className="ml-auto">{infoActionNode}</div>
-                  </div>
-                  {infoTabs.map((t) => (
-                    <div key={t.key} className="pb-3 pt-5 text-sm">
-                      {t.content}
-                    </div>
-                  ))}
-                  {footerNode}
+      {/* ── Info sections: under a hairline, the (i) Explanation button
+               at the bottom-left opens the pane beneath, drawn with no
+               panel, with the footer metadata pinned below. A card
+               without an explainer keeps the plain (i) for its footer. ── */}
+      {(hasExplainer || txHash) && (
+        <div className="px-4 pb-3 pt-1">
+          {/* The event page: the explanation stands open with no panel,
+              under a hairline and the (i) with its heading words, in the
+              foreground as the timeline's row is while open (ui-jobs 289). */}
+          {pageMode && infoTabs.length > 0 ? (
+            <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
+              <div className="flex items-center gap-2">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
+                  <svg className="h-5 w-5 text-foreground" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
+                  </svg>
+                  {explanationHeading}
+                </h3>
+                <div className="ml-auto">{infoActionNode}</div>
+              </div>
+              {infoTabs.map((t) => (
+                <div key={t.key} className="pb-3 pt-5 text-sm">
+                  {t.content}
                 </div>
-              ) : infoTabs.length > 0 ? (
-                <InfoTabsDisclosure
-                  bare
-                  anatomy="T3"
-                  heading={explanationHeading}
-                  tabs={infoTabs}
-                  openTab={openInfoTab}
-                  onOpenTabChange={setOpenInfoTab}
-                  footer={footerNode}
-                  rowExtra={infoActionNode}
-                />
-              ) : (
-                <InfoDisclosure
-                  bare
-                  footer={footerNode}
-                  rowExtra={infoActionNode && <div className="ml-auto">{infoActionNode}</div>}
-                  defaultOpen={pageMode}
-                >
-                  {null}
-                </InfoDisclosure>
-              )}
+              ))}
+              {footerNode}
             </div>
+          ) : infoTabs.length > 0 ? (
+            <InfoTabsDisclosure
+              bare
+              anatomy="T3"
+              heading={explanationHeading}
+              tabs={infoTabs}
+              openTab={openInfoTab}
+              onOpenTabChange={setOpenInfoTab}
+              footer={footerNode}
+              rowExtra={infoActionNode}
+            />
+          ) : (
+            <InfoDisclosure
+              bare
+              footer={footerNode}
+              rowExtra={infoActionNode && <div className="ml-auto">{infoActionNode}</div>}
+              defaultOpen={pageMode}
+            >
+              {null}
+            </InfoDisclosure>
           )}
         </div>
       )}
     </div>
   );
 
-  if (spine && captionCtx) {
-    const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-    const kind = custody
-      ? `${custody.dir === "to" ? "Sent to" : "Received from"} ${short(custody.address)}`
-      : `${caption ?? captionCtx.kind}${by ? ` by ${short(by)}` : ""}`;
-    const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
-    // The caption states the date once per day, else the time.
-    const when = datePrefix || dayMark ? date : formatTimestamp(captionCtx.ts);
-    return (
-      <SpineLegsContext.Provider value={spineLegs}>
-        <PriceBasisProvider>
-          <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-            <SpineSegment
-              wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
-              caption={
-                <>
-                  {kind} &middot; {when}
-                </>
-              }
-              spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
-              numberSlot={numberSlot ?? numberNode}
-              open={spineOpen}
-              onToggle={(anchor) => spine.toggle(cardId, anchor)}
-              iconColumn={iconColumn}
-              cardKey={cardId}
-              card={
-                // The opened card states its date in full: the caption above it
-                // drops the time, and the list's once-a-day prefix does not apply
-                // to a card read alone.
-                <EventDateContext.Provider value={date}>{contentTiers}</EventDateContext.Provider>
-              }
+  const body = !inTimeline
+    ? panel
+    : showDetail && (
+        // A stacking context, so on a phone the line below paints behind
+        // the card and shows only past its bottom edge.
+        <div className="spine-body relative isolate max-sm:mt-2">
+          {line && (
+            <div
+              aria-hidden
+              data-spine-line=""
+              className="absolute left-1/2 -z-10 w-px -translate-x-1/2 sm:hidden"
+              style={{ top: "calc(var(--card-pad) + 20px)", bottom: SPINE_LINE_OVERSHOOT, ...spineLineStyle(line) }}
             />
-          </ProvReceiptsScope>
-        </PriceBasisProvider>
-      </SpineLegsContext.Provider>
-    );
-  }
+          )}
+          {panel}
+        </div>
+      );
 
   return (
     <SpineLegsContext.Provider value={spineLegs}>
       <PriceBasisProvider>
         <ProvReceiptsScope registry={registry} scopeId={scopeId}>
           {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
-          the first event card stands for the spine's row height. */}
+          the first event card stands for the spine's row height. One DOM at
+          both widths (`.spine-row` in app/globals.css): from 640px the spine
+          column holds 2/5 of the row beside the card; below it, a timeline
+          row's column takes the width with the T1 row drawn as the caption
+          under its node, and the body opens beneath. */}
           <div
+            ref={rowRef}
             data-skel-section="detail-event"
             data-prov-scope={scopeId}
-            className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded} ${
+            className={`${
+              pageMode
+                ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
+                : `spine-row${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
+            } relative ${scale.cardRounded} ${
               muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
             }`}
             style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
           >
             {showAvatar && avatar}
-            {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
-            header there). Matches the sm breakpoint the card's own detail grid uses,
-            so the spine and the card body reflow together. On the event page the
-            column holds `pageAside`, stacked above the card below sm, where the row
-            drops its side padding so the paragraph and the card share one width. */}
             {pageMode ? (
+              // The event page: the column holds `pageAside`, stacked above
+              // the card below sm, where the row drops its side padding so the
+              // paragraph and the card share one width.
               <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
                 {pageAside}
               </div>
             ) : (
-              <div
-                className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
-                data-anatomy="L3"
-              >
-                <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
+              <div className="spine-cell" data-anatomy="L3">
+                <SpineRowContext.Provider value={inTimeline ? rowSlot : null}>
+                  <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
+                </SpineRowContext.Provider>
+                {phoneToggles && (
+                  // Under 640px the segment, its flank values and its caption
+                  // are one button, laid over the column; the glyphs under it
+                  // take no pointer.
+                  <button
+                    type="button"
+                    data-spine-toggle=""
+                    aria-expanded={showDetail}
+                    aria-controls={showDetail ? panelId : undefined}
+                    aria-label={label ?? (legs ? `${spoken}: ${legs}` : spoken)}
+                    onClick={(e) => toggleDetail(e.currentTarget)}
+                    className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
+                  >
+                    <span id={labelId} hidden>
+                      {spoken}
+                    </span>
+                  </button>
+                )}
               </div>
             )}
-            {contentTiers}
-            {/* The number column, at the left of the spine's area: the
-                event's number, or a group's button. After the card in the
-                DOM, so the keyboard reaches the header first. */}
+            <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
+              {t1}
+              {body}
+            </div>
+            {/* The number column, at the row's far left, level with the
+                first node: the event's number, or the boundary's count. After
+                the card in the DOM, so the keyboard reaches the header first. */}
             {!pageMode && (
               <div
-                className="absolute z-10 hidden w-11 justify-center sm:flex"
-                style={{ left: "calc(var(--card-pad) + 6px)", top: "calc(var(--card-pad) + 16px)" }}
+                className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
                 data-number-column=""
               >
                 {numberSlot ?? numberNode}

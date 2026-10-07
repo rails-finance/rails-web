@@ -1,17 +1,13 @@
 "use client";
 
-// The event's number in the card header's right-hand group, every family's
-// (rails-ops TO-DO-ui-jobs 291). Inside a timeline the pill is a link to the
-// event's page; on that page it links to the card in the timeline (`?at=`).
-// Outside a timeline (no share href: a simulator shell, the home page's live
-// example) it is the plain pill. `data-event-number` carries the number (a
-// range's first) for the verifiers.
-//
-// On the timeline's desktop row the number stands in the card's column left
-// of the spine, and with Display's "Transaction hashes" on its old slot on
-// the right holds the hash as an explorer link (ui-jobs 250). Below 640px the
-// header's pill shows the short hash in the number's place, the full hash in
-// its title, as ui-jobs 294 built it; the aria-label keeps the number. The event page's pill always shows the number.
+// The event's number, every family's (rails-ops TO-DO-ui-jobs 291, 250). A
+// header places `EventNumberPill` at the end of its right slot. In a timeline
+// card the number stands in the row's column at the far left, at both widths
+// (`PlainNumber`, no link), and the slot holds the transaction hash as an
+// explorer link where Display's "Transaction hashes" asks for it. On the
+// event page the slot draws the pill, a link to the card in the timeline
+// (`?at=`). `data-event-number` carries the number (a range's first) for the
+// verifiers.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,12 +23,9 @@ export const EventTxHashContext = createContext<string | null>(null);
 
 /** What `EventCard` hands its header (rails-ops TO-DO-ui-jobs 295): the
  *  chevron, which a header places after its action word with
- *  `<EventHeadChevron />`, and the event menu (⋮), which the number pill
- *  draws before the number so the pill stays the last thing on the line. Null
- *  outside a card, and on the event page. */
+ *  `<EventHeadChevron />`. Null outside a card, and on the event page. */
 export const EventHeadContext = createContext<{
   chevron: ReactNode;
-  menu: ReactNode;
   /** Set where the card draws the number in a column of its row, left of the
    *  spine (ui-jobs 250, the timeline's desktop row): the header's pill hands
    *  its number there and draws none in the header. */
@@ -77,7 +70,6 @@ function decoded(path: string): string {
 
 export function EventNumberPill(props: { number: number; last?: number }) {
   const head = useContext(EventHeadContext);
-  const menu = head?.menu ?? null;
   const toColumn = head?.numberColumn;
   const { number, last } = props;
   useLayoutEffect(() => {
@@ -90,7 +82,6 @@ export function EventNumberPill(props: { number: number; last?: number }) {
       {/* With the number in the card's column, its old slot holds the
           transaction hash where Display asks for it (desktop only). */}
       {toColumn && <TxHashLink />}
-      {menu}
       {/* In a timeline card the number stands in the row's column, at both
           widths; the header draws it only outside one (the event page). */}
       {!toColumn && <NumberPill {...props} />}
@@ -100,7 +91,7 @@ export function EventNumberPill(props: { number: number; last?: number }) {
 
 /** The transaction hash, abbreviated ("0x53e0…fac5"), as a link to the
  *  chain's explorer: "Transaction hashes" in Display, off by default, at
- *  >=640px; below it the opened card's ⋮ menu carries the explorer link. It
+ *  >=640px; below it the row's ⋮ menu carries the explorer link. It
  *  is a pointer and carries no receipt (TO-DO-mobile-timeline decision 13). */
 function TxHashLink() {
   const txHash = useContext(EventTxHashContext);

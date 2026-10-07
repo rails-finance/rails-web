@@ -220,7 +220,7 @@ console.log(`Market notes — against ${BASE}\n`);
 {
   const { ctx, page } = await open(390, `${URL_A}?timeline=spine`);
   await page.waitForTimeout(800);
-  if ((await page.locator("[data-mview='spine']").count()) > 0) {
+  if ((await page.locator("[data-timeline-rows-drawn]").count()) > 0) {
     const n = await page.locator("[data-note-marker]:visible").count();
     check("12. the phone spine view keeps its markers", n > 0, `${n}`);
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);

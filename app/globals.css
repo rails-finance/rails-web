@@ -2,17 +2,6 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-/* The phone spine view (components/shared/mobile-spine.tsx) is the only
-   phone view. It mounts after hydration from the viewport, and the timeline
-   root carries data-mview="spine" from then; until then a timeline that can
-   draw it (data-mspine-opt) keeps its rows hidden under 640px, so a phone
-   never shows the desktop rows first. The toolbar (the first child) stays. */
-@media (max-width: 639.98px) {
-  [data-mspine-opt]:not([data-mview="spine"]) > :not(:first-child) {
-    visibility: hidden;
-  }
-}
-
 @theme {
   /* Set default transition duration to 0 to prevent halo effect on theme switch */
   --default-transition-duration: 0s;
@@ -426,6 +415,75 @@ body {
      number, no fill, no link. */
   .num-pill {
     @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] leading-none tabular-nums text-rb-500;
+  }
+
+  /* A row on the spine, one DOM at both widths (ui-jobs 304): the spine cell
+     (`.spine-cell`, the node and its flanks) and the card (`.spine-content`,
+     the T1 row and the body). From 640px the cell holds 2/5 of the row beside
+     the card. Below it the cell is hidden, except on a timeline row
+     (`.spine-seg`): there the cell takes the width, the T1 row
+     (`.spine-t1`) draws as the caption over the foot of the cell, and the
+     body (`.spine-body`) opens beneath. The number column (`.spine-num`)
+     stands at the row's far left, level with the first node. */
+  .spine-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    width: 100%;
+  }
+  .spine-cell {
+    position: relative;
+    display: flex;
+    align-self: stretch;
+    align-items: stretch;
+    justify-content: center;
+  }
+  .spine-content {
+    min-width: 0;
+  }
+  .spine-num {
+    top: calc(var(--card-pad) + 16px);
+  }
+  @media (max-width: 639.98px) {
+    .spine-row:not(.spine-seg) > .spine-cell {
+      display: none;
+    }
+    .spine-row-avatar {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .spine-seg > .spine-cell {
+      grid-row: 1;
+      grid-column: 1;
+    }
+    .spine-seg > .spine-content {
+      display: contents;
+    }
+    .spine-seg > .spine-content > .spine-t1 {
+      grid-row: 1;
+      grid-column: 1;
+      align-self: end;
+      position: relative;
+      z-index: 30;
+      pointer-events: none;
+    }
+    .spine-seg > .spine-content > .spine-body {
+      grid-row: 2;
+      grid-column: 1;
+    }
+    .spine-num {
+      left: 0;
+    }
+  }
+  @media (min-width: 640px) {
+    .spine-row {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    }
+    .spine-row-avatar {
+      grid-template-columns: auto minmax(0, 2fr) minmax(0, 3fr);
+    }
+    .spine-num {
+      left: calc(var(--card-pad) + 6px);
+    }
   }
   /* Canonical body copy — one treatment so body text stays in parity across
      marketing + product. 16px / normal weight / rb-500 (#687790, set back in

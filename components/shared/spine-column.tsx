@@ -903,15 +903,12 @@ export function SpineColumn({
   const effectiveTip: SpineTip | null = tip !== undefined ? tip : contextTip;
   const { showTimelineValues } = useTimelineDisplay();
   const unreadOf = useUnreadTokenOf();
-  // The phone spine view: the card's caption sits on the line below the node,
-  // and the card's segment button is the only control: the chips drop their
-  // filter, and the card stops the pointer reaching the flank values.
+  // A timeline row: the phone's segment control takes the legs for its name.
   const spineRow = useSpineRow();
-  // Desktop: a click on the node or its flank values opens and closes the
-  // card. The folder node keeps its toggle; the phone view's segment is a
-  // button already.
+  // A click on the node or its flank values opens and closes the card (on a
+  // phone the segment's button lies over them and takes the click).
   const toggleCtx = useContext(SpineNodeToggleContext);
-  const nodeToggle = !spineRow && !detached ? toggleCtx : null;
+  const nodeToggle = !detached ? toggleCtx : null;
   const nodeProps = nodeToggle
     ? { onClick: nodeToggle.onToggle, ...nodeToggle.hover, "data-spine-node-toggle": "" }
     : {};
@@ -934,11 +931,6 @@ export function SpineColumn({
   useEffect(() => {
     setLegs?.(legs);
   }, [setLegs, legs]);
-  const captionEl = spineRow && (
-    <div className="relative z-10 flex justify-center pt-1.5 pb-2.5" data-spine-caption="">
-      {spineRow.caption}
-    </div>
-  );
   // ── The spine is never empty; the icon states WHY there is no flow ────────
   //
   // A card reaches this component with no token rows for many reasons unrelated
@@ -1004,8 +996,8 @@ export function SpineColumn({
     // `data-list-line` (item 118's stacked desktop markers).
     <div
       className={spineClasses}
-      data-spine-line={spineRow ? "" : undefined}
-      data-list-line={spineRow ? undefined : ""}
+      data-spine-line=""
+      data-list-line=""
       style={{ top: 0, bottom: SPINE_LINE_OVERSHOOT, ...spineStyle }}
     />
   );
@@ -1042,12 +1034,7 @@ export function SpineColumn({
         case "warning": {
           // The legs as nodes; the triangle only where the event names none.
           const node = adverseLegs?.length ? (
-            <WarningLegNodes
-              legs={adverseLegs}
-              tone={warningTone}
-              showValues={spineValues}
-              filterable={!spineRow && !nodeToggle}
-            />
+            <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!nodeToggle} />
           ) : (
             <div
               className="grid grid-rows-1 items-center justify-items-center"
@@ -1361,7 +1348,7 @@ export function SpineColumn({
 
     return (
       <div
-        className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
+        className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
         // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
         // its figures re-state the card's, which carries them.
         data-prov-exempt=""
@@ -1375,11 +1362,10 @@ export function SpineColumn({
           {leadIn}
           {iconContent}
         </div>
-        <div className="flex-1 relative">
+        <div className="flex-1 relative max-sm:min-h-9">
           {spineEl}
           {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
           {tipBelow}
-          {captionEl}
         </div>
       </div>
     );
@@ -1393,10 +1379,7 @@ export function SpineColumn({
   const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
 
   return (
-    <div
-      className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
-      data-prov-exempt=""
-    >
+    <div className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch" data-prov-exempt="">
       {leadingMask}
       <div
         className={`relative z-10 flex flex-col gap-y-1 items-center${nodeToggle ? " cursor-pointer" : ""}`}
@@ -1442,7 +1425,7 @@ export function SpineColumn({
                   iconOverride={row.iconSymbol}
                   address={row.address}
                   size={scale.tokenSize}
-                  filterable={!spineRow && !nodeToggle}
+                  filterable={!nodeToggle}
                 />
                 {row.badge === "check" ? (
                   <CheckBadge size={scale.tokenSize} />
@@ -1462,7 +1445,7 @@ export function SpineColumn({
                 iconOverride={row.iconSymbol}
                 address={row.address}
                 size={scale.tokenSize}
-                filterable={!spineRow && !nodeToggle}
+                filterable={!nodeToggle}
               />
             )}
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
@@ -1481,11 +1464,10 @@ export function SpineColumn({
           </div>
         ))}
       </div>
-      <div className="flex-1 relative">
+      <div className="flex-1 relative max-sm:min-h-9">
         {spineEl}
         {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
         {tipBelow}
-        {captionEl}
       </div>
     </div>
   );

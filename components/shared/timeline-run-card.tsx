@@ -13,11 +13,10 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
-import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { SpineSegment, spokenAmount, useSpineView } from "@/components/shared/mobile-spine";
+import { spokenAmount } from "@/components/shared/mobile-spine";
 import { formatDate } from "@/lib/date";
 
 /**
@@ -226,7 +225,6 @@ export function TimelineRunCard({
     askedRef.current = true;
     onOpen();
   }, [open, onOpen]);
-  const spineView = useSpineView();
   const hideVal = useHeaderValueHideClass();
   const membersId = useId();
 
@@ -298,12 +296,6 @@ export function TimelineRunCard({
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && onToggle() };
   const hide = { ...words2.hide, hide: () => open && onToggle() };
-  // The phone's closed group: its ⋮ rides the summary card the segment opens.
-  const phoneMenu = (
-    <div className="absolute right-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
-      <EventCardMenu shareHref={null} scopeId={membersId} groupShow={showMenu} />
-    </div>
-  );
   /** The closed row's column: the node, then the summed legs, then the dotted
    *  segment for the members not drawn. */
   const legsColumn = (
@@ -503,46 +495,13 @@ export function TimelineRunCard({
     }
   }
 
-  // ── The phone spine view: the summed row is one segment; a tap opens the
-  // summary card (one card open on the timeline at a time). The stacked pill
-  // at the row's left opens the members; open, the chevron under the first
-  // and the last member's number closes them.
-  if (spineView) {
-    const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
-    const spokenSums = legAggs
-      .filter((agg) => !unreadOf(undefined, agg.symbol))
-      .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
-    const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
-    return (
-      <GroupFrame
-        open={open}
-        show={showMenu.show}
-        hide={hide}
-        membersId={membersId}
-        members={body}
-        closed={
-          <SpineSegment
-            caption={
-              <>
-                {kindWord} {countMark} &middot; {range}
-              </>
-            }
-            spokenCaption={`${kindWord}, ${spokenRange}`}
-            label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
-            open={spineView.openId === membersId}
-            onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
-            iconColumn={legsColumn}
-            card={
-              <div className="relative">
-                <div className="rounded-xl bg-raised">{summary}</div>
-                {phoneMenu}
-              </div>
-            }
-          />
-        }
-      />
-    );
-  }
+  // The phone caption and the phone control's name: the word, the count and
+  // the range ("Redemptions (48) · 1 Oct '25 – 12 Oct '25").
+  const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
+  const spokenSums = legAggs
+    .filter((agg) => !unreadOf(undefined, agg.symbol))
+    .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
+  const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
 
   return (
     <GroupFrame
@@ -556,6 +515,13 @@ export function TimelineRunCard({
           iconColumn={legsColumn}
           groupMenu={showMenu}
           header={head}
+          phoneCaption={
+            <>
+              {kindWord} {countMark} &middot; {range}
+            </>
+          }
+          spokenCaption={`${kindWord}, ${spokenRange}`}
+          label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
           noChevron

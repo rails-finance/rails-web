@@ -544,14 +544,14 @@ export function LiveNoteGroupRow({
   return (
     <div
       data-live-note-group={group.notes.length}
-      className={`relative flex w-full items-start ${scale.cardRounded}`}
+      className={`spine-row relative ${scale.cardRounded}`}
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
-      <div className="relative hidden w-2/5 shrink-0 self-stretch items-stretch justify-center sm:flex">
+      <div className="spine-cell">
         <SpineColumn icon={nodeControl ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
         {nodeControl}
       </div>
-      <div className="min-w-0 grow rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
+      <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">
           <span className="text-xs font-medium text-rb-500">{LIVE_GROUP_TITLE}</span>
           <span className="ml-auto text-xs text-rb-500">Now</span>

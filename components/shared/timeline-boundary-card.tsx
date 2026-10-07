@@ -31,7 +31,6 @@ import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
 import { StatCard } from "@/components/shared/state-transition";
 import { EVENT_NUMBER_PILL, EventHeadChevron } from "@/components/shared/event-number-pill";
 import { FeedbackModal } from "@/components/shared/feedback-modal";
@@ -95,15 +94,13 @@ function longDate(unix: number): string {
  *    true the cut's own statement stands and this one is withheld: two glyphs
  *    at one end would read as two different omissions.
  *
- *  It draws the row GEOMETRY `EventCard` draws — the same card padding, the
- *  same 2/5-width spine gutter at ≥sm — so the node lands on the column the
- *  rows' nodes land on. Below sm there is no spine anywhere on the page and
- *  this row draws nothing at all, which is the same silence every other spine
- *  node keeps there.
+ *  It draws in the rows' shell (`.spine-row`), so the node lands on the
+ *  column the rows' nodes land on at both widths; below 640px a caption under
+ *  the node names what lies past it.
  *
  *  `tip={null}` refuses the pulsing dot outright: a boundary is never the tip,
  *  whichever end of the list it stands at. */
-/** The boundary row's caption in the phone spine view, per end. */
+/** The boundary row's caption under 640px, per end. */
 const BOUNDARY_CAPTION: Record<"cut" | "tip" | "view", string> = {
   cut: "Earlier events not shown",
   tip: "Newer events hidden by the filters",
@@ -120,31 +117,29 @@ export function TimelineBoundaryRow({
   isLast: boolean;
 }) {
   const scale = useTimelineScale();
-  // The phone spine view draws the glyph as a segment with a caption naming
-  // what lies past it. Nothing opens, so it is text, not a control.
-  const spineView = useSpineView();
-  if (spineView) {
-    return (
-      <SpineSegment
-        wrapperProps={{ "data-figure": "timeline-boundary-row", "data-boundary-row": kind }}
-        caption={BOUNDARY_CAPTION[kind]}
-        spokenCaption={BOUNDARY_CAPTION[kind]}
-        iconColumn={<SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} tip={null} />}
-      />
-    );
-  }
+  // Under 640px the glyph is a segment with a caption naming what lies past
+  // it. Nothing opens, so it is text.
   return (
     <div
       data-figure="timeline-boundary-row"
       data-anatomy="L8"
       data-boundary-row={kind}
-      className="relative flex w-full items-start"
+      className="spine-row spine-seg relative"
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
-      <div className="hidden w-2/5 shrink-0 items-stretch justify-center self-stretch sm:flex">
+      <div className="spine-cell">
         <SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} tip={null} />
       </div>
-      <div className="min-w-0 grow" />
+      <div className="spine-content">
+        <div className="spine-t1 flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
+          <span
+            className="block max-w-full truncate px-2 text-xs leading-5 text-rb-500"
+            style={{ backgroundColor: "var(--background)" }}
+          >
+            {BOUNDARY_CAPTION[kind]}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

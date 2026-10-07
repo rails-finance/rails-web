@@ -273,7 +273,7 @@ export function SpineNoteGap({
       data-anatomy={head ? "L5" : "L7"}
       // A gap between two rows cancels the list's own 8px so its growth is
       // what the markers ask for; the head slot keeps it.
-      className={`relative flex flex-col ${head ? "" : "-mt-2"}`}
+      className={`relative flex flex-col sm:hidden ${head ? "" : "-mt-2"}`}
       style={{ "--card-pad": `${scale.cardPad}px`, paddingTop: tip ? 22 : 0 } as React.CSSProperties}
     >
       {head && (
@@ -386,8 +386,7 @@ function ListNodeControl({ note, openAll, onClose }: { note: GapItem; openAll: b
  *  all filtered out, nothing stands above the markers to draw the line, so the
  *  gap draws its own, and the tip's dot when it holds the tip.
  *
- *  Below 640px the rows' spine column is hidden, so the timeline draws notes
- *  as rows there and never mounts this. */
+ *  Below 640px it is hidden and `SpineNoteGap` draws the gap. */
 export function ListNoteGap({
   notes,
   datePrefixFor,

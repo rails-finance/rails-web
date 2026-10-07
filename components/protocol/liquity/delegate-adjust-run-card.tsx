@@ -6,11 +6,9 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
-import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { UsersGlyph } from "./liquity-event-header";
-import { SpineSegment, useSpineView } from "@/components/shared/mobile-spine";
 import { formatDate } from "@/lib/date";
 
 /**
@@ -65,7 +63,6 @@ export function DelegateAdjustRunCard({
     : `${shortDate(fromTs)} ${shortDateYear(fromTs)} – ${shortDate(toTs)} ${shortDateYear(toTs)}`;
 
   const toggle = () => setOpen((v) => !v);
-  const spineView = useSpineView();
   const membersId = useId();
 
   const rateProv = (which: "first" | "last", ts: number): Provenance => ({
@@ -83,8 +80,6 @@ export function DelegateAdjustRunCard({
 
   const hasMovement = fromRate != null && toRate != null;
 
-  // In the phone spine view (`spine`) the header is the opened card: not a
-  // control, and without the narrow-width stand-ins the segment draws.
   // The run's words, as T1 states them: no asset moved, so the spine draws
   // no node and the words stand (set C gives the spine the rate).
   const words = (
@@ -116,51 +111,14 @@ export function DelegateAdjustRunCard({
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && toggle() };
   const hide = { ...words2.hide, hide: () => open && toggle() };
-  // The phone's closed group: its ⋮ rides the summary card the segment opens.
-  const phoneMenu = (
-    <div className="absolute right-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
-      <EventCardMenu shareHref={null} scopeId={membersId} groupShow={showMenu} />
-    </div>
-  );
   // No asset moved: no node, the words stand, and the dotted segment marks
   // the members not drawn.
   const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
 
-  if (spineView) {
-    const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
-    const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
-    const by = managerName ? ` by ${managerName}` : "";
-    const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
-    return (
-      <GroupFrame
-        open={open}
-        show={showMenu.show}
-        hide={hide}
-        membersId={membersId}
-        members={children}
-        closed={
-          <SpineSegment
-            caption={
-              <>
-                Adjusted ({count.toLocaleString("en-US")}) &middot; {range}
-              </>
-            }
-            spokenCaption={`Adjusted, ${spokenRange}`}
-            label={`${countText}${by}, ${spokenRange}${movement}`}
-            open={spineView.openId === membersId}
-            onToggle={(anchor) => spineView.toggle(membersId, anchor)}
-            iconColumn={column}
-            card={
-              <div className="relative">
-                <div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>
-                {phoneMenu}
-              </div>
-            }
-          />
-        }
-      />
-    );
-  }
+  const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
+  const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
+  const by = managerName ? ` by ${managerName}` : "";
+  const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
 
   return (
     <GroupFrame
@@ -174,6 +132,16 @@ export function DelegateAdjustRunCard({
           iconColumn={column}
           groupMenu={showMenu}
           header={<div className="pl-5 pt-4 pb-3">{words}</div>}
+          // On a phone the caption carries the word, the count and the range,
+          // and the words open beneath it as the card.
+          phoneCaption={
+            <>
+              Adjusted ({count.toLocaleString("en-US")}) &middot; {range}
+            </>
+          }
+          spokenCaption={`Adjusted, ${spokenRange}`}
+          label={`${countText}${by}, ${spokenRange}${movement}`}
+          detail={<div className="px-5 pt-4 pb-3">{words}</div>}
           hideDetailChevron
         />
       }

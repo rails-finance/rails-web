@@ -11,7 +11,7 @@
 // event, and neither is counted as one; what they share is the geometry.
 //
 // That geometry is EventCard's outer geometry, deliberately: the same
-// `--card-pad`, the same `hidden sm:flex w-2/5` spine column, the same header-
+// `--card-pad`, the same `.spine-row` shell and spine cell, the same header-
 // panel / body-panel surfaces and chevron, and the `bg-note` ground that reads
 // as a different KIND of row before the glyph does. The node then lands on the
 // same vertical line as the cards' own, which is the whole point of giving
@@ -78,14 +78,14 @@ export function NoteRowShell({
       <div
         {...{ [marker.attr]: marker.value, [`${marker.attr}-open`]: open ? "" : undefined }}
         data-anatomy="L7"
-        className={`flex w-full items-start relative ${scale.cardRounded}`}
+        className={`spine-row relative ${scale.cardRounded}`}
         style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
       >
-        <div className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center">
+        <div className="spine-cell">
           <SpineColumn icon={icon} isFirst={isFirst} isLast={isLast} />
           {nodeControl}
         </div>
-        <div className="min-w-0 grow">
+        <div className="spine-content">
           {/* ── Header panel — what the row states at rest ──────────────── */}
           <div className={`overflow-visible rounded-xl bg-note ${open ? "rounded-b-none" : ""}`}>
             <div
