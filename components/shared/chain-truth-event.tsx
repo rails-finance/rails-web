@@ -31,7 +31,6 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { Icon } from "@/components/icons/icon";
 import { EventTime } from "@/components/shared/event-time";
 import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
@@ -61,6 +60,7 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
+import { usePublishSpineLegs, WARNING_TONE_TEXT, type SpineWarningLeg } from "@/components/shared/spine-column";
 import { ClosedTokens, LedgerCell, usdAt } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -176,13 +176,13 @@ function readableExact(exact: string, symbol: string): string | undefined {
 export interface ChainTruthRowSpec {
   /** Action label, e.g. "Add Collateral" / "Open Vault". */
   label: string;
-  /** Critical events (liquidation / grab) tint the label; the spine's red
-   *  triangle carries the primary signal, so this stays restrained. */
+  /** Critical events (liquidation / grab): the label reads in red-500, and
+   *  the deltas are the spine's legs (see `labelOnSpine`). */
   critical?: boolean;
-  /** Adverse-but-not-terminal events (redemption): the action name lives on the
-   *  spine's caution pill, so the desktop row drops the text label and shows it
-   *  only as a mobile-only badge. Like `critical`, it also keeps the moved
-   *  amounts visible at ≥sm — the warning spine carries no flanking numbers. */
+  /** Adverse-but-not-terminal events (redemption): the label reads in the
+   *  caution orange. Like `critical`, the deltas hand off to the card's
+   *  warning spine as its legs (`usePublishSpineLegs`), so with Timeline
+   *  values on at ≥sm the head reads the word alone. */
   labelOnSpine?: boolean;
   /** Third-party action: someone other than the position owner executed this
    *  event (the spine shows the pink external-party glyph). The chip renders
@@ -506,18 +506,36 @@ export function ChainTruthRow({
   // now BADGES the flow instead of replacing it (SpineColumn `externalParty`),
   // so an external row hands off exactly like the owner-acted row it mirrors —
   // leaving it passive would paint the amount twice at ≥sm.
-  const hideClass = useHeaderValueHideClass({
-    isPassive: spec.critical || !!spec.labelOnSpine,
-  });
+  const hideClass = useHeaderValueHideClass();
+  // A redemption or a liquidation: its deltas are the warning spine's legs,
+  // collateral first (the redemption header names the debt first, so its
+  // order turns over). A muted figure (a pool's total) is not the position's
+  // and stays in the head.
+  const adverse = !!spec.critical || !!spec.labelOnSpine;
+  const legDeltas = adverse ? spec.deltas.filter((d) => !d.muted && !d.noSpineCounterpart) : [];
+  const legs: SpineWarningLeg[] | null = adverse
+    ? (spec.labelOnSpine ? [...legDeltas].reverse() : legDeltas).map((d) => ({
+        label: d.label,
+        value: Math.abs(d.value),
+        symbol: d.symbol,
+        address: d.address,
+        // The echo key is the head figure's: bare where labelled.
+        prov: { info: d.prov, value: chainTruthDeltaValue(d.value, Boolean(d.label)), symbol: d.symbol },
+      }))
+    : null;
+  usePublishSpineLegs(legs);
   // The row's 12px gap separates its ITEMS — the label from the amounts, one
   // amount from the next. A party chip is not an item of its own: `Supply by
   // 0xa60d…ddeb` and `400 ◎ to 0x546b…7240` are each ONE phrase, so the chip
   // sits at phrase spacing (the 6px between a figure and its glyph) behind
   // whatever precedes it — the `-ml-1.5` on the chip wrappers below.
-  const labelNode = spec.labelOnSpine ? (
-    // The spine's pill carries "Redemption" on desktop; here it's a
-    // mobile-only badge (the spine is hidden below sm), mirroring V2.
-    <span className="sm:hidden inline-block shrink-0 rounded-full bg-caution-500/15 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-caution-600 dark:text-caution-400">
+  const labelNode = adverse ? (
+    // T1 reads the word in the event's tone (caution, or the critical red);
+    // the legs follow it with Timeline values off or below sm.
+    <span
+      className={`max-w-full shrink-0 text-sm font-medium ${WARNING_TONE_TEXT[spec.critical ? "critical" : "caution"]}`}
+      data-adverse-word=""
+    >
       {spec.label}
     </span>
   ) : spec.status === "open" && !spec.critical ? (
@@ -534,17 +552,7 @@ export function ChainTruthRow({
       {spec.label}
     </span>
   ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
-    <span
-      className={`max-w-full shrink-0 text-sm font-medium ${spec.critical ? "text-red-600 dark:text-red-400" : "text-rb-500"}`}
-    >
-      {/* The spine's warning triangle is hidden below sm: the row keeps it. */}
-      {spec.critical && (
-        <span className="mr-1 inline-block align-[-1px] sm:hidden" aria-hidden="true">
-          <Icon name="triangle" size={12} />
-        </span>
-      )}
-      {spec.label}
-    </span>
+    <span className="max-w-full shrink-0 text-sm font-medium text-rb-500">{spec.label}</span>
   ) : // A combined adjust omits the row label — the per-axis delta labels carry
   // the verbs (V2's grammar) — and a custody row drops it: the spine's plane
   // and the chip's to/from are the verb. Render nothing so no empty span
@@ -586,7 +594,7 @@ export function ChainTruthRow({
     // its value at every width — otherwise the figure disappears at ≥sm.
     // A custody row's spine is the badged token alone, no flank, so every
     // delta on it stays.
-    const deltaHide = d.noSpineCounterpart || spec.custody ? "" : hideClass;
+    const deltaHide = d.noSpineCounterpart || spec.custody || (adverse && d.muted) ? "" : hideClass;
     // The ≥sm spine hand-off (hideClass) rides the Prov wrapper itself —
     // hiding a child would leave the pill box painting an empty lozenge
     // when the receipt opens with timeline values on.

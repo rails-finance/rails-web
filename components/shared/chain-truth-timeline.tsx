@@ -588,7 +588,14 @@ function ServedFolderRow({
   isLast: boolean;
   /** One member's card, numbered from the folder's own ordinals — the same
    *  literal numbering the rest of the list runs on, one level down. */
-  renderMember: (event: BaseActivityEvent, eventNumber: number, isLastMember: boolean, isNewest: boolean) => ReactNode;
+  renderMember: (
+    event: BaseActivityEvent,
+    eventNumber: number,
+    isLastMember: boolean,
+    isNewest: boolean,
+    /** The member drawn above this one; null for the first. */
+    above: BaseActivityEvent | null,
+  ) => ReactNode;
 }) {
   const folders = useFolderMembers();
   const entry = register(folder);
@@ -618,7 +625,9 @@ function ServedFolderRow({
               : "No event in this folder passes the filters."}
           </p>,
         ]
-      : shown?.map((m, i) => renderMember(m.event, m.eventNumber, i === shown.length - 1, i === newest));
+      : shown?.map((m, i) =>
+          renderMember(m.event, m.eventNumber, i === shown.length - 1, i === newest, i > 0 ? shown[i - 1].event : null),
+        );
   // Rule 6 (decision 0019, amended 2026-09-25): "a folder header is complete
   // about its members" — one sum per kind of event the folder holds, with its
   // count, and nothing else. `other` is what keeps that promise: with it the
@@ -1604,24 +1613,21 @@ function ChainTruthTimelineBody({
   // Each drawn row stamps its own moment as `data-row-at`, which lets a
   // check assert that every row of a loaded segment falls inside its month.
 
-  // Every card carries its date. Grouping by day (the date on the newest, then
-  // the newest and oldest card of each day) left the middle cards of a busy
-  // day as a bare time a reader dated from the card below it (MakerDAO 19103,
-  // 2026-09-29). `lastIdx` stays in the signature for a one-transaction run.
-  // On a page that ties the timeline to the Lifetime flows panel, the last
-  // event of each day carries the day's mark (FlowDayMark: its date and "View
-  // on chart") and every other card states its time only.
+  // The date once per day (ui-jobs 250, open for Miles's ruling): a row's
+  // time slot carries the date when the row drawn above it is on another UTC
+  // day, or when nothing is drawn above it (the first row of the list, the
+  // first member of an opened folder); otherwise the time alone. `dateOnce`
+  // is the rule; every event row's prefix goes through it. On a page that
+  // ties the timeline to the Lifetime flows panel, the day's mark (FlowDayMark:
+  // its date and "View on chart") takes the prefix's place on the row that
+  // opens a day.
   const dayMarks = useFlowFocus() != null;
-  const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) => {
-    const event = events[flatIdx];
-    // Under day marks the date stays on the day's mark, which takes the
-    // prefix's place on the row that opens a drawn day. A row that opens its
-    // day without a mark (the first row under a collapsed folder or inside a
-    // run that spans two days) carries the date, so a reader scrolling
-    // the list never meets a bare time as the first card of a day.
-    if (dayMarks && flatIdx > 0 && utcDay(events[flatIdx - 1].timestamp) === utcDay(event.timestamp)) return null;
-    return `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`;
-  };
+  const dateOnce = (ts: number, aboveTs: number | null): string | null =>
+    aboveTs != null && utcDay(aboveTs) === utcDay(ts) ? null : `${shortDate(ts)} ${shortDateYear(ts)}`;
+  /** A row's prefix by its place in the flat list: the event above it there.
+   *  `lastIdx` stays in the signature for a one-transaction run. */
+  const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) =>
+    dateOnce(events[flatIdx].timestamp, flatIdx > 0 ? events[flatIdx - 1].timestamp : null);
   /** A row's newest and oldest moment: the day its mark names, and the day
    *  the next row's mark is measured from. */
   const rowSpan = (row: TimelineRow): { top: number; bottom: number } => {
@@ -2036,12 +2042,15 @@ function ChainTruthTimelineBody({
                   row.kind === "event" ? (
                     renderEventRow(row.event, row.flatIdx, {
                       mark: marked,
-                      // The card below a folder or a run draws no mark when its
-                      // day is the one that row ends on, so it carries the date:
-                      // the range on the row above is not this day's first card.
-                      ...(dayMarks && !marked && rowIdx > 0 && windowed[rowIdx - 1].kind !== "event"
-                        ? { datePrefix: `${shortDate(row.event.timestamp)} ${shortDateYear(row.event.timestamp)}` }
-                        : {}),
+                      // Measured against the row drawn above. A folder or a
+                      // run above spans a range of days, so the row under
+                      // it carries the date.
+                      datePrefix: dateOnce(
+                        row.event.timestamp,
+                        rowIdx > 0 && windowed[rowIdx - 1].kind === "event"
+                          ? rowSpan(windowed[rowIdx - 1]).bottom
+                          : null,
+                      ),
                     })
                   ) : row.kind === "folder" ? (
                     <SpineTipContext.Provider
@@ -2084,20 +2093,14 @@ function ChainTruthTimelineBody({
                           // a live note or the boundary card now sits there.
                           isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
                           isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
-                          renderMember={(event, eventNumber, isLastMember, isNewest) =>
+                          renderMember={(event, eventNumber, isLastMember, isNewest, above) =>
                             renderEventRow(event, row.flatIdx, {
                               inRun: true,
                               eventNumber,
-                              // A member's own day, read off the member itself:
-                              // `datePrefixAt` indexes the flat displayed list,
-                              // and a folder's members are not in it.
-                              // Under day marks, a member of the folder's
-                              // newest day states its time only, and the
-                              // newest member carries the day's mark.
-                              datePrefix:
-                                dayMarks && utcDay(event.timestamp) === utcDay(rowSpan(row).top)
-                                  ? null
-                                  : `${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`,
+                              // Against the member above: `datePrefixAt` indexes
+                              // the flat displayed list, and a folder's members
+                              // are not in it. The first member carries the date.
+                              datePrefix: dateOnce(event.timestamp, above ? above.timestamp : null),
                               mark: marked && isNewest && utcDay(event.timestamp) === utcDay(rowSpan(row).top),
                               isLastMember:
                                 isLastMember && folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken,

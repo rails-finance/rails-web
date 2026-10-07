@@ -5,12 +5,12 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
 import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
+import { WARNING_TONE_TEXT } from "@/components/shared/spine-column";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import { Prov } from "@/components/shared/provenance";
@@ -127,10 +127,6 @@ export function LiquityEventHeader({
   const chev = useEventHeadChevron();
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
-  const { showTimelineValues } = useTimelineDisplay();
-  // A redemption's lozenges move onto the spine node's flanks in the phone
-  // spine view (SpineColumn's `warningLegs`); the opened card drops them.
-  const spineFlankHide = showTimelineValues && !title ? "mspine:max-sm:hidden" : "";
 
   const groupChip = ctx.blockGrouping?.isGrouped ? (
     <span
@@ -194,18 +190,10 @@ export function LiquityEventHeader({
 
   const hasDebtChange = Math.abs(debtChange) >= 0.01;
   const hasCollChange = Math.abs(collChange) >= 0.01;
-  const PASSIVE_OPS = new Set([
-    "liquidate",
-    "redeemCollateral",
-    "applyPendingDebt",
-    "adjustZombieTrove",
-    "adjustUnredeemableZombieTrove",
-  ]);
   // The event page has no spine to carry the values, so its title states them.
-  const spineHide = useHeaderValueHideClass({ isPassive: PASSIVE_OPS.has(ctx.operation) });
-  const hideVal = page || title ? "" : spineHide;
-  // The redemption and liquidation pills the spine draws from 640px.
-  const spinePillHide = page || title ? "" : "sm:hidden mspine:max-sm:hidden ";
+  // A pending-debt row's spine draws no flank, so its figure stays.
+  const spineHide = useHeaderValueHideClass();
+  const hideVal = page || title || ctx.operation === "applyPendingDebt" ? "" : spineHide;
   // The title's sizes; the header's otherwise.
   const TXT = title ? "text-2xl" : "text-sm";
   const GAP = title ? "gap-2.5" : "gap-1.5";
@@ -334,21 +322,17 @@ export function LiquityEventHeader({
             ))}
         </>
       ) : ctx.operation === "redeemCollateral" ? (
-        // The dotted spine carries a "REDEMPTION" pill on desktop, so the
-        // header badge is mobile-only here. The freed space lets the two
-        // facts that matter read with labels — the debt it cleared, then
-        // the collateral it reduced — as the explanation tells them. The
-        // phone spine view draws both lozenges on the node's flanks, so
-        // its opened card drops them while timeline values are on.
+        // T1 reads the word in the caution tone; the spine draws the legs as
+        // two nodes. With Timeline values off, or below sm with no spine, the
+        // legs follow the word with their labels — the debt it cleared, then
+        // the collateral it reduced — since the head has no arrows.
         <>
-          <span
-            className={`${spinePillHide}inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-          >
+          <span className={`${TXT} ${WARNING_TONE_TEXT.caution}`} data-adverse-word="">
             {style.label}
           </span>
           {hasDebtChange && (
-            <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
-              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
+              <span className={WARNING_TONE_TEXT.caution}>{L1_WORDS.cleared}</span>
               {wrapDebt(
                 <span className={AMT}>
                   <ExactTip
@@ -362,8 +346,8 @@ export function LiquityEventHeader({
             </span>
           )}
           {hasCollChange && (
-            <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
-              <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.reduced}</span>
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
+              <span className={WARNING_TONE_TEXT.caution}>{L1_WORDS.reduced}</span>
               {wrapColl(
                 <span className={AMT}>
                   <ExactTip
@@ -378,19 +362,14 @@ export function LiquityEventHeader({
           )}
         </>
       ) : ctx.operation === "liquidate" ? (
-        // The dotted spine carries a critical "LIQUIDATION" pill on desktop,
-        // so the header badge is mobile-only here. The freed space lets the
-        // facts read with labels — collateral liquidated, debt cleared —
-        // mirroring the redemption header grammar. Labels stay neutral
-        // (rb-500); the red spine alone carries the critical valence.
+        // The redemption's shape in the critical red: the word, then (values
+        // off, or below sm) the collateral liquidated and the debt cleared.
         <>
-          <span
-            className={`${spinePillHide}inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-          >
+          <span className={`${TXT} ${WARNING_TONE_TEXT.critical}`} data-adverse-word="">
             {style.label}
           </span>
           {hasCollChange && (
-            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
               <span className="text-rb-500">{L1_WORDS.liquidated}</span>
               {wrapColl(
                 <span className={AMT}>
@@ -405,7 +384,7 @@ export function LiquityEventHeader({
             </span>
           )}
           {hasDebtChange && (
-            <span className={`inline-flex items-center ${GAP} ${TXT}`}>
+            <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
               <span className="text-rb-500">{L1_WORDS.cleared}</span>
               {wrapDebt(
                 <span className={AMT}>

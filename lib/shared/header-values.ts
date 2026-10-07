@@ -7,9 +7,8 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 // Event-card headers hide their value spans at ≥sm (640px) so the SpineColumn
 // flanking values can take over without duplication, while below sm (no spine)
-// the "amount + icon" stays visible inline with the action pill. Passive events
-// (liquidations, challenges, rewards that happen TO the user) keep the value
-// visible at ≥sm too — the amount IS the story of the event.
+// the "amount + icon" stays visible inline with the action pill. A redemption
+// or a liquidation hands off the same way: its spine draws the legs as nodes.
 //
 // The "Timeline values" option in the Display dropdown is the default-on
 // preference: when on, values render in the spine and header amounts hide at ≥sm.
@@ -27,10 +26,9 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 // values below sm too, so its opened card hides them the same way.
 const HIDE_CLASS = "sm:hidden mspine:max-sm:hidden";
 
-export function useHeaderValueHideClass(opts?: { isPassive?: boolean }): string {
+export function useHeaderValueHideClass(): string {
   const { showTimelineValues } = useTimelineDisplay();
   if (!showTimelineValues) return "";
-  if (opts?.isPassive) return "";
   return HIDE_CLASS;
 }
 

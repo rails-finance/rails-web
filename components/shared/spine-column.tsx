@@ -1,7 +1,7 @@
 "use client";
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { ArrowRightToLine, Clock, Folder, FolderOpen, Layers, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -14,12 +14,13 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
 import { SPINE_LINE_OVERSHOOT, spineLineKey, spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
+import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
 /** Semantic icon that replaces token icons when the event isn't about token flow */
 export type SpineIcon =
-  | "warning" // Passive loss: liquidation, redemption (caution/critical tone via warningTone)
+  | "warning" // A change the owner did not make: redemption, liquidation (caution/critical tone via warningTone). Draws `warningLegs` as nodes; a triangle only where no leg is known
   | "rate-change" // Interest rate / parameter change (% with up/down arrow)
   | "delegate" // Delegation change (users icon with +/- badge)
   | "external" // Third-party action with nothing to draw (pink users icon) — the FALLBACK for `externalParty`; cards pass the flag, not this
@@ -67,17 +68,12 @@ const DOT_COLORS: Record<SpineColor, string> = {
   critical: "bg-red-400",
 };
 
-/** Pill classes for the warning label, keyed by warning tone */
-const WARNING_PILL_CLASSES: Record<WarningTone, string> = {
-  caution: "bg-caution-500/15 text-caution-600 dark:text-caution-400",
-  critical: "bg-red-500/15 text-red-600 dark:text-red-400",
-};
-
-/** Label classes for a warning leg's word ("Cleared"), keyed by warning tone —
- *  the same pair the event header's labels use. */
-const WARNING_LEG_LABEL_CLASSES: Record<WarningTone, string> = {
+/** The tone a warning leg's magnitude takes, and the T1 word with it
+ *  (color-grammar.md §5): caution orange for a redemption, red-500 for a
+ *  liquidation. The arrows stay grey and the token icons keep their colours. */
+export const WARNING_TONE_TEXT: Record<WarningTone, string> = {
   caution: "text-caution-600 dark:text-caution-400",
-  critical: "text-rb-500",
+  critical: "text-red-500",
 };
 
 // ── Token row descriptor ────────────────────────────────────────────────────
@@ -148,10 +144,12 @@ export type SpineSwapAxis = "supply" | "debt" | "mixed";
 
 // ── Props ───────────────────────────────────────────────────────────────────
 
-/** One flank of a warning node in the phone spine view: the header's word, the
- *  magnitude and the token ("Cleared 0.631 ◆"). */
+/** One leg of a warning event (a redemption, a liquidation): the token that
+ *  left the position, drawn as a node with "→" and the magnitude on the
+ *  right ("2 →" on the collateral, "6K →" on the debt it cleared). */
 export interface SpineWarningLeg {
-  label: string;
+  /** The header's word for the leg ("Cleared"), for the spoken label. */
+  label?: string;
   value: number;
   symbol: string;
   address?: string;
@@ -179,23 +177,23 @@ export interface SpineColumnProps {
    *  explicit check/cross IS that event's meaning, and the dotted spine still
    *  carries the external signal. */
   externalParty?: boolean;
-  /** Tone for the "warning" triangle — "caution" (orange) for a change to
-   *  the owner's position the owner did not make (a redemption, every routine
-   *  adverse event); "critical" (red) for
-   *  terminal events (liquidation). The dotted spine + lead-in dot inherit this
-   *  tone too. Defaults to "caution". See color-grammar.md §5. */
+  /** Tone of a warning event — "caution" (orange) for a change to the
+   *  owner's position the owner did not make (a redemption, every routine
+   *  adverse event); "critical" (red) for terminal events (liquidation). The
+   *  legs' magnitudes, the dotted spine and the lead-in dot take it. Defaults
+   *  to "caution". See color-grammar.md §5. */
   warningTone?: WarningTone;
-  /** Optional short label rendered in a tinted pill beneath the warning
-   *  triangle (e.g. "Redemption", "Liquidation"). Used with icon="warning",
-   *  and with icon="folder" for a one-kind folder that keeps its kind's pill
-   *  (a liquidations-only chunk). */
+  /** The kind's name ("Redemption", "Liquidation"). With icon="folder" a
+   *  one-kind folder keeps its kind's tone through it; a warning node draws
+   *  no pill (T1 states the word). */
   warningLabel?: string;
-  /** Optional hover/tap tip on the warning pill: what the kind means. */
+  /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
-  /** icon="warning" only, drawn in the phone spine view: the amounts the
-   *  event moved, worded as the desktop header words them ("Cleared" left,
-   *  "Reduced" right). The opened card's header then drops them. */
-  warningLegs?: { left?: SpineWarningLeg; right?: SpineWarningLeg };
+  /** icon="warning" only: the legs, top to bottom (the collateral, then the
+   *  debt), each drawn as a node pointing out of the position. Unset, the
+   *  legs the card's header publishes (`usePublishSpineLegs`) are drawn; with
+   *  neither, the triangle stands in. */
+  warningLegs?: SpineWarningLeg[];
   /** icon="folder" only — draw the open-folder glyph (the chunk is expanded). */
   folderOpen?: boolean;
   /** icon="folder" only — small glyph on the folder's corner: a chunk whose
@@ -260,6 +258,37 @@ export type SpineTip = "above" | "below";
  *  tip, so it reaches the column this way; a column with an explicit `tip`
  *  ignores the context. */
 export const SpineTipContext = createContext<SpineTip | null>(null);
+
+/** A warning event's legs, published by the card's header for the card's
+ *  spine: the header (ChainTruthRow, a family's own) holds the amounts, the
+ *  card's SpineColumn draws them. EventCard provides it. */
+export const SpineLegsContext = createContext<{
+  legs: SpineWarningLeg[] | null;
+  setLegs: (legs: SpineWarningLeg[] | null) => void;
+} | null>(null);
+
+const legsKey = (legs: SpineWarningLeg[] | null) =>
+  legs ? legs.map((l) => `${l.symbol}|${l.address ?? ""}|${l.value}|${l.prov?.value ?? ""}`).join(";") : "";
+
+/** The state EventCard holds for SpineLegsContext. */
+export function useSpineLegsState() {
+  const [legs, setLegsState] = useState<SpineWarningLeg[] | null>(null);
+  const setLegs = (next: SpineWarningLeg[] | null) =>
+    setLegsState((prev) => (legsKey(prev) === legsKey(next) ? prev : next));
+  return { legs, setLegs };
+}
+
+/** Hand a warning event's legs to the card's spine (no-op outside a card). */
+export function usePublishSpineLegs(legs: SpineWarningLeg[] | null) {
+  const ctx = useContext(SpineLegsContext);
+  const setLegs = ctx?.setLegs;
+  const key = legsKey(legs);
+  // Before paint, so the node never draws its fallback first.
+  useLayoutEffect(() => {
+    setLegs?.(legs);
+    // `key` stands for `legs`: a new array with the same legs is no change.
+  }, [setLegs, key]);
+}
 
 // ── Icon SVGs ───────────────────────────────────────────────────────────────
 
@@ -733,11 +762,11 @@ export function PulsingDot({ dotClass = "bg-green-400", side }: { dotClass?: str
 /** Covers the spine tail from the previous card that extends into the space below
  *  the last card's icon. Bounded by the flex-1 parent (which spans from the icon's
  *  bottom to the card's bottom) so it never bleeds past the card boundary. */
-function SpineTrailingMask() {
+function SpineTrailingMask({ ground = "var(--background)" }: { ground?: string }) {
   return (
     <div
       className="absolute left-1/2 -translate-x-1/2 z-10"
-      style={{ top: 0, bottom: 0, width: 12, backgroundColor: "var(--background)" }}
+      style={{ top: 0, bottom: 0, width: 12, backgroundColor: ground }}
     />
   );
 }
@@ -746,11 +775,11 @@ function SpineTrailingMask() {
  *  column's top padding), so nothing reaches down into a spine terminus —
  *  a first row draws no line above itself, whatever stands there. The tip's lead-in sits
  *  above this mask (z-20) when this row is also the newest. */
-function SpineLeadingMask() {
+function SpineLeadingMask({ ground = "var(--background)" }: { ground?: string }) {
   return (
     <div
       className="absolute left-1/2 -translate-x-1/2 z-10"
-      style={{ top: 0, height: 16, width: 12, backgroundColor: "var(--background)" }}
+      style={{ top: 0, height: 16, width: 12, backgroundColor: ground }}
     />
   );
 }
@@ -769,50 +798,73 @@ function spokenLegs(rows: SpineTokenRow[], unreadOf: ReturnType<typeof useUnread
   return legs.length ? legs.join(", ") : null;
 }
 
-/** The spine view's spoken legs for a warning node: "cleared 0.631 WETH,
- *  reduced 1,177 BOLD". */
-function spokenWarningLegs(
-  legs: { left?: SpineWarningLeg; right?: SpineWarningLeg },
-  unreadOf: ReturnType<typeof useUnreadTokenOf>,
-): string | null {
-  const said = [legs.left, legs.right].flatMap((l) =>
-    l && !unreadOf(l.address, l.symbol) && isFinite(l.value) && l.value !== 0
-      ? [`${l.label.toLowerCase()} ${spokenAmount(l.value)} ${l.symbol}`]
+/** The spine view's spoken legs for a warning node: "0.631 WETH cleared,
+ *  1,177 BOLD reduced". */
+function spokenWarningLegs(legs: SpineWarningLeg[], unreadOf: ReturnType<typeof useUnreadTokenOf>): string | null {
+  const said = legs.flatMap((l) =>
+    !unreadOf(l.address, l.symbol) && isFinite(l.value) && l.value !== 0
+      ? [`${spokenAmount(Math.abs(l.value))} ${l.symbol}${l.label ? ` ${l.label.toLowerCase()}` : ""}`]
       : [],
   );
   return said.length ? said.join(", ") : null;
 }
 
-/** A warning node's flank in the phone spine view — the header's lozenge
- *  ("Cleared 0.631 ◆") beside the triangle. */
-function WarningLegCell({
-  leg,
-  side,
+/** A warning event's legs, one node each: the token, "→", and the magnitude
+ *  in the event's tone. Both point out of the position — the collateral left
+ *  it and the debt was cleared — so a redemption reads as a withdraw plus a
+ *  repay. */
+function WarningLegNodes({
+  legs,
   tone,
+  showValues,
+  filterable,
 }: {
-  leg: SpineWarningLeg | undefined;
-  side: "left" | "right";
+  legs: SpineWarningLeg[];
   tone: WarningTone;
+  showValues: boolean;
+  filterable: boolean;
 }) {
+  const scale = useTimelineScale();
   const unreadOf = useUnreadTokenOf();
-  if (!leg || !isFinite(leg.value) || leg.value === 0 || unreadOf(leg.address, leg.symbol)) return <span />;
-  const txt = fmtSpine(Math.abs(leg.value));
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap text-sm ${side === "left" ? "justify-self-end pr-3" : "justify-self-start pl-3"}`}
-    >
-      <span className={WARNING_LEG_LABEL_CLASSES[tone]}>{leg.label}</span>
-      <span className="font-semibold text-foreground">
-        {leg.prov ? (
-          <Prov echo info={leg.prov.info} value={leg.prov.value} symbol={leg.prov.symbol}>
-            {txt}
-          </Prov>
-        ) : (
-          txt
-        )}
-      </span>
-      <TokenChipIcon symbol={leg.symbol} address={leg.address} size={16} filterable={false} />
-    </span>
+    <div className="flex flex-col gap-y-1 items-center" data-spine-legs={legs.length}>
+      {legs.map((leg, i) => {
+        // A token whose decimals did not load keeps its node and states no figure.
+        const txt =
+          showValues && isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
+            ? fmtHeaderMagnitude(Math.abs(leg.value), leg.symbol)
+            : "";
+        return (
+          <div
+            key={i}
+            className="grid items-center justify-items-center"
+            style={{ gridTemplateColumns: scale.gridCols }}
+            data-spine-leg=""
+          >
+            <span />
+            <span />
+            <TokenChipIcon symbol={leg.symbol} address={leg.address} size={scale.tokenSize} filterable={filterable} />
+            <ArrowFromDot direction="right" size={scale.arrowSize} />
+            {txt ? (
+              <span
+                className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
+                data-spine-leg-value=""
+              >
+                {leg.prov ? (
+                  <Prov echo info={leg.prov.info} value={leg.prov.value} symbol={leg.prov.symbol}>
+                    {txt}
+                  </Prov>
+                ) : (
+                  txt
+                )}
+              </span>
+            ) : (
+              <span />
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -851,19 +903,24 @@ export function SpineColumn({
   // and the card's segment button is the only control: the chips drop their
   // filter, and the card stops the pointer reaching the flank values.
   const spineRow = useSpineRow();
+  // A warning node's legs: the card's own, else the ones its header published.
+  const publishedLegs = useContext(SpineLegsContext)?.legs ?? null;
+  const adverseLegs = icon === "warning" ? (warningLegs ?? publishedLegs) : null;
   const legs = !spineRow
     ? null
     : !icon && tokens?.length
       ? spokenLegs(tokens, unreadOf)
-      : icon === "warning" && warningLegs
-        ? spokenWarningLegs(warningLegs, unreadOf)
+      : adverseLegs?.length
+        ? spokenWarningLegs(adverseLegs, unreadOf)
         : null;
   const setLegs = spineRow?.setLegs;
   useEffect(() => {
     setLegs?.(legs);
   }, [setLegs, legs]);
   const captionEl = spineRow && (
-    <div className="relative z-10 flex justify-center pt-1.5 pb-2.5">{spineRow.caption}</div>
+    <div className="relative z-10 flex justify-center pt-1.5 pb-2.5" data-spine-caption="">
+      {spineRow.caption}
+    </div>
   );
   // ── The spine is never empty; the icon states WHY there is no flow ────────
   //
@@ -887,9 +944,11 @@ export function SpineColumn({
   // still rides the provenance trace). The ≥sm / <sm hand-off to the card header
   // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
   const spineValues = showTimelineValues;
-  // A warning node draws its amounts on the flanks in the phone spine view
-  // only; on desktop the header beside the spine carries them.
-  const showWarningLegs = !!spineRow && spineValues && !!warningLegs;
+  // A named warning event (a redemption, a liquidation) stands on the band
+  // (EventCard), so its masks and the node's halo take the band's ground; the
+  // phone spine view draws no band.
+  const banded = effectiveIcon === "warning" && !!warningLabel;
+  const ground = banded && !spineRow ? "var(--surface-band)" : "var(--background)";
 
   // For warning events the spine + lead-in dot inherit the warning tone so the
   // whole dotted segment reads as caution (orange) / critical (red, liquidation).
@@ -960,45 +1019,30 @@ export function SpineColumn({
       </div>
     </div>
   );
-  const leadingMask = isFirst && !detached && <SpineLeadingMask />;
+  const leadingMask = isFirst && !detached && <SpineLeadingMask ground={ground} />;
 
   // Icon override mode — no token icons, just a semantic icon
   if (effectiveIcon) {
     const iconContent = (() => {
       switch (effectiveIcon) {
-        case "warning":
-          return (
-            <div className="flex flex-col items-center gap-1">
-              <div
-                className="grid grid-rows-1 items-center justify-items-center"
-                style={{ gridTemplateColumns: scale.gridCols }}
-              >
-                {showWarningLegs ? <WarningLegCell leg={warningLegs.left} side="left" tone={warningTone} /> : <span />}
-                <span />
-                <WarningIcon size={scale.tokenSize} color={SPINE_COLORS[warningTone]} />
-                <span />
-                {showWarningLegs ? (
-                  <WarningLegCell leg={warningLegs.right} side="right" tone={warningTone} />
-                ) : (
-                  <span />
-                )}
-              </div>
-              {/* The phone spine view's caption names the kind below the node,
-                  so the pill stays on desktop only. */}
-              {warningLabel &&
-                !spineRow &&
-                (() => {
-                  const pill = (
-                    <span
-                      className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide leading-none whitespace-nowrap ${WARNING_PILL_CLASSES[warningTone]}`}
-                    >
-                      {warningLabel}
-                    </span>
-                  );
-                  return warningTip ? <RevealTip tip={warningTip}>{pill}</RevealTip> : pill;
-                })()}
+        case "warning": {
+          // The legs as nodes; the triangle only where the event names none.
+          const node = adverseLegs?.length ? (
+            <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!spineRow} />
+          ) : (
+            <div
+              className="grid grid-rows-1 items-center justify-items-center"
+              style={{ gridTemplateColumns: scale.gridCols }}
+            >
+              <span />
+              <span />
+              <WarningIcon size={scale.tokenSize} color={SPINE_COLORS[warningTone]} />
+              <span />
+              <span />
             </div>
           );
+          return warningTip ? <RevealTip tip={warningTip}>{node}</RevealTip> : node;
+        }
         case "rate-change":
           return (
             <div
@@ -1382,20 +1426,22 @@ export function SpineColumn({
     })();
 
     return (
-      <div className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch">
+      <div
+        className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
+        // EventCard draws the band on a row whose spine carries this.
+        data-spine-adverse={banded ? warningTone : undefined}
+      >
         {leadingMask}
         <div
           className="relative z-10"
-          style={
-            detached ? undefined : { backgroundColor: "var(--background)", boxShadow: "0 0 0 4px var(--background)" }
-          }
+          style={detached ? undefined : { backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}` }}
         >
           {leadIn}
           {iconContent}
         </div>
         <div className="flex-1 relative">
           {spineEl}
-          {isLast && !detached && <SpineTrailingMask />}
+          {isLast && !detached && <SpineTrailingMask ground={ground} />}
           {tipBelow}
           {captionEl}
         </div>

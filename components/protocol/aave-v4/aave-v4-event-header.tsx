@@ -4,6 +4,7 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatExact } from "@/lib/utils/format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
+import { usePublishSpineLegs, WARNING_TONE_TEXT } from "@/components/shared/spine-column";
 import { EventTime } from "@/components/shared/event-time";
 import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -134,7 +135,7 @@ export function AaveV4EventHeader({
   // A third-party action is NOT passive: the spine badges the token flow rather
   // than replacing it (SpineColumn `externalParty`), so the amount hands off to
   // the flank exactly as an owner-acted row's does. See chain-truth-event.tsx.
-  const hideVal = useHeaderValueHideClass({ isPassive: ctx.eventType === "liquidation" });
+  const hideVal = useHeaderValueHideClass();
   const { showInterestRates, showTickerLabels } = useTimelineDisplay();
   // The symbol beside each icon, under the Display menu's ticker-label toggle
   // (the same switch the opened card's rows follow).
@@ -143,6 +144,67 @@ export function AaveV4EventHeader({
   // Concrete coordinates for the amount provenance. `asset` is filled per-Prov
   // below (liquidation's two legs concern different reserves).
   const coord = { spokeName: ctx.spokeName, spokeAddress: ctx.spokeAddress, txHash, blockNumber };
+
+  // A liquidation's two legs — the collateral seized, the debt repaid — each
+  // with its receipt; the spine draws them as nodes and echoes these.
+  const isLiq = ctx.eventType === "liquidation";
+  const seized =
+    isLiq && ctx.liquidatedCollateralAmount && ctx.collateralSymbol
+      ? {
+          n: Number(ctx.liquidatedCollateralAmount),
+          symbol: ctx.collateralSymbol,
+          info: eventLogProv(
+            "Collateral seized in the liquidation",
+            "collateralAmountRemoved",
+            {
+              ...coord,
+              asset: ctx.collateralSymbol,
+              raw: ctx.raw?.liquidatedCollateralAmount,
+              origin: ctx.origin?.liquidatedCollateralAmount,
+            },
+            "LiquidationCall",
+          ),
+        }
+      : null;
+  const repaid =
+    isLiq && ctx.debtToCover
+      ? {
+          n: Number(ctx.debtToCover),
+          symbol: ctx.reserveSymbol ?? "???",
+          info: eventLogProv(
+            "Debt repaid by the liquidation",
+            "debtAmountRestored",
+            { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
+            "LiquidationCall",
+          ),
+        }
+      : null;
+  usePublishSpineLegs(
+    isLiq
+      ? [
+          ...(seized
+            ? [
+                {
+                  label: "Seized",
+                  value: seized.n,
+                  symbol: seized.symbol,
+                  prov: { info: seized.info, value: formatExact(seized.n), symbol: seized.symbol },
+                },
+              ]
+            : []),
+          ...(repaid
+            ? [
+                {
+                  label: "Repaid",
+                  value: repaid.n,
+                  symbol: repaid.symbol,
+                  prov: { info: repaid.info, value: formatExact(repaid.n), symbol: ctx.reserveSymbol ?? undefined },
+                },
+              ]
+            : []),
+        ]
+      : null,
+  );
 
   // For collateral toggle, show enable/disable
   const label = ctx.eventType === "collateral_toggle" ? (ctx.enabled ? "Enable" : "Disable") : style.label;
@@ -172,12 +234,9 @@ export function AaveV4EventHeader({
             </span>
             <span className="text-sm text-rb-500">Supply</span>
           </>
-        ) : style.badge ? (
-          // The dotted spine now carries a "LIQUIDATION" pill on desktop, so the
-          // header badge is redundant there — keep it only on mobile (no spine).
-          <span
-            className={`sm:hidden inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-          >
+        ) : isLiq ? (
+          // T1 reads the word in the critical red; the spine draws the legs.
+          <span className={`text-sm ${WARNING_TONE_TEXT.critical}`} data-adverse-word="">
             {label}
           </span>
         ) : (
@@ -189,58 +248,35 @@ export function AaveV4EventHeader({
           // The verbs are the Aave V3 liquidation run's (lib/aave-v3/timeline-runs.tsx),
           // and neither reuses "cleared", which the card's prose keeps for the debt.
           <>
-            {ctx.liquidatedCollateralAmount && ctx.collateralSymbol && (
-              <span className="inline-flex items-center gap-1.5 text-sm">
+            {seized && (
+              <span className={`inline-flex items-center gap-1.5 text-sm ${hideVal}`}>
                 <span className="text-rb-500">Seized</span>
-                <span className={`font-bold text-foreground ${hideVal}`}>
-                  <Prov
-                    value={formatExact(Number(ctx.liquidatedCollateralAmount))}
-                    symbol={ctx.collateralSymbol}
-                    info={eventLogProv(
-                      "Collateral seized in the liquidation",
-                      "collateralAmountRemoved",
-                      {
-                        ...coord,
-                        asset: ctx.collateralSymbol,
-                        raw: ctx.raw?.liquidatedCollateralAmount,
-                        origin: ctx.origin?.liquidatedCollateralAmount,
-                      },
-                      "LiquidationCall",
-                    )}
-                  >
+                <span className="font-bold text-foreground">
+                  <Prov value={formatExact(seized.n)} symbol={seized.symbol} info={seized.info}>
                     <ExactTip
-                      text={fmtHeaderMagnitude(Number(ctx.liquidatedCollateralAmount), ctx.collateralSymbol)}
-                      exact={formatExact(Number(ctx.liquidatedCollateralAmount))}
-                      symbol={ctx.collateralSymbol ?? undefined}
+                      text={fmtHeaderMagnitude(seized.n, seized.symbol)}
+                      exact={formatExact(seized.n)}
+                      symbol={seized.symbol}
                     />
                   </Prov>
                 </span>
-                <TokenChipIcon symbol={ctx.collateralSymbol} size={16} />
-                {ticker(ctx.collateralSymbol)}
+                <TokenChipIcon symbol={seized.symbol} size={16} />
+                {ticker(seized.symbol)}
               </span>
             )}
-            {ctx.debtToCover && (
-              <span className="inline-flex items-center gap-1.5 text-sm">
+            {repaid && (
+              <span className={`inline-flex items-center gap-1.5 text-sm ${hideVal}`}>
                 <span className="text-rb-500">Repaid</span>
-                <span className={`font-bold text-foreground ${hideVal}`}>
-                  <Prov
-                    value={formatExact(Number(ctx.debtToCover))}
-                    symbol={ctx.reserveSymbol}
-                    info={eventLogProv(
-                      "Debt repaid by the liquidation",
-                      "debtAmountRestored",
-                      { ...coord, asset: ctx.reserveSymbol, raw: ctx.raw?.amount, origin: ctx.origin?.amount },
-                      "LiquidationCall",
-                    )}
-                  >
+                <span className="font-bold text-foreground">
+                  <Prov value={formatExact(repaid.n)} symbol={ctx.reserveSymbol} info={repaid.info}>
                     <ExactTip
-                      text={fmtHeaderMagnitude(Number(ctx.debtToCover), ctx.reserveSymbol)}
-                      exact={formatExact(Number(ctx.debtToCover))}
+                      text={fmtHeaderMagnitude(repaid.n, ctx.reserveSymbol)}
+                      exact={formatExact(repaid.n)}
                       symbol={ctx.reserveSymbol ?? undefined}
                     />
                   </Prov>
                 </span>
-                <TokenChipIcon symbol={ctx.reserveSymbol ?? "???"} size={16} />
+                <TokenChipIcon symbol={repaid.symbol} size={16} />
                 {ticker(ctx.reserveSymbol)}
               </span>
             )}

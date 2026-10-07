@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { SpineColumn, type SpineWarningLeg } from "@/components/shared/spine-column";
 import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
@@ -104,10 +104,10 @@ export function LiquityEventCard({
     );
 
   // Column 2 — Spine column with semantic icon modes
-  const PASSIVE_ACTIONS = new Set(["redeemCollateral", "liquidate", "applyPendingDebt"]);
+  const WARNING_ACTIONS = new Set(["redeemCollateral", "liquidate", "applyPendingDebt"]);
   const RATE_ACTIONS = new Set(["adjustTroveInterestRate", "setBatchManagerAnnualInterestRate"]);
   const DELEGATE_ACTIONS = new Set(["setInterestBatchManager", "removeFromBatch"]);
-  const isPassive = PASSIVE_ACTIONS.has(ctx.operation);
+  const isWarning = WARNING_ACTIONS.has(ctx.operation);
   const isRateChange = RATE_ACTIONS.has(ctx.operation);
   const isDelegate = DELEGATE_ACTIONS.has(ctx.operation);
 
@@ -117,47 +117,44 @@ export function LiquityEventCard({
   const isJoin = isDelegate ? ctx.operation === "setInterestBatchManager" : false;
 
   const isRedemption = ctx.operation === "redeemCollateral";
-  // A redemption's amounts, worded and ordered as the header words them, for
-  // the phone spine view's flanks: debt "Cleared" left, collateral "Reduced"
-  // right. The same change receipts the header's figures trace.
-  const redemptionLegs = (() => {
-    if (!isRedemption) return undefined;
+  const isLiquidation = ctx.operation === "liquidate";
+  // A redemption's or a liquidation's legs, drawn as two nodes on the spine:
+  // the collateral that left the Trove, then the debt it cleared. The same
+  // change receipts the header's figures trace.
+  const warningLegs = (() => {
+    if (!isRedemption && !isLiquidation) return undefined;
     const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
     const collCp = collChangeProv(ctx, coords);
     const debtCp = debtChangeProv(ctx, coords);
     const debtSym = ctx.assetType ?? "BOLD";
-    return {
-      left:
-        debtCp && Math.abs(debtCp.change) >= 0.01
-          ? {
-              label: L1_WORDS.cleared,
-              value: Math.abs(debtCp.change),
-              symbol: debtSym,
-              address: soleFlowAddress(event.flows, debtSym),
-              prov: debtCp,
-            }
-          : undefined,
-      right:
-        collCp && Math.abs(collCp.change) >= 0.01
-          ? {
-              label: L1_WORDS.reduced,
-              value: Math.abs(collCp.change),
-              symbol: ctx.collateralType,
-              address: soleFlowAddress(event.flows, ctx.collateralType),
-              prov: collCp,
-            }
-          : undefined,
-    };
+    const legs: SpineWarningLeg[] = [];
+    if (collCp && Math.abs(collCp.change) >= 0.01)
+      legs.push({
+        label: isRedemption ? L1_WORDS.reduced : L1_WORDS.liquidated,
+        value: Math.abs(collCp.change),
+        symbol: ctx.collateralType,
+        address: soleFlowAddress(event.flows, ctx.collateralType),
+        prov: collCp,
+      });
+    if (debtCp && Math.abs(debtCp.change) >= 0.01)
+      legs.push({
+        label: L1_WORDS.cleared,
+        value: Math.abs(debtCp.change),
+        symbol: debtSym,
+        address: soleFlowAddress(event.flows, debtSym),
+        prov: debtCp,
+      });
+    return legs;
   })();
 
-  const iconSlot = isPassive ? (
+  const iconSlot = isWarning ? (
     // A redemption changes the Trove without the owner acting: caution
     // (color-grammar.md §5). Liquidation stays critical red.
     <SpineColumn
       icon="warning"
       warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
       warningLabel={ctx.operation === "liquidate" ? "Liquidation" : isRedemption ? "Redemption" : undefined}
-      warningLegs={redemptionLegs}
+      warningLegs={warningLegs}
       spine="dotted"
       isFirst={isFirst}
       isLast={!!isLast}

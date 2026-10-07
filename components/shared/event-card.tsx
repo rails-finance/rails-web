@@ -22,6 +22,7 @@ import { EventCaptionContext, SpineSegment, useSpineView } from "@/components/sh
 import { EventDateContext } from "@/components/shared/event-time";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
+import { SpineLegsContext, useSpineLegsState } from "@/components/shared/spine-column";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -155,6 +156,8 @@ export function EventCard({
   // opens under it, one card open on the timeline at a time (a card with no
   // panel opens to its header). Run and folder rows draw their own segment
   // (`TimelineRunCard`), so a card that hides its chevron is not one here.
+  // A warning event's legs, handed from the header to the spine.
+  const spineLegs = useSpineLegsState();
   const spineView = useSpineView();
   const captionCtx = useContext(EventCaptionContext);
   const reactId = useId();
@@ -449,63 +452,73 @@ export function EventCard({
     const kind = caption ?? captionCtx.kind;
     const date = `${shortDate(captionCtx.ts)} ${shortDateYear(captionCtx.ts)}`;
     return (
-      <PriceBasisProvider>
-        <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-          <SpineSegment
-            wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
-            caption={
-              <>
-                {kind} &middot; {date}
-              </>
-            }
-            spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
-            open={spineOpen}
-            onToggle={(anchor) => spine.toggle(cardId, anchor)}
-            iconColumn={iconColumn}
-            cardKey={cardId}
-            card={
-              // The opened card states its date in full: the caption above it
-              // drops the time, and the list's once-a-day prefix does not apply
-              // to a card read alone.
-              <EventDateContext.Provider value={date}>{contentTiers}</EventDateContext.Provider>
-            }
-          />
-        </ProvReceiptsScope>
-      </PriceBasisProvider>
+      <SpineLegsContext.Provider value={spineLegs}>
+        <PriceBasisProvider>
+          <ProvReceiptsScope registry={registry} scopeId={scopeId}>
+            <SpineSegment
+              wrapperProps={{ "data-skel-section": "detail-event", "data-prov-scope": scopeId }}
+              caption={
+                <>
+                  {kind} &middot; {date}
+                </>
+              }
+              spokenCaption={`${kind}, ${formatDate(captionCtx.ts)}`}
+              open={spineOpen}
+              onToggle={(anchor) => spine.toggle(cardId, anchor)}
+              iconColumn={iconColumn}
+              cardKey={cardId}
+              card={
+                // The opened card states its date in full: the caption above it
+                // drops the time, and the list's once-a-day prefix does not apply
+                // to a card read alone.
+                <EventDateContext.Provider value={date}>{contentTiers}</EventDateContext.Provider>
+              }
+            />
+          </ProvReceiptsScope>
+        </PriceBasisProvider>
+      </SpineLegsContext.Provider>
     );
   }
 
   return (
-    <PriceBasisProvider>
-      <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-        {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
+    <SpineLegsContext.Provider value={spineLegs}>
+      <PriceBasisProvider>
+        <ProvReceiptsScope registry={registry} scopeId={scopeId}>
+          {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. */}
-        <div
-          data-skel-section="detail-event"
-          data-prov-scope={scopeId}
-          className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded}${
-            muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
-          }`}
-          style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
-        >
-          {showAvatar && avatar}
-          {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
+          <div
+            data-skel-section="detail-event"
+            data-prov-scope={scopeId}
+            // The band: a redemption's or a liquidation's row stands on the
+            // surface one step lighter than the page, flank to right edge,
+            // closed and open (its spine column carries `data-spine-adverse`).
+            className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded} has-[>[data-anatomy=L3]>[data-spine-adverse]]:bg-band ${
+              muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
+            }`}
+            style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+          >
+            {showAvatar && avatar}
+            {/* Spine area — 2/5 width at ≥sm (640px), hidden below (values move into the
             header there). Matches the sm breakpoint the card's own detail grid uses,
             so the spine and the card body reflow together. On the event page the
             column holds `pageAside`, stacked above the card below sm, where the row
             drops its side padding so the paragraph and the card share one width. */}
-          {pageMode ? (
-            <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-              {pageAside}
-            </div>
-          ) : (
-            <div className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center" data-anatomy="L3">
-              {iconColumn}
-            </div>
-          )}
-          {contentTiers}
-        </div>
-      </ProvReceiptsScope>
-    </PriceBasisProvider>
+            {pageMode ? (
+              <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
+                {pageAside}
+              </div>
+            ) : (
+              <div
+                className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
+                data-anatomy="L3"
+              >
+                {iconColumn}
+              </div>
+            )}
+            {contentTiers}
+          </div>
+        </ProvReceiptsScope>
+      </PriceBasisProvider>
+    </SpineLegsContext.Provider>
   );
 }

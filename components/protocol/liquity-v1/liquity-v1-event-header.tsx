@@ -46,7 +46,7 @@ export function LiquityV1EventHeader({
 
   // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
   // "Reduced", both in the caution orange, magnitudes only (the labels carry
-  // direction), and the action name rides the spine's REDEMPTION pill.
+  // direction); the spine draws them as its legs, collateral first.
   const isRedemption = ctx.eventType === "redemption";
 
   // Opens + owner adjusts get V2's per-axis grammar: each axis its own imperative
@@ -78,6 +78,9 @@ export function LiquityV1EventHeader({
         symbol: COLLATERAL_SYMBOL,
         prov: redemptionLegProv(coords, "surplus", legVals),
         label: "Surplus",
+        // Still the owner's, claimable: the spine's legs are what left (the
+        // redeemer's ETH, the debt cleared), so the surplus stays in the head.
+        noSpineCounterpart: true,
       });
   } else if (coll !== 0)
     deltas.push({
