@@ -1188,6 +1188,7 @@ function AaveV4SpokeTowerBlock({
               with its figures — beside route-icon Provenance, the receipts list
               for the breakdown figures. */}
           <ProvenanceInfoTabs
+            label="Lifetime flows explanation"
             rowExtra={flowTimeline != null && flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
             explanation={
               <div className="space-y-2 text-sm text-rb-500">

@@ -38,8 +38,8 @@ import {
   TransitionArrow,
   changeTone,
 } from "@/components/shared/state-transition";
-import { ClosedTokens } from "@/components/shared/event-ledger";
-import { eventPriceText } from "@/lib/shared/usd-display";
+import { ClosedTokens, usdAt } from "@/components/shared/event-ledger";
+import { todayUsdProv, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AmountText } from "@/components/shared/amount-text";
 import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
@@ -255,6 +255,29 @@ export function ClosedSide({
 }) {
   const legOf = (r: AaveV3PositionStateReserve) => (side === "supply" ? r.supply : r.debt);
   const rows = state.reserves.filter((r) => r.decimals != null && legHeld(legOf(r)));
+  // A card set to today restates a side over several reserves where each
+  // has a price at the latest block (ui-jobs 283).
+  const todayOf = useTodayBasisPrices();
+  const todayTotal = (when: "before" | "after"): number | null => {
+    let t = 0;
+    let priced = 0;
+    for (const r of rows) {
+      const amount = Number(humanOf(legOf(r)[when], r.decimals!));
+      if (!(amount > 0)) continue;
+      const p = todayOf(reserveSymbol(r));
+      if (p == null) return null;
+      t += amount * p;
+      priced++;
+    }
+    return priced > 0 ? t : null;
+  };
+  const todayFigure = (when: "before" | "after"): Figure | null => {
+    const v = todayTotal(when);
+    const what = `${side === "supply" ? "Collateral" : "Debt"} ${when === "after" ? "after" : "before"} the event`;
+    return v == null
+      ? null
+      : { text: fmtPositionUsd(v), value: v.toFixed(2), prov: todayUsdProv(what, "each reserve") };
+  };
   const afterProvOf = (r: AaveV3PositionStateReserve): Provenance => {
     const sym = reserveSymbol(r);
     const leg = legOf(r);
@@ -307,10 +330,14 @@ export function ClosedSide({
                     ) : (
                       "$0"
                     ),
-                    price:
-                      r.priceBase != null
-                        ? (eventPriceText(Number(humanOf(r.priceBase, 8)), sym) ?? undefined)
-                        : undefined,
+                    ...(r.priceBase != null
+                      ? usdAt({
+                          price: Number(humanOf(r.priceBase, 8)),
+                          symbol: sym,
+                          before: Number(before),
+                          after: Number(after),
+                        })
+                      : {}),
                   }
                 : undefined
             }
@@ -361,6 +388,11 @@ export function ClosedSide({
   }
 
   const icons = rows.filter((r) => big(legOf(r).after) > ZERO && (touched.has(r.reserve) || !isDustRow(r, side)));
+  const todayAfter = usd ? todayFigure("after") : null;
+  if (usd && todayAfter) {
+    const before = usd.before ? todayFigure("before") : null;
+    usd = { before, after: todayAfter, change: null };
+  }
   return (
     <div className="flex flex-col items-end" data-receipt-total={side}>
       <StateTransition>

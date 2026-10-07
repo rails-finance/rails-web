@@ -26,10 +26,11 @@ import {
   StateTransition,
   changeTone,
 } from "@/components/shared/state-transition";
+import { ThenTodayChip } from "@/components/shared/price-basis";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { ClosedTokens, LedgerCell, PendingBar, type ClosedUsdFigures } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell, PendingBar, usdAt, type ClosedUsdFigures } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
+import { usdShown } from "@/lib/shared/usd-display";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
@@ -326,7 +327,12 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
                           {fmtUsd(usdAfter)}
                         </P>
                       ),
-                      price: eventPriceText(price, COLLATERAL_SYMBOL) ?? undefined,
+                      ...usdAt({
+                        price,
+                        symbol: COLLATERAL_SYMBOL,
+                        before: Number(ctx.collBefore),
+                        after: Number(ctx.collAfter),
+                      }),
                     }
                   : undefined
               }
@@ -406,9 +412,13 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
           <StatCard label="ETH price">
             {price != null ? (
               <StateTransition>
-                <P info={eventPriceProv(coords, price)}>
-                  <span className="text-sm font-semibold tabular-nums text-rb-500">{fmtUsd(price)}</span>
-                </P>
+                <span className="text-sm font-semibold tabular-nums text-rb-500">
+                  <ThenTodayChip
+                    symbol={COLLATERAL_SYMBOL}
+                    format={fmtUsd}
+                    then={<P info={eventPriceProv(coords, price)}>{fmtUsd(price)}</P>}
+                  />
+                </span>
                 <TokenChipIcon symbol={COLLATERAL_SYMBOL} size={16} />
               </StateTransition>
             ) : (

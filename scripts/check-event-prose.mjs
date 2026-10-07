@@ -203,11 +203,8 @@ if (fnStart < 0 || switchStart < 0 || sameBlock < 0 || fnEnd < 0)
 for (const m of gen.matchAll(/"(liquity2\.[a-z_.]+)"/g))
   if (!templates.has(m[1])) failIn(GENERATOR, `reads template "${m[1]}", which ${DATA} lacks`);
 
-// Variants: the literal pairs pick() returns, and the three it builds.
+// Variants: the literal pairs pick() returns, and the two it builds.
 const picked = [...gen.matchAll(/id: "(liquity2\.[a-z_.]+)", variant: "([a-z_]+)"/g)].map((m) => [m[1], m[2]]);
-const today = /function redemptionToday[\s\S]*?\): ("[a-z_]+"(?: \| "[a-z_]+")*) \| null/.exec(gen);
-for (const v of today ? [...today[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [])
-  picked.push(["liquity2.redemption", v]);
 // `${c}_${d}`: add or withdraw, borrow or repay.
 if (/variant: `\$\{c\}_\$\{d\}`/.test(gen))
   for (const c of ["add", "withdraw"])

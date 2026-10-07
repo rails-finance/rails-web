@@ -104,7 +104,7 @@ async function explainerTextFor(labelText) {
   const card = page.locator('[data-skel-section="detail-event"]').filter({ hasText: labelText });
   await card.locator('.group\\/evt[role="button"], [role="button"].group\\/evt').first().click();
   await page.waitForTimeout(300);
-  const explainBtn = card.locator('button[aria-label="Show explanation"]').first();
+  const explainBtn = card.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
   if ((await explainBtn.count()) === 0) return null;
   await explainBtn.click();
   await page.waitForTimeout(300);

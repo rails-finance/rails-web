@@ -110,7 +110,7 @@ async function expandCardWithLabel(page, labelRe) {
   await page.click("[data-verify-target]");
 
   // The detail panel loads its own data, and the explainer prose then sits
-  // behind a "Show explanation" toggle — the header expansion alone paints
+  // behind a "Show … explanation" toggle — the header expansion alone paints
   // none of it. Poll rather than guess a settling time.
   let drawer = false;
   for (let i = 0; i < 40 && !drawer; i++) {
@@ -120,14 +120,14 @@ async function expandCardWithLabel(page, labelRe) {
       // The toggle is an icon button — its label lives in aria-label, and
       // innerText alone comes back empty.
       const btn = Array.from(card?.querySelectorAll("button") || []).find((b) =>
-        /show explanation/i.test(`${b.innerText || ""} ${b.getAttribute("aria-label") || ""}`.trim()),
+        /show (event )?explanation/i.test(`${b.innerText || ""} ${b.getAttribute("aria-label") || ""}`.trim()),
       );
       if (!btn) return false;
       btn.click();
       return true;
     }, CARD_SEL);
   }
-  if (!drawer) throw new Error(`the "Show explanation" toggle never appeared on the /${labelRe.source}/ card`);
+  if (!drawer) throw new Error(`the "Show … explanation" toggle never appeared on the /${labelRe.source}/ card`);
   await page.waitForTimeout(700);
 
   return page.evaluate((sel) => {

@@ -127,7 +127,16 @@ export interface LiquityL2 {
   accrual: LiquityAccrual;
   batchFee: BatchFeeAfter | null;
   batched: boolean;
-  redemption: { plHistoric: number; plToday: number | null; showPl: boolean; claimable: number | null } | null;
+  redemption: {
+    plHistoric: number;
+    plToday: number | null;
+    showPl: boolean;
+    claimable: number | null;
+    /** T2's row under the price chip (ui-jobs 283): where the redeemed
+     *  collateral at the latest block's price sits on the other side of the
+     *  debt it paid off. */
+    today: string | null;
+  } | null;
   redeemer: string | null;
   lines: string[];
 }
@@ -529,11 +538,11 @@ function redemptionToday(
   priceToday: number | undefined,
   debtCleared: number,
   collTaken: number,
-): "price_lower_now" | "price_higher_now" | null {
+): "lower" | "higher" | null {
   if (!priceToday || !(priceToday > 0) || fmtUsdWhole(priceToday) === fmtUsdWhole(priceAtEvent)) return null;
   const vsToday = collTaken * priceToday - debtCleared;
-  if (priceToday < priceAtEvent) return vsToday < 0 ? "price_lower_now" : null;
-  return vsToday > 0 ? "price_higher_now" : null;
+  if (priceToday < priceAtEvent) return vsToday < 0 ? "lower" : null;
+  return vsToday > 0 ? "higher" : null;
 }
 
 function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreContent {
@@ -552,7 +561,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const values: Record<string, ProseValue> = {};
   const env: FmtEnv = { values, collDecimals };
   const sel = pick(ctx);
-  let variant = sel.variant;
+  const variant = sel.variant;
   const t = liquityTemplate(sel.id);
   const sp = new Speaker(t, env);
   const v = values;
@@ -763,13 +772,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       if (price > 0) {
         if (num(v.redemption_result_usd) >= 0.5) sp.say("redeem.result");
         else sp.say("redeem.result_no_fee");
-        const today = redemptionToday(price, currentPrice, debtCleared, collTaken);
-        if (today && currentPrice) {
-          variant = today;
-          v.price_today = currentPrice;
-          v.redemption_vs_today_usd = Math.abs(debtCleared - collTaken * currentPrice);
-          sp.say(today === "price_lower_now" ? "redeem.today_lower" : "redeem.today_higher");
-        }
       }
       const zombie = ctx.isZombieTrove;
       const rate = { rate_after: "rate_after" as const };
@@ -1207,12 +1209,27 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     const lost = Math.abs(collChange);
     const plHistoric = cleared - lost * price;
     const plToday = currentPrice ? cleared - lost * currentPrice : null;
+    // The row's figures are the redemption log's, as the explanation's
+    // "A redeemer exchanged …" sentence states them.
+    const r = ctx.redemption;
+    const collTaken = op ? Math.abs(op.collChangeFromOperation) : (r?.ETHSent ?? 0);
+    const debtCleared = op ? Math.abs(op.debtChangeFromOperation) : (r?.actualBoldAmount ?? 0);
+    const todaySide = r ? redemptionToday(price, currentPrice, debtCleared, collTaken) : null;
     redemption = {
       plHistoric,
       plToday: plToday != null && Math.abs(plToday - plHistoric) > 0.01 ? plToday : null,
       showPl: cleared > 0.01,
       claimable: ctx.isZombieTrove && stateAfter.debt === 0 && collAfter > 0 ? collAfter : null,
+      today: null,
     };
+    if (todaySide && currentPrice) {
+      const price_today = currentPrice;
+      const redemption_vs_today_usd = Math.abs(debtCleared - collTaken * currentPrice);
+      redemption.today =
+        todaySide === "lower"
+          ? fillText(L2_WORDS.redemption_today_lower, { price_today, coll_symbol: collSym, redemption_vs_today_usd })
+          : fillText(L2_WORDS.redemption_today_higher, { price_today, coll_symbol: collSym, redemption_vs_today_usd });
+    }
   }
 
   const fig: LiquityL2 = {

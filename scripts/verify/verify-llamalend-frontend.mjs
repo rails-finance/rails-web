@@ -521,7 +521,7 @@ try {
   check("liq detail: no band figures on a closed position (stale ticks withheld)", !/\d+ bands:/.test(body));
 
   // The explainer bullets mount only when a card's detail panel and its
-  // icon-only Explanation tab (aria-label "Show explanation") are opened —
+  // icon-only Explanation tab (aria-label "Show … explanation") are opened —
   // drive the disclosures like a reader would, then assert. Expand every
   // liquidation-family row so both the partial hard-liq and the self-liq
   // explainers are in the DOM.
@@ -535,11 +535,11 @@ try {
         .catch(() => {});
       await page.waitForTimeout(200);
     }
-    // Opening a tab flips its aria-label to "Hide explanation" and reflows the
-    // page — so always click the FIRST remaining "Show explanation", re-located
+    // Opening a tab flips its aria-label to "Hide … explanation" and reflows the
+    // page — so always click the FIRST remaining "Show … explanation", re-located
     // fresh each pass, force-clicked (the icon can sit under the fixed strips).
     for (let pass = 0; pass < 10; pass++) {
-      const tab = page.locator("[aria-label='Show explanation']").first();
+      const tab = page.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       await tab.scrollIntoViewIfNeeded().catch(() => {});
       const ok = await tab
@@ -794,7 +794,7 @@ try {
       await page.waitForTimeout(200);
     }
     for (let pass = 0; pass < 20; pass++) {
-      const tab = page.locator("[aria-label='Show explanation']").first();
+      const tab = page.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })
@@ -916,7 +916,7 @@ try {
     await p4.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
     body = await openAllAndRead(p4);
     for (let pass = 0; pass < 12; pass++) {
-      const tab = p4.locator("[aria-label='Show explanation']").first();
+      const tab = p4.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })
@@ -960,7 +960,7 @@ try {
     await p5.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
     body = await openAllAndRead(p5);
     for (let pass = 0; pass < 12; pass++) {
-      const tab = p5.locator("[aria-label='Show explanation']").first();
+      const tab = p5.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })

@@ -21,7 +21,7 @@ import { armInspector } from "./lib/prov-inspector.mjs";
 /** The price chip sits behind the card's (i) (rails-ops TO-DO-ui-jobs 141):
  *  open it before reading the chip. */
 async function openInfo(card) {
-  const b = card.locator('button[aria-label="Show explanation"]').first();
+  const b = card.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
   if (await b.count()) {
     await b.click();
     await card.page().waitForTimeout(300);

@@ -37,8 +37,12 @@ import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import { StatCard, TransitionArrow } from "@/components/shared/state-transition";
 import { EventLedgerContext, LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
+import { todayUsdProv, useTodayBasisPrice, useTodayBasisPrices } from "@/components/shared/price-basis";
+import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
+import { eventPriceText, offPar, todayPriceText, type OffPar } from "@/lib/shared/usd-display";
+import { wholeUsd } from "@/lib/shared/flows-sum";
 import { eventCum, type EventCum } from "@/lib/shared/flow-focus";
-import { dayCloseNote, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
+import { dayCloseNote, ledgerAtPrice, ledgerDayStamp, type Ledger, type LedgerRow } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import {
   flowAssetProv,
@@ -332,6 +336,41 @@ export interface ClosedUsdFigures {
   after: ReactNode;
   /** The price line, e.g. "At the event\u2019s price, $2,431.20 per ETH". */
   price?: ReactNode;
+  /** The token the figures value, its price at the event and the amounts:
+   *  a dollar stablecoin off par states its price (`offPar`), and a card set
+   *  to today restates the figures at the latest block's price (ui-jobs 283). */
+  at?: UsdAt;
+}
+
+export interface UsdAt {
+  symbol: string;
+  price: number | null | undefined;
+  before?: number | null;
+  after?: number | null;
+}
+
+/** Spread into a cell's `usd`: the price line and what `at` carries. */
+export function usdAt(at: UsdAt): Pick<ClosedUsdFigures, "price" | "at"> {
+  return { price: eventPriceText(at.price, at.symbol) ?? undefined, at };
+}
+
+/** The figures as the card's price basis draws them, and the band they take. */
+function useUsdFigures(usd: ClosedUsdFigures | undefined): (ClosedUsdFigures & { off: OffPar | null }) | undefined {
+  const today = useTodayBasisPrice(usd?.at?.symbol);
+  if (!usd) return undefined;
+  const at = usd.at;
+  if (!at || today == null || at.after == null) return { ...usd, off: offPar(at?.price, at?.symbol) };
+  const fig = (amount: number, when: string) => (
+    <Prov info={todayUsdProv(`${at.symbol} ${when}`, at.symbol)}>{wholeUsd(amount * today)}</Prov>
+  );
+  const beforeShown = usd.before != null && at.before != null;
+  return {
+    before: beforeShown ? fig(at.before as number, "before the event") : null,
+    after: fig(at.after, "after the event"),
+    price: todayPriceText(today, at.symbol) ?? undefined,
+    at,
+    off: offPar(today, at.symbol),
+  };
 }
 
 /** A closed ledger cell's tokens, before → after, kept on one line. `usd` is
@@ -339,8 +378,9 @@ export interface ClosedUsdFigures {
  *  thin divider; in a cell that opens into a ledger the cell's text stays
  *  tokens and the dollars are a rich tooltip on hover and keyboard focus of
  *  the figure (a tap on touch), with the price they stand at (ui-jobs 296). */
-export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: ClosedUsdFigures }) {
+export function ClosedTokens({ children, usd: given }: { children: ReactNode; usd?: ClosedUsdFigures }) {
   const drawn = useContext(ClosedUsdContext);
+  const usd = useUsdFigures(given);
   const tokens = <span className="inline-flex items-center gap-1 whitespace-nowrap">{children}</span>;
   if (!usd) return tokens;
   if (drawn)
@@ -361,11 +401,11 @@ export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: Clo
               <span className="inline-flex items-center gap-1 text-sm font-semibold">
                 {usd.before != null && (
                   <>
-                    {usd.before}
+                    <span className={usd.off?.band ? OFF_PAR_BAND : undefined}>{usd.before}</span>
                     <TransitionArrow size="sm" />
                   </>
                 )}
-                {usd.after}
+                <OffParFigure off={usd.off}>{usd.after}</OffParFigure>
               </span>
               <span className="text-rb-500">{usd.price ?? "At the event\u2019s price"}</span>
             </span>
@@ -384,7 +424,7 @@ export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: Clo
  *  and dollars do not share a line: the dollars take the line under the
  *  tokens, set right, with no divider. A cell that opens into a ledger draws
  *  none: the ledger's USD column states them (ui-jobs 289). */
-function ClosedUsd({ before, after }: ClosedUsdFigures) {
+function ClosedUsd({ before, after, off }: ClosedUsdFigures & { off: OffPar | null }) {
   return (
     <span
       className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"
@@ -392,11 +432,11 @@ function ClosedUsd({ before, after }: ClosedUsdFigures) {
     >
       {before != null && (
         <span className="inline-flex items-center gap-1" data-ledger-closed-usd-before="">
-          {before}
+          <span className={off?.band ? OFF_PAR_BAND : undefined}>{before}</span>
           <TransitionArrow size="sm" />
         </span>
       )}
-      {after}
+      <OffParFigure off={off}>{after}</OffParFigure>
     </span>
   );
 }
@@ -529,7 +569,7 @@ export interface LedgerProvs {
 
 /** One ledger's rows, a rule and its total line, as cells of a LedgerGrid. */
 function LedgerRows({
-  ledger,
+  ledger: given,
   cols,
   name,
   at,
@@ -539,9 +579,13 @@ function LedgerRows({
   provs,
   daily = false,
   spaced = false,
+  atEvent = false,
 }: {
   ledger: Ledger;
   cols: Cols;
+  /** Keep the event's prices whatever the card's basis (a side whose assets
+   *  are not all priced today). */
+  atEvent?: boolean;
   /** A gap above the rows (a ledger after another). */
   spaced?: boolean;
   name: string;
@@ -552,8 +596,17 @@ function LedgerRows({
   provs?: LedgerProvs;
   daily?: boolean;
 }) {
+  // A card set to today restates the ledger at the latest block's price
+  // (lib/shared/event-ledger.ts `ledgerAtPrice`).
+  const today = useTodayBasisPrice(given.symbol);
+  const ledger = (today != null && !atEvent ? ledgerAtPrice(given, today) : null) ?? given;
+  const off = offPar(ledger.price, ledger.symbol);
   const side = ledger.side;
   totalUsdProv = provs?.totalUsd ?? totalUsdProv;
+  if (ledger !== given && ledger.symbol) {
+    totalUsdProv = todayUsdProv(`${name}, ${ledger.symbol} held,`, ledger.symbol);
+    totalUsdBeforeProv = todayUsdProv(`${name}, ${ledger.symbol} held before the event,`, ledger.symbol);
+  }
   const { two, hideTok, hideUsd } = cols;
   const unit = ledger.symbol ?? "USD";
   const tokenProv = (r: LedgerRow): Provenance =>
@@ -695,7 +748,9 @@ function LedgerRows({
           <span className={`self-end whitespace-nowrap py-1 text-right ${USD_CELL} ${hideUsd}`} data-ledger-usd="">
             {ledger.usd && (
               <span className="text-rb-500">
-                {totalUsdProv ? <Prov info={totalUsdProv}>{ledger.usd.after}</Prov> : ledger.usd.after}
+                <OffParFigure off={off}>
+                  {totalUsdProv ? <Prov info={totalUsdProv}>{ledger.usd.after}</Prov> : ledger.usd.after}
+                </OffParFigure>
               </span>
             )}
           </span>
@@ -779,6 +834,31 @@ export function AssetLedgers({
     shown.some((a) => !!a.symbol),
   );
   const held = side === "collateral" ? "Held" : "Owed";
+  // Set to today, the side restates only where every priced asset has a
+  // price today; its total is then the assets' dollars at those prices.
+  const todayOf = useTodayBasisPrices();
+  const priced = shown.filter((a) => a.usd != null);
+  const repriced = priced.map((a) => {
+    const p = todayOf(a.symbol);
+    return p != null ? ledgerAtPrice(a, p) : null;
+  });
+  const allToday = priced.length > 0 && repriced.every((l) => l != null);
+  if (usd && allToday) {
+    const dollars = repriced.reduce((t, l) => t + (l?.usd?.dollars ?? 0), 0);
+    // Before the event: each asset's tokens less the event's rows.
+    const before = priced.reduce((t, a) => {
+      if (!a.tokens || a.decimals == null) return t;
+      const moved = a.rows.reduce((m, r) => m + (r.role === "event" ? (r.tokens?.units ?? 0) : 0), 0);
+      return t + ((a.tokens.units - moved) / 10 ** a.decimals) * (todayOf(a.symbol) ?? 0);
+    }, 0);
+    usd = {
+      before: usd.before != null && Math.round(before) !== dollars ? wholeUsd(before) : null,
+      after: wholeUsd(dollars),
+      dollars,
+    };
+    totalUsdProv = todayUsdProv(`${SIDE_NAME[side]}, the assets held,`, "each asset");
+    totalUsdBeforeProv = todayUsdProv(`${SIDE_NAME[side]}, the assets held before the event,`, "each asset");
+  }
   return (
     <div data-ledger-assets={side}>
       <LedgerGrid cols={cols}>
@@ -787,6 +867,7 @@ export function AssetLedgers({
             key={a.symbol}
             spaced={i > 0}
             ledger={a}
+            atEvent={!allToday}
             cols={cols}
             name={held}
             at={at}

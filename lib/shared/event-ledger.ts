@@ -73,6 +73,9 @@ export interface Ledger {
    *  the side, and after. */
   tokens: { before: string | null; after: string; units: number } | null;
   usd: { before: string | null; after: string; dollars: number } | null;
+  /** The token's price at the event, where the builder is given it: the
+   *  off-par stablecoin rule reads it (lib/shared/usd-display.ts). */
+  price?: number | null;
 }
 
 /** A dollar line of the side, as flow-focus prints it. */
@@ -171,6 +174,7 @@ export function tokenLedger({
   usd,
   symbolFilter,
   accrualLabel,
+  price,
 }: {
   model: FlowModel;
   side: FlowSide;
@@ -184,6 +188,8 @@ export function tokenLedger({
    *  move (Liquity V2's debt): a line the accrual alone moved splits into its
    *  earlier part and this row, which the function names by the line's key. */
   accrualLabel?: (key: string) => string;
+  /** The token's price at the event. */
+  price?: number | null;
 }): Ledger {
   const scale = 10 ** sum.decimals;
   const bucketOf = (k: string) => model.buckets.find((b) => b.key === k);
@@ -291,6 +297,7 @@ export function tokenLedger({
     rows,
     tokens: { before, after: sum.total.amount, units: sum.total.units },
     usd: usd ? usdTotal(usd.dollars, usd.before) : null,
+    ...(price != null ? { price } : {}),
   };
 }
 
@@ -398,9 +405,37 @@ export function assetLedgers({
         lines.push({ key: `${side}-${symbol}-market`, label: "Market move", kind: "rest", seg: null, dollars: rest });
       usd = { lines, dollars: assetUsd, before: null };
     }
-    return tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol });
+    const price = sum.balances.find((x) => x.symbol === symbol)?.price ?? null;
+    return tokenLedger({ model, side, ev, sum: t, usd, symbolFilter: symbol, price });
   });
   return { assets, usd: usdTotal(total, heldBefore) };
+}
+
+/** A token ledger restated at another price (the card set to today, ui-jobs
+ *  283): the flows keep the dollars of their blocks, the total is the tokens
+ *  held at `price`, and Market move takes the difference. Null for a ledger
+ *  in dollars or with no USD. */
+export function ledgerAtPrice(l: Ledger, price: number): Ledger | null {
+  if (!l.tokens || !l.usd || l.decimals == null || !(price > 0)) return null;
+  const scale = 10 ** l.decimals;
+  const dollars = Math.round((l.tokens.units / scale) * price);
+  const moved = l.rows.reduce((a, r) => a + (r.role === "event" ? (r.tokens?.units ?? 0) : 0), 0);
+  const before = l.tokens.before != null ? ((l.tokens.units - moved) / scale) * price : null;
+  const rows = l.rows.filter((r) => r.role !== "market");
+  const market = dollars - rows.reduce((a, r) => a + (r.usd?.dollars ?? 0), 0);
+  if (market !== 0) {
+    const key = l.rows.find((r) => r.role === "market")?.key ?? `${l.side}-${l.symbol ?? "usd"}-market`;
+    rows.push({
+      key,
+      line: key,
+      label: "Market move",
+      role: "market",
+      seg: null,
+      tokens: null,
+      usd: { dollars: market, text: signedUsd(market) },
+    });
+  }
+  return { ...l, rows, usd: usdTotal(dollars, before), price };
 }
 
 /** The rows' sums, for the checks: every column adds to its total. */
