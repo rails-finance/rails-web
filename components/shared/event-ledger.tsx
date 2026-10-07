@@ -2,11 +2,13 @@
 
 // The event card's ledger (rails-ops reference/lifetime-flows-scrubber.md,
 // "The event card's sum"; anatomy T2.1). Each account cell of an opened card
-// (Collateral, Debt) is one row closed, its closing line: before → after, and a toggle at the right end of the cell's first line (the
+// (Collateral, Debt) is one row closed, its closing line: before → after, and a toggle after the name on the cell's first line (the
 // name's line) that opens the cell into its ledger: one row per kind of flow
 // as of the event, the event's row highlighted, a rule, and the closing line.
-// The toggle is one chevron, fixed to the cell's top right, that turns over
-// when the cell is open, so a tap opens and a tap at the same point closes; a click anywhere on that first line does the same. Tokens
+// The toggle is one chevron after the cell's name (ui-jobs 295), the figures
+// at the line's right end; it turns over when the cell is open and does not
+// move, so a tap opens and a tap at the same point closes; a click anywhere on
+// that first line does the same. Tokens
 // first, each token figure followed by its asset's icon (the symbol once,
 // on the asset's total line); USD in a second column after a thin divider where the timeline's
 // Display switches show it, with Market move, the price's effect, in that
@@ -27,7 +29,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown } from "lucide-react";
+import { DiscChevron } from "@/components/shared/expand-chevron";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -84,21 +86,17 @@ const SideSwatch = ({ side }: { side: FlowSide }) => (
   <i aria-hidden className="inline-block size-3 shrink-0 rounded-[2px]" style={{ background: SIDE_HUE[side] }} />
 );
 
-/** The toggle: one chevron, no box, fixed to the cell's top right, level with
- *  the name's line, closed and opened, so it never moves. It darkens when the
- *  pointer is on the cell's first line (`LINE_HOVER`) or on the
- *  chevron. 32px hit area (44px at phone width, where the cell's padding holds
- *  the larger one without growing the row); the keyboard focus ring is an
- *  outline on `focus-visible` only, so a pointer or a tap never shows it. */
+/** The toggle: one chevron, no box, directly after the cell's name (ui-jobs
+ *  295), closed and opened, so it never moves. Its visibility is the shared
+ *  `.disc-row` rule on the first line (app/globals.css). 32px hit area (44px
+ *  at phone width) reaching past the glyph without growing the line; the
+ *  keyboard focus ring is an outline on `focus-visible` only, so a pointer or
+ *  a tap never shows it. */
 const TOGGLE =
-  "absolute right-2.5 top-1.5 inline-flex size-8 items-center justify-center rounded-md text-rb-500 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 max-sm:right-1 max-sm:top-0 max-sm:size-11";
-/** The cell's rule that darkens the chevron while the pointer is on the first line. */
-const LINE_HOVER = "[&:has([data-ledger-first]:hover)>[data-ledger-toggle]]:text-foreground";
+  "relative -my-1 inline-flex size-6 shrink-0 items-center justify-center rounded-md after:absolute after:-inset-1 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-blue-500 max-sm:after:-inset-2.5";
 /** What a click on the first line leaves alone: controls, links and the figures
  *  that carry a receipt or an exact-value tip keep their tap. */
 const OWN_TAP = "button, a, input, select, textarea, [role=button], [data-prov-pickable], [data-reveal-tip]";
-/** The first line leaves room for the toggle at its right end. */
-const TOGGLE_ROOM = "pr-11 sm:pr-[38px]";
 
 /** A pending figure: one pulsing bar where a value will stand. The bar is
  *  `bg-skeleton`, which the T2 panel's surface does not show, so it sits
@@ -148,7 +146,7 @@ export const LedgerOpenContext = createContext(false);
 /** A T2 cell that can open into its side's ledger (anatomy T2.1). Closed, the
  *  cell is one row, the ledger's closing line on its own: the side's swatch
  *  and name, its figures at the right (before → after in tokens; USD after a
- *  thin divider only where the side has no ledger), and the toggle at the first line's right end where the side
+ *  thin divider only where the side has no ledger), and the toggle after the name where the side
  *  has a ledger. Opened, the first line stays (swatch, name, toggle) and the
  *  ledger's rows stand under it above a rule and the closing line, so the
  *  toggle stays where the pointer pressed it and the cell grows downward. `ledger`, where given, is the cell's ledger
@@ -220,17 +218,14 @@ export function LedgerCell({
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <ChevronDown
-        size={16}
-        aria-hidden
-        className={`transition-transform duration-150 motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
-      />
+      <DiscChevron isOpen={isOpen} size={14} />
     </button>
   ) : null;
   const nameRow = (
     <span className="flex min-h-5 max-w-full shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
       {side && <SideSwatch side={side} />}
       {label}
+      {toggle && <span className="-ml-1 inline-flex items-center">{toggle}</span>}
     </span>
   );
   const right = alignRight ?? ledgerCard;
@@ -251,7 +246,7 @@ export function LedgerCell({
     );
   return (
     <div
-      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${toggles ? LINE_HOVER : ""} ${className}`}
+      className={`@container relative flex h-full min-w-0 flex-col rounded-xl bg-background px-4 py-3 ${ledgerCard ? "col-span-full" : ""} ${className}`}
       {...data}
       {...(side ? { "data-ledger-cell": side } : {})}
       {...(ledgerCard ? { "data-ledger-span": "" } : {})}
@@ -260,7 +255,7 @@ export function LedgerCell({
       {isOpen ? (
         <>
           <div
-            className={`mb-1.5 flex items-start ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+            className={`mb-1.5 flex items-start ${toggles ? "disc-row cursor-pointer" : ""}`}
             data-ledger-row="head"
             {...line}
           >
@@ -299,9 +294,9 @@ export function LedgerCell({
         </>
       ) : right ? (
         // The figures keep to the name's line where they fit, else they take
-        // the next line; the toggle stays at the name's line's right end.
+        // the next line; the toggle stays after the name.
         <div
-          className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+          className={`flex flex-wrap items-start gap-x-3 gap-y-1 ${toggles ? "disc-row cursor-pointer" : ""}`}
           data-ledger-row="closed"
           {...line}
         >
@@ -313,7 +308,7 @@ export function LedgerCell({
       ) : (
         <>
           <div
-            className={`mb-1.5 flex items-start ${toggles ? `cursor-pointer ${TOGGLE_ROOM}` : ""}`}
+            className={`mb-1.5 flex items-start ${toggles ? "disc-row cursor-pointer" : ""}`}
             data-ledger-row="closed"
             {...line}
           >
@@ -322,7 +317,6 @@ export function LedgerCell({
           <ClosedUsdContext.Provider value={!has}>{children}</ClosedUsdContext.Provider>
         </>
       )}
-      {toggle}
     </div>
   );
 }

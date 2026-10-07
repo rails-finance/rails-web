@@ -13,13 +13,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortAddr } from "@/lib/shared/format-event";
 
 /** The card's transaction hash, provided by `EventCard` around its header. */
 export const EventTxHashContext = createContext<string | null>(null);
+
+/** What `EventCard` hands its header (rails-ops TO-DO-ui-jobs 295): the
+ *  chevron, which a header places after its action word with
+ *  `<EventHeadChevron />`, and the event menu (⋮), which the number pill
+ *  draws before the number so the pill stays the last thing on the line. Null
+ *  outside a card, and on the event page. */
+export const EventHeadContext = createContext<{ chevron: ReactNode; menu: ReactNode } | null>(null);
+
+/** The card's chevron, after the header's action word; `className` sets
+ *  its wrapper's spacing. Nothing where the card draws no chevron. */
+export function EventHeadChevron({ className }: { className?: string }) {
+  const chevron = useEventHeadChevron();
+  if (!chevron) return null;
+  return <span className={`inline-flex items-center ${className ?? ""}`}>{chevron}</span>;
+}
+
+/** The card's chevron node, or null where the card draws none. */
+export function useEventHeadChevron(): ReactNode {
+  return useContext(EventHeadContext)?.chevron ?? null;
+}
 
 /** The pill's shape, shared with the boundary card's row-range pill. */
 export const EVENT_NUMBER_PILL = "inline-flex items-center rounded-full bg-sunken px-1.5 py-0.5 text-[9px] text-rb-500";
@@ -44,7 +64,17 @@ function decoded(path: string): string {
   }
 }
 
-export function EventNumberPill({
+export function EventNumberPill(props: { number: number; last?: number }) {
+  const menu = useContext(EventHeadContext)?.menu ?? null;
+  return (
+    <>
+      {menu}
+      <NumberPill {...props} />
+    </>
+  );
+}
+
+function NumberPill({
   number,
   last,
 }: {

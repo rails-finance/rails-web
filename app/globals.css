@@ -671,8 +671,48 @@ body {
     flex-basis: 100%;
     justify-content: flex-end;
   }
-  .evt-has-chev .evt-meta {
+  /* A header whose chevron stands in the corner: the market note rows
+     (note-row-shell.tsx), and an event card whose header has no slot for
+     the chevron after its action word. */
+  .evt-has-chev:not(:has([data-evt-head-chev])) .evt-meta {
     padding-right: 3rem;
+  }
+}
+/* An event card's header that places its chevron after the action word
+   (`EventHeadChevron`) hides the card's fallback at the right end. */
+.evt-has-chev:has([data-evt-head-chev]) > .evt-chev-end {
+  display: none;
+}
+
+/* The disclosure chevron (rails-ops TO-DO-ui-jobs 295): it follows its
+   heading, and the right end of the row holds figures, the number pill and a
+   ⋮. One rule for the event card's header, T2's Collateral and Debt rows, the
+   (i) Event explanation row, the position card's rows and the Lifetime flows
+   header. `.disc-row` is the row or header, `.disc-chev` its chevron (the
+   `DiscChevron` in expand-chevron.tsx). On a pointer that hovers the chevron
+   stays hidden until the row is hovered or a control in it has keyboard
+   focus, then reads foreground; on a touch screen it always shows, muted. */
+.disc-chev {
+  color: var(--text-muted);
+  transition:
+    opacity 150ms,
+    color 150ms,
+    rotate 200ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .disc-chev {
+    transition: none;
+  }
+}
+@media (hover: hover) {
+  .disc-row .disc-chev {
+    opacity: 0;
+  }
+  .disc-row:hover .disc-chev,
+  .disc-row:focus-visible .disc-chev,
+  .disc-row:has(:focus-visible) .disc-chev {
+    opacity: 1;
+    color: var(--foreground);
   }
 }
 

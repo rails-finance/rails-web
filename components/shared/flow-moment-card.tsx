@@ -15,6 +15,7 @@
 // Explanation's. It is not an event: no number, no filter, not counted, and
 // it goes when the cut is cleared.
 
+import { EventHeadChevron } from "@/components/shared/event-number-pill";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { EventCaptionContext } from "@/components/shared/mobile-spine";
@@ -312,6 +313,7 @@ export function FlowMomentCard({
         <span className="text-sm font-semibold text-foreground" data-flow-moment-date="">
           {date} · close
         </span>
+        <EventHeadChevron className="self-center" />
         <span className="text-xs text-rb-500" data-flow-moment-between="">
           {plural(since, "day")} after {prevWords} · {nextWords}
         </span>

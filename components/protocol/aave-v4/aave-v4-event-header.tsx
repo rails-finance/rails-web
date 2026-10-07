@@ -5,7 +5,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { formatExact } from "@/lib/utils/format";
 import { useHeaderValueHideClass, fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { EventTime } from "@/components/shared/event-time";
-import { EventNumberPill } from "@/components/shared/event-number-pill";
+import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
@@ -158,6 +158,8 @@ export function AaveV4EventHeader({
     ) : null;
 
   const counter = eventNumber != null ? <EventNumberPill number={eventNumber} /> : null;
+  // The card's chevron, after the action word (ui-jobs 295).
+  const chev = useEventHeadChevron();
 
   return (
     <div className="pl-5 pt-4 pb-3">
@@ -169,6 +171,7 @@ export function AaveV4EventHeader({
               Enable
             </span>
             <span className="text-sm text-rb-500">Supply</span>
+            {chev}
           </>
         ) : style.badge ? (
           // The dotted spine now carries a "LIQUIDATION" pill on desktop, so the
@@ -181,6 +184,7 @@ export function AaveV4EventHeader({
         ) : (
           <span className="text-sm text-rb-500">{label}</span>
         )}
+        {!ctx.alsoToggledCollateral && chev}
         {ctx.eventType === "liquidation" ? (
           // Liquidation header: the two facts that matter, collateral seized
           // and debt repaid, each as value + token icon: "Seized X ◊ Repaid Y ⬡".

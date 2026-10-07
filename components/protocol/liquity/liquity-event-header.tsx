@@ -4,7 +4,7 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { EventTime } from "@/components/shared/event-time";
-import { EventNumberPill } from "@/components/shared/event-number-pill";
+import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
@@ -122,6 +122,9 @@ export function LiquityEventHeader({
   title,
 }: LiquityEventHeaderProps) {
   const surplusClaim = useSurplusClaimFor(ctx.operation === "liquidate" ? txHash : undefined);
+  // The card's chevron, after the action word (ui-jobs 295); none on the
+  // event page and in the page's title.
+  const chev = useEventHeadChevron();
   const style = getOperationStyle(ctx.operation, ctx);
   const { stateBefore, stateAfter, troveOperation } = ctx;
   const { showTimelineValues } = useTimelineDisplay();
@@ -157,6 +160,7 @@ export function LiquityEventHeader({
         ) : (
           <span className={`text-sm font-medium ${style.color || "text-rb-500"}`}>{style.label}</span>
         )}
+        {chev}
         <span className="ml-auto inline-flex items-center gap-2">
           {groupChip}
           {page ? (
@@ -244,6 +248,7 @@ export function LiquityEventHeader({
       {ctx.operation === "setBatchManagerAnnualInterestRate" && stateAfter ? (
         <>
           <span className={`${TXT} text-rb-500`}>{style.label}</span>
+          {chev}
           <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />
           {ctx.batchManager && (
             <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
@@ -273,6 +278,7 @@ export function LiquityEventHeader({
       ) : ctx.operation === "setInterestBatchManager" ? (
         <>
           <span className={`${TXT} text-rb-500`}>{style.label}</span>
+          {chev}
           {stateAfter.annualInterestRate > 0 && <DelegateRatePill rate={stateAfter.annualInterestRate} prov={rateP} />}
           {ctx.batchManager && (
             <span className={`${TXT} font-bold text-pink-500`}>{getBatchManagerName(ctx.batchManager)}</span>
@@ -283,6 +289,7 @@ export function LiquityEventHeader({
           <span className={`inline-block ${PILL} rounded-full font-bold ${style.bg} ${style.color}`}>
             {style.label}
           </span>
+          {chev}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT}`}>
               <span className="text-rb-500">{L1_WORDS.supply}</span>
@@ -333,6 +340,7 @@ export function LiquityEventHeader({
           >
             {style.label}
           </span>
+          {chev}
           {hasDebtChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT} ${spineFlankHide}`}>
               <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.cleared}</span>
@@ -376,6 +384,7 @@ export function LiquityEventHeader({
           >
             {style.label}
           </span>
+          {chev}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT}`}>
               <span className="text-rb-500">{L1_WORDS.liquidated}</span>
@@ -408,11 +417,14 @@ export function LiquityEventHeader({
           )}
         </>
       ) : style.badge ? (
-        <span
-          className={`inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
-        >
-          {style.label}
-        </span>
+        <>
+          <span
+            className={`inline-block ${PILL} rounded-full font-bold uppercase tracking-wide ${style.bg} ${style.color}`}
+          >
+            {style.label}
+          </span>
+          {chev}
+        </>
       ) : style.label.includes(" + ") ? (
         // Combined action: "Withdraw + Repay" etc — show with values and token icons
         <>
@@ -421,6 +433,7 @@ export function LiquityEventHeader({
             return (
               <span className={`inline-flex items-center ${GAP} ${TXT}`}>
                 <span className="text-rb-500">{collAction}</span>
+                {chev}
                 {hasCollChange &&
                   wrapColl(
                     <span className={AMT}>
@@ -449,7 +462,10 @@ export function LiquityEventHeader({
           })()}
         </>
       ) : (
-        <span className={`${TXT} text-rb-500`}>{style.label}</span>
+        <>
+          <span className={`${TXT} text-rb-500`}>{style.label}</span>
+          {chev}
+        </>
       )}
 
       {/* Debt change (skip for open trove, redemption, liquidation, delegate, and combined — shown inline or n/a).
