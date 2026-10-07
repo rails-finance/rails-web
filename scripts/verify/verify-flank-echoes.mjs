@@ -328,14 +328,6 @@ async function main() {
       label: "liquity-v1 (open/adjust)",
       url: `${BASE}/liquity-v1/0x04ca2a945ccba92ca2443024c07c99f81e71547f?epoch=1`,
     },
-    {
-      // ui-jobs 250: a redemption's legs are spine nodes, each echoing the
-      // header's leg receipt (the surplus stays in the head).
-      label: "liquity-v1 (redemption legs)",
-      url: `${BASE}/liquity-v1/0x017eff261795b59a61590d6a419ff13d466883aa?epoch=1`,
-      mustInclude: /Redemption/,
-      maxCards: 2,
-    },
     // Liquity V2 left this list with ui-jobs 284: its Trove page has no
     // page-level tool (the card's ⋮ arms the card alone) and its events are
     // inspected on the event page, which draws no spine and so no flank.

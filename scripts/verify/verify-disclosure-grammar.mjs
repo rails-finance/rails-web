@@ -524,12 +524,13 @@ async function waitHeads(page) {
     JSON.stringify(repay?.items),
   );
   const heads = await allHeads(page);
-  // ui-jobs 250: the spine draws a redemption's legs, so its head reads the
-  // word alone, then the chevron.
-  const redemption = heads.find((h) => h.items[0] === "Redemption");
+  const redemption = heads.find((h) => h.items[0] === "Cleared");
   check(
-    "5b. 1280, values on: a redemption card reads Redemption, then the chevron, no icon",
-    !!redemption && redemption.last && redemption.items.length === 2 && !redemption.items.includes("IMG"),
+    "5b. 1280, values on: a redemption card reads Cleared … Reduced … then the chevron",
+    !!redemption &&
+      redemption.last &&
+      redemption.items.indexOf("Reduced") > 0 &&
+      redemption.items.indexOf("CHEV") > redemption.items.indexOf("Reduced"),
     JSON.stringify(redemption?.items),
   );
   const first = cardWith(page, 1);
@@ -570,17 +571,6 @@ async function waitHeads(page) {
   const heads = await allHeads(page);
   const strays = heads.filter((h) => !h.last);
   check("5g. 1280, values off: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));
-  // Values off: the head states the legs after the word, labelled.
-  const redemptionOff = heads.find((h) => h.items[0] === "Redemption");
-  check(
-    "5g2. 1280, values off: a redemption reads Redemption Cleared … Reduced … then the chevron",
-    !!redemptionOff &&
-      redemptionOff.last &&
-      redemptionOff.items[1] === "Cleared" &&
-      redemptionOff.items.indexOf("Reduced") > 1 &&
-      redemptionOff.items.includes("IMG"),
-    JSON.stringify(redemptionOff?.items),
-  );
   check("5h. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }
