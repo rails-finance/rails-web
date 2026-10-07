@@ -4,9 +4,9 @@ import { createContext, useEffect, useRef, type ReactNode } from "react";
 import { GroupHideContext } from "@/components/shared/event-card-menu";
 
 // A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240):
-// a closed group is a row on the spine, its legs summed as nodes, its range of
-// event numbers in the row's column, and its ⋮ offering "Show 48 grouped
-// events", the one way to open it. Open, the members draw as rows and each
+// a closed group is a row on the spine, its legs summed as nodes, its number
+// column empty, and its ⋮ offering "Show 48 grouped events", the one way to
+// open it. Open, the members draw as rows and each
 // member's ⋮ offers "Hide", the one way to close it.
 // A bracket frame marks the group closed and open; the tone sits on the
 // nodes, the T1 word and the dotted segment.
@@ -22,26 +22,6 @@ export function groupRangeText(range: [number, number] | null): string | null {
   return lo === hi ? `#${lo}` : `#${lo}–${hi}`;
 }
 
-/** A closed group's number: its range on two lines, the newest member's
- *  number over the oldest ("144" over "97"), in the plain number style, so
- *  the column stays as narrow as one number. Plain text: the group opens
- *  from its row's ⋮ (ui-jobs 250, third revision). */
-export function GroupRange({ range }: { range: [number, number] | null }) {
-  if (!range) return null;
-  const [lo, hi] = range[0] <= range[1] ? range : [range[1], range[0]];
-  return (
-    <span
-      className="num-pill flex-col gap-0.5"
-      data-group-range=""
-      data-prov-exempt=""
-      aria-label={`Events ${lo} to ${hi}`}
-    >
-      <span>{hi}</span>
-      {lo !== hi && <span>{lo}</span>}
-    </span>
-  );
-}
-
 /** The menu rows that open and close a group: the closed row's ⋮ shows it,
  *  every member's ⋮ hides it, one handler behind both. */
 export function groupMenuWords(count: number, range: string | null) {
@@ -54,8 +34,7 @@ export function groupMenuWords(count: number, range: string | null) {
 
 /** The bracket frame around a group: a left border with bracket ends, in the
  *  muted border colour (`border-rb-300`, `dark:border-rb-500`). Closed it
- *  holds the group's row, its range in the number column and its ⋮ offering
- *  "Show"; open, the members alone, the first on the row the summed nodes
+ *  holds the group's row and its ⋮ offering "Show"; open, the members alone, the first on the row the summed nodes
  *  held, every member's ⋮ offering "Hide". A `group-open` event on the frame
  *  opens it (the timeline's rewind). */
 export function GroupFrame({

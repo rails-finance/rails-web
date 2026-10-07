@@ -423,7 +423,7 @@ body {
 
 @layer components {
   /* The event number on a timeline row (ui-jobs 250 point 3): the muted
-     number, no fill, no link. A closed group's range stacks two of them. */
+     number, no fill, no link. */
   .num-pill {
     @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] leading-none tabular-nums text-rb-500;
   }

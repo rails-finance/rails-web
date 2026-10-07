@@ -5,13 +5,7 @@ import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import {
-  GroupFrame,
-  GroupNumbersContext,
-  GroupRange,
-  groupMenuWords,
-  groupRangeText,
-} from "@/components/shared/group-frame";
+import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -28,13 +22,10 @@ import { formatDate } from "@/lib/date";
  * (first adjusted rate → last), and since the member events are already in the
  * client's timeline payload the row expands in place to the individual cards.
  *
- * Visual grammar is the folder register every collapsed run now draws in
- * (see TimelineRunCard's `folder`): the folder glyph in the spine's left
- * flank wearing a pink percent mark, a dot on the line, the count in a pill —
- * plus this card's own vocabulary, the pink delegate pill with the people
- * glyph and the net rate movement. The direction the rate-change glyph used
- * to carry lives in that pill (first rate → last). On mobile the glyph moves
- * into the header and the expanded members are held by a dashed rail.
+ * It draws as every group does (`group-frame.tsx`): the bracket, no node of
+ * its own, the dotted segment for the members not drawn, and its ⋮ to show
+ * them; its words are the pink delegate pill with the people glyph and the
+ * net rate movement (first rate → last).
  */
 export interface DelegateAdjustRunCardProps {
   count: number;
@@ -120,9 +111,8 @@ export function DelegateAdjustRunCard({
   );
   const numberRange = useContext(GroupNumbersContext);
   const rangeText = groupRangeText(numberRange);
-  // The range in the number column, plain; the group opens from its row's
-  // ⋮ ("Show 48 grouped events") and closes from a member's ("Hide …").
-  const pill = <GroupRange range={numberRange} />;
+  // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
+  // from a member's ("Hide …"); the range rides the items' sub-line.
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && toggle() };
   const hide = { ...words2.hide, hide: () => open && toggle() };
@@ -160,7 +150,6 @@ export function DelegateAdjustRunCard({
             open={spineView.openId === membersId}
             onToggle={(anchor) => spineView.toggle(membersId, anchor)}
             iconColumn={column}
-            numberSlot={pill}
             card={
               <div className="relative">
                 <div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>
@@ -183,7 +172,6 @@ export function DelegateAdjustRunCard({
         <EventCard
           avatar={null}
           iconColumn={column}
-          numberSlot={pill}
           groupMenu={showMenu}
           header={<div className="pl-5 pt-4 pb-3">{words}</div>}
           hideDetailChevron

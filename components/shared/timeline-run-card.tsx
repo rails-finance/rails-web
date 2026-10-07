@@ -12,13 +12,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import {
-  GroupFrame,
-  GroupNumbersContext,
-  GroupRange,
-  groupMenuWords,
-  groupRangeText,
-} from "@/components/shared/group-frame";
+import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -294,16 +288,13 @@ export function TimelineRunCard({
         .map((agg) => ({ label: agg.verb, value: agg.value, symbol: agg.symbol }))
     : undefined;
   const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
-  // The group's button: the stacked pill with its newest member's number,
-  // closed; the chevron under the first and the last member's number, open.
-  // The range of event numbers rides the name and the title.
+  // The group opens from its row's ⋮ ("Show 48 grouped events") and closes
+  // from a member's ("Hide …"); the range of event numbers rides the items'
+  // sub-line. A closed group's number column is empty.
   const contextRange = useContext(GroupNumbersContext);
   const numberRange = eventRange ?? contextRange;
   const rangeText = groupRangeText(numberRange);
   const onToggle = () => !forceOpen && toggle();
-  // The range in the number column, plain; the group opens from its row's
-  // ⋮ ("Show 48 grouped events") and closes from a member's ("Hide …").
-  const pill = <GroupRange range={numberRange} />;
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && onToggle() };
   const hide = { ...words2.hide, hide: () => open && onToggle() };
@@ -541,7 +532,6 @@ export function TimelineRunCard({
             open={spineView.openId === membersId}
             onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
             iconColumn={legsColumn}
-            numberSlot={pill}
             card={
               <div className="relative">
                 <div className="rounded-xl bg-raised">{summary}</div>
@@ -564,7 +554,6 @@ export function TimelineRunCard({
         <EventCard
           avatar={null}
           iconColumn={legsColumn}
-          numberSlot={pill}
           groupMenu={showMenu}
           header={head}
           detail={hasSums ? summary : undefined}
