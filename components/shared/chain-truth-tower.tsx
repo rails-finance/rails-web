@@ -289,7 +289,13 @@ export function ChainTruthTower({
               </p>
             )}
           </div>
-          <ProvenanceInfoTabs className="mt-3" explanation={explanation} learnMore={learnMore} rowExtra={rowExtra} />
+          <ProvenanceInfoTabs
+            className="mt-3"
+            label={`${title} explanation`}
+            explanation={explanation}
+            learnMore={learnMore}
+            rowExtra={rowExtra}
+          />
         </div>
       </section>
     </ProvReceiptsScope>
