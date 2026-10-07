@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type TimelineDisplayKey =
   | "showTimelineValues"
@@ -43,16 +43,7 @@ export interface TimelineDisplayState {
    *  number pill shows its transaction's short hash in place of the number.
    *  Off by default. The event page's pill keeps the number. */
   showTxHashes: boolean;
-  /** The reader's saved phone view: true for the spine view (the phone's
-   *  "Timeline | List" switch), false for the list. Read only on a phone, on
-   *  a page whose timeline opted in (components/shared/mobile-spine.tsx). */
-  mobileSpine: boolean;
-  /** The view this page shows: `?timeline=spine` or `?timeline=list` when the
-   *  URL names one, the saved `mobileSpine` otherwise. */
-  spineView: boolean;
   toggle: (key: TimelineDisplayKey) => void;
-  /** The switch: saves the choice and drops any `?timeline=` override. */
-  setSpineView: (on: boolean) => void;
 }
 
 const DEFAULTS = {
@@ -64,7 +55,6 @@ const DEFAULTS = {
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
-  mobileSpine: false,
 };
 // A NEW key with a default needs no bump: the provider restores by spreading
 // the stored object over DEFAULTS, so a reader whose stored preferences
@@ -73,30 +63,13 @@ const STORAGE_KEY = "timeline-display-v3";
 
 const Ctx = createContext<TimelineDisplayState>({
   ...DEFAULTS,
-  spineView: false,
   toggle: () => {},
-  setSpineView: () => {},
 });
-
-/** `?timeline=spine` → true, `?timeline=list` → false, anything else → null. */
-function urlSpineView(): boolean | null {
-  const v = new URLSearchParams(window.location.search).get("timeline");
-  return v === "spine" ? true : v === "list" ? false : null;
-}
-
-/** Keeps `<html data-timeline-view>` on the view in force. The inline script
- *  in app/layout.tsx sets it before first paint from the same two sources, so
- *  CSS can hold back an opted-in list until the spine view replaces it
- *  (app/globals.css). */
-function markSpineView(on: boolean) {
-  const d = document.documentElement.dataset;
-  if (on) d.timelineView = "spine";
-  else delete d.timelineView;
-}
 
 /** A stored preference drops the retired switches: `showUsdValues`,
  *  `showChangeBars`, `showBalanceBars`, `showEventNumbers`, `showTimestamps`,
- *  `showUsdStable` and `showUsdOther`. */
+ *  `showUsdStable`, `showUsdOther` and `mobileSpine` (the phone's Timeline |
+ *  List choice: the spine view is the only phone view). */
 function migrate(
   parsed: Partial<typeof DEFAULTS> & {
     showUsdValues?: boolean;
@@ -106,6 +79,7 @@ function migrate(
     showTimestamps?: boolean;
     showUsdStable?: boolean;
     showUsdOther?: boolean;
+    mobileSpine?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -117,6 +91,7 @@ function migrate(
     showTimestamps,
     showUsdStable,
     showUsdOther,
+    mobileSpine,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */
@@ -125,24 +100,15 @@ function migrate(
 
 export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(DEFAULTS);
-  const [override, setOverride] = useState<boolean | null>(null);
-  const saved = useRef(DEFAULTS.mobileSpine);
 
   useEffect(() => {
-    const fromUrl = urlSpineView();
-    setOverride(fromUrl);
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = migrate(JSON.parse(raw) as Partial<typeof DEFAULTS> & { showUsdValues?: boolean });
-        saved.current = parsed.mobileSpine === true;
         setState((s) => ({ ...s, ...parsed }));
       }
     } catch {}
-    markSpineView(fromUrl ?? saved.current);
-    // Leaving the page puts the attribute back on the saved choice, so a URL
-    // override does not reach the next page.
-    return () => markSpineView(saved.current);
   }, []);
 
   const toggle = useCallback((key: TimelineDisplayKey) => {
@@ -155,21 +121,7 @@ export function TimelineDisplayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const setSpineView = useCallback((on: boolean) => {
-    setOverride(null);
-    saved.current = on;
-    markSpineView(on);
-    setState((prev) => {
-      const next = { ...prev, mobileSpine: on };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
-  }, []);
-
-  const spineView = override ?? state.mobileSpine;
-  return <Ctx.Provider value={{ ...state, spineView, toggle, setSpineView }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ...state, toggle }}>{children}</Ctx.Provider>;
 }
 
 export function useTimelineDisplay(): TimelineDisplayState {

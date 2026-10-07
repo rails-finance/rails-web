@@ -51,7 +51,7 @@ import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-pro
 import { UsersGlyph } from "@/components/protocol/liquity/liquity-event-header";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
-import type { MobileSpineConfig } from "@/components/shared/mobile-spine";
+import type { SpineKey } from "@/components/shared/mobile-spine";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { priceGapNotesFor, livePriceGapNote } from "@/lib/shared/market-note";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
@@ -71,7 +71,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 /** The phone spine view's key row. */
-const LIQUITY_MOBILE_SPINE: MobileSpineConfig = { keyLeft: "to wallet", keyRight: "into Trove" };
+const LIQUITY_SPINE_KEY: SpineKey = { keyLeft: "to wallet", keyRight: "into Trove" };
 
 export interface TroveViewProps {
   collateralType: string;
@@ -713,7 +713,7 @@ export default function TroveView({
               liveNotesPending={isOpen && !!branch && liveOraclePending}
               runs={LIQUITY_TIMELINE_RUNS}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
-              mobileSpine={LIQUITY_MOBILE_SPINE}
+              spineKey={LIQUITY_SPINE_KEY}
               emptyLabel="No transaction history available"
               toolbarLeading={
                 <TimelineActivityHeader

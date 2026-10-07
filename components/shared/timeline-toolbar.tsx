@@ -20,7 +20,6 @@ import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/compon
 import { actionNoun } from "@/lib/shared/event-action-nouns";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
-import { SpineViewSwitch } from "@/components/shared/mobile-spine";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMountedNow } from "@/hooks/useMountedNow";
 import {
@@ -28,7 +27,6 @@ import {
   type TimelineDisplayKey,
   type TimelineDisplayState,
 } from "@/components/shared/timeline-display-context";
-import { useTimelineValuesDisabled } from "@/lib/shared/header-values";
 import {
   CARD_INSET_START,
   CTRL_GHOST,
@@ -307,24 +305,21 @@ export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
  *  copies; callers pass only the flags that have a render path on their cards. */
 export function TimelineDisplayMenu({ items }: { items: TimelineDisplayItem[] }) {
   const display = useTimelineDisplay() as TimelineDisplayState & Record<string, boolean>;
-  const tvDisabled = useTimelineValuesDisabled();
   // "Open all market notes" reads ticked only while the markers are on, and
   // is greyed while they are off: there is nothing for it to open.
   const isOn = (key: TimelineDisplayKey) =>
     key === "openAllMarketNotes" ? display.showMarketNotes && display.openAllMarketNotes : display[key];
   const selected = new Set(items.filter((it) => isOn(it.key)).map((it) => it.key));
   const options: FilterOption[] = items.map((it) =>
-    it.key === "showTimelineValues"
-      ? { key: it.key, label: it.label, disabled: tvDisabled.disabled, title: tvDisabled.reason }
-      : it.key === "openAllMarketNotes"
-        ? {
-            key: it.key,
-            label: it.label,
-            separatorBefore: it.separatorBefore,
-            disabled: !display.showMarketNotes,
-            title: display.showMarketNotes ? undefined : "Turn on market notes first",
-          }
-        : { key: it.key, label: it.label, separatorBefore: it.separatorBefore },
+    it.key === "openAllMarketNotes"
+      ? {
+          key: it.key,
+          label: it.label,
+          separatorBefore: it.separatorBefore,
+          disabled: !display.showMarketNotes,
+          title: display.showMarketNotes ? undefined : "Turn on market notes first",
+        }
+      : { key: it.key, label: it.label, separatorBefore: it.separatorBefore },
   );
   return (
     <FilterDropdown
@@ -361,9 +356,6 @@ export interface TimelineToolbarProps {
   countTooltip?: string;
   /** Words after an unfiltered whole-history count (ChainTruthTimelineProps.countDetail). */
   countDetail?: string;
-  /** The page opted into the phone spine view: the count line ends in the
-   *  "Timeline | List" switch below `sm`. */
-  viewSwitch?: boolean;
 }
 
 /**
@@ -741,7 +733,6 @@ export function TimelineToolbar({
   countTooltip,
   countDetail,
   monthReach,
-  viewSwitch,
 }: TimelineToolbarProps) {
   // One option is not an axis — a single-reserve wallet on a multi-asset roster
   // would get a control whose every state shows the same list.
@@ -866,7 +857,6 @@ export function TimelineToolbar({
             <span className="text-xs text-rb-500 tabular-nums" title={countTooltip}>
               {countLine}
             </span>
-            {viewSwitch && <SpineViewSwitch />}
           </span>
           {tl.eventOptions.length > 1 && (
             <FilterDropdown

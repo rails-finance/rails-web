@@ -916,7 +916,12 @@ export function SpineColumn({
       ? spokenLegs(tokens, unreadOf)
       : adverseLegs?.length
         ? spokenWarningLegs(adverseLegs, unreadOf)
-        : null;
+        : icon === "swap" && swapLegs?.length
+          ? swapLegs
+              .filter((l) => !unreadOf(l.address, l.symbol))
+              .map((l) => `${spokenAmount(l.value)} ${l.symbol}`)
+              .join(", ") || null
+          : null;
   const setLegs = spineRow?.setLegs;
   useEffect(() => {
     setLegs?.(legs);
@@ -1436,7 +1441,7 @@ export function SpineColumn({
 
     return (
       <div
-        className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
+        className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
         // EventCard draws the band on a row whose spine carries this.
         data-spine-adverse={banded ? warningTone : undefined}
       >
@@ -1467,7 +1472,9 @@ export function SpineColumn({
   const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
 
   return (
-    <div className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch">
+    <div
+      className={`${spineRow ? "flex max-w-full" : "hidden sm:flex"} flex-col items-center relative px-1 pt-4 self-stretch`}
+    >
       {leadingMask}
       <div
         className={`relative z-10 flex flex-col gap-y-1 items-center${nodeToggle ? " cursor-pointer" : ""}`}

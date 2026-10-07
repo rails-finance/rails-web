@@ -98,17 +98,9 @@ import {
   timelineFilterPills,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
-import { LiveNoteGroupRow, MarketNoteRow } from "@/components/shared/market-note-row";
-import {
-  PhoneNoteLine,
-  PhoneNoteRun,
-  type PhoneNoteLineWords,
-  type PhoneNoteRunWords,
-} from "@/components/shared/phone-note-run";
 import { ListNoteGap, SpineNoteGap, type GapItem } from "@/components/shared/spine-note-markers";
-import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { anchorMarketNotes, isLiveNoteGroup, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
+import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { folderTerminus } from "@/lib/shared/run-folders";
 import { settleRunRows } from "@/lib/shared/timeline-chunks";
@@ -128,7 +120,8 @@ import {
   SpineKeyRow,
   SpineViewProvider,
   useSpineViewActive,
-  type MobileSpineConfig,
+  DEFAULT_SPINE_KEY,
+  type SpineKey,
 } from "@/components/shared/mobile-spine";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
@@ -247,12 +240,6 @@ const PINNED_SKELETON_HEIGHT = 96;
 /** The flash id of the cut's moment card (flow-moment-card.tsx). */
 const MOMENT_FLASH = "flow-moment";
 const WINDOW_CHUNK = TIMELINE_PAGE_ROWS;
-
-/** A live note's header-panel height, closed — the note row's `SkeletonBlock`
- *  reserves this while its live read is still in flight, so the list does not
- *  shift under a reader once it lands (see `liveNotesPending`). Measured off
- *  MarketNoteRow's header panel (`px-5 pt-4 pb-3` around one row of chips). */
-const LIVE_NOTE_SKELETON_HEIGHT = 64;
 
 /** Stable empties for the notes path, so a page that passes none re-renders
  *  no more than it did before notes existed. */
@@ -395,16 +382,8 @@ export interface ChainTruthTimelineProps {
    *  or no live quantity exists); see `liveNotesPending` for the in-flight
    *  state. */
   liveNotes?: MarketNote[];
-  /** In the phone list view, two or more notes in one gap draw as one row
-   *  that names how many and the dates they span, and opens to each note
-   *  (components/shared/phone-note-run.tsx). Unset: every note is its own row. */
-  phoneNoteRun?: PhoneNoteRunWords;
-  /** In the phone list view, each rate-step note draws as one short line that
-   *  opens to its row (components/shared/phone-note-run.tsx PhoneNoteLine).
-   *  Unset: every note is its own row. */
-  phoneNoteLine?: PhoneNoteLineWords;
   /** True while this OPEN position's live reads are still in flight —
-   *  reserves the live-note slot's height (`LIVE_NOTE_SKELETON_HEIGHT`) so
+   *  reserves the live-note slot so
    *  the list does not shift under a reader once they land. Never pass this
    *  for a closed/liquidated position: it gets no live note at all, ever, so
    *  there is nothing to reserve room for. */
@@ -510,11 +489,9 @@ export interface ChainTruthTimelineProps {
    *  panel on 2026-09-25 (live's form with dev's reach) and
    *  `timeline-segment-picker.tsx` went with the ruling. */
   segments?: TimelineSegments;
-  /** Opts this timeline into the phone spine view: the toolbar grows the
-   *  phone's "Timeline | List" switch and `?timeline=` overrides it
-   *  (components/shared/mobile-spine.tsx). Omit it and neither does anything
-   *  here. Families are added one at a time after a 390px sweep. */
-  mobileSpine?: MobileSpineConfig;
+  /** The phone spine view's key row, in the family's words: what a left and
+   *  a right arrow mean. Unset: "to wallet" and "into position". */
+  spineKey?: SpineKey;
 }
 
 export interface TimelineSegments {
@@ -694,8 +671,6 @@ function ChainTruthTimelineBody({
   notes,
   liveNotes,
   liveNotesPending,
-  phoneNoteRun,
-  phoneNoteLine,
   liveWindow,
   footer,
   notice,
@@ -704,7 +679,7 @@ function ChainTruthTimelineBody({
   persistKeyPrefix,
   closed,
   segments,
-  mobileSpine,
+  spineKey,
 }: ChainTruthTimelineProps) {
   // Run-collapse is a display preference: flag off ⇒ no run specs reach the
   // rows memo, so it maps events straight to lone cards (the plain
@@ -726,27 +701,6 @@ function ChainTruthTimelineBody({
       return next;
     });
   }, []);
-  // Below 640px the list view hides the spine column, so notes there stay
-  // rows. Read after mount; the server draws the desktop markers, which are
-  // hidden below 640px by class.
-  const phone = useMediaQuery(PHONE_QUERY);
-  /** The phone list view's notes in one gap: each its own row, or one run
-   *  row where the timeline opts in. */
-  const phoneNoteRows = (list: MarketNote[], key: string, one: (note: MarketNote, i: number) => ReactNode) =>
-    phoneNoteRun && list.length > 1 ? (
-      <PhoneNoteRun key={`noterun_${key}`} notes={list} words={phoneNoteRun} renderNote={one} />
-    ) : phoneNoteLine ? (
-      list.map((note, i) => (
-        <PhoneNoteLine
-          key={`noteline_${key}_${note.id}`}
-          note={note}
-          words={phoneNoteLine}
-          renderNote={(n) => one(n, i)}
-        />
-      ))
-    ) : (
-      list.map(one)
-    );
   // Turning the collapse off leaves the `asOneEvent` specs standing: they draw
   // one transaction as one card and hide nothing, so there is nothing for the
   // choice to give back.
@@ -842,9 +796,10 @@ function ChainTruthTimelineBody({
   const routeParams = useParams<{ eventId?: string | string[] }>();
   const rawEventId = Array.isArray(routeParams?.eventId) ? routeParams.eventId[0] : routeParams?.eventId;
   const pinnedId = rawEventId != null ? decodeEventId(rawEventId) : null;
-  // The phone spine view: never on a pinned page, which shows one card open.
-  const spineOptIn = !!mobileSpine && !pinnedId;
-  const spineActive = useSpineViewActive(spineOptIn ? mobileSpine : undefined);
+  // The phone spine view is the phone layout, never on a pinned page, which
+  // shows one card open.
+  const spineOptIn = !pinnedId;
+  const spineActive = useSpineViewActive(spineOptIn);
   const chainId = useChainId();
   // The query params that are part of WHICH position this is, not view state:
   // Aave V3's `?market=` (Core vs Prime is a different account), Liquity V1's
@@ -1094,9 +1049,6 @@ function ChainTruthTimelineBody({
     const live: GapItem[] = liveGroup ? [liveGroup, ...liveRowsShown.filter((n) => !n.live)] : liveRowsShown;
     return !showMarketNotes || headNotes.length === 0 ? live : [...live, ...headNotes];
   }, [showMarketNotes, headNotes, liveRowsShown, liveGroup]);
-  /** The head slot's plain notes, for the phone list view, which draws the
-   *  group on its own above them. */
-  const topPlainNotes = useMemo(() => topNotes.filter((n): n is MarketNote => !isLiveNoteGroup(n)), [topNotes]);
   const liveSlotAtTop = topNotes.length > 0;
   /** The live WINDOW's own occupancy of the head slot — read off the prop, not
    *  off `showMarketNotes`: it is not a market note, so putting the notes away
@@ -1682,25 +1634,29 @@ function ChainTruthTimelineBody({
     // open it (the rewind's top).
     if (!row.spec.asOneEvent) return dayMarks ? <div data-flow-run={row.events[0].id}>{node}</div> : node;
     const lead = row.events[0];
+    // The phone spine view's caption, as a single card's (its `caption` prop
+    // can name the kind instead).
     return (
-      <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
-        <EventDayMarkContext.Provider
-          value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
-        >
-          <EventShareProvider href={shareHrefFor(lead.id)}>
-            <div
-              id={`event-${lead.id}`}
-              data-event-id={lead.id}
-              data-row-at={lead.timestamp}
-              className={`rounded-xl transition-shadow duration-[2000ms] ${
-                highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
-              }`}
-            >
-              {node}
-            </div>
-          </EventShareProvider>
-        </EventDayMarkContext.Provider>
-      </EventDateContext.Provider>
+      <EventCaptionContext.Provider value={{ kind: lead.actionLabel, ts: lead.timestamp }}>
+        <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
+          <EventDayMarkContext.Provider
+            value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
+          >
+            <EventShareProvider href={shareHrefFor(lead.id)}>
+              <div
+                id={`event-${lead.id}`}
+                data-event-id={lead.id}
+                data-row-at={lead.timestamp}
+                className={`rounded-xl transition-shadow duration-[2000ms] ${
+                  highlightId === lead.id ? "ring-2 ring-teal-500/70" : "ring-0 ring-teal-500/0"
+                }`}
+              >
+                {node}
+              </div>
+            </EventShareProvider>
+          </EventDayMarkContext.Provider>
+        </EventDateContext.Provider>
+      </EventCaptionContext.Provider>
     );
   };
 
@@ -1819,8 +1775,7 @@ function ChainTruthTimelineBody({
   // Auto-append the collapse toggle only when this page defines runs — a page
   // with none has nothing to collapse and must not show an inert toggle.
   // The market-note items follow under a rule on a page with notes (item 118;
-  // they were a toolbar pill, "Market notes · N", until then). A phone gets
-  // the switch alone: see MARKET_NOTE_ITEMS.
+  // they were a toolbar pill, "Market notes · N", until then).
   // Never on a served page: its folders are not a reader's choice (decision
   // 0021). `?folders=0` answers flat, so that page groups in the browser and
   // keeps the toggle.
@@ -1828,8 +1783,7 @@ function ChainTruthTimelineBody({
   // own, and neither does a collapse spec that forms no run on this list: a
   // page with only those would show one that changes nothing.
   const baseItems = collapsible ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
-  const items =
-    marketNoteCount > 0 ? [...baseItems, ...(phone ? MARKET_NOTE_ITEMS.slice(0, 1) : MARKET_NOTE_ITEMS)] : baseItems;
+  const items = marketNoteCount > 0 ? [...baseItems, ...MARKET_NOTE_ITEMS] : baseItems;
 
   /** The notes that sit beside one row: an event row's own, or the union over
    *  a collapsed run's members — a note whose anchor is inside a folder
@@ -1877,7 +1831,6 @@ function ChainTruthTimelineBody({
             leading={toolbarLeading}
             countTooltip={countTooltip}
             countDetail={countDetail}
-            viewSwitch={spineOptIn}
             // The Date button's panel hangs from the toolbar; the second path a
             // month click can take travels to it here.
             monthReach={
@@ -1954,7 +1907,7 @@ function ChainTruthTimelineBody({
         ) : rows.length > 0 ? (
           <>
             <div className="flex flex-col gap-2">
-              {spineActive && mobileSpine && <SpineKeyRow config={mobileSpine} />}
+              {spineActive && <SpineKeyRow config={spineKey ?? DEFAULT_SPINE_KEY} />}
               {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
                 are filtered out, so the row below is not the newest and the
@@ -1973,12 +1926,10 @@ function ChainTruthTimelineBody({
                   {liveWindow({ isFirst: !tipBoundaryAtTop })}
                 </SpineTipContext.Provider>
               )}
-              {/* The phone spine view draws the live notes as markers above the
-                newest event, under the tip's dot, and reserves nothing for
-                them while they load. */}
-              {liveSkeletonAtTop && !spineActive && phone && <SkeletonBlock height={LIVE_NOTE_SKELETON_HEIGHT} />}
-              {/* The desktop markers reserve one target for the live notes. */}
-              {liveSkeletonAtTop && !spineActive && !phone && !liveSlotAtTop && (
+              {/* The desktop markers reserve one target for the live notes; the
+                phone spine view draws them as markers above the newest event,
+                under the tip's dot, and reserves nothing while they load. */}
+              {liveSkeletonAtTop && !spineActive && !liveSlotAtTop && (
                 <div aria-hidden className="hidden sm:block" style={{ height: 28 }} />
               )}
               {liveSlotAtTop && spineActive && (
@@ -1988,7 +1939,7 @@ function ChainTruthTimelineBody({
                   head={{ tip: liveWindowAtTop ? null : tipSide }}
                 />
               )}
-              {liveSlotAtTop && !spineActive && !phone && (
+              {liveSlotAtTop && !spineActive && (
                 <ListNoteGap
                   notes={topNotes}
                   datePrefixFor={headDatePrefix}
@@ -2002,27 +1953,6 @@ function ChainTruthTimelineBody({
                   }}
                 />
               )}
-              {liveSlotAtTop && !spineActive && phone && liveGroup && (
-                <SpineTipContext.Provider value={!liveWindowAtTop ? tipSide : null}>
-                  <LiveNoteGroupRow group={liveGroup} isFirst={!tipBoundaryAtTop && !liveWindowAtTop} />
-                </SpineTipContext.Provider>
-              )}
-              {liveSlotAtTop &&
-                !spineActive &&
-                phone &&
-                phoneNoteRows(topPlainNotes, "head", (note, i) => (
-                  <SpineTipContext.Provider
-                    key={`live_${note.id}`}
-                    value={i === 0 && !liveGroup && !liveWindowAtTop ? tipSide : null}
-                  >
-                    <MarketNoteRow
-                      note={note}
-                      datePrefix={headDatePrefix(note)}
-                      isFirst={i === 0 && !liveGroup && !tipBoundaryAtTop && !liveWindowAtTop}
-                      isLast={false}
-                    />
-                  </SpineTipContext.Provider>
-                ))}
               {/* The cut's moment, where it falls on a day with no events:
                 above the rows, under the withheld tip's glyph. */}
               {moment && focusModel && (
@@ -2149,11 +2079,10 @@ function ChainTruthTimelineBody({
                 // wraps it.
                 const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
                 // Markers in the gap below: the phone spine view's, or the
-                // desktop list view's. The phone list view has no spine column
-                // to put them on, so its notes stay rows.
+                // desktop's.
                 const noteRows = spineActive ? (
                   <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
-                ) : !phone ? (
+                ) : (
                   <ListNoteGap
                     notes={rowNotes}
                     datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
@@ -2161,14 +2090,6 @@ function ChainTruthTimelineBody({
                     openAll={openAll}
                     onToggle={toggleNote}
                   />
-                ) : (
-                  phoneNoteRows(rowNotes, `row_${rowLastIdx}`, (note) => (
-                    <MarketNoteRow
-                      key={`note_${note.id}`}
-                      note={note}
-                      datePrefix={noteDatePrefixAfter(note, rowLastIdx)}
-                    />
-                  ))
                 );
                 return (
                   <Fragment key={rowKey}>
@@ -2242,7 +2163,7 @@ function ChainTruthTimelineBody({
                   <div className="flex flex-col gap-2">
                     {spineActive ? (
                       <SpineNoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
-                    ) : !phone ? (
+                    ) : (
                       <ListNoteGap
                         notes={topNotes}
                         datePrefixFor={headDatePrefix}
@@ -2251,13 +2172,6 @@ function ChainTruthTimelineBody({
                         onToggle={toggleNote}
                         head={{ tip: null, above: false, below: false }}
                       />
-                    ) : (
-                      <>
-                        {liveGroup && <LiveNoteGroupRow group={liveGroup} />}
-                        {phoneNoteRows(topPlainNotes, "filtered", (note) => (
-                          <MarketNoteRow key={`note_${note.id}`} note={note} datePrefix={headDatePrefix(note)} />
-                        ))}
-                      </>
                     )}
                   </div>
                 )}

@@ -737,7 +737,6 @@ export default function MakerVaultDetailView({
               folderRegister={MAKERDAO_FOLDER_REGISTER}
               readFolderMembers={readFolderMembers}
               segments={segments}
-              phoneNoteLine={MAKER_PHONE_NOTE_LINE}
               notice={<MakerSpineKey debtSym={ilkDebtSymbol(view?.ilk ?? "")} />}
               toolbarLeading={
                 <TimelineActivityHeader
@@ -767,8 +766,6 @@ export default function MakerVaultDetailView({
     </FlowFocusContext.Provider>
   );
 }
-
-const MAKER_PHONE_NOTE_LINE = { rate: "stability fee" };
 
 /** What the desktop spine's marks mean, once, above the first row. The phone
  *  list states each row in words. */

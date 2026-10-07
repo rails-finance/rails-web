@@ -32,9 +32,6 @@ import { skyFlowsContent } from "@/lib/sky-savings/learn-more";
 import { chiProv, psmPriceProv, rateChangeProv } from "@/lib/sky-savings/provenance";
 import type { SkyAsOf, SkyFlowDay, SkyGate, SkyPosition, SkyRateChange, SkyRates } from "@/lib/sky-savings/types";
 
-/** On a phone, consecutive Savings Rate changes draw as one row that opens. */
-const RATE_CHANGE_RUN = { many: "Savings Rate changes" };
-
 export default function SkySavingsPositionView({
   position,
   asOf,
@@ -213,7 +210,6 @@ export default function SkySavingsPositionView({
         tl={tl}
         notes={notes}
         liveNotes={trailingNotes.length ? trailingNotes : undefined}
-        phoneNoteRun={RATE_CHANGE_RUN}
         notice={
           totalEvents > skyEvents.length ? (
             <p className="text-xs text-rb-500">
