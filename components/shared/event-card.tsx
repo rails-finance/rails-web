@@ -1,7 +1,7 @@
 "use client";
 
 import { PriceBasisProvider } from "@/components/shared/price-basis";
-import { useState, useCallback, useEffect, useContext, useId, useLayoutEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useContext, useId, useLayoutEffect, useMemo, useRef } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
@@ -22,7 +22,8 @@ import { EventCaptionContext, SpineSegment, useSpineView } from "@/components/sh
 import { EventDateContext } from "@/components/shared/event-time";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
-import { SpineLegsContext, useSpineLegsState } from "@/components/shared/spine-column";
+import { SpineLegsContext, SpineNodeToggleContext, useSpineLegsState } from "@/components/shared/spine-column";
+import { useLinkedHover } from "@/hooks/useLinkedHover";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -212,6 +213,15 @@ export function EventCard({
   // In the spine view the segment is the control, so the header is not one.
   const headerToggles = !hideDetailChevron && !spine;
   const showChevron = hasDetail && headerToggles;
+  // The spine node is a second click target for the header (the folder
+  // node's rule): a click on it toggles the card, and hovering it lights the
+  // header and reveals its chevron. The header stays the one Tab stop.
+  const { lit: nodeLit, bind: bindNode } = useLinkedHover<"node">();
+  const nodeToggleOn = showChevron && !pageMode;
+  const nodeToggle = useMemo(
+    () => (nodeToggleOn ? { onToggle: toggleDetail, hover: bindNode("node") } : null),
+    [nodeToggleOn, toggleDetail, bindNode],
+  );
 
   /* ── Info sections — the headings are the buttons ────────────────── */
   // The story (Explanation, (i) disc): the heading-button expands the shared
@@ -298,15 +308,18 @@ export function EventCard({
       <div
         data-anatomy="T1"
         className={`overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
-          showDetail ? "rounded-b-none bg-raised" : hasDetail ? "hover:bg-raised" : ""
+          showDetail ? "rounded-b-none bg-raised" : hasDetail ? `hover:bg-raised${nodeLit ? " bg-raised" : ""}` : ""
         }`}
       >
         <div
-          className={headerToggles ? "group/evt disc-row disc-row-slow cursor-pointer" : ""}
+          className={
+            headerToggles ? `group/evt disc-row disc-row-slow cursor-pointer${nodeLit ? " disc-lit" : ""}` : ""
+          }
           onClick={() => {
             if (hasDetail && headerToggles) toggleDetail();
           }}
           role={headerToggles ? "button" : undefined}
+          aria-expanded={showChevron ? showDetail : undefined}
           tabIndex={headerToggles ? 0 : undefined}
           onKeyDown={(e) => {
             if ((e.key === "Enter" || e.key === " ") && hasDetail && headerToggles) {
@@ -512,7 +525,7 @@ export function EventCard({
                 className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
                 data-anatomy="L3"
               >
-                {iconColumn}
+                <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
               </div>
             )}
             {contentTiers}

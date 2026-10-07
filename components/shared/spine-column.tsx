@@ -7,7 +7,6 @@ import { ArrowRightToLine, Clock, Folder, FolderOpen, Layers, LogOut } from "luc
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
-import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
@@ -259,6 +258,15 @@ export type SpineTip = "above" | "below";
  *  ignores the context. */
 export const SpineTipContext = createContext<SpineTip | null>(null);
 
+/** The card's toggle, handed to its spine node (EventCard, desktop list):
+ *  the node and its flank values are a second click target for the header,
+ *  which stays the one focusable control. The hover handlers light the
+ *  header while the pointer is on the node (`useLinkedHover`). */
+export const SpineNodeToggleContext = createContext<{
+  onToggle: () => void;
+  hover: LinkedHoverHandlers;
+} | null>(null);
+
 /** A warning event's legs, published by the card's header for the card's
  *  spine: the header (ChainTruthRow, a family's own) holds the amounts, the
  *  card's SpineColumn draws them. EventCard provides it. */
@@ -491,13 +499,7 @@ function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
         return (
           <span key={i} className="inline-flex items-center gap-2 text-base font-semibold whitespace-nowrap">
             <TokenChipIcon symbol={leg.symbol} address={leg.address} size={20} />
-            {leg.prov ? (
-              <Prov echo info={leg.prov.info} value={leg.prov.value} symbol={leg.prov.symbol}>
-                {txt}
-              </Prov>
-            ) : (
-              txt
-            )}
+            {txt}
           </span>
         );
       })}
@@ -850,13 +852,7 @@ function WarningLegNodes({
                 className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
                 data-spine-leg-value=""
               >
-                {leg.prov ? (
-                  <Prov echo info={leg.prov.info} value={leg.prov.value} symbol={leg.prov.symbol}>
-                    {txt}
-                  </Prov>
-                ) : (
-                  txt
-                )}
+                {txt}
               </span>
             ) : (
               <span />
@@ -903,6 +899,14 @@ export function SpineColumn({
   // and the card's segment button is the only control: the chips drop their
   // filter, and the card stops the pointer reaching the flank values.
   const spineRow = useSpineRow();
+  // Desktop: a click on the node or its flank values opens and closes the
+  // card. The folder node keeps its toggle; the phone view's segment is a
+  // button already.
+  const toggleCtx = useContext(SpineNodeToggleContext);
+  const nodeToggle = !spineRow && !detached && icon !== "folder" ? toggleCtx : null;
+  const nodeProps = nodeToggle
+    ? { onClick: nodeToggle.onToggle, ...nodeToggle.hover, "data-spine-node-toggle": "" }
+    : {};
   // A warning node's legs: the card's own, else the ones its header published.
   const publishedLegs = useContext(SpineLegsContext)?.legs ?? null;
   const adverseLegs = icon === "warning" ? (warningLegs ?? publishedLegs) : null;
@@ -1028,7 +1032,12 @@ export function SpineColumn({
         case "warning": {
           // The legs as nodes; the triangle only where the event names none.
           const node = adverseLegs?.length ? (
-            <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!spineRow} />
+            <WarningLegNodes
+              legs={adverseLegs}
+              tone={warningTone}
+              showValues={spineValues}
+              filterable={!spineRow && !nodeToggle}
+            />
           ) : (
             <div
               className="grid grid-rows-1 items-center justify-items-center"
@@ -1433,8 +1442,9 @@ export function SpineColumn({
       >
         {leadingMask}
         <div
-          className="relative z-10"
+          className={`relative z-10${nodeToggle ? " cursor-pointer" : ""}`}
           style={detached ? undefined : { backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}` }}
+          {...nodeProps}
         >
           {leadIn}
           {iconContent}
@@ -1460,7 +1470,8 @@ export function SpineColumn({
     <div className="hidden sm:flex mspine:max-sm:flex mspine:max-sm:max-w-full flex-col items-center relative px-1 pt-4 self-stretch">
       {leadingMask}
       <div
-        className="relative z-10 flex flex-col gap-y-1 items-center"
+        className={`relative z-10 flex flex-col gap-y-1 items-center${nodeToggle ? " cursor-pointer" : ""}`}
+        {...nodeProps}
         style={
           detached
             ? { paddingBottom: hasBadge ? 6 : 0 }
@@ -1486,7 +1497,6 @@ export function SpineColumn({
               onChange={row.direction === "left" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}
               max={row.valueMax}
-              prov={row.prov}
               unit={row.unit}
               full={row.fullValue}
               text={row.display}
@@ -1503,7 +1513,7 @@ export function SpineColumn({
                   iconOverride={row.iconSymbol}
                   address={row.address}
                   size={scale.tokenSize}
-                  filterable={!spineRow}
+                  filterable={!spineRow && !nodeToggle}
                 />
                 {row.badge === "check" ? (
                   <CheckBadge size={scale.tokenSize} />
@@ -1523,7 +1533,7 @@ export function SpineColumn({
                 iconOverride={row.iconSymbol}
                 address={row.address}
                 size={scale.tokenSize}
-                filterable={!spineRow}
+                filterable={!spineRow && !nodeToggle}
               />
             )}
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
@@ -1535,7 +1545,6 @@ export function SpineColumn({
               onChange={row.direction === "right" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}
               max={row.valueMax}
-              prov={row.prov}
               unit={row.unit}
               full={row.fullValue}
               text={row.display}

@@ -709,6 +709,7 @@ body {
     opacity: 0;
   }
   .disc-row:hover .disc-chev,
+  .disc-row.disc-lit .disc-chev,
   .disc-row:focus-visible .disc-chev,
   .disc-row:has(:focus-visible) .disc-chev {
     opacity: 1;
@@ -719,7 +720,10 @@ body {
      the delay sits on the hover state alone. Keyboard focus shows it at once;
      the rotation starts at once. The position card's rows and the
      Lifetime flows header keep the instant reveal above. */
-  .disc-row-slow:hover .disc-chev {
+  /* `.disc-lit`: the pointer is on the card's spine node, the header's second
+     click target (event-card.tsx); the same half-second rule. */
+  .disc-row-slow:hover .disc-chev,
+  .disc-row-slow.disc-lit .disc-chev {
     transition-delay: 500ms, 500ms, 0ms;
   }
   .disc-row-slow:focus-visible .disc-chev,
@@ -728,7 +732,8 @@ body {
   }
 }
 @media (hover: hover) and (prefers-reduced-motion: reduce) {
-  .disc-row-slow:hover .disc-chev {
+  .disc-row-slow:hover .disc-chev,
+  .disc-row-slow.disc-lit .disc-chev {
     transition-delay: 0ms;
   }
 }
