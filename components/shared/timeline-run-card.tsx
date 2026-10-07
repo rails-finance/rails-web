@@ -13,13 +13,13 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
-  GroupPill,
-  groupPillText,
   GroupFrame,
   GroupNumbersContext,
-  groupLabel,
+  GroupRange,
+  groupMenuWords,
   groupRangeText,
 } from "@/components/shared/group-frame";
+import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -301,29 +301,18 @@ export function TimelineRunCard({
   const numberRange = eventRange ?? contextRange;
   const rangeText = groupRangeText(numberRange);
   const onToggle = () => !forceOpen && toggle();
-  const pill = (
-    <GroupPill
-      text={groupPillText(numberRange)}
-      label={groupLabel(count, false, rangeText)}
-      open={false}
-      onToggle={onToggle}
-      controls={membersId}
-    />
+  // The range in the number column, plain; the group opens from its row's
+  // ⋮ ("Show 48 grouped events") and closes from a member's ("Hide …").
+  const pill = <GroupRange range={numberRange} />;
+  const words2 = groupMenuWords(count, rangeText);
+  const showMenu = { ...words2.show, show: () => !open && onToggle() };
+  const hide = { ...words2.hide, hide: () => open && onToggle() };
+  // The phone's closed group: its ⋮ rides the summary card the segment opens.
+  const phoneMenu = (
+    <div className="absolute right-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
+      <EventCardMenu shareHref={null} scopeId={membersId} groupShow={showMenu} />
+    </div>
   );
-  const openPill = (
-    <GroupPill
-      text={groupPillText(numberRange)}
-      label={groupLabel(count, true, rangeText)}
-      open
-      onToggle={onToggle}
-      controls={membersId}
-    />
-  );
-  const hide = {
-    title: `Hide ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`,
-    subtitle: rangeText ? `Collapse the group, ${rangeText}` : "Collapse the group",
-    hide: onToggle,
-  };
   /** The closed row's column: the node, then the summed legs, then the dotted
    *  segment for the members not drawn. */
   const legsColumn = (
@@ -536,7 +525,7 @@ export function TimelineRunCard({
     return (
       <GroupFrame
         open={open}
-        openPill={openPill}
+        show={showMenu.show}
         hide={hide}
         membersId={membersId}
         members={body}
@@ -553,7 +542,12 @@ export function TimelineRunCard({
             onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
             iconColumn={legsColumn}
             numberSlot={pill}
-            card={<div className="rounded-xl bg-raised">{summary}</div>}
+            card={
+              <div className="relative">
+                <div className="rounded-xl bg-raised">{summary}</div>
+                {phoneMenu}
+              </div>
+            }
           />
         }
       />
@@ -563,7 +557,7 @@ export function TimelineRunCard({
   return (
     <GroupFrame
       open={open}
-      openPill={openPill}
+      show={showMenu.show}
       hide={hide}
       membersId={membersId}
       closed={
@@ -571,6 +565,7 @@ export function TimelineRunCard({
           avatar={null}
           iconColumn={legsColumn}
           numberSlot={pill}
+          groupMenu={showMenu}
           header={head}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"

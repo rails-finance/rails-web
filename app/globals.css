@@ -62,7 +62,6 @@
    them; new ports use rb-* and the semantic tokens below.
 */
 :root {
-  --group-edge: var(--color-rb-300);
   /* ── Paper tone knobs (LIGHT MODE ONLY) ────────────────────────────────────
      The warm-paper palette is ONE hue family at varying lightness: measuring
      the hand-tuned 2026-07 set (`96b6092`) in OKLCH put every token at H≈88,
@@ -240,7 +239,6 @@
 }
 
 .dark {
-  --group-edge: var(--color-rb-500);
   /* Dark mode colors (current theme as dark) */
   --foreground: #ffffff;
 
@@ -424,21 +422,10 @@ body {
 }
 
 @layer components {
-  /* The event number on a timeline row (ui-jobs 250 point 3, revised): the
-     muted number, no fill, no link. `num-pill-stacked` is a group's: the same
-     number with a second pill edge behind it, offset right and down, in the
-     bracket's muted border colour (`--group-edge`); it is the group's one
-     toggle, closed on its row and open on its first member's row. */
+  /* The event number on a timeline row (ui-jobs 250 point 3): the muted
+     number, no fill, no link. A closed group's range stacks two of them. */
   .num-pill {
     @apply inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] leading-none tabular-nums text-rb-500;
-  }
-  .num-pill-stacked {
-    @apply cursor-pointer transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)];
-    border: 1px solid var(--group-edge);
-    background-color: var(--background);
-    box-shadow:
-      3px 3px 0 -1px var(--background),
-      3px 3px 0 0 var(--group-edge);
   }
   /* Canonical body copy — one treatment so body text stays in parity across
      marketing + product. 16px / normal weight / rb-500 (#687790, set back in

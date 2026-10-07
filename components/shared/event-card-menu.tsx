@@ -11,7 +11,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronUp, Link2 } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronUp, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ExplorerMark } from "@/components/shared/explorer-mark";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
@@ -74,8 +74,12 @@ export function EventCardMenu({
   shareHref,
   scopeId,
   pageOnly,
+  groupShow,
 }: {
-  txHash: string;
+  txHash?: string;
+  /** A closed group's row: its one item, "Show 48 grouped events", the only
+   *  way to open the group (ui-jobs 250, third revision). */
+  groupShow?: { title: string; subtitle: string; show: () => void };
   /** Liquity V2's rows: the event page alone (the page's aside carries the
    *  other actions, ui-jobs 291), and "Hide" inside an open group. */
   pageOnly?: boolean;
@@ -100,55 +104,70 @@ export function EventCardMenu({
       variant="event"
       label={WORDS.menu}
       heading={WORDS.heading}
-      provScope={pageOnly ? undefined : { id: scopeId, hint: WORDS.provenance_hint }}
+      provScope={pageOnly || groupShow ? undefined : { id: scopeId, hint: WORDS.provenance_hint }}
     >
-      {(close) => (
-        <>
-          {shareHref && !onEventPage && (
-            <ToolsMenuItem
-              item="view-page"
-              icon={<ArrowUpRight size={16} />}
-              title={WORDS.view_page}
-              subtitle={WORDS.view_page_hint}
-              href={shareHref}
-              onClick={close}
-            />
-          )}
-          {group && (
-            <ToolsMenuItem
-              item="hide-group"
-              icon={<ChevronUp size={16} />}
-              title={group.title}
-              subtitle={group.subtitle}
-              onClick={() => {
-                close();
-                group.hide();
-              }}
-            />
-          )}
-          {!pageOnly && (
-            <ToolsMenuItem
-              item="view-explorer"
-              icon={<ExplorerMark chainId={chainId} />}
-              title={explorerTitle}
-              subtitle={WORDS.view_explorer_hint}
-              href={explorerUrl(chainId, "tx-logs", txHash)}
-              external
-              onClick={close}
-            />
-          )}
-          {shareHref && !pageOnly && (
-            <ToolsMenuItem
-              item="copy-link"
-              icon={copied === "link" ? tick : <Link2 size={16} className="-rotate-45" />}
-              title={WORDS.copy_link}
-              subtitle={copied === "link" ? WORDS.copied : WORDS.copy_link_hint}
-              copied={copied === "link"}
-              onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
-            />
-          )}
-        </>
-      )}
+      {(close) =>
+        groupShow ? (
+          <ToolsMenuItem
+            item="show-group"
+            expanded={false}
+            icon={<ChevronDown size={16} />}
+            title={groupShow.title}
+            subtitle={groupShow.subtitle}
+            onClick={() => {
+              close();
+              groupShow.show();
+            }}
+          />
+        ) : (
+          <>
+            {shareHref && !onEventPage && (
+              <ToolsMenuItem
+                item="view-page"
+                icon={<ArrowUpRight size={16} />}
+                title={WORDS.view_page}
+                subtitle={WORDS.view_page_hint}
+                href={shareHref}
+                onClick={close}
+              />
+            )}
+            {group && (
+              <ToolsMenuItem
+                item="hide-group"
+                expanded
+                icon={<ChevronUp size={16} />}
+                title={group.title}
+                subtitle={group.subtitle}
+                onClick={() => {
+                  close();
+                  group.hide();
+                }}
+              />
+            )}
+            {!pageOnly && txHash && (
+              <ToolsMenuItem
+                item="view-explorer"
+                icon={<ExplorerMark chainId={chainId} />}
+                title={explorerTitle}
+                subtitle={WORDS.view_explorer_hint}
+                href={explorerUrl(chainId, "tx-logs", txHash)}
+                external
+                onClick={close}
+              />
+            )}
+            {shareHref && !pageOnly && (
+              <ToolsMenuItem
+                item="copy-link"
+                icon={copied === "link" ? tick : <Link2 size={16} className="-rotate-45" />}
+                title={WORDS.copy_link}
+                subtitle={copied === "link" ? WORDS.copied : WORDS.copy_link_hint}
+                copied={copied === "link"}
+                onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
+              />
+            )}
+          </>
+        )
+      }
     </ToolsMenu>
   );
 }

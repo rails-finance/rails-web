@@ -6,13 +6,13 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import {
-  GroupPill,
-  groupPillText,
   GroupFrame,
   GroupNumbersContext,
-  groupLabel,
+  GroupRange,
+  groupMenuWords,
   groupRangeText,
 } from "@/components/shared/group-frame";
+import { EventCardMenu } from "@/components/shared/event-card-menu";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { UsersGlyph } from "./liquity-event-header";
@@ -120,29 +120,18 @@ export function DelegateAdjustRunCard({
   );
   const numberRange = useContext(GroupNumbersContext);
   const rangeText = groupRangeText(numberRange);
-  const pill = (
-    <GroupPill
-      text={groupPillText(numberRange)}
-      label={groupLabel(count, false, rangeText)}
-      open={false}
-      onToggle={toggle}
-      controls={membersId}
-    />
+  // The range in the number column, plain; the group opens from its row's
+  // ⋮ ("Show 48 grouped events") and closes from a member's ("Hide …").
+  const pill = <GroupRange range={numberRange} />;
+  const words2 = groupMenuWords(count, rangeText);
+  const showMenu = { ...words2.show, show: () => !open && toggle() };
+  const hide = { ...words2.hide, hide: () => open && toggle() };
+  // The phone's closed group: its ⋮ rides the summary card the segment opens.
+  const phoneMenu = (
+    <div className="absolute right-3 top-3 z-10" onClick={(e) => e.stopPropagation()}>
+      <EventCardMenu shareHref={null} scopeId={membersId} groupShow={showMenu} />
+    </div>
   );
-  const openPill = (
-    <GroupPill
-      text={groupPillText(numberRange)}
-      label={groupLabel(count, true, rangeText)}
-      open
-      onToggle={toggle}
-      controls={membersId}
-    />
-  );
-  const hide = {
-    title: `Hide ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`,
-    subtitle: rangeText ? `Collapse the group, ${rangeText}` : "Collapse the group",
-    hide: toggle,
-  };
   // No asset moved: no node, the words stand, and the dotted segment marks
   // the members not drawn.
   const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
@@ -155,7 +144,7 @@ export function DelegateAdjustRunCard({
     return (
       <GroupFrame
         open={open}
-        openPill={openPill}
+        show={showMenu.show}
         hide={hide}
         membersId={membersId}
         members={children}
@@ -172,7 +161,12 @@ export function DelegateAdjustRunCard({
             onToggle={(anchor) => spineView.toggle(membersId, anchor)}
             iconColumn={column}
             numberSlot={pill}
-            card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
+            card={
+              <div className="relative">
+                <div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>
+                {phoneMenu}
+              </div>
+            }
           />
         }
       />
@@ -182,7 +176,7 @@ export function DelegateAdjustRunCard({
   return (
     <GroupFrame
       open={open}
-      openPill={openPill}
+      show={showMenu.show}
       hide={hide}
       membersId={membersId}
       closed={
@@ -190,6 +184,7 @@ export function DelegateAdjustRunCard({
           avatar={null}
           iconColumn={column}
           numberSlot={pill}
+          groupMenu={showMenu}
           header={<div className="pl-5 pt-4 pb-3">{words}</div>}
           hideDetailChevron
         />

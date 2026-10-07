@@ -1386,11 +1386,10 @@ function ChainTruthTimelineBody({
       }
       if (runId && !runOpened) {
         runOpened = true;
-        // The group's control (its layers glyph), closed: the row's head
-        // would open the summary card instead of the members.
+        // A closed group opens from its ⋮; the rewind asks the frame directly.
         document
-          .querySelector<HTMLElement>(`[data-flow-run="${runId}"] [data-group-button][aria-expanded="false"]`)
-          ?.click();
+          .querySelector<HTMLElement>(`[data-flow-run="${runId}"] [data-group-frame="closed"]`)
+          ?.dispatchEvent(new Event("group-open"));
       }
       if (tries >= 50) {
         // No mark (its last event filtered out): the day's newest drawn

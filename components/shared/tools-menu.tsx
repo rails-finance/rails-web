@@ -45,6 +45,7 @@ export function ToolsMenuItem({
   external,
   copied,
   item,
+  expanded,
 }: {
   icon: ReactNode;
   title: string;
@@ -56,6 +57,9 @@ export function ToolsMenuItem({
   copied?: boolean;
   /** A name for the row (`data-menu-item`), for the verifiers. */
   item?: string;
+  /** A row that shows or hides a group (ui-jobs 250): its state, drawn as
+   *  `aria-expanded` with `data-group-button` on the row. */
+  expanded?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
@@ -68,7 +72,11 @@ export function ToolsMenuItem({
       </span>
     </>
   );
-  const data = { "data-menu-item": item, "data-copied": copied ? "" : undefined };
+  const data = {
+    "data-menu-item": item,
+    "data-copied": copied ? "" : undefined,
+    ...(expanded !== undefined ? { "data-group-button": "", "aria-expanded": expanded } : {}),
+  };
   if (href) {
     return external ? (
       <a

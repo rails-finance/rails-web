@@ -82,6 +82,9 @@ export interface EventCardProps {
   /** A group's closed row: the head opens the summary card with no chevron
    *  drawn (ui-jobs 250). */
   noChevron?: boolean;
+  /** A group's closed row: its ⋮ carries one item, "Show 48 grouped events",
+   *  the only way to open the group (ui-jobs 250, third revision). */
+  groupMenu?: { title: string; subtitle: string; show: () => void };
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
    *  the only dismiss action is an explicit close button. */
@@ -155,6 +158,7 @@ export function EventCard({
   explanationHeading = "Event explanation",
   eventMenu = true,
   noChevron,
+  groupMenu,
   numberSlot,
   by,
   custody,
@@ -309,7 +313,7 @@ export function EventCard({
   const headRef = useRef<HTMLDivElement>(null);
   const [menuAtEnd, setMenuAtEnd] = useState(false);
   const headMenu =
-    eventMenu && txHash && !pageMode ? (
+    !pageMode && ((eventMenu && txHash) || groupMenu) ? (
       <span
         className="-my-1 inline-flex items-center"
         data-event-head-menu=""
@@ -318,7 +322,13 @@ export function EventCard({
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu txHash={txHash} shareHref={shareHref} scopeId={scopeId} pageOnly={eventMenu === "page"} />
+        <EventCardMenu
+          txHash={txHash}
+          shareHref={groupMenu ? null : shareHref}
+          scopeId={scopeId}
+          pageOnly={eventMenu === "page"}
+          groupShow={groupMenu}
+        />
       </span>
     ) : null;
   useLayoutEffect(() => {
