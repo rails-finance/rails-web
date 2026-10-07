@@ -80,6 +80,9 @@ export interface ProvenanceInfoTabsProps {
   /** App-anatomy codes (rails-ops reference/app-anatomy.md) for the
    *  Explanation and its "?": C3/C4 on a position card, F8/F9 on Lifetime flows. */
   anatomy?: { explanation?: string; learnMore?: string };
+  /** The (i) button's noun: "Show {label}" / "Hide {label}". Names the surface so
+   *  a page with several (i) buttons gives each its own name. */
+  label?: string;
 }
 
 export function ProvenanceInfoTabs({
@@ -91,6 +94,7 @@ export function ProvenanceInfoTabs({
   rowExtra,
   className,
   anatomy,
+  label = "position explanation",
 }: ProvenanceInfoTabsProps) {
   const [openTab, setOpenTab] = useState<string | null>(
     explanation != null && explanationDefaultOpen ? "explanation" : null,
@@ -118,7 +122,7 @@ export function ProvenanceInfoTabs({
       ? [
           {
             key: "explanation",
-            label: "Explanation",
+            label,
             content:
               learnMore || viewHref ? (
                 <>

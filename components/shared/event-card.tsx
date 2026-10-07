@@ -219,7 +219,7 @@ export function EventCard({
       ? [
           {
             key: "explanation",
-            label: "Explanation",
+            label: "explanation",
             content: (
               <>
                 {explainerTeaser &&

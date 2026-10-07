@@ -110,7 +110,7 @@ async function expandCardWithLabel(page, labelRe) {
   await page.click("[data-verify-target]");
 
   // The detail panel loads its own data, and the explainer prose then sits
-  // behind a "Show explanation" toggle — the header expansion alone paints
+  // behind a "Show … explanation" toggle — the header expansion alone paints
   // none of it. Poll rather than guess a settling time.
   let drawer = false;
   for (let i = 0; i < 40 && !drawer; i++) {
@@ -127,7 +127,7 @@ async function expandCardWithLabel(page, labelRe) {
       return true;
     }, CARD_SEL);
   }
-  if (!drawer) throw new Error(`the "Show explanation" toggle never appeared on the /${labelRe.source}/ card`);
+  if (!drawer) throw new Error(`the "Show … explanation" toggle never appeared on the /${labelRe.source}/ card`);
   await page.waitForTimeout(700);
 
   return page.evaluate((sel) => {
