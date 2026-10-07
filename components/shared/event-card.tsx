@@ -502,10 +502,7 @@ export function EventCard({
           <div
             data-skel-section="detail-event"
             data-prov-scope={scopeId}
-            // The band: a redemption's or a liquidation's row stands on the
-            // raised surface (bg-raised, the opened card's), flank to right edge,
-            // closed and open (its spine column carries `data-spine-adverse`).
-            className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded} has-[>[data-anatomy=L3]>[data-spine-adverse]]:bg-raised ${
+            className={`flex w-full ${pageMode ? "flex-col max-sm:!px-0 sm:flex-row sm:items-start" : "items-start"} relative ${scale.cardRounded} ${
               muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
             }`}
             style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
