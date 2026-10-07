@@ -332,7 +332,7 @@ export function LiquityEventHeader({
           </span>
           {hasDebtChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
-              <span className={WARNING_TONE_TEXT.caution}>{L1_WORDS.cleared}</span>
+              <span className="text-rb-500">{L1_WORDS.cleared}</span>
               {wrapDebt(
                 <span className={AMT}>
                   <ExactTip
@@ -347,7 +347,7 @@ export function LiquityEventHeader({
           )}
           {hasCollChange && (
             <span className={`inline-flex items-center ${GAP} ${TXT} ${hideVal}`}>
-              <span className={WARNING_TONE_TEXT.caution}>{L1_WORDS.reduced}</span>
+              <span className="text-rb-500">{L1_WORDS.reduced}</span>
               {wrapColl(
                 <span className={AMT}>
                   <ExactTip

@@ -945,10 +945,10 @@ export function SpineColumn({
   // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
   const spineValues = showTimelineValues;
   // A named warning event (a redemption, a liquidation) stands on the band
-  // (EventCard), so its masks and the node's halo take the band's ground; the
+  // (EventCard, bg-raised), so its masks and the node's halo take that ground; the
   // phone spine view draws no band.
   const banded = effectiveIcon === "warning" && !!warningLabel;
-  const ground = banded && !spineRow ? "var(--surface-band)" : "var(--background)";
+  const ground = banded && !spineRow ? "var(--surface-raised)" : "var(--background)";
 
   // For warning events the spine + lead-in dot inherit the warning tone so the
   // whole dotted segment reads as caution (orange) / critical (red, liquidation).
