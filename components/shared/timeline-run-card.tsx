@@ -4,19 +4,18 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
+import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { ExpandChevron } from "@/components/shared/expand-chevron";
-import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
+import { GroupButton, GroupFrame, groupButtonWords } from "@/components/shared/group-frame";
+import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { useLinkedHover } from "@/hooks/useLinkedHover";
 import { SpineSegment, spokenAmount, useSpineView } from "@/components/shared/mobile-spine";
 import { formatDate } from "@/lib/date";
 
@@ -36,10 +35,12 @@ import { formatDate } from "@/lib/date";
  * own deltas (f(x)'s whole-tick rebalances) omits `aggregates` entirely and
  * renders count-only rather than misstate the position.
  *
- * Visual grammar mirrors the protocol's own single passive-event card: dotted
- * spine with the semantic icon, tinted verb + amount pairs, and the count in
- * the spine's folder pill. The row names no action in words — the verbs beside
- * the summed pairs already do (2026-09-02); the aria label names the members.
+ * The closed run is a row on the spine (ui-jobs 250 set B): its legs summed as
+ * nodes, the kind word in T1, the date range in the time slot, and the dotted
+ * segment below that stands for the members not drawn; the group button above
+ * ("Show 45 events") shows them, inside the bracket frame (`group-frame.tsx`).
+ * A click on the nodes or the head opens the summary card: the sums with
+ * their Σ receipts, and the date range.
  *
  * ── TWO WAYS THE MEMBERS ARRIVE, ONE CARD
  *
@@ -100,26 +101,14 @@ export interface TimelineRunCardProps {
   /** Spine glyph — "warning" for adverse runs, "external" for third-party
    *  actions that aren't a loss (keeper queue fills). */
   spineIcon?: SpineIcon;
-  /** Short label for the desktop spine pill / mobile header pill. */
+  /** The kind's word T1 states ("Redemptions"), in the run's tone. Unset:
+   *  the member noun, plural. */
   warningLabel?: string;
-  /** Folder register — the chunk-card treatment: this row is a chronological
-   *  slice of a longer third-party stretch, not a semantic grouping of its
-   *  own (see `lib/shared/timeline-chunks.ts`). On the spine the folder sits
-   *  in the LEFT flank with a dot on the line and the count in a pill to the
-   *  right — so the expanded members' own spine nodes line up to the folder's
-   *  right and read as its contents. The folder node is clickable (same
-   *  toggle as the header) and draws open while expanded, with a Finder-style
-   *  disclosure chevron to its left (right = closed, down = open) — the row's
-   *  only chevron; the header's trailing ▾ is dropped. Folder node and header
-   *  hover as ONE control: pointing at either raises the header and lights
-   *  the folder (`useLinkedHover`). On mobile, where the
-   *  spine column is hidden, chevron + glyph move into the header — the same
-   *  hand-off the warning pill makes — and the expanded members are held by
-   *  a left rail + slight indent instead. */
+  /** A chronological slice of a longer stretch (`lib/shared/timeline-chunks.ts`):
+   *  the summary card opens with the Σ glyph before the sums. */
   folder?: boolean;
-  /** Small glyph on the folder's corner — a chunk whose members are all one
-   *  kind wears that kind's mark (a liquidations-only folder carries the
-   *  warning triangle). Only rendered with `folder`. */
+  /** Not drawn since ui-jobs 250 set B (the group button and the frame mark
+   *  a group); the callers' marks are left for the end-of-design pass. */
   folderBadge?: ReactNode;
   /** Header content drawn before the aggregate pairs: a shape run's summary. */
   lead?: ReactNode;
@@ -227,10 +216,9 @@ export function TimelineRunCard({
     askedRef.current = true;
     onOpen();
   }, [open, onOpen]);
-  // Folder node (spine flank) + header are one control in two EventCard
-  // subtrees; this joins their hover so either surface lights both.
-  const { lit, bind } = useLinkedHover<"header" | "folder">();
   const spineView = useSpineView();
+  const hideVal = useHeaderValueHideClass();
+  const membersId = useId();
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
@@ -275,111 +263,126 @@ export function TimelineRunCard({
   // run's members' tokens) states no sum.
   const unreadOf = useUnreadTokenOf();
 
-  // In the phone spine view (`spine`) the header is the opened card: not a
-  // control (the segment above it is), and without the list view's
-  // narrow-width stand-ins for the spine, which the segment draws.
-  const headerRow = (spine: boolean) => (
-    <div
-      data-anatomy="L6"
-      className={
-        spine
-          ? "rounded-xl px-5 pt-4 pb-3"
-          : `group/run cursor-pointer rounded-xl transition-colors px-5 pt-4 pb-3${lit ? " bg-raised" : ""}`
-      }
-      {...(spine
-        ? {}
-        : {
-            onClick: toggle,
-            ...bind("header"),
-            role: "button",
-            tabIndex: 0,
-            "aria-expanded": open,
-            "aria-label": `${count} consecutive ${memberPlural} — ${open ? "collapse" : "expand"} the run`,
-            onKeyDown: (e: React.KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                toggle();
-              }
-            },
-          })}
-    >
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {/* The row reads as [icon] N [aggregates…] — the verbs beside each
-            summed pair already name what happened, so a word naming it again
-            was repetition and went, with the "×" beside it, on 2026-09-02
-            (next to the Σ glyph it read as arithmetic). The icon reads as
-            "Σ over this folder". The count rides the spine's folder pill. */}
-        {/* data-prov-exempt: the count is an index row count, the "event
-            numbers" class, not a chain-state figure. See SpineColumn's folder
-            pill, which carries the same stamp for the same reason. */}
-        {folder && (
-          <span data-prov-exempt="" className="inline-flex items-center gap-1 text-sm font-medium text-rb-500">
-            <Calculator size={15} strokeWidth={2} aria-hidden />
+  // ── The summed legs, as the spine's nodes ─────────────────────────────
+  // A run of redemptions or liquidations draws its legs as set A's warning
+  // nodes: every leg left the position, so each points out ("12.41 →",
+  // "37K →"), collateral first, in the run's tone. Any other run nets each
+  // token's legs: a leg whose verb moves the token into the position counts
+  // plus, one that moves it to the wallet minus, and the node's arrow points
+  // the way the net goes. A run whose members moved no asset draws no node.
+  const adverse = spineIcon === "warning" && tone !== "neutral";
+  const legAggs = (aggregates ?? []).filter((agg) => agg.value > 0);
+  const warningLegs = adverse
+    ? [...legAggs]
+        .sort((a, b) => Number(DEBT_VERB.test(a.verb)) - Number(DEBT_VERB.test(b.verb)))
+        .map((agg) => ({ label: agg.verb, value: agg.value, symbol: agg.symbol }))
+    : undefined;
+  const netTokens = adverse || spineIcon === "custody" ? [] : netLegs(legAggs);
+  const iconColumn = (
+    <SpineColumn
+      {...(adverse
+        ? {
+            icon: "warning" as const,
+            warningLegs,
+            warningLabel,
+            warningTone: tone === "danger" ? "critical" : "caution",
+          }
+        : spineIcon === "custody"
+          ? // A custody run moved the asset between accounts: the plane, no
+            // flank (a transfer is neither direction).
+            { icon: "custody" as const }
+          : netTokens.length > 0
+            ? { tokens: netTokens }
+            : { icon: "none" as const })}
+      undrawn
+      isFirst={isFirst}
+      isLast={!!isLast}
+    />
+  );
+  // T1's word: the shape a served folder names, else the kind ("Redemptions",
+  // "Transfers"), in the run's tone.
+  const kindWord = warningLabel ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
+
+  /** The sums, verb by verb: the summary card's body, and T1's legs where
+   *  the spine does not carry them (Timeline values off, a pinned page). */
+  const sums = (hide: string) =>
+    aggregates?.map((agg, i) => {
+      const unread = unreadOf(undefined, agg.symbol);
+      if (unread)
+        return (
+          <span
+            key={`${agg.verb}_${agg.symbol}_${i}`}
+            className={`inline-flex items-center gap-1.5 text-sm ${hide}`}
+            data-not-loaded=""
+          >
+            <span className="text-rb-500">{agg.verb}</span>
+            <TokenAmountNotLoaded address={unread.address} label={unread.label} />
           </span>
-        )}
-        {lead}
-        {aggregates?.map((agg, i) => {
-          const unread = unreadOf(undefined, agg.symbol);
-          if (unread)
-            return (
+        );
+      return (
+        agg.value > 0 && (
+          <span key={`${agg.verb}_${agg.symbol}_${i}`} className={`inline-flex items-center gap-1.5 text-sm ${hide}`}>
+            <span className="text-rb-500">{agg.verb}</span>
+            <Prov value={fullNum(agg.value)} symbol={agg.symbol} info={runProv(agg.provWhat)}>
+              <span className="font-bold text-foreground">
+                <ExactTip
+                  text={fmtHeaderMagnitude(agg.value, agg.symbol)}
+                  exact={formatExact(agg.value)}
+                  symbol={agg.symbol}
+                />
+              </span>
+            </Prov>
+            <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
+            {/* A receipt token wearing its underlying's mark names itself,
+                so 0.0675 mWETH does not read as 0.0675 WETH. */}
+            {agg.iconSymbol && agg.iconSymbol !== agg.symbol && (
+              <span className="text-xs text-rb-500">{agg.symbol}</span>
+            )}
+            {agg.count != null && (
+              // data-prov-exempt: a row count, the "event numbers" class.
               <span
-                key={`${agg.verb}_${agg.symbol}_${i}`}
-                className="inline-flex items-center gap-1.5 text-sm"
-                data-not-loaded=""
+                data-prov-exempt=""
+                className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
+                title={`${agg.count.toLocaleString("en-US")} ${agg.verb.toLowerCase()} rows, grouped in this row; open it to see each`}
               >
-                <span className={VERB_CLASSES[tone]}>{agg.verb}</span>
-                <TokenAmountNotLoaded address={unread.address} label={unread.label} />
+                {agg.count.toLocaleString("en-US")}
               </span>
-            );
-          return (
-            agg.value > 0 && (
-              <span key={`${agg.verb}_${agg.symbol}_${i}`} className="inline-flex items-center gap-1.5 text-sm">
-                <span className={VERB_CLASSES[tone]}>{agg.verb}</span>
-                <Prov value={fullNum(agg.value)} symbol={agg.symbol} info={runProv(agg.provWhat)}>
-                  <span className="font-bold text-foreground">
-                    <ExactTip
-                      text={fmtHeaderMagnitude(agg.value, agg.symbol)}
-                      exact={formatExact(agg.value)}
-                      symbol={agg.symbol}
-                    />
-                  </span>
-                </Prov>
-                <TokenChipIcon symbol={agg.symbol} iconOverride={agg.iconSymbol} size={16} />
-                {/* A receipt token wearing its underlying's mark names itself,
-                    so 0.0675 mWETH does not read as 0.0675 WETH. */}
-                {agg.iconSymbol && agg.iconSymbol !== agg.symbol && (
-                  <span className="text-xs text-rb-500">{agg.symbol}</span>
-                )}
-                {agg.count != null && (
-                  // data-prov-exempt: a row count, as the folder's member count.
-                  <span
-                    data-prov-exempt=""
-                    className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10"
-                    title={`${agg.count.toLocaleString("en-US")} ${agg.verb.toLowerCase()} rows, grouped in this row; open it to see each`}
-                  >
-                    {agg.count.toLocaleString("en-US")}
-                  </span>
-                )}
-              </span>
-            )
-          );
-        })}
-        {extraHeader}
-        {/* `evt-meta`: below sm this span becomes the header's own first
-            row (app/globals.css) — the date range sits right-aligned above
-            the aggregates, the same hand-off every event card's date/time
-            makes there. A folder row carries NO trailing chevron: its
-            disclosure mark is the Finder-style chevron beside the folder
-            glyph (spine node on sm+, header glyph below), so a second one
-            here would say the same thing twice (Miles, 2026-09-02). A
-            non-folder run row keeps the ▾. */}
-        {!spine && (
-          <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
-            <span className="text-xs text-rb-500">{range}</span>
-            {!folder && <ExpandChevron isOpen={open} group="run" />}
+            )}
           </span>
-        )}
-      </div>
+        )
+      );
+    });
+  const hasSums = legAggs.length > 0 || !!lead || !!extraHeader;
+
+  /** The group's summary card: the sums and the date range. */
+  const summary = (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-3 pb-4" data-group-summary="">
+      {folder && (
+        <span data-prov-exempt="" className="inline-flex items-center text-rb-500">
+          <Calculator size={15} strokeWidth={2} aria-label="Sums over the group" />
+        </span>
+      )}
+      {lead}
+      {sums("")}
+      {extraHeader}
+      <span className="ml-auto text-xs text-rb-500">{range}</span>
+    </div>
+  );
+
+  /** T1: the kind word in the run's tone, the sums where the spine does not
+   *  carry them, the date range in the time slot. */
+  const head = (
+    <div data-anatomy="L6" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
+      {lead ?? (
+        <span className={`text-sm font-medium ${VERB_CLASSES[adverse ? tone : "neutral"]}`} data-group-word="">
+          {kindWord}
+        </span>
+      )}
+      {sums(hideVal)}
+      {extraHeader}
+      <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
+        <span className="text-xs text-rb-500">{range}</span>
+      </span>
     </div>
   );
 
@@ -425,82 +428,90 @@ export function TimelineRunCard({
     }
   }
 
-  // ── The phone spine view: the row is one segment, captioned with the count
-  // and the span. A tap opens the header's sums as the card, and the members
-  // under it as segments of their own on the same line (no rail and no
-  // indent: the open folder glyph on the flank says whose they are).
+  const button = (
+    <GroupButton open={open} onClick={() => !forceOpen && toggle()} controls={membersId}>
+      {groupButtonWords(count, open)}
+    </GroupButton>
+  );
+
+  // ── The phone spine view: the summed row is one segment, captioned with the
+  // kind and the span; a tap opens the summary card (one card open on the
+  // timeline at a time). The members follow as segments of their own.
   if (spineView) {
     const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
-    const sums = (aggregates ?? [])
-      .filter((agg) => agg.value > 0 && !unreadOf(undefined, agg.symbol))
+    const spokenSums = legAggs
+      .filter((agg) => !unreadOf(undefined, agg.symbol))
       .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
     const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
+    const cardOpen = spineView.openId === membersId;
     return (
-      <div className="flex flex-col gap-2">
-        <SpineSegment
-          caption={
-            <>
-              {countText} &middot; {range}
-            </>
-          }
-          spokenCaption={`${countText}, ${spokenRange}`}
-          label={`${countText}, ${spokenRange}${sums.length ? `: ${sums.join(", ")}` : ""}`}
-          open={open}
-          onToggle={() => {
-            if (!forceOpen) toggle();
-          }}
-          iconColumn={
-            <SpineColumn
-              icon={folder ? "folder" : spineIcon}
-              warningTone={tone === "danger" ? "critical" : "caution"}
-              warningLabel={warningLabel}
-              folderOpen={folder ? open : undefined}
-              folderMark={folder ? folderBadge : undefined}
-              folderCount={folder ? count : undefined}
-              spine="dotted"
-              isFirst={isFirst}
-              isLast={!!isLast && !open}
-            />
-          }
-          card={<div className="rounded-xl bg-raised">{headerRow(true)}</div>}
-        />
-        {open && body}
-      </div>
+      <GroupFrame
+        open={open}
+        banded={adverse}
+        button={button}
+        membersId={membersId}
+        members={body}
+        closed={
+          <SpineSegment
+            caption={
+              <>
+                {kindWord} &middot; {range}
+              </>
+            }
+            spokenCaption={`${kindWord}, ${spokenRange}`}
+            label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
+            open={cardOpen}
+            onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
+            iconColumn={iconColumn}
+            card={<div className="rounded-xl bg-raised">{summary}</div>}
+          />
+        }
+      />
     );
   }
 
   return (
-    <>
-      <EventCard
-        avatar={<div className="hidden sm:block" />}
-        iconColumn={
-          <SpineColumn
-            icon={folder ? "folder" : spineIcon}
-            warningTone={tone === "danger" ? "critical" : "caution"}
-            warningLabel={warningLabel}
-            folderOpen={folder ? open : undefined}
-            folderMark={folder ? folderBadge : undefined}
-            folderCount={folder ? count : undefined}
-            onFolderToggle={folder ? toggle : undefined}
-            folderLit={folder ? lit : undefined}
-            folderHover={folder ? bind("folder") : undefined}
-            spine="dotted"
-            isFirst={isFirst}
-            isLast={!!isLast && !open}
-          />
-        }
-        header={headerRow(false)}
-        hideDetailChevron
-        muted={muted}
-      />
-      {open &&
-        (folder ? (
-          // The members join the outer flex column; the spine (the folder in
-          // the left flank, the members' nodes to its right) holds them.
-          <>{body}</>
-        ) : (
-          body
-        ))}
-    </>
+    <GroupFrame
+      open={open}
+      banded={adverse}
+      button={button}
+      membersId={membersId}
+      members={body}
+      closed={
+        <EventCard
+          avatar={null}
+          iconColumn={iconColumn}
+          header={head}
+          detail={hasSums ? summary : undefined}
+          detailLabel="The group's sums"
+          muted={muted}
+        />
+      }
+    />
   );
+}
+
+/** A verb that names the debt side of a leg: drawn last, after the
+ *  collateral, as set A's warning nodes are. */
+const DEBT_VERB = /^(cleared|repaid|repay|debt)/i;
+/** A verb that moves the token to the wallet; every other one into the
+ *  position. */
+const OUT_VERB = /^(withdr|borrow|received|paid out|claimed|redeemed|sent)/i;
+
+/** Net each token's legs: into the position plus, to the wallet minus. */
+function netLegs(aggs: RunAggregate[]): SpineTokenRow[] {
+  const net = new Map<string, { value: number; iconSymbol?: string }>();
+  for (const agg of aggs) {
+    const cur = net.get(agg.symbol) ?? { value: 0, iconSymbol: agg.iconSymbol };
+    cur.value += OUT_VERB.test(agg.verb) ? -agg.value : agg.value;
+    net.set(agg.symbol, cur);
+  }
+  return [...net.entries()]
+    .filter(([, v]) => v.value !== 0)
+    .map(([symbol, v]) => ({
+      symbol,
+      iconSymbol: v.iconSymbol,
+      direction: v.value > 0 ? ("right" as const) : ("left" as const),
+      value: Math.abs(v.value),
+    }));
 }
