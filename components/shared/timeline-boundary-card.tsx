@@ -27,7 +27,7 @@
 //
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
-import { GroupNode } from "@/components/shared/group-frame";
+import { GroupCount } from "@/components/shared/group-frame";
 import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
@@ -356,26 +356,19 @@ export function TimelineBoundaryCard({
     <div data-figure="timeline-boundary" data-prov-exempt="" data-boundary-arm={b.arm}>
       <EventCard
         avatar={null}
-        // The group node's form in place of a node: the range of the rows it
-        // stands for over the layers glyph, the one glyph that means "events
-        // not drawn". It opens and closes the card, as the header does; its
-        // words are the card's, in its accessible name and title.
-        iconColumn={
-          <SpineColumn
-            icon="none"
-            lead={
-              <GroupNode
-                range={range ? `#${range.split(" – ").reverse().join("–")}` : null}
-                label={label}
-                open={open}
-                onToggle={() => setOpen((v) => !v)}
-              />
-            }
-            undrawn
-            isFirst={isFirst}
-            isLast={isLast}
+        // The group's form: the layers glyph and the count in the number
+        // column, the one mark for "events not drawn"; it opens and closes
+        // the card, as the header does, its words in its name and title. The
+        // spine draws the dotted segment alone.
+        numberSlot={
+          <GroupCount
+            count={counted ? (b.omitted as number) : undefined}
+            label={range ? `${label}, #${range.split(" – ").reverse().join("–")}` : label}
+            open={open}
+            onToggle={() => setOpen((v) => !v)}
           />
         }
+        iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={isLast} />}
         header={header}
         detail={hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />}
         detailOpen={open}

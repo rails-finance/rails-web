@@ -6,10 +6,11 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import {
+  GroupCaptionRow,
+  GroupCount,
   GroupFrame,
-  GroupNode,
   GroupNumbersContext,
-  PhoneGroupNode,
+  groupLabel,
   groupRangeText,
 } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
@@ -116,19 +117,21 @@ export function DelegateAdjustRunCard({
       </span>
     </div>
   );
-  const range2 = groupRangeText(useContext(GroupNumbersContext));
-  const nodeLabel = `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}`;
-  const nodeProps = { range: range2, label: nodeLabel, open, onToggle: toggle, controls: membersId };
-  // No asset moved, so the node stands alone on the line, with the dotted
-  // segment for the members not drawn while closed.
-  const column = (closed: boolean, last: boolean) => (
-    <SpineColumn
-      icon="none"
-      lead={<GroupNode {...nodeProps} />}
-      undrawn={closed}
-      isFirst={!last && isFirst}
-      isLast={(closed || last) && !!isLast}
+  const rangeText = groupRangeText(useContext(GroupNumbersContext));
+  const control = (inline?: boolean) => (
+    <GroupCount
+      count={count}
+      label={groupLabel(count, open, rangeText)}
+      open={open}
+      onToggle={toggle}
+      controls={membersId}
+      inline={inline}
     />
+  );
+  // No asset moved: no node, the words stand, and the dotted segment marks
+  // the members not drawn while closed.
+  const column = (closed: boolean, last: boolean) => (
+    <SpineColumn icon="none" undrawn={closed} isFirst={!last && isFirst} isLast={(closed || last) && !!isLast} />
   );
 
   if (spineView) {
@@ -136,26 +139,26 @@ export function DelegateAdjustRunCard({
     const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
     const by = managerName ? ` by ${managerName}` : "";
     const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
-    const phoneNode = <PhoneGroupNode {...nodeProps} />;
+    const captionRow = <GroupCaptionRow control={control(true)}>Adjusted &middot; {range}</GroupCaptionRow>;
     return (
       <GroupFrame
         open={open}
         membersId={membersId}
-        top={phoneNode}
+        top={captionRow}
         members={children}
-        bottom={phoneNode}
+        bottom={<GroupCaptionRow control={control(true)} />}
         closed={
           <div className="flex flex-col">
-            {phoneNode}
             <SpineSegment
-              caption={<>Adjusted &middot; {range}</>}
+              caption={null}
               spokenCaption={`Adjusted, ${spokenRange}`}
               label={`${countText}${by}, ${spokenRange}${movement}`}
               open={spineView.openId === membersId}
               onToggle={(anchor) => spineView.toggle(membersId, anchor)}
-              iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />}
+              iconColumn={column(true, false)}
               card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
             />
+            {captionRow}
           </div>
         }
       />
@@ -163,7 +166,13 @@ export function DelegateAdjustRunCard({
   }
 
   const row = (closed: boolean, last: boolean, header: ReactNode) => (
-    <EventCard avatar={null} iconColumn={column(closed, last)} header={header} hideDetailChevron />
+    <EventCard
+      avatar={null}
+      iconColumn={column(closed, last)}
+      numberSlot={control()}
+      header={header}
+      hideDetailChevron
+    />
   );
   return (
     <GroupFrame

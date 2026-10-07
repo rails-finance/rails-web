@@ -2,15 +2,14 @@
 
 import { createContext, type ReactNode } from "react";
 import { Layers } from "lucide-react";
-import { useTimelineScale } from "@/components/shared/activity-timeline";
 
 // A group on the timeline (rails-ops TO-DO-ui-jobs 250 points 3 and 4, 240):
-// a closed group is a row on the spine. Its control is a node on the line:
-// the range of event numbers it holds ("#139–147") over the layers glyph, one
-// button; under it, the group's legs summed as nodes. Open, the members draw
-// as rows and the same node repeats as the group's bottom node. A bracket
-// frame marks the group closed and open; the tone sits on the nodes, the T1
-// word and the dotted segment.
+// a closed group is a row on the spine, its legs summed as nodes. Its control
+// stands in the number column, left of the spine, where a member's number
+// would: the layers glyph and the count. Open, the members draw as rows with
+// their numbers and the control repeats at the group's bottom row. A
+// bracket frame marks the group closed and open; the tone sits on the nodes,
+// the T1 word and the dotted segment.
 
 /** The event numbers a client-grouped folder holds, lowest and highest, for
  *  its node (`renderRunFolders` provides it). */
@@ -23,24 +22,29 @@ export function groupRangeText(range: [number, number] | null): string | null {
   return lo === hi ? `#${lo}` : `#${lo}–${hi}`;
 }
 
-/** The group's one control, on the spine: the range in the time slot's small
- *  muted type over the layers glyph. The verb lives in the accessible name
- *  and the native title ("Show 9 grouped events"); the row shows none. */
-export function GroupNode({
-  range,
+/** The group's one control, in the number column where a member's number
+ *  would stand: the layers glyph with the count under it ("× 45") in the
+ *  muted small type. The verb and the range live in the accessible name and
+ *  the native title ("Show 45 grouped events, #7–51"); the row shows neither. */
+export function GroupCount({
+  count,
   label,
   open,
   onToggle,
   controls,
+  inline,
 }: {
-  range: string | null;
+  /** Unset where the count is not known (the boundary before the index
+   *  has counted): the glyph alone. */
+  count?: number;
   label: string;
-  /** Unset where the node opens no list (the boundary's card). */
+  /** Unset where the control opens no list (the boundary's card). */
   open?: boolean;
   onToggle: () => void;
   controls?: string;
+  /** The phone's caption row: glyph and count side by side. */
+  inline?: boolean;
 }) {
-  const scale = useTimelineScale();
   return (
     <button
       type="button"
@@ -53,43 +57,41 @@ export function GroupNode({
         onToggle();
       }}
       data-group-button=""
-      // The glyph is the node; the padding, cancelled by the margin, takes
-      // the target to 44px without moving the stack.
-      className="group/gn relative -m-1.5 flex items-center justify-center rounded-full p-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]"
+      // The padding, cancelled by the margin, takes the target to 44px.
+      className={`group/gc relative -m-2 flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg p-2 text-xs tabular-nums text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] ${inline ? "flex-row" : "flex-col"}`}
     >
-      {range && (
-        <span
-          className="absolute bottom-full left-1/2 -translate-x-1/2 whitespace-nowrap px-1 text-xs leading-4 tabular-nums text-rb-500 transition-colors group-hover/gn:text-foreground"
-          style={{ backgroundColor: "var(--background)" }}
-          data-group-range=""
-        >
-          {range}
-        </span>
-      )}
       <Layers
-        size={scale.tokenSize}
-        strokeWidth={1.25}
+        size={18}
+        strokeWidth={1.5}
         absoluteStrokeWidth
         aria-hidden
-        className="text-rb-500 transition-colors group-hover/gn:text-foreground"
+        className="text-teal-600 dark:text-teal-500"
       />
+      {count != null && <span aria-hidden>&times; {count.toLocaleString("en-US")}</span>}
     </button>
   );
 }
 
-/** The phone spine view's group node: the segment below it is a button of its
- *  own, so the node stands on the line above it, centred on the spine. */
-export function PhoneGroupNode(props: Parameters<typeof GroupNode>[0]) {
+/** "Show 45 grouped events, #7–51" / "Hide …". */
+export function groupLabel(count: number, open: boolean, range: string | null): string {
+  return `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}${range ? `, ${range}` : ""}`;
+}
+
+/** The phone spine view's caption row for a group: the control first, then
+ *  the kind and the span ("[layers] × 45 Redemptions · 1 Oct '25 – 12 Oct
+ *  '25"), on the line. The segment above is a button of its own, so the
+ *  control stands in this row, outside it. */
+export function GroupCaptionRow({ control, children }: { control: ReactNode; children?: ReactNode }) {
   return (
-    <div className="relative flex justify-center pt-5 pb-1">
-      {/* The line runs on into the node of the segment below. */}
-      <div aria-hidden className="absolute left-1/2 top-0 -bottom-6 w-px -translate-x-1/2 bg-rb-500" />
-      <div
-        className="relative"
-        style={{ backgroundColor: "var(--background)", boxShadow: "0 0 0 4px var(--background)" }}
+    <div className="relative flex justify-center py-1" data-group-caption="">
+      <div aria-hidden className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-rb-500" />
+      <span
+        className="relative inline-flex max-w-full items-center gap-2 px-2 text-xs leading-5 text-rb-500"
+        style={{ backgroundColor: "var(--background)" }}
       >
-        <GroupNode {...props} />
-      </div>
+        {control}
+        {children && <span className="truncate">{children}</span>}
+      </span>
     </div>
   );
 }

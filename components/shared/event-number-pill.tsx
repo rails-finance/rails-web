@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, type ReactNode } from "react";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortAddr } from "@/lib/shared/format-event";
@@ -26,7 +26,14 @@ export const EventTxHashContext = createContext<string | null>(null);
  *  `<EventHeadChevron />`, and the event menu (⋮), which the number pill
  *  draws before the number so the pill stays the last thing on the line. Null
  *  outside a card, and on the event page. */
-export const EventHeadContext = createContext<{ chevron: ReactNode; menu: ReactNode } | null>(null);
+export const EventHeadContext = createContext<{
+  chevron: ReactNode;
+  menu: ReactNode;
+  /** Set where the card draws the number in a column of its row, left of the
+   *  spine (ui-jobs 250, the timeline's desktop row): the header's pill hands
+   *  its number there and draws none in the header. */
+  numberColumn?: (n: { number: number; last?: number } | null) => void;
+} | null>(null);
 
 /** The card's chevron, after the header's action word; `className` sets
  *  its wrapper's spacing. Nothing where the card draws no chevron. */
@@ -65,22 +72,34 @@ function decoded(path: string): string {
 }
 
 export function EventNumberPill(props: { number: number; last?: number }) {
-  const menu = useContext(EventHeadContext)?.menu ?? null;
+  const head = useContext(EventHeadContext);
+  const menu = head?.menu ?? null;
+  const toColumn = head?.numberColumn;
+  const { number, last } = props;
+  useLayoutEffect(() => {
+    if (!toColumn) return;
+    toColumn({ number, last });
+    return () => toColumn(null);
+  }, [toColumn, number, last]);
   return (
     <>
       {menu}
-      <NumberPill {...props} />
+      {/* Where the card's column carries the number (>=640px), the header's
+          pill shows only below it, where the column is hidden. */}
+      <NumberPill {...props} className={toColumn ? "sm:hidden" : undefined} />
     </>
   );
 }
 
-function NumberPill({
+export function NumberPill({
   number,
   last,
+  className,
 }: {
   number: number;
   /** A row drawing several events ends its range here: "7–8". */
   last?: number;
+  className?: string;
 }) {
   const shareHref = useEventShareHref();
   const pathname = usePathname();
@@ -93,7 +112,7 @@ function NumberPill({
   if (!shareHref) {
     return (
       <span
-        className={EVENT_NUMBER_PILL}
+        className={`${EVENT_NUMBER_PILL}${className ? ` ${className}` : ""}`}
         aria-label={range ? `Events ${number} to ${last}` : `Event ${number}`}
         data-event-number={number}
         data-prov-exempt=""
@@ -110,7 +129,7 @@ function NumberPill({
   return (
     <Link
       href={onPage ? timelineHrefOf(shareHref) : shareHref}
-      className={`${EVENT_NUMBER_PILL} ${LINKED}${hash ? " font-mono" : ""}`}
+      className={`${EVENT_NUMBER_PILL} ${LINKED}${hash ? " font-mono" : ""}${className ? ` ${className}` : ""}`}
       aria-label={`${action}, ${which}`}
       title={hash ?? action}
       data-event-number={number}

@@ -6,7 +6,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
-import { EventHeadContext, EventTxHashContext } from "@/components/shared/event-number-pill";
+import { EventHeadContext, EventTxHashContext, NumberPill } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
@@ -110,6 +110,9 @@ export interface EventCardProps {
   /** The words after T3's (i): the button's on the timeline, the heading's
    *  on the event page. A family's strings file can replace the default. */
   explanationHeading?: string;
+  /** What the number column draws in place of the event's number: a group's
+   *  control (`GroupCount`), the boundary's. */
+  numberSlot?: React.ReactNode;
 }
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
@@ -141,6 +144,7 @@ export function EventCard({
   pageAside,
   explanationHeading = "Event explanation",
   eventMenu = true,
+  numberSlot,
 }: EventCardProps) {
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
@@ -269,6 +273,16 @@ export function EventCard({
   ) : null;
   // A header with no number pill (a Fluid round trip) takes the menu at the
   // right end of its row, after the header.
+  // The number column (ui-jobs 250): on the timeline's desktop row the
+  // event's number stands in a column of its own, left of the spine; the
+  // header's pill hands it here.
+  const numberColumnOn = !pageMode && !spine;
+  const [num, setNumState] = useState<{ number: number; last?: number } | null>(null);
+  const setNum = useCallback(
+    (n: { number: number; last?: number } | null) =>
+      setNumState((cur) => (cur?.number === n?.number && cur?.last === n?.last ? cur : n)),
+    [],
+  );
   const headRef = useRef<HTMLDivElement>(null);
   const [menuAtEnd, setMenuAtEnd] = useState(false);
   const headMenu =
@@ -338,7 +352,13 @@ export function EventCard({
           <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
             <div className={`flex-1 min-w-0 ${menuAtEnd ? "" : "pr-5"}`} ref={headRef}>
               <EventTxHashContext.Provider value={txHash ?? null}>
-                <EventHeadContext.Provider value={{ chevron: headChevron, menu: menuAtEnd ? null : headMenu }}>
+                <EventHeadContext.Provider
+                  value={{
+                    chevron: headChevron,
+                    menu: menuAtEnd ? null : headMenu,
+                    numberColumn: numberColumnOn ? setNum : undefined,
+                  }}
+                >
                   {header}
                 </EventHeadContext.Provider>
               </EventTxHashContext.Provider>
@@ -519,9 +539,19 @@ export function EventCard({
               </div>
             ) : (
               <div
-                className="hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
+                className="relative hidden sm:flex w-2/5 shrink-0 self-stretch items-stretch justify-center"
                 data-anatomy="L3"
               >
+                {/* The number column, at the left of the spine's area: the
+                    event's number, or a group's control. */}
+                <div className="absolute left-0 top-4 z-10 flex w-11 justify-center" data-number-column="">
+                  {numberSlot ??
+                    (num && (
+                      <EventTxHashContext.Provider value={txHash ?? null}>
+                        <NumberPill number={num.number} last={num.last} />
+                      </EventTxHashContext.Provider>
+                    ))}
+                </div>
                 <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
               </div>
             )}

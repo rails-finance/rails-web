@@ -33,7 +33,7 @@ export type SpineIcon =
   | "market-open" // A market note opened from its spine marker (item 118): the same diamond, filled in the same neutral ink, so the open note is marked on the spine
   | "market" // A market note — a receipted fact about the MARKET between two of the account's own events (components/shared/market-note-row.tsx): hollow diamond, neutral ink, never a party colour
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: the same hollow outline in the same neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts — turned square where the note's is a diamond, so the two classes are told apart by shape
-  | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws its `lead` alone
+  | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
@@ -194,9 +194,6 @@ export interface SpineColumnProps {
    *  group): dotted, in the warning tone or the neutral ink. Every other
    *  line is solid. */
   undrawn?: boolean;
-  /** A group's node (`GroupNode`), drawn on the line above the node stack:
-   *  the group's range and the layers glyph, its one control. */
-  lead?: ReactNode;
   /** Spine color tint — encodes subsystem or event category */
   color?: SpineColor;
   /** The first node on the spine: nothing is drawn above it (a leading mask
@@ -858,7 +855,6 @@ export function SpineColumn({
   warningLegs,
   iconDirection,
   undrawn,
-  lead,
   color = "default",
   isFirst,
   isLast,
@@ -1317,7 +1313,6 @@ export function SpineColumn({
           {...nodeProps}
         >
           {leadIn}
-          {lead && <div className="flex justify-center pb-1">{lead}</div>}
           {iconContent}
         </div>
         <div className="flex-1 relative">
@@ -1357,7 +1352,6 @@ export function SpineColumn({
         }
       >
         {leadIn}
-        {lead && <div className="flex justify-center pb-1">{lead}</div>}
         {rows.map((row, i) => (
           <div
             key={i}
