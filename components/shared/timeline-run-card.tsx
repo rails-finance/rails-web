@@ -13,7 +13,6 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
-  GroupCaptionRow,
   GroupCount,
   GroupFrame,
   GroupNumbersContext,
@@ -298,14 +297,12 @@ export function TimelineRunCard({
   // column; the range of event numbers rides its name and title.
   const numberRange = useContext(GroupNumbersContext);
   const rangeText = groupRangeText(eventRange ?? numberRange);
-  const control = (inline?: boolean) => (
+  const control = (
     <GroupCount
-      count={count}
       label={groupLabel(count, open, rangeText)}
       open={open}
       onToggle={() => !forceOpen && toggle()}
       controls={membersId}
-      inline={inline}
     />
   );
   /** The closed row's column: the node, then the summed legs, then the dotted
@@ -331,13 +328,11 @@ export function TimelineRunCard({
       isLast={!!isLast}
     />
   );
-  /** An open group's top and bottom rows: the line runs through. */
-  const lineColumn = (last: boolean) => (
-    <SpineColumn icon="none" isFirst={!last && isFirst} isLast={last && !!isLast} />
-  );
   // T1's word: the shape a served folder names, else the kind ("Redemptions",
   // "Transfers"), in the run's tone.
   const kindWord = warningLabel ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
+  // The count rides T1 and the caption: "Redemptions (48)".
+  const countMark = `(${count.toLocaleString("en-US")})`;
 
   /** The sums, verb by verb: the summary card's body, and T1's legs where
    *  the spine does not carry them (Timeline values off, a pinned page). */
@@ -449,9 +444,14 @@ export function TimelineRunCard({
    *  carry them, the date range in the time slot. */
   const head = (
     <div data-anatomy="L6" className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
-      {lead ?? (
+      {lead ? (
+        <span className="inline-flex items-center gap-1.5" data-group-word="">
+          {lead}
+          <span className="text-sm text-rb-500">{countMark}</span>
+        </span>
+      ) : (
         <span className={`text-sm font-medium ${VERB_CLASSES[adverse ? tone : "neutral"]}`} data-group-word="">
-          {kindWord}
+          {kindWord} {countMark}
         </span>
       )}
       {sums(hideVal)}
@@ -505,54 +505,35 @@ export function TimelineRunCard({
   }
 
   // ── The phone spine view: the summed row is one segment; a tap opens the
-  // summary card (one card open on the timeline at a time). The caption row
-  // under it starts with the group's control. Open, the members follow as
-  // segments of their own, and the control closes them from the bottom row.
+  // summary card (one card open on the timeline at a time). The control
+  // straddles the frame's corner; open, the members follow as segments,
+  // and the control repeats at the bottom corner.
   if (spineView) {
     const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
     const spokenSums = legAggs
       .filter((agg) => !unreadOf(undefined, agg.symbol))
       .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
     const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
-    // The control sits at the far left of the group's first row, where the
-    // desktop's number column puts it; the open group's bottom row repeats it.
-    const corner = <div className="absolute left-3 top-2 z-20">{control()}</div>;
     return (
       <GroupFrame
         open={open}
+        control={control}
         membersId={membersId}
-        top={
-          <div className="relative min-h-12">
-            {corner}
-            <GroupCaptionRow>
-              {kindWord} &middot; {range}
-            </GroupCaptionRow>
-          </div>
-        }
         members={body}
-        bottom={
-          <div className="relative min-h-12">
-            {corner}
-            <GroupCaptionRow />
-          </div>
-        }
         closed={
-          <div className="relative">
-            {corner}
-            <SpineSegment
-              caption={
-                <>
-                  {kindWord} &middot; {range}
-                </>
-              }
-              spokenCaption={`${kindWord}, ${spokenRange}`}
-              label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
-              open={spineView.openId === membersId}
-              onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
-              iconColumn={legsColumn}
-              card={<div className="rounded-xl bg-raised">{summary}</div>}
-            />
-          </div>
+          <SpineSegment
+            caption={
+              <>
+                {kindWord} {countMark} &middot; {range}
+              </>
+            }
+            spokenCaption={`${kindWord}, ${spokenRange}`}
+            label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
+            open={spineView.openId === membersId}
+            onToggle={hasSums ? (anchor) => spineView.toggle(membersId, anchor) : undefined}
+            iconColumn={legsColumn}
+            card={<div className="rounded-xl bg-raised">{summary}</div>}
+          />
         }
       />
     );
@@ -561,38 +542,19 @@ export function TimelineRunCard({
   return (
     <GroupFrame
       open={open}
+      control={control}
       membersId={membersId}
       closed={
         <EventCard
           avatar={null}
           iconColumn={legsColumn}
-          numberSlot={control()}
           header={head}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
           muted={muted}
         />
       }
-      top={
-        <EventCard
-          avatar={null}
-          iconColumn={lineColumn(false)}
-          numberSlot={control()}
-          header={head}
-          hideDetailChevron
-          muted={muted}
-        />
-      }
       members={body}
-      bottom={
-        <EventCard
-          avatar={null}
-          iconColumn={lineColumn(true)}
-          numberSlot={control()}
-          header={<div />}
-          hideDetailChevron
-        />
-      }
     />
   );
 }

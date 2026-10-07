@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import {
-  GroupCaptionRow,
   GroupCount,
   GroupFrame,
   GroupNumbersContext,
@@ -112,86 +111,64 @@ export function DelegateAdjustRunCard({
         </span>
       )}
       {managerName && <span className="text-sm font-bold text-pink-500">{managerName}</span>}
+      <span className="text-sm text-rb-500">({count.toLocaleString("en-US")})</span>
       <span className="evt-meta ml-auto inline-flex items-center gap-2 whitespace-nowrap">
         <span className="text-xs text-rb-500">{range}</span>
       </span>
     </div>
   );
   const rangeText = groupRangeText(useContext(GroupNumbersContext));
-  const control = (inline?: boolean) => (
-    <GroupCount
-      count={count}
-      label={groupLabel(count, open, rangeText)}
-      open={open}
-      onToggle={toggle}
-      controls={membersId}
-      inline={inline}
-    />
+  const control = (
+    <GroupCount label={groupLabel(count, open, rangeText)} open={open} onToggle={toggle} controls={membersId} />
   );
   // No asset moved: no node, the words stand, and the dotted segment marks
-  // the members not drawn while closed.
-  const column = (closed: boolean, last: boolean) => (
-    <SpineColumn icon="none" undrawn={closed} isFirst={!last && isFirst} isLast={(closed || last) && !!isLast} />
-  );
+  // the members not drawn.
+  const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
 
   if (spineView) {
     const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
     const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
     const by = managerName ? ` by ${managerName}` : "";
     const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
-    const corner = <div className="absolute left-3 top-2 z-20">{control()}</div>;
     return (
       <GroupFrame
         open={open}
+        control={control}
         membersId={membersId}
-        top={
-          <div className="relative min-h-12">
-            {corner}
-            <GroupCaptionRow>Adjusted &middot; {range}</GroupCaptionRow>
-          </div>
-        }
         members={children}
-        bottom={
-          <div className="relative min-h-12">
-            {corner}
-            <GroupCaptionRow />
-          </div>
-        }
         closed={
-          <div className="relative">
-            {corner}
-            <SpineSegment
-              caption={<>Adjusted &middot; {range}</>}
-              spokenCaption={`Adjusted, ${spokenRange}`}
-              label={`${countText}${by}, ${spokenRange}${movement}`}
-              open={spineView.openId === membersId}
-              onToggle={(anchor) => spineView.toggle(membersId, anchor)}
-              iconColumn={column(true, false)}
-              card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
-            />
-          </div>
+          <SpineSegment
+            caption={
+              <>
+                Adjusted ({count.toLocaleString("en-US")}) &middot; {range}
+              </>
+            }
+            spokenCaption={`Adjusted, ${spokenRange}`}
+            label={`${countText}${by}, ${spokenRange}${movement}`}
+            open={spineView.openId === membersId}
+            onToggle={(anchor) => spineView.toggle(membersId, anchor)}
+            iconColumn={column}
+            card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
+          />
         }
       />
     );
   }
 
-  const row = (closed: boolean, last: boolean, header: ReactNode) => (
-    <EventCard
-      avatar={null}
-      iconColumn={column(closed, last)}
-      numberSlot={control()}
-      header={header}
-      hideDetailChevron
-    />
-  );
   return (
     <GroupFrame
       open={open}
+      control={control}
       membersId={membersId}
-      closed={row(true, false, <div className="pl-5 pt-4 pb-3">{words}</div>)}
-      top={row(false, false, <div className="pl-5 pt-4 pb-3">{words}</div>)}
+      closed={
+        <EventCard
+          avatar={null}
+          iconColumn={column}
+          header={<div className="pl-5 pt-4 pb-3">{words}</div>}
+          hideDetailChevron
+        />
+      }
       members={children}
-      bottom={row(false, true, <div />)}
     />
   );
 }

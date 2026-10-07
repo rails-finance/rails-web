@@ -362,7 +362,6 @@ export function TimelineBoundaryCard({
         // spine draws the dotted segment alone.
         numberSlot={
           <GroupCount
-            count={counted ? (b.omitted as number) : undefined}
             label={range ? `${label}, #${range.split(" – ").reverse().join("–")}` : label}
             open={open}
             onToggle={() => setOpen((v) => !v)}

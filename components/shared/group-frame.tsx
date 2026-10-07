@@ -22,28 +22,20 @@ export function groupRangeText(range: [number, number] | null): string | null {
   return lo === hi ? `#${lo}` : `#${lo}–${hi}`;
 }
 
-/** The group's one control, in the number column where a member's number
- *  would stand: the layers glyph with the count under it ("× 45") in the
- *  muted small type. The verb and the range live in the accessible name and
- *  the native title ("Show 45 grouped events, #7–51"); the row shows neither. */
+/** The group's one control: the layers glyph alone, on the frame's corner.
+ *  The verb, the count and the range live in the accessible name and the
+ *  native title ("Show 45 grouped events, #7–51"). */
 export function GroupCount({
-  count,
   label,
   open,
   onToggle,
   controls,
-  inline,
 }: {
-  /** Unset where the count is not known (the boundary before the index
-   *  has counted): the glyph alone. */
-  count?: number;
   label: string;
   /** Unset where the control opens no list (the boundary's card). */
   open?: boolean;
   onToggle: () => void;
   controls?: string;
-  /** The phone's caption row: glyph and count side by side. */
-  inline?: boolean;
 }) {
   return (
     <button
@@ -57,17 +49,12 @@ export function GroupCount({
         onToggle();
       }}
       data-group-button=""
-      // The padding, cancelled by the margin, takes the target to 44px.
-      className={`group/gc relative -m-2 flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg p-2 text-xs tabular-nums text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] ${inline ? "flex-row" : "flex-col"}`}
+      // A 44px target around the 18px glyph.
+      className="flex size-11 items-center justify-center rounded-full text-teal-600 transition-colors hover:text-teal-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] dark:text-teal-500 dark:hover:text-teal-400"
     >
-      <Layers
-        size={18}
-        strokeWidth={1.5}
-        absoluteStrokeWidth
-        aria-hidden
-        className="text-teal-600 dark:text-teal-500"
-      />
-      {count != null && <span aria-hidden>&times; {count.toLocaleString("en-US")}</span>}
+      <span className="rounded-full p-1" style={{ backgroundColor: "var(--background)" }}>
+        <Layers size={18} strokeWidth={1.5} absoluteStrokeWidth aria-hidden />
+      </span>
     </button>
   );
 }
@@ -77,56 +64,50 @@ export function groupLabel(count: number, open: boolean, range: string | null): 
   return `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}${range ? `, ${range}` : ""}`;
 }
 
-/** The phone spine view's caption row for an open group's top and bottom
- *  rows: the kind and the span on the line (the control sits at the row's
- *  left, outside it). */
-export function GroupCaptionRow({ children }: { children?: ReactNode }) {
-  return (
-    <div className="relative flex justify-center py-1" data-group-caption="">
-      <div aria-hidden className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-rb-500" />
-      <span
-        className="relative inline-flex max-w-full items-center gap-2 px-2 text-xs leading-5 text-rb-500"
-        style={{ backgroundColor: "var(--background)" }}
-      >
-        {children && <span className="truncate">{children}</span>}
-      </span>
-    </div>
-  );
-}
-
 /** The bracket frame around a group: a left border with bracket ends, in the
- *  muted border colour (`border-rb-300`, `dark:border-rb-500`). Closed it
- *  holds the group's row; open, the top node row, the members and the bottom
- *  node row. */
+ *  muted border colour (`border-rb-300`, `dark:border-rb-500`). The group's
+ *  control straddles the frame's top-left corner, centred on the border, and
+ *  open, the bottom-left corner too, so a long group closes from below. Closed
+ *  the frame holds the group's row; open, the members alone, the first on the
+ *  row the summed nodes held. */
 export function GroupFrame({
   open,
+  control,
   closed,
-  top,
   members,
-  bottom,
   membersId,
 }: {
   open: boolean;
+  control: ReactNode;
   closed: ReactNode;
-  top: ReactNode;
   members: ReactNode;
-  bottom: ReactNode;
   membersId?: string;
 }) {
+  // The page ground behind the glyph breaks the hairline under it.
+  const corner = (where: "top" | "bottom") => (
+    <div
+      className={`absolute left-px z-30 -translate-x-1/2 ${where === "top" ? "top-0 -translate-y-1/3" : "bottom-0 translate-y-1/3"}`}
+      data-group-corner={where}
+    >
+      <div className="rounded-full" style={{ backgroundColor: "var(--background)" }}>
+        {control}
+      </div>
+    </div>
+  );
   return (
-    <div data-group-frame={open ? "open" : "closed"} className="relative flex flex-col gap-2 rounded-xl">
+    <div data-group-frame={open ? "open" : "closed"} className="relative flex flex-col gap-2 rounded-xl max-sm:ml-2">
       <div
         aria-hidden
         data-group-bracket=""
         className="pointer-events-none absolute inset-y-0 left-0 z-20 w-3 rounded-l-xl border-y border-l border-rb-300 dark:border-rb-500"
       />
+      {corner("top")}
       {open ? (
         <>
-          {top}
           <div id={membersId} className="flex flex-col gap-2">
             {members}
           </div>
-          {bottom}
+          {corner("bottom")}
         </>
       ) : (
         // The dotted segment runs on below the legs inside the frame, and its
