@@ -24,8 +24,10 @@
 // check-explainer-register.mjs scans this file's string literals for the
 // plain-words register, and a sum receipt's formula legitimately carries "Σ".
 
+import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { TroveEconomics as TroveEconomicsType } from "@/types/api/trove";
+import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import { calculateAccruedInterest } from "@/lib/liquity/utils/interest-calculator";
 import { FORK_ALL_IDS } from "@/lib/shared/fork-config";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
@@ -135,8 +137,12 @@ export function calculateEconomicsFromEvents(
   let liquidationCollSurplus = 0;
   let hasLiquidations = false;
 
+  // Each Trove's previous event: a wallet-scoped feed interleaves its Troves.
+  const previousByTrove = new Map<string, MinimalEvent>();
   for (const event of sorted) {
     const c = event.context.data;
+    const priorEvent = previousByTrove.get(c.troveId ?? "");
+    previousByTrove.set(c.troveId ?? "", event);
 
     // Gas — only count gas the Trove owner actually paid. Passive events
     // (redemption/liquidation/pending-debt application) are sent by a third party
@@ -187,6 +193,12 @@ export function calculateEconomicsFromEvents(
       else if (collChange < 0) totalCollateralWithdrawn += Math.abs(collChange);
 
       totalUpfrontFees += c.troveOperation.debtIncreaseFromUpfrontFee || 0;
+    } else {
+      // A batch manager's rate change carries no TroveOperation log; inside the
+      // 7-day cooldown its upfront fee is the share of the debt's move that the
+      // event row and the Lifetime flows replay name.
+      totalUpfrontFees +=
+        batchRateDebtMove(c, priorEvent as BaseActivityEvent | undefined, event as BaseActivityEvent)?.upfront ?? 0;
     }
   }
 
