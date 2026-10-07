@@ -27,6 +27,7 @@
 //
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
+import { GroupButton } from "@/components/shared/group-frame";
 import { useState } from "react";
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
@@ -219,8 +220,7 @@ export function TimelineBoundaryCard({
   const range = counted ? `${n(b.omitted as number)} – 1` : null;
   const header = (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
-      <span className="shrink-0 text-sm font-medium text-rb-500">{label}</span>
-      <EventHeadChevron className="-ml-1.5" />
+      <EventHeadChevron />
       {/* The same slot, the same register and the same pill as the rows'
           date, time and number — so the span aligns with the dates above it
           and the range pill lines up with the row-number pills. */}
@@ -354,9 +354,17 @@ export function TimelineBoundaryCard({
     // under), and the state lines restate the oldest drawn row's own
     // before-figure, whose receipt sits on that row.
     <div data-figure="timeline-boundary" data-prov-exempt="" data-boundary-arm={b.arm}>
+      {/* The group button's form, the layers glyph and the card's words, in
+          place of a node: the one glyph means "events not drawn". It opens
+          and closes the card, as the header does. */}
+      <div className="pl-6 pt-2">
+        <GroupButton open={open} onClick={() => setOpen((v) => !v)}>
+          {label}
+        </GroupButton>
+      </div>
       <EventCard
         avatar={null}
-        iconColumn={<SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} />}
+        iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={isLast} />}
         header={header}
         detail={hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />}
         detailOpen={open}
