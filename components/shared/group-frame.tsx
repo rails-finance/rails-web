@@ -77,11 +77,10 @@ export function groupLabel(count: number, open: boolean, range: string | null): 
   return `${open ? "Hide" : "Show"} ${count.toLocaleString("en-US")} grouped ${count === 1 ? "event" : "events"}${range ? `, ${range}` : ""}`;
 }
 
-/** The phone spine view's caption row for a group: the control first, then
- *  the kind and the span ("[layers] × 45 Redemptions · 1 Oct '25 – 12 Oct
- *  '25"), on the line. The segment above is a button of its own, so the
- *  control stands in this row, outside it. */
-export function GroupCaptionRow({ control, children }: { control: ReactNode; children?: ReactNode }) {
+/** The phone spine view's caption row for an open group's top and bottom
+ *  rows: the kind and the span on the line (the control sits at the row's
+ *  left, outside it). */
+export function GroupCaptionRow({ children }: { children?: ReactNode }) {
   return (
     <div className="relative flex justify-center py-1" data-group-caption="">
       <div aria-hidden className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-1/2 bg-rb-500" />
@@ -89,7 +88,6 @@ export function GroupCaptionRow({ control, children }: { control: ReactNode; chi
         className="relative inline-flex max-w-full items-center gap-2 px-2 text-xs leading-5 text-rb-500"
         style={{ backgroundColor: "var(--background)" }}
       >
-        {control}
         {children && <span className="truncate">{children}</span>}
       </span>
     </div>

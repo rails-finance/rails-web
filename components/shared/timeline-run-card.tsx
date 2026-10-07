@@ -120,6 +120,10 @@ export interface TimelineRunCardProps {
   /** The event numbers the group holds, lowest and highest, where the caller
    *  knows them (a served folder's ordinals). Unset: `GroupNumbersContext`. */
   eventRange?: [number, number];
+  /** The position across the group, for the summary card's sentence: each
+   *  side's state before the first member and after the last ("the debt"
+   *  first, then any other: "collateral"). */
+  stateSpan?: { label: string; from: number; to: number; symbol: string }[];
   /** Header content drawn before the aggregate pairs: a shape run's summary. */
   lead?: ReactNode;
   /** Extra header content, rendered after the aggregate pairs. */
@@ -211,6 +215,7 @@ export function TimelineRunCard({
   summedByIndex,
   readingLine,
   eventRange,
+  stateSpan,
 }: TimelineRunCardProps) {
   const [ownOpen, setOwnOpen] = useState(false);
   const open = ownOpen || !!forceOpen;
@@ -386,17 +391,57 @@ export function TimelineRunCard({
   const hasSums = legAggs.length > 0 || !!lead || !!extraHeader;
 
   /** The group's summary card: the sums and the date range. */
+  // T2: one sentence of what the group holds, from the members: the head's
+  // verbs in lower case, the sums at the head's precision, the effective
+  // price where the run cleared a dollar debt against collateral, and the
+  // position's span where the caller states it.
+  const t2 = (() => {
+    if (legAggs.length === 0) return null;
+    const amt = (v: number, sym: string) => `${fmtHeaderMagnitude(v, sym)} ${sym}`;
+    let clauses: string;
+    let price = "";
+    if (adverse) {
+      clauses = legAggs.map((a) => `${a.verb.toLowerCase()} ${amt(a.value, a.symbol)}`).join(" and ");
+      const debt = legAggs.find((a) => DEBT_VERB.test(a.verb));
+      const coll = legAggs.find((a) => !DEBT_VERB.test(a.verb));
+      if (debt && coll && coll.value > 0 && USD_DEBT.test(debt.symbol))
+        price = `, an effective $${Math.round(debt.value / coll.value).toLocaleString("en-US")} per ${coll.symbol}`;
+    } else {
+      if (netTokens.length === 0) return null;
+      clauses = netTokens
+        .map((t) => {
+          const out = t.direction === "left";
+          const verb = legAggs.find((a) => a.symbol === t.symbol && OUT_VERB.test(a.verb) === out)?.verb;
+          return `${verb ? `${verb.toLowerCase()} ` : ""}a net ${amt(Number(t.value), t.symbol)}`;
+        })
+        .join(" and ");
+    }
+    const spans = (stateSpan ?? []).map(
+      (st, i) =>
+        `${i === 0 ? st.label : st.label.replace(/^the /, "")} went from ${stateAmount(st.from)} to ${stateAmount(st.to)} ${st.symbol}`,
+    );
+    const spanText = spans.length ? `; ${spans.join(", ").replace(/, (\S+) went from/g, ", $1 from")}` : "";
+    return `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural} ${spanWords(fromTs, toTs)} ${clauses}${price}${spanText}.`;
+  })();
+
   const summary = (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-3 pb-4" data-group-summary="">
-      {folder && (
-        <span data-prov-exempt="" className="inline-flex items-center text-rb-500">
-          <Calculator size={15} strokeWidth={2} aria-label="Sums over the group" />
-        </span>
+    <div data-group-summary="">
+      {t2 && (
+        <p className="px-5 pt-3 text-sm leading-relaxed text-rb-500" data-anatomy="T2" data-group-sentence="">
+          {t2}
+        </p>
       )}
-      {lead}
-      {sums("")}
-      {extraHeader}
-      <span className="ml-auto text-xs text-rb-500">{range}</span>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 pt-3 pb-4">
+        {folder && (
+          <span data-prov-exempt="" className="inline-flex items-center text-rb-500">
+            <Calculator size={15} strokeWidth={2} aria-label="Sums over the group" />
+          </span>
+        )}
+        {lead}
+        {sums("")}
+        {extraHeader}
+        <span className="ml-auto text-xs text-rb-500">{range}</span>
+      </div>
     </div>
   );
 
@@ -469,22 +514,37 @@ export function TimelineRunCard({
       .filter((agg) => !unreadOf(undefined, agg.symbol))
       .map((agg) => `${agg.verb.toLowerCase()} ${spokenAmount(agg.value)} ${agg.symbol}`);
     const countText = `${count.toLocaleString("en-US")} ${count === 1 ? memberNoun : memberPlural}`;
-    const captionRow = (
-      <GroupCaptionRow control={control(true)}>
-        {kindWord} &middot; {range}
-      </GroupCaptionRow>
-    );
+    // The control sits at the far left of the group's first row, where the
+    // desktop's number column puts it; the open group's bottom row repeats it.
+    const corner = <div className="absolute left-3 top-2 z-20">{control()}</div>;
     return (
       <GroupFrame
         open={open}
         membersId={membersId}
-        top={captionRow}
+        top={
+          <div className="relative min-h-12">
+            {corner}
+            <GroupCaptionRow>
+              {kindWord} &middot; {range}
+            </GroupCaptionRow>
+          </div>
+        }
         members={body}
-        bottom={<GroupCaptionRow control={control(true)} />}
+        bottom={
+          <div className="relative min-h-12">
+            {corner}
+            <GroupCaptionRow />
+          </div>
+        }
         closed={
-          <div className="flex flex-col">
+          <div className="relative">
+            {corner}
             <SpineSegment
-              caption={null}
+              caption={
+                <>
+                  {kindWord} &middot; {range}
+                </>
+              }
               spokenCaption={`${kindWord}, ${spokenRange}`}
               label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
               open={spineView.openId === membersId}
@@ -492,7 +552,6 @@ export function TimelineRunCard({
               iconColumn={legsColumn}
               card={<div className="rounded-xl bg-raised">{summary}</div>}
             />
-            {captionRow}
           </div>
         }
       />
@@ -536,6 +595,30 @@ export function TimelineRunCard({
       }
     />
   );
+}
+
+/** A state figure as the card's grid states it: whole units from a thousand,
+ *  two places below. */
+function stateAmount(v: number): string {
+  return v.toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : 2 });
+}
+
+/** A debt in dollars, against which an effective collateral price reads. */
+const USD_DEBT = /USD|BOLD|LUSD|DAI|GHO|FRAX/i;
+
+/** "between 1 and 12 Oct '25", "on 1 Sep '25", "between 28 Sep '25 and
+ *  2 Oct '25". */
+function spanWords(a: number, b: number): string {
+  const [lo, hi] = a <= b ? [a, b] : [b, a];
+  const d1 = shortDate(lo);
+  const d2 = shortDate(hi);
+  const y1 = shortDateYear(lo);
+  const y2 = shortDateYear(hi);
+  if (d1 === d2 && y1 === y2) return `on ${d1} ${y1}`;
+  const [day1, mon1] = d1.split(" ");
+  const [day2, mon2] = d2.split(" ");
+  if (mon1 === mon2 && y1 === y2) return `between ${day1} and ${day2} ${mon2} ${y2}`;
+  return `between ${d1} ${y1} and ${d2} ${y2}`;
 }
 
 /** A verb that names the debt side of a leg: drawn last, after the

@@ -37,6 +37,9 @@ export interface RedemptionRunCardProps {
   isLast?: boolean;
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
+  /** The Trove's debt before the first redemption and after the last, for
+   *  the summary card's sentence. */
+  debtSpan?: [number, number];
 }
 
 export function RedemptionRunCard({
@@ -50,6 +53,7 @@ export function RedemptionRunCard({
   isFirst,
   isLast,
   children,
+  debtSpan,
 }: RedemptionRunCardProps) {
   return (
     <TimelineRunCard
@@ -67,6 +71,7 @@ export function RedemptionRunCard({
       lastTimestamp={lastTimestamp}
       isFirst={isFirst}
       isLast={isLast}
+      stateSpan={debtSpan ? [{ label: "the debt", from: debtSpan[0], to: debtSpan[1], symbol: debtSymbol }] : undefined}
     >
       {children}
     </TimelineRunCard>

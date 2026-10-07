@@ -40,6 +40,15 @@ const REDEMPTION_RUN: TimelineRunSpec = {
         totalDebt += Math.abs(op?.debtChangeFromOperation ?? 0);
       }
       const first = isLiquityEvent(events[0]) ? events[0].context.data : undefined;
+      // The debt across the run, in time order: before the earliest, after the
+      // latest.
+      const chrono = [...events].sort((a, b) => a.timestamp - b.timestamp);
+      const early = chrono[0];
+      const late = chrono[chrono.length - 1];
+      const debtSpan: [number, number] | undefined =
+        isLiquityEvent(early) && isLiquityEvent(late) && early.context.data.stateBefore && late.context.data.stateAfter
+          ? [early.context.data.stateBefore.debt, late.context.data.stateAfter.debt]
+          : undefined;
       return (
         <RedemptionRunCard
           key={folder.key}
@@ -52,6 +61,7 @@ const REDEMPTION_RUN: TimelineRunSpec = {
           lastTimestamp={events[events.length - 1].timestamp}
           isFirst={folder.isFirst}
           isLast={folder.isLast}
+          debtSpan={debtSpan}
         >
           {folder.children}
         </RedemptionRunCard>

@@ -35,8 +35,24 @@ export const LIQUITY_V1_REDEMPTION_RUNS: TimelineRunSpec[] = [
           totalColl += Math.abs(Number(e.context.data.collDelta) || 0);
           totalDebt += Math.abs(Number(e.context.data.debtDelta) || 0);
         }
+        // The debt across the run, in time order: the earliest member's after
+        // less its move, and the latest member's after.
+        const chrono = [...events].sort((a, b) => a.timestamp - b.timestamp);
+        const early = chrono[0];
+        const late = chrono[chrono.length - 1];
+        const debtSpan: [number, number] | undefined =
+          isLiquityV1Event(early) &&
+          isLiquityV1Event(late) &&
+          early.context.data.debtAfter != null &&
+          late.context.data.debtAfter != null
+            ? [
+                Number(early.context.data.debtAfter) - (Number(early.context.data.debtDelta) || 0),
+                Number(late.context.data.debtAfter),
+              ]
+            : undefined;
         return (
           <RedemptionRunCard
+            debtSpan={debtSpan}
             key={folder.key}
             count={events.length}
             totalColl={totalColl}

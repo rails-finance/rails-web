@@ -139,18 +139,29 @@ export function DelegateAdjustRunCard({
     const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
     const by = managerName ? ` by ${managerName}` : "";
     const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
-    const captionRow = <GroupCaptionRow control={control(true)}>Adjusted &middot; {range}</GroupCaptionRow>;
+    const corner = <div className="absolute left-3 top-2 z-20">{control()}</div>;
     return (
       <GroupFrame
         open={open}
         membersId={membersId}
-        top={captionRow}
+        top={
+          <div className="relative min-h-12">
+            {corner}
+            <GroupCaptionRow>Adjusted &middot; {range}</GroupCaptionRow>
+          </div>
+        }
         members={children}
-        bottom={<GroupCaptionRow control={control(true)} />}
+        bottom={
+          <div className="relative min-h-12">
+            {corner}
+            <GroupCaptionRow />
+          </div>
+        }
         closed={
-          <div className="flex flex-col">
+          <div className="relative">
+            {corner}
             <SpineSegment
-              caption={null}
+              caption={<>Adjusted &middot; {range}</>}
               spokenCaption={`Adjusted, ${spokenRange}`}
               label={`${countText}${by}, ${spokenRange}${movement}`}
               open={spineView.openId === membersId}
@@ -158,7 +169,6 @@ export function DelegateAdjustRunCard({
               iconColumn={column(true, false)}
               card={<div className="rounded-xl bg-raised px-5 pt-4 pb-3">{words}</div>}
             />
-            {captionRow}
           </div>
         }
       />
