@@ -150,6 +150,7 @@ const ledgerRows = (l) =>
     : null;
 
 function sidecar({ event, p, l3, c }) {
+  const said = prose.explanationRuns(p).flatMap((r) => r.sentences);
   return {
     n: c.n,
     id: event.id,
@@ -161,11 +162,16 @@ function sidecar({ event, p, l3, c }) {
       L1: p.L1,
       L2: p.L2?.lines ?? [],
       L3: l3 ? { collateral: ledgerRows(l3.collateral), debt: ledgerRows(l3.debt) } : null,
-      L4: [...p.L4, ...p.list].map((s) => s.text),
+      L4: said.map((s) => s.text),
       L5: p.L5.key,
     },
     values: p.values,
-    sentences: [...p.L4, ...p.list].map((s) => ({ text: s.text, sentence_id: s.sentence_id, uses: s.uses })),
+    sentences: said.map((s) => ({
+      text: s.text,
+      sentence_id: s.sentence_id,
+      uses: s.uses,
+      ...(s.group ? { group: s.group } : {}),
+    })),
   };
 }
 
@@ -439,7 +445,8 @@ function catalogue() {
       const s = t.sentences[id] ?? SHARED_SENTENCES[id];
       const shared = !t.sentences[id];
       const listed = t.list?.includes(id) ? " (list)" : "";
-      out.push(`- **${id}**${shared ? " (shared)" : ""}${listed} — when ${s.when}`);
+      const group = Object.entries(t.groups).find(([, ids]) => ids.includes(id))?.[0];
+      out.push(`- **${id}**${shared ? " (shared)" : ""}${listed} [${group}] — when ${s.when}`);
       if (!shared) out.push(`  > ${s.text}`, `  - placeholders: ${ph(s.text) || "none"}`);
     }
     out.push("");

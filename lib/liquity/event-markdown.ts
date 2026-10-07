@@ -5,7 +5,13 @@
 // string on the page comes out here character for character. Facts only.
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { contextHeader, footerLine, type LiquityEventContext, type LiquityEventProse } from "@/lib/liquity/event-prose";
+import {
+  contextHeader,
+  explanationRuns,
+  footerLine,
+  type LiquityEventContext,
+  type LiquityEventProse,
+} from "@/lib/liquity/event-prose";
 import { ledgerMarkdown, type LiquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { COPY_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 
@@ -37,6 +43,9 @@ export function learnMoreMarkdown(c: LearnMoreContent): string[] {
   return out;
 }
 
+/** A group's heading in L4: "**L4 · What happened**". */
+export const l4Heading = (heading: string) => `**L4 · ${heading}**`;
+
 /** The L5 heading: "**L5 · How adjusting a trove works**". */
 export const l5Heading = (title: string) => `**L5 · ${title}**`;
 
@@ -57,8 +66,10 @@ export function liquityEventMarkdown(
     out.push("", "**L3**");
     tables.forEach((t, i) => out.push(...(i > 0 ? ["", ...t] : t)));
   }
-  const bullets = [...p.L4, ...p.list];
-  if (bullets.length) out.push("", "**L4**", ...bullets.map((s) => `- ${s.text}`));
+  // A grouped explanation heads each group's bullets "**L4 · What happened**",
+  // the pane's heading (ui-jobs 282).
+  for (const run of explanationRuns(p))
+    out.push("", run.heading ? l4Heading(run.heading) : "**L4**", ...run.sentences.map((s) => `- ${s.text}`));
   if (l5 === "full") out.push("", l5Heading(p.L5.content.title), ...learnMoreMarkdown(p.L5.content));
   else out.push("", `**L5** ${p.L5.content.title} ${COPY_WORDS.below}`);
   out.push("", `**${COPY_WORDS.footer}** ${footerLine(p)}`);

@@ -12,10 +12,16 @@ export function ExplainGroup({
 }: { title: string; children: ReactNode } & Record<`data-${string}`, string | undefined>) {
   return (
     <section className="mt-3 first:mt-0" {...rest}>
-      <h4 className="text-xs font-semibold text-foreground">{title}</h4>
+      <ExplainHeading>{title}</ExplainHeading>
       <ul className="mt-1 space-y-1 text-sm leading-snug text-rb-500">{children}</ul>
     </section>
   );
+}
+
+/** A group's heading: the Lifetime flows pane's, and an event explanation's
+ *  where its bullets are grouped (lib/shared/explainer-prose.tsx). */
+export function ExplainHeading({ children }: { children: ReactNode }) {
+  return <h4 className="text-xs font-semibold text-foreground">{children}</h4>;
 }
 
 export function ExplainBullet({ children, ...rest }: { children: ReactNode } & Record<`data-${string}`, string>) {

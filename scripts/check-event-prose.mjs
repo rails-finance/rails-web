@@ -81,6 +81,7 @@ const WORD_SECTIONS = [
   "copy_words",
   "action_words",
   "page_words",
+  "group_words",
   "L5_words",
   "fragments",
 ];
@@ -140,6 +141,25 @@ for (const [i, t] of d.templates.entries()) {
   }
   for (const id of Object.keys(t.sentences ?? {}))
     if (!t.order?.includes(id) && !t.list?.includes(id)) fail(`${t.id}: sentence "${id}" is in neither order nor list`);
+  // Groups: each sentence of order and list in one group_words id, and one only.
+  if (obj(`${t.id}.groups`, t.groups)) {
+    const seen = new Map();
+    for (const [g, ids] of Object.entries(t.groups)) {
+      if (!(g in (d.group_words ?? {}))) fail(`${t.id}.groups: "${g}" is not in group_words`);
+      if (!Array.isArray(ids)) {
+        fail(`${t.id}.groups.${g} is not a list of sentence ids`);
+        continue;
+      }
+      for (const id of ids) {
+        if (!t.order?.includes(id) && !t.list?.includes(id))
+          fail(`${t.id}.groups.${g}: "${id}" is in neither order nor list`);
+        if (seen.has(id)) fail(`${t.id}.groups: "${id}" is in both ${seen.get(id)} and ${g}`);
+        seen.set(id, g);
+      }
+    }
+    for (const id of [...(t.order ?? []), ...(t.list ?? [])])
+      if (!seen.has(id)) fail(`${t.id}: "${id}" is in no group of groups`);
+  }
 }
 
 const faqSrc = read("components/transaction-timeline/explanation/shared/faqUrls.ts");

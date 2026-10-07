@@ -9,7 +9,7 @@ import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
-import { LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
+import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { LiquityEventMarkdownContext, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
@@ -267,7 +267,10 @@ export function LiquityEventCard({
     })()
   );
 
-  const liquityTeaser = prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : null;
+  const liquityTeaser =
+    prose.L4.length > 0 && !isGroupedExplanation(prose) ? (
+      <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} />
+    ) : null;
   // Gas (owner-paid events only; the generator leaves a third party's out)
   // stands in T2's price row (LiquityEventDetail); a card that draws no price
   // row keeps it in the footer. The card has no event menu: the header's

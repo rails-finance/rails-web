@@ -24,6 +24,7 @@ import {
   CONTEXT_WORDS,
   FOOTER_WORDS,
   FRAGMENTS,
+  GROUP_WORDS,
   L1_WORDS,
   L2_WORDS,
   L5,
@@ -90,6 +91,9 @@ export interface ProseSentence {
   text: string;
   uses: string[];
   segs: ProseSeg[];
+  /** The `group_words` id it sits under; set only when the explanation is
+   *  grouped (`grouped`). */
+  group?: string;
 }
 
 export type ProseValue = number | string | null;
@@ -342,7 +346,7 @@ function sentenceOf(t: EventTemplate, id: string): SentenceTemplate {
  *  regenerated export shows which templates changed. */
 export function templateVersion(t: EventTemplate): string {
   const shared = t.order.filter((id) => SHARED_SENTENCES[id]).map((id) => SHARED_SENTENCES[id].text);
-  const src = JSON.stringify([t.title, t.L1, Object.values(t.sentences).map((s) => s.text), shared]);
+  const src = JSON.stringify([t.title, t.L1, Object.values(t.sentences).map((s) => s.text), shared, t.groups]);
   let h = 2166136261;
   for (let i = 0; i < src.length; i++) {
     h ^= src.charCodeAt(i);
@@ -1061,7 +1065,10 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     v.redist_l1 = parts.join(` ${L1_WORDS.and} `);
   }
 
-  const { L4, list } = sp.out();
+  const said = sp.out();
+  const all = grouped(t, [...said.L4, ...said.list]);
+  const L4 = all.slice(0, said.L4.length);
+  const list = all.slice(said.L4.length);
   const paid = event.gas && event.gas.gasCostEth > 0 && !PASSIVE.has(ctx.operation) ? event.gas : null;
   const gas = paid
     ? ctx.noChangeRun
@@ -1086,6 +1093,47 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     },
     values,
   };
+}
+
+// ── L4's groups ──────────────────────────────────────────────────────────────
+
+/** The sentences said, each with its group, when the explanation is grouped:
+ *  two or more groups hold two or more bullets each (ui-jobs 282). A grouped
+ *  explanation heads every group that has a bullet, one-bullet groups
+ *  included. Otherwise the sentences come back as said, with no group. */
+function grouped(t: EventTemplate, said: ProseSentence[]): ProseSentence[] {
+  const groupOf = new Map<string, string>();
+  for (const [g, ids] of Object.entries(t.groups)) for (const id of ids) groupOf.set(id, g);
+  const sizes = new Map<string, number>();
+  for (const s of said) {
+    const g = groupOf.get(s.sentence_id);
+    if (g == null) return said;
+    sizes.set(g, (sizes.get(g) ?? 0) + 1);
+  }
+  const draw = [...sizes.values()].filter((n) => n >= 2).length >= 2;
+  return draw ? said.map((s) => ({ ...s, group: groupOf.get(s.sentence_id) })) : said;
+}
+
+const GROUP_RANK = new Map(Object.keys(GROUP_WORDS).map((g, i) => [g, i]));
+
+/** L4 as the explanation prints it: one run with no heading, or one run per
+ *  group under its heading, in `group_words` order and the template's order
+ *  within each. A liquidation's payout legs follow the bullets in the flat
+ *  form and sit in their group in the grouped one. */
+export function explanationRuns(p: LiquityEventProse): {
+  group: string | null;
+  heading: string | null;
+  sentences: ProseSentence[];
+}[] {
+  const all = [...p.L4, ...p.list];
+  if (!all.some((s) => s.group)) return all.length ? [{ group: null, heading: null, sentences: all }] : [];
+  const runs: { group: string; heading: string; sentences: ProseSentence[] }[] = [];
+  for (const s of [...all].sort((a, b) => GROUP_RANK.get(a.group!)! - GROUP_RANK.get(b.group!)!)) {
+    const last = runs[runs.length - 1];
+    if (last?.group === s.group) last.sentences.push(s);
+    else runs.push({ group: s.group!, heading: GROUP_WORDS[s.group!], sentences: [s] });
+  }
+  return runs;
 }
 
 /** The replay's debt buckets that lower the debt. */

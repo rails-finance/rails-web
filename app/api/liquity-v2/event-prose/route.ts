@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
       L1: p.L1,
       L2: p.L2?.lines ?? [],
       sentences: [...p.L4.map((s) => ({ ...s, list: false })), ...p.list.map((s) => ({ ...s, list: true }))].map(
-        (s) => ({ sentence_id: s.sentence_id, list: s.list, uses: s.uses, text: s.text }),
+        (s) => ({ sentence_id: s.sentence_id, list: s.list, group: s.group ?? null, uses: s.uses, text: s.text }),
       ),
       L5: p.L5.key,
       footer: p.footer,
