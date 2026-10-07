@@ -15,7 +15,6 @@ import { Icon } from "@/components/icons/icon";
 import { MountedAge } from "@/components/shared/mounted-age";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { LiquidatedBadge } from "@/components/shared/liquidated-badge";
-import { PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
 
 export interface PositionCardMetaProps {
   /** Unix epoch of the most recent event. Omit/null when the protocol carries no
@@ -51,9 +50,6 @@ export interface PositionCardMetaProps {
   /** `age-last`: transactions, warnings, then the age (the card's foot strip,
    *  ui-jobs 270). Default `age-first`. */
   order?: "age-first" | "age-last";
-  /** Close the cluster with the disclosure chevron. Default true; a card
-   *  whose chevron sits in its header passes false. */
-  chevron?: boolean;
 }
 
 // formatDuration treats a bare number as SECONDS. Unix seconds are ~1.7e9 today;
@@ -82,7 +78,6 @@ export function PositionCardMeta({
   countRule,
   countNounVisible = false,
   order = "age-first",
-  chevron = true,
 }: PositionCardMetaProps) {
   const showTime = lastActivityAt != null && lastActivityAt > 0;
   const showEvents = eventCount != null && eventCount > 0;
@@ -90,10 +85,7 @@ export function PositionCardMeta({
   const hasLiqCount = liquidationCount != null && liquidationCount > 0;
   const showLiquidation = hasLiqCount || liquidated === true;
 
-  // The disclosure chevron closes the cluster on a card whose shell opted in
-  // (PositionCardShell `disclosureKey`); it renders nothing anywhere else.
-  const toggle = chevron ? <PositionCardDisclosureToggle /> : null;
-  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return toggle;
+  if (!showTime && !showEvents && !showRedemption && !showLiquidation) return null;
   const age = showTime && (
     <RevealTip
       tip={`Last activity ${utcStamp(toSeconds(lastActivityAt as number))}`}
@@ -151,7 +143,6 @@ export function PositionCardMeta({
         <LiquidatedBadge count={hasLiqCount ? (liquidationCount as number) : undefined} rule={liquidationRule} />
       )}
       {order === "age-last" && age}
-      {toggle}
     </span>
   );
 }

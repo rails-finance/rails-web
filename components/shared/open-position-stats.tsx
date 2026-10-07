@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
-import { TipLabel } from "@/components/shared/tip-label";
-import { PositionCardHeader, PositionCardRegion } from "@/components/shared/position-card-disclosure";
+import {
+  PositionCardHeader,
+  PositionCardRegion,
+  PositionCardRow,
+  PositionSummaryHeading,
+} from "@/components/shared/position-card-disclosure";
 
 export interface OpenPositionStatsColumn {
   label: string;
@@ -14,6 +18,10 @@ export interface OpenPositionStatsColumn {
    *  When ANY column sets this, the leading `icons` slot is suppressed so the
    *  cluster sits next to the data it identifies. */
   assetIcons?: ReactNode;
+  /** On a disclosing card, whether the row's lines stand open before a
+   *  viewer moves them (ui-jobs 295). Default: the first two rows (the
+   *  position's assets) open, the rest closed. */
+  defaultOpen?: boolean;
 }
 
 export interface OpenPositionStatsProps {
@@ -80,6 +88,7 @@ export function OpenPositionStats({
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+          <PositionSummaryHeading />
           {statusPill}
           {leadingIdentity}
         </span>
@@ -94,11 +103,15 @@ export function OpenPositionStats({
           // keep the original 3-cols-spanning-last behaviour.
           const spanLast = !stackOnPhone && visibleCount === 3 && i === columns.length - 1;
           return (
-            <div key={col.label || `col-${i}`} className={spanLast ? "col-span-2 sm:col-span-1" : undefined}>
-              <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-                <TipLabel text={col.label} tip={col.labelTip} />
-                {col.headerIcon}
-              </div>
+            <PositionCardRow
+              key={col.label || `col-${i}`}
+              index={i}
+              defaultOpen={col.defaultOpen ?? i < 2}
+              label={col.label}
+              labelTip={col.labelTip}
+              headerIcon={col.headerIcon}
+              className={spanLast ? "col-span-2 sm:col-span-1" : undefined}
+            >
               {col.assetIcons ? (
                 <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
                   {col.value}
@@ -108,7 +121,7 @@ export function OpenPositionStats({
                 col.value
               )}
               {col.footnote}
-            </div>
+            </PositionCardRow>
           );
         })}
       </PositionCardRegion>

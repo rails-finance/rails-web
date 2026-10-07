@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback, useEffect, useContext, useId } from "react";
+import { useState, useCallback, useEffect, useContext, useId, useLayoutEffect, useRef } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
-import { ExpandChevron } from "@/components/shared/expand-chevron";
+import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
-import { EventTxHashContext } from "@/components/shared/event-number-pill";
+import { EventHeadContext, EventTxHashContext } from "@/components/shared/event-number-pill";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import {
   INFO_PATH,
@@ -69,11 +69,12 @@ export interface EventCardProps {
   /** Content before the footer's "?" (a family's gas where it has no price
    *  row in T2). */
   footerExtra?: React.ReactNode;
-  /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), alone at the
-   *  right end of the footer (T6). */
+  /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), at the right end
+   *  of the footer (T6). */
   learnMore?: React.ReactNode;
-  /** The event menu (⋮) in T6 before the "?". Liquity V2 turns it off: its
-   *  event page's aside carries the actions (ui-jobs 291). */
+  /** The event menu (⋮) at the header's right end, before the number pill
+   *  (ui-jobs 295). Liquity V2 turns it off: its event page's aside carries
+   *  the actions (ui-jobs 291). */
   eventMenu?: boolean;
   /** Suppress the expand/collapse chevron and the header's click-to-toggle
    *  affordance. Used by the simulator shell where detail is always open and
@@ -237,13 +238,39 @@ export function EventCard({
         ]
       : []),
   ];
-  const footerNode = txHash ? (
-    <EventCardFooter
-      extra={footerExtra}
-      menu={eventMenu ? <EventCardMenu txHash={txHash} shareHref={shareHref} /> : undefined}
-      learnMore={learnMore}
-    />
-  ) : undefined;
+  const footerNode = txHash ? <EventCardFooter extra={footerExtra} learnMore={learnMore} /> : undefined;
+
+  // The header's slots (ui-jobs 295): the chevron after the action word, and
+  // the event menu before the number pill at the right end. A press on the
+  // menu stays with the menu, as the pill's does: its click and its Enter or
+  // Space do not reach the header's toggle (Escape still reaches the menu's
+  // document listener).
+  const headChevron = showChevron ? (
+    <span className="inline-flex items-center self-center" data-anatomy="T5" data-evt-head-chev="">
+      <DiscChevron isOpen={showDetail} />
+    </span>
+  ) : null;
+  // A header with no number pill (a Fluid round trip) takes the menu at the
+  // right end of its row, after the header.
+  const headRef = useRef<HTMLDivElement>(null);
+  const [menuAtEnd, setMenuAtEnd] = useState(false);
+  const headMenu =
+    eventMenu && txHash && !pageMode ? (
+      <span
+        className="-my-1 inline-flex items-center"
+        data-event-head-menu=""
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+        }}
+      >
+        <EventCardMenu txHash={txHash} shareHref={shareHref} />
+      </span>
+    ) : null;
+  useLayoutEffect(() => {
+    const atEnd = headMenu != null && !headRef.current?.querySelector("[data-event-number]");
+    if (atEnd !== menuAtEnd) setMenuAtEnd(atEnd);
+  });
 
   // The (i) row's right end, before its chevron and reachable with the
   // explanation closed: the card's action. The transaction hash is on the
@@ -268,7 +295,7 @@ export function EventCard({
         }`}
       >
         <div
-          className={headerToggles ? "group/evt cursor-pointer" : ""}
+          className={headerToggles ? "group/evt disc-row cursor-pointer" : ""}
           onClick={() => {
             if (hasDetail && headerToggles) toggleDetail();
           }}
@@ -281,22 +308,28 @@ export function EventCard({
             }
           }}
         >
-          {/* The header's right-hand cluster: the expand chevron only (the
-              event's link is the header's number pill, event-number-pill.tsx). Below sm the cluster
-              leaves the flex row for the header's top-right corner and the
-              header's `.evt-meta` row lines up beside it, reserving width
-              for the chevron when present — see the `.evt-meta` rules in
-              app/globals.css. */}
+          {/* The header places the chevron after its action word
+              (`EventHeadChevron`) and the number pill draws the menu before
+              the number (event-number-pill.tsx). A header with no slot for the
+              chevron gets it at the right end (`.evt-chev-end`, hidden by
+              app/globals.css where the header has its own); below sm it
+              stands in the header's top-right corner beside the `.evt-meta`
+              row, which reserves its width. */}
           <div className={`relative flex items-start gap-2${showChevron ? " evt-has-chev" : ""}`}>
-            <div className={`flex-1 min-w-0${showChevron ? "" : " pr-5"}`}>
-              <EventTxHashContext.Provider value={txHash ?? null}>{header}</EventTxHashContext.Provider>
+            <div className={`flex-1 min-w-0 ${menuAtEnd ? "" : "pr-5"}`} ref={headRef}>
+              <EventTxHashContext.Provider value={txHash ?? null}>
+                <EventHeadContext.Provider value={{ chevron: headChevron, menu: menuAtEnd ? null : headMenu }}>
+                  {header}
+                </EventHeadContext.Provider>
+              </EventTxHashContext.Provider>
             </div>
+            {menuAtEnd && <div className="mr-4 mt-3 shrink-0">{headMenu}</div>}
             {showChevron && (
               <div
-                className="absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
+                className="evt-chev-end absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
                 data-anatomy="T5"
               >
-                <ExpandChevron isOpen={showDetail} group="evt" />
+                <DiscChevron isOpen={showDetail} className="m-1" />
               </div>
             )}
           </div>

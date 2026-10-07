@@ -168,12 +168,10 @@ async function click(page, selector) {
 }
 
 const openCard = async (page) => {
-  // The header button is the toggle (ui-jobs 265); C9 is its chevron cue.
-  if (await seen(page, `${sel("P1")}${sel("C1")}`, 5000)) {
-    await page
-      .locator(`${sel("P1")} [data-card-disclosure-toggle]`)
-      .first()
-      .dispatchEvent("click");
+  // Each headline row opens on a chevron (ui-jobs 295).
+  const closed = page.locator(`${sel("P1")} [data-card-row-toggle][aria-expanded="false"]`);
+  for (let i = 0; i < 6 && (await closed.count()) > 0; i++) {
+    await closed.first().dispatchEvent("click");
     await page.waitForTimeout(400);
   }
 };

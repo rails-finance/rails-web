@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useRef, useState } from "react";
 import { useEscapeClose } from "@/components/shared/use-escape-close";
+import { DiscChevron } from "@/components/shared/expand-chevron";
 
 /**
  * Standard "plain language" help affordance — the single info grammar for every
@@ -280,9 +281,9 @@ export interface InfoTabsDisclosureProps {
    *  rounded box. Unset, the panel register. */
   bare?: boolean;
   /** Words after the (i) ("Event explanation" on an event card). Set, the
-   *  first tab draws as the event card's row (ui-jobs 281): the toggle spans
-   *  the (i), the words and the free space after them, `rowExtra` follows it,
-   *  and the chevron stands at the row's right end. */
+   *  first tab draws as the event card's row (ui-jobs 281, 295): the toggle
+   *  spans the (i), the words, the chevron after them and the free space
+   *  after it, and `rowExtra` stands at the row's right end. */
   heading?: string;
 }
 
@@ -340,12 +341,12 @@ export function InfoTabsDisclosure({
   return (
     <div className={`${bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
       {heading && first ? (
-        // The event card's row. `rowExtra` (the card's action) sits between
-        // the two halves of the toggle as a sibling, so no control nests in
-        // another. The chevron is a second
-        // press area for the same toggle, out of the tab order: Tab reaches
-        // the toggle, then the controls in `rowExtra`.
-        <div className="group/t3row flex items-center gap-2">
+        // The event card's row. The chevron follows the words inside the
+        // toggle (ui-jobs 295), and the toggle spans the free space after
+        // them; `rowExtra` (the card's action) stands at the right end as a
+        // sibling, so no control nests in another. Tab reaches the toggle,
+        // then the controls in `rowExtra`.
+        <div className="group/t3row disc-row flex items-center gap-2">
           <button
             ref={(el) => {
               if (el) buttons.current.set(first.key, el);
@@ -372,30 +373,11 @@ export function InfoTabsDisclosure({
             <span className={`truncate text-sm font-semibold transition-colors ${tone}`} data-t3-heading="">
               {heading}
             </span>
+            <span className="inline-flex items-center" data-t3-chevron="">
+              <DiscChevron isOpen={open?.key === first.key} />
+            </span>
           </button>
           {rowExtra}
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            data-t3-toggle=""
-            data-t3-chevron=""
-            onClick={toggleFirst}
-            className="flex cursor-pointer items-center self-stretch py-1 pl-1"
-          >
-            <svg
-              className={`h-3 w-3 ${tone} transition-[color,transform] ${open?.key === first.key ? "rotate-180" : ""}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
         </div>
       ) : (
         <>

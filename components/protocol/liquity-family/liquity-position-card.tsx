@@ -30,7 +30,7 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import { PositionCardDetail, PositionCardDisclosureToggle } from "@/components/shared/position-card-disclosure";
+import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -490,13 +490,14 @@ export function LiquityPositionCard({
   /** Opened-layer lines under Collateral ratio from the page's live read
    *  (the price bar). Only drawn on a disclosing card. */
   riskDetail?: ReactNode;
-  /** The card header set (ui-jobs 270, built on Liquity V2 first): a status
-   *  tag only for an ended Trove, no asset names or IDs in the header, the
-   *  chevron alone at its right, the activity and `cardMenu` in the foot
-   *  strip, and USD under each asset figure. Detail render only. */
+  /** The card header set (ui-jobs 270, 295, built on Liquity V2 first): the
+   *  "Position summary" heading with a status tag only for an ended Trove and
+   *  the delegate flag, no asset names or IDs in the header, `cardMenu` at
+   *  its right end, the activity in the foot strip, and USD under each asset
+   *  figure in its row's opened lines. Detail render only. */
   headerSet?: boolean;
-  /** The card's ⋮ menu (ToolsMenu `card` variant), at the end of the foot
-   *  strip with `headerSet`. */
+  /** The card's ⋮ menu (ToolsMenu `card` variant), at the right end of the
+   *  heading with `headerSet`. */
   cardMenu?: ReactNode;
 }) {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
@@ -561,9 +562,9 @@ export function LiquityPositionCard({
     </div>
   );
 
-  // The header set's pieces (ui-jobs 270): the foot strip (transactions,
-  // warnings, age, ⋮), the header's right end (the delegate flag and the
-  // chevron), and the small tag naming an ended or redeemed-down Trove.
+  // The header set's pieces (ui-jobs 270, 295): the foot strip (transactions,
+  // warnings, age), the heading's right end (the ⋮), and the small tag
+  // naming an ended or redeemed-down Trove.
   const set = headerSet && !!receipts;
   // The listing card under the header set (ui-jobs 246): status, the owner
   // as text, the activity and the headline figures; no action icons, and
@@ -581,17 +582,13 @@ export function LiquityPositionCard({
     />
   ) : undefined;
   const footStrip = set ? (
-    <>
-      <PositionCardMeta
-        lastActivityAt={v.lastActivityAt}
-        eventCount={v.txCount}
-        liquidationCount={v.liquidationCount}
-        redemptionCount={v.redemptionCount}
-        order="age-last"
-        chevron={false}
-      />
-      {cardMenu}
-    </>
+    <PositionCardMeta
+      lastActivityAt={v.lastActivityAt}
+      eventCount={v.txCount}
+      liquidationCount={v.liquidationCount}
+      redemptionCount={v.redemptionCount}
+      order="age-last"
+    />
   ) : undefined;
   const delegateFlag = v.isBatched && v.status === "open" && (
     // Delegate marker: the name is in the Explanation; pink marks an outside party.
@@ -602,12 +599,7 @@ export function LiquityPositionCard({
       <Users className="w-3.5 h-3.5" aria-hidden="true" />
     </span>
   );
-  const headerEnd = set ? (
-    <span className="flex items-center gap-2">
-      {delegateFlag}
-      <PositionCardDisclosureToggle />
-    </span>
-  ) : undefined;
+  const headerEnd = set ? <span className="-my-1 flex items-center">{cardMenu}</span> : undefined;
   const tag = (word: string, cls: string) => (
     <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${cls}`} data-anatomy="C6">
       {word}
@@ -767,9 +759,10 @@ export function LiquityPositionCard({
         // for OPEN on a redeemed-down Trove.
         statusPill={
           set ? (
-            zombie ? (
-              tag("Zombie", MUTED_TAG)
-            ) : null
+            <>
+              {zombie && tag("Zombie", MUTED_TAG)}
+              {delegateFlag}
+            </>
           ) : receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
               {zombie ? "Zombie" : "Borrowing"}
@@ -842,17 +835,19 @@ export function LiquityPositionCard({
               </StatValue>
             ),
             footnote: headerSet ? (
-              <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
-                {collUsd !== null && collUsd > 0 ? (
-                  <Prov info={fp.collUsd}>
-                    <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
-                      <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
-                    </HighlightableValue>
-                  </Prov>
-                ) : pending && coll > 0 ? (
-                  <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
-                ) : null}
-              </div>
+              <Detail>
+                <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
+                  {collUsd !== null && collUsd > 0 ? (
+                    <Prov info={fp.collUsd}>
+                      <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
+                        <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
+                      </HighlightableValue>
+                    </Prov>
+                  ) : pending && coll > 0 ? (
+                    <span className="inline-block h-3 w-16 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />
+                  ) : null}
+                </div>
+              </Detail>
             ) : (
               <Detail>
                 <div className="text-xs mt-0.5 min-h-[1rem]">
@@ -896,14 +891,14 @@ export function LiquityPositionCard({
             ),
             footnote: (
               <>
-                {headerSet && debt > 0 && (
-                  <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
-                    <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
-                      <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
-                    </Prov>
-                  </div>
-                )}
                 <Detail>
+                  {headerSet && debt > 0 && (
+                    <div className="text-xs mt-0.5 min-h-[1rem] tabular-nums">
+                      <Prov info={debtUsdProv(cfg.debtSymbol, debt)}>
+                        <span className="font-bold text-green-400">{formatUsdValue(debt)}</span>
+                      </Prov>
+                    </div>
+                  )}
                   <div className="text-xs mt-0.5 text-rb-500">
                     <Prov info={fp.rate}>
                       <HighlightableValue type="interestRate" state="after" value={rate} className="text-rb-500">

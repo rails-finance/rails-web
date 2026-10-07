@@ -1,6 +1,10 @@
 import { Fragment, type ComponentType, type ReactNode } from "react";
-import { TipLabel } from "@/components/shared/tip-label";
-import { PositionCardHeader, PositionCardRegion } from "@/components/shared/position-card-disclosure";
+import {
+  PositionCardHeader,
+  PositionCardRegion,
+  PositionCardRow,
+  PositionSummaryHeading,
+} from "@/components/shared/position-card-disclosure";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { formatDate } from "@/lib/date";
@@ -83,8 +87,8 @@ export interface ClosedPositionStatsProps {
    *  status-line companion rather than a top-right tag. */
   leadingIdentity?: ReactNode;
   /** A card with progressive disclosure (ui-jobs 209) passes its detail gate
-   *  (`PositionCardDetail`): every cell but Outcome then draws only while the
-   *  card is open, so the closed card is its header and the outcome. */
+   *  (`PositionCardDetail`). Since the rows open one by one (ui-jobs 295) the
+   *  gate outside a row draws its cells. */
   detailGate?: ComponentType<{ children: ReactNode }>;
   /** Drawn in place of the CLOSED badge: a card that names its ending in its
    *  own tag (ui-jobs 270's "Closed" / "Liquidated"). */
@@ -145,6 +149,7 @@ export function ClosedPositionStats({
         {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
         <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+          <PositionSummaryHeading />
           {tag !== undefined ? (
             tag
           ) : badgeTip ? (
@@ -166,11 +171,13 @@ export function ClosedPositionStats({
       <PositionCardRegion className={gridClass} anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
         <Gate>
-          <div>
-            <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-              <TipLabel text={collateralLabel} tip={labelTips?.collateral} />
-              {collateralIcon}
-            </div>
+          <PositionCardRow
+            index={0}
+            defaultOpen
+            label={collateralLabel}
+            labelTip={labelTips?.collateral}
+            headerIcon={collateralIcon}
+          >
             {collateralAssetIcons ? (
               <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
                 {collateral}
@@ -180,13 +187,9 @@ export function ClosedPositionStats({
               collateral
             )}
             {collateralFootnote}
-          </div>
+          </PositionCardRow>
           {showDebt ? (
-            <div>
-              <div className="text-rb-500 text-xs font-semibold flex items-center gap-1.5">
-                <TipLabel text={debtLabel} tip={labelTips?.debt} />
-                {debtIcon}
-              </div>
+            <PositionCardRow index={1} defaultOpen label={debtLabel} labelTip={labelTips?.debt} headerIcon={debtIcon}>
               {debtAssetIcons ? (
                 <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
                   {debt}
@@ -196,15 +199,12 @@ export function ClosedPositionStats({
                 debt
               )}
               {debtFootnote}
-            </div>
+            </PositionCardRow>
           ) : outcomeFollows ? null : (
             <div className="hidden sm:block" />
           )}
         </Gate>
-        <div>
-          <div className="text-rb-500 text-xs font-semibold">
-            <TipLabel text="Outcome" tip={labelTips?.outcome} />
-          </div>
+        <PositionCardRow index={2} defaultOpen={false} label="Outcome" labelTip={labelTips?.outcome}>
           <div className={`text-lg font-bold mt-2 ${color}`}>{outcomeLabel ?? label}</div>
           {outcomeDates && outcomeDates.length > 0
             ? outcomeDates.map((d) => (
@@ -214,13 +214,12 @@ export function ClosedPositionStats({
               ))
             : closure && <div className="text-xs text-rb-500 mt-0.5">{closure}</div>}
           {outcomeFootnote}
-        </div>
+        </PositionCardRow>
         <Gate>
           {extra ? (
-            <div>
-              <div className="text-rb-500 text-xs font-semibold">{extra.label}</div>
+            <PositionCardRow index={3} defaultOpen={false} label={extra.label}>
               {extra.value}
-            </div>
+            </PositionCardRow>
           ) : (
             <div className="hidden sm:block" />
           )}
