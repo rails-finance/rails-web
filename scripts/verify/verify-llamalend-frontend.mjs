@@ -539,7 +539,7 @@ try {
     // page — so always click the FIRST remaining "Show explanation", re-located
     // fresh each pass, force-clicked (the icon can sit under the fixed strips).
     for (let pass = 0; pass < 10; pass++) {
-      const tab = page.locator("[aria-label='Show explanation']").first();
+      const tab = page.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       await tab.scrollIntoViewIfNeeded().catch(() => {});
       const ok = await tab
@@ -794,7 +794,7 @@ try {
       await page.waitForTimeout(200);
     }
     for (let pass = 0; pass < 20; pass++) {
-      const tab = page.locator("[aria-label='Show explanation']").first();
+      const tab = page.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })
@@ -916,7 +916,7 @@ try {
     await p4.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
     body = await openAllAndRead(p4);
     for (let pass = 0; pass < 12; pass++) {
-      const tab = p4.locator("[aria-label='Show explanation']").first();
+      const tab = p4.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })
@@ -960,7 +960,7 @@ try {
     await p5.waitForSelector("text=LIFETIME FLOWS", { timeout: 120000 });
     body = await openAllAndRead(p5);
     for (let pass = 0; pass < 12; pass++) {
-      const tab = p5.locator("[aria-label='Show explanation']").first();
+      const tab = p5.locator("[aria-label^='Show'][aria-label$='explanation']").first();
       if ((await tab.count().catch(() => 0)) === 0) break;
       const ok = await tab
         .click({ timeout: 5000, force: true })

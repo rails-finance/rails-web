@@ -120,7 +120,7 @@ async function expandCardWithLabel(page, labelRe) {
       // The toggle is an icon button — its label lives in aria-label, and
       // innerText alone comes back empty.
       const btn = Array.from(card?.querySelectorAll("button") || []).find((b) =>
-        /show explanation/i.test(`${b.innerText || ""} ${b.getAttribute("aria-label") || ""}`.trim()),
+        /show (event )?explanation/i.test(`${b.innerText || ""} ${b.getAttribute("aria-label") || ""}`.trim()),
       );
       if (!btn) return false;
       btn.click();

@@ -357,9 +357,7 @@ export function InfoTabsDisclosure({
             data-t3-toggle=""
             onClick={toggleFirst}
             aria-expanded={open?.key === first.key}
-            aria-label={
-              open?.key === first.key ? `Hide ${first.label.toLowerCase()}` : `Show ${first.label.toLowerCase()}`
-            }
+            aria-label={`${open?.key === first.key ? "Hide" : "Show"} ${heading.toLowerCase()}`}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch rounded-md py-1 text-left"
           >
             <svg
