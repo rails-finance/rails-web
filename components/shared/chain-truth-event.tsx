@@ -44,7 +44,7 @@ import {
   ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
-import { usdShown } from "@/lib/shared/usd-display";
+import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -59,7 +59,7 @@ import { ExactTip } from "@/components/shared/amount-text";
 import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
-import { ClosedTokens, ClosedUsd, LedgerCell } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
@@ -832,97 +832,105 @@ export function ChainTruthDetail({
             <StatCard label={s.label}>{children}</StatCard>
           );
         // A ledger cell keeps its tokens' before → after on one line.
-        const Tokens = s.ledger ? ClosedTokens : Fragment;
         const usdOn = s.usd && usdShown(s.usd.value);
+        const heldAmount = Number(s.value);
+        const ledgerUsd =
+          s.ledger && s.usd && usdOn
+            ? {
+                before:
+                  s.usdBefore && s.transition ? (
+                    <Prov info={s.usdBefore.prov} value={formatUsdValue(s.usdBefore.value)}>
+                      {fmtUsdChip(s.usdBefore.value)}
+                    </Prov>
+                  ) : null,
+                after: (
+                  <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
+                    {fmtUsdChip(s.usd.value)}
+                  </Prov>
+                ),
+                price:
+                  s.symbol && heldAmount > 0
+                    ? (eventPriceText(s.usd.value / heldAmount, s.symbol) ?? undefined)
+                    : undefined,
+              }
+            : undefined;
+        const tokensWrap = (kids: ReactNode) =>
+          s.ledger ? <ClosedTokens usd={ledgerUsd}>{kids}</ClosedTokens> : <>{kids}</>;
         return (
           <div key={i} className={s.ledger ? "contents" : "h-full"}>
             {wrap(
               <>
                 <StateTransition>
-                  <Tokens>
-                    {s.transition && (
-                      <DeltaToggle
-                        before={
-                          <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                            <ExactTip
-                              always
-                              text={
-                                s.transition.shownAsIs
-                                  ? s.transition.before
-                                  : atLedger(
-                                      s.ledger,
-                                      s.transition.beforeExact,
-                                      transitionFigure(s.transition.before, s.transition.beforeExact, false),
-                                    )
-                              }
-                              exact={s.transition.beforeExact}
-                              symbol={s.symbol}
-                              label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
-                            />
-                          </Prov>
-                        }
-                        delta={
-                          <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                            <ExactTip
-                              always
-                              text={
-                                s.transition.shownAsIs
-                                  ? s.transition.change
-                                  : atLedger(
-                                      s.ledger,
-                                      s.transition.changeExact,
-                                      transitionFigure(s.transition.change, s.transition.changeExact),
-                                    )
-                              }
-                              exact={s.transition.changeExact}
-                              symbol={s.symbol}
-                              label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
-                            />
-                          </Prov>
-                        }
-                        size="sm"
-                      />
-                    )}
-                    <Prov
-                      info={s.prov}
-                      value={s.value}
-                      icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
-                    >
-                      <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
-                        <ExactTip
-                          always
-                          text={atLedger(s.ledger, s.value, s.display ?? compactAmount(s.value))}
-                          exact={s.value}
-                          symbol={s.symbol}
-                          label={
-                            s.readableLabel && Number.isFinite(Number(s.value))
-                              ? readableName(Number(s.value), s.symbol, false)
-                              : undefined
+                  {tokensWrap(
+                    <>
+                      {s.transition && (
+                        <DeltaToggle
+                          before={
+                            <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
+                              <ExactTip
+                                always
+                                text={
+                                  s.transition.shownAsIs
+                                    ? s.transition.before
+                                    : atLedger(
+                                        s.ledger,
+                                        s.transition.beforeExact,
+                                        transitionFigure(s.transition.before, s.transition.beforeExact, false),
+                                      )
+                                }
+                                exact={s.transition.beforeExact}
+                                symbol={s.symbol}
+                                label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
+                              />
+                            </Prov>
                           }
+                          delta={
+                            <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
+                              <ExactTip
+                                always
+                                text={
+                                  s.transition.shownAsIs
+                                    ? s.transition.change
+                                    : atLedger(
+                                        s.ledger,
+                                        s.transition.changeExact,
+                                        transitionFigure(s.transition.change, s.transition.changeExact),
+                                      )
+                                }
+                                exact={s.transition.changeExact}
+                                symbol={s.symbol}
+                                label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
+                              />
+                            </Prov>
+                          }
+                          size="sm"
                         />
-                        {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
-                      </span>
-                    </Prov>
-                  </Tokens>
+                      )}
+                      <Prov
+                        info={s.prov}
+                        value={s.value}
+                        icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
+                      >
+                        <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
+                          <ExactTip
+                            always
+                            text={atLedger(s.ledger, s.value, s.display ?? compactAmount(s.value))}
+                            exact={s.value}
+                            symbol={s.symbol}
+                            label={
+                              s.readableLabel && Number.isFinite(Number(s.value))
+                                ? readableName(Number(s.value), s.symbol, false)
+                                : undefined
+                            }
+                          />
+                          {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
+                        </span>
+                      </Prov>
+                    </>,
+                  )}
                   {s.usd &&
                     usdOn &&
-                    (s.ledger ? (
-                      // A ledger cell states its USD after a thin divider.
-                      <ClosedUsd
-                        before={
-                          s.usdBefore && s.transition ? (
-                            <Prov info={s.usdBefore.prov} value={formatUsdValue(s.usdBefore.value)}>
-                              {fmtUsdChip(s.usdBefore.value)}
-                            </Prov>
-                          ) : null
-                        }
-                        after={
-                          <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
-                            {fmtUsdChip(s.usd.value)}
-                          </Prov>
-                        }
-                      />
-                    ) : (
+                    (s.ledger ? null : (
                       // The after-balance valued at the event-block oracle price —
                       // the bordered chip the Liquity V2 / Aave V4 details use
                       // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the

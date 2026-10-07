@@ -25,7 +25,7 @@ import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { FLOWS_SCOPE, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
@@ -69,12 +69,18 @@ const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
 const READING = lifetimeFlowsReadingContent();
 
 /** The ⋮ at the header's right end (ui-jobs 295): How to read these charts,
- *  one text on every explorer (§264), in the modal the "?" opened. */
+ *  one text on every explorer (§264), in the modal the "?" opened; then "Show
+ *  provenance", which arms the inspector on this panel alone (ui-jobs 284). */
 function FlowsMenu({ title }: { title: string }) {
   const [reading, setReading] = useState(false);
   return (
     <>
-      <ToolsMenu variant="panel" label={`${title} menu`} heading={title}>
+      <ToolsMenu
+        variant="panel"
+        label={`${title} menu`}
+        heading={title}
+        provScope={{ id: FLOWS_SCOPE, hint: "Click a value in this panel to trace it" }}
+      >
         {(close) => (
           <ToolsMenuItem
             item="how-to-read"
@@ -136,8 +142,9 @@ export function LifetimeFlowsPanel({
 
   return (
     // Its own receipts scope: every traced figure in the panel registers here.
-    <ProvReceiptsScope registry={registry}>
+    <ProvReceiptsScope registry={registry} scopeId={FLOWS_SCOPE}>
       <section
+        data-prov-scope={FLOWS_SCOPE}
         data-skel-section="detail-economics"
         {...(loading || infoOpen ? { "data-skel-pause": "" } : {})}
         data-lifetime-flows-panel=""

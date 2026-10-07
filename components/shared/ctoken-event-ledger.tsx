@@ -20,13 +20,12 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { DeltaToggle, StateTransition, changeTone } from "@/components/shared/state-transition";
-import { usdShown } from "@/lib/shared/usd-display";
+import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
 import {
   AssetLedgers,
   ClosedTokens,
-  ClosedUsd,
   DayCloseNote,
   EventLedgerContext,
   LedgerCell,
@@ -221,7 +220,20 @@ function ClosedSide({
     const usdOn = usd != null && usdShown(usd);
     return (
       <StateTransition>
-        <ClosedTokens>
+        <ClosedTokens
+          usd={
+            usdOn && held != null
+              ? {
+                  before:
+                    changed && before != null ? (
+                      <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
+                    ) : null,
+                  after: <Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>,
+                  price: eventPriceText(a.price, a.symbol) ?? undefined,
+                }
+              : undefined
+          }
+        >
           {changed && (
             <DeltaToggle
               size="sm"
@@ -246,16 +258,6 @@ function ClosedSide({
             <span className={`text-sm font-semibold tabular-nums ${changeTone(moved)}`}>{fmt(a.amount)}</span>
           </Prov>
         </ClosedTokens>
-        {usdOn && held != null && (
-          <ClosedUsd
-            before={
-              changed && before != null ? (
-                <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
-              ) : null
-            }
-            after={<Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>}
-          />
-        )}
       </StateTransition>
     );
   }

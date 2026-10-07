@@ -11,3 +11,11 @@ export const DEPEG_BAND = 0.01;
 export function usdShown(usd: number | null | undefined): boolean {
   return usd != null && Number.isFinite(usd);
 }
+
+/** The line under a closed cell's USD tooltip: "At the event's price, $2,431.20
+ *  per ETH". Null where the price is not a positive finite number. */
+export function eventPriceText(price: number | null | undefined, symbol: string): string | null {
+  if (price == null || !Number.isFinite(price) || price <= 0) return null;
+  const digits = price >= 1 ? 2 : price >= 0.01 ? 4 : 6;
+  return `At the event\u2019s price, $${price.toLocaleString("en-US", { minimumFractionDigits: price >= 1 ? 2 : 0, maximumFractionDigits: digits })} per ${symbol}`;
+}

@@ -30,7 +30,7 @@ import {
   type ReactNode,
 } from "react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov, ProvDetached, type Provenance } from "@/components/shared/provenance";
 import { HUE, INFLOW_SWATCH, fillStyle } from "@/components/shared/lifetime-flows-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -97,6 +97,9 @@ const TOGGLE =
 /** What a click on the first line leaves alone: controls, links and the figures
  *  that carry a receipt or an exact-value tip keep their tap. */
 const OWN_TAP = "button, a, input, select, textarea, [role=button], [data-prov-pickable], [data-reveal-tip]";
+/** The USD tooltip's host (ClosedTokens): a click on its figure toggles the
+ *  cell like a click on the name; on touch the first tap opens the tip. */
+const USD_TIP_HOST = "data-closed-usd-tip";
 
 /** A pending figure: one pulsing bar where a value will stand. The bar is
  *  `bg-skeleton`, which the T2 panel's surface does not show, so it sits
@@ -198,7 +201,8 @@ export function LedgerCell({
   // card above.
   const onLine = (e: MouseEvent<HTMLElement>) => {
     e.stopPropagation();
-    if ((e.target as Element).closest(OWN_TAP)) return;
+    const own = (e.target as Element).closest(OWN_TAP);
+    if (own && !own.parentElement?.hasAttribute(USD_TIP_HOST)) return;
     if (typeof window !== "undefined" && (window.getSelection()?.toString().length ?? 0) > 0) return;
     setOpen((v) => !v);
   };
@@ -321,9 +325,57 @@ export function LedgerCell({
   );
 }
 
-/** A closed ledger cell's tokens, before → after, kept on one line. */
-export function ClosedTokens({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center gap-1 whitespace-nowrap">{children}</span>;
+/** The dollars a closed cell states, before → after the event (the after
+ *  alone where no before is given), at the event's price. */
+export interface ClosedUsdFigures {
+  before?: ReactNode;
+  after: ReactNode;
+  /** The price line, e.g. "At the event\u2019s price, $2,431.20 per ETH". */
+  price?: ReactNode;
+}
+
+/** A closed ledger cell's tokens, before → after, kept on one line. `usd` is
+ *  the side's dollars: in a cell with no ledger they follow the tokens after a
+ *  thin divider; in a cell that opens into a ledger the cell's text stays
+ *  tokens and the dollars are a rich tooltip on hover and keyboard focus of
+ *  the figure (a tap on touch), with the price they stand at (ui-jobs 296). */
+export function ClosedTokens({ children, usd }: { children: ReactNode; usd?: ClosedUsdFigures }) {
+  const drawn = useContext(ClosedUsdContext);
+  const tokens = <span className="inline-flex items-center gap-1 whitespace-nowrap">{children}</span>;
+  if (!usd) return tokens;
+  if (drawn)
+    return (
+      <>
+        {tokens}
+        <ClosedUsd {...usd} />
+      </>
+    );
+  return (
+    <span className="inline-flex" {...{ [USD_TIP_HOST]: "" }}>
+      <RevealTip
+        focusable
+        align="end"
+        tip={
+          <ProvDetached>
+            <span className="flex flex-col gap-0.5" data-ledger-usd-tip="">
+              <span className="inline-flex items-center gap-1 text-sm font-semibold">
+                {usd.before != null && (
+                  <>
+                    {usd.before}
+                    <TransitionArrow size="sm" />
+                  </>
+                )}
+                {usd.after}
+              </span>
+              <span className="text-rb-500">{usd.price ?? "At the event\u2019s price"}</span>
+            </span>
+          </ProvDetached>
+        }
+      >
+        {tokens}
+      </RevealTip>
+    </span>
+  );
 }
 
 /** A closed ledger cell's USD after its tokens: a thin divider, then the
@@ -332,8 +384,7 @@ export function ClosedTokens({ children }: { children: ReactNode }) {
  *  and dollars do not share a line: the dollars take the line under the
  *  tokens, set right, with no divider. A cell that opens into a ledger draws
  *  none: the ledger's USD column states them (ui-jobs 289). */
-export function ClosedUsd({ before, after }: { before?: ReactNode; after: ReactNode }) {
-  if (!useContext(ClosedUsdContext)) return null;
+function ClosedUsd({ before, after }: ClosedUsdFigures) {
   return (
     <span
       className="ml-1 inline-flex items-center justify-end gap-1 whitespace-nowrap border-l border-rb-300 pl-2 text-sm tabular-nums text-rb-500 dark:border-rb-600 @max-xl:ml-0 @max-xl:basis-full @max-xl:border-l-0 @max-xl:pl-0"

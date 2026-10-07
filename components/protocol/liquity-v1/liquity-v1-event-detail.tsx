@@ -24,13 +24,12 @@ import {
   StatCard,
   StatSubline,
   StateTransition,
-  ValuePill,
   changeTone,
 } from "@/components/shared/state-transition";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { LedgerCell, PendingBar } from "@/components/shared/event-ledger";
+import { ClosedTokens, LedgerCell, PendingBar, type ClosedUsdFigures } from "@/components/shared/event-ledger";
 import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
-import { usdShown } from "@/lib/shared/usd-display";
+import { eventPriceText, usdShown } from "@/lib/shared/usd-display";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
@@ -149,8 +148,7 @@ function Transition({
   closed,
   delta,
   symbol,
-  afterExtra,
-  beforeExtra,
+  usd,
   provBefore,
   provAfter,
 }: {
@@ -160,21 +158,15 @@ function Transition({
   closed?: boolean;
   delta?: ReactNode;
   symbol?: string;
-  afterExtra?: ReactNode;
-  beforeExtra?: ReactNode;
+  /** The side's dollars, a tooltip on the figure (a cell with a ledger). */
+  usd?: ClosedUsdFigures;
   provBefore?: Provenance;
   provAfter?: Provenance;
 }) {
   const changed = before !== after;
-  return (
-    <StateTransition>
-      {showBefore && (
-        <DeltaToggle
-          before={<P info={provBefore}>{before}</P>}
-          delta={closed ? null : (delta ?? null)}
-          beforeExtra={beforeExtra}
-        />
-      )}
+  const figures = (
+    <>
+      {showBefore && <DeltaToggle before={<P info={provBefore}>{before}</P>} delta={closed ? null : (delta ?? null)} />}
       {closed ? (
         <ClosedLabel />
       ) : (
@@ -183,9 +175,9 @@ function Transition({
         </P>
       )}
       {symbol && <TokenChipIcon symbol={symbol} size={16} />}
-      {afterExtra}
-    </StateTransition>
+    </>
   );
+  return <StateTransition>{usd ? <ClosedTokens usd={usd}>{figures}</ClosedTokens> : figures}</StateTransition>;
 }
 
 export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, currentPrice }: LiquityV1EventDetailProps) {
@@ -308,27 +300,35 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
               delta={
                 <P info={collDeltaProv(coords, { after: ctx.collAfter, before: ctx.collBefore })}>{collDeltaStr}</P>
               }
-              beforeExtra={
-                (isRedemption || isLiq) && usdBefore != null && usdShown(usdBefore) ? (
-                  <P
-                    info={collUsdAtBlockProv(coords, {
-                      coll: ctx.collBefore,
-                      priceUsd: price as number,
-                      side: "before",
-                    })}
-                  >
-                    <ValuePill>{fmtUsd(usdBefore)}</ValuePill>
-                  </P>
-                ) : undefined
-              }
-              afterExtra={
-                usdAfter != null && usdShown(usdAfter) ? (
-                  <P
-                    info={collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price as number, side: "after" })}
-                  >
-                    <ValuePill changed={collChanged}>{fmtUsd(usdAfter)}</ValuePill>
-                  </P>
-                ) : undefined
+              usd={
+                usdAfter != null && usdShown(usdAfter)
+                  ? {
+                      before:
+                        (isRedemption || isLiq) && usdBefore != null && usdShown(usdBefore) ? (
+                          <P
+                            info={collUsdAtBlockProv(coords, {
+                              coll: ctx.collBefore,
+                              priceUsd: price as number,
+                              side: "before",
+                            })}
+                          >
+                            {fmtUsd(usdBefore)}
+                          </P>
+                        ) : null,
+                      after: (
+                        <P
+                          info={collUsdAtBlockProv(coords, {
+                            coll: ctx.collAfter,
+                            priceUsd: price as number,
+                            side: "after",
+                          })}
+                        >
+                          {fmtUsd(usdAfter)}
+                        </P>
+                      ),
+                      price: eventPriceText(price, COLLATERAL_SYMBOL) ?? undefined,
+                    }
+                  : undefined
               }
             />
             {!collChanged && <StatSubline>unchanged</StatSubline>}
