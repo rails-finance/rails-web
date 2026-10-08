@@ -14,6 +14,12 @@
 // tail itself, exactly as it did before the route had a server half.
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  collateralPriceInfo as collateralPriceReceipt,
+  closingPriceInfo,
+  LastOwnerPrefix,
+} from "@/lib/liquity/trove-page-words";
+import { troveWords } from "@/lib/liquity/event-templates";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
@@ -70,7 +76,10 @@ import type { Provenance } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 /** The phone spine view's key row. */
-const LIQUITY_SPINE_KEY: SpineKey = { keyLeft: "to wallet", keyRight: "into Trove" };
+const LIQUITY_SPINE_KEY: SpineKey = {
+  keyLeft: troveWords("spine_to_wallet"),
+  keyRight: troveWords("spine_into_trove"),
+};
 
 export interface TroveViewProps {
   collateralType: string;
@@ -211,13 +220,13 @@ export default function TroveView({
       ]);
 
       if (!troveResponse.ok) {
-        throw new Error(`Failed to fetch trove: ${troveResponse.statusText}`);
+        throw new Error(troveWords("trove_fetch_failed", { status: troveResponse.statusText }));
       }
 
       const troveDataResp: TrovesResponse = await troveResponse.json();
 
       if (!troveDataResp.data || troveDataResp.data.length === 0) {
-        setError("Trove not found");
+        setError(troveWords("trove_not_found"));
         setLoading(false);
         return;
       }
@@ -232,7 +241,7 @@ export default function TroveView({
       setLoading(false);
       loadEnhancements();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load trove data");
+      setError(err instanceof Error ? err.message : troveWords("trove_load_failed"));
       console.error("Error loading trove data:", err);
       setLoading(false);
     }
@@ -273,7 +282,7 @@ export default function TroveView({
   };
 
   const getEnhancementStatus = (): string | null => {
-    return enhancementLoading.blockchain ? "Loading current state..." : null;
+    return enhancementLoading.blockchain ? troveWords("trove_loading_state") : null;
   };
 
   // The live note's own two reads: the branch's oracle price and the chain
@@ -335,7 +344,7 @@ export default function TroveView({
       collSurplusClaimEvent({
         source: surplus,
         family: "liquity-v2",
-        protocolName: "Liquity V2",
+        protocolName: troveWords("protocol_name"),
         chainId: MAINNET_CHAIN_ID,
         symbol: troveData?.collateralType ?? collateralType,
         owner: effectiveOwner,
@@ -547,12 +556,12 @@ export default function TroveView({
       <>
         <div className="py-8 space-y-6">
           <div className="bg-red-500/10 border border-red-500/40 rounded-lg p-4">
-            <p className="text-red-600 dark:text-red-400">{error || "Trove not found"}</p>
+            <p className="text-red-600 dark:text-red-400">{error || troveWords("trove_not_found")}</p>
             <button
               onClick={loadData}
               className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded text-white text-sm"
             >
-              Retry
+              {troveWords("retry")}
             </button>
           </div>
         </div>
@@ -566,12 +575,7 @@ export default function TroveView({
   // there's no separate price source for it.
   const collateralPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
   const collateralPriceInfo: Provenance | undefined = collateralPrice
-    ? {
-        kind: "chain-derived",
-        pclass: "oracle",
-        summary: `${troveData.collateralType}'s price — Liquity's on-chain oracle, read now.`,
-        via: "Liquity's on-chain oracle (Chainlink feed + LST canonical rate, the MIN/MAX rule)",
-      }
+    ? collateralPriceReceipt(troveData.collateralType)
     : undefined;
   const stripAssets: LatestPriceAsset[] = [
     ...(collateralPrice
@@ -589,12 +593,7 @@ export default function TroveView({
                 {
                   symbol: troveData.collateralType,
                   price,
-                  info: {
-                    kind: "chain-derived",
-                    pclass: "oracle",
-                    summary: `${troveData.collateralType}'s price at the Trove's closing row — the collateral price Liquity's oracle gave that transaction.`,
-                    via: "the closing event's collateral price",
-                  } satisfies Provenance,
+                  info: closingPriceInfo(troveData.collateralType),
                 },
                 { symbol: "BOLD", price: 1 },
               ]
@@ -611,12 +610,7 @@ export default function TroveView({
           owner={{
             wallet: effectiveOwner,
             ensName: troveData?.ownerEns ?? null,
-            prefix:
-              effectiveOwner && effectiveOwner !== troveData?.owner ? (
-                <span className="shrink-0 whitespace-nowrap text-rb-400" title="Last owner (trove closed)">
-                  last owner
-                </span>
-              ) : undefined,
+            prefix: effectiveOwner && effectiveOwner !== troveData?.owner ? <LastOwnerPrefix /> : undefined,
           }}
           assets={stripAssets}
           closed={troveData.status !== "open"}
@@ -711,7 +705,7 @@ export default function TroveView({
               runs={LIQUITY_TIMELINE_RUNS}
               displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
               spineKey={LIQUITY_SPINE_KEY}
-              emptyLabel="No transaction history available"
+              emptyLabel={troveWords("history_empty")}
               toolbarLeading={
                 <TimelineActivityHeader
                   events={liquityEvents}

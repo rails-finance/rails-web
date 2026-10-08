@@ -699,6 +699,223 @@ L5_words:
   delegate_unnamed: |-
     a batch-manager delegate
 
+# ── The Trove listing, the Trove page and the position card: the words around the events ──
+# Read by troveWords / troveNodes (lib/liquity/event-templates.ts). A {name} is a value the
+# caller passes; a bullet's links and receipts are drawn around it.
+trove_words:
+  # ── The Trove listing: its heading, noun and search box ──
+  listing_title: |-
+    Liquity V2 Troves
+  listing_noun: |-
+    Troves
+  listing_search: |-
+    Address, ENS, or ID
+  # ── The Trove page and the event page: loading, failure, the sub-nav ──
+  retry: |-
+    Retry
+  protocol_name: |-
+    Liquity V2
+  spine_to_wallet: |-
+    to wallet
+  spine_into_trove: |-
+    into Trove
+  trove_not_found: |-
+    Trove not found
+  trove_load_failed: |-
+    Failed to load trove data
+  trove_fetch_failed: |-
+    Failed to fetch trove: {status}
+  trove_loading_state: |-
+    Loading current state...
+  history_unreadable: |-
+    This Trove’s history could not be read.
+  history_empty: |-
+    No transaction history available
+  last_owner: |-
+    last owner
+  last_owner_hint: |-
+    Last owner (trove closed)
+  price_now_summary: |-
+    {coll_type}’s price — Liquity’s on-chain oracle, read now.
+  price_now_via: |-
+    Liquity’s on-chain oracle (Chainlink feed + LST canonical rate, the MIN/MAX rule)
+  price_closing_summary: |-
+    {coll_type}’s price at the Trove’s closing row — the collateral price Liquity’s oracle gave that transaction.
+  price_closing_via: |-
+    the closing event’s collateral price
+  # ── The delegate run card: one row for a stretch of rate adjustments ──
+  run_adjusted: |-
+    Adjusted
+  run_phone_caption: |-
+    Adjusted ({count}) · {range}
+  run_spoken: |-
+    Adjusted, {range}
+  run_count_one: |-
+    {count} rate adjustment
+  run_count_many: |-
+    {count} rate adjustments
+  run_by: |-
+     by {manager}
+  run_movement: |-
+    : {from} to {to}
+  run_range_days: |-
+    {from} to {to}
+  run_label: |-
+    {count_text}{by}, {range}{movement}
+  run_first: |-
+    first
+  run_last: |-
+    last
+  run_rate_summary: |-
+    The delegate’s annual interest rate after the {which} adjustment of this run — the rate the contract logged at that adjustment. Open the run to see each event’s receipt.
+  run_rate_input: |-
+    {which} adjustment
+  run_rate_note: |-
+    one of the {count} events collapsed into this row
+  # ── The position card's explanation: the lead and bullets under the stats ──
+  # A {name} is a figure or a linked value the hook draws in its receipt; the rest is the sentence.
+  liq_lead: |-
+    Trove {id} was liquidated when its collateral ratio fell below the minimum threshold ({threshold}% for {coll_type}):
+  liq_lifecycle: |-
+    Trove was active for {duration} before liquidation from {range}
+  liq_nft: |-
+    The {nft} representing trove {id} was held by {owner} at the time of liquidation
+  closed_lead_redeemed: |-
+    This trove has been closed after redemption cleared all its debt — the owner closed it to collect the collateral left, and the 0.0375 ETH liquidation reserve was refunded on top:
+  closed_lead_repaid: |-
+    This trove has been closed with all debt repaid — all the collateral was returned to the owner, and the 0.0375 ETH liquidation reserve was refunded on top:
+  closed_peak_debt: |-
+    This trove reached a maximum debt of {debt} during its lifetime
+  closed_peak_coll: |-
+    The highest recorded collateral was {coll}
+  closed_lifecycle: |-
+    Trove was active for {duration} from {range}
+  open_lead: |-
+    This trove holds {coll} of collateral against {debt} of debt:
+  debt_breakdown: |-
+    Current debt of {debt} consists of {principal} carried debt plus {interest} interest accrued since the last event
+  debt_breakdown_fee: |-
+    and {fee} delegate fees
+  coll_worth: |-
+    {coll} collateral worth {usd} secures this position
+  spot_price: |-
+    That worth is priced at the latest block’s {price} per {coll_type}
+  coll_secures: |-
+    {coll} collateral secures this position
+  coll_ratio: |-
+    Collateral ratio of {ratio} means the collateral is worth {multiple}× the debt
+  rate_cost_delegate: |-
+    {rate} interest rate managed by {delegate} with a +{fee_rate} management fee; interest accrues on the debt every block while the trove is open, the base interest costing approximately {interest_year} per year, plus {fee_year} per year in delegate fees
+  rate_cost_owner: |-
+    The owner sets the interest rate, {rate}, which accrues on the debt every block while the trove is open, costing approximately {interest_year} per year
+  delegate_visit: |-
+    Visit {name} website
+  delegate_fallback: |-
+    Batch Manager
+  debt_in_front: |-
+    {debt} of debt sits at the same or lower interest rate and is exposed to redemption alongside this trove
+  troves_ahead_one: |-
+    ({count} other trove)
+  troves_ahead_many: |-
+    ({count} other troves)
+  branch_debt: |-
+    The whole {coll_type} redemption queue holds {debt} of branch debt
+  queue_share: |-
+    {share} of that queue sits in front of this trove and would be redeemed first
+  nft_held: |-
+    A transferable {nft} representing trove {id} is held by wallet {owner}
+  nft_word: |-
+    NFT
+  nft_open_title: |-
+    View NFT on OpenSea
+  counts_both: |-
+    Redeemed against {redemptions} {time_word} across {owner_txs} {tx_word}
+  counts_owner: |-
+    Shaped by {owner_txs} {tx_word}
+  counts_redeemed: |-
+    Redeemed against {redemptions} {time_word}
+  time_one: |-
+    time
+  time_many: |-
+    times
+  owner_tx_one: |-
+    owner transaction
+  owner_tx_many: |-
+    owner transactions
+  # ── The explanation's receipts: summary, formula, inputs ──
+  state_live: |-
+    live on-chain read
+  state_indexed: |-
+    indexed
+  prov_price_summary: |-
+    Liquity’s current price for {coll_type} — from Chainlink’s on-chain price feeds (and, for staked ETH, the token’s exchange rate) at the latest block, combined by the rules in Liquity’s PriceFeed contract.
+  prov_price_via: |-
+    Chainlink feeds at the latest block, combined by Liquity PriceFeed rules
+  input_collateral: |-
+    collateral
+  input_price: |-
+    price
+  input_debt: |-
+    debt
+  input_rate: |-
+    rate
+  input_principal: |-
+    principal
+  input_mgmt_rate: |-
+    mgmt rate
+  input_mcr: |-
+    MCR
+  input_mcr_note: |-
+    branch constant
+  prov_debt_live: |-
+    The trove’s debt — what the trove owes now, as the TroveManager contract reports it: the debt at the trove’s last change, plus the interest built up since and any share of liquidated troves’ debt passed to it.
+  prov_debt_indexed: |-
+    The trove’s debt — the debt the contract logged at the trove’s most recent change. Interest has built up since then.
+  prov_recorded: |-
+    Recorded debt — the trove’s debt as of its last change, before the interest built up since.
+  prov_accrued: |-
+    Accrued interest — the interest built up on the trove’s debt since its last change.
+  prov_mgmt_fee: |-
+    Accrued delegate fee — the delegate’s management fee built up on the trove’s debt since its last change. It is charged on top of the interest.
+  prov_coll_what: |-
+    Collateral held by the trove
+  prov_rate_what: |-
+    Annual interest rate the trove pays
+  prov_coll_usd: |-
+    Collateral value in USD — the collateral multiplied by Liquity’s current price for {coll_type}.
+  prov_coll_usd_formula: |-
+    collateral × price
+  prov_cr: |-
+    Collateral ratio — the collateral’s dollar value divided by the debt, at Liquity’s current price for {coll_type}.
+  prov_cr_formula: |-
+    collateral × price ÷ debt × 100
+  prov_annual_interest: |-
+    Annual interest cost — the debt at the trove’s last change multiplied by the interest rate. It is a year’s interest at today’s rate, before any delegate fee.
+  prov_annual_interest_formula: |-
+    principal × rate
+  prov_annual_mgmt: |-
+    Annual delegate fee — the debt at the trove’s last change multiplied by the delegate’s management rate. It is charged on top of the interest.
+  prov_annual_mgmt_formula: |-
+    principal × mgmt rate
+  prov_mgmt_rate: |-
+    Delegate management rate — the delegate’s annual fee, charged on top of the interest rate. The delegate sets one rate for every trove in the batch.
+  prov_mgmt_rate_via: |-
+    the batch’s most recent BatchUpdated log: _annualManagementFee
+  prov_liq_price: |-
+    Liquidation price — the {coll_type} price at which the trove’s collateral ratio would equal the branch’s minimum of {mcr}%. Below that price the trove can be liquidated.
+  prov_liq_price_formula: |-
+    debt × MCR ÷ collateral
+  prov_redemption_count: |-
+    Redemption count — the number of redemptions that have taken collateral from this trove.
+  prov_redemption_count_via: |-
+    count of the trove’s redemption events
+  prov_owner_tx_count: |-
+    Owner transactions — the number of events in the trove’s history minus its redemptions, which other BOLD holders start.
+  prov_owner_tx_count_formula: |-
+    transaction count − redemption count
+  prov_owner_tx_count_via: |-
+    counts of the trove’s events
+
 # ── Fragments: parts of a sentence the code joins ──
 # redist.balance's {debt_terms} is these, in order, joined with spaces; {x} is
 # the term's figure.

@@ -24,6 +24,8 @@ import { LiquityEventHeader } from "@/components/protocol/liquity/liquity-event-
 import { LiquityEventPageAside } from "@/components/protocol/liquity/liquity-event-page-aside";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
+import { collateralPriceInfo, closingPriceInfo, LastOwnerPrefix } from "@/lib/liquity/trove-page-words";
+import { troveWords } from "@/lib/liquity/event-templates";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import type { Provenance } from "@/components/shared/provenance";
@@ -128,12 +130,12 @@ export default function EventView({
     return (
       <div className="py-8">
         <div className="bg-red-500/10 border border-red-500/40 rounded-lg p-4">
-          <p className="text-red-600 dark:text-red-400">This Trove&rsquo;s history could not be read.</p>
+          <p className="text-red-600 dark:text-red-400">{troveWords("history_unreadable")}</p>
           <button
             onClick={() => router.refresh()}
             className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded text-white text-sm"
           >
-            Retry
+            {troveWords("retry")}
           </button>
         </div>
       </div>
@@ -141,14 +143,7 @@ export default function EventView({
   }
 
   // The sub-nav's prices, as the trove page states them.
-  const priceInfo: Provenance | undefined = currentPrice
-    ? {
-        kind: "chain-derived",
-        pclass: "oracle",
-        summary: `${trove.collateralType}'s price — Liquity's on-chain oracle, read now.`,
-        via: "Liquity's on-chain oracle (Chainlink feed + LST canonical rate, the MIN/MAX rule)",
-      }
-    : undefined;
+  const priceInfo: Provenance | undefined = currentPrice ? collateralPriceInfo(trove.collateralType) : undefined;
   const stripAssets: LatestPriceAsset[] = [
     ...(currentPrice ? [{ symbol: trove.collateralType, price: currentPrice, info: priceInfo }] : []),
     { symbol: "BOLD", price: 1 },
@@ -161,12 +156,7 @@ export default function EventView({
               {
                 symbol: trove.collateralType,
                 price,
-                info: {
-                  kind: "chain-derived",
-                  pclass: "oracle",
-                  summary: `${trove.collateralType}'s price at the Trove's closing row — the collateral price Liquity's oracle gave that transaction.`,
-                  via: "the closing event's collateral price",
-                } satisfies Provenance,
+                info: closingPriceInfo(trove.collateralType),
               },
               { symbol: "BOLD", price: 1 },
             ]
@@ -184,12 +174,7 @@ export default function EventView({
           owner={{
             wallet: owner,
             ensName: trove.ownerEns ?? null,
-            prefix:
-              owner && owner !== trove.owner ? (
-                <span className="shrink-0 whitespace-nowrap text-rb-400" title="Last owner (trove closed)">
-                  last owner
-                </span>
-              ) : undefined,
+            prefix: owner && owner !== trove.owner ? <LastOwnerPrefix /> : undefined,
           }}
           assets={stripAssets}
           closed={!open}

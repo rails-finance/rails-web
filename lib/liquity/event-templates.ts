@@ -110,6 +110,7 @@ interface ProseFile {
   page_words: Words;
   group_words: Words;
   L5_words: Words;
+  trove_words: Words;
   fragments: Words;
   shared_sentences: Record<string, SentenceTemplate>;
   templates: EventTemplate[];
@@ -137,6 +138,9 @@ export const ACTION_WORDS = FILE.action_words;
 export const PAGE_WORDS = FILE.page_words;
 /** The explanation's group headings, in the order the pane shows them. */
 export const GROUP_WORDS = FILE.group_words;
+/** The Trove listing, the Trove page, the run card and the position card's
+ *  explanation: the words around the events. Read through troveWords. */
+const TROVE_WORDS = FILE.trove_words;
 /** Parts of a sentence the generator joins. */
 export const FRAGMENTS = FILE.fragments;
 /** Sentences more than one template says. */
@@ -150,6 +154,19 @@ function fillWords(text: string, values: Record<string, string>): string {
     if (v === undefined) throw new Error(`event prose: no value for {${name}} in "${text}"`);
     return v;
   });
+}
+
+/** A trove_words string as written, for a bullet that draws its {name}s as
+ *  nodes (lib/liquity/trove-nodes.tsx). */
+export function troveText(id: string): string {
+  const text = TROVE_WORDS[id];
+  if (text === undefined) throw new Error(`event prose: no trove_words.${id}`);
+  return text;
+}
+
+/** A trove_words string with each {name} printed as given. */
+export function troveWords(id: string, values: Record<string, string | number> = {}): string {
+  return fillWords(troveText(id), Object.fromEntries(Object.entries(values).map(([k, v]) => [k, String(v)])));
 }
 
 /** The liquidation modal names the branch's minimum; the interest-rate modal
