@@ -6,21 +6,17 @@
 // paragraph's LEAD sentence as its teaser; this pane renders the REST
 // (skipLead), so the first sentence is never duplicated.
 
-import type { GasCost, PolarisContext } from "@/lib/shared/types/event-shape";
+import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { PolarisCoords } from "@/lib/polaris/event-provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { polarisCdpContent, polarisLiquidationContent, polarisTransferContent } from "@/lib/shared/learn-more-content";
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { polarisEventSlots, polarisGasClause } from "@/lib/polaris/explainer-clauses";
+import { polarisEventSlots } from "@/lib/polaris/explainer-clauses";
 
 export interface PolarisEventExplainerProps {
   ctx: PolarisContext;
   txHash?: string;
   blockNumber?: number;
-  /** This transaction's gas cost — the trailing clause. Passed only for the
-   *  holder's own touches; the card withholds it on a liquidation (the
-   *  liquidator sent it) and on a transfer (whoever moved the NFT paid). */
-  gas?: GasCost;
   skipLead?: boolean;
 }
 
@@ -36,13 +32,9 @@ export function polarisLearnMoreContent(ctx: PolarisContext): LearnMoreContent {
   }
 }
 
-export function PolarisEventExplainer({ ctx, txHash, blockNumber, gas, skipLead }: PolarisEventExplainerProps) {
+export function PolarisEventExplainer({ ctx, txHash, blockNumber, skipLead }: PolarisEventExplainerProps) {
   const coords: PolarisCoords = { txHash, blockNumber, market: ctx.market, cdpId: ctx.cdpId };
   const clauses = eventClauses(polarisEventSlots(ctx, coords));
-  // Gas rides last, after the arc — never the lead, so skipLead removes
-  // exactly the teaser sentence and the gas clause always survives.
-  const gasClause = gas ? polarisGasClause(gas) : null;
-  const withGas = gasClause ? [...clauses, gasClause] : clauses;
-  const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
+  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
   return <ProseExplainer items={items} />;
 }

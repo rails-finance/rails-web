@@ -7,6 +7,7 @@
 // identical across protocols.
 
 import { EventCard } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -117,12 +118,12 @@ export function AaveV4EventCard({
           ctx={ctx}
           event={event}
           siblings={siblings ?? [event]}
-          gas={event.gas}
           previousRate={previousRate}
           debtLifeInterest={debtLifeInterest}
           skipLead
         />
       }
+      price={gasPrice(event.gas)}
       explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={aaveV4LearnMoreContent(ctx)} />}

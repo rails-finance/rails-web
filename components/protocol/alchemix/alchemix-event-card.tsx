@@ -33,6 +33,7 @@
 
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import { EventCard } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -42,6 +43,7 @@ import { chainTruthCaption } from "@/components/shared/chain-truth-event";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
+  alchemixOwnerGas,
   alchemixExplainerTeaser,
   alchemixLearnMoreFor,
   type AlchemixCardProse,
@@ -205,6 +207,7 @@ export function AlchemixEventCard({
       }
       detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
       explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />}
+      price={gasPrice(alchemixOwnerGas(legs))}
       explainerTeaser={alchemixExplainerTeaser(legs, sibs, prose)}
       txHash={lead.txHash}
       learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}

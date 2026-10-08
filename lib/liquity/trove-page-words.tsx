@@ -21,6 +21,11 @@ export function closingPriceInfo(collType: string): Provenance {
   };
 }
 
+/** The event card's price chip's tip. */
+export function eventPriceTitle(collType: string): string {
+  return troveWords("event_price_title", { coll_type: collType });
+}
+
 /** The word before a closed Trove's last owner in the sub-nav. */
 export function LastOwnerPrefix() {
   return (

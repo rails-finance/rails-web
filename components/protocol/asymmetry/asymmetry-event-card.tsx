@@ -9,6 +9,7 @@
 import { forkDebtMove, FORK_DEBT_DUST_FLOAT, forkCollMove } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, AsymmetryContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
 import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -197,11 +198,11 @@ export function AsymmetryEventCard({ event, isLast, eventNumber }: AsymmetryEven
             txHash={event.txHash}
             blockNumber={event.blockNumber}
             skipLead
-            // The owner's transactions only: a redeemer, a liquidator or a
-            // batch manager paid for theirs.
-            gas={isWarning || ctx.batchRate ? undefined : event.gas}
           />
         }
+        // The gas of the owner's transactions only: a redeemer, a liquidator
+        // or a batch manager paid for theirs.
+        price={gasPrice(isWarning || ctx.batchRate ? undefined : event.gas)}
         explainerTeaser={
           liquityForkExplainerTeaser(ctx, coords, ASYMMETRY_FORK, ASYMMETRY_EXPLAINER_PROVS) ? (
             <InLedgerFigures

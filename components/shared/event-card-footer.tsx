@@ -1,9 +1,6 @@
 "use client";
 
 export interface EventCardFooterProps {
-  /** Content before the "?" (a family's gas where its card has no price row
-   *  in T2). */
-  extra?: React.ReactNode;
   /** The Learn-More "?" trigger, at the right end. */
   learnMore?: React.ReactNode;
 }
@@ -11,11 +8,10 @@ export interface EventCardFooterProps {
 /** T6, the foot of the open explanation: the "?" at the bottom right, as C4
  *  sits at the foot of C3 (rails-ops TO-DO-ui-jobs 281). The event menu
  *  stands at the header's right end (ui-jobs 295). */
-export function EventCardFooter({ extra, learnMore }: EventCardFooterProps) {
-  if (extra == null && learnMore == null) return null;
+export function EventCardFooter({ learnMore }: EventCardFooterProps) {
+  if (learnMore == null) return null;
   return (
     <div className="flex items-center justify-end gap-3 px-4 pb-2 pt-1" data-anatomy="T6">
-      {extra}
       {learnMore}
     </div>
   );

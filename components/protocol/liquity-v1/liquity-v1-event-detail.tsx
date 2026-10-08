@@ -15,7 +15,8 @@
 // CollSurplusPool read.
 
 import type { ReactNode } from "react";
-import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
+import type { GasCost, LiquityV1Context } from "@/lib/shared/types/event-shape";
+import { EventPriceRow, gasPrice } from "@/components/shared/event-price-row";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   ClosedLabel,
@@ -84,6 +85,10 @@ export interface LiquityV1EventDetailProps {
   wallet?: string;
   /** The PriceFeed price now, for a redemption's net outcome at today's price. */
   currentPrice?: number | null;
+  /** The transaction's gas from the index; the receipt read supplies it where
+   *  the row carries none. Stated on the owner's events only: a
+   *  redemption's or a liquidation's gas is its caller's. */
+  gas?: GasCost;
 }
 
 const P = ({ info, value, children }: { info?: Provenance; value?: string; children: ReactNode }) =>
@@ -181,7 +186,14 @@ function Transition({
   return <StateTransition>{usd ? <ClosedTokens usd={usd}>{figures}</ClosedTokens> : figures}</StateTransition>;
 }
 
-export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, currentPrice }: LiquityV1EventDetailProps) {
+export function LiquityV1EventDetail({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  currentPrice,
+  gas,
+}: LiquityV1EventDetailProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber, wallet };
   const { read, pending: readPending } = useLiquityV1EventReadState(txHash, wallet);
   const s = sidesOf(ctx);
@@ -284,6 +296,12 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
   const crAfterStr = crAfter != null ? fmtPct(crAfter) : null;
 
   const forensics = isLiq ? buildV1LiquidationForensics(ctx, coords) : undefined;
+
+  const ownerPaid = isOpen || isClose || ctx.eventType === "adjustTrove";
+  const paid = ownerPaid ? (gas ?? read?.gas ?? null) : null;
+  const ownerGas = gasPrice(
+    paid ? { ...paid, gasCostUsd: read?.priceUsd ? paid.gasCostEth * read.priceUsd : 0 } : undefined,
+  );
 
   return (
     <>
@@ -439,6 +457,10 @@ export function LiquityV1EventDetail({ ctx, txHash, blockNumber, wallet, current
       ) : isLiq && readPending ? (
         <LiquidationRoutePending />
       ) : null}
+      {/* T2's price row: the gas the owner paid, in USD at the receipt's
+          ETH price. The row moves into the shell's price slot with V1's
+          step of ui-jobs 309. */}
+      {ownerGas && <EventPriceRow price={ownerGas} />}
     </>
   );
 }

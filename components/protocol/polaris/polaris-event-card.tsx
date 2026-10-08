@@ -11,6 +11,7 @@
 
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
 
 import { type PolarisCoords } from "@/lib/polaris/event-provenance";
@@ -103,19 +104,11 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
           />
         }
         detail={<PolarisEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-        explainer={
-          <PolarisEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            // A liquidation is sent by the liquidator and a transfer is paid for
-            // by whoever moved the NFT — neither transaction's gas is the CDP
-            // holder's, so the clause is withheld on those two rows and stated
-            // on the holder's own open / adjust / close.
-            gas={ctx.eventType === "liquidate" || ctx.eventType === "transfer" ? undefined : event.gas}
-            skipLead
-          />
-        }
+        explainer={<PolarisEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />}
+        // A liquidation is sent by the liquidator and a transfer is paid for
+        // by whoever moved the NFT: neither transaction's gas is the CDP
+        // holder's, so the row states gas on the holder's open, adjust and close.
+        price={gasPrice(ctx.eventType === "liquidate" || ctx.eventType === "transfer" ? undefined : event.gas)}
         explainerTeaser={polarisExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={polarisLearnMoreContent(ctx)} />}

@@ -21,8 +21,8 @@ import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import type { AlchemixReading } from "@/lib/alchemix/readings-before";
-import { clause, composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
-import { formatGasCost } from "@/lib/shared/format-event";
+import { composeBullets, splitLead, ProseExplainer, type ClauseInput } from "@/lib/shared/explainer-prose";
+import type { GasCost } from "@/lib/shared/types/event-shape";
 import {
   alchemixBetweenReadingsClauses,
   alchemixCustodyRoundTripClause,
@@ -131,13 +131,11 @@ export interface AlchemixCardProse {
   lineEventInBlock?: boolean;
 }
 
-/** The trailing gas bullet, Liquity's: the holder's own transactions only. A
- *  line row is the Transmuter's transaction, and its gas is nobody's here. */
-function gasClause(legs: AlchemistEvent[]): ClauseInput {
-  if (legs.some((l) => l.context.data.scope === "line")) return null;
-  const gas = legs.find((l) => l.gas && l.gas.gasCostEth > 0)?.gas;
-  if (!gas) return null;
-  return clause(<>Gas for this transaction: {formatGasCost(gas)}.</>);
+/** The gas T2's price row states: the holder's transactions only. A line
+ *  row is the Transmuter's transaction, and its gas is nobody's here. */
+export function alchemixOwnerGas(legs: AlchemistEvent[]): GasCost | undefined {
+  if (legs.some((l) => l.context.data.scope === "line")) return undefined;
+  return legs.find((l) => l.gas && l.gas.gasCostEth > 0)?.gas;
 }
 
 /** Every bullet the card can show, teaser included. */
@@ -179,7 +177,6 @@ function alchemixCardClauses(
       { symbol: prose.underlyingSymbol, decimals: prose.underlyingDecimals },
       { protocolFeeBps: prose.protocolFeeBps, lineEventInBlock: prose.lineEventInBlock ?? false },
     ),
-    gasClause(legs),
   ];
 }
 

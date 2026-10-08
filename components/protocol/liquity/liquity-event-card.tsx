@@ -9,19 +9,21 @@ import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/compone
 import { Facehash } from "@/components/shared/facehash";
 import { useLiquityHeadSpec } from "./liquity-head";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
-import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
+import { LiquityEventDetail } from "./liquity-event-detail";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { collChangeProv, debtChangeProv } from "@/lib/liquity/event-provenance";
+import { collChangeProv, debtChangeProv, eventPriceProv } from "@/lib/liquity/event-provenance";
+import { eventPriceTitle } from "@/lib/liquity/trove-page-words";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
-import { L1_WORDS } from "@/lib/liquity/event-templates";
+import { L1_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -236,12 +238,37 @@ export function LiquityEventCard({
               { icon: "no-change", isLast: !!isLast }
             : { tokens: tokenRows(), isLast: !!isLast };
 
-  // Gas (owner-paid events only; the generator leaves a third party's out)
-  // stands in T2's price row; a card that draws no price row keeps it in the
-  // footer.
-  const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
-  const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
-  const detailPart = (part: "cells" | "notes" | "price") => (
+  // T2's price row: the gas the owner paid (the generator leaves a third
+  // party's out), the redemption's outcome and the collateral's price at
+  // this block, where the event carries its state.
+  const l2 = ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0 ? prose.L2 : null;
+  const priceP = l2 ? eventPriceProv(ctx, coords) : undefined;
+  const redemption = l2?.redemption;
+  const price: EventCardPrice = {
+    gas: prose.footer.gasCost ? { ...prose.footer.gasCost, run: prose.footer.gasRun } : null,
+    prices: l2
+      ? [
+          {
+            symbol: ctx.collateralType,
+            usd: l2.price,
+            info: priceP?.info,
+            value: priceP?.value,
+            title: eventPriceTitle(ctx.collateralType),
+          },
+        ]
+      : [],
+    outcome: redemption
+      ? {
+          claimable:
+            redemption.claimable != null
+              ? { amount: redemption.claimable, symbol: ctx.collateralType, word: L2_WORDS.claimable }
+              : undefined,
+          pl: redemption.showPl ? { usd: redemption.plHistoric, word: L2_WORDS.pl } : undefined,
+          today: redemption.today,
+        }
+      : null,
+  };
+  const detailPart = (part: "cells" | "notes") => (
     <LiquityEventDetail
       ctx={ctx}
       txHash={event.txHash}
@@ -291,7 +318,7 @@ export function LiquityEventCard({
       ),
     },
     notes: detailPart("notes"),
-    price: detailPart("price"),
+    price,
     explainer: {
       body: <LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />,
       first: prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : undefined,
@@ -300,7 +327,7 @@ export function LiquityEventCard({
     learnMore: <LearnMore inline content={prose.L5.content} />,
   };
 
-  const card = <EventCard slots={slots} avatar={avatarOverride ?? avatarSlot} footerExtra={footerExtra} />;
+  const card = <EventCard slots={slots} avatar={avatarOverride ?? avatarSlot} />;
   return page ? (
     <LedgerOpenContext.Provider value>
       <EventMarkdownContext.Provider value={buildMarkdown}>{card}</EventMarkdownContext.Provider>

@@ -25,7 +25,7 @@
 //     is stated from the log's own legs.
 
 import type { ReactNode } from "react";
-import type { GasCost, PolarisContext } from "@/lib/shared/types/event-shape";
+import type { PolarisContext } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
@@ -48,7 +48,6 @@ import {
 import { explorerUrl } from "@/lib/shared/chains";
 import { PETH, POLARIS_CHAIN_ID, shortAddress } from "@/lib/polaris/asset-catalog";
 import { formatExact, formatNumber } from "@/lib/utils/format";
-import { formatGasCost } from "@/lib/shared/format-event";
 import { AmountText } from "@/components/shared/amount-text";
 import { formatPolarisRatio } from "@/lib/polaris/ratio-format";
 
@@ -573,16 +572,6 @@ export function polarisEventSlots(ctx: PolarisContext, coords: PolarisCoords): E
       };
     }
   }
-}
-
-/** The trailing gas clause — the holder's own touches only. A liquidation is
- *  sent by the liquidator and a transfer is paid for by whoever moved the NFT,
- *  so attributing either transaction's gas to the CDP's holder would be wrong;
- *  the card passes no gas on those rows and this clause never renders there.
- *  Always last in the arc, never the lead, so the teaser never carries it. */
-export function polarisGasClause(gas: GasCost): ClauseInput {
-  if (!gas || gas.gasCostEth <= 0) return null;
-  return clause(<>Gas for this transaction: {formatGasCost(gas)}.</>);
 }
 
 /** The card's teaser — the first sentence of the same prose. */

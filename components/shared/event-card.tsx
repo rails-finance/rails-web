@@ -32,6 +32,7 @@ import {
 } from "@/components/shared/spine-column";
 import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -52,8 +53,7 @@ function ExplanationNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
 /* ── The slots (rails-ops reference/shared-event-card-spec.md §3; ui-jobs 309) ──
  * A family on the shell supplies data and words in these; the shell decides
  * which parts exist and where they sit. A slot typed `ReactNode` here takes a
- * typed shape in a later step of 309: `price` and the explainer's bullets in
- * step 3, `cells` in step 4. */
+ * typed shape in a later step of 309: `cells` in step 4. */
 
 /** The event the card stands for. The shell builds the card's open-state key
  *  from `family` and `id`, and the menu from `txHash`. */
@@ -105,8 +105,9 @@ export interface EventCardSlots {
   /** T2's grid. */
   cells: ReactNode;
   ledgers: EventCardLedgers;
-  /** T2's price row. */
-  price?: ReactNode;
+  /** T2's price row: the owner-paid gas, the prices the cells value, the
+   *  outcome. The row draws where one of them is present. */
+  price?: EventCardPrice;
   /** Short lines under the grid (the redeemer, forensics, "not read" notices). */
   notes?: ReactNode;
   explainer: EventCardExplainer;
@@ -154,9 +155,6 @@ interface EventCardFrame {
   /** The boundary card's controlled open. */
   detailOpen?: boolean;
   onDetailToggle?: (isOpen: boolean) => void;
-  /** Content before the footer's "?": Liquity V2's gas where its T2 draws no
-   *  price row, until gas stands in the shell's price row (309 step 3). */
-  footerExtra?: ReactNode;
 }
 
 /** The parts a family not yet on the slots passes; 309's later steps move
@@ -168,6 +166,8 @@ interface EventCardParts {
   /** A full-width strip under the header (the `band` slot). */
   band?: ReactNode;
   detail?: ReactNode;
+  /** T2's price row, under the detail (the `price` slot). */
+  price?: EventCardPrice;
   explainer?: ReactNode;
   /** Teaser line at the top of the open explanation: the first bullet. */
   explainerTeaser?: ReactNode;
@@ -207,9 +207,9 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
       <>
         {slots.cells}
         {slots.notes}
-        {slots.price}
       </>
     ),
+    price: slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
     txHash: event.txHash,
@@ -239,7 +239,6 @@ export function EventCard(props: EventCardProps) {
     numberSlot,
     detailOpen: detailOpenProp,
     onDetailToggle,
-    footerExtra,
   } = props;
   // The event page's card (rails-ops TO-DO-ui-jobs 236), where the route's
   // shell provides `EventPageContext`: the shared side column stands in the
@@ -254,6 +253,7 @@ export function EventCard(props: EventCardProps) {
     header,
     band,
     detail,
+    price,
     explainer: explainerProp,
     explainerTeaser: explainerTeaserProp,
     txHash,
@@ -394,7 +394,7 @@ export function EventCard(props: EventCardProps) {
         ]
       : []),
   ];
-  const footerNode = txHash ? <EventCardFooter extra={footerExtra} learnMore={learnMore} /> : undefined;
+  const footerNode = txHash ? <EventCardFooter learnMore={learnMore} /> : undefined;
 
   // The header's chevron slot (ui-jobs 295), after the action word.
   const headChevron =
@@ -577,6 +577,7 @@ export function EventCard(props: EventCardProps) {
       {inTimeline && band && <div className="sm:hidden">{band}</div>}
 
       {detail}
+      {hasPriceRow(price) && <EventPriceRow price={price} />}
 
       {/* ── Info sections: under a hairline, the (i) Explanation button
                at the bottom-left opens the pane beneath, drawn with no

@@ -89,8 +89,8 @@
 //   • Gas on Basedollar. The MV carries tx_gas_used and tx_gas_price, but on an L2
 //     their product is the execution fee ALONE and omits the L1 data fee, so a gas
 //     figure built from them would understate the true cost. It waits on
-//     capturing the receipt's l1Fee. The mainnet forks state gas as the pane's
-//     last clause (liquity-fork-event-explainer.tsx), as Liquity V2 does.
+//     capturing the receipt's l1Fee. The mainnet forks state gas in T2's price
+//     row (components/shared/event-price-row.tsx), as Liquity V2 does.
 
 import { collFigure } from "@/lib/shared/coll-figure";
 import type { ReactNode } from "react";

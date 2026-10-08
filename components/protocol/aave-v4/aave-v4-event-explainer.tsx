@@ -10,7 +10,6 @@
 // figure that lives beyond this card's scope).
 
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
-import type { GasCost } from "@/lib/shared/types/activity";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   aaveV4LiquidationContent,
@@ -21,15 +20,7 @@ import {
   aaveV4CollateralToggleContent,
   aaveV4EventFallbackContent,
 } from "@/lib/shared/learn-more-content";
-import { formatGasCost } from "@/lib/shared/format-event";
-import {
-  clause,
-  composeBullets,
-  eventClauses,
-  splitLead,
-  ProseExplainer,
-  type ClauseInput,
-} from "@/lib/shared/explainer-prose";
+import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { aaveV4EventSlots, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
 import { useHealthFactorAround, hfOf, premiumAt } from "@/lib/aave-v4/use-health-factor-around";
 
@@ -39,8 +30,6 @@ export interface AaveV4EventExplainerProps {
   /** Same-transaction sibling events (defaults to just this one) — the seam the
    *  combined-act narration and cross-reference clauses read. */
   siblings?: AaveV4Event[];
-  /** This transaction's gas cost — rendered as the trailing explainer clause. */
-  gas?: GasCost;
   /** The card shows the lead sentence as the teaser; render only the rest here. */
   skipLead?: boolean;
   /** The previous event's borrow rate on this asset (decimal), to say when it moved. */
@@ -76,7 +65,6 @@ export function AaveV4EventExplainer({
   ctx,
   event,
   siblings,
-  gas,
   skipLead,
   previousRate,
   debtLifeInterest,
@@ -106,13 +94,7 @@ export function AaveV4EventExplainer({
   const clauses = eventClauses(
     aaveV4EventSlots(ctx, coord, siblings ?? [event], event, hf, previousRate, debtLifeInterest),
   );
-  // Per-transaction gas as the closing clause (muted — not a header/grid value,
-  // so it stays in the body tone). Appended after the arc so it always reads
-  // last, regardless of the teaser/skipLead split.
-  const gasClause: ClauseInput =
-    gas && gas.gasCostEth > 0 ? clause(<>This transaction cost {formatGasCost(gas)} in gas.</>) : null;
-  const withGas = gasClause ? [...clauses, gasClause] : clauses;
-  const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
+  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;
 }

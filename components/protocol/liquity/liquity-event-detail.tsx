@@ -4,14 +4,11 @@ import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { accrualNoun, type BatchFeeAfter, type LiquityAccrual } from "@/lib/liquity/accrual";
 import { fillText, wordsAround, type LiquityEventProse, type LiquityL2 } from "@/lib/liquity/event-prose";
-import { FOOTER_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
-import { ThenTodayChip } from "@/components/shared/price-basis";
+import { L2_WORDS } from "@/lib/liquity/event-templates";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { usePreferences } from "@/lib/shared/preferences-context";
-import { GAS_UNITS, type GasUnit } from "@/lib/shared/preferences";
 import { formatRatio, ratioLabel, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
-import { Fuel } from "lucide-react";
 import {
   TransitionArrow,
   DeltaToggle,
@@ -19,7 +16,6 @@ import {
   StatCard,
   StateTransition,
   StatSubline,
-  PriceChipShell,
   changeTone,
 } from "@/components/shared/state-transition";
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued, fmtRateNum } from "@/lib/liquity/figure-format";
@@ -38,7 +34,6 @@ import {
   collChangeProv,
   rateAfterProv,
   upfrontFeeProv,
-  eventPriceProv,
   TROVE_MANAGER,
   type ChangeProv,
   type FigureProv,
@@ -468,51 +463,6 @@ function CollateralRatioMetric({
   );
 }
 
-/** The gas the owner paid: a fuel-pump icon and one figure, in USD or ETH. A
- *  press switches the unit, kept in the preferences so every card follows
- *  (ui-jobs 289). A cost with no USD figure reads in ETH. */
-export function LiquityGas({ footer }: { footer: LiquityEventProse["footer"] }) {
-  const { prefs, update } = usePreferences();
-  const cost = footer.gasCost;
-  if (!cost) return null;
-  const units = GAS_UNITS.filter((u) => u !== "usd" || cost.usd > 0);
-  const unit: GasUnit = units.includes(prefs.gasUnit) ? prefs.gasUnit : units[0];
-  const next = units[(units.indexOf(unit) + 1) % units.length];
-  const figure = (u: GasUnit) =>
-    u === "usd"
-      ? cost.usd < 0.01
-        ? "< $0.01"
-        : `$${cost.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : `${cost.eth < 0.001 ? cost.eth.toFixed(6) : cost.eth.toFixed(4)} ETH`;
-  const unitWord = (u: GasUnit) => (u === "usd" ? FOOTER_WORDS.gas_unit_usd : FOOTER_WORDS.gas_unit_eth);
-  const gasLine =
-    footer.gasRun != null
-      ? fillText(FOOTER_WORDS.gas_run, { run_count: footer.gasRun, gas: figure(unit) })
-      : fillText(FOOTER_WORDS.gas, { gas: figure(unit) });
-  const label =
-    units.length > 1
-      ? fillText(FOOTER_WORDS.gas_press, { gas_line: gasLine, unit: unitWord(unit), next_unit: unitWord(next) })
-      : gasLine;
-  return (
-    <button
-      type="button"
-      className="inline-flex min-h-6 cursor-pointer items-center gap-1 rounded-md text-xs tabular-nums text-rb-500 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
-      aria-label={label}
-      title={label}
-      data-gas=""
-      data-gas-unit={unit}
-      onClick={(e) => {
-        e.stopPropagation();
-        update({ gasUnit: next });
-      }}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{figure(unit)}</span>
-    </button>
-  );
-}
-
 // ── Main component ──────────────────────────────────────────────────
 
 export interface LiquityEventDetailProps {
@@ -528,9 +478,9 @@ export interface LiquityEventDetailProps {
   currentPrice?: number;
   /** The generator's levels (lib/liquity/event-prose.ts): the grid's figures. */
   prose: LiquityEventProse;
-  /** Which of the card's slots this draws: the grid (`cells`), the redeemer
-   *  line (`notes`) or the price row and its today line (`price`). */
-  part: "cells" | "notes" | "price";
+  /** Which of the card's slots this draws: the grid (`cells`) or the
+   *  redeemer line (`notes`). */
+  part: "cells" | "notes";
 }
 
 export function LiquityEventDetail({
@@ -672,7 +622,6 @@ export function LiquityEventDetail({
   // rate receipt, so the identity must be built in one place.
   const rateP = rateAfterProv(ctx, coords);
   const feeP = upfrontFeeProv(ctx, coords);
-  const priceP = eventPriceProv(ctx, coords);
   const collBeforeProv: Provenance =
     isRedemption && troveOperation
       ? {
@@ -1005,67 +954,6 @@ export function LiquityEventDetail({
           liquidated, claimable surplus, SP/liquidator splits) is generated
           there by generateLiquidateItems, so it no longer appears in the
           details body. */}
-
-      {/* The price row: the gas the owner paid, the redemption P/L (net
-          outcome), the historic collateral price. P/L
-          reconciles with the Cleared / Reduced figures in the header: debt
-          cleared minus the value of collateral given up, at the
-          redemption-time price. Today's price is the T2 row below the chip.
-          (Batch membership is conveyed by the "Delegate" treatment on
-          interest-rate events, so no standalone "Batched" badge here.) */}
-      {part === "price" && collPrice > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
-          <LiquityGas footer={prose.footer} />
-          {l2.redemption &&
-            (() => {
-              // P/L reconciles with the header's Cleared / Reduced: debt cleared
-              // less the collateral given up, at the redemption's price.
-              const { claimable, showPl, plHistoric } = l2.redemption;
-              const plStr = (n: number) => `${n >= 0 ? "+" : "−"}${formatUsd(Math.abs(n))}`;
-              const plColor = (n: number) => (n >= 0 ? "text-green-400" : "text-red-400");
-              if (claimable == null && !showPl) return null;
-              return (
-                <div className="inline-flex items-center gap-4 flex-wrap text-xs">
-                  {claimable != null && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="font-bold text-foreground">{claimable.toFixed(4)}</span>
-                      <TokenChipIcon symbol={ctx.collateralType} size={14} />
-                      <span className="font-semibold text-green-600 dark:text-green-400">{L2_WORDS.claimable}</span>
-                    </span>
-                  )}
-                  {showPl && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="text-rb-500">{L2_WORDS.pl}</span>
-                      <span className={`font-bold ${plColor(plHistoric)}`}>{plStr(plHistoric)}</span>
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
-          <PriceChipShell bare title={`${ctx.collateralType} price at the time of this event`}>
-            <ThenTodayChip
-              symbol={ctx.collateralType}
-              format={formatUsd}
-              then={
-                <P
-                  info={priceP?.info}
-                  value={priceP?.value}
-                  icon={<TokenChipIcon symbol={ctx.collateralType} size={14} />}
-                >
-                  {formatUsd(collPrice)}
-                </P>
-              }
-            />
-          </PriceChipShell>
-        </div>
-      )}
-      {/* The redeemed collateral at the latest block's price, under the
-          price chip (ui-jobs 283). */}
-      {part === "price" && collPrice > 0 && l2.redemption?.today && (
-        <div className="px-4 pb-2 text-xs text-rb-500" data-redemption-today="">
-          {l2.redemption.today}
-        </div>
-      )}
     </>
   );
 }

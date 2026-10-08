@@ -572,12 +572,6 @@ footer_words:
     Gas {gas}
   gas_run: |-
     Gas across {run_count} transactions {gas}
-  gas_unit_usd: |-
-    USD
-  gas_unit_eth: |-
-    ETH
-  gas_press: |-
-    {gas_line}, in {unit}. Press for {next_unit}
   tx: |-
     tx {tx}
   block: |-
@@ -696,6 +690,9 @@ trove_words:
     {coll_type}’s price at the Trove’s closing row — the collateral price Liquity’s oracle gave that transaction.
   price_closing_via: |-
     the closing event’s collateral price
+  # ── The event card's price row: the chip's tip ──
+  event_price_title: |-
+    {coll_type} price at the time of this event
   # ── The delegate run card: one row for a stretch of rate adjustments ──
   run_adjusted: |-
     Adjusted

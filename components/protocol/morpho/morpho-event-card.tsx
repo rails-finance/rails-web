@@ -6,6 +6,8 @@
 
 import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
+import { useMorphoNeighbours } from "@/lib/morpho/timeline-neighbours";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -44,6 +46,8 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
   const sym = ctx.side === "collateral" ? ctx.collateralSymbol : ctx.loanSymbol;
   const delta = Number(ctx.assetsDelta) || 0;
   const mag = Math.abs(delta);
+  // The first event of its transaction, which states the transaction's gas.
+  const firstInTx = (useMorphoNeighbours(event.id)?.earlierInTx.length ?? 0) === 0;
   // Third-party action: the owner (onBehalf) neither signed the tx nor made
   // the Morpho call. Such events badge the token
   // icon pink, and the header names the actor in a "by …" chip — but the flow
@@ -114,12 +118,14 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
             txHash={event.txHash}
             blockNumber={event.blockNumber}
             eventId={event.id}
-            // The liquidator pays a liquidation's gas and a third party pays
-            // an acted row's: neither is the owner's cost, so neither is stated.
-            gas={isLiq || extBy ? undefined : event.gas}
             skipLead
           />
         }
+        // The liquidator pays a liquidation's gas and a third party pays an
+        // acted row's: neither is the owner's cost, so neither is stated. A
+        // transaction carrying several events (Add Collateral and Borrow)
+        // states it on the first of them.
+        price={gasPrice(isLiq || extBy || !firstInTx ? undefined : event.gas)}
         explainerTeaser={morphoExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={morphoLearnMoreContent(ctx)} />}

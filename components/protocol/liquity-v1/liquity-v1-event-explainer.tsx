@@ -19,9 +19,7 @@ import {
   liquityV1LiquidationContent,
   liquityV1EventFallbackContent,
 } from "@/lib/shared/learn-more-content";
-import { clause, composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import type { GasCost } from "@/lib/shared/types/event-shape";
-import { formatGasCost } from "@/lib/shared/format-event";
+import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useCollFigures } from "@/components/shared/event-ledger-context";
 import { liquityV1EventSlots } from "@/lib/liquity-v1/explainer-clauses";
 import { useLiquityV1EventReadState, useLiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
@@ -41,10 +39,6 @@ export interface LiquityV1EventExplainerProps {
   skipLead?: boolean;
   /** On a liquidation, what the Trove's life left its owner. */
   ownerOutcome?: LiquityV1OwnerOutcome | null;
-  /** The transaction's gas from the index; the receipt read supplies it where
-   *  the row carries none. Stated on the owner's own events only: a
-   *  redemption's or a liquidation's gas is its caller's. */
-  gas?: GasCost;
 }
 
 /** Mechanic modal content for this event — never-empty floor: every event type
@@ -80,7 +74,6 @@ export function LiquityV1EventExplainer({
   currentPrice,
   skipLead,
   ownerOutcome,
-  gas,
 }: LiquityV1EventExplainerProps) {
   const coords: LiquityV1Coords = { txHash, blockNumber };
   // The same reads the opened grid makes; the hooks share one request each.
@@ -92,13 +85,7 @@ export function LiquityV1EventExplainer({
   const clauses = figures(() =>
     eventClauses(liquityV1EventSlots(ctx, coords, { read, surplus, price, currentPrice, readPending, ownerOutcome })),
   );
-  // Gas rides last, after the arc, so skipLead removes only the teaser.
-  const ownerPaid = ctx.eventType === "openTrove" || ctx.eventType === "adjustTrove" || ctx.eventType === "closeTrove";
-  const paid = ownerPaid ? (gas ?? read?.gas ?? null) : null;
-  const priced: GasCost | null =
-    paid && paid.gasCostEth > 0 ? { ...paid, gasCostUsd: read?.priceUsd ? paid.gasCostEth * read.priceUsd : 0 } : null;
-  const withGas = priced ? [...clauses, clause(<>Gas for this transaction: {formatGasCost(priced)}.</>)] : clauses;
-  const items = composeBullets(skipLead ? splitLead(withGas).rest : withGas);
+  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
 
   return <ProseExplainer items={items} />;
 }
