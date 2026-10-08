@@ -9,7 +9,6 @@ import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
-import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
 import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
@@ -209,14 +208,11 @@ export type SpineTip = "above";
  *  ignores the context. */
 export const SpineTipContext = createContext<SpineTip | null>(null);
 
-/** The card's toggle, handed to its spine node (EventCard, desktop list):
- *  the node and its flank values are a second click target for the header,
- *  which stays the one focusable control. The hover handlers light the
- *  header while the pointer is on the node (`useLinkedHover`). */
-export const SpineNodeToggleContext = createContext<{
-  onToggle: () => void;
-  hover: LinkedHoverHandlers;
-} | null>(null);
+/** The card's toggle, handed to its spine node (EventCard): the node and its
+ *  flank values are a second click target for the header, which stays the one
+ *  focusable control. Hovering the node lights the header (`.evt-row` in
+ *  app/globals.css). */
+export const SpineNodeToggleContext = createContext<{ onToggle: () => void } | null>(null);
 
 /** A warning event's legs, published by the card's header for the card's
  *  spine: the header (ChainTruthRow, a family's own) holds the amounts, the
@@ -841,9 +837,7 @@ export function SpineColumn({
   // phone the segment's button lies over them and takes the click).
   const toggleCtx = useContext(SpineNodeToggleContext);
   const nodeToggle = toggleCtx;
-  const nodeProps = nodeToggle
-    ? { onClick: nodeToggle.onToggle, ...nodeToggle.hover, "data-spine-node-toggle": "" }
-    : {};
+  const nodeProps = nodeToggle ? { onClick: nodeToggle.onToggle, "data-spine-node-toggle": "" } : {};
   // A warning node's legs: the card's own, else the ones its header published.
   const publishedLegs = useContext(SpineLegsContext)?.legs ?? null;
   const adverseLegs = icon === "warning" ? (warningLegs ?? publishedLegs) : null;

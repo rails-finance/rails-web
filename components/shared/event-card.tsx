@@ -23,7 +23,6 @@ import { EventDateContext, EventDayMarkContext } from "@/components/shared/event
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
 import { SpineLegsContext, SpineNodeToggleContext, useSpineLegsState } from "@/components/shared/spine-column";
-import { useLinkedHover } from "@/hooks/useLinkedHover";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -276,14 +275,13 @@ export function EventCard({
   // control is the segment's button.
   const headerToggles = !hideDetailChevron && !pageMode;
   const showChevron = hasDetail && headerToggles;
-  // The spine node is a second click target for the header (the folder
-  // node's rule): a click on it toggles the card, and hovering it lights the
-  // header and reveals its chevron. The header stays the one Tab stop.
-  const { lit: nodeLit, bind: bindNode } = useLinkedHover<"node">();
+  // The spine node is a second click target for the header: a click on it
+  // toggles the card, and hovering it lights the header and reveals its
+  // chevron (`.evt-row` in app/globals.css). The header stays the one Tab stop.
   const nodeToggleOn = showChevron && !pageMode;
   const nodeToggle = useMemo(
-    () => (nodeToggleOn ? { onToggle: () => toggleDetail(), hover: bindNode("node") } : null),
-    [nodeToggleOn, toggleDetail, bindNode],
+    () => (nodeToggleOn ? { onToggle: () => toggleDetail() } : null),
+    [nodeToggleOn, toggleDetail],
   );
   // The phone segment's control: every timeline row with a body to open.
   const phoneToggles = inTimeline && hasDetail;
@@ -410,18 +408,12 @@ export function EventCard({
     <div
       data-anatomy="T1"
       className={`relative overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
-        showDetail
-          ? `${bp}rounded-b-none ${bp}bg-raised`
-          : showChevron
-            ? `${bp}hover:bg-raised${nodeLit ? ` ${bp}bg-raised` : ""}`
-            : ""
+        showDetail ? `${bp}rounded-b-none ${bp}bg-raised` : showChevron ? `${bp}hover:bg-raised evt-t1-lit` : ""
       }${inTimeline ? " spine-t1" : ""}`}
     >
       <div className={`${headMenu ? "pr-[52px]" : ""}${inTimeline ? " max-sm:hidden" : ""}`}>
         <div
-          className={`${
-            headerToggles ? `group/evt disc-row disc-row-slow cursor-pointer${nodeLit ? " disc-lit" : ""}` : ""
-          }`}
+          className={`${headerToggles ? "group/evt disc-row disc-row-slow cursor-pointer" : ""}`}
           onClick={() => {
             if (hasDetail && headerToggles) toggleDetail();
           }}
@@ -608,7 +600,7 @@ export function EventCard({
             className={`${
               pageMode
                 ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
-                : `spine-row${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
+                : `spine-row evt-row${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
             } relative ${scale.cardRounded} ${
               muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
             }`}
