@@ -33,6 +33,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { EventNotFoundNotice } from "@/components/shared/chain-truth-timeline";
 import { EventDateContext } from "@/components/shared/event-time";
 import { EventShareProvider } from "@/components/shared/event-share-context";
+import { EventPageContext } from "@/components/shared/event-page-aside";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -186,35 +187,39 @@ export default function EventView({
             <LiquityTroveMetaContext.Provider value={troveMeta}>
               <EventDateContext.Provider value={`${shortDate(event.timestamp)} ${shortDateYear(event.timestamp)}`}>
                 <EventShareProvider href={eventPath(event.id)}>
-                  <div id={`event-${event.id}`} data-event-id={event.id} className="rounded-xl">
-                    <UnreadTokensProvider tokens={event.decimalsUnread}>
-                      <LiquityEventCard
-                        event={event}
-                        addressDisplay="hidden"
-                        isLast
-                        previousEvent={previous}
-                        eventNumber={n}
-                        currentPrice={currentPrice}
-                        page={{
-                          contract: liquityV2Explorer.eventPage({
-                            collateralType,
-                            troveId,
-                            trove,
-                            place: { ...place, event },
-                          }),
-                          title: (
-                            <LiquityEventHeader
-                              ctx={event.context.data}
-                              timestamp={event.timestamp}
-                              txHash={event.txHash}
-                              blockNumber={event.blockNumber}
-                              title
-                            />
-                          ),
-                        }}
-                      />
-                    </UnreadTokensProvider>
-                  </div>
+                  <EventPageContext.Provider
+                    value={{
+                      contract: liquityV2Explorer.eventPage({
+                        collateralType,
+                        troveId,
+                        trove,
+                        place: { ...place, event },
+                        currentPrice,
+                      }),
+                      title: (
+                        <LiquityEventHeader
+                          ctx={event.context.data}
+                          timestamp={event.timestamp}
+                          txHash={event.txHash}
+                          blockNumber={event.blockNumber}
+                          title
+                        />
+                      ),
+                    }}
+                  >
+                    <div id={`event-${event.id}`} data-event-id={event.id} className="rounded-xl">
+                      <UnreadTokensProvider tokens={event.decimalsUnread}>
+                        <LiquityEventCard
+                          event={event}
+                          addressDisplay="hidden"
+                          isLast
+                          previousEvent={previous}
+                          eventNumber={n}
+                          currentPrice={currentPrice}
+                        />
+                      </UnreadTokensProvider>
+                    </div>
+                  </EventPageContext.Provider>
                 </EventShareProvider>
               </EventDateContext.Provider>
             </LiquityTroveMetaContext.Provider>

@@ -6,8 +6,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
-import { EventPageAside } from "@/components/shared/event-page-aside";
-import type { EventPageMode } from "@/lib/shared/explorer-adapter";
+import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
@@ -116,12 +115,6 @@ export interface EventCardProps {
   /** A control at the right of the open card's (i) row (the Aave and
    *  Liquity families' calculator). */
   infoAction?: React.ReactNode;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): the shared side
-   *  column (`EventPageAside`, drawn from the family's contract) stands in the
-   *  spine's column, beside the card from 640px and above it below; the
-   *  header draws no chevron and the body stands open. Unset, the card is the
-   *  timeline's. */
-  page?: EventPageMode;
   /** The words after T3's (i): the button's on the timeline, the heading's
    *  on the event page. A family's strings file can replace the default. */
   explanationHeading?: string;
@@ -170,7 +163,6 @@ export function EventCard({
   spokenCaption,
   label,
   infoAction,
-  page,
   explanationHeading = "Event explanation",
   noChevron,
   groupMenu,
@@ -203,8 +195,12 @@ export function EventCard({
   const reactId = useId();
   const cardId = persistKey ?? reactId;
   const hasPanel = detail != null || !!detailLoading || !!detailError;
-  // The event page's card (`page`): the explanation and the footer stand
-  // open, with no toggle.
+  // The event page's card (rails-ops TO-DO-ui-jobs 236), where the route's
+  // shell provides `EventPageContext`: the shared side column stands in the
+  // spine's column, beside the card from 640px and above it below; the
+  // header draws no chevron and the body, the explanation and the footer
+  // stand open with no toggle.
+  const page = useContext(EventPageContext);
   const pageMode = page != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
@@ -647,8 +643,10 @@ export function EventCard({
               </div>
             )}
             <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
-              {t1}
-              {body}
+              <EventPageContext.Provider value={null}>
+                {t1}
+                {body}
+              </EventPageContext.Provider>
             </div>
             {/* The number column, at the row's far left, level with the
                 first node: the event's number, or the boundary's count. After

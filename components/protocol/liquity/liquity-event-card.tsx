@@ -1,5 +1,6 @@
 "use client";
 
+import { useContext } from "react";
 import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -10,7 +11,7 @@ import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-heade
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
-import type { EventPageMode } from "@/lib/shared/explorer-adapter";
+import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -41,10 +42,6 @@ export interface LiquityEventCardProps {
   /** Live oracle price for this collateral — drives the "today" leg of the
    *  redemption P/L in the header and explainer. */
   currentPrice?: number;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): its ledgers open
-   *  with no toggles, and the shared side column drawn from `contract` with
-   *  `title` as its h1. Unset, the card is the timeline's. */
-  page?: Omit<EventPageMode, "markdown">;
 }
 
 export function LiquityEventCard({
@@ -58,8 +55,10 @@ export function LiquityEventCard({
   previousEvent,
   eventNumber,
   currentPrice,
-  page,
 }: LiquityEventCardProps) {
+  // The event page's card (rails-ops TO-DO-ui-jobs 236): its ledgers open
+  // with no toggles, and the column reads the Copy for LLM build.
+  const page = useContext(EventPageContext) != null;
   const ctx = event.context.data;
   const wallet = event.wallet;
   const prose = useLiquityEventProse(event, previousEvent, currentPrice);
@@ -258,7 +257,7 @@ export function LiquityEventCard({
             txHash={event.txHash}
             blockNumber={event.blockNumber}
             eventNumber={eventNumber}
-            page={!!page}
+            page={page}
           />
         }
         detail={
@@ -296,14 +295,14 @@ export function LiquityEventCard({
             : undefined
         }
         caption={rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx)}
-        page={
-          page && {
-            ...page,
-            markdown: buildMarkdown ? { build: buildMarkdown } : { missing: "the Trove's place is unread" },
-          }
-        }
       />
     </LiquityLedgerProvider>
   );
-  return page ? <LedgerOpenContext.Provider value>{card}</LedgerOpenContext.Provider> : card;
+  return page ? (
+    <LedgerOpenContext.Provider value>
+      <EventMarkdownContext.Provider value={buildMarkdown}>{card}</EventMarkdownContext.Provider>
+    </LedgerOpenContext.Provider>
+  ) : (
+    card
+  );
 }

@@ -12,7 +12,7 @@
 // and position, no figure that carries a receipt, so the provenance tripwire
 // passes over it.
 
-import { useState } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
@@ -21,7 +21,26 @@ import { ProvScopeToggle } from "@/components/shared/prov-inspector";
 import { useChainId } from "@/lib/shared/chain-context";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
-import type { EventPageContract, EventPageFact, EventPageMode } from "@/lib/shared/explorer-adapter";
+import type { EventPageContract, EventPageFact, EventPageShell } from "@/lib/shared/explorer-adapter";
+
+/** The event page's shell, from the route's view: an `EventCard` inside it
+ *  draws in page mode with this column. */
+export const EventPageContext = createContext<EventPageShell | null>(null);
+
+/** The event's Copy for LLM build, from a family's card to the column, which
+ *  renders inside the card. Null where the family has none
+ *  (`ExplorerAdapter.eventMarkdown`). */
+export const EventMarkdownContext = createContext<(() => string) | null>(null);
+
+/** The page's h1 where the family's header has no title form: the
+ *  contract's heading, which the browser title also carries. */
+export function EventPageTitle({ children }: { children: ReactNode }) {
+  return (
+    <h1 className="text-2xl font-normal leading-tight text-foreground" data-event-page-title="">
+      {children}
+    </h1>
+  );
+}
 
 const LINK = "text-blue-600 hover:underline dark:text-blue-400";
 const ACTION = `${LINK} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm`;
@@ -119,11 +138,12 @@ function CopyForLlm({ href, build }: { href: string; build: () => string }) {
 
 /** The row under the title: the links, then the copy buttons. Each item
  *  carries `data-menu-item`, the names the row's ⋮ had, for the verifiers. */
-function EventActions({ c, markdown }: { c: EventPageContract; markdown: EventPageMode["markdown"] }) {
+function EventActions({ c }: { c: EventPageContract }) {
   const chainId = useChainId();
   const shareHref = useEventShareHref();
+  const build = useContext(EventMarkdownContext);
   const [copied, copy] = useMenuCopied();
-  const md = "build" in markdown && shareHref ? { href: eventMarkdownHref(shareHref), build: markdown.build } : null;
+  const md = build && shareHref ? { href: eventMarkdownHref(shareHref), build } : null;
   const explorer = chainMeta(chainId).explorerName;
   return (
     <div role="group" aria-label={W.actions} className="flex flex-wrap gap-x-4 gap-y-1" data-event-page-actions="">
@@ -186,13 +206,13 @@ function EventActions({ c, markdown }: { c: EventPageContract; markdown: EventPa
   );
 }
 
-export function EventPageAside({ page }: { page: EventPageMode }) {
+export function EventPageAside({ page }: { page: EventPageShell }) {
   const c = page.contract;
   return (
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
       <div className="space-y-2 pb-2">
         {page.title}
-        <EventActions c={c} markdown={page.markdown} />
+        <EventActions c={c} />
       </div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {c.words.paragraph}{" "}

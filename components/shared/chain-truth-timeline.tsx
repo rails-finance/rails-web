@@ -125,6 +125,8 @@ import {
 } from "@/components/shared/mobile-spine";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { EventShareProvider } from "@/components/shared/event-share-context";
+import { EventPageContext, EventPageTitle } from "@/components/shared/event-page-aside";
+import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { setCardOpen } from "@/lib/shared/card-open-store";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
@@ -470,6 +472,11 @@ export interface ChainTruthTimelineProps {
    *  applies — see `clickToOpenIfClosed`). Omit for a family this batch
    *  doesn't touch. */
   persistKeyPrefix?: string;
+  /** The event page (rails-ops TO-DO-ui-jobs 236) for a family that has moved
+   *  onto it: on the `/event/<id>` route the event's card draws in page mode
+   *  with the shared side column, from the family's contract
+   *  (`lib/<family>/explorer.ts`). Unset, the route draws the pinned card. */
+  eventPage?: (slot: EventPageSlot) => EventPageContract;
   /** True once this position is closed/liquidated. Suppresses the pulsing
    *  "live" tip dot — the newest row is no longer a claim about an ongoing
    *  position. Does NOT touch which row IS the tip (numbering, the stale-tip
@@ -676,6 +683,7 @@ function ChainTruthTimelineBody({
   boundary,
   csvExportCeiling,
   persistKeyPrefix,
+  eventPage,
   closed,
   segments,
   spineKey,
@@ -1752,6 +1760,44 @@ function ChainTruthTimelineBody({
     // render just writes the same value twice.
     if (pinnedEvent && persistKeyPrefix) setCardOpen(`${persistKeyPrefix}:${pinnedEvent.id}`, true);
     const viewInTimelineHref = `${positionPath}?at=${encodeURIComponent(pinnedId)}${subjectQuery ? `&${subjectQuery}` : ""}`;
+    if (eventPage) {
+      if (!pinnedEvent)
+        return pinnedPending ? (
+          <SkeletonBlock height={PINNED_SKELETON_HEIGHT} />
+        ) : (
+          <EventNotFoundNotice id={pinnedId} chainId={chainId} />
+        );
+      // The event page: the card in page mode beside the shared column, its
+      // neighbours the served rows numbered either side of it.
+      const chrono = [...tl.sortedEvents].sort((a, b) => tl.eventNumberOf(a) - tl.eventNumberOf(b));
+      const at = chrono.findIndex((e) => e.id === pinnedEvent.id);
+      const previous = at > 0 ? chrono[at - 1] : undefined;
+      const next = at >= 0 && at + 1 < chrono.length ? chrono[at + 1] : undefined;
+      const contract = eventPage({
+        event: pinnedEvent,
+        n: pinnedNumber || at + 1,
+        total: tl.totalCount,
+        previousHref: previous ? shareHrefFor(previous.id) : null,
+        nextHref: next ? shareHrefFor(next.id) : null,
+        timelineHref: viewInTimelineHref,
+      });
+      const shell = { contract, title: <EventPageTitle>{contract.heading}</EventPageTitle> };
+      return (
+        <EventDateContext.Provider
+          value={`${shortDate(pinnedEvent.timestamp)} ${shortDateYear(pinnedEvent.timestamp)}`}
+        >
+          <EventShareProvider href={shareHrefFor(pinnedEvent.id)}>
+            <EventPageContext.Provider value={shell}>
+              <div id={`event-${pinnedEvent.id}`} data-event-id={pinnedEvent.id} className="rounded-xl">
+                <UnreadTokensProvider tokens={pinnedEvent.decimalsUnread}>
+                  {renderCard(pinnedEvent, { eventNumber: pinnedNumber, isLast: true })}
+                </UnreadTokensProvider>
+              </div>
+            </EventPageContext.Provider>
+          </EventShareProvider>
+        </EventDateContext.Provider>
+      );
+    }
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-rb-500">

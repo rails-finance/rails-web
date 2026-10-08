@@ -8,7 +8,13 @@ import type { TroveSummary } from "@/types/api/trove";
 import type { ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { ACTION_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
-import { eventPageDescription, holderName, troveHolder, type EventPagePlace } from "@/lib/liquity/event-page";
+import {
+  eventHeadingWords,
+  eventPageDescription,
+  holderName,
+  troveHolder,
+  type EventPagePlace,
+} from "@/lib/liquity/event-page";
 import { liquityEventPath } from "@/lib/liquity/event-page-markdown";
 
 export interface LiquityEventPageInput {
@@ -18,15 +24,19 @@ export interface LiquityEventPageInput {
   trove: TroveSummary;
   /** `eventPagePlace` for an event the history holds. */
   place: EventPagePlace & { event: NonNullable<EventPagePlace["event"]> };
+  /** The branch's oracle price now: a redemption's heading states its P/L
+   *  at it. */
+  currentPrice?: number;
 }
 
 export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
-  eventPage: ({ collateralType, troveId, trove, place }) => {
+  eventPage: ({ collateralType, troveId, trove, place, currentPrice }) => {
     const holder = troveHolder(trove);
     const ownerEns = trove.ownerEns ?? null;
     const path = (id: string) => liquityEventPath(collateralType, troveId, id);
     const timelineHref = `/ethereum/liquity-v2/trove/${collateralType}/${troveId}?at=${encodeURIComponent(place.event.id)}`;
     return {
+      heading: eventHeadingWords(place, currentPrice) ?? place.event.actionLabel,
       words: {
         paragraph: PAGE_WORDS.paragraph,
         timelineLink: PAGE_WORDS.timeline_link,
@@ -63,4 +73,5 @@ export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
       }),
     };
   },
+  eventMarkdown: "card",
 };

@@ -21,6 +21,8 @@
 // are native everywhere; no dollar renders on this page.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { frankencoinExplorer } from "@/lib/frankencoin/explorer";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -330,6 +332,10 @@ export default function FrankencoinPositionView({
     };
   }, [frankEvents, cutoffBlock]);
 
+  // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the
+  // event's card in page mode with the shared column; no position card, no
+  // flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const tl = useTimelineEvents(frankEvents, {
     storageKey: `frankencoin-${position}`,
     protocolKey: "frankencoin",
@@ -448,88 +454,94 @@ export default function FrankencoinPositionView({
         ) : (
           <>
             <FrankencoinPageFactsProvider value={pageFacts}>
-              <FrankencoinPositionCard
-                v={view}
-                cloneParent={cloneParent}
-                ending={ending}
-                lifetimeDebt={lifetimeDebt}
-                receipts
-                viewHref={tl.viewHref}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). A running challenge stays in view; the challenge tally,
-                // the phase length and the minting cooldown, from the
-                // position's slots at head, sit in the opened layer.
-                disclosureKey={`frankencoin:${view.position.toLowerCase()}`}
-                challengeAlert={
-                  chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
-                    <RiskFigure alignStart caution>
-                      Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
-                    </RiskFigure>
-                  ) : undefined
-                }
-                collateralDetail={
-                  chain && view.status === "open" ? (
-                    <>
-                      {(chain.challengedAmount ?? 0) > 0 ? null : summary ? (
-                        <RiskFigure alignStart>
-                          {summary.challengeCount === 0
-                            ? "never challenged"
-                            : `challenged ${summary.challengeCount}×, none running`}
+              {!onEventPage && (
+                <>
+                  <FrankencoinPositionCard
+                    v={view}
+                    cloneParent={cloneParent}
+                    ending={ending}
+                    lifetimeDebt={lifetimeDebt}
+                    receipts
+                    viewHref={tl.viewHref}
+                    // Closed by default, remembered per viewer and position (ui-jobs
+                    // 209). A running challenge stays in view; the challenge tally,
+                    // the phase length and the minting cooldown, from the
+                    // position's slots at head, sit in the opened layer.
+                    disclosureKey={`frankencoin:${view.position.toLowerCase()}`}
+                    challengeAlert={
+                      chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
+                        <RiskFigure alignStart caution>
+                          Under challenge — {chain.challengedAmount} {view.collateralSymbol} in auction
                         </RiskFigure>
-                      ) : null}
-                      {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
-                        <RiskFigure alignStart>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
-                      ) : null}
-                    </>
-                  ) : undefined
-                }
-                debtDetail={
-                  chain && view.status === "open" ? (
-                    chain.cooldownActive && chain.cooldownUntil != null ? (
-                      <RiskFigure alignStart>minting cooldown until {formatDayMonth(chain.cooldownUntil)}</RiskFigure>
-                    ) : !chain.mintingDisabledForGood ? (
-                      <RiskFigure alignStart>no minting cooldown</RiskFigure>
-                    ) : undefined
-                  ) : undefined
-                }
-                // Everything describing the CURRENT on-chain position lives on
-                // the card: the Explanation heading-button holds the narration —
-                // mounted when the live read landed.
-                explanation={
-                  chain ? (
-                    <FrankencoinPositionExplanation
-                      chain={chain}
-                      openedAt={summary?.openedAt}
-                      challengeCount={summary?.challengeCount}
-                      denied={summary?.status === "denied"}
-                      txCount={summary?.txCount}
-                      eventTally={eventTally}
-                      cloneParent={cloneParent}
-                      lastMint={lastMint}
-                      ending={ending}
-                      closedAt={summary?.lastActivityAt ?? null}
-                    />
-                  ) : undefined
-                }
-              />
+                      ) : undefined
+                    }
+                    collateralDetail={
+                      chain && view.status === "open" ? (
+                        <>
+                          {(chain.challengedAmount ?? 0) > 0 ? null : summary ? (
+                            <RiskFigure alignStart>
+                              {summary.challengeCount === 0
+                                ? "never challenged"
+                                : `challenged ${summary.challengeCount}×, none running`}
+                            </RiskFigure>
+                          ) : null}
+                          {chain.challengePeriod != null && chain.challengePeriod > 0 ? (
+                            <RiskFigure alignStart>challenge phases {phaseText(chain.challengePeriod)} each</RiskFigure>
+                          ) : null}
+                        </>
+                      ) : undefined
+                    }
+                    debtDetail={
+                      chain && view.status === "open" ? (
+                        chain.cooldownActive && chain.cooldownUntil != null ? (
+                          <RiskFigure alignStart>
+                            minting cooldown until {formatDayMonth(chain.cooldownUntil)}
+                          </RiskFigure>
+                        ) : !chain.mintingDisabledForGood ? (
+                          <RiskFigure alignStart>no minting cooldown</RiskFigure>
+                        ) : undefined
+                      ) : undefined
+                    }
+                    // Everything describing the CURRENT on-chain position lives on
+                    // the card: the Explanation heading-button holds the narration —
+                    // mounted when the live read landed.
+                    explanation={
+                      chain ? (
+                        <FrankencoinPositionExplanation
+                          chain={chain}
+                          openedAt={summary?.openedAt}
+                          challengeCount={summary?.challengeCount}
+                          denied={summary?.status === "denied"}
+                          txCount={summary?.txCount}
+                          eventTally={eventTally}
+                          cloneParent={cloneParent}
+                          lastMint={lastMint}
+                          ending={ending}
+                          closedAt={summary?.lastActivityAt ?? null}
+                        />
+                      ) : undefined
+                    }
+                  />
 
-              {/* Lifetime flows: the bars and the line over the position's
+                  {/* Lifetime flows: the bars and the line over the position's
               replay (lib/frankencoin/flows.ts), the collateral in its token
               and the debt in ZCHF, in place of the tower (TO-DO-ui-jobs 206). */}
-              <LifetimeFlowsPanel
-                scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
-                read={flows.read}
-                explanation={
-                  <div className="space-y-2 text-sm text-rb-500">
-                    <FrankencoinFlowsNote
-                      facts={flows.facts}
-                      collSymbol={view.collateralSymbol}
-                      clone={chain?.isClone ?? cloneParent != null}
-                    />
-                  </div>
-                }
-                learnMore={frankencoinFlowsContent()}
-              />
+                  <LifetimeFlowsPanel
+                    scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
+                    read={flows.read}
+                    explanation={
+                      <div className="space-y-2 text-sm text-rb-500">
+                        <FrankencoinFlowsNote
+                          facts={flows.facts}
+                          collSymbol={view.collateralSymbol}
+                          clone={chain?.isClone ?? cloneParent != null}
+                        />
+                      </div>
+                    }
+                    learnMore={frankencoinFlowsContent()}
+                  />
+                </>
+              )}
 
               {/* The challenge forensics card — grouped by (hub, challenge
               number), slices within; renders only when history carries
@@ -537,10 +549,12 @@ export default function FrankencoinPositionView({
               a challenge older than the window is summarised in the counts
               above the timeline, not re-narrated here. No observed position
               is deep enough to reach that case. */}
-              <FrankencoinChallengeCard
-                events={frankEvents}
-                positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
-              />
+              {!onEventPage && (
+                <FrankencoinChallengeCard
+                  events={frankEvents}
+                  positionOpen={chain ? !chain.isClosed : summary ? summary.status === "open" : null}
+                />
+              )}
 
               {indexPending && frankEvents.length === 0 ? (
                 <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
@@ -554,6 +568,14 @@ export default function FrankencoinPositionView({
                   // lets pinned mode (the per-event share route) force a landed
                   // card's detail panel open on its first mount.
                   persistKeyPrefix="frankencoin"
+                  eventPage={(slot) =>
+                    frankencoinExplorer.eventPage({
+                      ...slot,
+                      position,
+                      collateralSymbol: view.collateralSymbol,
+                      owner: view.owner,
+                    })
+                  }
                   closed={view.status !== "open"}
                   tl={tl}
                   runs={FRANKENCOIN_AUCTION_RUNS}
