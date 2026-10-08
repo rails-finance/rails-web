@@ -5,7 +5,7 @@ import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef } 
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
-import { EventCardMenu } from "@/components/shared/event-card-menu";
+import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
 import { EventPageAside } from "@/components/shared/event-page-aside";
 import type { EventPageMode } from "@/lib/shared/explorer-adapter";
 import { disclosureProps } from "@/components/shared/disclosure";
@@ -69,7 +69,7 @@ export interface EventCardProps {
   /** How the teaser reads: "bullet" (default) keeps the leading • glyph; "prose"
    *  renders it as a plain lead paragraph with no glyph. */
   explainerTeaserVariant?: "bullet" | "prose";
-  /** Transaction hash: the event menu, and the header's number pill when
+  /** Transaction hash: the footer, and the header's number pill when
    *  Display's "Transaction hashes" is on (ui-jobs 294). */
   txHash?: string;
   /** Content before the footer's "?" (a family's gas where it has no price
@@ -78,10 +78,6 @@ export interface EventCardProps {
   /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), at the right end
    *  of the footer (T6). */
   learnMore?: React.ReactNode;
-  /** The event menu (⋮) in the header's right slot (ui-jobs 295). "page":
-   *  Liquity V2's, the event page alone (its page's aside carries the other
-   *  actions, ui-jobs 291), and "Hide" inside an open group. */
-  eventMenu?: boolean | "page";
   /** A group's closed row: the head opens the summary card with no chevron
    *  drawn (ui-jobs 250). */
   noChevron?: boolean;
@@ -176,7 +172,6 @@ export function EventCard({
   infoAction,
   page,
   explanationHeading = "Event explanation",
-  eventMenu = true,
   noChevron,
   groupMenu,
   numberSlot,
@@ -346,8 +341,9 @@ export function EventCard({
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
   // the header on desktop, at the caption's right on a phone. A press on it
   // stays with the menu (Escape still reaches the menu's document listener).
+  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
   const headMenu =
-    !pageMode && ((eventMenu && txHash) || groupMenu) ? (
+    !pageMode && menuRows ? (
       <span
         className="-my-1 inline-flex items-center"
         data-event-head-menu=""
@@ -356,13 +352,7 @@ export function EventCard({
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu
-          txHash={txHash}
-          shareHref={groupMenu ? null : shareHref}
-          scopeId={scopeId}
-          pageOnly={eventMenu === "page"}
-          groupShow={groupMenu}
-        />
+        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} />
       </span>
     ) : null;
 

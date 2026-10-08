@@ -242,9 +242,7 @@ export function LiquityEventCard({
     ) : null;
   // Gas (owner-paid events only; the generator leaves a third party's out)
   // stands in T2's price row (LiquityEventDetail); a card that draws no price
-  // row keeps it in the footer. The card has no event menu: the header's
-  // number pill links to the event page, whose side column carries the
-  // actions (ui-jobs 291).
+  // row keeps it in the footer.
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
 
@@ -280,7 +278,6 @@ export function LiquityEventCard({
         footerExtra={footerExtra}
         learnMore={<LearnMore inline content={prose.L5.content} />}
         explanationHeading={PAGE_WORDS.explanation_heading}
-        eventMenu="page"
         persistKey={`liquity-v2:${event.id}`}
         // A third party's act names who acted: the redeemer, the batch
         // manager moving a delegated Trove's rate.

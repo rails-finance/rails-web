@@ -135,8 +135,9 @@ export function ToolsMenu({
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
    *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
-   *  right end, the card menu named by `label` and `heading`, its last row
-   *  the event's "Show provenance" (`provScope`). `panel`: the same for a panel's header (Lifetime flows). */
+   *  right end, the card menu named by `label` and `heading`. `panel`: the
+   *  same for a panel's header (Lifetime flows), its last row the panel's
+   *  "Show provenance" (`provScope`). */
   variant?: "tools" | "card" | "event" | "panel";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
@@ -163,7 +164,7 @@ export function ToolsMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   // The event and panel menus: the card menu's trigger and rows, named by
-  // `label` and `heading`, ending on their section's "Show provenance".
+  // `label` and `heading`; a panel's ends on its section's "Show provenance".
   const eventMenu = variant === "event" || variant === "panel";
   const card = variant === "card" || eventMenu;
   const scope =
