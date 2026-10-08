@@ -523,7 +523,6 @@ export function TimelineRunCard({
           spokenCaption={`${kindWord}, ${spokenRange}`}
           label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
           detail={hasSums ? summary : undefined}
-          detailLabel="The group's sums"
           group="summary"
           muted={muted}
         />

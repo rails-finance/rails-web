@@ -176,7 +176,6 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
             blockPeers={blockPeers}
           />
         }
-        detailLabel="Position before → after"
         explainer={
           <FxEventExplainer
             ctx={ctx}

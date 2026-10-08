@@ -7,10 +7,11 @@
 // protocols can't drift apart. Each protocol supplies a small spec via its own
 // adapter (where the provenance + field mapping live); this file owns the look.
 //
-// Liquity V2 / Aave V4 stay on their own richer headers (before→after metrics,
-// USD, rate pills); this tier is deliberately the minimal one. Four opt-in
-// layers extend it, each stating its claim in the type so the tier stays
-// minimal BY DESIGN rather than by accident:
+// The head row (`ChainTruthRow`) is the shared T1 every family's card draws,
+// Liquity V2's included (ui-jobs 309): its chips (redistribution, surplus,
+// zombie, "n of m", the batch manager) are spec fields, and its look is the
+// template. Four opt-in layers extend the tier, each stating its claim in the
+// type so the tier stays minimal BY DESIGN rather than by accident:
 //   1. a stat may carry `usd` — the after-balance valued at the EVENT's block by
 //      the protocol's own captured oracle price (never today's price), where the
 //      index provides it (Aave V3 + Spark, server mig 092);
@@ -21,7 +22,7 @@
 //      acting for them) CHOSE, never a utilization rate; it echoes the detail
 //      grid's rate receipt (the two Liquity forks' owner-set interest);
 //   4. a row may carry `status: "open"` — the green status pill Liquity V2 uses
-//      for an opening event, byte-matched from its header. A status affordance
+//      for an opening event. A status affordance
 //      on the LABEL WORD, never on a number (pure-truth-status-pill-color.md);
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
@@ -35,6 +36,9 @@ import { EventTime } from "@/components/shared/event-time";
 import { EventNumberPill, useEventHeadChevron } from "@/components/shared/event-number-pill";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { useEnsName } from "@/lib/ens/use-ens-names";
+import { AlertTriangle } from "lucide-react";
+import { formatDate } from "@/lib/date";
+import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import {
   DeltaToggle,
   StatCard,
@@ -161,6 +165,13 @@ export interface ChainTruthDelta {
    *  precision (Polaris: every figure in full, to three decimals). Unsigned:
    *  the sign rule above still applies. Default: the compact header form. */
   display?: string;
+  /** The exact figure the tip states and the receipt registers, where the
+   *  family's builder names it (Liquity V2's change receipts, which the spine
+   *  echoes). Default: `chainTruthDeltaValue`. */
+  exact?: string;
+  /** A labelled figure that keeps its sign ("Debt +1.4K" on a batch
+   *  manager's rate change). */
+  signed?: boolean;
 }
 
 /** "−0.00534 wstETH": a figure's accessible name in the site's number format. */
@@ -245,7 +256,13 @@ export interface ChainTruthRowSpec {
   ratePill?: {
     pct: number;
     tone?: "delegate";
-    prov: Provenance;
+    prov?: Provenance;
+    /** The receipt key the pill echoes, where the detail grid registers the
+     *  rate under its exact figure (Liquity V2). Default: the 2-dp figure. */
+    echoValue?: string;
+    /** Drawn after the label, before the amounts, with `manager` after it:
+     *  a delegate's row, whose point is the rate. */
+    lead?: boolean;
     /** The rate before, where the row's point is the move (a batch manager's
      *  change): drawn `3.20% → 3.60%` inside the one lozenge, as the Liquity V2
      *  delegate run's header draws it. Only the after-rate echoes the receipt. */
@@ -259,7 +276,7 @@ export interface ChainTruthRowSpec {
    *  `Open  Deposit 6 ◊  Borrow 10K ♭`. `"close"` draws Liquity V2's neutral
    *  "Close" pill the same way. Ignored when `labelOnSpine`/`critical` own the
    *  label. */
-  status?: "open" | "close";
+  status?: "open" | "close" | "party" | "marker";
   /** A trailing ratio chip ("134% CR") — the position's collateral ratio at
    *  this event, for an explorer whose rows carry the figures and an at-block
    *  price to state one (Polaris). Rendered once, just before the `evt-meta`
@@ -276,6 +293,61 @@ export interface ChainTruthRowSpec {
   deltas: ChainTruthDelta[];
   /** A short muted note after the deltas ("both rebalances in this block"). */
   note?: ReactNode;
+  /** The batch manager's name, in party pink after the rate pill. */
+  manager?: string;
+  /** A liquidated neighbour's debt and collateral this event took on, in the
+   *  caution tone after the amounts: "from liquidation 1.2K ♭ and 0.4 ◊". No
+   *  token moved for it, so the figures stay at every width. */
+  redistribution?: { label: string; and: string; deltas: ChainTruthDelta[] };
+  /** A liquidation's collateral surplus, claimable by the owner; muted, with
+   *  the date, once claimed. */
+  surplus?: { amount: number; symbol: string; word: string; claimed?: { timestamp?: number | null } };
+  /** The zombie flag before the time: a redemption that left the debt under
+   *  the minimum. */
+  zombie?: { word: string; title: string };
+  /** "2 of 3": the event's place among the position's events in one block. */
+  sameBlock?: { index: number; count: number };
+}
+
+/** The row's sizes: the timeline's head, or the event page's title. */
+const ROW_SIZES = {
+  txt: "text-sm",
+  gap: "gap-1.5",
+  amt: "font-bold text-foreground",
+  icon: 16,
+  pill: "px-2 py-0.5 text-xs",
+};
+const TITLE_SIZES = {
+  txt: "text-2xl",
+  gap: "gap-2.5",
+  amt: "font-normal text-foreground",
+  icon: 40,
+  pill: "px-3 py-1 text-sm",
+};
+
+/** The event page's pill for a word, by its status or its tone. */
+const PAGE_PILL: Record<string, string> = {
+  open: "text-positive bg-positive/20",
+  close: "bg-rb-500/20",
+  party: "text-pink-700 dark:text-pink-400 bg-pink-500/20",
+  marker: "text-foreground bg-marker",
+  caution: "text-white bg-caution-500",
+};
+
+/** The event page's time slot: the date, the time and the number. */
+function PageMeta({ timestamp, counter }: { timestamp: number; counter: ReactNode }) {
+  const time = formatTimestamp(timestamp);
+  return (
+    <span className="inline-flex items-center gap-2" data-event-page-meta="">
+      <span className="text-xs">
+        {shortDate(timestamp)} {shortDateYear(timestamp)}
+      </span>
+      <span className="text-xs text-rb-500" title={`${formatDate(timestamp)} ${time} UTC`}>
+        {time}
+      </span>
+      {counter}
+    </span>
+  );
 }
 
 /** A before→after transition attached to a snapshot stat: the reconstructed
@@ -506,6 +578,7 @@ export function ChainTruthRow({
   timestamp,
   eventNumber,
   eventNumberLast,
+  variant = "row",
 }: {
   spec: ChainTruthRowSpec;
   timestamp: number;
@@ -513,86 +586,165 @@ export function ChainTruthRow({
   /** A row drawing several events (one transaction's logs as one card) ends
    *  its number range here: the badge reads "7–8". */
   eventNumberLast?: number;
+  /** "row": the timeline's head. "page": the event page's card, the word and
+   *  the time slot (its title states the amounts). "title": the event page's
+   *  h1, the words and amounts large. */
+  variant?: "row" | "page" | "title";
 }) {
   // The moved amounts follow the shared header hide-class: on the spine (≥md,
   // Timeline values on), hidden here; otherwise rendered here.
-  // Timestamps gate inside <EventTime>. px-5 pt-4 pb-3 matches the Aave header so
-  // the row sits inset from the card edge (and aligns with the detail's px-5).
+  // Timestamps gate inside <EventTime>. pl-5 pt-4 pb-3 insets the row from the
+  // card edge and aligns it with the detail's px-5.
   const unreadOf = useUnreadTokenOf();
   // `externalActor` is deliberately NOT passive. It used to be: the spine
   // replaced the token flow with a lone glyph on a third-party action, so there
   // was no flank to hand the amount to and the header had to keep it. The spine
   // now BADGES the flow instead of replacing it (SpineColumn `externalParty`),
-  // so an external row hands off exactly like the owner-acted row it mirrors —
+  // so an external row hands off as the owner-acted row it mirrors —
   // leaving it passive would paint the amount twice at ≥sm.
-  const hideClass = useHeaderValueHideClass();
+  const spineHide = useHeaderValueHideClass();
+  // The event page has no spine to carry the values, so its title states them.
+  const hideClass = variant === "row" ? spineHide : "";
+  const sz = variant === "title" ? TITLE_SIZES : ROW_SIZES;
   // A redemption or a liquidation: its deltas are the warning spine's legs,
   // collateral first and the debt after, whatever order the head states. A
   // muted figure (a pool's total) is not the position's and stays in the
   // head.
   const adverse = !!spec.critical || !!spec.labelOnSpine;
-  const legDeltas = adverse ? spec.deltas.filter((d) => !d.muted && !d.noSpineCounterpart) : [];
-  const legs: SpineWarningLeg[] | null = adverse
-    ? [...legDeltas]
-        .sort((a, b) => legRank(a) - legRank(b))
-        .map((d) => ({
-          label: d.label,
-          locked: d.locked,
-          value: Math.abs(d.value),
-          symbol: d.symbol,
-          address: d.address,
-        }))
-    : null;
+  const legDeltas = adverse && variant === "row" ? spec.deltas.filter((d) => !d.muted && !d.noSpineCounterpart) : [];
+  const legs: SpineWarningLeg[] | null =
+    adverse && variant === "row"
+      ? [...legDeltas]
+          .sort((a, b) => legRank(a) - legRank(b))
+          .map((d) => ({
+            label: d.label,
+            locked: d.locked,
+            value: Math.abs(d.value),
+            symbol: d.symbol,
+            address: d.address,
+          }))
+      : null;
   usePublishSpineLegs(legs);
-  // The row's 12px gap separates its ITEMS — the label from the amounts, one
-  // amount from the next. A party chip is not an item of its own: `Supply by
-  // 0xa60d…ddeb` and `400 ◎ to 0x546b…7240` are each ONE phrase, so the chip
-  // sits at phrase spacing (the 6px between a figure and its glyph) behind
-  // whatever precedes it — the `-ml-1.5` on the chip wrappers below.
+  const headChevron = useEventHeadChevron();
+  const counter = eventNumber != null ? <EventNumberPill number={eventNumber} last={eventNumberLast} /> : null;
+
+  // `evt-meta`: below sm this span becomes the header's first row
+  // (app/globals.css). Its 24px line puts the icon, date, time and number on
+  // the card chevron's centre line, and its direct children sit on one
+  // middle (ui-jobs 289).
+  const meta = (
+    <span className="evt-meta ml-auto inline-flex min-h-6 items-center gap-2">
+      {spec.zombie && (
+        <span
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold rounded bg-caution-500/15 text-tone-caution"
+          title={spec.zombie.title}
+        >
+          <AlertTriangle className="w-3 h-3" />
+          <span className="hidden md:inline">{spec.zombie.word}</span>
+        </span>
+      )}
+      {spec.sameBlock && (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-sunken text-rb-500"
+          title={`This trove had ${spec.sameBlock.count} events in the same block; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the block recorded them`}
+        >
+          {spec.sameBlock.index} of {spec.sameBlock.count}
+        </span>
+      )}
+      {variant === "page" ? (
+        <PageMeta timestamp={timestamp} counter={counter} />
+      ) : (
+        <>
+          {timestamp > 0 && (
+            <span className="text-xs [&>*]:align-middle">
+              <EventTime ts={timestamp} />
+            </span>
+          )}
+          {counter}
+        </>
+      )}
+    </span>
+  );
+
+  // The event page's card: the word, as a pill where it has a status or a
+  // tone, and the time slot.
+  if (variant === "page") {
+    const word = spec.label || chainTruthCaption(spec) || "";
+    const tone = spec.status ?? (spec.critical ? "marker" : spec.labelOnSpine ? "caution" : undefined);
+    return (
+      <div className="pl-5 pt-4 pb-3">
+        <div className="flex items-center gap-1.5 flex-wrap" data-event-page-header="">
+          {tone ? (
+            <span
+              className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${PAGE_PILL[tone]}`}
+            >
+              {word}
+            </span>
+          ) : (
+            <span className="text-sm text-rb-500">{word}</span>
+          )}
+          {meta}
+        </div>
+      </div>
+    );
+  }
+
   const labelNode = adverse ? (
     // T1 reads the word in the event's tone (caution, or the critical red);
     // the legs follow it with Timeline values off or below sm.
     <span
-      className={`max-w-full shrink-0 text-sm font-medium ${WARNING_TONE_TEXT[spec.critical ? "critical" : "caution"]}`}
+      className={`max-w-full shrink-0 ${sz.txt} ${WARNING_TONE_TEXT[spec.critical ? "critical" : "caution"]}`}
       data-adverse-word=""
     >
       {spec.label}
     </span>
-  ) : spec.status === "open" && !spec.critical ? (
-    // Opening event — the green "Open" status pill, byte-matched from Liquity
-    // V2's open header (liquity-event-header.tsx). The `positive` token is the
-    // Open/Enable green (app/globals.css). The per-axis delta labels beside it
-    // carry each axis' own verb, so the CDP openers read as V2 does.
-    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-positive/20 text-positive">
-      {spec.label}
-    </span>
-  ) : spec.status === "close" && !spec.critical ? (
-    // Closing event — Liquity V2's neutral "Close" pill (liquity-event-header.tsx).
-    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-rb-500/20 dark:bg-rb-500/20">
+  ) : spec.status === "open" ? (
+    // Opening event — the green "Open" status pill. The `positive` token is
+    // the Open/Enable green (app/globals.css). The per-axis delta labels
+    // beside it carry each axis' verb, so the CDP openers read as V2 does.
+    <span className={`inline-block ${sz.pill} rounded-full font-bold bg-positive/20 text-positive`}>{spec.label}</span>
+  ) : spec.status ? (
+    // Closing, a pending debt applied, a zombie adjusted: the word in its
+    // status pill.
+    <span
+      className={`inline-block ${sz.pill} rounded-full font-bold uppercase tracking-wide ${PAGE_PILL[spec.status]}`}
+    >
       {spec.label}
     </span>
   ) : spec.label && (!spec.custody || spec.custodyLabel) ? (
-    <span className="max-w-full shrink-0 text-sm font-medium text-rb-500">{spec.label}</span>
+    <span className={`max-w-full shrink-0 ${sz.txt} text-rb-500`}>{spec.label}</span>
   ) : // A combined adjust omits the row label — the per-axis delta labels carry
   // the verbs (V2's grammar) — and a custody row drops it: the spine's plane
   // and the chip's to/from are the verb. Render nothing so no empty span
   // steals a gap.
   null;
   // The card's chevron follows everything the head states (ui-jobs 302): the
-  // label, the amounts that show, then the rate pill, parties and notes. The row's 12px gap is for items; the
-  // chevron sits at a phrase's 6px.
-  const headChevron = useEventHeadChevron();
-  const chevron = headChevron ? <span className="-ml-1.5 inline-flex items-center">{headChevron}</span> : null;
+  // label, the amounts that show, then the rate pill, parties and notes.
+  const chevron = variant === "row" ? headChevron : null;
+  const figure = (d: ChainTruthDelta, text: string, exact: string, opts: { muted?: boolean; named?: boolean } = {}) => (
+    <span className={opts.muted ? "tabular-nums text-rb-500" : sz.amt}>
+      <ExactTip
+        text={text}
+        exact={exact}
+        symbol={d.symbol}
+        label={
+          opts.named && d.readableLabel
+            ? readableName(d.value, d.symbol, !(d.label || spec.custody) || !!d.signed)
+            : undefined
+        }
+      />
+    </span>
+  );
   const deltaNodes = spec.deltas.map((d, i) => {
     // Labeled deltas (redemption's Cleared/Reduced) show a bare magnitude —
     // the label carries the direction; unlabeled ones keep the ± sign. A
     // custody row is bare too: the to/from chip is its direction.
     // A dust magnitude reads "<0.01" (see fmtHeaderMagnitude); a space
     // keeps the sign from running into the "<" ("− <0.01").
-    const bare = Boolean(d.label) || Boolean(spec.custody);
+    const bare = (Boolean(d.label) || Boolean(spec.custody)) && !d.signed;
     const magnitude = d.display ?? fmtHeaderMagnitude(Math.abs(d.value), d.symbol);
     const text =
-      bare || spec.unsignedDeltas
+      bare || (spec.unsignedDeltas && !d.signed)
         ? magnitude
         : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
     // On a redemption or a liquidation the word alone carries the tone; the
@@ -603,7 +755,7 @@ export function ChainTruthRow({
     const unread = unreadOf(d.address, d.symbol);
     if (unread)
       return (
-        <span key={i} className="inline-flex items-center gap-1.5 text-sm" data-not-loaded="">
+        <span key={i} className={`inline-flex items-center gap-1.5 ${sz.txt}`} data-not-loaded="">
           {d.label && <span className={toneClass}>{d.label}</span>}
           <TokenAmountNotLoaded address={unread.address} label={unread.label} />
         </span>
@@ -611,15 +763,15 @@ export function ChainTruthRow({
     // The header shows the compact form; the exact figure — full pipeline
     // precision, no re-rounding — rides the trace. Number only: the token
     // rides as `symbol` (the receipt shows its icon).
-    const exact = chainTruthDeltaValue(d.value, bare);
+    const exact = d.exact ?? chainTruthDeltaValue(d.value, Boolean(d.label) || Boolean(spec.custody));
     // A delta the spine never draws has nothing to hand off TO, so it keeps
     // its value at every width — otherwise the figure disappears at ≥sm.
     // A custody row's spine is the badged token alone, no flank, so every
     // delta on it stays.
     const deltaHide = d.noSpineCounterpart || spec.custody || (adverse && d.muted) ? "" : hideClass;
-    // The ≥sm spine hand-off (hideClass) rides the Prov wrapper itself —
-    // hiding a child would leave the pill box painting an empty lozenge
-    // when the receipt opens with timeline values on.
+    // The ≥sm spine hand-off (hideClass) rides the Prov wrapper — hiding a
+    // child would leave the pill box painting an empty lozenge when the
+    // receipt opens with timeline values on.
     //
     // A per-axis ACTION VERB (open/adjust) instead follows V2's combined
     // grammar: the verb word + glyph stay visible at ≥sm and ONLY the value's
@@ -628,104 +780,142 @@ export function ChainTruthRow({
     // still owns the whole Prov, so the lozenge never paints empty.
     if (d.axisVerb) {
       return (
-        <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+        <span key={i} className={`inline-flex items-center ${sz.gap} whitespace-nowrap ${sz.txt}`}>
           {d.label && <span className={toneClass}>{d.label}</span>}
           <Prov info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
-            <span className="font-semibold tabular-nums text-foreground">
-              <ExactTip text={text} exact={exact} symbol={d.symbol} />
-            </span>
+            {figure(d, text, exact)}
           </Prov>
           {/* The icon follows its amount: it hands off to the spine with it. */}
-          <span className={`inline-flex items-center ${deltaHide}`}>
-            <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
-          </span>
+          {deltaHide ? (
+            <span className={`inline-flex items-center ${deltaHide}`}>
+              <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
+            </span>
+          ) : (
+            <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
+          )}
           {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
         </span>
       );
     }
     return (
       <Prov key={i} info={d.prov} value={exact} symbol={d.symbol} className={deltaHide || undefined}>
-        <span className="inline-flex items-center gap-1.5 text-sm">
+        <span className={`inline-flex items-center ${sz.gap} ${sz.txt}`}>
           {d.label && <span className={d.muted ? "text-rb-500" : toneClass}>{d.label}</span>}
-          <span className={d.muted ? "tabular-nums text-rb-500" : "font-semibold tabular-nums text-foreground"}>
-            <ExactTip
-              text={text}
-              exact={exact}
-              symbol={d.symbol}
-              label={d.readableLabel ? readableName(d.value, d.symbol, !bare) : undefined}
-            />
-          </span>
-          <TokenChipIcon symbol={d.symbol} address={d.address} size={16} />
+          {figure(d, text, exact, { muted: d.muted, named: true })}
+          <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
           {d.suffix && <span className="text-[10px] font-normal text-rb-500">{d.suffix}</span>}
         </span>
       </Prov>
     );
   });
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-5 pt-4 pb-3">
+
+  // Rate pill — a chosen rate, in the lozenge, outside hideClass: the ≥sm
+  // spine carries moved amounts and the pill stays visible in
+  // both value modes. Echoes the detail grid's rate receipt (same prov, same
+  // value key) so the two pulse as one. Both tones state two places.
+  const rateNode =
+    spec.ratePill &&
+    (() => {
+      const rp = spec.ratePill;
+      const echoValue = rp.echoValue ?? `${rp.pct.toFixed(2)}%`;
+      const echo = (node: ReactNode) =>
+        rp.prov ? (
+          <Prov echo info={rp.prov} value={echoValue}>
+            {node}
+          </Prov>
+        ) : (
+          node
+        );
+      const Shell = rp.tone === "delegate" ? DelegateRatePillShell : RatePillShell;
+      // The plain span holds the lozenge out of the row's flex layout, so it
+      // keeps its inline-flex box; its zero line height leaves the lozenge's
+      // box as the span's height.
+      if (rp.fromPct != null)
+        return (
+          <span className="leading-[0]">
+            <Shell>
+              <span>{rp.fromPct.toFixed(2)}%</span>
+              <span aria-hidden="true">→</span>
+              {echo(<span>{rp.pct.toFixed(2)}%</span>)}
+            </Shell>
+          </span>
+        );
+      return (
+        <span className="leading-[0]">
+          <Shell>{echo(<>{rp.pct.toFixed(2)}%</>)}</Shell>
+        </span>
+      );
+    })();
+  const managerNode = spec.manager ? <span className={`${sz.txt} font-bold text-pink-500`}>{spec.manager}</span> : null;
+  const redist = spec.redistribution;
+  const surplus = spec.surplus;
+
+  const cluster = (
+    <>
       {labelNode}
+      {spec.ratePill?.lead && rateNode}
+      {spec.ratePill?.lead && managerNode}
       {deltaNodes}
 
-      {/* Rate pill — a chosen rate, rendered as the Liquity V2 lozenge. Deliberately
-          NOT wrapped in hideClass: the ≥sm spine carries moved amounts, not a rate,
-          so the pill stays visible in both value modes. Echoes the detail grid's
-          rate receipt (same prov, same exact value key) so the two pulse as one. */}
-      {spec.ratePill &&
-        (() => {
-          const rp = spec.ratePill;
-          // The echo key is the exact 2-dp figure — shared with the detail rate
-          // stat regardless of the pill's own display precision (1dp individual).
-          const echoValue = `${rp.pct.toFixed(2)}%`;
-          const display = rp.tone === "delegate" ? `${rp.pct.toFixed(2)}%` : `${rp.pct.toFixed(1)}%`;
-          const Shell = rp.tone === "delegate" ? DelegateRatePillShell : RatePillShell;
-          if (rp.fromPct != null) {
-            const from = rp.tone === "delegate" ? `${rp.fromPct.toFixed(2)}%` : `${rp.fromPct.toFixed(1)}%`;
+      {redist && redist.deltas.length > 0 && (
+        <span className={`inline-flex items-center ${sz.gap} ${sz.txt}`}>
+          <span className="text-tone-caution">{redist.label}</span>
+          {redist.deltas.map((d, i) => {
+            const exact = d.exact ?? formatExact(Math.abs(d.value));
             return (
-              <Shell>
-                <span>{from}</span>
-                <span aria-hidden="true">→</span>
-                <Prov echo info={rp.prov} value={echoValue}>
-                  <span>{display}</span>
+              <Fragment key={i}>
+                {i > 0 && <span className="text-tone-caution">{redist.and}</span>}
+                <Prov value={exact} symbol={d.symbol} info={d.prov}>
+                  {figure(d, fmtHeaderMagnitude(d.value, d.symbol), exact)}
                 </Prov>
-              </Shell>
+                <TokenChipIcon symbol={d.symbol} address={d.address} size={sz.icon} />
+              </Fragment>
             );
-          }
-          return (
-            <Prov echo info={rp.prov} value={echoValue}>
-              <Shell>{display}</Shell>
-            </Prov>
-          );
-        })()}
+          })}
+        </span>
+      )}
 
-      {spec.fromParty && (
-        <span className="-ml-1.5 inline-flex items-center">
-          <PartyChip party={spec.fromParty} />
-        </span>
-      )}
-      {spec.party && (
-        <span className="-ml-1.5 inline-flex items-center">
-          <PartyChip party={spec.party} />
-        </span>
-      )}
+      {surplus &&
+        (surplus.claimed ? (
+          <span
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-rb-500/15 text-rb-500"
+            title="Claimable at the liquidation; the owner has since claimed it"
+          >
+            <span>{surplus.amount.toFixed(4)}</span>
+            <TokenChipIcon symbol={surplus.symbol} size={16} />
+            {surplus.word}
+            {surplus.claimed.timestamp != null && <> {formatDate(surplus.claimed.timestamp)}</>}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+            <span>{surplus.amount.toFixed(4)}</span>
+            <TokenChipIcon symbol={surplus.symbol} size={16} />
+            {surplus.word}
+          </span>
+        ))}
+
+      {!spec.ratePill?.lead && rateNode}
+      {!spec.ratePill?.lead && managerNode}
+
+      {spec.fromParty && <PartyChip party={spec.fromParty} />}
+      {spec.party && <PartyChip party={spec.party} />}
 
       {spec.externalActor && (
         // The acting party in the external-party pink, named where ENS resolves
         // one — the receipt traces the tx sender + Pool caller against the owner.
-        <span className="-ml-1.5 inline-flex items-center">
-          <ExternalActorChip
-            address={spec.externalActor.address}
-            prov={spec.externalActor.prov}
-            tip={spec.externalActor.tip}
-            prefix={spec.externalActor.prefix}
-          />
-        </span>
+        <ExternalActorChip
+          address={spec.externalActor.address}
+          prov={spec.externalActor.prov}
+          tip={spec.externalActor.tip}
+          prefix={spec.externalActor.prefix}
+        />
       )}
 
       {spec.note != null && <span className="text-xs text-rb-500">{spec.note}</span>}
 
       {/* Ratio chip — the position's collateral ratio at this event. Like the
           rate pill, not a moved amount, so not behind hideClass. An echo of
-          the detail grid's own ratio receipt (same info, same value key). */}
+          the detail grid's ratio receipt (same info, same value key). */}
       {spec.ratioChip && (
         <Prov echo info={spec.ratioChip.prov} value={spec.ratioChip.value}>
           <span
@@ -739,14 +929,25 @@ export function ChainTruthRow({
       )}
 
       {chevron}
+    </>
+  );
 
-      {/* `evt-meta`: below sm this span becomes the header's own first row
-          (app/globals.css) — date, time and event number right-aligned
-          beside the card's chevron, the label and amounts beneath. */}
-      <span className="evt-meta ml-auto flex items-center gap-2 tabular-nums">
-        <EventTime ts={timestamp} />
-        {eventNumber != null && <EventNumberPill number={eventNumber} last={eventNumberLast} />}
-      </span>
+  // The event page's title (ui-jobs 286): the words and amounts, large, as
+  // the side column's h1.
+  if (variant === "title")
+    return (
+      <h1
+        className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xl font-normal leading-tight"
+        data-event-page-title=""
+      >
+        {cluster}
+      </h1>
+    );
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 pl-5 pt-4 pb-3">
+      {cluster}
+      {meta}
     </div>
   );
 }

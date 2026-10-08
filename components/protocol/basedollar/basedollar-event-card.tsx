@@ -185,7 +185,6 @@ export function BasedollarEventCard({ event, isLast, eventNumber }: BasedollarEv
           />
         }
         detail={<BasedollarEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-        detailLabel="Trove state"
         explainer={
           <LiquityForkEventExplainer
             ctx={ctx}

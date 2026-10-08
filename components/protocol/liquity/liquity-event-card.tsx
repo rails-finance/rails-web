@@ -7,7 +7,8 @@ import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
 import { Facehash } from "@/components/shared/facehash";
-import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
+import { useLiquityHeadSpec } from "./liquity-head";
+import { liquityL1Label } from "@/lib/liquity/event-prose";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
@@ -253,6 +254,7 @@ export function LiquityEventCard({
     />
   );
 
+  const head = useLiquityHeadSpec(ctx, coords);
   const slots: EventCardSlots = {
     event: {
       id: event.id,
@@ -263,17 +265,8 @@ export function LiquityEventCard({
       number: eventNumber,
     },
     spine,
-    head: (
-      <LiquityEventHeader
-        ctx={ctx}
-        timestamp={event.timestamp}
-        txHash={event.txHash}
-        blockNumber={event.blockNumber}
-        eventNumber={eventNumber}
-        page={page}
-      />
-    ),
-    caption: rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx),
+    head,
+    caption: rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityL1Label(ctx),
     // A third party's act names who acted: the redeemer, the batch manager
     // moving a delegated Trove's rate.
     actor: {

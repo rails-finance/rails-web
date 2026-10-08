@@ -168,7 +168,6 @@ export function CompoundEventCard({
             previousTx={prevRow(previousTx)}
           />
         }
-        detailLabel="Position state"
         explainer={
           <CompoundEventExplainer
             ctx={ctx}

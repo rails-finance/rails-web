@@ -31,6 +31,7 @@ import {
   type SpineColumnProps,
 } from "@/components/shared/spine-column";
 import { useRowTarget } from "@/components/shared/row-target";
+import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -51,8 +52,8 @@ function ExplanationNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
 /* ── The slots (rails-ops reference/shared-event-card-spec.md §3; ui-jobs 309) ──
  * A family on the shell supplies data and words in these; the shell decides
  * which parts exist and where they sit. A slot typed `ReactNode` here takes a
- * typed shape in a later step of 309: `head` in step 2, `price` and the
- * explainer's bullets in step 3, `cells` in step 4. */
+ * typed shape in a later step of 309: `price` and the explainer's bullets in
+ * step 3, `cells` in step 4. */
 
 /** The event the card stands for. The shell builds the card's open-state key
  *  from `family` and `id`, and the menu from `txHash`. */
@@ -96,8 +97,8 @@ export interface EventCardExplainer {
 export interface EventCardSlots {
   event: EventCardEvent;
   spine: SpineColumnProps;
-  /** T1's head row. */
-  head: ReactNode;
+  /** T1's head row, drawn by the shared `ChainTruthRow`. */
+  head: ChainTruthRowSpec;
   /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"). */
   caption: string;
   actor?: EventCardActor;
@@ -167,7 +168,6 @@ interface EventCardParts {
   /** A full-width strip under the header (the `band` slot). */
   band?: ReactNode;
   detail?: ReactNode;
-  detailLabel?: string;
   explainer?: ReactNode;
   /** Teaser line at the top of the open explanation: the first bullet. */
   explainerTeaser?: ReactNode;
@@ -190,11 +190,18 @@ interface EventCardParts {
 export type EventCardProps = EventCardFrame & ({ slots: EventCardSlots } | EventCardParts);
 
 /** A slotted card's parts, as the shell draws them. */
-function partsOf(slots: EventCardSlots): Omit<EventCardParts, "slots"> {
+function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts, "slots"> {
   const { event, actor, explainer } = slots;
   return {
     iconColumn: <SpineColumn {...slots.spine} />,
-    header: slots.head,
+    header: (
+      <ChainTruthRow
+        spec={slots.head}
+        timestamp={event.timestamp}
+        eventNumber={event.number}
+        variant={pageMode ? "page" : "row"}
+      />
+    ),
     band: slots.band,
     detail: (
       <>
@@ -234,13 +241,19 @@ export function EventCard(props: EventCardProps) {
     onDetailToggle,
     footerExtra,
   } = props;
-  const parts = props.slots ? partsOf(props.slots) : props;
+  // The event page's card (rails-ops TO-DO-ui-jobs 236), where the route's
+  // shell provides `EventPageContext`: the shared side column stands in the
+  // spine's column, beside the card from 640px and above it below; the
+  // header draws no chevron and the body, the explanation and the footer
+  // stand open with no toggle. The boundary card's open is controlled.
+  const page = useContext(EventPageContext);
+  const pageMode = page != null;
+  const parts = props.slots ? partsOf(props.slots, pageMode) : props;
   const {
     iconColumn,
     header,
     band,
     detail,
-    detailLabel,
     explainer: explainerProp,
     explainerTeaser: explainerTeaserProp,
     txHash,
@@ -261,13 +274,6 @@ export function EventCard(props: EventCardProps) {
 
   const [detailOpenInternal, setDetailOpenInternal] = useState(false);
 
-  // The event page's card (rails-ops TO-DO-ui-jobs 236), where the route's
-  // shell provides `EventPageContext`: the shared side column stands in the
-  // spine's column, beside the card from 640px and above it below; the
-  // header draws no chevron and the body, the explanation and the footer
-  // stand open with no toggle. The boundary card's open is controlled.
-  const page = useContext(EventPageContext);
-  const pageMode = page != null;
   const isControlled = pageMode || detailOpenProp !== undefined;
 
   // A warning event's legs, handed from the header to the spine.
@@ -570,10 +576,6 @@ export function EventCard(props: EventCardProps) {
     >
       {inTimeline && band && <div className="sm:hidden">{band}</div>}
 
-      {/* `detailLabel` names the pane for a reader moving by heading —
-          sr-only because the pane's content carries the
-          visible structure (rails-ops TO-DO-ui-jobs item 76). */}
-      {detailLabel && <h3 className="sr-only">{detailLabel}</h3>}
       {detail}
 
       {/* ── Info sections: under a hairline, the (i) Explanation button

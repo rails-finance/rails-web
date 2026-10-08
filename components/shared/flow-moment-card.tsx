@@ -658,7 +658,6 @@ export function FlowMomentCard({
           iconColumn={<SpineColumn icon="moment" isLast={false} tip={null} />}
           header={header}
           detail={detail}
-          detailLabel={`The position at the close of ${date}`}
           explainer={explainer}
           caption="Position at close"
         />

@@ -129,7 +129,6 @@ export function LlamalendEventCard({
             previousStated={previousStated}
           />
         }
-        detailLabel="Position state"
         explainer={
           <LlamalendEventExplainer
             ctx={ctx}

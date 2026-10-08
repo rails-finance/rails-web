@@ -189,7 +189,6 @@ export function AsymmetryEventCard({ event, isLast, eventNumber }: AsymmetryEven
           />
         }
         detail={<AsymmetryEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-        detailLabel="Trove state"
         explainer={
           <LiquityForkEventExplainer
             ctx={ctx}

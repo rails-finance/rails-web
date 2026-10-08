@@ -53,7 +53,7 @@ import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplu
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
-import { UsersGlyph } from "@/components/protocol/liquity/liquity-event-header";
+import { UsersGlyph } from "@/components/shared/rate-pill";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { LIQUITY_TIMELINE_RUNS } from "@/lib/liquity/timeline-runs";
 import type { SpineKey } from "@/components/shared/mobile-spine";

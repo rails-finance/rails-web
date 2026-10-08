@@ -169,7 +169,6 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
             timestamp={event.timestamp}
           />
         }
-        detailLabel="Position state"
         explainer={
           <FrankencoinEventExplainer
             ctx={ctx}

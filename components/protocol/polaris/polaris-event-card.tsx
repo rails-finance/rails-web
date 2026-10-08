@@ -103,7 +103,6 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
           />
         }
         detail={<PolarisEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-        detailLabel="CDP state"
         explainer={
           <PolarisEventExplainer
             ctx={ctx}

@@ -188,7 +188,6 @@ export function EbisuEventCard({ event, isLast, eventNumber }: EbisuEventCardPro
           />
         }
         detail={<EbisuEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />}
-        detailLabel="Trove state"
         explainer={
           <LiquityForkEventExplainer
             ctx={ctx}

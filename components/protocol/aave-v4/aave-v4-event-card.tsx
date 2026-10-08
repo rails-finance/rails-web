@@ -112,7 +112,6 @@ export function AaveV4EventCard({
       detail={
         <AaveV4EventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
       }
-      detailLabel="Aave V4 Details"
       explainer={
         <AaveV4EventExplainer
           ctx={ctx}

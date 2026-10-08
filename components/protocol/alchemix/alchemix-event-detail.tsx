@@ -304,10 +304,9 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
 
   return (
     <>
-      {/* Both grids are headed, and the first one is why. The shell declares a
-          `detailLabel` and renders it nowhere, so a lone heading over the
-          second grid would read as covering the pane. Naming this one says
-          which figures the transaction emitted and which were read. */}
+      {/* Both grids are headed, and the first one is why: a lone heading
+          over the second grid would read as covering the pane. Naming this
+          one says which figures the transaction emitted and which were read. */}
       {stats.length > 0 ? (
         <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>
           {legs.some((l) => l.context.data.eventType === "self_liquidated")

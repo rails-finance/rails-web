@@ -204,7 +204,6 @@ export function AlchemixEventCard({
         />
       }
       detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
-      detailLabel="What the logs state"
       explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />}
       explainerTeaser={alchemixExplainerTeaser(legs, sibs, prose)}
       txHash={lead.txHash}

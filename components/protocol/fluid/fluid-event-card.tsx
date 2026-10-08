@@ -156,7 +156,6 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
             opening={openedBy != null || fundedSameTx(sibs, event)}
           />
         }
-        detailLabel="Position state"
         explainer={
           <FluidEventExplainer
             ctx={ctx}

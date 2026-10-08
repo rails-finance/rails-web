@@ -168,7 +168,6 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
           notesSlot={notesSlot}
         />
       }
-      detailLabel="Position state"
       explainer={
         <>
           <div ref={setNotesSlot} className="mb-2 empty:hidden" />

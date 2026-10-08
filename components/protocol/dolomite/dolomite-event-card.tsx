@@ -110,7 +110,6 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
           accountNumber={accountNumber}
         />
       }
-      detailLabel="Position state"
       explainer={
         <DolomiteEventExplainer
           ctx={ctx}

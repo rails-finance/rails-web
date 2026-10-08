@@ -285,7 +285,6 @@ export function AlchemixV2EventCard({
           </>
         ) : undefined
       }
-      detailLabel="What the log states"
       // The one sentence is the teaser, which the pane draws as its lead; the
       // body adds nothing, so the sentence shows once.
       explainer={line ? <ProseExplainer items={[]} /> : undefined}

@@ -43,7 +43,7 @@ const READERS = [
   "lib/liquity/accrual.ts",
   "lib/liquity/event-page.ts",
   "components/protocol/liquity/event-prose-render.tsx",
-  "components/protocol/liquity/liquity-event-header.tsx",
+  "components/protocol/liquity/liquity-head.tsx",
   "components/protocol/liquity/liquity-event-detail.tsx",
   "components/protocol/liquity/liquity-event-card.tsx",
   "lib/liquity/explorer.ts",

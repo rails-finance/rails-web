@@ -349,7 +349,6 @@ export function TransmuterEventCard({
           </>
         ) : undefined
       }
-      detailLabel="What the logs state"
       // The first sentence is the teaser, which the pane draws as its lead
       // bullet; the pane lists the rest, so no sentence shows twice.
       explainer={lines.length > 0 ? <ProseExplainer items={lines.slice(1)} /> : undefined}

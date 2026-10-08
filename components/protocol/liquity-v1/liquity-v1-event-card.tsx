@@ -122,7 +122,6 @@ export function LiquityV1EventCard({
             currentPrice={currentPrice}
           />
         }
-        detailLabel="Trove state"
         explainer={
           <LiquityV1EventExplainer
             ctx={ctx}

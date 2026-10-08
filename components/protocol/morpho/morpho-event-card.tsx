@@ -108,7 +108,6 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
         detail={
           <MorphoEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} flows={event.flows} />
         }
-        detailLabel="Position state"
         explainer={
           <MorphoEventExplainer
             ctx={ctx}

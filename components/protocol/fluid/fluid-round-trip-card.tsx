@@ -110,7 +110,6 @@ export function FluidRoundTripCard({ hops, operates, isLast }: FluidRoundTripCar
         />
       }
       detail={<ChainTruthDetail stats={stats} />}
-      detailLabel="Hops"
       explainer={<ProseExplainer items={composeBullets(rest)} />}
       explainerTeaser={lead}
       txHash={first.txHash}

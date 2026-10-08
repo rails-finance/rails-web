@@ -155,7 +155,6 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
             eventId={event.id}
           />
         }
-        detailLabel="Position state"
         explainer={
           <MapleEventExplainer
             ctx={ctx}

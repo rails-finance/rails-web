@@ -127,7 +127,6 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
           eventTs={event.timestamp}
         />
       }
-      detailLabel="Position state"
       explainer={
         <MoonwellEventExplainer
           ctx={ctx}

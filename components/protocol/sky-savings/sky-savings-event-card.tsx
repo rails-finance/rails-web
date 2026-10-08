@@ -317,7 +317,6 @@ export function SkySavingsEventCard({
       iconColumn={iconColumn}
       header={<ChainTruthRow spec={spec} timestamp={event.timestamp} eventNumber={eventNumber} />}
       detail={detail}
-      detailLabel="Position after this event"
       explainer={<SkySavingsEventExplainer ctx={c} previous={previous} />}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={skyEventContent(kind)} />}

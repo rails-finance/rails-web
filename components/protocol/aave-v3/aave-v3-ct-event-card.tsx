@@ -244,7 +244,6 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
           notesSlot={notesSlot}
         />
       }
-      detailLabel="Position state"
       explainer={
         <>
           <div ref={setNotesSlot} className="mb-2 empty:hidden" />

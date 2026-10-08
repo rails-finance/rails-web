@@ -21,7 +21,7 @@ import { useWalletContext } from "@/components/nav/wallet-context";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
-import { LiquityEventHeader } from "@/components/protocol/liquity/liquity-event-header";
+import { LiquityEventTitle } from "@/components/protocol/liquity/liquity-head";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { collateralPriceInfo, closingPriceInfo, LastOwnerPrefix } from "@/lib/liquity/trove-page-words";
@@ -197,12 +197,11 @@ export default function EventView({
                         currentPrice,
                       }),
                       title: (
-                        <LiquityEventHeader
+                        <LiquityEventTitle
                           ctx={event.context.data}
                           timestamp={event.timestamp}
                           txHash={event.txHash}
                           blockNumber={event.blockNumber}
-                          title
                         />
                       ),
                     }}

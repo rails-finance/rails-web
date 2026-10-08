@@ -154,7 +154,6 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
           eventTs={event.timestamp}
         />
       }
-      detailLabel="Position state"
       explainer={
         <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} skipLead />
       }

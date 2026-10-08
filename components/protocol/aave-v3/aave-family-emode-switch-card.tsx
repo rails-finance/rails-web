@@ -141,7 +141,6 @@ export function AaveFamilyEmodeSwitchCard({
           </div>
         ) : null
       }
-      detailLabel="Position state"
       explainer={
         <p className="text-sm leading-relaxed">
           {entering ? (

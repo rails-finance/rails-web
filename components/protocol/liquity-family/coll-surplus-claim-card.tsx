@@ -237,7 +237,6 @@ export function CollSurplusClaimCard({
           }
         />
       }
-      detailLabel="Surplus claimed"
       explainer={rest.length > 0 ? <ProseExplainer items={rest} /> : undefined}
       explainerTeaser={lead}
       txHash={event.txHash}

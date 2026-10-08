@@ -9,14 +9,11 @@
 // rate, so it belongs only where a user sets a rate, never on a utilization
 // rate.
 //
-// The SHELLS carry the visual; the V2 pills wrap them with the FigureProv echo
-// (so the pill pulses with the detail grid's rate receipt). The fork path wraps
-// the shells with its own chain-state <Prov echo> instead — same look, its own
-// provenance system.
+// The SHELLS carry the visual; the shared row (ChainTruthRow) puts the rate's
+// <Prov echo> inside them, so the pill pulses with the detail grid's rate
+// receipt.
 
 import type { ReactNode } from "react";
-import { Prov } from "@/components/shared/provenance";
-import type { FigureProv } from "@/lib/liquity/event-provenance";
 
 /** Small "people" glyph inside the pink delegate / batch rate pills, and reused
  *  as the event-filter suffix that marks a delegate-set "Interest rate" row
@@ -60,38 +57,5 @@ export function DelegateRatePillShell({ children }: { children: ReactNode }) {
       <UsersGlyph />
       {children}
     </span>
-  );
-}
-
-/** Pill body — the rate ECHOES the detail grid's after-rate receipt (the shared
- *  rateAfterProv identity), so the locator pulse reaches the pill; the pill
- *  never forms a receipt row of its own. The builder's explicit exact value
- *  keeps the key stable across the pills' display precisions. */
-export function RateEcho({ prov, children }: { prov?: FigureProv; children: ReactNode }) {
-  if (!prov) return <>{children}</>;
-  return (
-    <Prov echo info={prov.info} value={prov.value}>
-      {children}
-    </Prov>
-  );
-}
-
-/** Interest-rate pill for individual (non-delegated) troves — 2dp. */
-export function RatePill({ rate, prov }: { rate: number; prov?: FigureProv }) {
-  return (
-    <RatePillShell>
-      <RateEcho prov={prov}>{rate.toFixed(2)}%</RateEcho>
-    </RatePillShell>
-  );
-}
-
-/** Interest-rate pill for delegated troves — pink with the people glyph, 2dp.
- *  Both pills state a rate at two places, as the detail grid and the
- *  explanation do. */
-export function DelegateRatePill({ rate, prov }: { rate: number; prov?: FigureProv }) {
-  return (
-    <DelegateRatePillShell>
-      <RateEcho prov={prov}>{rate.toFixed(2)}%</RateEcho>
-    </DelegateRatePillShell>
   );
 }

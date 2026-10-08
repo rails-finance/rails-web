@@ -8,7 +8,7 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { UsersGlyph } from "./liquity-event-header";
+import { UsersGlyph } from "@/components/shared/rate-pill";
 import { formatDate } from "@/lib/date";
 import { troveWords } from "@/lib/liquity/event-templates";
 

@@ -206,7 +206,6 @@ export function VaultTimelineRow({
           detailNotes={detailNotes}
         />
       }
-      detailLabel="What the chain recorded"
       explainer={<RowExplainer event={event} shareUnit={shareUnit} assetSymbol={assetSymbol} />}
       txHash={event.txHash}
       persistKey={`${persistPrefix}:${vaultAddress}:${event.id}`}

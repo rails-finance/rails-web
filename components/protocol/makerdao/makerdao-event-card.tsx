@@ -131,7 +131,6 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
         detail={
           <MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
         }
-        detailLabel="Vault state"
         explainer={
           <MakerDAOEventExplainer
             ctx={ctx}
