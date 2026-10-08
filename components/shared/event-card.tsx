@@ -6,6 +6,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
+import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
 import {
@@ -391,10 +392,13 @@ export function EventCard({
       </>
     ) : null);
   const spoken = spokenCaption ?? (captionCtx ? `${kind}, ${formatDate(captionCtx.ts)}` : "");
-  // The legs the column reports, for the phone control's name.
-  const [legs, setLegs] = useState<string | null>(null);
-  const rowSlot = useMemo(() => ({ setLegs }), []);
+  // The row's name, the same at both widths: the spoken caption, then the
+  // legs the column states under `legsId` ("Repay, 6 June 2026: 7,500 BOLD
+  // repaid"); a group passes its whole `label`.
   const labelId = `${reactId}-label`;
+  const legsId = `${reactId}-legs`;
+  const rowSlot = useMemo(() => ({ legsId }), [legsId]);
+  const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
   const panelId = `${reactId}-card`;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
@@ -414,19 +418,12 @@ export function EventCard({
       <div className={`${headMenu ? "pr-[52px]" : ""}${inTimeline ? " max-sm:hidden" : ""}`}>
         <div
           className={`${headerToggles ? "group/evt disc-row disc-row-slow cursor-pointer" : ""}`}
-          onClick={() => {
-            if (hasDetail && headerToggles) toggleDetail();
-          }}
-          role={headerToggles ? "button" : undefined}
-          aria-expanded={showChevron ? showDetail : undefined}
-          aria-controls={showChevron && showDetail ? panelId : undefined}
-          tabIndex={headerToggles ? 0 : undefined}
-          onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === " ") && hasDetail && headerToggles) {
-              e.preventDefault();
-              toggleDetail();
-            }
-          }}
+          {...(showChevron
+            ? {
+                ...disclosureProps<HTMLDivElement>(showDetail, panelId, () => toggleDetail(), "role"),
+                ...(inTimeline ? nameProps : {}),
+              }
+            : {})}
         >
           {/* The header places the chevron after its action word
               (`EventHeadChevron`). A header with no slot for the chevron gets
@@ -616,6 +613,11 @@ export function EventCard({
               </div>
             ) : (
               <div className="spine-cell" data-anatomy="L3">
+                {inTimeline && (
+                  <span id={labelId} hidden>
+                    {spoken}
+                  </span>
+                )}
                 <SpineRowContext.Provider value={inTimeline ? rowSlot : null}>
                   <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
                 </SpineRowContext.Provider>
@@ -624,18 +626,11 @@ export function EventCard({
                   // are one button, laid over the column; the glyphs under it
                   // take no pointer.
                   <button
-                    type="button"
                     data-spine-toggle=""
-                    aria-expanded={showDetail}
-                    aria-controls={showDetail ? panelId : undefined}
-                    aria-label={label ?? (legs ? `${spoken}: ${legs}` : spoken)}
-                    onClick={(e) => toggleDetail(e.currentTarget)}
+                    {...disclosureProps<HTMLButtonElement>(showDetail, panelId, toggleDetail)}
+                    {...nameProps}
                     className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
-                  >
-                    <span id={labelId} hidden>
-                      {spoken}
-                    </span>
-                  </button>
+                  />
                 )}
               </div>
             )}

@@ -89,10 +89,11 @@ export interface EventCaption {
 
 export const EventCaptionContext = createContext<EventCaption | null>(null);
 
-/** What a timeline row hands its `SpineColumn`: where to report the spoken
- *  legs for the phone control's name. */
+/** What a timeline row hands its `SpineColumn`: the id under which the
+ *  column states its legs as spoken ("7,500 BOLD repaid"), which the row's
+ *  controls take into their names. */
 export interface SpineRowSlot {
-  setLegs: (legs: string | null) => void;
+  legsId: string;
 }
 
 export const SpineRowContext = createContext<SpineRowSlot | null>(null);

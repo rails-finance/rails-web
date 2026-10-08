@@ -23,12 +23,13 @@
 // header's content and the body are the caller's — the shell reads none of
 // them.
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
+import { disclosureProps } from "@/components/shared/disclosure";
 
 export interface NoteRowShellProps {
   /** The spine glyph this row's class wears. */
@@ -66,6 +67,7 @@ export function NoteRowShell({
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
   const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
   const toggle = () => setOpen((o) => !o);
 
   return (
@@ -83,17 +85,8 @@ export function NoteRowShell({
           <div className={`overflow-visible rounded-xl bg-note ${open ? "rounded-b-none" : ""}`}>
             <div
               className="group/evt cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500"
-              role="button"
-              tabIndex={0}
-              aria-expanded={open}
+              {...disclosureProps<HTMLDivElement>(open, panelId, toggle, "role")}
               aria-label={label}
-              onClick={toggle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  toggle();
-                }
-              }}
             >
               <div className="relative flex items-start gap-2 evt-has-chev">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 pl-5 pt-4 pb-3">
@@ -105,7 +98,11 @@ export function NoteRowShell({
           </div>
 
           {/* ── Body panel — mounted only while open, like a card's ─────── */}
-          {open && <div className="rounded-b-xl bg-note">{children}</div>}
+          {open && (
+            <div id={panelId} className="rounded-b-xl bg-note">
+              {children}
+            </div>
+          )}
         </div>
       </div>
     </ProvReceiptsScope>

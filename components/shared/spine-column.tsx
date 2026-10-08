@@ -1,7 +1,7 @@
 "use client";
 
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
-import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 import { ArrowRightToLine, Clock, Layers, Lock, LogOut } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -853,10 +853,12 @@ export function SpineColumn({
               .map((l) => `${spokenAmount(l.value)} ${l.symbol}`)
               .join(", ") || null
           : null;
-  const setLegs = spineRow?.setLegs;
-  useEffect(() => {
-    setLegs?.(legs);
-  }, [setLegs, legs]);
+  // The legs as spoken, for the row's controls to name themselves with.
+  const legsEl = spineRow && legs && (
+    <span id={spineRow.legsId} hidden>
+      : {legs}
+    </span>
+  );
   // ── The spine is never empty; the icon states WHY there is no flow ────────
   //
   // A card reaches this component with no token rows for many reasons unrelated
@@ -1135,6 +1137,7 @@ export function SpineColumn({
         {effectiveIcon ? node : tokenRows}
       </div>
       <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>
+      {legsEl}
     </div>
   );
 }
