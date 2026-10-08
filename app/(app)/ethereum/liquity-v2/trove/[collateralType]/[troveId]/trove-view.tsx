@@ -31,7 +31,6 @@ import { troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
-import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
@@ -660,8 +659,7 @@ export default function TroveView({
         {/* Lifetime flows: the bars and the line over the Trove's own event
             replay (lib/shared/liquity-flows.ts). The runway that used to share
             this panel lives in the position card with the current-state
-            stats. A mixed wallet (owns this trove AND redeemed against
-            others) gets the redeemer block underneath. */}
+            stats. */}
         {(() => {
           const currentPrice = prices?.[troveData.collateralType.toLowerCase() as keyof OraclePricesData];
           // One clock for the scrubber and the Explanation once mounted;
@@ -693,7 +691,6 @@ export default function TroveView({
                 }
                 learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
               />
-              {result.redeemer && <RedeemerSummary stats={result.redeemer} currentPrice={currentPrice} />}
             </>
           );
         })()}

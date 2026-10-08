@@ -9,7 +9,6 @@ import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { liquityEconomicsExplanation } from "@/lib/liquity/economics-explanation";
-import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { SpineLine } from "@/components/shared/spine-line";
@@ -104,7 +103,6 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
                 // chevron here would be a control nobody could press.
                 collapseKey={null}
               />
-              {result.redeemer && <RedeemerSummary stats={result.redeemer} currentPrice={currentPrice} />}
             </>
           );
         })()}

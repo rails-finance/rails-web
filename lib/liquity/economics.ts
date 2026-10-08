@@ -272,84 +272,11 @@ export function calculateEconomicsFromEvents(
   };
 }
 
-// ---- Redeemer stats — a wallet that redeemed against someone else's trove ----
-// Co-located with calculateEconomicsFromEvents (shares its ownedTroveIds
-// derivation) rather than in redeemer-summary.tsx, so that component can
-// import both without a cycle; it re-exports these two names alongside
-// RedeemerSummary, so all three still live at one import path.
-
-export interface RedeemerStats {
-  totalDebtRedeemed: number;
-  totalCollateralReceived: number;
-  redemptionCount: number;
-  uniqueTroves: number;
-  totalGasCostEth: number;
-  totalGasCostUsd: number;
-  firstTimestamp: number;
-  lastTimestamp: number;
-  collateralType: string;
-  stableSymbol: string;
-}
-
-export function calculateRedeemerStats(events: MinimalEvent[]): RedeemerStats | null {
-  const liquityEvents = events.filter(isLiquityMinimal);
-
-  // Mirror the ownedTroveIds derivation in calculateEconomicsFromEvents so the
-  // wallet-scoped vs trove-scoped predicate stays symmetric.
-  const OPEN_OPS = new Set(["openTrove", "openTroveAndJoinBatch"]);
-  const ownedTroveIds = new Set<string>();
-  for (const e of liquityEvents) {
-    const c = e.context.data;
-    if (OPEN_OPS.has(c.operation) && c.troveId) ownedTroveIds.add(c.troveId);
-  }
-
-  const redeemerEvents = liquityEvents.filter((e) => {
-    const c = e.context.data;
-    return c.operation === "redeemCollateral" && !!c.troveId && !ownedTroveIds.has(c.troveId);
-  });
-  if (redeemerEvents.length === 0) return null;
-
-  const sorted = [...redeemerEvents].sort((a, b) => a.timestamp - b.timestamp);
-  let totalDebtRedeemed = 0;
-  let totalCollateralReceived = 0;
-  let totalGasCostEth = 0;
-  let totalGasCostUsd = 0;
-  const troveIds = new Set<string>();
-
-  for (const event of sorted) {
-    const c = event.context.data;
-    if (event.gas) {
-      totalGasCostEth += event.gas.gasCostEth || 0;
-      totalGasCostUsd += event.gas.gasCostUsd || 0;
-    }
-    if (c.troveOperation) {
-      totalDebtRedeemed += Math.abs(c.troveOperation.debtChangeFromOperation);
-      totalCollateralReceived += Math.abs(c.troveOperation.collChangeFromOperation);
-    }
-    if (c.troveId) troveIds.add(c.troveId);
-  }
-
-  const ctx = sorted[0].context.data;
-  return {
-    totalDebtRedeemed,
-    totalCollateralReceived,
-    redemptionCount: redeemerEvents.length,
-    uniqueTroves: troveIds.size,
-    totalGasCostEth,
-    totalGasCostUsd,
-    firstTimestamp: sorted[0].timestamp,
-    lastTimestamp: sorted[sorted.length - 1].timestamp,
-    collateralType: ctx.collateralType,
-    stableSymbol: ctx.assetType || "BOLD",
-  };
-}
-
 // ---- Tower projection ----
 
 export interface LiquityEconomicsResult {
   data: ChainTruthTowerData;
   economics: TroveEconomicsType & { _meta: TroveMeta };
-  redeemer: RedeemerStats | null;
 }
 
 export function computeLiquityEconomics(
@@ -369,7 +296,6 @@ export function computeLiquityEconomics(
   },
 ): LiquityEconomicsResult | null {
   const baseResult = calculateEconomicsFromEvents(events);
-  const redeemer = calculateRedeemerStats(events);
   if (!baseResult) return null;
 
   const meta = baseResult._meta;
@@ -572,5 +498,5 @@ export function computeLiquityEconomics(
       "The tower shows the trove as it stands; every inflow and outflow that produced it is in the timeline below, event by event.",
   };
 
-  return { data, economics: { ...economics, _meta: meta }, redeemer };
+  return { data, economics: { ...economics, _meta: meta } };
 }
