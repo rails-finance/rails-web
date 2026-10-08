@@ -403,8 +403,8 @@ export function EventCard({
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   // A timeline row's T1 surface is the desktop header's; under 640px it is the
-  // caption on the page's ground.
-  const bp = inTimeline ? "sm:" : "";
+  // caption on the page's ground. The classes are written out whole: Tailwind
+  // generates only the class names it finds in the source.
   const t1 = (
     // The ring: the header of a day's last event flashes after the Lifetime
     // flows chart's "Show timeline to {date}" or the timeline chip brings it
@@ -412,7 +412,13 @@ export function EventCard({
     <div
       data-anatomy="T1"
       className={`relative overflow-visible rounded-xl ring-0 ring-teal-500/0 [transition:color_150ms,background-color_150ms,box-shadow_2000ms] has-[[data-flow-day-flash]]:ring-2 has-[[data-flow-day-flash]]:ring-teal-500/70 ${
-        showDetail ? `${bp}rounded-b-none ${bp}bg-raised` : showChevron ? `${bp}hover:bg-raised evt-t1-lit` : ""
+        showDetail
+          ? inTimeline
+            ? "sm:rounded-b-none sm:bg-raised"
+            : "rounded-b-none bg-raised"
+          : showChevron
+            ? `${inTimeline ? "sm:hover:bg-raised" : "hover:bg-raised"} evt-t1-lit`
+            : ""
       }${inTimeline ? " spine-t1" : ""}`}
     >
       <div className={`${headMenu ? "pr-[52px]" : ""}${inTimeline ? " max-sm:hidden" : ""}`}>
