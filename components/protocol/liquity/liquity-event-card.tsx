@@ -5,7 +5,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineWarningLeg } from "@/components/shared/spine-column";
-import { fmtSpine } from "@/components/shared/activity-timeline";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
@@ -140,7 +139,6 @@ export function LiquityEventCard({
         value: Math.abs(collCp.change),
         symbol: ctx.collateralType,
         address: soleFlowAddress(event.flows, ctx.collateralType),
-        prov: collCp,
       });
     if (debtCp && Math.abs(debtCp.change) >= 0.01)
       legs.push({
@@ -148,7 +146,6 @@ export function LiquityEventCard({
         value: Math.abs(debtCp.change),
         symbol: debtSym,
         address: soleFlowAddress(event.flows, debtSym),
-        prov: debtCp,
       });
     return legs;
   })();
@@ -159,7 +156,6 @@ export function LiquityEventCard({
     <SpineColumn
       icon="warning"
       warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
-      warningLabel={ctx.operation === "liquidate" ? "Liquidation" : isRedemption ? "Redemption" : undefined}
       warningLegs={warningLegs}
       isFirst={isFirst}
       isLast={!!isLast}
@@ -189,19 +185,6 @@ export function LiquityEventCard({
     (() => {
       const debtOp = ctx.troveOperation?.debtChangeFromOperation ?? 0;
       const collOp = ctx.troveOperation?.collChangeFromOperation ?? 0;
-      // The spine flanking value re-renders the header's change figure, so it
-      // echoes into that receipt (the locator pulse then reaches it) — when
-      // the two are the same number AT DISPLAY PRECISION, the same rule the
-      // detail's delta echo uses. The spine shows the operation's own
-      // movement; the receipt includes redistribution (+ upfront fee for
-      // debt). Those extras are usually dust that vanishes in the compact
-      // form (both render "17K") — indistinguishable figures echo; a visibly
-      // different figure would be a false pairing, so it drops.
-      const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
-      const collCp = collChangeProv(ctx, coords);
-      const debtCp = debtChangeProv(ctx, coords);
-      const collProv = collCp && fmtSpine(Math.abs(collCp.change)) === fmtSpine(Math.abs(collOp)) ? collCp : undefined;
-      const debtProv = debtCp && fmtSpine(Math.abs(debtCp.change)) === fmtSpine(Math.abs(debtOp)) ? debtCp : undefined;
       const boldDir = debtOp < 0 ? ("right" as const) : ("left" as const);
       const collDir = collOp < 0 ? ("left" as const) : ("right" as const);
       // A close moves BOLD only when it repaid debt: closing a zombie a
@@ -241,7 +224,6 @@ export function LiquityEventCard({
                 direction: collDir,
                 verb: collDir === "left" ? "withdrawn" : "added",
                 value: collVal,
-                prov: collVal != null ? collProv : undefined,
               },
             ]
           : []),
@@ -253,7 +235,6 @@ export function LiquityEventCard({
                 direction: boldDir,
                 verb: boldDir === "left" ? "borrowed" : "repaid",
                 value: debtVal,
-                prov: debtVal != null ? debtProv : undefined,
               },
             ]
           : []),

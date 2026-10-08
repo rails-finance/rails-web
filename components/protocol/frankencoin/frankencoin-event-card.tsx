@@ -16,9 +16,9 @@ import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/e
 import { EventCard } from "@/components/shared/event-card";
 import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { changeProv, type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
+import { type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
 import { frankencoinExplainerTeaser } from "@/lib/frankencoin/explainer-clauses";
 import { FrankencoinEventHeader } from "./frankencoin-event-header";
 import { FrankencoinEventDetail } from "./frankencoin-event-detail";
@@ -72,35 +72,16 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
   const openColl = ctx.eventType === "open" || ctx.eventType === "clone" ? num(ctx.collateral) : 0;
   const collMove = dColl ?? (openColl > 0 ? openColl : 0);
 
-  // Echo: the header registers a `changeProv("collateral", …)` receipt on
-  // exactly these event types (frankencoin-event-header.tsx) — bare on
-  // open/clone/add/withdraw/adjust (per-axis verb, axisVerb), signed on
-  // close. Mirror its guard (the V1 clone-creation lie never surfaces as a
-  // moved amount) so this only echoes when the header actually registered.
-  const isOpen = ctx.eventType === "open" || ctx.eventType === "clone";
-  const isDeltaLeg =
-    ctx.eventType === "add_collateral" || ctx.eventType === "withdraw_collateral" || ctx.eventType === "adjust";
-  const headerRegistersColl = isOpen
-    ? openColl > 0
-    : (isDeltaLeg || ctx.eventType === "close") && !ctx.collateralUnderstated && dColl != null && dColl !== 0;
   const coords: FrankencoinCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     position: ctx.position,
     hub: ctx.hub,
   };
-  const collProv = headerRegistersColl
-    ? {
-        info: changeProv("collateral", ctx.collateralSymbol, coords),
-        value: chainTruthDeltaValue(collMove, ctx.eventType !== "close"),
-        symbol: ctx.collateralSymbol,
-      }
-    : undefined;
 
   // The ZCHF the owner's own action moved: minted to the wallet or repaid into
-  // the position. The header registers a `changeProv("minted", …)` receipt on
-  // these rows (bare on open/mint/repay/adjust, signed on close), so the flank
-  // echoes it and the amount the header hands off at ≥sm lands here.
+  // the position, on the rows whose header states it.
+  const isOpen = ctx.eventType === "open" || ctx.eventType === "clone";
   const dMint = ctx.minted != null && ctx.mintedBefore != null ? num(ctx.minted) - num(ctx.mintedBefore) : null;
   const debtMove = dMint ?? (isOpen ? num(ctx.minted) : 0);
   const headerRegistersDebt =
@@ -130,7 +111,6 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
                   address: soleFlowAddress(event.flows, ctx.collateralSymbol),
                   direction: collMove > 0 ? ("right" as const) : ("left" as const),
                   value: Math.abs(collMove),
-                  prov: collProv,
                 },
               ]
             : []),
@@ -141,11 +121,6 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
                   address: soleFlowAddress(event.flows, "ZCHF"),
                   direction: debtMove > 0 ? ("left" as const) : ("right" as const),
                   value: Math.abs(debtMove),
-                  prov: {
-                    info: changeProv("minted", ctx.collateralSymbol, coords),
-                    value: chainTruthDeltaValue(debtMove, ctx.eventType !== "close"),
-                    symbol: "ZCHF",
-                  },
                 },
               ]
             : []),
@@ -154,23 +129,7 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
 
   const iconSlot =
     critical || caution ? (
-      <SpineColumn
-        icon="warning"
-        warningTone={critical ? "critical" : "caution"}
-        warningLabel={
-          ctx.eventType === "challenge_started"
-            ? "Challenge"
-            : ctx.eventType === "challenge_succeeded"
-              ? "Collateral sold"
-              : ctx.eventType === "denied"
-                ? "Denied"
-                : ctx.eventType === "auction_settlement" && !forcedTx
-                  ? "Auction"
-                  : "Forced sale"
-        }
-        isFirst={isFirst}
-        isLast={!!isLast}
-      />
+      <SpineColumn icon="warning" warningTone={critical ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
     ) : ctx.eventType === "ownership_transferred" ? (
       // An ownership handover is a people event with no token flow — the person
       // glyph with the join badge marks the new owner taking over; dotted spine

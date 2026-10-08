@@ -27,14 +27,12 @@
 // stretch grouped, and the corner mark is the only warning a folder row wears
 // (the pill was retired at every width, 2026-09-02).
 
-import { DANGER_FOLDER_BADGE, MIXED_FOLDER_BADGE, TRANSFER_FOLDER_BADGE } from "@/lib/shared/run-folders";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 
 const LIQUIDATION: FolderRegisterEntry = {
   memberNoun: "liquidation",
   tone: "danger",
-  warningLabel: "Liquidations",
-  folderBadge: DANGER_FOLDER_BADGE,
+  kindWord: "Liquidations",
 };
 
 const TRANSFER: FolderRegisterEntry = {
@@ -42,7 +40,6 @@ const TRANSFER: FolderRegisterEntry = {
   tone: "neutral",
   spineIcon: "custody",
   muted: true,
-  folderBadge: TRANSFER_FOLDER_BADGE,
 };
 
 /** A stretch rule 6 refused to summarise under one kind — the per-kind counts
@@ -52,7 +49,6 @@ const MIXED: FolderRegisterEntry = {
   memberNoun: "event",
   tone: "neutral",
   spineIcon: "external",
-  folderBadge: MIXED_FOLDER_BADGE,
 };
 
 /** A mixed folder holding a liquidation keeps the liquidation register's
@@ -61,7 +57,6 @@ const MIXED_WITH_LIQUIDATION: FolderRegisterEntry = {
   ...MIXED,
   tone: "danger",
   spineIcon: "warning",
-  folderBadge: DANGER_FOLDER_BADGE,
 };
 
 export const AAVE_FAMILY_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry => {

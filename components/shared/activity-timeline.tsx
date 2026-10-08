@@ -14,16 +14,6 @@
 import { createContext, useContext, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
 export { fmtSpine };
-import { Prov, type Provenance } from "@/components/shared/provenance";
-
-/** A receipt identity for a spine flanking value — the SAME info/value/symbol
- *  the card's primary instance (the header change value) registers with, so
- *  the spine figure echoes into that receipt and the locator pulse reaches it. */
-export interface SpineValProv {
-  info: Provenance;
-  value: string;
-  symbol?: string;
-}
 
 // ── Timeline scale ─────────────────────────────────────────────────────
 
@@ -74,7 +64,6 @@ export function SpineVal({
   onChange,
   decimals = 4,
   max,
-  prov,
   unit,
   full,
   text,
@@ -90,8 +79,6 @@ export function SpineVal({
   onChange?: (v: number) => void;
   decimals?: number;
   max?: number;
-  /** Echo this figure into the receipt it re-renders (see SpineValProv). */
-  prov?: SpineValProv;
 }) {
   const compact = fmtSpine(value, full);
   const txt = compact && text != null ? text : compact;
@@ -106,13 +93,7 @@ export function SpineVal({
   }
   return (
     <span className={`text-base font-semibold whitespace-nowrap ${sideClass}`}>
-      {prov ? (
-        <Prov echo info={prov.info} value={prov.value} symbol={prov.symbol}>
-          {txt}
-        </Prov>
-      ) : (
-        txt
-      )}
+      {txt}
       {unit ? <span className="ml-1 text-xs font-normal text-rb-500">{unit}</span> : null}
     </span>
   );

@@ -3,17 +3,16 @@
 import type { ReactNode } from "react";
 
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
-import { CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
 
 /**
  * Redemption run card — one row standing in for a stretch of consecutive
- * redemption touches. The mechanics (summed header pairs with their Σ receipt,
- * date range, in-place expansion to the member cards, dotted caution spine)
- * live in the shared `TimelineRunCard`; this is the redemption vocabulary for
- * it: caution tone (color-grammar.md §5), "REDEMPTIONS" pill, "redemption" as the member noun the
- * Σ receipt and the aria label pluralise, and the two pairs a redemption
- * moves, debt first as the event headers name them: "Cleared" the debt,
- * "Reduced" the collateral. Every redemption run draws in the folder register
+ * redemption touches. The mechanics (the summed legs as nodes, their Σ
+ * receipts, the date range, in-place expansion to the member cards) live in
+ * the shared `TimelineRunCard`; this is the redemption vocabulary for it:
+ * caution tone (color-grammar.md §5), "redemption" as the member noun the Σ
+ * receipt and the aria label pluralise, and the two pairs a redemption moves,
+ * "Cleared" the debt and "Reduced" the collateral, drawn collateral first on
+ * the spine. Every redemption run draws in the folder register
  * (TimelineRunCard's `folder`) — one folder per chronological chunk of the
  * run, sliced by the caller via `renderRunFolders`.
  *
@@ -60,9 +59,8 @@ export function RedemptionRunCard({
       count={count}
       memberNoun="redemption"
       tone="caution"
-      warningLabel="Redemptions"
+      kindWord="Redemptions"
       folder
-      folderBadge={CAUTION_FOLDER_BADGE}
       aggregates={[
         { verb: "Cleared", value: totalDebt, symbol: debtSymbol, provWhat: "Debt cleared" },
         { verb: "Reduced", value: totalColl, symbol: collateralSymbol, provWhat: "Collateral sent to redeemers" },

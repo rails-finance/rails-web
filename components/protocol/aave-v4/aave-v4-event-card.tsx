@@ -10,7 +10,7 @@ import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { AaveV4EventHeader, aaveV4AmountProv, aaveV4Label, type AaveV4TxGroup } from "./aave-v4-event-header";
+import { AaveV4EventHeader, aaveV4Label, type AaveV4TxGroup } from "./aave-v4-event-header";
 import { AaveV4EventDetail } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -68,25 +68,8 @@ export function AaveV4EventCard({
   // undefined and falls back to the symbol lookup exactly as before.
   const symAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
 
-  // The flanking amount echoes the header's amount receipt, so a click on it in
-  // the provenance inspector traces to the same figure the header registers.
-  // Both ends call ONE builder (aaveV4AmountProv) because the echo matches on
-  // `receiptLabel|value|symbol` byte-for-byte and fails SILENTLY on a mismatch —
-  // these flanks were bare text until now, untraceable on every row, not just
-  // third-party ones. Only attach it when there is an amount to trace: the
-  // header registers nothing at zero, so an echo there could only ever miss.
-  const amountProv =
-    amt != null && amt > 0
-      ? aaveV4AmountProv(ctx, {
-          spokeName: ctx.spokeName,
-          spokeAddress: ctx.spokeAddress,
-          txHash: event.txHash,
-          blockNumber: event.blockNumber,
-        })
-      : undefined;
-
   const iconSlot = isLiquidation ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : isCollateralToggle ? (
     // The toggle's own check/cross badge is the event's MEANING, so it keeps
     // the icon corner even when a third party flipped it — the dotted spine and
@@ -99,16 +82,14 @@ export function AaveV4EventCard({
     />
   ) : alsoToggled ? (
     <SpineColumn
-      tokens={[{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt, prov: amountProv }]}
+      tokens={[{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }]}
       externalParty={!!extBy}
       isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : (
     <SpineColumn
-      tokens={[
-        { symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt, prov: amountProv },
-      ]}
+      tokens={[{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }]}
       externalParty={!!extBy}
       isFirst={isFirst}
       isLast={!!isLast}

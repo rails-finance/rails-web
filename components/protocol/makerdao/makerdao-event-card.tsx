@@ -10,8 +10,8 @@ import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { dinkProv, debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
+
+import { debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
 import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
 import { MakerDAOEventHeader } from "./makerdao-event-header";
 import { MakerLedgerProvider } from "./makerdao-ledger";
@@ -52,15 +52,7 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
     ? null
     : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.txTo }, ctx.ownerAt ?? event.wallet);
 
-  // Echo: the header registers dinkProv/dartProv on every frob/fork/grab with
-  // a nonzero delta (makerdao-event-header.tsx pushes unconditionally; the debt
-  // leg through debtDeltaOf, as here), bare
-  // ONLY on a frob (perAxis there collapses to `eventType === "frob"` — isOpen
-  // and its negation cover the whole frob domain) and signed otherwise. The
-  // spine itself only ever shows dink+dart tokens for frob/fork (isGrab hides
-  // both, isFork hides dart) — echo exactly the legs actually rendered below.
   const coords: MakerCoords = { txHash: event.txHash, blockNumber: event.blockNumber, urn: ctx.urn, ilk: ctx.ilk };
-  const labeled = ctx.eventType === "frob";
   const debt = debtDeltaOf(ctx, ilkDebtSymbol(ctx.ilk), coords);
   // The closed card reads only what the page holds (no chain call per row).
   const extras = useMakerRowExtras(ctx, event.id, event.txHash, event.blockNumber, false);
@@ -80,11 +72,6 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
                 symbol: ctx.collateralSymbol,
                 direction: (dink > 0 ? "right" : "left") as "right" | "left",
                 value: Math.abs(dink),
-                prov: {
-                  info: dinkProv(ctx.collateralSymbol, coords),
-                  value: chainTruthDeltaValue(dink, labeled),
-                  symbol: ctx.collateralSymbol,
-                },
               },
             ]
           : []),
@@ -102,11 +89,6 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
                 address: soleFlowAddress(event.flows, ilkDebtSymbol(ctx.ilk)),
                 direction: (dart > 0 ? "left" : "right") as "right" | "left",
                 value: Math.abs(debt.value),
-                prov: {
-                  info: debt.prov,
-                  value: chainTruthDeltaValue(debt.value, labeled),
-                  symbol: ilkDebtSymbol(ctx.ilk),
-                },
               },
             ]
           : []),
@@ -114,13 +96,7 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
 
   const iconSlot =
     isGrab || isLseLiq ? (
-      <SpineColumn
-        icon="warning"
-        warningTone="critical"
-        warningLabel={isGrab ? "Liquidation" : "Auction"}
-        isFirst={isFirst}
-        isLast={!!isLast}
-      />
+      <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
     ) : isGive ? (
       // An ownership handover is a people event with no token flow — the person
       // glyph with the join badge marks the new owner taking over; dotted spine

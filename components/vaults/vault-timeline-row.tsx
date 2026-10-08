@@ -46,7 +46,7 @@
 
 import type { ReactNode } from "react";
 
-import { ChainTruthRow, chainTruthDeltaValue, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
 import { EventCard } from "@/components/shared/event-card";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
@@ -155,7 +155,6 @@ export function VaultTimelineRow({
       symbol: assetSymbol,
       direction: isDeposit ? "right" : "left",
       value: Math.abs(value),
-      prov: { info, value: chainTruthDeltaValue(value, false), symbol: assetSymbol },
     });
   }
 
@@ -170,7 +169,6 @@ export function VaultTimelineRow({
             address: vaultAddress,
             direction: deltaValue < 0 ? "right" : "left",
             value: Math.abs(deltaValue),
-            prov: { info, value: chainTruthDeltaValue(deltaValue, false), symbol: shareUnit },
           },
     );
   }

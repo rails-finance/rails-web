@@ -14,7 +14,7 @@ import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { compoundAbsorbSplit } from "@/lib/compound/row-facts";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
@@ -63,10 +63,9 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             count={count}
             memberNoun="liquidation"
             tone="danger"
-            warningLabel="Liquidations"
+            kindWord="Liquidations"
             aggregates={aggregates}
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}
@@ -94,8 +93,7 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
 const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   memberNoun: "event",
   tone: "danger",
-  warningLabel: "Liquidations",
-  folderBadge: DANGER_FOLDER_BADGE,
+  kindWord: "Liquidations",
   readingLine: true,
 };
 

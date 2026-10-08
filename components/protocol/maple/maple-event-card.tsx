@@ -6,7 +6,7 @@
 import type { BaseActivityEvent, MapleContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
@@ -56,9 +56,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
       ? null
       : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
-  // The spine value IS the header's flanked leg — same builder + signed-value
-  // convention (flankedLegProv negates `request`), so the echo's receipt key
-  // matches byte-for-byte regardless of the card's own direction convention.
+  // The spine value is the header's flanked leg (flankedLegProv).
   const coords: MapleCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -100,11 +98,6 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
               // The token named beside every amount: a request moves shares,
               // a fill pays the asset, and the icons alone look alike.
               unit: symbol,
-              prov: {
-                info: flanked.prov,
-                value: chainTruthDeltaValue(flanked.value, false),
-                symbol: flanked.symbol,
-              },
             },
             ...(shares
               ? [
@@ -115,11 +108,6 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
                     value: Math.abs(shares.value),
                     display: formatNumber(Math.abs(shares.value)),
                     unit: shares.symbol,
-                    prov: {
-                      info: shares.prov,
-                      value: chainTruthDeltaValue(shares.value, false),
-                      symbol: shares.symbol,
-                    },
                   },
                 ]
               : []),

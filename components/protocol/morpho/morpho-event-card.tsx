@@ -14,9 +14,9 @@ import { MorphoEventDetail } from "./morpho-event-detail";
 import { MorphoLedgerProvider } from "./morpho-ledger";
 import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { assetsDeltaProv, type MorphoCoords } from "@/lib/morpho/event-provenance";
+import { type MorphoCoords } from "@/lib/morpho/event-provenance";
 import { morphoExplainerTeaser } from "@/lib/morpho/explainer-clauses";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 
@@ -46,20 +46,11 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
   const delta = Number(ctx.assetsDelta) || 0;
   const mag = Math.abs(delta);
   // Third-party action: the owner (onBehalf) neither signed the tx nor made
-  // the Morpho call. Such events ride the dotted spine and badge the token
+  // the Morpho call. Such events badge the token
   // icon pink, and the header names the actor in a "by …" chip — but the flow
   // itself still renders. WHO acted annotates WHAT moved; it never replaces it.
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
-  // The spine value IS the event's own logged amount (no fee/redistribution
-  // component separating them), so it echoes the assets-delta receipt.
-  //
-  // The echo's key is `receiptLabel|value|symbol` byte-for-byte, so the value
-  // MUST be built through chainTruthDeltaValue — the same helper the header
-  // registers with — which keeps the sign (U+2212 for negatives). This card
-  // used to pass a bare `formatExact(mag)`: unsigned, never matching, and
-  // silently so. The miss was invisible while the pink external glyph was
-  // displacing the flank on exactly the positions that would have shown it.
   // The chain and the capture lane are route facts read from context, so the
   // receipts name the right explorer and the right custody on a Base page.
   const coords: MorphoCoords = {
@@ -85,16 +76,11 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
             address: soleFlowAddress(event.flows, sym),
             direction: DIRECTION[ctx.eventType],
             value: mag,
-            prov: {
-              info: assetsDeltaProv(sym, ctx.side, coords, ctx.eventType),
-              value: chainTruthDeltaValue(delta, false),
-              symbol: sym,
-            },
           },
         ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

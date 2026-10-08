@@ -5,11 +5,11 @@
 
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { movedDeltaProv, type CompoundCoords } from "@/lib/compound/event-provenance";
+import { type CompoundCoords } from "@/lib/compound/event-provenance";
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -79,11 +79,6 @@ export function CompoundEventCard({
   // header keeps the moved amount plus the "by 0x…" chip.
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.funder }, event.wallet);
 
-  // Echo the spine flank value into the header's moved-amount receipt so the
-  // picker can target it: the SpineValProv must carry the SAME info/value/symbol
-  // the header registers. Only when the spine value IS that single moved figure
-  // (the token branch below; liquidations and external-funded events don't draw
-  // a flank).
   // The market resolves against the DEPLOYMENT this page is about (the slugs
   // collide across chains — Base's cUSDCv3 is `usdc` too), and the chain and
   // capture source ride the coords so the receipt's link and custody line say
@@ -98,19 +93,12 @@ export function CompoundEventCard({
     source: useCaptureSource(),
     ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
-  // A transfer draws no flank (see `tokens` below), so it echoes nothing.
   const kind = ctx.eventType;
   const isTransfer =
     kind === "transfer_in" ||
     kind === "transfer_out" ||
     kind === "transfer_collateral_in" ||
     kind === "transfer_collateral_out";
-  const signedDelta = Number(ctx.assetsDelta) || 0;
-  const movedProv = isTransfer ? null : movedDeltaProv(ctx.eventType, ctx.assetSymbol, coords);
-  const spineProv =
-    movedProv != null
-      ? { info: movedProv, value: chainTruthDeltaValue(signedDelta, false), symbol: ctx.assetSymbol }
-      : undefined;
 
   // Hand the icon chip the asset's contract as well as its symbol. A Comet's
   // base and collateral assets are a curated list, so the house symbol table
@@ -141,12 +129,11 @@ export function CompoundEventCard({
               direction: DIRECTION[kind],
               value: mag,
               unit: ctx.assetSymbol,
-              prov: spineProv,
             },
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

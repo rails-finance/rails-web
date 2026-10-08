@@ -38,7 +38,7 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
 import { AlchemixEventHeader, ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
-import { chainTruthCaption, chainTruthDeltaValue, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import { chainTruthCaption } from "@/components/shared/chain-truth-event";
 import { AlchemixEventDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
@@ -124,14 +124,6 @@ function legTokens(leg: AlchemistEvent, mytSymbol: string): SpineTokenRow[] {
   }
 }
 
-const WARNING_LABEL: Record<string, string> = {
-  liquidated: "Liquidation",
-  force_repay: "Forced repayment",
-  redemption: "Redemption",
-  batch_liquidated: "Batch liquidation",
-  fee_shortfall: "Fee shortfall",
-};
-
 export function AlchemixEventCard({
   legs,
   mytSymbol,
@@ -177,25 +169,8 @@ export function AlchemixEventCard({
   const cautioned = closed ? undefined : legs.find((l) => ALCHEMIX_CAUTION.has(l.context.data.eventType));
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
 
-  // Each flank echoes the header figure it redraws: the delta built from the
-  // same leg's `amount`, with the value string the header registers, so the
-  // flank joins that receipt.
   const header = alchemixHeaderSpec(legs, sibs, mytSymbol, coordsFor, before);
-  const echoed = new Set<ChainTruthDelta>();
-  const withEcho = (leg: AlchemistEvent, row: SpineTokenRow): SpineTokenRow => {
-    const raw = leg.context.data.raw.amount;
-    const d = header.deltas.find(
-      (x) => !echoed.has(x) && x.prov && x.symbol === row.symbol && x.prov.scaling?.raw === raw,
-    );
-    if (!d?.prov) return row;
-    echoed.add(d);
-    const bare = Boolean(d.label) || Boolean(header.custody);
-    return { ...row, prov: { info: d.prov, value: chainTruthDeltaValue(d.value, bare), symbol: d.symbol } };
-  };
-  const tokens =
-    adverse || cautioned || closed
-      ? []
-      : legs.flatMap((leg) => legTokens(leg, mytSymbol).map((row) => withEcho(leg, row)));
+  const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
   const iconSlot = custodyOnly ? (
     <SpineColumn
@@ -212,7 +187,6 @@ export function AlchemixEventCard({
       // the position without the owner acting: caution (color-grammar.md §5),
       // told apart by the pill's word. A liquidation stays critical.
       warningTone={adverse ? "critical" : "caution"}
-      warningLabel={WARNING_LABEL[(adverse ?? cautioned)!.context.data.eventType]}
       isFirst={isFirst}
       isLast={!!isLast}
     />

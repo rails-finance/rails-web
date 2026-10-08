@@ -12,14 +12,8 @@ import type { BaseActivityEvent, LlamalendContext } from "@/lib/shared/types/eve
 import { EventCard } from "@/components/shared/event-card";
 import { LlamalendLedgerProvider } from "./llamalend-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
-import type { SpineValProv } from "@/components/shared/activity-timeline";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import {
-  collateralDeltaProv,
-  debtDeltaProv,
-  liquidationProv,
-  type LlamalendCoords,
-} from "@/lib/llamalend/event-provenance";
+
+import { type LlamalendCoords } from "@/lib/llamalend/event-provenance";
 import { llamalendExplainerTeaser } from "@/lib/llamalend/explainer-clauses";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { LlamalendEventHeader } from "./llamalend-event-header";
@@ -63,14 +57,6 @@ export function LlamalendEventCard({
   const isBorrowerLoss =
     ctx.eventType === "liquidation" && (ctx.role ?? "borrower") === "borrower" && !ctx.selfLiquidation;
 
-  // Echo: the header registers collateralDeltaProv/debtDeltaProv (or, on a
-  // liquidation, liquidationProv per LEG+role) for every nonzero delta —
-  // llamalend-event-header.tsx never labels a delta, so every registered
-  // value is SIGNED. The borrower's own liquidation leg draws no spine token
-  // at all (isBorrowerLoss branches to the warning icon below), so it gets no
-  // echo; the liquidator's leg and a self-liquidation render normally.
-  const isLiq = ctx.eventType === "liquidation";
-  const role = ctx.role ?? (isLiq ? "borrower" : undefined);
   const coords: LlamalendCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -92,7 +78,6 @@ export function LlamalendEventCard({
     address?: string;
     direction: "left" | "right";
     value: number;
-    prov: SpineValProv;
   }[] = [];
   const coll = Number(ctx.collateralDelta ?? "0") || 0;
   const debt = Number(ctx.debtDelta ?? "0") || 0;
@@ -102,13 +87,6 @@ export function LlamalendEventCard({
       address: soleFlowAddress(event.flows, ctx.collateralSymbol),
       direction: coll > 0 ? "left" : "right",
       value: Math.abs(coll),
-      prov: {
-        info: isLiq
-          ? liquidationProv("collateral", ctx.collateralSymbol, role ?? "borrower", coords, ctx.raw?.collateralDelta)
-          : collateralDeltaProv(ctx.collateralSymbol, ctx.eventType, coords, ctx.raw?.collateralDelta),
-        value: chainTruthDeltaValue(coll, !isLiq),
-        symbol: ctx.collateralSymbol,
-      },
     });
   if (debt !== 0)
     tokens.push({
@@ -116,23 +94,10 @@ export function LlamalendEventCard({
       address: soleFlowAddress(event.flows, ctx.borrowedSymbol),
       direction: debt > 0 ? "left" : "right",
       value: Math.abs(debt),
-      prov: {
-        info: isLiq
-          ? liquidationProv("debt", ctx.borrowedSymbol, role ?? "borrower", coords, ctx.raw?.debtDelta)
-          : debtDeltaProv(ctx.borrowedSymbol, ctx.eventType, coords, ctx.raw?.debtDelta),
-        value: chainTruthDeltaValue(debt, !isLiq),
-        symbol: ctx.borrowedSymbol,
-      },
     });
 
   const iconSlot = isBorrowerLoss ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Liquidation"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
   );

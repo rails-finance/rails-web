@@ -12,11 +12,10 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { RedemptionRunCard } from "@/components/shared/redemption-run-card";
-import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { forkDebtMove } from "@/lib/shared/liquity-fork-ops";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
-import { Percent } from "lucide-react";
 
 /** Runs shorter than this stay as individual cards (the V2 trove threshold). */
 export const MIN_REDEMPTION_RUN = 4;
@@ -96,8 +95,7 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
 const REDEMPTION_FOLDER: FolderRegisterEntry = {
   memberNoun: "redemption",
   tone: "caution",
-  warningLabel: "Redemptions",
-  folderBadge: CAUTION_FOLDER_BADGE,
+  kindWord: "Redemptions",
 };
 
 /** One member of an owner run, by the action it repeats. */
@@ -113,7 +111,6 @@ const OWNER_RUN_NOUN: Record<string, string> = {
 const BATCH_RATE_FOLDER: FolderRegisterEntry = {
   memberNoun: "batch rate change",
   tone: "neutral",
-  folderBadge: <Percent size={10} strokeWidth={2.5} className="text-pink-500" />,
 };
 
 export const LIQUITY_FORK_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>

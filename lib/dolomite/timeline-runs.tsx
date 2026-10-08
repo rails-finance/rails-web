@@ -13,7 +13,7 @@
 import { isDolomiteEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
 /** Runs shorter than this stay as individual cards — the four-row floor every
@@ -57,10 +57,9 @@ export const DOLOMITE_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             count={count}
             memberNoun="liquidation"
             tone="danger"
-            warningLabel="Liquidations"
+            kindWord="Liquidations"
             aggregates={aggregates}
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}

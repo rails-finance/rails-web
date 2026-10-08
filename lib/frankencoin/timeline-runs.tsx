@@ -8,7 +8,7 @@
 import { isFrankencoinEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
 /** Two slices are already the same settled auction — a keyed run needs no
@@ -73,9 +73,8 @@ export const FRANKENCOIN_AUCTION_RUNS: TimelineRunSpec[] = [
             memberNoun="auction slice"
             aggregates={aggregates}
             tone="danger"
-            warningLabel="Auction"
+            kindWord="Auction"
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}

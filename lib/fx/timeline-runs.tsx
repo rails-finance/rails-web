@@ -12,7 +12,7 @@ import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { fxBlocksChange, useFxSocializedReads } from "@/lib/fx/socialized-reads";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
-import { renderRunFolders, CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { formatNumber } from "@/lib/utils/format";
 
 /** The run's noun: "tick rebalance" when every member targeted one tick,
@@ -122,9 +122,8 @@ function FxRebalanceRunCard({
       aggregates={aggregates}
       extraHeader={<RunInfo events={events} change={change} normSym={normSym} />}
       tone="caution"
-      warningLabel="Rebalance"
+      kindWord="Rebalance"
       folder
-      folderBadge={CAUTION_FOLDER_BADGE}
       firstTimestamp={events[0].timestamp}
       lastTimestamp={events[events.length - 1].timestamp}
       isFirst={folder.isFirst}

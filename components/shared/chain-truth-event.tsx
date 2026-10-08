@@ -370,9 +370,8 @@ export interface ChainTruthStat {
 /** The exact value string a ChainTruthRow delta registers with its receipt:
  *  labeled deltas (per-axis open/adjust verbs) register a BARE magnitude — the
  *  label carries the direction; unlabeled ones keep the sign (U+2212 minus).
- *  Cards echoing a header receipt onto a spine flank MUST build their echo
- *  value through this helper — the receipt entryKey matches byte-for-byte, so
- *  a private reimplementation that drifts silently unlinks the flank. */
+ *  A second figure echoing that receipt builds its value through this helper,
+ *  so the receipt entryKey matches byte-for-byte. */
 export function chainTruthDeltaValue(value: number, labeled: boolean): string {
   return `${labeled ? "" : value < 0 ? "−" : "+"}${formatExact(Math.abs(value))}`;
 }
@@ -542,8 +541,6 @@ export function ChainTruthRow({
           value: Math.abs(d.value),
           symbol: d.symbol,
           address: d.address,
-          // The echo key is the head figure's: bare where labelled.
-          prov: { info: d.prov, value: chainTruthDeltaValue(d.value, Boolean(d.label)), symbol: d.symbol },
         }))
     : null;
   usePublishSpineLegs(legs);

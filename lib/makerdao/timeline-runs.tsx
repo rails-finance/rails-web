@@ -10,7 +10,7 @@
 import { isMakerDAOEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import { DAI_META } from "@/lib/makerdao/asset-catalog";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
@@ -60,10 +60,9 @@ export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             count={count}
             memberNoun="liquidation"
             tone="danger"
-            warningLabel="Liquidations"
+            kindWord="Liquidations"
             aggregates={aggregates}
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}
@@ -87,8 +86,7 @@ export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
 const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   memberNoun: "liquidation",
   tone: "danger",
-  warningLabel: "Liquidations",
-  folderBadge: DANGER_FOLDER_BADGE,
+  kindWord: "Liquidations",
 };
 
 /** One member of an owner run, by the frob shape it repeats (the summary's

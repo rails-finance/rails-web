@@ -23,7 +23,6 @@ import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-colum
 import {
   ChainTruthDetail,
   ChainTruthRow,
-  chainTruthDeltaValue,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
@@ -137,7 +136,6 @@ export function SkySavingsEventCard({
       address: USDS.address,
       direction: kind === "deposit" ? "right" : "left",
       value: usdsMoved,
-      prov: { info: usdsProv, value: chainTruthDeltaValue(usdsSigned, false), symbol: USDS.symbol },
     });
     deltas.push({
       value: sharesMoved,
@@ -152,7 +150,6 @@ export function SkySavingsEventCard({
       address: SUSDS.address,
       direction: sharesMoved < 0 ? "right" : "left",
       value: Math.abs(sharesMoved),
-      prov: { info: sharesProv, value: chainTruthDeltaValue(sharesMoved, false), symbol: SUSDS.symbol },
     });
   } else if (isTransfer) {
     // A transfer moves sUSDS only; its worth in USDS rides beside it.

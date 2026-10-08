@@ -9,9 +9,9 @@ import { FluidLedgerProvider } from "./fluid-ledger";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { colDeltaProv, debtDeltaProv, type FluidCoords } from "@/lib/fluid/event-provenance";
+import { type FluidCoords } from "@/lib/fluid/event-provenance";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { fluidExplainerTeaser, fundedSameTx, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
 import { FluidEventHeader } from "./fluid-event-header";
 import { FluidEventDetail } from "./fluid-event-detail";
@@ -64,9 +64,7 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.initiator }, ctx.ownerAt ?? event.wallet);
 
   // Token chips: one per moved leg. A composite carries both, each leg signed
-  // by its own delta; a single-leg kind uses its canonical direction. Each
-  // flanking value echoes the header's delta receipt (same exact figure, same
-  // provenance — the SpineValProv contract).
+  // by its own delta; a single-leg kind uses its canonical direction.
   const coords: FluidCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -86,21 +84,11 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
     symbol: supplySym,
     address: soleFlowAddress(event.flows, ctx.supplySymbol),
     value: Math.abs(colD),
-    prov: {
-      info: colDeltaProv(supplySym, coords, ctx.raw?.colAmt),
-      value: chainTruthDeltaValue(colD, false),
-      symbol: supplySym,
-    },
   };
   const debtRow = {
     symbol: borrowSym,
     address: soleFlowAddress(event.flows, ctx.borrowSymbol),
     value: Math.abs(debtD),
-    prov: {
-      info: debtDeltaProv(borrowSym, coords, ctx.raw?.debtAmt),
-      value: chainTruthDeltaValue(debtD, false),
-      symbol: borrowSym,
-    },
   };
   const tokens =
     isLiq || isNftMove
@@ -117,13 +105,7 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
             : undefined;
 
   const iconSlot = isLiq ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel={ctx.eventType === "absorbed" ? "Absorbed" : "Liquidation"}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : ctx.eventType === "mint" ? (
     <SpineColumn icon="mint" isFirst={isFirst} isLast={!!isLast} />
   ) : ctx.eventType === "transfer" ? (

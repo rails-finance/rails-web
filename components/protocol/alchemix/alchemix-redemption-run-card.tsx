@@ -25,7 +25,7 @@ import type { ReactNode } from "react";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { CAUTION_FOLDER_BADGE } from "@/lib/shared/run-folders";
+
 import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 
 export interface AlchemixRedemptionRunCardProps {
@@ -123,9 +123,8 @@ export function AlchemixRedemptionRunCard({
       count={count}
       memberNoun="redemption"
       tone="caution"
-      warningLabel="Redemptions"
+      kindWord="Redemptions"
       folder
-      folderBadge={CAUTION_FOLDER_BADGE}
       extraHeader={
         figure || shortfall ? (
           <span className="inline-flex items-center gap-2 flex-wrap">

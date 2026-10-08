@@ -13,10 +13,10 @@
 
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { movedDeltaProv, type DolomiteCoords } from "@/lib/dolomite/event-provenance";
+import { type DolomiteCoords } from "@/lib/dolomite/event-provenance";
 import { dolomiteExplainerTeaser, type DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
 import { DolomiteEventHeader } from "./dolomite-event-header";
 import { DolomiteEventDetail } from "./dolomite-event-detail";
@@ -58,9 +58,6 @@ export function DolomiteEventCard({
 
   // direction "right" = tokens moving away from the account, "left" = toward it.
   const dir = d > 0 ? ("left" as const) : ("right" as const);
-  // The spine value IS the header's registered delta (this account carries
-  // only one leg per row) — echo it via the SAME selector + coords the header
-  // builds from, so the receipt key matches byte-for-byte.
   const coords: DolomiteCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -83,22 +80,11 @@ export function DolomiteEventCard({
             address: soleFlowAddress(event.flows, ctx.marketSymbol),
             direction: dir,
             value: mag,
-            prov: {
-              info: movedDeltaProv(ctx.eventType, ctx.marketSymbol, coords, ctx.raw?.weiDelta),
-              value: chainTruthDeltaValue(d, false),
-              symbol: ctx.marketSymbol,
-            },
           },
         ];
 
   const iconSlot = isBorrowerLoss ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel={ctx.eventType === "liquidation" ? "Liquidation" : "Seizure"}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

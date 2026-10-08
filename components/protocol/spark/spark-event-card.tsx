@@ -6,11 +6,11 @@
 
 import type { BaseActivityEvent, SparkContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { assetsDeltaProv, transferDeltaProv, type SparkCoords } from "@/lib/spark/event-provenance";
+import { type SparkCoords } from "@/lib/spark/event-provenance";
 import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
 import { SparkEventHeader } from "./spark-event-header";
 import { SparkEventDetail } from "./spark-event-detail";
@@ -93,29 +93,13 @@ export function SparkEventCard({
   // moved amount plus the "by 0x…" chip.
   const extBy = externalActor(ctx, event.wallet);
 
-  // Echo the spine flank value into the header's registered reserve-delta
-  // receipt so the picker can target it: same prov builder + args, same
-  // signed-string helper, same symbol the header uses. Liquidations don't
-  // draw a token flank (the warning icon replaces it), so no echo there.
   const coords: SparkCoords = { txHash: event.txHash, blockNumber: event.blockNumber };
-  // A transfer draws no flank (see `tokens` below), so it echoes nothing.
   const kind = ctx.eventType;
   // A withdrawal as ETH through the gateway, and a liquidation's fee, leave the
-  // position like a withdrawal: they draw the outgoing flank with the amount,
-  // echoing the header's transfer receipt. A plain transfer stays a custody row.
+  // position like a withdrawal: they draw the outgoing flank with the amount.
+  // A plain transfer stays a custody row.
   const outFlow = isGatewayWithdrawal(ctx) || !!feeOf;
   const isTransfer = !outFlow && (kind === "transfer_in" || kind === "transfer_out");
-  const signedDelta = Number(ctx.assetsDelta) || 0;
-  const spineProv =
-    !isLiq && !isTransfer && signedDelta !== 0
-      ? {
-          info: outFlow
-            ? transferDeltaProv(ctx.reserveSymbol, "out", coords)
-            : assetsDeltaProv(ctx.reserveSymbol, ctx.side, coords),
-          value: chainTruthDeltaValue(signedDelta, false),
-          symbol: ctx.reserveSymbol,
-        }
-      : undefined;
 
   // The reserve's contract goes to the chip alongside its symbol. SparkLend
   // lists a fixed set the house address table already covers, so no row here is
@@ -147,12 +131,11 @@ export function SparkEventCard({
               value: mag,
               unit: ctx.reserveSymbol,
               fullValue: true,
-              prov: spineProv,
             },
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

@@ -631,10 +631,9 @@ function ServedFolderRow({
       tone={entry.tone}
       spineIcon={entry.spineIcon}
       // A shape run's label is its kind word too (the phone caption's).
-      warningLabel={entry.warningLabel ?? entry.shapeLabel}
+      kindWord={entry.kindWord ?? entry.shapeLabel}
       muted={entry.muted}
       folder
-      folderBadge={entry.folderBadge}
       lead={
         entry.shapeLabel ? (
           // data-prov-exempt: a count of transactions and the kinds they hold,
@@ -1578,9 +1577,8 @@ function ChainTruthTimelineBody({
   const dayMarks = useFlowFocus() != null;
   const dateOnce = (ts: number, aboveTs: number | null): string | null =>
     aboveTs != null && utcDay(aboveTs) === utcDay(ts) ? null : `${shortDate(ts)} ${shortDateYear(ts)}`;
-  /** A row's prefix by its place in the flat list: the event above it there.
-   *  `lastIdx` stays in the signature for a one-transaction run. */
-  const datePrefixAt = (flatIdx: number, _lastIdx: number = flatIdx) =>
+  /** A row's prefix by its place in the flat list: the event above it there. */
+  const datePrefixAt = (flatIdx: number) =>
     dateOnce(events[flatIdx].timestamp, flatIdx > 0 ? events[flatIdx - 1].timestamp : null);
   /** A row's newest and oldest moment: the day its mark names, and the day
    *  the next row's mark is measured from. */
@@ -1604,7 +1602,7 @@ function ChainTruthTimelineBody({
 
   /** A market note's day stamp, on the same rule: dated by its stretch's
    *  later end. */
-  const noteDatePrefixAfter = (note: MarketNote, _lastIdx: number): string | null => {
+  const noteDatePrefixAfter = (note: MarketNote): string | null => {
     const ts = note.to.timestamp;
     if (!(ts > 0)) return null;
     return `${shortDate(ts)} ${shortDateYear(ts)}`;
@@ -1651,7 +1649,7 @@ function ChainTruthTimelineBody({
           ...runNumbers(row.events.map((e) => tl.eventNumberOf(e))),
         }}
       >
-        <EventDateContext.Provider value={datePrefixAt(row.flatIdx, row.flatIdx + row.events.length - 1)}>
+        <EventDateContext.Provider value={datePrefixAt(row.flatIdx)}>
           <EventDayMarkContext.Provider
             value={marked ? markFor(row.events[newestOf(row.events)].timestamp, lead.id) : null}
           >
@@ -2083,12 +2081,11 @@ function ChainTruthTimelineBody({
                 // Below is older, so a note FOLLOWS the event it is known to
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
-                const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
                 // Markers in the gap below, at both widths.
                 const noteRows = (
                   <NoteGap
                     notes={rowNotes}
-                    datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
+                    datePrefixFor={(note) => noteDatePrefixAfter(note)}
                     openIds={openNoteIds}
                     openAll={openAll}
                     onToggle={toggleNote}

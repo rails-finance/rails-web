@@ -79,7 +79,7 @@
 
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, TRANSFER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { KIND_LABEL, type VaultHolderEvent } from "@/lib/shared/vault-holder-timeline";
@@ -220,7 +220,6 @@ export function aaveVaultTimelineRuns(
               // wears on its token — the same mark the lending explorers' own
               // transfer folders carry. A deposit or withdrawal folder wears
               // none: it is the holder's own move into or out of the vault.
-              folderBadge={kind === "transfer-in" || kind === "transfer-out" ? TRANSFER_FOLDER_BADGE : undefined}
               firstTimestamp={events[0].timestamp}
               lastTimestamp={events[events.length - 1].timestamp}
               isFirst={folder.isFirst}

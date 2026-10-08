@@ -13,7 +13,7 @@ import { operatesIn, roundTripHops, type FluidEvent } from "@/lib/fluid/explaine
 import { FluidEventCard } from "@/components/protocol/fluid/fluid-event-card";
 import { FluidRoundTripCard } from "@/components/protocol/fluid/fluid-round-trip-card";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 
 /** Runs shorter than this stay as individual cards. */
@@ -65,10 +65,9 @@ export const FLUID_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             count={events.length}
             memberNoun="liquidation"
             tone="danger"
-            warningLabel="Liquidations"
+            kindWord="Liquidations"
             aggregates={aggregates}
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={first.timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}

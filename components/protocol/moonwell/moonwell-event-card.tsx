@@ -5,11 +5,10 @@
 
 import type { BaseActivityEvent, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { assetsDeltaProv, transferAmountProv } from "@/lib/moonwell/event-provenance";
 import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
 import { moonwellExplainerTeaser } from "@/lib/moonwell/explainer-clauses";
 import { MoonwellEventHeader } from "./moonwell-event-header";
@@ -59,31 +58,6 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
   // mark (they carry the neutral "via router" chip instead — see the header).
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
-  // Echo the spine flank value into the header's registered delta receipt so
-  // the picker can target it: same prov builder + args, same signed-string
-  // helper, same symbol the header uses. The header picks transferAmountProv
-  // (mToken symbol, mTokensDelta) for transfers and assetsDeltaProv (market
-  // symbol, assetsDelta) otherwise; liquidations don't draw a token flank
-  // (the warning icon replaces it), so no echo there — nor on a transfer,
-  // which draws the badged mToken and no flank.
-  let spineProv: { info: ReturnType<typeof assetsDeltaProv>; value: string; symbol: string } | undefined;
-  switch (ctx.eventType) {
-    case "mint":
-    case "redeem":
-    case "borrow":
-    case "repay": {
-      const d = Number(ctx.assetsDelta ?? "0") || 0;
-      if (d !== 0)
-        spineProv = {
-          info: assetsDeltaProv(ctx.marketSymbol, ctx.eventType, coords, ctx.raw?.amount),
-          value: chainTruthDeltaValue(d, false),
-          symbol,
-        };
-      break;
-    }
-    // "liquidation" draws no token flank (the warning icon replaces it).
-  }
-
   //
   // A transfer is a custody move: the token's icon wears the paper-plane badge
   // and neither flank is drawn — the two flanks are "out to the wallet" and
@@ -117,12 +91,11 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
               address: soleFlowAddress(event.flows, ctx.marketSymbol),
               direction: DIRECTION[kind],
               value: mag,
-              prov: spineProv,
             },
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

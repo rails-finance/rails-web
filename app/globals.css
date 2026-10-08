@@ -438,6 +438,14 @@ body {
     align-items: stretch;
     justify-content: center;
   }
+  /* One row of a spine node: the left value and arrow, the glyph, the right
+     arrow and value (components/shared/spine-column.tsx). */
+  .spine-grid {
+    display: grid;
+    grid-template-columns: 1fr 18px 32px 18px 1fr;
+    align-items: center;
+    justify-items: center;
+  }
   /* Positioned, so the card paints over the list's line (spine-line.tsx). */
   .spine-content,
   .spine-body {

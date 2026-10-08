@@ -20,15 +20,10 @@
 // transaction) and legs netted per asset; the header names the shape before
 // the sums, "12 × deposit + share transfer".
 
-import type { ReactNode } from "react";
-import { Repeat } from "lucide-react";
 import type { FolderRegisterEntry, ServedFolder } from "@/lib/shared/timeline-folder";
 
 /** The wire kind of an owner-run folder. */
 export const OWNER_RUN_KIND = "owner_run";
-
-/** The corner mark: one action, repeated. */
-export const OWNER_RUN_FOLDER_BADGE: ReactNode = <Repeat size={10} strokeWidth={2.5} className="text-rb-500" />;
 
 /**
  * The register entry for an owner-run folder. `nounOf` names one member from
@@ -40,14 +35,12 @@ export function ownerRunEntry(folder: ServedFolder, nounOf: (action: string) => 
     return {
       memberNoun: "event",
       tone: "neutral",
-      folderBadge: OWNER_RUN_FOLDER_BADGE,
       shapeLabel: ownerShapeLabel(folder.shape, nounOf),
     };
   }
   return {
     memberNoun: nounOf(folder.counts[0]?.key ?? ""),
     tone: "neutral",
-    folderBadge: OWNER_RUN_FOLDER_BADGE,
   };
 }
 

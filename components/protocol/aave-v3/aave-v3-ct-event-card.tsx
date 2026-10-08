@@ -7,13 +7,13 @@
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import { EventCard } from "@/components/shared/event-card";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { assetsDeltaProv, swapLegNet, swapLegProv, swapLegSign, type V3Coords } from "@/lib/aave-v3/event-provenance";
+import { type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
-import { AaveV3CtEventHeader, aaveV3CtLabel, isAaveV3LossRow, signedAmount } from "./aave-v3-ct-event-header";
+import { AaveV3CtEventHeader, aaveV3CtLabel, isAaveV3LossRow } from "./aave-v3-ct-event-header";
 import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
 import { useState } from "react";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
@@ -93,7 +93,6 @@ export function AaveV3CtEventCard({
   // liquidation's protocol fee (lib/aave-v3/liquidation-fee.ts).
   const feeOf = feeLiquidation(ctx, siblings, chainId);
   const fee = liquidationFee(ctx, siblings, chainId);
-  const isLiq = ctx.eventType === "liquidation";
   // A loss row: the liquidation, or the write-off of the debt it could not
   // cover. Both draw the critical warning glyph on the dotted (passive) spine
   // and hand the amount to the header, which keeps it under `critical`.
@@ -112,10 +111,6 @@ export function AaveV3CtEventCard({
   const isFlowSwap = isWithdrawSwap || isSupplySwap;
   const extBy = isSwap ? null : externalActor(ctx, event.wallet);
 
-  // Echo the spine flank value into the header's registered reserve-delta
-  // receipt so the picker can target it: same prov builder + args, same
-  // signed-string helper, same symbol the header uses. Liquidations don't
-  // draw a token flank (the warning icon replaces it), so no echo there.
   const coords: V3Coords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -123,19 +118,8 @@ export function AaveV3CtEventCard({
     source: useCaptureSource(),
     pool: useV3Pool(),
   };
-  const side = ctx.eventType === "supply" || ctx.eventType === "withdraw" ? "supply" : "debt";
-  // A transfer draws no flank (see `tokens` below), so it echoes nothing.
   const kind = ctx.eventType;
   const isTransfer = kind === "transfer_in" || kind === "transfer_out";
-  const signedDelta = signedAmount(ctx);
-  const spineProv =
-    !isLoss && !isTransfer && !isSwap && signedDelta !== 0 && ctx.reserveSymbol
-      ? {
-          info: assetsDeltaProv(ctx.reserveSymbol, side, coords, ctx.raw?.amount, ctx.origin?.amount),
-          value: chainTruthDeltaValue(signedDelta, false),
-          symbol: ctx.reserveSymbol,
-        }
-      : undefined;
 
   // The icon chip resolves a mark from an ADDRESS, and given only a symbol it
   // has to find one in the hand-kept house table. Aave V3's reserves are a
@@ -161,22 +145,6 @@ export function AaveV3CtEventCard({
               direction: isSupplySwap ? ("right" as const) : ("left" as const),
               value: mag,
               badge: "swap" as const,
-              prov: ctx.reserveSymbol
-                ? {
-                    info: swapLegProv(
-                      ctx.reserveSymbol,
-                      isSupplySwap ? "transfer_in" : "transfer_out",
-                      coords,
-                      ctx.raw?.amount,
-                      ctx.origin?.amount,
-                      isSupplySwap ? "supply_from_swap" : "withdraw_and_swap",
-                      undefined,
-                      ctx.swap,
-                    ),
-                    value: chainTruthDeltaValue(isSupplySwap ? mag : -mag, false),
-                    symbol: ctx.reserveSymbol,
-                  }
-                : undefined,
             },
           ]
         : isTransfer
@@ -193,13 +161,11 @@ export function AaveV3CtEventCard({
                 address: soleFlowAddress(event.flows, ctx.reserveSymbol),
                 direction: DIRECTION[kind as keyof typeof DIRECTION],
                 value: mag,
-                prov: spineProv,
               },
             ];
 
   // A swap that stayed in the position stacks its legs beside the node, given
-  // then received, each echoing the header's leg receipt (same builder, same
-  // arguments, same signed value). The glyph takes the axis the legs share.
+  // then received. The glyph takes the axis the legs share.
   const s = ctx.swap;
   const legAxis = (action: string): "supply" | "debt" =>
     action === "repay" || action === "borrow" ? "debt" : "supply";
@@ -218,20 +184,6 @@ export function AaveV3CtEventCard({
                   symbol: ctx.reserveSymbol,
                   address: soleFlowAddress(event.flows, ctx.reserveSymbol),
                   value: mag,
-                  prov: {
-                    info: swapLegProv(
-                      ctx.reserveSymbol,
-                      s.givenAction,
-                      coords,
-                      ctx.raw?.amount,
-                      ctx.origin?.amount,
-                      s.kind,
-                      swapLegNet(s, "given"),
-                      s,
-                    ),
-                    value: chainTruthDeltaValue(swapLegSign(s.givenAction) * mag, false),
-                    symbol: ctx.reserveSymbol,
-                  },
                 },
               ]
             : []),
@@ -241,20 +193,6 @@ export function AaveV3CtEventCard({
                   symbol: s.receivedSymbol,
                   address: s.receivedAsset,
                   value: received,
-                  prov: {
-                    info: swapLegProv(
-                      s.receivedSymbol,
-                      s.receivedAction,
-                      coords,
-                      s.raw.receivedAmount,
-                      s.receivedOrigin,
-                      s.kind,
-                      swapLegNet(s, "received"),
-                      s,
-                    ),
-                    value: chainTruthDeltaValue(swapLegSign(s.receivedAction, s.kind) * received, false),
-                    symbol: s.receivedSymbol,
-                  },
                 },
               ]
             : []),
@@ -262,13 +200,7 @@ export function AaveV3CtEventCard({
       : undefined;
 
   const iconSlot = isLoss ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel={isLiq ? "Liquidation" : "Written off"}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : isSwap && !isFlowSwap ? (
     <SpineColumn icon="swap" swapLegs={swapLegs} swapAxis={swapAxis} isFirst={isFirst} isLast={!!isLast} />
   ) : (

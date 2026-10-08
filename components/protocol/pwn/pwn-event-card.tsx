@@ -6,10 +6,9 @@
 import type { PwnContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import type { SpineValProv } from "@/components/shared/activity-timeline";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { creditAdvancedProv, rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
+import { rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
 import { pwnExplainerTeaser, type PwnEvent } from "@/lib/pwn/explainer-clauses";
 import { PwnEventHeader, fullAmount } from "./pwn-event-header";
 import { PwnEventDetail } from "./pwn-event-detail";
@@ -60,7 +59,6 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
         value?: number;
         display?: string;
         unit?: string;
-        prov?: SpineValProv;
       }[]
     | undefined;
   if (ctx.eventType === "created" && ctx.creditSymbol) {
@@ -76,11 +74,6 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           unit: ctx.creditSymbol,
           // Echoes the header's creditAdvancedProv (pwn-event-header.tsx) —
           // always positive, so the header's unlabeled (signed) value is "+".
-          prov: {
-            info: creditAdvancedProv(ctx.creditSymbol, coords),
-            value: chainTruthDeltaValue(v, false),
-            symbol: ctx.creditSymbol,
-          },
         },
       ];
   } else if (ctx.eventType === "paid_back" && ctx.creditSymbol) {
@@ -96,11 +89,6 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           display: fullAmount(v),
           unit: ctx.creditSymbol,
           // Echoes the header's repayment receipt — same "+"-signed grammar.
-          prov: {
-            info: r.prov,
-            value: chainTruthDeltaValue(v, false),
-            symbol: ctx.creditSymbol,
-          },
         },
       ];
   } else if (ctx.eventType === "claimed" && !ctx.defaulted && ctx.creditSymbol) {
@@ -119,11 +107,6 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           value: v,
           display: fullAmount(v),
           unit: ctx.creditSymbol,
-          prov: {
-            info: r.prov,
-            value: chainTruthDeltaValue(v, false),
-            symbol: ctx.creditSymbol,
-          },
         },
       ];
     else tokens = [{ symbol: ctx.creditSymbol, address: creditAddress, direction: "left" }];
@@ -142,19 +125,9 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           : undefined;
 
   const iconSlot = isSeizure ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningLabel="Default"
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : lifecycleIcon ? (
-    <SpineColumn
-      icon={lifecycleIcon}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon={lifecycleIcon} isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
   );

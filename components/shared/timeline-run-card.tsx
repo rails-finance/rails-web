@@ -36,11 +36,11 @@ import { formatDate } from "@/lib/date";
  * renders count-only rather than misstate the position.
  *
  * The closed run is a row on the spine (ui-jobs 250 set B): its legs summed as
- * nodes, the kind word in T1, the date range in the time slot, and the dotted
- * segment below that stands for the members not drawn; the group button above
- * ("Show 45 events") shows them, inside the bracket frame (`group-frame.tsx`).
- * A click on the nodes or the head opens the summary card: the sums with
- * their Σ receipts, and the date range.
+ * nodes, the kind word and the count in T1 ("Redemptions (48)"), the date
+ * range in the time slot, and the list's line dotted below it for the members
+ * not drawn; the row's ⋮ ("Show 48 grouped events") shows them, inside the
+ * bracket frame (`group-frame.tsx`). A click on the nodes or the head opens the
+ * summary card: the sums with their Σ receipts, and the date range.
  *
  * ── TWO WAYS THE MEMBERS ARRIVE, ONE CARD
  *
@@ -78,8 +78,8 @@ export interface RunAggregate {
   /** Subject of the Σ receipt, e.g. "Collateral seized". */
   provWhat: string;
   /** How many member events feed this verb group, rendered as a mini muted
-   *  pill after the pair (the spine ×N pill's own register) — a mixed folder
-   *  carries its per-kind counts this way instead of a separate counter row.
+   *  pill after the pair in the summary card: a mixed folder carries its
+   *  per-kind counts this way.
    *  Bare count, no ×: beside a magnitude, "×25" would read as arithmetic. */
   count?: number;
 }
@@ -91,25 +91,21 @@ export interface TimelineRunCardProps {
   memberNoun: string;
   /** Summed header pairs. Omit for a count-only row. */
   aggregates?: RunAggregate[];
-  /** Verb color + pill tone. Match the protocol's own single-event card:
-   *  "caution" for a change to the owner's position the owner did not make
-   *  (redemptions, tick rebalances; color-grammar.md §5), "danger" for terminal
-   *  ones (liquidation, auction settlement), "neutral" for runs that carry no
-   *  adverse signal at all (custody transfers) — neutral rb verbs, and pair it
-   *  with spineIcon="custody" so no warning triangle renders. */
+  /** The T1 word's tone and the summed legs': "caution" for a change to the
+   *  owner's position the owner did not make (redemptions, tick rebalances;
+   *  color-grammar.md §5), "danger" for terminal ones (liquidation, auction
+   *  settlement), "neutral" for runs that carry no adverse signal (custody
+   *  transfers, with spineIcon="custody"). */
   tone?: "caution" | "danger" | "neutral";
   /** Spine glyph — "warning" for adverse runs, "external" for third-party
    *  actions that aren't a loss (keeper queue fills). */
   spineIcon?: SpineIcon;
   /** The kind's word T1 states ("Redemptions"), in the run's tone. Unset:
    *  the member noun, plural. */
-  warningLabel?: string;
+  kindWord?: string;
   /** A chronological slice of a longer stretch (`lib/shared/timeline-chunks.ts`):
    *  the summary card opens with the Σ glyph before the sums. */
   folder?: boolean;
-  /** Not drawn since ui-jobs 250 set B (the group button and the frame mark
-   *  a group); the callers' marks are left for the end-of-design pass. */
-  folderBadge?: ReactNode;
   /** The event numbers the group holds, lowest and highest, where the caller
    *  knows them (a served folder's ordinals). Unset: `GroupNumbersContext`. */
   eventRange?: [number, number];
@@ -189,9 +185,8 @@ export function TimelineRunCard({
   aggregates,
   tone = "caution",
   spineIcon = "warning",
-  warningLabel,
+  kindWord: kindWordProp,
   folder,
-  folderBadge,
   lead,
   extraHeader,
   firstTimestamp,
@@ -304,7 +299,6 @@ export function TimelineRunCard({
         ? {
             icon: "warning" as const,
             warningLegs,
-            warningLabel,
             warningTone: tone === "danger" ? "critical" : "caution",
           }
         : spineIcon === "custody"
@@ -321,7 +315,7 @@ export function TimelineRunCard({
   );
   // T1's word: the shape a served folder names, else the kind ("Redemptions",
   // "Transfers"), in the run's tone.
-  const kindWord = warningLabel ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
+  const kindWord = kindWordProp ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
   // The count rides T1 and the caption: "Redemptions (48)".
   const countMark = `(${count.toLocaleString("en-US")})`;
 

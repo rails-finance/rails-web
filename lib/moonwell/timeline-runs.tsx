@@ -42,26 +42,17 @@
 // it, and expanding a wrapper to reveal folders was one level of ceremony
 // more than the reader needs. Each folder's header carries the chunk-scoped
 // aggregate pairs — each with its member count riding inline, muted, after
-// the pair — and its own tight date range, and the folder glyph rides the
-// SPINE (open while expanded) — so the sequence of
-// dated folder nodes paints the churn's rhythm before anything is expanded.
-// A folder whose members are all one kind takes that kind's own register
-// (member noun, tone, warning pill) and wears the kind's mark on the folder
-// glyph;
-// a stretch of 4–100 third-party events is simply one folder — same grammar,
+// the pair — and its own tight date range, so the sequence of dated group
+// rows paints the churn's rhythm before anything is expanded.
+// A folder whose members are all one kind takes that kind's register (member
+// noun, tone, T1 word); a stretch of 4–100 third-party events is simply one folder — same grammar,
 // no special case.
 
 import type { ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, Undo2 } from "lucide-react";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
-import {
-  renderRunFolders,
-  DANGER_FOLDER_BADGE,
-  MIXED_FOLDER_BADGE,
-  type RunFolderMeta,
-} from "@/lib/shared/run-folders";
+import { renderRunFolders, type RunFolderMeta } from "@/lib/shared/run-folders";
 import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import type { BaseActivityEvent, MoonwellEventType } from "@/lib/shared/types/event-shape";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
@@ -75,10 +66,8 @@ interface KindSpec {
   aggregatesOf: (events: BaseActivityEvent[]) => RunAggregate[];
   tone: "caution" | "danger" | "neutral";
   spineIcon: "custody" | "warning";
-  warningLabel?: string;
+  kindWord?: string;
   muted: boolean;
-  /** Corner mark a homogeneous folder wears on its folder glyph. */
-  folderBadge: ReactNode;
 }
 
 /** Per-symbol Σ of assetsDelta — works for both repay-kind members and
@@ -142,9 +131,8 @@ const LIQUIDATION_SPEC: KindSpec = {
   },
   tone: "danger",
   spineIcon: "warning",
-  warningLabel: "Liquidations",
+  kindWord: "Liquidations",
   muted: false,
-  folderBadge: DANGER_FOLDER_BADGE,
 };
 
 const REPAY_SPEC: KindSpec = {
@@ -154,7 +142,6 @@ const REPAY_SPEC: KindSpec = {
   tone: "neutral",
   spineIcon: "custody",
   muted: true,
-  folderBadge: <Undo2 size={10} strokeWidth={2.5} className="text-rb-500" />,
 };
 
 /** Build one direction's transfer spec — "Sent"/"Received" share everything
@@ -187,12 +174,6 @@ function transferSpec(direction: "transfer_in" | "transfer_out"): KindSpec {
     tone: "neutral",
     spineIcon: "custody",
     muted: true,
-    folderBadge:
-      direction === "transfer_in" ? (
-        <ArrowDownLeft size={10} strokeWidth={2.5} className="text-rb-500" />
-      ) : (
-        <ArrowUpRight size={10} strokeWidth={2.5} className="text-rb-500" />
-      ),
   };
 }
 
@@ -228,7 +209,7 @@ function bucketByKind(events: BaseActivityEvent[]): {
 /** Attach a member count to a verb group, riding the LAST pair with value > 0
  *  (the card skips zero-value pairs, so a count on one would vanish with it).
  *  The count names how many member events feed the group behind it; a
- *  homogeneous folder needs none — its spine ×N pill already says so. */
+ *  homogeneous folder needs none: T1's count says so. */
 function withCount(pairs: RunAggregate[], count: number): RunAggregate[] {
   const i = pairs.map((p) => p.value > 0).lastIndexOf(true);
   return i < 0 ? pairs : pairs.map((p, idx) => (idx === i ? { ...p, count } : p));
@@ -295,12 +276,11 @@ function folderCard(events: BaseActivityEvent[], folder: RunFolderMeta): ReactNo
       aggregates={solo ? solo.aggregatesOf(events) : activityAggregates(buckets)}
       tone={solo ? solo.tone : hasLiquidation ? "danger" : "neutral"}
       spineIcon={solo ? solo.spineIcon : hasLiquidation ? "warning" : "custody"}
-      warningLabel={solo?.warningLabel ?? (hasLiquidation ? "Liquidation" : undefined)}
+      kindWord={solo?.kindWord ?? (hasLiquidation ? "Liquidation" : undefined)}
       // A folder holding a liquidation is drawn at full weight: it is the
       // row the account's story turns on.
       muted={solo ? solo.muted : !hasLiquidation}
       folder
-      folderBadge={solo ? solo.folderBadge : MIXED_FOLDER_BADGE}
       extraHeader={
         solo ? undefined : other > 0 ? (
           <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none whitespace-nowrap text-rb-500 bg-rb-500/10">
@@ -324,7 +304,6 @@ const MIXED_FOLDER: FolderRegisterEntry = {
   tone: "neutral",
   spineIcon: "custody",
   muted: true,
-  folderBadge: MIXED_FOLDER_BADGE,
 };
 
 /**
@@ -342,15 +321,14 @@ export const MOONWELL_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFol
       : undefined;
   if (!solo)
     return folder.counts.some((c) => c.key === "liquidation")
-      ? { ...MIXED_FOLDER, tone: "danger", spineIcon: "warning", warningLabel: "Liquidation", muted: false }
+      ? { ...MIXED_FOLDER, tone: "danger", spineIcon: "warning", kindWord: "Liquidation", muted: false }
       : MIXED_FOLDER;
   return {
     memberNoun: solo.memberNoun,
     tone: solo.tone,
     spineIcon: solo.spineIcon,
-    warningLabel: solo.warningLabel,
+    kindWord: solo.kindWord,
     muted: solo.muted,
-    folderBadge: solo.folderBadge,
   };
 };
 

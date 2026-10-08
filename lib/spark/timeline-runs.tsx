@@ -19,7 +19,7 @@
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard, type RunAggregate } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, DANGER_FOLDER_BADGE, TRANSFER_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import { AAVE_FAMILY_FOLDER_REGISTER } from "@/lib/shared/aave-family-folders";
 
@@ -63,10 +63,9 @@ export const SPARK_TIMELINE_RUNS: TimelineRunSpec[] = [
             count={events.length}
             memberNoun="liquidation"
             tone="danger"
-            warningLabel="Liquidations"
+            kindWord="Liquidations"
             aggregates={aggregates}
             folder
-            folderBadge={DANGER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}
@@ -124,7 +123,6 @@ export const SPARK_TIMELINE_RUNS: TimelineRunSpec[] = [
             spineIcon="custody"
             muted
             folder
-            folderBadge={TRANSFER_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}

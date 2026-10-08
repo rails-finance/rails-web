@@ -19,7 +19,6 @@ import {
   type ReactNode,
 } from "react";
 import { PHONE_QUERY } from "@/hooks/useMediaQuery";
-import { useTimelineScale } from "@/components/shared/activity-timeline";
 
 /** The key row above the first event: what the left and the right arrows
  *  mean, in the family's words ("to wallet" / "into Trove"). */
@@ -106,13 +105,8 @@ export function useSpineRow(): SpineRowSlot | null {
  *  left arrow and a right arrow mean. It stays true whichever way the first
  *  event moves. */
 export function SpineKeyRow({ config }: { config: SpineKey }) {
-  const scale = useTimelineScale();
   return (
-    <div
-      aria-hidden
-      className="grid items-center px-1 pb-1 text-xs text-rb-500 sm:hidden"
-      style={{ gridTemplateColumns: scale.gridCols }}
-    >
+    <div aria-hidden className="spine-grid px-1 pb-1 text-xs text-rb-500 sm:hidden">
       <span className="justify-self-end whitespace-nowrap pr-3">&larr; {config.keyLeft}</span>
       <span />
       <span />

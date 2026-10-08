@@ -6,20 +6,13 @@
 // (branch collateral + BD debt); a liquidation shows the critical warning
 // spine, a redemption the caution one.
 
-import {
-  forkDebtMove,
-  forkDebtMoveOps,
-  FORK_DEBT_DUST_FLOAT,
-  forkCollMove,
-  forkCollMoveOps,
-} from "@/lib/shared/liquity-fork-ops";
+import { forkDebtMove, FORK_DEBT_DUST_FLOAT, forkCollMove } from "@/lib/shared/liquity-fork-ops";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
-import type { SpineValProv } from "@/components/shared/activity-timeline";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { LiquityForkEventHeader } from "@/components/protocol/liquity-fork/liquity-fork-event-header";
 import { BasedollarEventDetail } from "./basedollar-event-detail";
 import {
@@ -114,35 +107,14 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
   // The debt the act moved (TroveOperation), the figure the header states.
   const debtDelta = forkDebtMove(ctx).value;
 
-  // The spine flanking value re-renders the header's change figure, so it
-  // echoes into that receipt (LiquityForkEventHeader): open/adjust register a
-  // BARE magnitude (each axis carries its own verb there), close and
-  // applyPendingDebt register SIGNED. Coords + ops mirror the header's
-  // construction exactly.
-  const labeled =
-    ctx.eventType === "openTrove" || ctx.eventType === "openTroveAndJoinBatch" || ctx.eventType === "adjustTrove";
+  const debtMoved = Math.abs(debtDelta) >= FORK_DEBT_DUST_FLOAT;
+
   const coords: BasedollarCoords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
     collateralType: ctx.collateralSymbol,
     isBatched: ctx.isBatched,
   };
-  const collProv: SpineValProv | undefined =
-    collDelta !== 0
-      ? {
-          info: collDeltaProv(coords, forkCollMoveOps(ctx), ctx.origin?.coll),
-          value: chainTruthDeltaValue(collDelta, labeled),
-          symbol: ctx.collateralSymbol,
-        }
-      : undefined;
-  const debtMoved = Math.abs(debtDelta) >= FORK_DEBT_DUST_FLOAT;
-  const debtProv: SpineValProv | undefined = debtMoved
-    ? {
-        info: debtDeltaProv(coords, forkDebtMoveOps(ctx), ctx.origin?.debt),
-        value: chainTruthDeltaValue(debtDelta, labeled),
-        symbol: DEBT_SYMBOL,
-      }
-    : undefined;
 
   // direction "right" = token moves toward the protocol (collateral deposit / debt
   // repay), "left" = toward the wallet (collateral withdraw / debt draw).
@@ -163,7 +135,6 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
                 address: soleFlowAddress(event.flows, ctx.collateralSymbol),
                 direction: collDelta > 0 ? ("right" as const) : ("left" as const),
                 value: Math.abs(collDelta),
-                prov: collProv,
               }
             : null,
           debtMoved
@@ -172,20 +143,13 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
                 address: soleFlowAddress(event.flows, DEBT_SYMBOL),
                 direction: debtDelta > 0 ? ("left" as const) : ("right" as const),
                 value: Math.abs(debtDelta),
-                prov: debtProv,
               }
             : null,
         ] as (SpineTokenRow | null)[]
       ).filter((t): t is SpineTokenRow => t !== null);
 
   const iconSlot = isWarning ? (
-    <SpineColumn
-      icon="warning"
-      warningTone={isLiq ? "critical" : "caution"}
-      warningLabel={isLiq ? "Liquidation" : "Redemption"}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
   ) : isNoChange ? (
     <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
   ) : (

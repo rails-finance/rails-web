@@ -17,10 +17,10 @@
 import type { BaseActivityEvent, FxContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { collDeltaProv, debtDeltaProv, type FxCoords } from "@/lib/fx/event-provenance";
+import { type FxCoords } from "@/lib/fx/event-provenance";
 import { fxExplainerTeaser } from "@/lib/fx/explainer-clauses";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { FxEventHeader } from "./fx-event-header";
@@ -69,7 +69,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     poolLabel: ctx.poolSymbol,
     positionId: ctx.positionId,
   };
-  const labeled = !ctx.emptiesPosition;
 
   // Token chips: collateral (TOKEN units) + fxUSD. direction "right" = toward
   // the protocol (deposit / repay), "left" = toward the wallet (withdraw /
@@ -91,11 +90,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
                 address: soleFlowAddress(event.flows, ctx.poolSymbol),
                 direction: (collDelta > 0 ? "right" : "left") as "right" | "left",
                 value: Math.abs(collDelta),
-                prov: {
-                  info: collDeltaProv(ctx.poolSymbol, coords),
-                  value: chainTruthDeltaValue(collDelta, labeled),
-                  symbol: ctx.poolSymbol,
-                },
               },
             ]
           : []),
@@ -106,11 +100,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
                 address: soleFlowAddress(event.flows, "fxUSD"),
                 direction: (debtDelta > 0 ? "left" : "right") as "right" | "left",
                 value: Math.abs(debtDelta),
-                prov: {
-                  info: debtDeltaProv(coords),
-                  value: chainTruthDeltaValue(debtDelta, labeled),
-                  symbol: "fxUSD",
-                },
               },
             ]
           : []),
@@ -120,7 +109,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     <SpineColumn
       icon="warning"
       warningTone="critical"
-      warningLabel="Liquidation"
       warningTip={
         ctx.poolWide
           ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
@@ -133,7 +121,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     <SpineColumn
       icon="warning"
       warningTone="caution"
-      warningLabel="Redemption"
       warningTip="Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act."
       isFirst={isFirst}
       isLast={!!isLast}
@@ -144,7 +131,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     <SpineColumn
       icon="warning"
       warningTone="caution"
-      warningLabel="Rebalance"
       warningTip="A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act."
       isFirst={isFirst}
       isLast={!!isLast}

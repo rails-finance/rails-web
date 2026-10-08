@@ -14,10 +14,10 @@
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { movedDeltaProv, type CompoundV2Coords } from "@/lib/compound-v2/event-provenance";
+import { type CompoundV2Coords } from "@/lib/compound-v2/event-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2ExplainerTeaser, type CompoundV2Event } from "@/lib/compound-v2/explainer-clauses";
 import { CompoundV2EventHeader } from "./compound-v2-event-header";
@@ -77,10 +77,6 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
 
   const dir = DIRECTION[ctx.eventType];
   const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
-  // The header registers its receipt under the CATALOG cSym (market?.cSymbol),
-  // not event.flows[0].tokenSymbol — the two diverge on cSAI/cWBTC2 — so the
-  // echo's identity is built from the catalog symbol even though the icon
-  // above renders the display `symbol`.
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const catalogCSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
   const coords: CompoundV2Coords = {
@@ -90,13 +86,10 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
     marketLabel: catalogCSym,
     account: event.wallet,
   };
-  const provSym = isCTokenMove ? catalogCSym : ctx.marketSymbol;
-  const raw = isCTokenMove ? ctx.raw?.cTokens : ctx.raw?.amount;
   // The address goes to the icon chip, which can only ask a CDN about a
   // contract; the symbol alone sends it to the house table. It is looked up
-  // under the DISPLAYED `symbol` rather than the receipt's `provSym`, because
-  // the address has to identify the same asset the mark is being drawn for —
-  // and on the cToken lane those two deliberately differ (cSAI/cWBTC2). A mint
+  // under the DISPLAYED `symbol`, because the address has to identify the same
+  // asset the mark is being drawn for (cSAI/cWBTC2 on the cToken lane). A mint
   // moves the underlying and the cToken in one transaction, so both symbols
   // appear in the flows; matching by symbol picks out the right one, and a
   // symbol carried by two flows is left unresolved rather than guessed at.
@@ -118,21 +111,13 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
                 address: soleFlowAddress(event.flows, symbol),
                 direction: dir,
                 value: mag,
-                prov: {
-                  // Defined for every eventType reaching this branch (dir is only
-                  // set for the lanes movedDeltaProv covers) — the "!" documents
-                  // that, rather than papering over a real gap.
-                  info: movedDeltaProv(ctx.eventType, ctx.marketSymbol, catalogCSym, coords, raw)!,
-                  value: chainTruthDeltaValue(d, false),
-                  symbol: provSym,
-                },
               },
             ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Liquidation" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : isSeizeLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" warningLabel="Seizure" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
   ) : (
     <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
   );

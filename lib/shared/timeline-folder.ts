@@ -47,7 +47,6 @@
 // a client-grouped one in the last places. That difference is the served one
 // being right.
 
-import type { ReactNode } from "react";
 import type { RunAggregate } from "@/components/shared/timeline-run-card";
 import type { SpineIcon } from "@/components/shared/spine-column";
 import { scaleBaseUnits, type OpeningBucket, type OpeningFlowBucket } from "@/lib/shared/timeline-opening-balance";
@@ -334,11 +333,8 @@ export interface FolderRegisterEntry {
   memberNoun: string;
   tone?: "caution" | "danger" | "neutral";
   spineIcon?: SpineIcon;
-  warningLabel?: string;
+  kindWord?: string;
   muted?: boolean;
-  /** The corner mark on the folder's glyph — the kind's severity at a glance,
-   *  before anything is expanded. */
-  folderBadge?: ReactNode;
   /** A shape run's summary, drawn before its sums: "12 × deposit + share
    *  transfer". */
   shapeLabel?: string;

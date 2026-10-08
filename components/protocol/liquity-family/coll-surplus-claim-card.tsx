@@ -199,7 +199,6 @@ export function CollSurplusClaimCard({
               symbol: d.symbol,
               direction: "left",
               value: d.amount,
-              prov: { info: amountProv, value: chainTruthDeltaValue(d.amount, true), symbol: d.symbol },
               verb: "claimed",
             },
           ]}

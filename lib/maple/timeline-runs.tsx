@@ -8,7 +8,7 @@
 import { isMapleEvent } from "@/lib/shared/types/event-shape";
 import type { TimelineRunSpec } from "@/components/shared/chain-truth-timeline";
 import { TimelineRunCard } from "@/components/shared/timeline-run-card";
-import { renderRunFolders, PAID_OUT_FOLDER_BADGE } from "@/lib/shared/run-folders";
+import { renderRunFolders } from "@/lib/shared/run-folders";
 import { sumBySymbol } from "@/lib/shared/run-aggregates";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { OWNER_RUN_KIND, ownerRunEntry } from "@/lib/shared/owner-run-folders";
@@ -45,7 +45,6 @@ export const MAPLE_QUEUE_FILL_RUNS: TimelineRunSpec[] = [
               provWhat: "Assets paid out",
             }))}
             folder
-            folderBadge={PAID_OUT_FOLDER_BADGE}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
             isFirst={folder.isFirst}
@@ -69,7 +68,6 @@ export const MAPLE_QUEUE_FILL_RUNS: TimelineRunSpec[] = [
 const QUEUE_FILL_FOLDER: FolderRegisterEntry = {
   memberNoun: "queue fill",
   spineIcon: "external",
-  folderBadge: PAID_OUT_FOLDER_BADGE,
   readingLine: true,
 };
 

@@ -11,8 +11,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
-import { Prov } from "@/components/shared/provenance";
-import type { SpineValProv } from "@/components/shared/activity-timeline";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { eventLogProv, heldDebtRateProv, externalActorProv } from "@/lib/aave-v4/position-provenance";
 
@@ -72,15 +71,7 @@ export interface AaveV4AmountCoord {
   blockNumber?: number;
 }
 
-/** The amount receipt for a non-liquidation row — the ONE builder for this
- *  figure, shared by the header (which registers it) and the card's spine flank
- *  (which echoes it).
- *
- *  🔑 An echo only resolves when its entryKey — `receiptLabel|value|symbol` —
- *  byte-matches the registration. Two call sites assembling that key by hand is
- *  precisely how morpho-event-card.tsx shipped a flank nobody could trace: it
- *  built an unsigned `formatExact(mag)` against a signed header. So the two ends
- *  share this function rather than agreeing by convention.
+/** The amount receipt for a non-liquidation row, which the header registers.
  *
  *  Note the value is UNSIGNED here, and deliberately so: V4's `ctx.amount` is a
  *  magnitude whose direction is carried by `eventType`, not a signed delta.
@@ -88,7 +79,10 @@ export interface AaveV4AmountCoord {
  *  protocols use — would prepend a sign the header never registers and recreate
  *  the very drift this shared builder exists to prevent. V4 does not use
  *  ChainTruthRow; match the header, not the family. */
-export function aaveV4AmountProv(ctx: AaveV4Context, coord: AaveV4AmountCoord): SpineValProv {
+export function aaveV4AmountProv(
+  ctx: AaveV4Context,
+  coord: AaveV4AmountCoord,
+): { info: Provenance; value: string; symbol?: string } {
   const amount = parseFloat(ctx.amount ?? "0") || 0;
   const style = STYLES[ctx.eventType] ?? { label: ctx.eventType, color: "", bg: "", badge: false };
   const label = ctx.eventType === "collateral_toggle" ? (ctx.enabled ? "Enable" : "Disable") : style.label;
@@ -154,7 +148,7 @@ export function AaveV4EventHeader({
   const coord = { spokeName: ctx.spokeName, spokeAddress: ctx.spokeAddress, txHash, blockNumber };
 
   // A liquidation's two legs — the collateral seized, the debt repaid — each
-  // with its receipt; the spine draws them as nodes and echoes these.
+  // with its receipt; the spine draws them as nodes.
   const isLiq = ctx.eventType === "liquidation";
   const seized =
     isLiq && ctx.liquidatedCollateralAmount && ctx.collateralSymbol
@@ -196,7 +190,6 @@ export function AaveV4EventHeader({
                   label: "Seized",
                   value: seized.n,
                   symbol: seized.symbol,
-                  prov: { info: seized.info, value: formatExact(seized.n), symbol: seized.symbol },
                 },
               ]
             : []),
@@ -206,7 +199,6 @@ export function AaveV4EventHeader({
                   label: "Repaid",
                   value: repaid.n,
                   symbol: repaid.symbol,
-                  prov: { info: repaid.info, value: formatExact(repaid.n), symbol: ctx.reserveSymbol ?? undefined },
                 },
               ]
             : []),

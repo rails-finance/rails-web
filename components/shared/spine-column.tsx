@@ -7,7 +7,7 @@ import { ArrowRightToLine, Clock, Layers, Lock, LogOut } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
+import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
 import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
@@ -37,27 +37,22 @@ export type SpineIcon =
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
-/** Spine color tint. The spine line itself carries NO decorative/subsystem
- *  tint — it stays neutral. The only tints are the two §5 adverse tones, the
- *  warningTone values: caution for a change to the owner's position the owner
- *  did not make (a redemption, a force repay, a tick rebalance), critical for
- *  a liquidation. Delegation signals via the pink glyph badge
- *  (color-grammar.md §4b), not the spine line. (The former blue/green/
- *  violet/purple subsystem tints were retired — color variation doesn't belong
- *  on the spine.) */
-export type SpineColor = "default" | "caution" | "critical";
-
-/** The warning triangle's tones. */
+/** The two §5 adverse tones (color-grammar.md): caution for a change to the
+ *  owner's position the owner did not make (a redemption, a force repay, a
+ *  tick rebalance), critical for a liquidation. */
 export type WarningTone = "caution" | "critical";
 
-export const SPINE_COLORS: Record<SpineColor, string> = {
+/** The spine's inks: neutral, or a warning tone on a warning node and its
+ *  dotted stretch. Delegation signals via the pink glyph badge
+ *  (color-grammar.md §4b), never the line. */
+export const SPINE_COLORS: Record<"default" | WarningTone, string> = {
   default: "rgb(101 115 140)", // rb-500
   caution: "var(--caution)", // a change the owner did not make: redemption + routine adverse (color-grammar.md §5)
   critical: "rgb(239 68 68)", // red-500 — liquidation + critical
 };
 
-/** Pulsing dot color matching spine tint */
-const DOT_COLORS: Record<SpineColor, string> = {
+/** Pulsing dot color matching the node's tone */
+const DOT_COLORS: Record<"default" | WarningTone, string> = {
   default: "bg-green-400",
   caution: "bg-caution-400",
   critical: "bg-red-400",
@@ -111,12 +106,6 @@ export interface SpineTokenRow {
   valueDecimals?: number;
   /** Inclusive upper bound for the inline edit input. */
   valueMax?: number;
-  /** Receipt identity for the flanking value — echoes the figure into the
-   *  receipt the card already registers (the header change value), so the
-   *  locator pulse includes the spine figure. Pass it ONLY when the spine
-   *  value IS that receipt's figure (e.g. no redistribution/fee component
-   *  separating them) — a false pairing is worse than none. */
-  prov?: SpineValProv;
   /** The leg's verb in the phone spine view's spoken label ("0.5 ETH
    *  withdrawn"). Unset reads by direction: "to the wallet", "into the
    *  position". */
@@ -129,8 +118,6 @@ export interface SpineSwapLeg {
   symbol: string;
   address?: string;
   value: number;
-  /** Echo of the header's leg receipt (see SpineTokenRow.prov). */
-  prov?: SpineValProv;
 }
 
 /** The position axis a swap's legs sit on: both supplied (a collateral swap),
@@ -152,8 +139,6 @@ export interface SpineWarningLeg {
   value: number;
   symbol: string;
   address?: string;
-  /** Echo the figure into the receipt the header's figure traces. */
-  prov?: SpineValProv;
 }
 
 export interface SpineColumnProps {
@@ -172,19 +157,16 @@ export interface SpineColumnProps {
    *  the token icons rather than replacing them: WHO acted annotates the flow,
    *  it doesn't substitute for it. When there are no token rows to draw, falls
    *  back to the standalone `external` glyph so a card never renders a blank
-   *  spine slot. Pair with spine="dotted". A row's own `badge` wins — an
-   *  explicit check/cross IS that event's meaning, and the dotted spine still
-   *  carries the external signal. */
+   *  spine slot. A row's own `badge` wins: an explicit check/cross IS that
+   *  event's meaning, and the header's "by …" chip names the actor. */
   externalParty?: boolean;
   /** Tone of a warning event — "caution" (orange) for a change to the
    *  owner's position the owner did not make (a redemption, every routine
    *  adverse event); "critical" (red) for terminal events (liquidation). The
-   *  legs' magnitudes, the dotted spine and the lead-in dot take it. Defaults
+   *  legs' magnitudes, a closed group's dotted stretch and the lead-in dot
+   *  take it. Defaults
    *  to "caution". See color-grammar.md §5. */
   warningTone?: WarningTone;
-  /** The kind's name ("Redemption", "Liquidation"). A warning node draws no
-   *  pill (T1 states the word). */
-  warningLabel?: string;
   /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
   /** icon="warning" only: the legs, top to bottom (the collateral, then the
@@ -202,8 +184,6 @@ export interface SpineColumnProps {
    *  group): dotted, in the warning tone or the neutral ink. Every other
    *  line is solid. */
   undrawn?: boolean;
-  /** Spine color tint — encodes subsystem or event category */
-  color?: SpineColor;
   /** The first node on the spine. A LINE-END prop, not the tip — the
    *  pulsing dot is `tip`'s alone. The list's line starts at the first node
    *  it finds (spine-line.tsx). */
@@ -212,27 +192,17 @@ export interface SpineColumnProps {
    *  (`data-spine-end`). */
   isLast: boolean;
   /** THE TIP OF THE TIMELINE — the newest event — and the one thing that
-   *  draws the pulsing dot. "above": a lead-in line and the dot above the
-   *  node, which is the top row. "below": a short line below the node and the
-   *  dot, in place of the trailing mask.
-   *
-   *  ⚠️ NOTHING PRODUCES "below" TODAY. It was the oldest-first arm's tip, and
-   *  that order was removed from every timeline on 2026-09-12 (see
-   *  useTimelineEvents's header for why). The variant is kept because this is
-   *  a PRIMITIVE and its axis has two ends — a view that draws a stretch from
-   *  the middle of a history will need the far one — not because a caller is
-   *  reaching it. Check before assuming a change here is visible anywhere.
+   *  draws the pulsing dot: a lead-in line and the dot above the node, which
+   *  is the top row (newest first, the only order a timeline has).
    *
    *  The dot marks the newest event, never a list position: the boundary
    *  glyph, the oldest row and a pinned card never carry it. Undefined reads
    *  <SpineTipContext>, which the shared timeline provides around the newest
    *  row alone; null refuses it. */
   tip?: SpineTip | null;
-  /** Detached column — no trailing spine and no trailing background mask. Used by the simulator card, which no longer sits in the timeline. */
-  detached?: boolean;
 }
 
-export type SpineTip = "above" | "below";
+export type SpineTip = "above";
 
 /** Which end of the newest row the pulsing dot sits at, provided by the
  *  shared timeline around that ONE row — or around whatever stands in the head
@@ -261,7 +231,7 @@ export const SpineLegsContext = createContext<{
 } | null>(null);
 
 const legsKey = (legs: SpineWarningLeg[] | null) =>
-  legs ? legs.map((l) => `${l.symbol}|${l.address ?? ""}|${l.value}|${l.prov?.value ?? ""}`).join(";") : "";
+  legs ? legs.map((l) => `${l.symbol}|${l.address ?? ""}|${l.value}|${l.locked ? "l" : ""}`).join(";") : "";
 
 /** The state EventCard holds for SpineLegsContext. */
 export function useSpineLegsState() {
@@ -327,7 +297,7 @@ function RateIcon({ size, color = "var(--color-rb-500)" }: { size: number; color
  *  the spine's neutral ink. Drawn at the flank's token size so it sits on the
  *  same centre as every other glyph, with the diamond itself small enough that
  *  the row reads as an annotation beside the timeline rather than a row of it.
- *  The stroke is pinned in absolute pixels (the folder glyph's rule). */
+ *  The stroke is pinned in absolute pixels. */
 function MarketNoteIcon({ size, color, filled = false }: { size: number; color: string; filled?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -473,7 +443,7 @@ function SwapIcon({ size, axis = "mixed" }: { size: number; axis?: SpineSwapAxis
 }
 
 /** The swap's legs on the node's right flank, one row each, given first: the
- *  token, then the compact amount echoing the header's receipt. */
+ *  token, then the compact amount. */
 function SwapLegs({ legs }: { legs: SpineSwapLeg[] }) {
   const unreadOf = useUnreadTokenOf();
   return (
@@ -813,12 +783,7 @@ function WarningLegNodes({
             ? fmtHeaderMagnitude(Math.abs(leg.value), leg.symbol)
             : "";
         return (
-          <div
-            key={i}
-            className="grid items-center justify-items-center"
-            style={{ gridTemplateColumns: scale.gridCols }}
-            data-spine-leg=""
-          >
+          <div key={i} className="spine-grid" data-spine-leg="">
             <span />
             <span />
             {leg.locked ? (
@@ -861,17 +826,13 @@ export function SpineColumn({
   icon,
   externalParty,
   warningTone = "caution",
-  warningLabel,
   warningTip,
   warningLegs,
   iconDirection,
   rateSpan,
   undrawn,
-  color = "default",
-  isFirst,
   isLast,
   tip,
-  detached,
 }: SpineColumnProps) {
   const scale = useTimelineScale();
   const contextTip = useContext(SpineTipContext);
@@ -883,7 +844,7 @@ export function SpineColumn({
   // A click on the node or its flank values opens and closes the card (on a
   // phone the segment's button lies over them and takes the click).
   const toggleCtx = useContext(SpineNodeToggleContext);
-  const nodeToggle = !detached ? toggleCtx : null;
+  const nodeToggle = toggleCtx;
   const nodeProps = nodeToggle
     ? { onClick: nodeToggle.onToggle, ...nodeToggle.hover, "data-spine-node-toggle": "" }
     : {};
@@ -921,12 +882,9 @@ export function SpineColumn({
   // show. Only a row that is neither falls through to `no-change`.
   const effectiveIcon: SpineIcon | undefined =
     icon ?? (tokens?.length ? undefined : externalParty ? "external" : "no-change");
-  // Spine flanking values follow the "Timeline values" toggle in BOTH views. The
-  // chain-state (monochrome) view is no longer special-cased: it carries the same
-  // compact flanking notation as the interpreted one (compact display is the
-  // one-step readability leeway the tier allows — view-tiers.md; the exact figure
-  // still rides the provenance trace). The ≥sm / <sm hand-off to the card header
-  // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
+  // Spine flanking values follow the "Timeline values" toggle in both views
+  // (interpreted and chain-state): the compact notation is the one-step
+  // readability leeway the tier allows (view-tiers.md).
   const spineValues = showTimelineValues;
   // The node's halo takes the page's ground: the list's line (spine-line.tsx)
   // stops 4px short of every glyph.
@@ -937,7 +895,7 @@ export function SpineColumn({
   // "events not drawn" below a closed group or the boundary, which takes the
   // tone too: the node marks it (`data-spine-undrawn`), and at the foot of the
   // list the row draws it.
-  const effectiveColor: SpineColor = effectiveIcon === "warning" ? warningTone : color;
+  const effectiveColor = effectiveIcon === "warning" ? warningTone : "default";
   const isDotted = !!undrawn;
   const spineRgb = SPINE_COLORS[isDotted ? effectiveColor : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
@@ -969,393 +927,146 @@ export function SpineColumn({
       <div className="w-px" style={{ height: 12, backgroundColor: spineRgb }} />
     </div>
   );
-  // The tip below (the bottom row): a short line down from the node, then the
-  // dot — in the strip the trailing mask covers. Unreached today; see the
-  // `tip` prop's own doc.
-  const tipBelow = effectiveTip === "below" && (
-    <div className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center" style={{ top: 0 }}>
-      <div className="w-px" style={{ height: 12, backgroundColor: spineRgb }} />
-      <div style={{ paddingTop: 4 }}>
-        <PulsingDot dotClass={dotClass} side="below" />
-      </div>
-    </div>
-  );
-
-  // Icon override mode — no token icons, just a semantic icon
-  if (effectiveIcon) {
-    const iconContent = (() => {
-      switch (effectiveIcon) {
-        case "warning": {
-          // The legs as nodes; the triangle only where the event names none.
-          const node = adverseLegs?.length ? (
-            <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!nodeToggle} />
-          ) : (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <WarningIcon size={scale.tokenSize} color={SPINE_COLORS[warningTone]} />
-              <span />
-              <span />
-            </div>
-          );
-          return warningTip ? <RevealTip tip={warningTip}>{node}</RevealTip> : node;
-        }
-        case "rate-change":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <RateIcon size={scale.tokenSize} />
-              {rateSpan ? (
-                spineValues ? (
-                  <span
-                    className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
-                    style={{ gridColumn: "4 / 6" }}
-                    data-spine-rate=""
-                  >
-                    <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
-                    <span className="px-1 font-normal text-rb-500" aria-hidden>
-                      &rarr;
-                    </span>
-                    {rateSpan[1].toFixed(2)}%
-                  </span>
-                ) : (
-                  <>
-                    <span />
-                    <span />
-                  </>
-                )
-              ) : (
-                <>
-                  <DirectionArrow direction={iconDirection ?? "up"} size={Math.round(scale.arrowSize * 0.7)} />
-                  <span />
-                </>
-              )}
-            </div>
-          );
-        case "delegate":
-          return (
-            // A delegation is a people event, not a rate tweak — render a
-            // person glyph with a join (+) / leave (−) badge so it reads
-            // distinctly from the rate-change "%↑". iconDirection up = join
-            // (setInterestBatchManager), down = leave (removeFromBatch).
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <div className="relative">
-                <UsersIcon size={scale.tokenSize} />
-                <DelegateBadge size={scale.tokenSize} join={iconDirection !== "down"} />
-              </div>
-              <span />
-              <span />
-            </div>
-          );
-        case "external":
-          return (
-            // A third-party action with NOTHING TO DRAW — no token row, so the
-            // people glyph in the pink external-party tint (color-grammar.md
-            // §4b) stands alone. Unlike the delegate icon it carries no
-            // join/leave badge: nothing was delegated, an outside party simply
-            // acted on the position. Where the event DID move tokens, the flow
-            // renders and this glyph rides it as ExternalBadge instead.
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <UsersIcon size={scale.tokenSize} color="#EC4899" />
-              <span />
-              <span />
-            </div>
-          );
-        case "mint":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <MintIcon size={scale.tokenSize} />
-              <span />
-              <span />
-            </div>
-          );
-        case "burn":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <BurnIcon size={scale.tokenSize} />
-              <span />
-              <span />
-            </div>
-          );
-        case "extend":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <ExtendIcon size={scale.tokenSize} />
-              <span />
-              <span />
-            </div>
-          );
-        case "no-change":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <NoChangeIcon size={scale.tokenSize} />
-              <span />
-              <span />
-            </div>
-          );
-        case "custody":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <CustodyIcon size={scale.tokenSize} />
-              <span />
-              <span />
-            </div>
-          );
-        case "swap":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <SwapIcon size={scale.tokenSize} axis={swapAxis} />
-              {spineValues && swapLegs?.length ? (
-                <SwapLegs legs={swapLegs} />
-              ) : (
-                <>
-                  <span />
-                  <span />
-                </>
-              )}
-            </div>
-          );
-        case "market":
-        case "market-open":
-          // A market note's own node. It sits ON the spine like an event's
-          // glyph — a note is placed between two of the account's events and
-          // the reader has to see which two — but it is deliberately among the
-          // quietest marks on the column: a small hollow diamond in the spine's
-          // neutral ink, no fill, no party colour and no pulse. Nothing
-          // happened to the ACCOUNT here, so nothing on the node may read as an
-          // action of its own. A note opened from its marker fills the diamond
-          // in the same ink, which marks the open note on the spine.
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <MarketNoteIcon
-                size={scale.tokenSize}
-                color={SPINE_COLORS.default}
-                filled={effectiveIcon === "market-open"}
-              />
-              <span />
-              <span />
-            </div>
-          );
-        case "live-window":
-          // The live window's node — the note's register, because the same
-          // thing is true of both: the account did nothing here. So it keeps
-          // the hollow outline and the neutral ink and takes no fill, no tint
-          // and no pulse, and differs in SHAPE alone. On a CDP carrying both,
-          // the window and the live notes stand together in the head slot, and
-          // the shape is what tells a reader the classes apart there — putting
-          // the notes away and watching one row survive is not a way to learn
-          // it.
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <LiveWindowIcon size={scale.tokenSize} color={SPINE_COLORS.default} />
-              <span />
-              <span />
-            </div>
-          );
-        case "close":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <LogOut
-                size={scale.tokenSize}
-                strokeWidth={1.5}
-                absoluteStrokeWidth
-                color="var(--color-rb-500)"
-                aria-hidden="true"
-              />
-              <span />
-              <span />
-            </div>
-          );
-        case "dead-end":
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <ArrowRightToLine
-                size={scale.tokenSize}
-                strokeWidth={1.5}
-                absoluteStrokeWidth
-                color="var(--color-rb-500)"
-                aria-hidden="true"
-              />
-              <span />
-              <span />
-            </div>
-          );
-        case "moment":
-          // The state card's node: a clock (lucide `clock`) in the boundary's
-          // neutral ink, where an event row shows its token. The card states
-          // a moment, which no transaction made.
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <Clock
-                size={scale.tokenSize}
-                strokeWidth={1.25}
-                absoluteStrokeWidth
-                color="var(--color-rb-500)"
-                aria-hidden="true"
-              />
-              <span />
-              <span />
-            </div>
-          );
-        case "boundary":
-          // The boundary card's node: a stack (lucide `layers`) standing for
-          // the events before the oldest drawn row, where an event row shows
-          // its token. Neutral ink, no pulse, no pill on the flank — the
-          // count rides the card header's own number-pill slot so it lines up
-          // with the row numbers above it. Drawn at the flank's token size
-          // with the stroke pinned in absolute pixels, the folder's rule.
-          return (
-            <div
-              className="grid grid-rows-1 items-center justify-items-center"
-              style={{ gridTemplateColumns: scale.gridCols }}
-            >
-              <span />
-              <span />
-              <Layers
-                size={scale.tokenSize}
-                strokeWidth={1.25}
-                absoluteStrokeWidth
-                color="var(--color-rb-500)"
-                aria-hidden="true"
-              />
-              <span />
-              <span />
-            </div>
-          );
-        case "none":
-          // A group with no asset legs, or the boundary: the group node alone.
-          return null;
+  const T = scale.tokenSize;
+  /** A node row: the glyph on the spine, and what stands on its right flank
+   *  (two empty cells unless given). The grid is `.spine-grid`. */
+  const nodeRow = (glyph: ReactNode, right?: ReactNode) => <NodeRow glyph={glyph} right={right} />;
+  // The node: a glyph that states why there is no flow, else the token rows.
+  const node: ReactNode = (() => {
+    switch (effectiveIcon) {
+      case undefined:
+        return null;
+      case "warning": {
+        // The legs as nodes; the triangle only where the event names none.
+        const legs = adverseLegs?.length ? (
+          <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!nodeToggle} />
+        ) : (
+          nodeRow(<WarningIcon size={T} color={SPINE_COLORS[warningTone]} />)
+        );
+        return warningTip ? <RevealTip tip={warningTip}>{legs}</RevealTip> : legs;
       }
-    })();
+      case "rate-change":
+        return nodeRow(
+          <RateIcon size={T} />,
+          rateSpan ? (
+            spineValues ? (
+              <span
+                className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
+                style={{ gridColumn: "4 / 6" }}
+                data-spine-rate=""
+              >
+                <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
+                <span className="px-1 font-normal text-rb-500" aria-hidden>
+                  &rarr;
+                </span>
+                {rateSpan[1].toFixed(2)}%
+              </span>
+            ) : undefined
+          ) : (
+            <>
+              <DirectionArrow direction={iconDirection ?? "up"} size={Math.round(scale.arrowSize * 0.7)} />
+              <span />
+            </>
+          ),
+        );
+      case "delegate":
+        // A delegation is a people event, not a rate tweak: a person glyph
+        // with a join (+) / leave (−) badge. iconDirection up = join
+        // (setInterestBatchManager), down = leave (removeFromBatch).
+        return nodeRow(
+          <div className="relative">
+            <UsersIcon size={T} />
+            <DelegateBadge size={T} join={iconDirection !== "down"} />
+          </div>,
+        );
+      case "external":
+        // A third-party action with NOTHING TO DRAW: the people glyph in the
+        // pink external-party tint (color-grammar.md §4b) stands alone, with
+        // no join/leave badge. Where the event moved tokens, the flow renders
+        // and this glyph rides it as ExternalBadge instead.
+        return nodeRow(<UsersIcon size={T} color="#EC4899" />);
+      case "mint":
+        return nodeRow(<MintIcon size={T} />);
+      case "burn":
+        return nodeRow(<BurnIcon size={T} />);
+      case "extend":
+        return nodeRow(<ExtendIcon size={T} />);
+      case "no-change":
+        return nodeRow(<NoChangeIcon size={T} />);
+      case "custody":
+        return nodeRow(<CustodyIcon size={T} />);
+      case "swap":
+        return nodeRow(
+          <SwapIcon size={T} axis={swapAxis} />,
+          spineValues && swapLegs?.length ? <SwapLegs legs={swapLegs} /> : undefined,
+        );
+      case "market":
+      case "market-open":
+        // A market note's node, among the quietest marks on the column: a
+        // small hollow diamond in the spine's neutral ink, no fill, no party
+        // colour, no pulse. Nothing happened to the ACCOUNT here. A note
+        // opened from its marker fills the diamond in the same ink.
+        return nodeRow(
+          <MarketNoteIcon size={T} color={SPINE_COLORS.default} filled={effectiveIcon === "market-open"} />,
+        );
+      case "live-window":
+        // The live window's node: the note's register (the account did
+        // nothing here), differing in SHAPE alone, which is what tells the two
+        // classes apart where they stand together in the head slot.
+        return nodeRow(<LiveWindowIcon size={T} color={SPINE_COLORS.default} />);
+      case "close":
+        return nodeRow(
+          <LogOut size={T} strokeWidth={1.5} absoluteStrokeWidth color="var(--color-rb-500)" aria-hidden="true" />,
+        );
+      case "dead-end":
+        return nodeRow(
+          <ArrowRightToLine
+            size={T}
+            strokeWidth={1.5}
+            absoluteStrokeWidth
+            color="var(--color-rb-500)"
+            aria-hidden="true"
+          />,
+        );
+      case "moment":
+        // The state card's node: a clock in the boundary's neutral ink. The
+        // card states a moment, which no transaction made.
+        return nodeRow(
+          <Clock size={T} strokeWidth={1.25} absoluteStrokeWidth color="var(--color-rb-500)" aria-hidden="true" />,
+        );
+      case "boundary":
+        // The boundary row's node: a stack (lucide `layers`) standing for the
+        // events before the oldest drawn row. Neutral ink, no pulse.
+        return nodeRow(
+          <Layers size={T} strokeWidth={1.25} absoluteStrokeWidth color="var(--color-rb-500)" aria-hidden="true" />,
+        );
+      case "none":
+        // A group with no asset legs, or the boundary card: no node.
+        return null;
+    }
+  })();
 
-    return (
-      <div
-        className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
-        // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
-        // its figures re-state the card's, which carries them.
-        data-prov-exempt=""
-      >
-        <div
-          data-spine-node=""
-          {...nodeAttrs}
-          className={`relative z-10${nodeToggle ? " cursor-pointer" : ""}`}
-          style={detached ? undefined : { backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}` }}
-          {...nodeProps}
-        >
-          {leadIn}
-          {iconContent}
-        </div>
-        <div className="flex-1 relative max-sm:min-h-9">
-          {spineEl}
-          {tipBelow}
-        </div>
-      </div>
-    );
-  }
-
-  // Token flow mode — 1 or 2 rows of token icons with directional arrows
-  const rows = tokens ?? [];
+  // Token flow mode — 1 or 2 rows of token icons with directional arrows.
+  const rows = effectiveIcon ? [] : (tokens ?? []);
   // The external badge occupies the same bottom-right corner as check/cross, so
   // it takes the same paddingBottom compensation — without it the badge clips
   // into the row below.
   const hasBadge = rows.some((r) => r.badge) || (externalParty && rows.length > 0);
-
-  return (
-    <div className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch" data-prov-exempt="">
-      <div
-        data-spine-node=""
-        {...nodeAttrs}
-        className={`relative z-10 flex flex-col gap-y-1 items-center${nodeToggle ? " cursor-pointer" : ""}`}
-        {...nodeProps}
-        style={
-          detached
-            ? { paddingBottom: hasBadge ? 6 : 0 }
-            : {
-                backgroundColor: ground,
-                boxShadow: `0 0 0 4px ${ground}`,
-                paddingBottom: hasBadge ? 6 : 0,
-              }
-        }
-      >
-        {leadIn}
-        {rows.map((row, i) => (
-          <div
-            key={i}
-            className="grid items-center justify-items-center"
-            style={{ gridTemplateColumns: scale.gridCols }}
-          >
+  const tokenRows = rows.map((row, i) => {
+    const chip = (
+      <TokenChipIcon
+        symbol={row.symbol}
+        iconOverride={row.iconSymbol}
+        address={row.address}
+        size={T}
+        filterable={!nodeToggle}
+      />
+    );
+    return (
+      <NodeRow
+        key={i}
+        left={
+          <>
             <SpineVal
               value={
                 spineValues && row.direction === "left" && !unreadOf(row.address, row.symbol) ? row.value : undefined
@@ -1369,40 +1080,34 @@ export function SpineColumn({
               text={row.display}
             />
             {row.direction === "left" ? <ArrowFromDot direction="left" size={scale.arrowSize} /> : <span />}
-            {/* One corner, one badge. An explicit row badge WINS over the
-                external one: a check/cross is the event's own meaning (Aave
-                V4's collateral toggle), whereas "a third party did this" is
-                still carried by the dotted spine and the header's "by …" chip. */}
-            {row.badge || externalParty ? (
-              <div className="relative">
-                <TokenChipIcon
-                  symbol={row.symbol}
-                  iconOverride={row.iconSymbol}
-                  address={row.address}
-                  size={scale.tokenSize}
-                  filterable={!nodeToggle}
-                />
-                {row.badge === "check" ? (
-                  <CheckBadge size={scale.tokenSize} />
-                ) : row.badge === "cross" ? (
-                  <CrossBadge size={scale.tokenSize} />
-                ) : row.badge === "send" ? (
-                  <SendBadge size={scale.tokenSize} />
-                ) : row.badge === "swap" ? (
-                  <SwapBadge size={scale.tokenSize} />
-                ) : (
-                  <ExternalBadge size={scale.tokenSize} />
-                )}
-              </div>
-            ) : (
-              <TokenChipIcon
-                symbol={row.symbol}
-                iconOverride={row.iconSymbol}
-                address={row.address}
-                size={scale.tokenSize}
-                filterable={!nodeToggle}
-              />
-            )}
+          </>
+        }
+        glyph={
+          // One corner, one badge. An explicit row badge WINS over the
+          // external one: a check/cross is the event's own meaning (Aave V4's
+          // collateral toggle), whereas "a third party did this" is still
+          // carried by the header's "by …" chip.
+          row.badge || externalParty ? (
+            <div className="relative">
+              {chip}
+              {row.badge === "check" ? (
+                <CheckBadge size={T} />
+              ) : row.badge === "cross" ? (
+                <CrossBadge size={T} />
+              ) : row.badge === "send" ? (
+                <SendBadge size={T} />
+              ) : row.badge === "swap" ? (
+                <SwapBadge size={T} />
+              ) : (
+                <ExternalBadge size={T} />
+              )}
+            </div>
+          ) : (
+            chip
+          )
+        }
+        right={
+          <>
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
             <SpineVal
               value={
@@ -1416,13 +1121,53 @@ export function SpineColumn({
               full={row.fullValue}
               text={row.display}
             />
-          </div>
-        ))}
+          </>
+        }
+      />
+    );
+  });
+
+  return (
+    <div
+      className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch"
+      // The spine carries no receipts (TO-DO-mobile-timeline decision 13):
+      // its figures re-state the card's, which carries them.
+      data-prov-exempt=""
+    >
+      <div
+        data-spine-node=""
+        {...nodeAttrs}
+        className={`relative z-10${effectiveIcon ? "" : " flex flex-col gap-y-1 items-center"}${nodeToggle ? " cursor-pointer" : ""}`}
+        style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
+        {...nodeProps}
+      >
+        {leadIn}
+        {effectiveIcon ? node : tokenRows}
       </div>
-      <div className="flex-1 relative max-sm:min-h-9">
-        {spineEl}
-        {tipBelow}
-      </div>
+      <div className="flex-1 relative max-sm:min-h-9">{spineEl}</div>
+    </div>
+  );
+}
+
+/** One row of the spine's node: the left flank (a value and an arrow), the
+ *  glyph on the spine, the right flank. Each flank is two empty cells unless
+ *  given. The five columns are `.spine-grid` (app/globals.css). */
+function NodeRow({ left, glyph, right }: { left?: ReactNode; glyph: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="spine-grid">
+      {left ?? (
+        <>
+          <span />
+          <span />
+        </>
+      )}
+      {glyph}
+      {right ?? (
+        <>
+          <span />
+          <span />
+        </>
+      )}
     </div>
   );
 }

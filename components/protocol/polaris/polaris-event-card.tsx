@@ -12,8 +12,8 @@
 import type { BaseActivityEvent, PolarisContext } from "@/lib/shared/types/event-shape";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
-import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
-import { ledgerFieldProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
+
+import { type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { polarisExplainerTeaser } from "@/lib/polaris/explainer-clauses";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
@@ -49,9 +49,6 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
   const dColl = num(ctx.collChange);
   const dDebt = num(ctx.debtChange);
   const isTouch = ctx.eventType === "open" || ctx.eventType === "adjust" || ctx.eventType === "close";
-  // The header registers a labelled (bare-magnitude) receipt on open/adjust
-  // and a signed one on close — the echo's value key must match exactly.
-  const labeled = ctx.eventType !== "close";
 
   const tokens: SpineTokenRow[] = [];
   if (isTouch && dColl !== 0)
@@ -64,11 +61,6 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
       // The header's rule: in full, three decimals, the token named.
       display: formatNumber(Math.abs(dColl)),
       unit: PETH.symbol,
-      prov: {
-        info: ledgerFieldProv("collChange", coords, ctx.raw?.collChange),
-        value: chainTruthDeltaValue(dColl, labeled),
-        symbol: PETH.symbol,
-      },
     });
   if (isTouch && dDebt !== 0)
     tokens.push({
@@ -79,22 +71,11 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
       value: Math.abs(dDebt),
       display: formatNumber(Math.abs(dDebt)),
       unit: stable,
-      prov: {
-        info: ledgerFieldProv("debtChange", coords, ctx.raw?.debtChange),
-        value: chainTruthDeltaValue(dDebt, labeled),
-        symbol: stable,
-      },
     });
 
   const iconSlot =
     ctx.eventType === "liquidate" ? (
-      <SpineColumn
-        icon="warning"
-        warningTone="critical"
-        warningLabel="Liquidation"
-        isFirst={isFirst}
-        isLast={!!isLast}
-      />
+      <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
     ) : ctx.eventType === "transfer" ? (
       <SpineColumn icon="custody" isFirst={isFirst} isLast={!!isLast} />
     ) : tokens.length === 0 ? (

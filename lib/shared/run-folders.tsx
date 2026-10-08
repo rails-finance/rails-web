@@ -2,10 +2,8 @@
 
 // The folder grammar for a collapsed timeline run — one renderer, every spec.
 // ----------------------------------------------------------------------------
-// A collapsed run row that expands in place IS a folder, and it draws as one:
-// the folder glyph in the spine's left flank, a dot on the line, the count in
-// a pill, the members indented under a rail on mobile (all of that lives in
-// TimelineRunCard's `folder` register / SpineColumn's folder node). What THIS
+// A collapsed run row that expands in place IS a folder, and it draws as a
+// group (TimelineRunCard in its bracket frame, group-frame.tsx). What THIS
 // module holds is the run→folders step every spec shares: a run longer than
 // ~CHUNK_TARGET splits into chronological folders of ~100 consecutive events
 // (`chunkByTransaction` — a transaction never splits across folders), each a
@@ -26,7 +24,6 @@
 // never moved at all. The two paths draw the same card.
 
 import type { ReactNode } from "react";
-import { ArrowDownLeft, ArrowLeftRight, Send, TriangleAlert } from "lucide-react";
 import { CHUNK_TARGET, chunkByTransaction } from "@/lib/shared/timeline-chunks";
 import { RunLandingContext } from "@/components/shared/timeline-run-card";
 import { GroupNumbersContext } from "@/components/shared/group-frame";
@@ -115,30 +112,3 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
 export function folderTerminus(i: number, length: number): { isFirst: boolean; isLast: boolean } {
   return { isFirst: i === 0, isLast: i === length - 1 };
 }
-
-// Corner marks a folder wears on its glyph (SpineColumn's `folderMark` /
-// TimelineRunCard's `folderBadge`) — the run kind's severity at a glance,
-// before anything is expanded. Kind-specific marks (a repay's undo arrow, a
-// transfer direction) stay with the spec that owns the kind; these are the
-// registers several protocols share.
-
-/** Terminal adverse runs — liquidations, absorptions, auction settlements. */
-export const DANGER_FOLDER_BADGE: ReactNode = <TriangleAlert size={10} strokeWidth={2.5} className="text-red-500" />;
-
-/** Changes to the owner's position the owner did not make — redemption runs
- *  (Liquity family, Alchemix), f(x) tick rebalances (color-grammar.md §5). */
-export const CAUTION_FOLDER_BADGE: ReactNode = (
-  <TriangleAlert size={10} strokeWidth={2.5} className="text-caution-500" />
-);
-
-/** Custody runs — the paper plane, the same mark the single transfer row wears on its token. */
-export const TRANSFER_FOLDER_BADGE: ReactNode = <Send size={10} strokeWidth={2.5} className="text-rb-500" />;
-
-/** A folder holding MORE THAN ONE kind of event — the same two-way arrows
- *  the position card meta uses for its event count, so "events, various"
- *  reads the same on the folder as it does there (Miles, 2026-09-02). A
- *  one-kind folder wears its kind's own mark instead. */
-export const MIXED_FOLDER_BADGE: ReactNode = <ArrowLeftRight size={10} strokeWidth={2.5} className="text-rb-500" />;
-
-/** Third-party payouts landing in the wallet — queue fills. */
-export const PAID_OUT_FOLDER_BADGE: ReactNode = <ArrowDownLeft size={10} strokeWidth={2.5} className="text-rb-500" />;
