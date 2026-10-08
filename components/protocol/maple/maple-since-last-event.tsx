@@ -55,11 +55,9 @@ const Amount = ({ value, symbol, signed = false }: { value: number; symbol: stri
 
 export function MapleSinceLastEventRow({
   lines,
-  isFirst = false,
   now,
 }: {
   lines: MapleSinceLastEvent[];
-  isFirst?: boolean;
   /** Unix seconds the page counts the stretch to; null until the browser's clock
    *  has arrived (hooks/useMountedNow), when the length is left out. */
   now: number | null;
@@ -75,7 +73,6 @@ export function MapleSinceLastEventRow({
   return (
     <NoteRowShell
       icon="live-window"
-      isFirst={isFirst}
       label={`Since the last event: interest ${period}, ${live}`}
       marker={{ attr: "data-live-window", value: "maple-since-last-event" }}
       header={

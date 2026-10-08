@@ -55,14 +55,12 @@ const fig = (n: number) =>
 
 export function CollSurplusClaimCard({
   event,
-  isFirst,
   isLast,
   eventNumber,
   persistPrefix,
   fork,
 }: {
   event: CollSurplusClaimEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The page's EventCard persist prefix ("liquity-v2", "asymmetry", …). */
@@ -202,7 +200,6 @@ export function CollSurplusClaimCard({
               verb: "claimed",
             },
           ]}
-          isFirst={isFirst}
           isLast={!!isLast}
         />
       }

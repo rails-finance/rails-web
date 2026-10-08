@@ -85,9 +85,6 @@ export interface VaultTimelineRowProps {
   assetSymbol: string;
   vaultAddress: string;
   isLast: boolean;
-  /** The newest row — the head of the list, which draws the pulsing dot above
-   *  it. Rows run newest first, so this is the row at index 0. */
-  isFirst: boolean;
   /** This row's 1-based place in the position's WHOLE history, chronological
    *  and stable across a sort flip — the badge the display menu's "Event
    *  numbers" reveals. Omitted, no badge is drawn. */
@@ -118,7 +115,6 @@ export function VaultTimelineRow({
   assetSymbol,
   vaultAddress,
   isLast,
-  isFirst,
   eventNumber,
   prov,
   headerBars,
@@ -189,9 +185,7 @@ export function VaultTimelineRow({
     <EventCard
       avatar={null}
       caption={KIND_LABEL[event.kind]}
-      iconColumn={
-        <SpineColumn tokens={tokens.length ? tokens : undefined} icon={icon} isFirst={isFirst} isLast={isLast} />
-      }
+      iconColumn={<SpineColumn tokens={tokens.length ? tokens : undefined} icon={icon} isLast={isLast} />}
       header={
         <ChainTruthRow
           spec={{ label: KIND_LABEL[event.kind], custody: isTransfer, deltas, party }}

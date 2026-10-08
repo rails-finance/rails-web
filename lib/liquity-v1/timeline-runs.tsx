@@ -61,7 +61,6 @@ export const LIQUITY_V1_REDEMPTION_RUNS: TimelineRunSpec[] = [
             debtSymbol={DEBT_SYMBOL}
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
-            isFirst={folder.isFirst}
             isLast={folder.isLast}
           >
             {folder.children}

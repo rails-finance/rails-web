@@ -71,7 +71,6 @@ export function liquityForkTimelineRuns<E extends ForkRunEvent>(opts: {
               debtSymbol={debtSymbol}
               firstTimestamp={events[0].timestamp}
               lastTimestamp={events[events.length - 1].timestamp}
-              isFirst={folder.isFirst}
               isLast={folder.isLast}
             >
               {folder.children}

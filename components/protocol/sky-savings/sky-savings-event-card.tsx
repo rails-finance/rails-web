@@ -81,13 +81,11 @@ const signedCompact = (v: bigint) => {
 
 export function SkySavingsEventCard({
   event,
-  isFirst,
   isLast,
   eventNumber,
   previous,
 }: {
   event: SkySavingsEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The holder's event before this one: null for the first, undefined when
@@ -308,9 +306,9 @@ export function SkySavingsEventCard({
   // ── the spine ─────────────────────────────────────────────────────────────
   const iconColumn =
     kind === "self" || tokens.length === 0 ? (
-      <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="no-change" isLast={!!isLast} />
     ) : (
-      <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn tokens={tokens} isLast={!!isLast} />
     );
 
   return (

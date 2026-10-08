@@ -113,7 +113,6 @@ export function FlowMomentCard({
   prev,
   next,
   today,
-  isFirst,
   flash,
 }: {
   moment: FlowMoment;
@@ -124,7 +123,6 @@ export function FlowMomentCard({
   next: MomentNeighbour | null;
   /** Today's UTC day. */
   today: number;
-  isFirst: boolean;
   /** The header rings for a moment after the chip's text brings it into view
    *  or it first comes into view after "Show timeline to {date}". */
   flash: boolean;
@@ -657,7 +655,7 @@ export function FlowMomentCard({
       <div id="flow-moment" data-flow-moment={moment.day} data-anatomy="L4" className="rounded-xl">
         <EventCard
           avatar={null}
-          iconColumn={<SpineColumn icon="moment" isFirst={isFirst} isLast={false} tip={null} />}
+          iconColumn={<SpineColumn icon="moment" isLast={false} tip={null} />}
           header={header}
           detail={detail}
           detailLabel={`The position at the close of ${date}`}

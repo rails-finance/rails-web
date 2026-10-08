@@ -478,7 +478,6 @@ export default function DolomitePositionView({
                     <DolomiteEventCard
                       event={event}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       siblings={siblingsByTx.get(event.txHash) ?? [event]}
                       accountNumber={accountNumber ?? undefined}

@@ -32,7 +32,6 @@ import { shortAddress } from "@/lib/frankencoin/asset-catalog";
 
 export interface FrankencoinEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "frankencoin"; data: FrankencoinContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
@@ -42,7 +41,7 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: FrankencoinEventCardProps) {
+export function FrankencoinEventCard({ event, isLast, eventNumber }: FrankencoinEventCardProps) {
   const ctx = event.context.data;
   const facts = useFrankencoinPageFacts();
   // The receipt read the teaser's lead can use (a new owner's kind); the same
@@ -129,16 +128,16 @@ export function FrankencoinEventCard({ event, isFirst, isLast, eventNumber }: Fr
 
   const iconSlot =
     critical || caution ? (
-      <SpineColumn icon="warning" warningTone={critical ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="warning" warningTone={critical ? "critical" : "caution"} isLast={!!isLast} />
     ) : ctx.eventType === "ownership_transferred" ? (
       // An ownership handover is a people event with no token flow — the person
       // glyph with the join badge marks the new owner taking over; dotted spine
       // (nothing moved). Same treatment as makerdao's `give`, fluid's and fx's
       // `transfer`. Covers the mint-time factory→owner handover too ("Owner Set
       // at Mint"), which is the same shape: a party changed, no collateral did.
-      <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
     ) : (
-      <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn tokens={tokens} isLast={!!isLast} />
     );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

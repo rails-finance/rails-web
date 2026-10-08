@@ -36,11 +36,10 @@ function numberRange(ns: (number | null | undefined)[]): [number, number] | null
 }
 
 /** What one folder knows about its place in the run: a stable key, the run's
- *  spine-terminus flags scoped to the OUTERMOST folders, and the members'
+ *  spine-terminus flag scoped to the LAST folder, and the members'
  *  already-rendered cards for the in-place expand. */
 export interface RunFolderMeta {
   key: string;
-  isFirst: boolean;
   isLast: boolean;
   children: ReactNode[];
 }
@@ -56,7 +55,6 @@ export interface RunFolderMeta {
 export function renderRunFolders<E extends { id: string; txHash: string }>(
   run: E[],
   meta: {
-    isFirst: boolean;
     isLast: boolean;
     children: ReactNode[];
     landingId?: string;
@@ -70,7 +68,7 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
   const zipped = run.map((event, i) => ({ event, child: meta.children[i], n: meta.eventNumbers?.[i] }));
   const chunks = chunkByTransaction(zipped, (m) => m.event.txHash, CHUNK_TARGET, minRun);
   // The folders ARE the run's presentation — siblings on the timeline, no
-  // wrapper row. The run's spine-terminus flags land on its outermost folders.
+  // wrapper row. The run's spine-terminus flag lands on its last folder.
   return (
     <>
       {chunks.map((chunk, i) => (
@@ -83,7 +81,6 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
               chunk.map((m) => m.event),
               {
                 key: `chunk_${chunk[0].event.id}`,
-                isFirst: meta.isFirst && i === 0,
                 isLast: meta.isLast && i === chunks.length - 1,
                 children: chunk.map((m) => m.child),
               },
@@ -96,19 +93,19 @@ export function renderRunFolders<E extends { id: string; txHash: string }>(
 }
 
 /**
- * The spine-terminus flags for a row at position `i` of a list of `length`
- * rows — where the dotted line begins and ends.
+ * The spine-terminus flag for a row at position `i` of a list of `length`
+ * rows: where the line ends.
  *
  * A render-order fact, computed from position in the DISPLAYED list, which is
  * why it survived grouping moving into the index: a served folder has no run
  * around it to scope its termini to, so the row's own place in the list is the
- * whole answer. `renderRunFolders` above scopes the RUN's flags to its
- * outermost folders instead, because there the run is the thing with ends.
+ * whole answer. `renderRunFolders` above scopes the RUN's flag to its
+ * last folder instead, because there the run is the thing with ends.
  *
  * Kept beside that helper rather than in the timeline component, so the two
  * grouping paths state the same fact in the same file for as long as both
  * exist (decision 0019's rollout is one family at a time).
  */
-export function folderTerminus(i: number, length: number): { isFirst: boolean; isLast: boolean } {
-  return { isFirst: i === 0, isLast: i === length - 1 };
+export function folderTerminus(i: number, length: number): { isLast: boolean } {
+  return { isLast: i === length - 1 };
 }

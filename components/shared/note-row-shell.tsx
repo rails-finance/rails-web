@@ -34,9 +34,8 @@ import { disclosureProps } from "@/components/shared/disclosure";
 export interface NoteRowShellProps {
   /** The spine glyph this row's class wears. */
   icon: SpineIcon;
-  /** Spine terminus flags. A row that sits BETWEEN two others is neither, so
-   *  both default false; a row in the timeline's head slot passes `isFirst`. */
-  isFirst?: boolean;
+  /** The spine's last node. A row that sits BETWEEN two others is not, so it
+   *  defaults false. */
   isLast?: boolean;
   /** The header control's accessible name. */
   label: string;
@@ -56,7 +55,6 @@ export interface NoteRowShellProps {
 
 export function NoteRowShell({
   icon,
-  isFirst = false,
   isLast = false,
   label,
   marker,
@@ -78,7 +76,7 @@ export function NoteRowShell({
         className={`spine-row relative ${scale.cardRounded}`}
       >
         <div className="spine-cell">
-          <SpineColumn icon={icon} isFirst={isFirst} isLast={isLast} />
+          <SpineColumn icon={icon} isLast={isLast} />
         </div>
         <div className="spine-content">
           {/* ── Header panel — what the row states at rest ──────────────── */}

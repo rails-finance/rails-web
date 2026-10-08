@@ -24,7 +24,6 @@ import { compoundRowLabel } from "@/lib/compound/row-facts";
 
 export interface CompoundEventCardProps {
   event: CompoundEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Same-tx sibling events — the absorb-leg seam (defaults to just this one). */
@@ -55,7 +54,6 @@ const DIRECTION: Record<Exclude<CompoundContext["eventType"], CompoundTransferKi
 
 export function CompoundEventCard({
   event,
-  isFirst,
   isLast,
   eventNumber,
   siblings,
@@ -133,9 +131,9 @@ export function CompoundEventCard({
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   // The collateral and debt cells open into their ledgers where the page ties

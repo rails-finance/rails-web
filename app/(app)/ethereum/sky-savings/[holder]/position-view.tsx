@@ -235,7 +235,6 @@ export default function SkySavingsPositionView({
             <SkySavingsEventCard
               event={event}
               eventNumber={meta.eventNumber}
-              isFirst={meta.isFirst}
               isLast={meta.isLast}
               previous={previousOf.get(event.id)}
             />

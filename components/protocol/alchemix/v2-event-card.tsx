@@ -244,14 +244,12 @@ function explainer(e: AlchemixV2Event, a: Amount | null): string | null {
 export function AlchemixV2EventCard({
   event,
   showVersion = false,
-  isFirst,
   isLast,
   eventNumber,
 }: {
   event: AlchemixV2Event;
   /** Name the version on the row: set where the timeline carries both. */
   showVersion?: boolean;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }) {
@@ -262,9 +260,9 @@ export function AlchemixV2EventCard({
     // dead-end arrow on a solid (agency) spine, the same register as V3's
     // self-liquidation `close` mark.
     d.eventType === "liquidate" ? (
-      <SpineColumn icon="dead-end" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="dead-end" isLast={!!isLast} />
     ) : (
-      <SpineColumn tokens={spine(d, a)} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn tokens={spine(d, a)} isLast={!!isLast} />
     );
   const stats = detailStats(event, a);
   const line = explainer(event, a);

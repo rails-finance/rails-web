@@ -414,7 +414,6 @@ function MarketSection({
                   <CompoundEventCard
                     event={event}
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     siblings={siblingsByTx.get(event.txHash) ?? [event]}
                     previous={previousById.get(event.id)}

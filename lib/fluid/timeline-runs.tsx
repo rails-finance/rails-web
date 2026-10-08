@@ -70,7 +70,6 @@ export const FLUID_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             folder
             firstTimestamp={first.timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
-            isFirst={folder.isFirst}
             isLast={folder.isLast}
           >
             {folder.children}
@@ -111,7 +110,7 @@ const logIndex = (e: BaseActivityEvent): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFirst: boolean; isLast: boolean }) {
+function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLast: boolean }) {
   const members = run.filter(isFluidEvent).sort((a, b) => logIndex(b) - logIndex(a));
   const nft = members[0].context.data.nftId;
   const mint = members.find((m) => m.context.data.eventType === "mint") ?? null;
@@ -124,16 +123,15 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFir
 
   // Cards newest first, the list's order: operates (the Open row among them),
   // then the round trip, then whatever else the transaction holds.
-  const cards: { key: string; node: (first: boolean, last: boolean) => ReactNode }[] = [];
+  const cards: { key: string; node: (last: boolean) => ReactNode }[] = [];
   for (const o of [...operates].reverse()) {
     cards.push({
       key: o.id,
-      node: (first, last) => (
+      node: (last) => (
         <FluidEventCard
           event={o}
           siblings={sibs}
           openedBy={o === openOperate ? (mint ?? undefined) : undefined}
-          isFirst={first}
           isLast={last}
         />
       ),
@@ -142,16 +140,14 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFir
   if (drawnAsRoundTrip) {
     cards.push({
       key: `roundtrip_${hops[0].id}`,
-      node: (first, last) => (
-        <FluidRoundTripCard hops={hops} operates={operatesIn(sibs, nft)} isFirst={first} isLast={last} />
-      ),
+      node: (last) => <FluidRoundTripCard hops={hops} operates={operatesIn(sibs, nft)} isLast={last} />,
     });
   }
   for (const m of members) {
     if (operates.includes(m) || (mint === m && openOperate) || (drawnAsRoundTrip && hops.includes(m))) continue;
     cards.push({
       key: m.id,
-      node: (first, last) => <FluidEventCard event={m} siblings={sibs} isFirst={first} isLast={last} />,
+      node: (last) => <FluidEventCard event={m} siblings={sibs} isLast={last} />,
     });
   }
   return (
@@ -161,10 +157,10 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isFir
       {cards.map((c, i) => (
         <div key={c.key}>
           {i === 0 ? (
-            c.node(meta.isFirst, meta.isLast && cards.length === 1)
+            c.node(meta.isLast && cards.length === 1)
           ) : (
             <SpineTipContext.Provider value={null}>
-              {c.node(false, meta.isLast && i === cards.length - 1)}
+              {c.node(meta.isLast && i === cards.length - 1)}
             </SpineTipContext.Provider>
           )}
         </div>

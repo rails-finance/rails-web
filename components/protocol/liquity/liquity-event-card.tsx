@@ -30,7 +30,6 @@ export interface LiquityEventCardProps {
   ensName?: string | null;
   hoveredAddress?: string | null;
   setHoveredAddress?: (addr: string | null) => void;
-  isFirst?: boolean;
   isLast?: boolean;
   /** When provided, replaces the internally-built avatar slot */
   avatarOverride?: React.ReactNode;
@@ -53,7 +52,6 @@ export function LiquityEventCard({
   ensName,
   hoveredAddress,
   setHoveredAddress,
-  isFirst,
   isLast,
   avatarOverride,
   previousEvent,
@@ -157,30 +155,23 @@ export function LiquityEventCard({
       icon="warning"
       warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
       warningLegs={warningLegs}
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : isDelegate ? (
     // Delegation reads as an external-party event via the pink +/- glyph badge
     // (color-grammar.md §4b); the spine line itself stays neutral.
-    <SpineColumn icon="delegate" iconDirection={isJoin ? "up" : "down"} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="delegate" iconDirection={isJoin ? "up" : "down"} isLast={!!isLast} />
   ) : isRateChange ? (
-    <SpineColumn
-      icon="rate-change"
-      iconDirection={rateUp ? "up" : "down"}
-      rateSpan={rateSpan}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn icon="rate-change" iconDirection={rateUp ? "up" : "down"} rateSpan={rateSpan} isLast={!!isLast} />
   ) : ctx.operation === "transferTrove" ? (
     // The Trove NFT changed hands; no collateral or BOLD moved. The custody
     // plane in its neutral disc (detail-page-anatomy.md, "The custody row"),
     // the mark Polaris's position transfer wears.
-    <SpineColumn icon="custody" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="custody" isLast={!!isLast} />
   ) : isNoChangeAdjust(ctx) ? (
     // Zero-delta touch: no flows to draw, but an empty spine slot reads as a
     // rendering hole — mark the event with the neutral "nothing moved" glyph.
-    <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="no-change" isLast={!!isLast} />
   ) : (
     (() => {
       const debtOp = ctx.troveOperation?.debtChangeFromOperation ?? 0;
@@ -240,7 +231,7 @@ export function LiquityEventCard({
           : []),
       ] as import("@/components/shared/spine-column").SpineTokenRow[];
 
-      return <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />;
+      return <SpineColumn tokens={tokens} isLast={!!isLast} />;
     })()
   );
 

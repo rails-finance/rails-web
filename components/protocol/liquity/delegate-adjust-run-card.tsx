@@ -36,7 +36,6 @@ export interface DelegateAdjustRunCardProps {
   /** Chronological bounds of the run (either display order). */
   firstTimestamp: number;
   lastTimestamp: number;
-  isFirst?: boolean;
   isLast?: boolean;
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
@@ -49,7 +48,6 @@ export function DelegateAdjustRunCard({
   managerName,
   firstTimestamp,
   lastTimestamp,
-  isFirst,
   isLast,
   children,
 }: DelegateAdjustRunCardProps) {
@@ -113,7 +111,7 @@ export function DelegateAdjustRunCard({
   const hide = { ...words2.hide, hide: () => open && toggle() };
   // No asset moved: no node, the words stand, and the dotted segment marks
   // the members not drawn.
-  const column = <SpineColumn icon="none" undrawn isFirst={isFirst} isLast={!!isLast} />;
+  const column = <SpineColumn icon="none" undrawn isLast={!!isLast} />;
 
   const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
   const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";

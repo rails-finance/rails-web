@@ -635,16 +635,13 @@ export default function MaplePositionView({
                 readFolderMembers={readMembers}
                 segments={segments}
                 liveWindow={
-                  sinceLast.length > 0
-                    ? ({ isFirst }) => <MapleSinceLastEventRow lines={sinceLast} isFirst={isFirst} now={mountedNow} />
-                    : undefined
+                  sinceLast.length > 0 ? () => <MapleSinceLastEventRow lines={sinceLast} now={mountedNow} /> : undefined
                 }
                 renderCard={(event, meta) =>
                   isMapleEvent(event) ? (
                     <MapleEventCard
                       event={event}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       times={rowTimes.get(event.id)}
                     />

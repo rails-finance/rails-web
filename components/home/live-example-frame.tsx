@@ -165,7 +165,6 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
                     <LiquityEventCard
                       event={event}
                       addressDisplay="hidden"
-                      isFirst={idx === 0}
                       isLast={idx === visibleEvents.length - 1}
                       previousEvent={previousEvent}
                       eventNumber={tempIdx + 1}

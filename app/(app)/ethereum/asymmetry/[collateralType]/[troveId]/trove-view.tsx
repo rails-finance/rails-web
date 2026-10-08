@@ -619,19 +619,13 @@ export default function AsymmetryTroveDetail({
                 isCollSurplusClaimEvent(event) ? (
                   <CollSurplusClaimCard
                     event={event}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     eventNumber={meta.eventNumber}
                     persistPrefix="asymmetry"
                     fork={ASYMMETRY_FORK}
                   />
                 ) : isAsymmetryEvent(event) ? (
-                  <AsymmetryEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
+                  <AsymmetryEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                 ) : null
               }
             />

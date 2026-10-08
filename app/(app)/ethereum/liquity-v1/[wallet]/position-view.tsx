@@ -648,7 +648,6 @@ export default function LiquityV1TroveView({
                 isCollSurplusClaimEvent(event) ? (
                   <CollSurplusClaimCard
                     event={event}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     eventNumber={meta.eventNumber}
                     persistPrefix="liquity-v1"
@@ -657,7 +656,6 @@ export default function LiquityV1TroveView({
                   <LiquityV1EventCard
                     event={event}
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     // Today's PriceFeed price — a redemption's net outcome at
                     // today's value. Read on any life: it prices the ETH now.

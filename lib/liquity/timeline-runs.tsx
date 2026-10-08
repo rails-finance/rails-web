@@ -59,7 +59,6 @@ const REDEMPTION_RUN: TimelineRunSpec = {
           debtSymbol={first?.assetType ?? "BOLD"}
           firstTimestamp={events[0].timestamp}
           lastTimestamp={events[events.length - 1].timestamp}
-          isFirst={folder.isFirst}
           isLast={folder.isLast}
           debtSpan={debtSpan}
         >
@@ -99,7 +98,6 @@ const DELEGATE_ADJUST_RUN: TimelineRunSpec = {
           managerName={manager ? getBatchManagerName(manager) : undefined}
           firstTimestamp={events[0].timestamp}
           lastTimestamp={events[events.length - 1].timestamp}
-          isFirst={folder.isFirst}
           isLast={folder.isLast}
         >
           {folder.children}

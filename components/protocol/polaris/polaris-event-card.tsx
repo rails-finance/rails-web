@@ -25,7 +25,6 @@ import { PolarisLedgerProvider } from "./polaris-ledger";
 
 export interface PolarisEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "polaris"; data: PolarisContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
@@ -35,7 +34,7 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: PolarisEventCardProps) {
+export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCardProps) {
   const ctx = event.context.data;
   const coords: PolarisCoords = {
     txHash: event.txHash,
@@ -75,15 +74,15 @@ export function PolarisEventCard({ event, isFirst, isLast, eventNumber }: Polari
 
   const iconSlot =
     ctx.eventType === "liquidate" ? (
-      <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
     ) : ctx.eventType === "transfer" ? (
-      <SpineColumn icon="custody" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="custody" isLast={!!isLast} />
     ) : tokens.length === 0 ? (
       // An interest-only touch: the log wrote the pending legs in and moved
       // nothing the holder chose.
-      <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="no-change" isLast={!!isLast} />
     ) : (
-      <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn tokens={tokens} isLast={!!isLast} />
     );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

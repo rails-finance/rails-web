@@ -310,7 +310,6 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
                   assetSymbol={assetSymbol}
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
                   isLast={meta.isLast}
                 />
               );
@@ -463,7 +462,6 @@ function AaveTimelineRow({
   assetSymbol,
   vaultAddress,
   eventNumber,
-  isFirst,
   isLast,
 }: {
   event: VaultHolderEvent;
@@ -474,7 +472,6 @@ function AaveTimelineRow({
   /** This row's place in the WHOLE history, 1-based and chronological: the
    *  header's number pill. */
   eventNumber: number;
-  isFirst: boolean;
   isLast: boolean;
 }) {
   const cooldowns = cooldownsOf(event);
@@ -488,7 +485,6 @@ function AaveTimelineRow({
       assetSymbol={assetSymbol}
       vaultAddress={vaultAddress}
       eventNumber={eventNumber}
-      isFirst={isFirst}
       isLast={isLast}
       prov={PROV}
       persistPrefix="aave-vault"

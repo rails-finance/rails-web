@@ -252,7 +252,6 @@ export function AlchemixV2PositionView({
             return (
               <AlchemixV2EventCard
                 event={event as AlchemixV2Event}
-                isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 eventNumber={meta.eventNumber}
               />

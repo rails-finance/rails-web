@@ -179,10 +179,6 @@ export interface SpineColumnProps {
    *  group): dotted, in the warning tone or the neutral ink. Every other
    *  line is solid. */
   undrawn?: boolean;
-  /** The first node on the spine. A LINE-END prop, not the tip — the
-   *  pulsing dot is `tip`'s alone. The list's line starts at the first node
-   *  it finds (spine-line.tsx). */
-  isFirst?: boolean;
   /** The last node on the spine: the list's line ends at it
    *  (`data-spine-end`). */
   isLast: boolean;
@@ -202,9 +198,8 @@ export type SpineTip = "above";
 /** Which end of the newest row the pulsing dot sits at, provided by the
  *  shared timeline around that ONE row — or around whatever stands in the head
  *  slot above it instead: the live window row, else a live market-note row.
- *  The protocol cards pass
- *  `isFirst`/`isLast` through to <SpineColumn> without knowing about the
- *  tip, so it reaches the column this way; a column with an explicit `tip`
+ *  The protocol cards pass `isLast` through to <SpineColumn> without knowing
+ *  about the tip, so it reaches the column this way; a column with an explicit `tip`
  *  ignores the context. */
 export const SpineTipContext = createContext<SpineTip | null>(null);
 
@@ -909,7 +904,7 @@ export function SpineColumn({
 
   // The tip above: a lead-in line and the pulsing dot above the newest event's
   // node — absolutely positioned so it doesn't push the icon down. Drawn by
-  // `tip` alone; `isFirst` draws nothing above (see the props).
+  // `tip` alone.
   const leadIn = effectiveTip === "above" && (
     <div
       className="absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center"

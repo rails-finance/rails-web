@@ -74,13 +74,10 @@ export function PolarisSinceLastTouchRow({
   window: w,
   market,
   stable,
-  isFirst = false,
 }: {
   window: PolarisSinceLastTouch;
   market: "usdp" | "goldp";
   stable: string;
-  /** The spine terminus the timeline's head slot decides (see `liveWindow`). */
-  isFirst?: boolean;
 }) {
   // formatDuration reads a bare number as unix SECONDS, which is what both ends carry.
   const elapsed = formatDuration(w.from.timestamp, w.to.timestamp);
@@ -233,7 +230,6 @@ export function PolarisSinceLastTouchRow({
   return (
     <NoteRowShell
       icon="live-window"
-      isFirst={isFirst}
       label={`Since its last touch — ${signedFigure(w.total, stable)}`}
       marker={{ attr: "data-live-window", value: "polaris-since-touch" }}
       header={

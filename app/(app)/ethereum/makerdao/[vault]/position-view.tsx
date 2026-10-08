@@ -750,12 +750,7 @@ export default function MakerVaultDetailView({
               }
               renderCard={(event, meta) =>
                 isMakerDAOEvent(event) ? (
-                  <MakerDAOEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
+                  <MakerDAOEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                 ) : null
               }
             />

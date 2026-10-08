@@ -79,7 +79,6 @@ export interface AlchemixEventCardProps {
    *  can leave one leg of an opening standing alone, and that leg must still be
    *  able to tell a forwarding hop from a change of owner. */
   siblings?: AlchemistEvent[];
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The last of the card's event numbers, where it draws several logs. */
@@ -129,7 +128,6 @@ export function AlchemixEventCard({
   mytSymbol,
   underlyingDecimals = null,
   siblings,
-  isFirst,
   isLast,
   eventNumber,
   eventNumberLast,
@@ -173,13 +171,9 @@ export function AlchemixEventCard({
   const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
   const iconSlot = custodyOnly ? (
-    <SpineColumn
-      tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]} isLast={!!isLast} />
   ) : closed ? (
-    <SpineColumn icon="close" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="close" isLast={!!isLast} />
   ) : adverse || cautioned ? (
     <SpineColumn
       icon="warning"
@@ -187,11 +181,10 @@ export function AlchemixEventCard({
       // the position without the owner acting: caution (color-grammar.md §5),
       // told apart by the pill's word. A liquidation stays critical.
       warningTone={adverse ? "critical" : "caution"}
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : (
-    <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} isLast={!!isLast} />
   );
 
   return (

@@ -867,7 +867,6 @@ export default function AaveV3PositionDetail({
                       persistPrefix="aave-v3"
                       hfFormat={hfLabelV3}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       market={sharedBlocks.has(event.blockNumber) ? undefined : `chain:${market}`}
                     />
@@ -875,7 +874,6 @@ export default function AaveV3PositionDetail({
                     <AaveV3CtEventCard
                       event={event as AaveV3Event}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       market={market}
                       siblings={neighbours.get(event.id)?.siblings}

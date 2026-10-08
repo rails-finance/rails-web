@@ -23,12 +23,10 @@ function range(events: AlchemistEvent[]): string {
 
 export function AlchemixQuietRedemptions({
   events,
-  isFirst,
   isLast,
   children,
 }: {
   events: AlchemistEvent[];
-  isFirst?: boolean;
   isLast?: boolean;
   children: ReactNode;
 }) {
@@ -41,7 +39,6 @@ export function AlchemixQuietRedemptions({
   return (
     <NoteRowShell
       icon="no-change"
-      isFirst={isFirst}
       isLast={isLast}
       label={sentence}
       marker={{ attr: "data-quiet-redemptions", value: events[0]?.id ?? "" }}

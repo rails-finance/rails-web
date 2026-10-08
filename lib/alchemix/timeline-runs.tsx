@@ -140,7 +140,6 @@ export function useAlchemixTimelineRuns(
               mytSymbol={mytSymbol}
               underlyingDecimals={underlyingDecimals}
               siblings={siblingsByTx.get(legs[0].txHash) ?? legs}
-              isFirst={meta.isFirst}
               isLast={meta.isLast}
               eventNumber={numbered.length > 0 ? Math.min(...numbered) : undefined}
               eventNumberLast={numbered.length > 0 ? Math.max(...numbered) : undefined}
@@ -160,7 +159,6 @@ export function useAlchemixTimelineRuns(
           <AlchemixQuietRedemptions
             key={`quiet_${run[0].id}`}
             events={run.filter(isAlchemistEvent)}
-            isFirst={meta.isFirst}
             isLast={meta.isLast}
           >
             {meta.children}
@@ -220,7 +218,6 @@ export function useAlchemixTimelineRuns(
                 prov={clearedRunProv(symbol, raw, events.length, stated, range, coords)}
                 firstTimestamp={events[0].timestamp}
                 lastTimestamp={events[events.length - 1].timestamp}
-                isFirst={folder.isFirst}
                 isLast={folder.isLast}
               >
                 {folder.children}

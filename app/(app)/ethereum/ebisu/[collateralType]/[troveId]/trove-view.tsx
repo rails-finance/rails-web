@@ -618,19 +618,13 @@ export default function EbisuTroveDetail({
                 isCollSurplusClaimEvent(event) ? (
                   <CollSurplusClaimCard
                     event={event}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     eventNumber={meta.eventNumber}
                     persistPrefix="ebisu"
                     fork={EBISU_FORK}
                   />
                 ) : isEbisuEvent(event) ? (
-                  <EbisuEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
+                  <EbisuEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                 ) : null
               }
             />

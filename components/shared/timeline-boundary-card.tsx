@@ -106,15 +106,7 @@ const BOUNDARY_CAPTION: Record<"cut" | "tip" | "view", string> = {
   view: "Earlier events hidden by the filters",
 };
 
-export function TimelineBoundaryRow({
-  kind,
-  isFirst,
-  isLast,
-}: {
-  kind: "cut" | "tip" | "view";
-  isFirst?: boolean;
-  isLast: boolean;
-}) {
+export function TimelineBoundaryRow({ kind, isLast }: { kind: "cut" | "tip" | "view"; isLast: boolean }) {
   // Under 640px the glyph is a segment with a caption naming what lies past
   // it. Nothing opens, so it is text.
   return (
@@ -125,7 +117,7 @@ export function TimelineBoundaryRow({
       className="spine-row spine-seg relative"
     >
       <div className="spine-cell">
-        <SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} tip={null} />
+        <SpineColumn icon="boundary" isLast={isLast} tip={null} />
       </div>
       <div className="spine-content">
         <div className="spine-t1 flex justify-center px-7 pb-2.5 pt-1.5 sm:hidden" data-spine-caption="">
@@ -152,17 +144,10 @@ export interface TimelineBoundaryCardProps {
    *  small print then names the CSV download. Absent or false: the request
    *  sentence alone. Never true on a vault holder page (no export menu). */
   csvExport?: boolean;
-  isFirst: boolean;
   isLast: boolean;
 }
 
-export function TimelineBoundaryCard({
-  boundary: b,
-  protocolKey,
-  csvExport,
-  isFirst,
-  isLast,
-}: TimelineBoundaryCardProps) {
+export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLast }: TimelineBoundaryCardProps) {
   const chainId = useChainId();
   // Open at rest: the body is the statement the card exists to make, and a
   // reader who has scrolled to the end of the list is here for it. Still a
@@ -357,7 +342,7 @@ export function TimelineBoundaryCard({
             </span>
           ) : undefined
         }
-        iconColumn={<SpineColumn icon="none" undrawn isFirst={isFirst} isLast={isLast} />}
+        iconColumn={<SpineColumn icon="none" undrawn isLast={isLast} />}
         header={header}
         detail={hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />}
         detailOpen={open}

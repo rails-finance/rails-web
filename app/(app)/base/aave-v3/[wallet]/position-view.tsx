@@ -756,7 +756,6 @@ export default function AaveV3BasePositionView({
                             persistPrefix="aave-v3"
                             hfFormat={hfLabelV3}
                             eventNumber={meta.eventNumber}
-                            isFirst={meta.isFirst}
                             isLast={meta.isLast}
                             market={sharedBlocks.has(event.blockNumber) ? undefined : "base"}
                           />
@@ -764,7 +763,6 @@ export default function AaveV3BasePositionView({
                           <AaveV3CtEventCard
                             event={event}
                             eventNumber={meta.eventNumber}
-                            isFirst={meta.isFirst}
                             isLast={meta.isLast}
                             market={sharedBlocks.has(event.blockNumber) ? undefined : "base"}
                             siblings={neighbours.get(event.id)?.siblings}

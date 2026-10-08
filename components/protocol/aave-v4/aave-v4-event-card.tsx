@@ -18,7 +18,6 @@ import { aaveV4ExplainerTeaser, coordsFor, type AaveV4Event } from "@/lib/aave-v
 
 export interface AaveV4EventCardProps {
   event: AaveV4Event;
-  isFirst?: boolean;
   isLast?: boolean;
   /** Position + total within shared tx_hash. Drives the "X OF Y" chip. */
   txGroup?: AaveV4TxGroup;
@@ -36,7 +35,6 @@ export interface AaveV4EventCardProps {
 
 export function AaveV4EventCard({
   event,
-  isFirst,
   isLast,
   txGroup,
   siblings,
@@ -69,7 +67,7 @@ export function AaveV4EventCard({
   const symAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
 
   const iconSlot = isLiquidation ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : isCollateralToggle ? (
     // The toggle's own check/cross badge is the event's MEANING, so it keeps
     // the icon corner even when a third party flipped it — the dotted spine and
@@ -77,21 +75,18 @@ export function AaveV4EventCard({
     <SpineColumn
       tokens={[{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }]}
       externalParty={!!extBy}
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : alsoToggled ? (
     <SpineColumn
       tokens={[{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }]}
       externalParty={!!extBy}
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : (
     <SpineColumn
       tokens={[{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }]}
       externalParty={!!extBy}
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   );

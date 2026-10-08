@@ -522,9 +522,8 @@ export default function PwnLoanView({
               tl={tl}
               liveWindow={
                 unclaimed && deadline != null
-                  ? ({ isFirst }) => (
+                  ? () => (
                       <PwnDeadlinePassedRow
-                        isFirst={isFirst}
                         deadline={deadline}
                         extended={view.extendedDueAt != null && view.extendedDueAt !== loanDueAt(view)}
                         dueKind={view.dueKind}
@@ -579,7 +578,6 @@ export default function PwnLoanView({
                   <PwnEventCard
                     event={event}
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     siblings={siblingsByTx.get(event.txHash) ?? [event]}
                   />

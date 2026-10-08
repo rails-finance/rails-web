@@ -292,12 +292,10 @@ export interface TimelineRunSpec {
   asOneEvent?: boolean;
   /** Render the collapsed row. `children` holds the run's member cards
    *  (already rendered via renderCard, date-prefixed) for in-place expansion,
-   *  one per member in run order; isFirst/isLast are the run's spine-terminus
-   *  flags. */
+   *  one per member in run order; isLast is the run's spine-terminus flag. */
   render: (
     run: BaseActivityEvent[],
     meta: {
-      isFirst: boolean;
       isLast: boolean;
       children: ReactNode[];
       /** Each member's event number, in run order: an `asOneEvent` row numbers
@@ -323,7 +321,7 @@ export interface ChainTruthTimelineProps {
   /** The page's useTimelineEvents result. */
   tl: TimelineEventsState;
   /** Render one event's card, given its spine position. */
-  renderCard: (event: BaseActivityEvent, meta: { eventNumber: number; isFirst: boolean; isLast: boolean }) => ReactNode;
+  renderCard: (event: BaseActivityEvent, meta: { eventNumber: number; isLast: boolean }) => ReactNode;
   /** Toolbar leading text (default "replayed from chain"). */
   toolbarLeading?: ReactNode;
   /** A title on the toolbar's event-count line, for a family whose count is a
@@ -360,7 +358,7 @@ export interface ChainTruthTimelineProps {
    *  A note is NOT an event and is never counted as one. It reaches the list
    *  through this prop alone, is attached to a row at render time by the id of
    *  the event it sits beside, and touches nothing the page counts —
-   *  `tl.displayedEvents`, `rows`, `windowSize`, `hasMore`, `isFirst`/`isLast`,
+   *  `tl.displayedEvents`, `rows`, `windowSize`, `hasMore`, `isLast`,
    *  `eventNumberOf`, the toolbar's count line, the filter option counts, the
    *  heatmap, run counts and the export tables all read exactly what they read
    *  with the array empty. Passing at least one note also adds Display's
@@ -410,12 +408,11 @@ export interface ChainTruthTimelineProps {
    *  It is never ANCHORED to a place in the sequence: it ends at now, and now
    *  is the top of a newest-first list — so it sits in the head slot always,
    *  above the live notes, and takes the spine's lead-in dot from the newest
-   *  row. The callback receives the spine-terminus flag the slot decides
-   *  (`isFirst` is false where the tip's own glyph already stands above it).
+   *  row.
    *
    *  Omit it wherever the window is not a fact — a closed position, a read that
    *  has not landed — and the slot draws nothing. */
-  liveWindow?: (meta: { isFirst: boolean }) => ReactNode;
+  liveWindow?: () => ReactNode;
   /** Rendered beneath the last event, once the whole list is on screen.
    *
    *  For the statement a SWEPT timeline owes its reader: where the history
@@ -546,7 +543,6 @@ function ServedFolderRow({
   forceOpen,
   memberPasses,
   onlyDates,
-  isFirst,
   isLast,
   renderMember,
 }: {
@@ -562,7 +558,6 @@ function ServedFolderRow({
   /** The date range is the only filter in force — the empty line then names
    *  the dates rather than the filters. */
   onlyDates: boolean;
-  isFirst: boolean;
   isLast: boolean;
   /** One member's card, numbered from the folder's own ordinals — the same
    *  literal numbering the rest of the list runs on, one level down. */
@@ -646,7 +641,6 @@ function ServedFolderRow({
       extraHeader={extras.length > 0 ? <>{extras}</> : undefined}
       firstTimestamp={folder.firstAt}
       lastTimestamp={folder.lastAt}
-      isFirst={isFirst}
       isLast={isLast}
       summedByIndex
       eventRange={[folder.ordinalFirst, folder.ordinalFirst + folder.count - 1]}
@@ -1033,8 +1027,8 @@ function ChainTruthTimelineBody({
   // topmost, and no business of the notes toggle) and the live NOTES, the
   // latter split into "rows" (once settled) and "skeleton" (their read still
   // in flight) so the two never show at once. Whatever stands highest there
-  // takes the spine's lead-in dot and the `isFirst` flag, and every other
-  // claim on them is suppressed below, so no two rows draw either.
+  // takes the spine's lead-in dot, and every other claim on it is suppressed
+  // below, so no two rows draw it.
   // A rewound list ends at its cut, so it holds no live notes.
   const liveRowsShown = showMarketNotes && cut == null ? (liveNotes ?? NO_NOTES) : NO_NOTES;
   /** Two or more live notes stand as one card (`liveNoteGroup`); one keeps
@@ -1519,10 +1513,8 @@ function ChainTruthTimelineBody({
   // waits for the whole list to be drawn: while a "Show 50 more" button stands
   // below the rows, the older events are not hidden, they are one click away.
   const viewBoundaryAtBottom = tailIsCut && !hasMore && !boundaryAtBottom;
-  // A row draws a spine TERMINUS only where nothing else stands at that end.
-  // The top's occupants are the live window, the live-note slot and the tip's
-  // withheld-dot glyph; the bottom's are the cut's and the view's.
-  const topTerminusTaken = liveWindowAtTop || liveSlotAtTop || tipBoundaryAtTop || moment != null;
+  // The last row draws the spine's terminus only where nothing else stands
+  // at the bottom: the cut's glyph or the view's (`bottomTerminusTaken`).
   /** The events either side of the cut's moment, where the page holds them:
    *  the card names them. */
   const momentNeighbours = useMemo((): { prev: MomentNeighbour | null; next: MomentNeighbour | null } => {
@@ -1728,9 +1720,6 @@ function ChainTruthTimelineBody({
                     // Line ends only — the dot is the tip's (see `tipEventId`).
                     // Inside an expanded run the LAST member still owns the spine
                     // terminus so the dotted segment ends where the timeline does.
-                    // Suppressed at the top when a live note now sits there
-                    // instead — see `liveSlotAtTop`.
-                    isFirst: flatIdx === 0 && !opts?.inRun && !topTerminusTaken,
                     isLast:
                       opts?.isLastMember !== undefined
                         ? opts.isLastMember
@@ -1775,7 +1764,7 @@ function ChainTruthTimelineBody({
             <EventShareProvider href={shareHrefFor(pinnedEvent.id)}>
               <div id={`event-${pinnedEvent.id}`} data-event-id={pinnedEvent.id} className="rounded-xl">
                 <UnreadTokensProvider tokens={pinnedEvent.decimalsUnread}>
-                  {renderCard(pinnedEvent, { eventNumber: pinnedNumber, isFirst: true, isLast: true })}
+                  {renderCard(pinnedEvent, { eventNumber: pinnedNumber, isLast: true })}
                 </UnreadTokensProvider>
               </div>
             </EventShareProvider>
@@ -1933,14 +1922,12 @@ function ChainTruthTimelineBody({
                 Above everything in the head slot as well as the rows — the
                 glyph is the end of the drawn spine, and the spine is the
                 account's events. */}
-              {tipBoundaryAtTop && <TimelineBoundaryRow kind="tip" isFirst isLast={false} />}
+              {tipBoundaryAtTop && <TimelineBoundaryRow kind="tip" isLast={false} />}
               {/* The live window is the head row: it ends at now, so it stands
                 above the live notes and takes the lead-in dot. The notes
                 toggle does not reach it — it is not a note (see `liveWindow`). */}
               {liveWindowAtTop && liveWindow && (
-                <SpineTipContext.Provider value={tipSide}>
-                  {liveWindow({ isFirst: !tipBoundaryAtTop })}
-                </SpineTipContext.Provider>
+                <SpineTipContext.Provider value={tipSide}>{liveWindow()}</SpineTipContext.Provider>
               )}
               {/* From 640px the markers reserve one target for the live notes
                 while they load; a phone reserves nothing. */}
@@ -1966,7 +1953,6 @@ function ChainTruthTimelineBody({
                   prev={momentNeighbours.prev}
                   next={momentNeighbours.next}
                   today={utcDay(Date.now() / 1000)}
-                  isFirst={!tipBoundaryAtTop && !liveWindowAtTop && !liveSlotAtTop}
                   flash={flashId === MOMENT_FLASH}
                 />
               )}
@@ -2022,10 +2008,9 @@ function ChainTruthTimelineBody({
                             tl.visibleVersionKeys.size === tl.versionOptions.length
                           }
                           // A served folder has no run around it to scope its
-                          // spine termini to, so its place in the displayed list
-                          // is the whole answer — suppressed at either end where
-                          // a live note or the boundary card now sits there.
-                          isFirst={folderTerminus(rowIdx, rows.length).isFirst && !topTerminusTaken}
+                          // spine terminus to, so its place in the displayed list
+                          // is the whole answer — suppressed where the boundary
+                          // now sits below it.
                           isLast={folderTerminus(rowIdx, rows.length).isLast && !bottomTerminusTaken}
                           renderMember={(event, eventNumber, isLastMember, isNewest, above) =>
                             renderEventRow(event, row.flatIdx, {
@@ -2054,7 +2039,6 @@ function ChainTruthTimelineBody({
                         {wrapRunRow(
                           row,
                           row.spec.render(row.events, {
-                            isFirst: row.flatIdx === 0 && !topTerminusTaken,
                             isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
                             children: row.events.map((e, k) =>
                               renderEventRow(e, row.flatIdx + k, {
@@ -2112,7 +2096,7 @@ function ChainTruthTimelineBody({
                 was the only statement of, so nobody rediscovers the loss by
                 accident. */}
               {(boundaryAtBottom || viewBoundaryAtBottom) && (
-                <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : tailKind} isFirst={false} isLast />
+                <TimelineBoundaryRow kind={boundaryAtBottom ? "cut" : tailKind} isLast />
               )}
             </div>
             {/* The button alone: how many rows the page holds is not a figure
@@ -2152,7 +2136,6 @@ function ChainTruthTimelineBody({
                   boundary={effectiveBoundary}
                   protocolKey={tl.protocolKey}
                   csvExport={csvExport}
-                  isFirst
                   isLast
                 />
               </div>

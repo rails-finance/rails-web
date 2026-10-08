@@ -727,7 +727,6 @@ export default function TroveView({
                   return (
                     <CollSurplusClaimCard
                       event={event}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       eventNumber={meta.eventNumber}
                       persistPrefix="liquity-v2"
@@ -743,7 +742,6 @@ export default function TroveView({
                   <LiquityEventCard
                     event={event}
                     addressDisplay="hidden"
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     previousEvent={previousEvent}
                     eventNumber={meta.eventNumber}

@@ -507,7 +507,6 @@ export default function LlamalendPositionView({
                   <LlamalendEventCard
                     event={event}
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     previousStated={previousStated.get(event.id) ?? null}
                     loanMark={loanMarks?.get(event.id) ?? null}

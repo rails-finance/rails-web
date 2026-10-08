@@ -99,7 +99,6 @@ export const AAVE_V3_TIMELINE_RUNS: TimelineRunSpec[] = [
             folder
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
-            isFirst={folder.isFirst}
             isLast={folder.isLast}
           >
             {folder.children}
@@ -151,7 +150,6 @@ export const AAVE_V3_TIMELINE_RUNS: TimelineRunSpec[] = [
             folder
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
-            isFirst={folder.isFirst}
             isLast={folder.isLast}
           >
             {folder.children}

@@ -23,12 +23,11 @@ import { makerTxHashOf } from "@/lib/makerdao/market-notes";
 
 export interface MakerDAOEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "makerdao"; data: MakerDAOContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
 
-export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: MakerDAOEventCardProps) {
+export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventCardProps) {
   const ctx = event.context.data;
   const isGrab = ctx.eventType === "grab";
   const isFork = ctx.eventType === "fork-out" || ctx.eventType === "fork-in";
@@ -96,14 +95,14 @@ export function MakerDAOEventCard({ event, isFirst, isLast, eventNumber }: Maker
 
   const iconSlot =
     isGrab || isLseLiq ? (
-      <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
     ) : isGive ? (
       // An ownership handover is a people event with no token flow — the person
       // glyph with the join badge marks the new owner taking over; dotted spine
       // (nothing moved in the urn).
-      <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
     ) : (
-      <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+      <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
     );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

@@ -62,7 +62,6 @@ export const DOLOMITE_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             folder
             firstTimestamp={events[0].timestamp}
             lastTimestamp={events[events.length - 1].timestamp}
-            isFirst={folder.isFirst}
             isLast={folder.isLast}
           >
             {folder.children}

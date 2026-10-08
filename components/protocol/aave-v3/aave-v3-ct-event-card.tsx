@@ -28,7 +28,6 @@ import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-
 
 export interface AaveV3CtEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "aave-v3"; data: AaveV3Context } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The served market key (core / prime / etherfi, or "base"). Its presence is
@@ -68,15 +67,7 @@ const DIRECTION: Record<
   bad_debt_written_off: "right",
 };
 
-export function AaveV3CtEventCard({
-  event,
-  isFirst,
-  isLast,
-  eventNumber,
-  market,
-  siblings,
-  previous,
-}: AaveV3CtEventCardProps) {
+export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings, previous }: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
   // The (i)'s slot for the interest line and the prices.
@@ -200,11 +191,11 @@ export function AaveV3CtEventCard({
       : undefined;
 
   const iconSlot = isLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : isSwap && !isFlowSwap ? (
-    <SpineColumn icon="swap" swapLegs={swapLegs} swapAxis={swapAxis} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="swap" swapLegs={swapLegs} swapAxis={swapAxis} isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   return (

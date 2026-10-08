@@ -23,7 +23,6 @@ export interface FluidRoundTripCardProps {
   hops: FluidEvent[];
   /** The position's operates in the same transaction, in log order. */
   operates: FluidEvent[];
-  isFirst?: boolean;
   isLast?: boolean;
 }
 
@@ -36,7 +35,7 @@ function Addr({ coords, addr, echo }: { coords: FluidCoords; addr: string; echo?
   );
 }
 
-export function FluidRoundTripCard({ hops, operates, isFirst, isLast }: FluidRoundTripCardProps) {
+export function FluidRoundTripCard({ hops, operates, isLast }: FluidRoundTripCardProps) {
   const first = hops[0];
   const coords = coordsFor(first);
   const home = (first.context.data.transferFrom ?? "").toLowerCase();
@@ -100,7 +99,7 @@ export function FluidRoundTripCard({ hops, operates, isFirst, isLast }: FluidRou
     <EventCard
       avatar={null}
       caption="Ownership round trip"
-      iconColumn={<SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />}
+      iconColumn={<SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />}
       header={
         <ChainTruthRow
           spec={{

@@ -585,7 +585,6 @@ export default function FxPositionView({
                     <FxEventCard
                       event={event}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       blockPeers={
                         event.context.data.eventType === "tickRebalance"

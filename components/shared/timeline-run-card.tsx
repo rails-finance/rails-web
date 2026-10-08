@@ -121,7 +121,6 @@ export interface TimelineRunCardProps {
   /** Chronological bounds of the run (either display order). */
   firstTimestamp: number;
   lastTimestamp: number;
-  isFirst?: boolean;
   isLast?: boolean;
   /** Muted register (see EventCard.muted) — the collapsed run row renders at
    *  reduced opacity at rest. Pair with tone="neutral" for custody runs. */
@@ -192,7 +191,6 @@ export function TimelineRunCard({
   extraHeader,
   firstTimestamp,
   lastTimestamp,
-  isFirst,
   isLast,
   muted,
   children,
@@ -310,7 +308,6 @@ export function TimelineRunCard({
             ? { tokens: netTokens }
             : { icon: "none" as const })}
       undrawn
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   );

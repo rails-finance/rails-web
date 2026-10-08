@@ -21,7 +21,6 @@ import { MapleLedgerProvider } from "./maple-ledger";
 
 export interface MapleEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "maple"; data: MapleContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The previous row in this pool and a fill's request, where loaded. */
@@ -42,7 +41,7 @@ const DIRECTION: Record<Exclude<MapleContext["eventType"], "transfer_in" | "tran
   request_fill: "left",
 };
 
-export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: MapleEventCardProps) {
+export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEventCardProps) {
   const ctx = event.context.data;
   const kind = ctx.eventType;
   const isTransfer = kind === "transfer_in" || kind === "transfer_out";
@@ -113,7 +112,7 @@ export function MapleEventCard({ event, isFirst, isLast, eventNumber, times }: M
               : []),
           ];
 
-  const iconSlot = <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />;
+  const iconSlot = <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />;
 
   // The pool claim opens into its ledger where the page ties its timeline to
   // the Lifetime flows panel and the panel shows this pool.

@@ -895,7 +895,6 @@ export default function SparkPositionDetail({
                     pool={SPARK_POOL_IDENTITY}
                     persistPrefix="spark"
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
                   />
@@ -903,7 +902,6 @@ export default function SparkPositionDetail({
                   <SparkEventCard
                     event={event}
                     eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     market={sharedBlocks.has(event.blockNumber) ? undefined : "spark"}
                     siblings={neighbours.get(event.id)?.siblings}

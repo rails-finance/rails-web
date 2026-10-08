@@ -55,7 +55,6 @@ export function AaveFamilyEmodeSwitchCard({
   sw: s,
   pool,
   persistPrefix,
-  isFirst,
   isLast,
   eventNumber,
   market,
@@ -67,7 +66,6 @@ export function AaveFamilyEmodeSwitchCard({
   pool: V3PoolIdentity;
   /** The timeline's card-state key prefix ("spark", "aave-v3"). */
   persistPrefix: string;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Where the account around this transaction can be read at N−1 and N
@@ -108,9 +106,7 @@ export function AaveFamilyEmodeSwitchCard({
   return (
     <EventCard
       avatar={null}
-      iconColumn={
-        <SpineColumn icon="rate-change" iconDirection={entering ? "up" : "down"} isFirst={isFirst} isLast={!!isLast} />
-      }
+      iconColumn={<SpineColumn icon="rate-change" iconDirection={entering ? "up" : "down"} isLast={!!isLast} />}
       header={
         <ChainTruthRow
           spec={{

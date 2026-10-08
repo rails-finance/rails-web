@@ -721,12 +721,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                         }
                         renderCard={(event, meta) =>
                           isMoonwellEvent(event) ? (
-                            <MoonwellEventCard
-                              event={event}
-                              eventNumber={meta.eventNumber}
-                              isFirst={meta.isFirst}
-                              isLast={meta.isLast}
-                            />
+                            <MoonwellEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                           ) : null
                         }
                       />

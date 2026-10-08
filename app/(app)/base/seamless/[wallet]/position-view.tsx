@@ -769,7 +769,6 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                             persistPrefix="aave-v3"
                             hfFormat={hfLabelV3}
                             eventNumber={meta.eventNumber}
-                            isFirst={meta.isFirst}
                             isLast={meta.isLast}
                             market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
                           />
@@ -777,7 +776,6 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                           <AaveV3CtEventCard
                             event={event}
                             eventNumber={meta.eventNumber}
-                            isFirst={meta.isFirst}
                             isLast={meta.isLast}
                             market={sharedBlocks.has(event.blockNumber) ? undefined : "seamless"}
                             siblings={neighbours.get(event.id)?.siblings}

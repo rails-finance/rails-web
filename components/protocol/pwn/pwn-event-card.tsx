@@ -18,7 +18,6 @@ import { PwnLedgerProvider } from "./pwn-ledger";
 
 export interface PwnEventCardProps {
   event: PwnEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Same-tx sibling events — the custody cross-reference seam (defaults to just
@@ -26,7 +25,7 @@ export interface PwnEventCardProps {
   siblings?: PwnEvent[];
 }
 
-export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: PwnEventCardProps) {
+export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isSeizure = ctx.eventType === "claimed" && ctx.defaulted === true;
@@ -125,11 +124,11 @@ export function PwnEventCard({ event, isFirst, isLast, eventNumber, siblings }: 
           : undefined;
 
   const iconSlot = isSeizure ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : lifecycleIcon ? (
-    <SpineColumn icon={lifecycleIcon} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon={lifecycleIcon} isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} isLast={!!isLast} />
   );
 
   return (

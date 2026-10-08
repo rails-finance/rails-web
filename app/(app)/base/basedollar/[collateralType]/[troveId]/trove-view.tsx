@@ -578,19 +578,13 @@ export default function BasedollarTroveDetail({
                 isCollSurplusClaimEvent(event) ? (
                   <CollSurplusClaimCard
                     event={event}
-                    isFirst={meta.isFirst}
                     isLast={meta.isLast}
                     eventNumber={meta.eventNumber}
                     persistPrefix="basedollar"
                     fork={BASEDOLLAR_FORK}
                   />
                 ) : isBasedollarEvent(event) ? (
-                  <BasedollarEventCard
-                    event={event}
-                    eventNumber={meta.eventNumber}
-                    isFirst={meta.isFirst}
-                    isLast={meta.isLast}
-                  />
+                  <BasedollarEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                 ) : null
               }
             />

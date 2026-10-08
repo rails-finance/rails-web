@@ -964,7 +964,6 @@ export function AlchemistPositionView({
                           <AlchemixV2EventCard
                             event={event as AlchemixV2Event}
                             showVersion
-                            isFirst={meta.isFirst}
                             isLast={meta.isLast}
                             eventNumber={meta.eventNumber}
                           />
@@ -977,7 +976,6 @@ export function AlchemistPositionView({
                           mytSymbol={mytSymbol}
                           underlyingDecimals={underlyingDecimals}
                           siblings={siblingsByTx.get(event.txHash) ?? [event]}
-                          isFirst={meta.isFirst}
                           isLast={meta.isLast}
                           eventNumber={meta.eventNumber}
                         />

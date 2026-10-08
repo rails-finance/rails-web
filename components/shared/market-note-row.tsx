@@ -264,7 +264,6 @@ const ADDRESS_SEGMENT = /^0x[0-9a-fA-F]{40}$/;
 
 export function MarketNoteRow({
   note,
-  isFirst = false,
   isLast = false,
   datePrefix = null,
   defaultOpen,
@@ -286,14 +285,12 @@ export function MarketNoteRow({
    *  ChainTruthTimeline's `liveSlotAtTop` and `liveWindowAtTop`, which between
    *  them suppress every other claim on the flag so only one row on the page
    *  ever takes the spine's lead-in dot. */
-  isFirst?: boolean;
   isLast?: boolean;
 }) {
   const body = useNoteBody(note);
   return (
     <NoteRowShell
       icon={opened ? "market-open" : "market"}
-      isFirst={isFirst}
       isLast={isLast}
       label={body.label}
       marker={{ attr: "data-market-note", value: note.id }}
@@ -528,13 +525,11 @@ export function liveGroupMarkerText(group: LiveNoteGroup): { tip: string; spoken
  *  its lone row. */
 export function LiveNoteGroupRow({
   group,
-  isFirst = false,
   isLast = false,
   opened,
 }: {
   group: LiveNoteGroup;
   /** Spine terminus flags, as on a lone note row in the head slot. */
-  isFirst?: boolean;
   isLast?: boolean;
   /** Opened from its marker: the node draws the diamond filled. */
   opened?: boolean;
@@ -543,7 +538,7 @@ export function LiveNoteGroupRow({
   return (
     <div data-live-note-group={group.notes.length} className={`spine-row relative ${scale.cardRounded}`}>
       <div className="spine-cell">
-        <SpineColumn icon={opened ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
+        <SpineColumn icon={opened ? "market-open" : "market"} isLast={isLast} />
       </div>
       <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">

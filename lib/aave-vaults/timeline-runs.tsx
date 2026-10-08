@@ -222,7 +222,6 @@ export function aaveVaultTimelineRuns(
               // none: it is the holder's own move into or out of the vault.
               firstTimestamp={events[0].timestamp}
               lastTimestamp={events[events.length - 1].timestamp}
-              isFirst={folder.isFirst}
               isLast={folder.isLast}
             >
               {folder.children}

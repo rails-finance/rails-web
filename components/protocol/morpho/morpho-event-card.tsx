@@ -22,7 +22,6 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 
 export interface MorphoEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "morpho"; data: MorphoContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
@@ -39,7 +38,7 @@ const DIRECTION: Record<MorphoContext["eventType"], "right" | "left"> = {
   liquidation: "left",
 };
 
-export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoEventCardProps) {
+export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const sym = ctx.side === "collateral" ? ctx.collateralSymbol : ctx.loanSymbol;
@@ -80,9 +79,9 @@ export function MorphoEventCard({ event, isFirst, isLast, eventNumber }: MorphoE
         ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   // The Collateral (or Supplied) and Debt cells open into their ledgers where

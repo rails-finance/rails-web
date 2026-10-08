@@ -32,7 +32,6 @@ import { FxLedgerProvider } from "./fx-ledger";
 
 export interface FxEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "fx"; data: FxContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** tickRebalance rows only — how many of the position's rebalance rows share
@@ -45,7 +44,7 @@ export interface FxEventCardProps {
 // SAME predicate over the whole history for the Explanation's operator bullet,
 // so it cannot stay a file-local helper here.
 
-export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }: FxEventCardProps) {
+export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const isTransfer = ctx.eventType === "transfer";
@@ -114,7 +113,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
           ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
           : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act."
       }
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : ctx.eventType === "tickRebalance" && ctx.redemption ? (
@@ -122,7 +120,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       icon="warning"
       warningTone="caution"
       warningTip="Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act."
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : ctx.eventType === "tickRebalance" ? (
@@ -132,7 +129,6 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
       icon="warning"
       warningTone="caution"
       warningTip="A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act."
-      isFirst={isFirst}
       isLast={!!isLast}
     />
   ) : isTransfer ? (
@@ -143,11 +139,11 @@ export function FxEventCard({ event, isFirst, isLast, eventNumber, blockPeers }:
     // The glyph is the event's own MEANING, so it wins over the third-party
     // fallback the way a check/cross badge does — that fact is still carried by
     // the dotted spine and the header's from → to chips.
-    <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
   ) : (
     // Third-party operate badges the flow pink (color-grammar §4) rather than
     // replacing it — see spine-column's `externalParty`.
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

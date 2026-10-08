@@ -601,12 +601,7 @@ export default function MoonwellPositionView({
                 }
                 renderCard={(event, meta) =>
                   isMoonwellEvent(event) ? (
-                    <MoonwellEventCard
-                      event={event}
-                      eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                    />
+                    <MoonwellEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                   ) : null
                 }
               />

@@ -571,7 +571,6 @@ export default function CompoundV2PositionView({
                     <CompoundV2EventCard
                       event={event}
                       eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
                       isLast={meta.isLast}
                       siblings={siblingsByTx.get(event.txHash) ?? [event]}
                     />

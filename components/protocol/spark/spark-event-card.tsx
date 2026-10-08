@@ -23,7 +23,6 @@ import { isGatewayWithdrawal, sparkFeeLiquidation, type SparkTimelineEvent } fro
 
 export interface SparkEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "spark"; data: SparkContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** "spark" where the account state around this transaction can be read at
@@ -52,15 +51,7 @@ const DIRECTION: Record<
   liquidation: "left",
 };
 
-export function SparkEventCard({
-  event,
-  isFirst,
-  isLast,
-  eventNumber,
-  market,
-  siblings,
-  previous,
-}: SparkEventCardProps) {
+export function SparkEventCard({ event, isLast, eventNumber, market, siblings, previous }: SparkEventCardProps) {
   // The (i)'s slot for the interest line and the prices.
   const [notesSlot, setNotesSlot] = useState<HTMLElement | null>(null);
   const ctx = event.context.data;
@@ -135,9 +126,9 @@ export function SparkEventCard({
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   return (

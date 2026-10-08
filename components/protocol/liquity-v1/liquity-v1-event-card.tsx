@@ -23,7 +23,6 @@ import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liqu
 
 export interface LiquityV1EventCardProps {
   event: BaseActivityEvent & { context: { protocol: "liquity-v1"; data: LiquityV1Context } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The PriceFeed price now — a redemption's net outcome at today's price. */
@@ -34,7 +33,6 @@ export interface LiquityV1EventCardProps {
 
 export function LiquityV1EventCard({
   event,
-  isFirst,
   isLast,
   eventNumber,
   currentPrice,
@@ -93,9 +91,9 @@ export function LiquityV1EventCard({
       ).filter((t): t is SpineTokenRow => t !== null);
 
   const iconSlot = isWarning ? (
-    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
   );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

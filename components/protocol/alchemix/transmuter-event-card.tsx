@@ -306,7 +306,6 @@ function explainerLines(legs: TransmuterEvent[], mytSymbol: string, early: Trans
 export function TransmuterEventCard({
   legs,
   mytSymbol,
-  isFirst,
   isLast,
   eventNumber,
   early = null,
@@ -317,7 +316,6 @@ export function TransmuterEventCard({
   /** The position's claim split into its parts, where it came before
    *  maturity; the claim's own log does not carry the stake or its term. */
   early?: TransmuterEarlyClaim | null;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }) {
@@ -325,13 +323,9 @@ export function TransmuterEventCard({
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
   const tokens = spineTokens(legs, mytSymbol);
   const iconSlot = custodyOnly ? (
-    <SpineColumn
-      tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]}
-      isFirst={isFirst}
-      isLast={!!isLast}
-    />
+    <SpineColumn tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]} isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} isLast={!!isLast} />
   );
   const claimLeg = find(legs, "transmuter_position_claimed");
   const earlyHere = claimLeg ? early : null;

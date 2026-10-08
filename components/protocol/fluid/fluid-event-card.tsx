@@ -21,7 +21,6 @@ import { fluidMintContent } from "@/lib/shared/learn-more-content";
 
 export interface FluidEventCardProps {
   event: FluidEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Same-tx sibling events — the split-open seam (defaults to just this one). */
@@ -49,7 +48,7 @@ const DIRECTION: Record<FluidContext["eventType"], "right" | "left"> = {
   transfer: "right",
 };
 
-export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, openedBy }: FluidEventCardProps) {
+export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy }: FluidEventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isLiq = ctx.eventType === "liquidated" || ctx.eventType === "absorbed";
@@ -105,15 +104,15 @@ export function FluidEventCard({ event, isFirst, isLast, eventNumber, siblings, 
             : undefined;
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : ctx.eventType === "mint" ? (
-    <SpineColumn icon="mint" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="mint" isLast={!!isLast} />
   ) : ctx.eventType === "transfer" ? (
     // An ownership handover is a people event with no token flow — the person
     // glyph with the join badge marks the new owner taking over.
-    <SpineColumn icon="delegate" iconDirection="up" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   // T1's word, which the phone spine view's caption repeats. A hop of an NFT

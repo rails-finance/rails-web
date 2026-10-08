@@ -119,7 +119,6 @@ export function TransmuterPositionView({
               key={legs[0].id}
               legs={legs}
               mytSymbol={mytSymbol}
-              isFirst={meta.isFirst}
               isLast={meta.isLast}
               early={early}
             />
@@ -246,7 +245,6 @@ export function TransmuterPositionView({
               <TransmuterEventCard
                 legs={withRiders([event as TransmuterEvent], ridersByTx)}
                 mytSymbol={mytSymbol}
-                isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 eventNumber={meta.eventNumber}
                 early={early}

@@ -32,7 +32,6 @@ export interface RedemptionRunCardProps {
   /** Chronological bounds of the run (either display order). */
   firstTimestamp: number;
   lastTimestamp: number;
-  isFirst?: boolean;
   isLast?: boolean;
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
@@ -49,7 +48,6 @@ export function RedemptionRunCard({
   debtSymbol,
   firstTimestamp,
   lastTimestamp,
-  isFirst,
   isLast,
   children,
   debtSpan,
@@ -67,7 +65,6 @@ export function RedemptionRunCard({
       ]}
       firstTimestamp={firstTimestamp}
       lastTimestamp={lastTimestamp}
-      isFirst={isFirst}
       isLast={isLast}
       stateSpan={debtSpan ? [{ label: "the debt", from: debtSpan[0], to: debtSpan[1], symbol: debtSymbol }] : undefined}
     >

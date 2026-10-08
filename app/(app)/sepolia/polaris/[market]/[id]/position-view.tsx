@@ -589,26 +589,14 @@ export default function PolarisPositionView({
                 // the slot draws nothing.
                 liveWindow={
                   sinceTouch
-                    ? ({ isFirst }) => (
-                        <PolarisSinceLastTouchRow
-                          window={sinceTouch}
-                          market={market}
-                          stable={stable}
-                          isFirst={isFirst}
-                        />
-                      )
+                    ? () => <PolarisSinceLastTouchRow window={sinceTouch} market={market} stable={stable} />
                     : undefined
                 }
                 displayItems={POLARIS_DISPLAY_ITEMS}
                 toolbarLeading={<TimelineActivityHeader events={polarisEvents} closed={view.status !== "open"} />}
                 renderCard={(event, meta) =>
                   isPolarisEvent(event) ? (
-                    <PolarisEventCard
-                      event={event}
-                      eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                    />
+                    <PolarisEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                   ) : null
                 }
               />

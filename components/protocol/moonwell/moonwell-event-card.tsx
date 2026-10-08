@@ -18,7 +18,6 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface MoonwellEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "moonwell"; data: MoonwellContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
@@ -35,7 +34,7 @@ const DIRECTION: Record<Exclude<MoonwellContext["eventType"], "transfer_in" | "t
   liquidation: "left",
 };
 
-export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: MoonwellEventCardProps) {
+export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidation";
   const kind = ctx.eventType;
@@ -95,9 +94,9 @@ export function MoonwellEventCard({ event, isFirst, isLast, eventNumber }: Moonw
           ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   return (

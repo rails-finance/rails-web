@@ -83,12 +83,11 @@ const BASEDOLLAR_EXPLAINER_PROVS = {
 
 export interface BasedollarEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "basedollar"; data: BasedollarContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
 
-export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: BasedollarEventCardProps) {
+export function BasedollarEventCard({ event, isLast, eventNumber }: BasedollarEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
@@ -149,11 +148,11 @@ export function BasedollarEventCard({ event, isFirst, isLast, eventNumber }: Bas
       ).filter((t): t is SpineTokenRow => t !== null);
 
   const iconSlot = isWarning ? (
-    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isLast={!!isLast} />
   ) : isNoChange ? (
-    <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="no-change" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
   );
 
   return (

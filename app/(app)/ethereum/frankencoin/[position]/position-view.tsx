@@ -569,12 +569,7 @@ export default function FrankencoinPositionView({
                   }
                   renderCard={(event, meta) =>
                     isFrankencoinEvent(event) ? (
-                      <FrankencoinEventCard
-                        event={event}
-                        eventNumber={meta.eventNumber}
-                        isFirst={meta.isFirst}
-                        isLast={meta.isLast}
-                      />
+                      <FrankencoinEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                     ) : null
                   }
                 />

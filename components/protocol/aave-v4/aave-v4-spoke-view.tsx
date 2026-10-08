@@ -931,7 +931,6 @@ function AaveV4SpokePageInner({
             isAaveV4Event(event) ? (
               <AaveV4EventCard
                 event={event}
-                isFirst={meta.isFirst}
                 isLast={meta.isLast}
                 txGroup={txGroups.get(event.id)}
                 siblings={txSiblings.get(event.txHash ?? "")}

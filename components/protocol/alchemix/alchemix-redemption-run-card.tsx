@@ -47,7 +47,6 @@ export interface AlchemixRedemptionRunCardProps {
   /** Chronological bounds of the run (either display order). */
   firstTimestamp: number;
   lastTimestamp: number;
-  isFirst?: boolean;
   isLast?: boolean;
   /** The run's member cards, rendered when expanded. */
   children: ReactNode;
@@ -64,7 +63,6 @@ export function AlchemixRedemptionRunCard({
   prov,
   firstTimestamp,
   lastTimestamp,
-  isFirst,
   isLast,
   children,
 }: AlchemixRedemptionRunCardProps) {
@@ -135,7 +133,6 @@ export function AlchemixRedemptionRunCard({
       }
       firstTimestamp={firstTimestamp}
       lastTimestamp={lastTimestamp}
-      isFirst={isFirst}
       isLast={isLast}
     >
       {children}

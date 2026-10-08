@@ -291,7 +291,6 @@ function folderCard(events: BaseActivityEvent[], folder: RunFolderMeta): ReactNo
       }
       firstTimestamp={earliest(events).timestamp}
       lastTimestamp={latest(events).timestamp}
-      isFirst={folder.isFirst}
       isLast={folder.isLast}
     >
       {folder.children}

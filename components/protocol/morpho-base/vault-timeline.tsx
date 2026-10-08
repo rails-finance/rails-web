@@ -340,7 +340,6 @@ export function MorphoBaseVaultTimeline({
                   assetSymbol={assetSymbol}
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   prov={PROV}
                   persistPrefix="morpho-base-vault"
@@ -350,9 +349,7 @@ export function MorphoBaseVaultTimeline({
                       event={row}
                       coords={{ ...coords, blockNumber: row.blockNumber, txHash: row.txHash }}
                       assetSymbol={assetSymbol}
-                      // The newest row states the rule. `meta.isFirst` is the
-                      // spine terminus, which no member of a run carries, so a
-                      // newest row inside a run would leave the rule unstated.
+                      // The newest row (index 0) states the rule.
                       first={i === 0}
                     />
                   }

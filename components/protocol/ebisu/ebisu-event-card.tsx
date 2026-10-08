@@ -86,12 +86,11 @@ const EBISU_EXPLAINER_PROVS = {
 
 export interface EbisuEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "ebisu"; data: EbisuContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
 }
 
-export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEventCardProps) {
+export function EbisuEventCard({ event, isLast, eventNumber }: EbisuEventCardProps) {
   const ctx = event.context.data;
   const isLiq = ctx.eventType === "liquidate";
   const isRedemption = ctx.eventType === "redeemCollateral";
@@ -152,11 +151,11 @@ export function EbisuEventCard({ event, isFirst, isLast, eventNumber }: EbisuEve
       ).filter((t): t is SpineTokenRow => t !== null);
 
   const iconSlot = isWarning ? (
-    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isLast={!!isLast} />
   ) : isNoChange ? (
-    <SpineColumn icon="no-change" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="no-change" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
   );
 
   return (

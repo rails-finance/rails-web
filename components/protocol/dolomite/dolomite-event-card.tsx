@@ -25,7 +25,6 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface DolomiteEventCardProps {
   event: DolomiteEvent;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Same-tx sibling legs — the liquidation seam (defaults to just this one). */
@@ -34,14 +33,7 @@ export interface DolomiteEventCardProps {
   accountNumber?: string;
 }
 
-export function DolomiteEventCard({
-  event,
-  isFirst,
-  isLast,
-  eventNumber,
-  siblings,
-  accountNumber,
-}: DolomiteEventCardProps) {
+export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accountNumber }: DolomiteEventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   // The borrower's side of a liquidation: debt written down / collateral
@@ -84,9 +76,9 @@ export function DolomiteEventCard({
         ];
 
   const iconSlot = isBorrowerLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   return (

@@ -237,7 +237,6 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
                   assetSymbol={assetSymbol}
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
-                  isFirst={meta.isFirst}
                   isLast={meta.isLast}
                   prov={PROV}
                   persistPrefix="yearn-vault"

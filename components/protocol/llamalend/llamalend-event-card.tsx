@@ -24,7 +24,6 @@ import type { LlamalendLoanMark, LlamalendNextRow, LlamalendPreviousStated } fro
 
 export interface LlamalendEventCardProps {
   event: BaseActivityEvent & { context: { protocol: "llamalend"; data: LlamalendContext } };
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** The last collateral balance an earlier row stated, for what the AMM
@@ -42,7 +41,6 @@ export interface LlamalendEventCardProps {
 
 export function LlamalendEventCard({
   event,
-  isFirst,
   isLast,
   eventNumber,
   previousStated,
@@ -97,9 +95,9 @@ export function LlamalendEventCard({
     });
 
   const iconSlot = isBorrowerLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens.length > 0 ? tokens : undefined} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
   );
 
   // The Collateral and Debt cells open into their ledgers where the page ties

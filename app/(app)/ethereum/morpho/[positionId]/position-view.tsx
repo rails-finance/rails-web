@@ -556,12 +556,7 @@ export default function MorphoPositionView({
                 }
                 renderCard={(event, meta) =>
                   isMorphoEvent(event) ? (
-                    <MorphoEventCard
-                      event={event}
-                      eventNumber={meta.eventNumber}
-                      isFirst={meta.isFirst}
-                      isLast={meta.isLast}
-                    />
+                    <MorphoEventCard event={event} eventNumber={meta.eventNumber} isLast={meta.isLast} />
                   ) : null
                 }
               />

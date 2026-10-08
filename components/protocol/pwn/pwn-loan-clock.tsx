@@ -142,7 +142,6 @@ export function PwnDeadlinePassedRow({
   version,
   owed,
   collateral,
-  isFirst = false,
 }: {
   deadline: number;
   /** The deadline is an extension's, not the terms'. */
@@ -154,7 +153,6 @@ export function PwnDeadlinePassedRow({
   owed: string | null;
   /** "PWN Bundle #29" — what stays in escrow. */
   collateral: string;
-  isFirst?: boolean;
 }) {
   const now = useMountedNow();
   const prov = extended ? extendedDeadlineProv({ loanId, version }) : bookDueProv(dueKind);
@@ -164,7 +162,6 @@ export function PwnDeadlinePassedRow({
     <SpineTipContext.Provider value={null}>
       <NoteRowShell
         icon="live-window"
-        isFirst={isFirst}
         label={`Deadline passed unpaid on ${formatDate(deadline)}: the lender can claim the collateral. Read from the clock; no event marks it.`}
         marker={{ attr: "data-pwn-deadline-row", value: String(deadline) }}
         header={

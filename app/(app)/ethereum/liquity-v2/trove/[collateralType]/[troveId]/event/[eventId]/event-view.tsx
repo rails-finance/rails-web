@@ -207,7 +207,6 @@ export default function EventView({
                       <LiquityEventCard
                         event={event}
                         addressDisplay="hidden"
-                        isFirst
                         isLast
                         previousEvent={previous}
                         eventNumber={n}

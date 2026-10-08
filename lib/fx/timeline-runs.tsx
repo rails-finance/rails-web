@@ -87,7 +87,7 @@ function FxRebalanceRunCard({
   folder,
 }: {
   events: BaseActivityEvent[];
-  folder: { key: string; isFirst: boolean; isLast: boolean; children: ReactNode[] };
+  folder: { key: string; isLast: boolean; children: ReactNode[] };
 }) {
   const socialized = useFxSocializedReads();
   const change = fxBlocksChange(
@@ -126,7 +126,6 @@ function FxRebalanceRunCard({
       folder
       firstTimestamp={events[0].timestamp}
       lastTimestamp={events[events.length - 1].timestamp}
-      isFirst={folder.isFirst}
       isLast={folder.isLast}
     >
       {folder.children}

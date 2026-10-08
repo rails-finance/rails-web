@@ -27,7 +27,6 @@ import { LearnMore } from "@/components/shared/learn-more-modal";
 
 export interface CompoundV2EventCardProps {
   event: CompoundV2Event;
-  isFirst?: boolean;
   isLast?: boolean;
   eventNumber?: number;
   /** Same-tx sibling events — the seize seam (defaults to just this one). */
@@ -48,7 +47,7 @@ const DIRECTION: Partial<Record<CompoundV2Context["eventType"], "right" | "left"
   seize_in: "left",
 };
 
-export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, siblings }: CompoundV2EventCardProps) {
+export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: CompoundV2EventCardProps) {
   const ctx = event.context.data;
   const sibs = siblings ?? [event];
   const isLiq = ctx.eventType === "liquidation";
@@ -115,11 +114,11 @@ export function CompoundV2EventCard({ event, isFirst, isLast, eventNumber, sibli
             ];
 
   const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : isSeizeLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
   ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isFirst={isFirst} isLast={!!isLast} />
+    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
   );
 
   return (
