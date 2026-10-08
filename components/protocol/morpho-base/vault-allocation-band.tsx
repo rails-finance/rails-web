@@ -146,7 +146,7 @@ export interface VaultAllocationBandProps {
   first: boolean;
 }
 
-/** The band itself, in the row's `headerBars` slot: full panel width, so its
+/** The band, in the row's `band` slot: full panel width, so its
  *  grid lines up with the detail grid under it. */
 export function VaultAllocationBand({ event, coords, assetSymbol, first }: VaultAllocationBandProps) {
   const extra = metaExtra(event);

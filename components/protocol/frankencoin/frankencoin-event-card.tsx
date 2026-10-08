@@ -180,7 +180,6 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />}

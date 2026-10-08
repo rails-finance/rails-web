@@ -158,7 +158,6 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
       explainer={
         <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} skipLead />
       }
-      explainerLabel="Plain English"
       explainerTeaser={compoundV2ExplainerTeaser(ctx, coords, sibs, event, extBy ?? undefined)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={compoundV2LearnMoreContent(ctx)} />}

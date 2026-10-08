@@ -141,7 +141,6 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={makerdaoExplainerTeaser(ctx, coords, extras)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />}

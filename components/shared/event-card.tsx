@@ -1,7 +1,7 @@
 "use client";
 
 import { PriceBasisProvider } from "@/components/shared/price-basis";
-import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef, type ReactNode } from "react";
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
@@ -23,7 +23,12 @@ import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } f
 import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
-import { SpineLegsContext, useSpineLegsState } from "@/components/shared/spine-column";
+import {
+  SpineColumn,
+  SpineLegsContext,
+  useSpineLegsState,
+  type SpineColumnProps,
+} from "@/components/shared/spine-column";
 import { useRowTarget } from "@/components/shared/row-target";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
@@ -42,58 +47,91 @@ function ExplanationNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
   );
 }
 
-export interface EventCardProps {
-  avatar: React.ReactNode;
-  iconColumn: React.ReactNode;
-  header: React.ReactNode;
-  /** Optional row that sits below the header flex row but still inside the
-   * header panel container. Rendered at full panel width so its two-column
-   * grid aligns with the two-column grid in `detail` below. */
-  headerBars?: React.ReactNode;
-  detail?: React.ReactNode;
-  detailLabel?: string;
-  detailIcon?: React.ReactNode;
-  explainer?: React.ReactNode;
-  explainerLabel?: string;
-  explainerIcon?: React.ReactNode;
-  detailOpen?: boolean;
-  onDetailToggle?: (isOpen: boolean) => void;
-  detailLoading?: boolean;
-  detailError?: boolean;
-  onDetailRetry?: () => void;
-  priceBadge?: React.ReactNode;
-  /** Teaser line shown at the bottom of the detail panel — first explainer bullet */
-  explainerTeaser?: React.ReactNode;
-  /** How the teaser reads: "bullet" (default) keeps the leading • glyph; "prose"
-   *  renders it as a plain lead paragraph with no glyph. */
-  explainerTeaserVariant?: "bullet" | "prose";
-  /** Transaction hash: the event menu, and the header's number pill when
-   *  Display's "Transaction hashes" is on (ui-jobs 294). */
+/* ── The slots (rails-ops reference/shared-event-card-spec.md §3; ui-jobs 309) ──
+ * A family on the shell supplies data and words in these; the shell decides
+ * which parts exist and where they sit. A slot typed `ReactNode` here takes a
+ * typed shape in a later step of 309: `head` in step 2, `price` and the
+ * explainer's bullets in step 3, `cells` in step 4. */
+
+/** The event the card stands for. The shell builds the card's open-state key
+ *  from `family` and `id`, and the menu from `txHash`. */
+export interface EventCardEvent {
+  id: string;
+  /** The key the open state is stored under ("liquity-v2"). */
+  family: string;
   txHash?: string;
-  /** Content before the footer's "?" (a family's gas where it has no price
-   *  row in T2). */
-  footerExtra?: React.ReactNode;
-  /** The Learn-More "?" trigger (a `<LearnMore inline …/>`), at the right end
-   *  of the footer (T6). */
-  learnMore?: React.ReactNode;
+  blockNumber?: number;
+  timestamp: number;
+  number?: number;
+}
+
+/** Who acted, where the owner did not. */
+export interface EventCardActor {
+  /** The third party who acted (a redeemer, a liquidator, a batch manager, a
+   *  caller on the owner's position): the phone caption and the segment's
+   *  label say "Redemption by 0x1234…abcd". */
+  by?: string;
+  /** Whether the owner actioned the event. Unset: unless `by` names another
+   *  actor. False draws the spine dotted below the node (a protocol's event,
+   *  a queue fill). */
+  byOwner?: boolean;
+  /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
+   *  "Received from 0x…". */
+  custody?: { dir: "to" | "from"; address: string };
+}
+
+/** The family's ledgers (T2.1): the provider the opened cells read, or the
+ *  reason the family has none. */
+export type EventCardLedgers = { provider: (children: ReactNode) => ReactNode } | { none: string };
+
+/** T3: the explanation's body, and its first bullet, which the shell draws as
+ *  the teaser at the top of the open pane; a grouped explanation has none. */
+export interface EventCardExplainer {
+  body: ReactNode;
+  first?: ReactNode;
+  grouped?: boolean;
+}
+
+export interface EventCardSlots {
+  event: EventCardEvent;
+  spine: SpineColumnProps;
+  /** T1's head row. */
+  head: ReactNode;
+  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"). */
+  caption: string;
+  actor?: EventCardActor;
+  /** T2's grid. */
+  cells: ReactNode;
+  ledgers: EventCardLedgers;
+  /** T2's price row. */
+  price?: ReactNode;
+  /** Short lines under the grid (the redeemer, forensics, "not read" notices). */
+  notes?: ReactNode;
+  explainer: EventCardExplainer;
+  /** T4: the Learn-More "?" (a `<LearnMore inline …/>`), at the right end of
+   *  the footer (T6). */
+  learnMore: ReactNode;
+  /** A full-width strip under T1 (Morpho Base vaults' allocation). */
+  band?: ReactNode;
+  /** Run on pointer-over or focus of the row (a prefetch). */
+  onIntent?: () => void;
+}
+
+/** What the shell takes beside a family's parts: the timeline's and the
+ *  event page's. */
+interface EventCardFrame {
+  avatar?: ReactNode;
   /** The event menu (⋮) in the header's right slot (ui-jobs 295). "page":
    *  Liquity V2's, the event page alone (its page's aside carries the other
    *  actions, ui-jobs 291), and "Hide" inside an open group. */
   eventMenu?: boolean | "page";
-  /** A group's closed row: the head opens the summary card with no chevron
-   *  drawn (ui-jobs 250). */
-  noChevron?: boolean;
+  /** A group's closed row. "summary": the head opens the summary card with no
+   *  chevron drawn (ui-jobs 250). "words": the head is words and draws no
+   *  control; they open as the phone's card (a delegate run). */
+  group?: "summary" | "words";
   /** A group's closed row: its ⋮ carries one item, "Show 48 grouped events",
    *  the only way to open the group (ui-jobs 250, third revision). */
   groupMenu?: { title: string; subtitle: string; show: () => void };
-  /** The desktop header is not a control and draws no chevron: a
-   *  delegate run's row, whose words stand in T1 and open as the phone's
-   *  card. */
-  hideDetailChevron?: boolean;
-  /** Stable, globally-unique id for this card. When set (and the detail panel
-   *  is uncontrolled), the expanded/collapsed state is persisted to
-   *  localStorage and restored on reload / back-navigation. */
-  persistKey?: string;
   /** Muted register — a collapsed run or folder row reads quieter than the
    *  events it stands for: the whole row (spine flank included) renders at
    *  reduced opacity at rest, returning to full weight on hover, keyboard
@@ -104,82 +142,126 @@ export interface EventCardProps {
    *  and inside a folder the dimmed rows read as disabled, not as quieter
    *  (Miles, 2026-09-02). */
   muted?: boolean;
-  /** The phone caption's kind, where the card's label differs from the
-   *  event's `actionLabel` (which the timeline provides by default). */
-  caption?: string;
   /** A group's whole phone caption ("Redemptions (48) · 1 Oct '25 – 12 Oct
    *  '25"), in place of the kind and the moment. */
-  phoneCaption?: React.ReactNode;
+  phoneCaption?: ReactNode;
   /** The caption as spoken ("Redemptions, 1 October 2025 to …"). */
   spokenCaption?: string;
   /** The phone control's full name; unset, the spoken caption and the legs
    *  the column reports. */
   label?: string;
-  /** A control at the right of the open card's (i) row (the Aave and
-   *  Liquity families' calculator). */
-  infoAction?: React.ReactNode;
   /** The event page's card (rails-ops TO-DO-ui-jobs 236): what stands in the
-   *  spine's column, beside the card from 640px and above it below. Set with
-   *  `hideDetailChevron` and `detailOpen`; unset, the card is the timeline's. */
-  pageAside?: React.ReactNode;
-  /** The words after T3's (i): the button's on the timeline, the heading's
-   *  on the event page. A family's strings file can replace the default. */
-  explanationHeading?: string;
-  /** The third party who acted (a redeemer, a liquidator, a batch manager,
-   *  a caller on the owner's position): the phone caption and the segment's
-   *  label say "Redemption by 0x1234…abcd". */
-  by?: string;
-  /** Whether the owner actioned the event. Unset: unless `by` names another
-   *  actor. False draws the spine dotted below the node (a protocol's own
-   *  event, a queue fill). */
-  byOwner?: boolean;
-  /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
-   *  "Received from 0x…". */
-  custody?: { dir: "to" | "from"; address: string };
+   *  spine's column, beside the card from 640px and above it below. Set, the
+   *  card stands open with no chevron; unset, the card is the timeline's. */
+  pageAside?: ReactNode;
   /** What the number column draws in place of the event's number: the
    *  boundary's count. */
-  numberSlot?: React.ReactNode;
+  numberSlot?: ReactNode;
+  /** The boundary card's controlled open. */
+  detailOpen?: boolean;
+  onDetailToggle?: (isOpen: boolean) => void;
+  /** Content before the footer's "?": Liquity V2's gas where its T2 draws no
+   *  price row, until gas stands in the shell's price row (309 step 3). */
+  footerExtra?: ReactNode;
 }
+
+/** The parts a family not yet on the slots passes; 309's later steps move
+ *  each family onto `slots`. */
+interface EventCardParts {
+  slots?: undefined;
+  iconColumn: ReactNode;
+  header: ReactNode;
+  /** A full-width strip under the header (the `band` slot). */
+  band?: ReactNode;
+  detail?: ReactNode;
+  detailLabel?: string;
+  explainer?: ReactNode;
+  /** Teaser line at the top of the open explanation: the first bullet. */
+  explainerTeaser?: ReactNode;
+  /** Transaction hash: the event menu, and the header's number pill when
+   *  Display's "Transaction hashes" is on (ui-jobs 294). */
+  txHash?: string;
+  learnMore?: ReactNode;
+  /** Stable, globally-unique id for this card. When set (and the detail panel
+   *  is uncontrolled), the expanded/collapsed state is persisted to
+   *  localStorage and restored on reload / back-navigation. */
+  persistKey?: string;
+  /** The phone caption's kind, where the card's label differs from the
+   *  event's `actionLabel` (which the timeline provides by default). */
+  caption?: string;
+  by?: string;
+  byOwner?: boolean;
+  custody?: EventCardActor["custody"];
+}
+
+export type EventCardProps = EventCardFrame & ({ slots: EventCardSlots } | EventCardParts);
+
+/** A slotted card's parts, as the shell draws them. */
+function partsOf(slots: EventCardSlots): Omit<EventCardParts, "slots"> {
+  const { event, actor, explainer } = slots;
+  return {
+    iconColumn: <SpineColumn {...slots.spine} />,
+    header: slots.head,
+    band: slots.band,
+    detail: (
+      <>
+        {slots.cells}
+        {slots.notes}
+        {slots.price}
+      </>
+    ),
+    explainer: explainer.body,
+    explainerTeaser: explainer.grouped ? undefined : explainer.first,
+    txHash: event.txHash,
+    learnMore: slots.learnMore,
+    persistKey: `${event.family}:${event.id}`,
+    caption: slots.caption,
+    by: actor?.by,
+    byOwner: actor?.byOwner,
+    custody: actor?.custody,
+  };
+}
+
+/** The (i) row's words, on every card. */
+const EXPLANATION_HEADING = "Event explanation";
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
 
-export function EventCard({
-  avatar,
-  iconColumn,
-  header,
-  headerBars,
-  detail,
-  detailLabel,
-  explainer: explainerProp,
-  detailOpen: detailOpenProp,
-  onDetailToggle,
-  detailLoading,
-  detailError,
-  onDetailRetry,
-  priceBadge,
-  explainerTeaser: explainerTeaserProp,
-  explainerTeaserVariant = "bullet",
-  txHash,
-  footerExtra,
-  learnMore,
-  hideDetailChevron,
-  persistKey,
-  muted,
-  caption,
-  phoneCaption,
-  spokenCaption,
-  label,
-  infoAction,
-  pageAside,
-  explanationHeading = "Event explanation",
-  eventMenu = true,
-  noChevron,
-  groupMenu,
-  numberSlot,
-  by,
-  byOwner,
-  custody,
-}: EventCardProps) {
+export function EventCard(props: EventCardProps) {
+  const {
+    avatar,
+    eventMenu = true,
+    group,
+    groupMenu,
+    muted,
+    phoneCaption,
+    spokenCaption,
+    label,
+    pageAside,
+    numberSlot,
+    detailOpen: detailOpenProp,
+    onDetailToggle,
+    footerExtra,
+  } = props;
+  const parts = props.slots ? partsOf(props.slots) : props;
+  const {
+    iconColumn,
+    header,
+    band,
+    detail,
+    detailLabel,
+    explainer: explainerProp,
+    explainerTeaser: explainerTeaserProp,
+    txHash,
+    learnMore,
+    persistKey,
+    caption,
+    by,
+    byOwner,
+    custody,
+  } = parts;
+  const ledgers = props.slots?.ledgers;
+  const onIntent = props.slots?.onIntent;
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
   const showAvatar = !singleWallet && !!avatar;
@@ -188,7 +270,10 @@ export function EventCard({
 
   const [detailOpenInternal, setDetailOpenInternal] = useState(false);
 
-  const isControlled = detailOpenProp !== undefined;
+  // The event page's card (`pageAside`) stands open; the boundary card's
+  // open is controlled.
+  const pageMode = pageAside != null;
+  const isControlled = pageMode || detailOpenProp !== undefined;
 
   // A warning event's legs, handed from the header to the spine.
   const spineLegs = useSpineLegsState();
@@ -203,16 +288,13 @@ export function EventCard({
   const dayMark = useContext(EventDayMarkContext);
   const reactId = useId();
   const cardId = persistKey ?? reactId;
-  const hasPanel = detail != null || !!detailLoading || !!detailError;
-  // The event page's card (`pageAside`): the explanation and the footer stand
-  // open, with no toggle.
-  const pageMode = pageAside != null;
+  const hasPanel = detail != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
   // body opens beneath it.
   const inTimeline = !pageMode && phoneOpen != null && (captionCtx != null || phoneCaption != null);
 
-  const localOpen = isControlled ? !!detailOpenProp : detailOpenInternal;
+  const localOpen = pageMode || (isControlled ? !!detailOpenProp : detailOpenInternal);
   const showDetail = localOpen || (inTimeline && phoneOpen?.openId === cardId);
 
   // ── Receipts scope — the inspector's per-card roster ──────────────────
@@ -280,7 +362,7 @@ export function EventCard({
   const hasExplainer = explainer != null;
   // The desktop header is the card's control; under 640px a timeline row's
   // control is the segment's button.
-  const headerToggles = !hideDetailChevron && !pageMode;
+  const headerToggles = group !== "words" && !pageMode;
   const showChevron = hasDetail && headerToggles;
   // The phone segment's control: every timeline row with a body to open.
   const phoneToggles = inTimeline && hasDetail;
@@ -298,18 +380,12 @@ export function EventCard({
             label: "explanation",
             content: (
               <>
-                {explainerTeaser &&
-                  (explainerTeaserVariant === "prose" ? (
-                    // Prose teaser: the lead sentence as its own paragraph, no
-                    // glyph. A <p> so the pane always carries a paragraph even
-                    // when the explainer body (the rest) is empty.
-                    <p className="mb-2 text-sm leading-relaxed text-rb-500">{explainerTeaser}</p>
-                  ) : (
-                    <div className="mb-2 flex items-baseline gap-2 text-rb-500">
-                      <span className="shrink-0">•</span>
-                      <div className="min-w-0 flex-1 leading-relaxed">{explainerTeaser}</div>
-                    </div>
-                  ))}
+                {explainerTeaser && (
+                  <div className="mb-2 flex items-baseline gap-2 text-rb-500">
+                    <span className="shrink-0">•</span>
+                    <div className="min-w-0 flex-1 leading-relaxed">{explainerTeaser}</div>
+                  </div>
+                )}
                 {explainer}
               </>
             ),
@@ -321,7 +397,7 @@ export function EventCard({
 
   // The header's chevron slot (ui-jobs 295), after the action word.
   const headChevron =
-    showChevron && !noChevron ? (
+    showChevron && group !== "summary" ? (
       <span className="inline-flex items-center self-center" data-anatomy="T5" data-evt-head-chev="">
         <DiscChevron isOpen={showDetail} />
       </span>
@@ -361,15 +437,6 @@ export function EventCard({
         />
       </span>
     ) : null;
-
-  // The (i) row's right end, before its chevron and reachable with the
-  // explanation closed: the card's action. The transaction hash is in the
-  // header's right slot (Display) and the event page's aside (ui-jobs 294).
-  const infoActionNode = infoAction ? (
-    <div className="flex shrink-0 items-center gap-2 self-center" onClick={(e) => e.stopPropagation()}>
-      <div className="-my-2 flex items-center sm:my-0">{infoAction}</div>
-    </div>
-  ) : undefined;
 
   // ── The phone caption: the T1 row under 640px (mobile decision 16) ─────
   // "Repay · 6 Jun '26 13:31", the date once per day as the desktop row
@@ -448,7 +515,9 @@ export function EventCard({
               (`EventHeadChevron`). A header with no slot for the chevron gets
               it at the right end (`.evt-chev-end`, hidden by app/globals.css
               where the header has its own). */}
-          <div className={`relative flex items-start gap-2${showChevron && !noChevron ? " evt-has-chev" : ""}`}>
+          <div
+            className={`relative flex items-start gap-2${showChevron && group !== "summary" ? " evt-has-chev" : ""}`}
+          >
             <div className={`flex-1 min-w-0 ${headMenu ? "" : "pr-5"}`}>
               <EventTxHashContext.Provider value={txHash ?? null}>
                 <EventHeadContext.Provider
@@ -461,7 +530,7 @@ export function EventCard({
                 </EventHeadContext.Provider>
               </EventTxHashContext.Provider>
             </div>
-            {showChevron && !noChevron && (
+            {showChevron && group !== "summary" && (
               <div
                 className="evt-chev-end absolute right-0 top-0 mr-5 mt-[18px] flex items-center gap-1 sm:static"
                 data-anatomy="T5"
@@ -470,8 +539,7 @@ export function EventCard({
               </div>
             )}
           </div>
-          {headerBars}
-          {priceBadge && <div className="flex justify-end px-5 pb-2 -mt-1">{priceBadge}</div>}
+          {band}
         </div>
       </div>
       {inTimeline && (
@@ -510,33 +578,7 @@ export function EventCard({
       className={`flow-root rounded-b-xl bg-raised${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
       data-anatomy="T2"
     >
-      {inTimeline && headerBars && <div className="sm:hidden">{headerBars}</div>}
-      {detailLoading && (
-        <div className="flex items-center justify-center gap-2 py-8 text-sm ">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-2 animate-ping rounded-full bg-blue-400 opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-blue-500" />
-          </span>
-          Loading&hellip;
-        </div>
-      )}
-
-      {detailError && !detailLoading && (
-        <div className="flex items-center justify-center gap-2 py-8">
-          <span className="text-sm text-red-500">Failed to load data.</span>
-          {onDetailRetry && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDetailRetry();
-              }}
-              className="text-sm text-blue-500 hover:underline"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
+      {inTimeline && band && <div className="sm:hidden">{band}</div>}
 
       {/* `detailLabel` names the pane for a reader moving by heading —
           sr-only because the pane's content carries the
@@ -560,9 +602,8 @@ export function EventCard({
                   <svg className="h-5 w-5 text-foreground" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
                   </svg>
-                  {explanationHeading}
+                  {EXPLANATION_HEADING}
                 </h3>
-                <div className="ml-auto">{infoActionNode}</div>
               </div>
               {infoTabs.map((t) => (
                 <div key={t.key} className="pb-3 pt-5 text-sm">
@@ -575,20 +616,14 @@ export function EventCard({
             <InfoTabsDisclosure
               bare
               anatomy="T3"
-              heading={explanationHeading}
+              heading={EXPLANATION_HEADING}
               tabs={infoTabs}
               openTab={openInfoTab}
               onOpenTabChange={setOpenInfoTab}
               footer={footerNode}
-              rowExtra={infoActionNode}
             />
           ) : (
-            <InfoDisclosure
-              bare
-              footer={footerNode}
-              rowExtra={infoActionNode && <div className="ml-auto">{infoActionNode}</div>}
-              defaultOpen={pageMode}
-            >
+            <InfoDisclosure bare footer={footerNode} defaultOpen={pageMode}>
               {null}
             </InfoDisclosure>
           )}
@@ -599,7 +634,7 @@ export function EventCard({
 
   const body = !inTimeline ? panel : showDetail && <div className="spine-body max-sm:mt-2">{panel}</div>;
 
-  return (
+  const card = (
     <SpineLegsContext.Provider value={spineLegs}>
       <PriceBasisProvider>
         <ProvReceiptsScope registry={registry} scopeId={scopeId}>
@@ -622,6 +657,8 @@ export function EventCard({
             }`}
             style={pageMode ? { padding: scale.cardPad } : undefined}
             {...(rowTarget ? rowClick : {})}
+            onPointerEnter={onIntent}
+            onFocus={onIntent}
           >
             {showAvatar && avatar}
             {pageMode ? (
@@ -672,4 +709,5 @@ export function EventCard({
       </PriceBasisProvider>
     </SpineLegsContext.Provider>
   );
+  return ledgers && "provider" in ledgers ? ledgers.provider(card) : card;
 }

@@ -528,6 +528,9 @@ export interface LiquityEventDetailProps {
   currentPrice?: number;
   /** The generator's levels (lib/liquity/event-prose.ts): the grid's figures. */
   prose: LiquityEventProse;
+  /** Which of the card's slots this draws: the grid (`cells`), the redeemer
+   *  line (`notes`) or the price row and its today line (`price`). */
+  part: "cells" | "notes" | "price";
 }
 
 export function LiquityEventDetail({
@@ -537,6 +540,7 @@ export function LiquityEventDetail({
   previousEvent,
   currentEvent,
   prose,
+  part,
 }: LiquityEventDetailProps) {
   const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
   const l2 = prose.L2;
@@ -912,7 +916,7 @@ export function LiquityEventDetail({
   return (
     <>
       {/* 2×2 State Grid — rails-web pattern */}
-      {showGrid && (
+      {part === "cells" && showGrid && (
         <div className="px-5 py-2">
           {isBatchManagerOp ? (
             <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2">
@@ -985,7 +989,7 @@ export function LiquityEventDetail({
       {/* Redemption counterparty — claimable + P/L now live inline in the
           header; only the redeemer link remains here (when present). The
           redemption-wide totals and fee detail live in the explainer. */}
-      {isRedemption && ctx.redeemer && (
+      {part === "notes" && isRedemption && ctx.redeemer && (
         <div className="px-5 py-2">
           <span className="text-xs text-rb-500">
             {L2_WORDS.redeemed_by}{" "}
@@ -1009,7 +1013,7 @@ export function LiquityEventDetail({
           redemption-time price. Today's price is the T2 row below the chip.
           (Batch membership is conveyed by the "Delegate" treatment on
           interest-rate events, so no standalone "Batched" badge here.) */}
-      {collPrice > 0 && (
+      {part === "price" && collPrice > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
           <LiquityGas footer={prose.footer} />
           {l2.redemption &&
@@ -1057,7 +1061,7 @@ export function LiquityEventDetail({
       )}
       {/* The redeemed collateral at the latest block's price, under the
           price chip (ui-jobs 283). */}
-      {collPrice > 0 && l2.redemption?.today && (
+      {part === "price" && collPrice > 0 && l2.redemption?.today && (
         <div className="px-4 pb-2 text-xs text-rb-500" data-redemption-today="">
           {l2.redemption.today}
         </div>

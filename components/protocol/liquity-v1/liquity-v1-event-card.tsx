@@ -135,7 +135,6 @@ export function LiquityV1EventCard({
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={
           liquityV1ExplainerTeaser(ctx, coords) ? (
             <InLedgerFigures build={() => liquityV1ExplainerTeaser(ctx, coords)} />

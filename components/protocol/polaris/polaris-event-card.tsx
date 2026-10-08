@@ -117,7 +117,6 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={polarisExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={polarisLearnMoreContent(ctx)} />}

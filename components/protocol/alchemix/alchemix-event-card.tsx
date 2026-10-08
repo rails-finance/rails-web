@@ -206,7 +206,6 @@ export function AlchemixEventCard({
       detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
       detailLabel="What the logs state"
       explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />}
-      explainerLabel="Plain English"
       explainerTeaser={alchemixExplainerTeaser(legs, sibs, prose)}
       txHash={lead.txHash}
       learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}

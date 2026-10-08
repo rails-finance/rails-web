@@ -169,7 +169,6 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
             openedBy={openedBy}
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy })}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />}

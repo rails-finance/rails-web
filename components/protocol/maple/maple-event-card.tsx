@@ -165,7 +165,6 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={mapleExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={mapleLearnMoreContent(ctx)} />}

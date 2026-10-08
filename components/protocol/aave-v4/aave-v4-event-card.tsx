@@ -123,7 +123,6 @@ export function AaveV4EventCard({
           skipLead
         />
       }
-      explainerLabel="Plain English"
       explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={aaveV4LearnMoreContent(ctx)} />}

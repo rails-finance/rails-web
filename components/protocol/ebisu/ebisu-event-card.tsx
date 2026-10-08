@@ -202,7 +202,6 @@ export function EbisuEventCard({ event, isLast, eventNumber }: EbisuEventCardPro
             gas={isWarning || ctx.batchRate ? undefined : event.gas}
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={
           liquityForkExplainerTeaser(ctx, coords, EBISU_FORK, EBISU_EXPLAINER_PROVS) ? (
             <InLedgerFigures build={() => liquityForkExplainerTeaser(ctx, coords, EBISU_FORK, EBISU_EXPLAINER_PROVS)} />

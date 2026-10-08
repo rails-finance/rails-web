@@ -261,7 +261,6 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
           />
         </>
       }
-      explainerLabel="Plain English"
       explainerTeaser={aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />}

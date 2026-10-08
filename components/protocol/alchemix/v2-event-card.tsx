@@ -289,7 +289,6 @@ export function AlchemixV2EventCard({
       // The one sentence is the teaser, which the pane draws as its lead; the
       // body adds nothing, so the sentence shows once.
       explainer={line ? <ProseExplainer items={[]} /> : undefined}
-      explainerLabel="Plain English"
       explainerTeaser={line ?? undefined}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={ALCHEMIX_V2} />}

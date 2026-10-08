@@ -142,7 +142,6 @@ export function LlamalendEventCard({
             next={next}
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx, controllerHasApprovals ?? null)} />}

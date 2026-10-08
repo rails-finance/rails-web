@@ -168,7 +168,6 @@ export function AaveFamilyEmodeSwitchCard({
           ) : null}
         </p>
       }
-      explainerLabel="Plain English"
       txHash={event.txHash}
       persistKey={`${persistPrefix}:${event.id}`}
       caption="E-mode"

@@ -138,7 +138,6 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
           skipLead
         />
       }
-      explainerLabel="Plain English"
       explainerTeaser={moonwellExplainerTeaser(ctx, coords, extBy ?? undefined)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={moonwellLearnMoreContent(ctx, coords.chainId)} />}

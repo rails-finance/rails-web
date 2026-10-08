@@ -196,7 +196,6 @@ export function BasedollarEventCard({ event, isLast, eventNumber }: BasedollarEv
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={
           liquityForkExplainerTeaser(ctx, coords, BASEDOLLAR_FORK, BASEDOLLAR_EXPLAINER_PROVS) ? (
             <InLedgerFigures

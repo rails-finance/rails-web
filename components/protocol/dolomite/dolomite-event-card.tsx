@@ -122,7 +122,6 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
           skipLead
         />
       }
-      explainerLabel="Plain English"
       explainerTeaser={dolomiteExplainerTeaser(ctx, coords, sibs, event)}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={dolomiteLearnMoreContent(ctx)} />}

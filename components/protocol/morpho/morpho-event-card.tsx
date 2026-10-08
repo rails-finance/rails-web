@@ -121,7 +121,6 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={morphoExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={morphoLearnMoreContent(ctx)} />}

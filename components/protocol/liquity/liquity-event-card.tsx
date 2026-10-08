@@ -3,8 +3,8 @@
 import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn, type SpineWarningLeg } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/components/shared/spine-column";
 import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
@@ -18,7 +18,7 @@ import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liqu
 import { liquityAccrualLabel } from "@/lib/liquity/event-ledgers";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { LedgerOpenContext } from "@/components/shared/event-ledger";
-import { L1_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
+import { L1_WORDS } from "@/lib/liquity/event-templates";
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
@@ -148,165 +148,174 @@ export function LiquityEventCard({
     return legs;
   })();
 
-  const iconSlot = isWarning ? (
-    // A redemption changes the Trove without the owner acting: caution
-    // (color-grammar.md §5). Liquidation stays critical red.
-    <SpineColumn
-      icon="warning"
-      warningTone={ctx.operation === "liquidate" ? "critical" : "caution"}
-      warningLegs={warningLegs}
-      isLast={!!isLast}
-    />
-  ) : isDelegate ? (
-    // Delegation reads as an external-party event via the pink +/- glyph badge
-    // (color-grammar.md §4b); the spine line itself stays neutral.
-    <SpineColumn icon="delegate" iconDirection={isJoin ? "up" : "down"} isLast={!!isLast} />
-  ) : isRateChange ? (
-    <SpineColumn icon="rate-change" iconDirection={rateUp ? "up" : "down"} rateSpan={rateSpan} isLast={!!isLast} />
-  ) : ctx.operation === "transferTrove" ? (
-    // The Trove NFT changed hands; no collateral or BOLD moved. The custody
-    // plane in its neutral disc (detail-page-anatomy.md, "The custody row"),
-    // the mark Polaris's position transfer wears.
-    <SpineColumn icon="custody" isLast={!!isLast} />
-  ) : isNoChangeAdjust(ctx) ? (
-    // Zero-delta touch: no flows to draw, but an empty spine slot reads as a
-    // rendering hole — mark the event with the neutral "nothing moved" glyph.
-    <SpineColumn icon="no-change" isLast={!!isLast} />
-  ) : (
-    (() => {
-      const debtOp = ctx.troveOperation?.debtChangeFromOperation ?? 0;
-      const collOp = ctx.troveOperation?.collChangeFromOperation ?? 0;
-      const boldDir = debtOp < 0 ? ("right" as const) : ("left" as const);
-      const collDir = collOp < 0 ? ("left" as const) : ("right" as const);
-      // A close moves BOLD only when it repaid debt: closing a zombie a
-      // redemption already cleared to zero returns collateral and nothing else.
-      const closeRepaid =
-        ctx.operation === "closeTrove" && (Math.abs(debtOp) >= 0.01 || (ctx.stateBefore?.debt ?? 0) >= 0.01);
-      const showBold = closeRepaid || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
-      const showColl = ctx.operation === "closeTrove" || Math.abs(collOp) >= 0.01 || !ctx.troveOperation;
-      const isActiveOp = ![
-        "redeemCollateral",
-        "adjustZombieTrove",
-        "adjustUnredeemableZombieTrove",
-        "liquidate",
-        "applyPendingDebt",
-        "adjustTroveInterestRate",
-        "setBatchManagerAnnualInterestRate",
-        "setInterestBatchManager",
-        "removeFromBatch",
-        "transferTrove",
-      ].includes(ctx.operation);
-      const collVal = isActiveOp ? Math.abs(collOp) : undefined;
-      const debtVal = isActiveOp ? Math.abs(debtOp) : undefined;
+  // An owner's move: the collateral and BOLD it moved, as token rows.
+  const tokenRows = (): SpineTokenRow[] => {
+    const debtOp = ctx.troveOperation?.debtChangeFromOperation ?? 0;
+    const collOp = ctx.troveOperation?.collChangeFromOperation ?? 0;
+    const boldDir = debtOp < 0 ? ("right" as const) : ("left" as const);
+    const collDir = collOp < 0 ? ("left" as const) : ("right" as const);
+    // A close moves BOLD only when it repaid debt: closing a zombie a
+    // redemption already cleared to zero returns collateral and nothing else.
+    const closeRepaid =
+      ctx.operation === "closeTrove" && (Math.abs(debtOp) >= 0.01 || (ctx.stateBefore?.debt ?? 0) >= 0.01);
+    const showBold = closeRepaid || Math.abs(debtOp) >= 0.01 || !ctx.troveOperation;
+    const showColl = ctx.operation === "closeTrove" || Math.abs(collOp) >= 0.01 || !ctx.troveOperation;
+    const isActiveOp = ![
+      "redeemCollateral",
+      "adjustZombieTrove",
+      "adjustUnredeemableZombieTrove",
+      "liquidate",
+      "applyPendingDebt",
+      "adjustTroveInterestRate",
+      "setBatchManagerAnnualInterestRate",
+      "setInterestBatchManager",
+      "removeFromBatch",
+      "transferTrove",
+    ].includes(ctx.operation);
+    const collVal = isActiveOp ? Math.abs(collOp) : undefined;
+    const debtVal = isActiveOp ? Math.abs(debtOp) : undefined;
 
-      // The chip draws a mark from a contract address; a symbol on its own only
-      // gets it as far as the house lookup table. Liquity V2's branches and
-      // BOLD are fixed, so both symbols are already in that table and no glyph
-      // on this explorer is currently a letter — but the event's flows state
-      // the contracts outright, and preferring the stated fact to the looked-up
-      // one is the same reason the rest of these cards read from flows. The
-      // helper answers only where a symbol appears on exactly one flow.
-      const tokens = [
-        ...(showColl
-          ? [
-              {
-                symbol: ctx.collateralType,
-                address: soleFlowAddress(event.flows, ctx.collateralType),
-                direction: collDir,
-                verb: collDir === "left" ? "withdrawn" : "added",
-                value: collVal,
-              },
-            ]
-          : []),
-        ...(showBold
-          ? [
-              {
-                symbol: "BOLD",
-                address: soleFlowAddress(event.flows, "BOLD"),
-                direction: boldDir,
-                verb: boldDir === "left" ? "borrowed" : "repaid",
-                value: debtVal,
-              },
-            ]
-          : []),
-      ] as import("@/components/shared/spine-column").SpineTokenRow[];
+    // The chip draws a mark from a contract address; a symbol alone only
+    // gets it as far as the house lookup table. Liquity V2's branches and
+    // BOLD are fixed, so both symbols are already in that table and no glyph
+    // on this explorer is currently a letter — but the event's flows state
+    // the contracts outright, and preferring the stated fact to the looked-up
+    // one is the same reason the rest of these cards read from flows. The
+    // helper answers only where a symbol appears on one flow alone.
+    return [
+      ...(showColl
+        ? [
+            {
+              symbol: ctx.collateralType,
+              address: soleFlowAddress(event.flows, ctx.collateralType),
+              direction: collDir,
+              verb: collDir === "left" ? "withdrawn" : "added",
+              value: collVal,
+            },
+          ]
+        : []),
+      ...(showBold
+        ? [
+            {
+              symbol: "BOLD",
+              address: soleFlowAddress(event.flows, "BOLD"),
+              direction: boldDir,
+              verb: boldDir === "left" ? "borrowed" : "repaid",
+              value: debtVal,
+            },
+          ]
+        : []),
+    ];
+  };
 
-      return <SpineColumn tokens={tokens} isLast={!!isLast} />;
-    })()
-  );
+  const spine: SpineColumnProps = isWarning
+    ? // A redemption changes the Trove without the owner acting: caution
+      // (color-grammar.md §5). Liquidation stays critical red.
+      {
+        icon: "warning",
+        warningTone: ctx.operation === "liquidate" ? "critical" : "caution",
+        warningLegs,
+        isLast: !!isLast,
+      }
+    : isDelegate
+      ? // Delegation reads as an external-party event via the pink +/- glyph
+        // badge (color-grammar.md §4b); the spine line stays neutral.
+        { icon: "delegate", iconDirection: isJoin ? "up" : "down", isLast: !!isLast }
+      : isRateChange
+        ? { icon: "rate-change", iconDirection: rateUp ? "up" : "down", rateSpan, isLast: !!isLast }
+        : ctx.operation === "transferTrove"
+          ? // The Trove NFT changed hands; no collateral or BOLD moved. The
+            // custody plane in its neutral disc (detail-page-anatomy.md, "The
+            // custody row"), the mark Polaris's position transfer wears.
+            { icon: "custody", isLast: !!isLast }
+          : isNoChangeAdjust(ctx)
+            ? // Zero-delta touch: no flows to draw, but an empty spine slot
+              // reads as a rendering hole — mark the event with the neutral
+              // "nothing moved" glyph.
+              { icon: "no-change", isLast: !!isLast }
+            : { tokens: tokenRows(), isLast: !!isLast };
 
-  const liquityTeaser =
-    prose.L4.length > 0 && !isGroupedExplanation(prose) ? (
-      <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} />
-    ) : null;
   // Gas (owner-paid events only; the generator leaves a third party's out)
-  // stands in T2's price row (LiquityEventDetail); a card that draws no price
-  // row keeps it in the footer. The card has no event menu: the header's
-  // number pill links to the event page, whose side column carries the
-  // actions (ui-jobs 291).
+  // stands in T2's price row; a card that draws no price row keeps it in the
+  // footer. The card has no event menu: the header's number pill links to the
+  // event page, whose side column carries the actions (ui-jobs 291).
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
+  const detailPart = (part: "cells" | "notes" | "price") => (
+    <LiquityEventDetail
+      ctx={ctx}
+      txHash={event.txHash}
+      blockNumber={event.blockNumber}
+      previousEvent={previousEvent}
+      currentEvent={event}
+      currentPrice={currentPrice}
+      prose={prose}
+      part={part}
+    />
+  );
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "liquity-v2",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: (
+      <LiquityEventHeader
+        ctx={ctx}
+        timestamp={event.timestamp}
+        txHash={event.txHash}
+        blockNumber={event.blockNumber}
+        eventNumber={eventNumber}
+        page={!!page}
+      />
+    ),
+    caption: rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx),
+    // A third party's act names who acted: the redeemer, the batch manager
+    // moving a delegated Trove's rate.
+    actor: {
+      by: isRedemption
+        ? ctx.redeemer
+        : ctx.operation === "setBatchManagerAnnualInterestRate"
+          ? ctx.batchManager
+          : undefined,
+      custody:
+        ctx.operation === "transferTrove" && ctx.transfer
+          ? ctx.transfer.toAddress?.toLowerCase() === event.wallet?.toLowerCase()
+            ? { dir: "from", address: ctx.transfer.fromAddress }
+            : { dir: "to", address: ctx.transfer.toAddress }
+          : undefined,
+    },
+    cells: detailPart("cells"),
+    ledgers: {
+      provider: (children) => (
+        <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>
+          {children}
+        </LiquityLedgerProvider>
+      ),
+    },
+    notes: detailPart("notes"),
+    price: detailPart("price"),
+    explainer: {
+      body: <LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />,
+      first: prose.L4.length > 0 ? <LiquityExplainerTeaser prose={prose} ctx={ctx} coords={coords} /> : undefined,
+      grouped: isGroupedExplanation(prose),
+    },
+    learnMore: <LearnMore inline content={prose.L5.content} />,
+  };
 
   const card = (
-    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>
-      <EventCard
-        avatar={avatarOverride ?? avatarSlot}
-        iconColumn={iconSlot}
-        header={
-          <LiquityEventHeader
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            page={!!page}
-          />
-        }
-        detail={
-          <LiquityEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            previousEvent={previousEvent}
-            currentEvent={event}
-            currentPrice={currentPrice}
-            prose={prose}
-          />
-        }
-        explainer={<LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />}
-        explainerTeaser={liquityTeaser}
-        txHash={event.txHash}
-        footerExtra={footerExtra}
-        learnMore={<LearnMore inline content={prose.L5.content} />}
-        explanationHeading={PAGE_WORDS.explanation_heading}
-        eventMenu="page"
-        persistKey={`liquity-v2:${event.id}`}
-        // A third party's act names who acted: the redeemer, the batch
-        // manager moving a delegated Trove's rate.
-        by={
-          isRedemption
-            ? ctx.redeemer
-            : ctx.operation === "setBatchManagerAnnualInterestRate"
-              ? ctx.batchManager
-              : undefined
-        }
-        custody={
-          ctx.operation === "transferTrove" && ctx.transfer
-            ? ctx.transfer.toAddress?.toLowerCase() === event.wallet?.toLowerCase()
-              ? { dir: "from", address: ctx.transfer.fromAddress }
-              : { dir: "to", address: ctx.transfer.toAddress }
-            : undefined
-        }
-        caption={rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx)}
-        {...(page
-          ? {
-              hideDetailChevron: true,
-              detailOpen: true,
-              pageAside: page.aside,
-            }
-          : {})}
-      />
-    </LiquityLedgerProvider>
+    <EventCard
+      slots={slots}
+      avatar={avatarOverride ?? avatarSlot}
+      footerExtra={footerExtra}
+      eventMenu="page"
+      pageAside={page?.aside}
+    />
   );
   // The event page's side column renders inside the card and reads the Copy
   // for LLM build from here.

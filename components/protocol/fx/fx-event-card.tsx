@@ -186,7 +186,6 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={fxExplainerTeaser(ctx, coords)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />}

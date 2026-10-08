@@ -179,7 +179,6 @@ export function CompoundEventCard({
             skipLead
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={compoundExplainerTeaser(ctx, coords, sibs, event, m)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={compoundLearnMoreContent(ctx)} />}

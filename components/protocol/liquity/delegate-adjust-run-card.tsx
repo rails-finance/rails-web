@@ -140,7 +140,7 @@ export function DelegateAdjustRunCard({
           spokenCaption={`Adjusted, ${spokenRange}`}
           label={`${countText}${by}, ${spokenRange}${movement}`}
           detail={<div className="px-5 pt-4 pb-3">{words}</div>}
-          hideDetailChevron
+          group="words"
         />
       }
       members={children}

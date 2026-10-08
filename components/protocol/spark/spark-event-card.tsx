@@ -185,7 +185,6 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
           />
         </>
       }
-      explainerLabel="Plain English"
       explainerTeaser={sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
       txHash={event.txHash}
       learnMore={<LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />}

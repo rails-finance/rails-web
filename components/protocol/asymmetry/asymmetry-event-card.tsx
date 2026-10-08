@@ -203,7 +203,6 @@ export function AsymmetryEventCard({ event, isLast, eventNumber }: AsymmetryEven
             gas={isWarning || ctx.batchRate ? undefined : event.gas}
           />
         }
-        explainerLabel="Plain English"
         explainerTeaser={
           liquityForkExplainerTeaser(ctx, coords, ASYMMETRY_FORK, ASYMMETRY_EXPLAINER_PROVS) ? (
             <InLedgerFigures

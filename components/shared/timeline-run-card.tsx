@@ -524,7 +524,7 @@ export function TimelineRunCard({
           label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
           detail={hasSums ? summary : undefined}
           detailLabel="The group's sums"
-          noChevron
+          group="summary"
           muted={muted}
         />
       }

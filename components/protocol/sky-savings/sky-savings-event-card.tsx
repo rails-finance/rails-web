@@ -319,7 +319,6 @@ export function SkySavingsEventCard({
       detail={detail}
       detailLabel="Position after this event"
       explainer={<SkySavingsEventExplainer ctx={c} previous={previous} />}
-      explainerLabel="Plain English"
       txHash={event.txHash}
       learnMore={<LearnMore inline content={skyEventContent(kind)} />}
       persistKey={`sky-savings:${event.id}`}

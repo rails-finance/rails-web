@@ -344,7 +344,7 @@ export function MorphoBaseVaultTimeline({
                   prov={PROV}
                   persistPrefix="morpho-base-vault"
                   icon={row.kind === "transfer-self" ? "no-change" : undefined}
-                  headerBars={
+                  band={
                     <VaultAllocationBand
                       event={row}
                       coords={{ ...coords, blockNumber: row.blockNumber, txHash: row.txHash }}

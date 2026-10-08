@@ -163,7 +163,6 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventC
         }
         detailLabel="Loan terms"
         explainer={<PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />}
-        explainerLabel="Plain English"
         explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
         txHash={event.txHash}
         learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}

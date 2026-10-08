@@ -93,7 +93,7 @@ export interface VaultTimelineRowProps {
   /** A family's own full-width instrument under the header, inside the header
    *  panel — the `EventCard` slot whose grid lines up with the detail grid.
    *  Ethereum's families have none; MetaMorpho draws its allocation band here. */
-  headerBars?: ReactNode;
+  band?: ReactNode;
   /** Where a family's own figure joins the row's stat grid. */
   detailCards?: (rowCoords: VaultTimelineCoords) => ReactNode;
   /** Where a family's own sentence joins the row's detail panel, under the
@@ -117,7 +117,7 @@ export function VaultTimelineRow({
   isLast,
   eventNumber,
   prov,
-  headerBars,
+  band,
   detailCards,
   detailNotes,
   icon,
@@ -193,7 +193,7 @@ export function VaultTimelineRow({
           eventNumber={eventNumber}
         />
       }
-      headerBars={headerBars}
+      band={band}
       detail={
         <RowDetail
           event={event}
@@ -208,7 +208,6 @@ export function VaultTimelineRow({
       }
       detailLabel="What the chain recorded"
       explainer={<RowExplainer event={event} shareUnit={shareUnit} assetSymbol={assetSymbol} />}
-      explainerLabel="Plain English"
       txHash={event.txHash}
       persistKey={`${persistPrefix}:${vaultAddress}:${event.id}`}
     />
