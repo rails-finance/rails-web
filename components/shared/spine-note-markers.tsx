@@ -183,7 +183,6 @@ export function NoteGap({
   head?: { tip: SpineTip | null };
 }) {
   const phone = useSpineView();
-  const { cardPad } = useTimelineScale();
   const ref = useRef<HTMLDivElement>(null);
   // Focus follows the click: opening a marker moves it to the note's header,
   // closing returns it to the marker.
@@ -228,7 +227,7 @@ export function NoteGap({
       // Between two rows the gap cancels the list's 8px, so its growth is what
       // the markers ask for; the head slot keeps it.
       className={`relative flex flex-col ${head ? "" : "-mt-2"}`}
-      style={{ "--card-pad": `${cardPad}px`, "--spine-x": SPINE_X, paddingTop: tip ? 22 : 0 } as CSSProperties}
+      style={{ "--spine-x": SPINE_X, paddingTop: tip ? 22 : 0 } as CSSProperties}
     >
       {tip && (
         <div aria-hidden className="absolute left-1/2 top-0 z-20 -translate-x-1/2 sm:left-[var(--spine-x)]">

@@ -604,7 +604,7 @@ export function EventCard({
             } relative ${scale.cardRounded} ${
               muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
             }`}
-            style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
+            style={pageMode ? { padding: scale.cardPad } : undefined}
           >
             {showAvatar && avatar}
             {pageMode ? (

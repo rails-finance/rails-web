@@ -74,7 +74,6 @@ export function NoteRowShell({
         {...{ [marker.attr]: marker.value, [`${marker.attr}-open`]: open ? "" : undefined }}
         data-anatomy="L7"
         className={`spine-row relative ${scale.cardRounded}`}
-        style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
       >
         <div className="spine-cell">
           <SpineColumn icon={icon} isFirst={isFirst} isLast={isLast} />

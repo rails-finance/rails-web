@@ -541,11 +541,7 @@ export function LiveNoteGroupRow({
 }) {
   const scale = useTimelineScale();
   return (
-    <div
-      data-live-note-group={group.notes.length}
-      className={`spine-row relative ${scale.cardRounded}`}
-      style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
-    >
+    <div data-live-note-group={group.notes.length} className={`spine-row relative ${scale.cardRounded}`}>
       <div className="spine-cell">
         <SpineColumn icon={opened ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
       </div>

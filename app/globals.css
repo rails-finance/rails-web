@@ -194,6 +194,13 @@
      SVG `color`). See color-grammar.md §5. */
   --caution: var(--color-caution-500);
 
+  /* The timeline row's geometry (`.spine-row`): its padding, and the top of
+     its spine node, the padding plus the column's 16px top padding (pt-4 in
+     spine-column.tsx). The number column and the market-note markers line up
+     on it. */
+  --card-pad: 4px;
+  --node-y: calc(var(--card-pad) + 16px);
+
   /* The two adverse tones (lib/shared/tone.ts): the glyph ink on the spine
      (`--tone-*`) and the text (`--tone-*-text`, the `text-tone-*` utilities),
      one place for both themes. */
@@ -447,6 +454,7 @@ body {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
     width: 100%;
+    padding: var(--card-pad);
   }
   .spine-cell {
     position: relative;
@@ -470,7 +478,7 @@ body {
     min-width: 0;
   }
   .spine-num {
-    top: calc(var(--card-pad) + 16px);
+    top: var(--node-y);
   }
   @media (max-width: 639.98px) {
     .spine-row:not(.spine-seg) > .spine-cell {

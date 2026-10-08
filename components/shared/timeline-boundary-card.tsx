@@ -28,7 +28,6 @@
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
 import { useState } from "react";
-import { useTimelineScale } from "@/components/shared/activity-timeline";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { StatCard } from "@/components/shared/state-transition";
@@ -116,7 +115,6 @@ export function TimelineBoundaryRow({
   isFirst?: boolean;
   isLast: boolean;
 }) {
-  const scale = useTimelineScale();
   // Under 640px the glyph is a segment with a caption naming what lies past
   // it. Nothing opens, so it is text.
   return (
@@ -125,7 +123,6 @@ export function TimelineBoundaryRow({
       data-anatomy="L8"
       data-boundary-row={kind}
       className="spine-row spine-seg relative"
-      style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
       <div className="spine-cell">
         <SpineColumn icon="boundary" isFirst={isFirst} isLast={isLast} tip={null} />
