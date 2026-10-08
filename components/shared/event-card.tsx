@@ -23,7 +23,8 @@ import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } f
 import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
-import { SpineLegsContext, SpineNodeToggleContext, useSpineLegsState } from "@/components/shared/spine-column";
+import { SpineLegsContext, useSpineLegsState } from "@/components/shared/spine-column";
+import { useRowTarget } from "@/components/shared/row-target";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -276,14 +277,6 @@ export function EventCard({
   // control is the segment's button.
   const headerToggles = !hideDetailChevron && !pageMode;
   const showChevron = hasDetail && headerToggles;
-  // The spine node is a second click target for the header: a click on it
-  // toggles the card, and hovering it lights the header and reveals its
-  // chevron (`.evt-row` in app/globals.css). The header stays the one Tab stop.
-  const nodeToggleOn = showChevron && !pageMode;
-  const nodeToggle = useMemo(
-    () => (nodeToggleOn ? { onToggle: () => toggleDetail() } : null),
-    [nodeToggleOn, toggleDetail],
-  );
   // The phone segment's control: every timeline row with a body to open.
   const phoneToggles = inTimeline && hasDetail;
 
@@ -397,7 +390,19 @@ export function EventCard({
   // repaid"); a group passes its whole `label`.
   const labelId = `${reactId}-label`;
   const legsId = `${reactId}-legs`;
-  const rowSlot = useMemo(() => ({ legsId }), [legsId]);
+  // The whole row is the card's click target (row-target.ts): from 640px
+  // where the header is the control, below it where the segment's button
+  // is. Hovering it lights the header (`.evt-row-target` in globals.css).
+  const rowTarget = !pageMode && (showChevron || phoneToggles);
+  const rowClick = useRowTarget(
+    rowTarget
+      ? () => ((isPhoneViewport() && inTimeline ? phoneToggles : showChevron) ? toggleDetail() : undefined)
+      : null,
+  );
+  const rowSlot = useMemo(
+    () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget }),
+    [inTimeline, legsId, rowTarget],
+  );
   const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
   const panelId = `${reactId}-card`;
 
@@ -603,11 +608,12 @@ export function EventCard({
             className={`${
               pageMode
                 ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
-                : `spine-row evt-row${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
+                : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
             } relative ${scale.cardRounded} ${
               muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
             }`}
             style={pageMode ? { padding: scale.cardPad } : undefined}
+            {...(rowTarget ? rowClick : {})}
           >
             {showAvatar && avatar}
             {pageMode ? (
@@ -624,16 +630,14 @@ export function EventCard({
                     {spoken}
                   </span>
                 )}
-                <SpineRowContext.Provider value={inTimeline ? rowSlot : null}>
-                  <SpineNodeToggleContext.Provider value={nodeToggle}>{iconColumn}</SpineNodeToggleContext.Provider>
-                </SpineRowContext.Provider>
+                <SpineRowContext.Provider value={rowSlot}>{iconColumn}</SpineRowContext.Provider>
                 {phoneToggles && (
                   // Under 640px the segment, its flank values and its caption
                   // are one button, laid over the column; the glyphs under it
                   // take no pointer.
                   <button
                     data-spine-toggle=""
-                    {...disclosureProps<HTMLButtonElement>(showDetail, panelId, toggleDetail)}
+                    {...disclosureProps<HTMLButtonElement>(showDetail, panelId, () => toggleDetail())}
                     {...nameProps}
                     className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
                   />

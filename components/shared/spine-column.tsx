@@ -203,12 +203,6 @@ export type SpineTip = "above";
  *  ignores the context. */
 export const SpineTipContext = createContext<SpineTip | null>(null);
 
-/** The card's toggle, handed to its spine node (EventCard): the node and its
- *  flank values are a second click target for the header, which stays the one
- *  focusable control. Hovering the node lights the header (`.evt-row` in
- *  app/globals.css). */
-export const SpineNodeToggleContext = createContext<{ onToggle: () => void } | null>(null);
-
 /** A warning event's legs, published by the card's header for the card's
  *  spine: the header (ChainTruthRow, a family's own) holds the amounts, the
  *  card's SpineColumn draws them. EventCard provides it. */
@@ -826,17 +820,14 @@ export function SpineColumn({
   const effectiveTip: SpineTip | null = tip !== undefined ? tip : contextTip;
   const { showTimelineValues } = useTimelineDisplay();
   const unreadOf = useUnreadTokenOf();
-  // A timeline row: the phone's segment control takes the legs for its name.
+  // The row: its controls take the legs for their name, and where the whole
+  // row is the card's click target the token chips drop their filter click.
   const spineRow = useSpineRow();
-  // A click on the node or its flank values opens and closes the card (on a
-  // phone the segment's button lies over them and takes the click).
-  const toggleCtx = useContext(SpineNodeToggleContext);
-  const nodeToggle = toggleCtx;
-  const nodeProps = nodeToggle ? { onClick: nodeToggle.onToggle, "data-spine-node-toggle": "" } : {};
+  const rowTarget = !!spineRow?.target;
   // A warning node's legs: the card's own, else the ones its header published.
   const publishedLegs = useContext(SpineLegsContext)?.legs ?? null;
   const adverseLegs = icon === "warning" ? (warningLegs ?? publishedLegs) : null;
-  const legs = !spineRow
+  const legs = !spineRow?.legsId
     ? null
     : !icon && tokens?.length
       ? spokenLegs(tokens, unreadOf)
@@ -849,7 +840,7 @@ export function SpineColumn({
               .join(", ") || null
           : null;
   // The legs as spoken, for the row's controls to name themselves with.
-  const legsEl = spineRow && legs && (
+  const legsEl = spineRow?.legsId && legs && (
     <span id={spineRow.legsId} hidden>
       : {legs}
     </span>
@@ -926,7 +917,7 @@ export function SpineColumn({
       case "warning": {
         // The legs as nodes; the triangle only where the event names none.
         const legs = adverseLegs?.length ? (
-          <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!nodeToggle} />
+          <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!rowTarget} />
         ) : (
           nodeRow(<WarningIcon size={T} color={SPINE_COLORS[warningTone]} />)
         );
@@ -1046,7 +1037,7 @@ export function SpineColumn({
         iconOverride={row.iconSymbol}
         address={row.address}
         size={T}
-        filterable={!nodeToggle}
+        filterable={!rowTarget}
       />
     );
     return (
@@ -1124,9 +1115,8 @@ export function SpineColumn({
       <div
         data-spine-node=""
         {...nodeAttrs}
-        className={`relative z-10${effectiveIcon ? "" : " flex flex-col gap-y-1 items-center"}${nodeToggle ? " cursor-pointer" : ""}`}
+        className={`relative z-10${effectiveIcon ? "" : " flex flex-col gap-y-1 items-center"}`}
         style={{ backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}`, paddingBottom: hasBadge ? 6 : undefined }}
-        {...nodeProps}
       >
         {leadIn}
         {effectiveIcon ? node : tokenRows}

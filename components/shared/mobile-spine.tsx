@@ -89,11 +89,13 @@ export interface EventCaption {
 
 export const EventCaptionContext = createContext<EventCaption | null>(null);
 
-/** What a timeline row hands its `SpineColumn`: the id under which the
+/** What a row hands its `SpineColumn`: on a timeline, the id under which the
  *  column states its legs as spoken ("7,500 BOLD repaid"), which the row's
- *  controls take into their names. */
+ *  controls take into their names; and whether the whole row is the card's
+ *  click target. */
 export interface SpineRowSlot {
-  legsId: string;
+  legsId?: string;
+  target: boolean;
 }
 
 export const SpineRowContext = createContext<SpineRowSlot | null>(null);

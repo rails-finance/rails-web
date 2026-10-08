@@ -798,7 +798,7 @@ body {
     opacity: 0;
   }
   .disc-row:hover .disc-chev,
-  .evt-row:has([data-spine-node-toggle]:hover) .disc-row .disc-chev,
+  .evt-row-target:hover:not(:has([data-anatomy="T2"]:hover)) .disc-row .disc-chev,
   .disc-row:focus-visible .disc-chev,
   .disc-row:has(:focus-visible) .disc-chev {
     opacity: 1;
@@ -809,10 +809,10 @@ body {
      the delay sits on the hover state alone. Keyboard focus shows it at once;
      the rotation starts at once. The position card's rows and the
      Lifetime flows header keep the instant reveal above. */
-  /* The pointer on the card's spine node, the header's second click target
-     (event-card.tsx): the same half-second rule. */
+  /* The pointer anywhere on a row that is the card's click target
+     (row-target.ts): the same half-second rule. */
   .disc-row-slow:hover .disc-chev,
-  .evt-row:has([data-spine-node-toggle]:hover) .disc-row-slow .disc-chev {
+  .evt-row-target:hover:not(:has([data-anatomy="T2"]:hover)) .disc-row-slow .disc-chev {
     transition-delay: 500ms, 500ms, 0ms;
   }
   .disc-row-slow:focus-visible .disc-chev,
@@ -822,15 +822,24 @@ body {
 }
 @media (hover: hover) and (prefers-reduced-motion: reduce) {
   .disc-row-slow:hover .disc-chev,
-  .evt-row:has([data-spine-node-toggle]:hover) .disc-row-slow .disc-chev {
+  .evt-row-target:hover:not(:has([data-anatomy="T2"]:hover)) .disc-row-slow .disc-chev {
     transition-delay: 0ms;
   }
 }
 
-/* The pointer on a card's spine node lights the header's surface, as the
-   header's hover does (event-card.tsx). */
-.evt-row:has([data-spine-node-toggle]:hover) .evt-t1-lit {
-  background-color: var(--surface-raised);
+/* The whole row is a card's click target (row-target.ts): the pointer on it
+   lights the header's surface, as the header's hover does, and the open
+   body keeps the default cursor. */
+.evt-row-target {
+  cursor: pointer;
+}
+.evt-row-target [data-anatomy="T2"] {
+  cursor: auto;
+}
+@media (min-width: 640px) {
+  .evt-row-target:hover:not(:has([data-anatomy="T2"]:hover)) .evt-t1-lit {
+    background-color: var(--surface-raised);
+  }
 }
 
 /* Focus ring */

@@ -30,6 +30,7 @@ import { ExpandChevron } from "@/components/shared/expand-chevron";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { SpineColumn, type SpineIcon } from "@/components/shared/spine-column";
 import { disclosureProps } from "@/components/shared/disclosure";
+import { useRowTarget } from "@/components/shared/row-target";
 
 export interface NoteRowShellProps {
   /** The spine glyph this row's class wears. */
@@ -67,13 +68,16 @@ export function NoteRowShell({
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
   const toggle = () => setOpen((o) => !o);
+  const rowClick = useRowTarget(toggle);
 
   return (
     <ProvReceiptsScope registry={registry}>
       <div
         {...{ [marker.attr]: marker.value, [`${marker.attr}-open`]: open ? "" : undefined }}
         data-anatomy="L7"
-        className={`spine-row relative ${scale.cardRounded}`}
+        className={`spine-row relative cursor-pointer ${scale.cardRounded}`}
+        // The whole row opens and closes the note, as an event card's does.
+        {...rowClick}
       >
         <div className="spine-cell">
           <SpineColumn icon={icon} isLast={isLast} />
@@ -97,7 +101,7 @@ export function NoteRowShell({
 
           {/* ── Body panel — mounted only while open, like a card's ─────── */}
           {open && (
-            <div id={panelId} className="rounded-b-xl bg-note">
+            <div id={panelId} className="cursor-auto rounded-b-xl bg-note" data-row-body="">
               {children}
             </div>
           )}
