@@ -134,11 +134,12 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
    *  a wallet sets the search query to that address (filters the listing). The
    *  same protocol keys the star on each card. Omit to skip bookmarks. */
   bookmarksProtocol?: BookmarkScope;
-  /** Render a bespoke failure state when a fetch rejects; the shell renders the
-   *  returned node in place of the row column. Omit (every Tier-1 config does)
-   *  for the shared default — <ListingUnavailable> with a retry — so a down
-   *  backend never masquerades as "no {noun} captured yet.". */
-  renderError?: (error: unknown) => ReactNode;
+  /** Render a bespoke failure state for a fetch rejection that means something
+   *  more than "unreachable" (a gate statement); the shell renders the returned
+   *  node in place of the row column. Return null, or omit the prop, for the
+   *  shared <ListingUnavailable> with a retry, so a down backend never
+   *  masquerades as "no {noun} captured yet.". */
+  renderError?: (error: unknown) => ReactNode | null;
   /** Fired (in an effect) whenever the decoded selection changes, with the live
    *  filters. Lets a config run identity side effects — e.g. push the searched
    *  wallet into the wallet context (+ resolve its ENS for the header pill) —
@@ -489,15 +490,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       refreshing={refreshing}
       viewKey={viewKey}
       pagination={pagination}
-      error={
-        error != null ? (
-          renderError ? (
-            renderError(error)
-          ) : (
-            <ListingUnavailable noun={noun} onRetry={retry} />
-          )
-        ) : undefined
-      }
+      error={error != null ? (renderError?.(error) ?? <ListingUnavailable noun={noun} onRetry={retry} />) : undefined}
       renderCard={renderCard}
       hrefFor={hrefFor}
       keyFor={keyFor}
