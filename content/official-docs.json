@@ -1,0 +1,26 @@
+{
+  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere.",
+  "families": {
+    "liquity-v2": ["docs.liquity.org"],
+    "liquity-v1": ["docs.liquity.org"],
+    "aave-v3": ["aave.com"],
+    "aave-v4": ["aave.com"],
+    "seamless": ["docs.seamlessprotocol.com"],
+    "spark": ["docs.spark.fi"],
+    "morpho": ["docs.morpho.org"],
+    "compound": ["docs.compound.finance"],
+    "compound-v2": ["docs.compound.finance"],
+    "makerdao": ["docs.makerdao.com"],
+    "alchemix": ["docs.alchemix.fi"],
+    "fx": ["fxprotocol.gitbook.io"],
+    "pwn": ["docs.pwn.xyz"],
+    "moonwell": ["docs.moonwell.fi"],
+    "maple": ["docs.maple.finance"],
+    "frankencoin": ["docs.frankencoin.com"],
+    "fluid": ["docs.fluid.io"],
+    "dolomite": ["docs.dolomite.io"],
+    "llamalend": ["docs.curve.finance"],
+    "polaris": ["docs.polaris.finance"]
+  },
+  "notDocumentation": ["github.com", "www.youtube.com", "youtube.com", "app.aave.com", "governance.aave.com"]
+}
