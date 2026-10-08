@@ -108,6 +108,7 @@ import {
 import { aaveFamilyLiquidationPriceNotes } from "@/lib/aave-v3/liquidation-price-notes";
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import type { MarketNote } from "@/lib/shared/market-note";
+import { v3ViewWithLiveRead } from "@/lib/aave-v3/chain-position-view";
 
 // Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
 // one chunk off the initial bundle, mirroring the V4 spoke page.
@@ -662,9 +663,12 @@ export default function AaveV3PositionDetail({
   // this the card face showed the listing's snapshot-sweep HF next to the
   // risk slot's live one — two "drop to liquidation" percentages from two
   // blocks on one card. The listing keeps the snapshot; this page re-reads
-  // live (which the snapshot receipt itself states).
+  // live (which the snapshot receipt itself states). When the read finds the
+  // account empty while the index still has it open (the index trails the
+  // chain by its refresh), the page shows it closed: see v3ViewWithLiveRead.
+  // Everything below that states what the account holds now reads `liveView`.
   const liveView = useMemo<AaveV3PositionView | null>(
-    () => (view && chain ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false } : view),
+    () => (view && chain ? v3ViewWithLiveRead(view, chain) : view),
     [view, chain],
   );
 
@@ -672,15 +676,16 @@ export default function AaveV3PositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view
-    ? computeAaveV3CardCaptions(view, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
+  const captions = liveView
+    ? computeAaveV3CardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, aaveEvents)
     : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
   const towerData = useMemo(
-    () => (view ? computeAaveV3Economics(view, lifetimeEvents, undefined, precomputedLifetime, laneInterest) : null),
-    [view, lifetimeEvents, precomputedLifetime, laneInterest],
+    () =>
+      liveView ? computeAaveV3Economics(liveView, lifetimeEvents, undefined, precomputedLifetime, laneInterest) : null,
+    [liveView, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
   const flowSeriesSource = useMemo(
@@ -701,18 +706,18 @@ export default function AaveV3PositionDetail({
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
-    if (!view || view.status !== "open") return [];
+    if (!liveView || liveView.status !== "open") return [];
     const seen = new Set<string>();
     const out: PriceStripAsset[] = [];
-    for (const r of [...view.supplies, ...view.borrows]) {
+    for (const r of [...liveView.supplies, ...liveView.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
-      const p = view.priceByAddress?.[a];
+      const p = liveView.priceByAddress?.[a];
       if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
     }
     return out;
-  }, [view]);
+  }, [liveView]);
 
   // Which Pool the receipts name. Core, Prime and EtherFi are three separate
   // contracts and the market is a query parameter, so before this the cards on
@@ -734,13 +739,13 @@ export default function AaveV3PositionDetail({
             wallet={wallet}
             owner={{ wallet }}
             assets={stripAssets}
-            closed={view != null && view.status !== "open"}
+            closed={liveView != null && liveView.status !== "open"}
           >
             {view && (
               <AaveV3ExportMenu
                 wallet={wallet}
                 marketName={MARKET_NAME[market] ?? "Core"}
-                view={view}
+                view={liveView ?? view}
                 chain={chain}
                 captions={captions}
                 events={aaveEvents}
@@ -822,7 +827,7 @@ export default function AaveV3PositionDetail({
                 // lets pinned mode (the per-event share route) force a landed
                 // card's detail panel open on its first mount.
                 persistKeyPrefix="aave-v3"
-                closed={view ? view.status !== "open" : undefined}
+                closed={liveView ? liveView.status !== "open" : undefined}
                 notes={notes}
                 liveNotes={liveNotes}
                 liveNotesPending={liveNotesPending}
@@ -843,11 +848,11 @@ export default function AaveV3PositionDetail({
                 // Tenure-first header (the V4 spoke treatment): when the account
                 // started, how long it has run, how fresh the latest activity is.
                 toolbarLeading={
-                  view ? (
+                  liveView ? (
                     <TimelineActivityHeader
                       events={aaveEvents}
                       folders={servedFolders}
-                      closed={view.status !== "open"}
+                      closed={liveView.status !== "open"}
                       // When the position actually opened, not when the window
                       // does — otherwise a wallet with 104,000 events reads as
                       // days old because its oldest loaded card is. Same reason

@@ -134,3 +134,30 @@ export function v3ViewFromChain(
     chainHfStale: chain.chainStale,
   };
 }
+
+/**
+ * Merge the position page's live Pool read over the indexed view (Ethereum).
+ *
+ * The card's balances come from the index, which trails the chain while its
+ * reduction refreshes; the health factor comes from the live read at head. When
+ * the live read finds the account holds nothing while the index still has it
+ * open, the two would describe different positions on one card — debt beside
+ * "No debt", and an Explanation with nothing to narrate. The live read is the
+ * chain-state truth (0006), so the account renders as closed (liquidated when
+ * the index counts a liquidation, as `v3ViewFromChain` decides on Base). The
+ * closed card carries no current balances, so no indexed figure is shown under
+ * a live label. A partial lag (both sides hold something) keeps the indexed
+ * balances, and the card marks an HF the read could not give for the debt shown.
+ */
+export function v3ViewWithLiveRead(view: AaveV3PositionView, chain: AaveV3PositionChainResponse): AaveV3PositionView {
+  const live: AaveV3PositionView = { ...view, healthFactor: chain.healthFactor, chainHfStale: false };
+  const holdsNothing = chain.reserves.every((r) => r.supplyBalanceRaw === "0" && r.debtBalanceRaw === "0");
+  if (view.status !== "open" || !holdsNothing) return live;
+  return {
+    ...live,
+    status: view.liquidationCount > 0 ? "liquidated" : "closed",
+    supplies: [],
+    borrows: [],
+    atBlock: chain.blockNumber,
+  };
+}

@@ -679,10 +679,14 @@ export default function SparkPositionDetail({
     const t = setTimeout(() => setChainSlow(true), HF_READ_WAIT_MS);
     return () => clearTimeout(t);
   }, [wallet]);
+  // When the read finds the account empty while the index still has it open
+  // (the index trails the chain by its refresh), the account renders closed —
+  // the Aave V3 page's rule (v3ViewWithLiveRead), so debt is never shown
+  // beside a "No debt" health factor or an empty Explanation.
   const liveView = useMemo<SparkPositionView | null>(
     () =>
       view && chain
-        ? { ...view, healthFactor: chain.healthFactor, chainHfStale: false }
+        ? sparkViewWithLiveRead(view, chain)
         : view && view.status === "open"
           ? { ...view, hfRead: chainSettled || chainSlow ? "unread" : "reading" }
           : view,
@@ -693,15 +697,15 @@ export default function SparkPositionDetail({
   // interest split; the live Pool read feeds the rate and streams in when it
   // lands. Computed once: the card and the LLM export share the object so they
   // agree number-for-number.
-  const captions = view
-    ? computeSparkCardCaptions(view, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
+  const captions = liveView
+    ? computeSparkCardCaptions(liveView, lifetimeEvents, chain, precomputedLifetime, sparkEvents)
     : null;
 
   // The tower's data feeds both the bars and their Explanation prose, so it's
   // computed once and shared rather than re-derived for each.
   const towerData = useMemo(
-    () => (view ? computeSparkEconomics(view, lifetimeEvents, precomputedLifetime, laneInterest) : null),
-    [view, lifetimeEvents, precomputedLifetime, laneInterest],
+    () => (liveView ? computeSparkEconomics(liveView, lifetimeEvents, precomputedLifetime, laneInterest) : null),
+    [liveView, lifetimeEvents, precomputedLifetime, laneInterest],
   );
 
   const flowSeriesSource = useMemo(() => ({ path: "/api/spark/flows/series", params: { wallet } }), [wallet]);
@@ -761,7 +765,7 @@ export default function SparkPositionDetail({
           wallet={wallet}
           owner={{ wallet }}
           assets={stripAssets}
-          closed={view != null && view.status !== "open"}
+          closed={liveView != null && liveView.status !== "open"}
         >
           {view && (
             <SparkExportMenu
@@ -852,7 +856,7 @@ export default function SparkPositionDetail({
               // lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="spark"
-              closed={view ? view.status !== "open" : undefined}
+              closed={liveView ? liveView.status !== "open" : undefined}
               notes={notes}
               liveNotes={liveNotes}
               liveNotesPending={liveNotesPending}
@@ -873,11 +877,11 @@ export default function SparkPositionDetail({
               // Tenure-first header (the V4 spoke treatment): when the account
               // started, how long it has run, how fresh the latest activity is.
               toolbarLeading={
-                view ? (
+                liveView ? (
                   <TimelineActivityHeader
                     events={sparkEvents}
                     folders={servedFolders}
-                    closed={view.status !== "open"}
+                    closed={liveView.status !== "open"}
                     // When the position actually opened, not when the window
                     // does — otherwise a wallet with 28,000 events reads as days
                     // old because its oldest loaded card is.
@@ -917,4 +921,17 @@ export default function SparkPositionDetail({
       </div>
     </FlowFocusContext.Provider>
   );
+}
+
+function sparkViewWithLiveRead(view: SparkPositionView, chain: SparkPositionChainResponse): SparkPositionView {
+  const live: SparkPositionView = { ...view, healthFactor: chain.healthFactor, chainHfStale: false };
+  const holdsNothing = chain.reserves.every((r) => r.supplyBalanceRaw === "0" && r.debtBalanceRaw === "0");
+  if (view.status !== "open" || !holdsNothing) return live;
+  return {
+    ...live,
+    status: view.liquidationCount > 0 ? "liquidated" : "closed",
+    supplies: [],
+    borrows: [],
+    atBlock: chain.blockNumber,
+  };
 }
