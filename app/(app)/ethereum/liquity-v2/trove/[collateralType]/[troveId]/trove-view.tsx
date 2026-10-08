@@ -37,7 +37,7 @@ import { troveLives } from "@/lib/shared/liquity-flows-explanation";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { LiquityFlowsExplanation } from "@/lib/liquity/economics-explanation";
-import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
+import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
@@ -683,7 +683,7 @@ export default function TroveView({
                     daily={flowDaily.obs != null}
                   />
                 }
-                learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
+                learnMore={liquityLifetimeFlowsContent({ isBatched: result.economics._meta.isInBatch })}
               />
             </>
           );

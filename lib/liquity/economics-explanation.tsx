@@ -2,7 +2,7 @@
 // components/protocol/liquity/trove-economics.tsx built as `economicsItems`,
 // carried over verbatim (the redemption net outcome is a Totals bullet via
 // `liquityRedemptionOutcome`; the batch/delegate wording is kept) now that the tower itself is the shared
-// <ChainTruthTower>. The "?" FAQ stays `liquityEconomicsContent` from
+// <ChainTruthTower>. The "?" FAQ stays `liquityLifetimeFlowsContent` from
 // lib/shared/learn-more-content.ts — unchanged, so it isn't duplicated here.
 //
 // `liquityEconomicsExplanation` takes only `economics` + `meta` (no raw
