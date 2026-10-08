@@ -13,6 +13,7 @@ import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
 import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
+import type { Tone } from "@/lib/shared/tone";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
@@ -37,33 +38,28 @@ export type SpineIcon =
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Show timeline to {date}" cut the timeline: lucide `clock`, neutral ink, not an event
   | "boundary"; // The boundary card (components/shared/timeline-boundary-card.tsx) — a stack of transactions, the events before the oldest drawn row; neutral ink, the last node on the spine
 
-/** The two §5 adverse tones (color-grammar.md): caution for a change to the
- *  owner's position the owner did not make (a redemption, a force repay, a
- *  tick rebalance), critical for a liquidation. */
-export type WarningTone = "caution" | "critical";
-
 /** The spine's inks: neutral, or a warning tone on a warning node and its
  *  dotted stretch. Delegation signals via the pink glyph badge
  *  (color-grammar.md §4b), never the line. */
-export const SPINE_COLORS: Record<"default" | WarningTone, string> = {
+export const SPINE_COLORS: Record<"default" | Tone, string> = {
   default: "rgb(101 115 140)", // rb-500
-  caution: "var(--caution)", // a change the owner did not make: redemption + routine adverse (color-grammar.md §5)
-  critical: "rgb(239 68 68)", // red-500 — liquidation + critical
+  caution: "var(--tone-caution)",
+  critical: "var(--tone-critical)",
 };
 
 /** Pulsing dot color matching the node's tone */
-const DOT_COLORS: Record<"default" | WarningTone, string> = {
+const DOT_COLORS: Record<"default" | Tone, string> = {
   default: "bg-green-400",
   caution: "bg-caution-400",
   critical: "bg-red-400",
 };
 
 /** The tone a warning leg's magnitude takes, and the T1 word with it
- *  (color-grammar.md §5): caution orange for a redemption, red-500 for a
- *  liquidation. The arrows stay grey and the token icons keep their colours. */
-export const WARNING_TONE_TEXT: Record<WarningTone, string> = {
-  caution: "text-caution-600 dark:text-caution-400",
-  critical: "text-red-500",
+ *  (color-grammar.md §5). The arrows stay grey and the token icons keep their
+ *  colours. */
+export const WARNING_TONE_TEXT: Record<Tone, string> = {
+  caution: "text-tone-caution",
+  critical: "text-tone-critical",
 };
 
 // ── Token row descriptor ────────────────────────────────────────────────────
@@ -166,7 +162,7 @@ export interface SpineColumnProps {
    *  legs' magnitudes, a closed group's dotted stretch and the lead-in dot
    *  take it. Defaults
    *  to "caution". See color-grammar.md §5. */
-  warningTone?: WarningTone;
+  warningTone?: Tone;
   /** Optional hover/tap tip on a warning node: what the kind means. */
   warningTip?: ReactNode;
   /** icon="warning" only: the legs, top to bottom (the collateral, then the
@@ -255,7 +251,7 @@ export function usePublishSpineLegs(legs: SpineWarningLeg[] | null) {
 
 // ── Icon SVGs ───────────────────────────────────────────────────────────────
 
-function WarningIcon({ size, color = "var(--caution)" }: { size: number; color?: string }) {
+function WarningIcon({ size, color = "var(--tone-caution)" }: { size: number; color?: string }) {
   return (
     <svg
       width={size}
@@ -768,7 +764,7 @@ function WarningLegNodes({
   filterable,
 }: {
   legs: SpineWarningLeg[];
-  tone: WarningTone;
+  tone: Tone;
   showValues: boolean;
   filterable: boolean;
 }) {

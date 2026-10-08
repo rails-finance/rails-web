@@ -93,7 +93,7 @@ export const AAVE_V3_TIMELINE_RUNS: TimelineRunSpec[] = [
             key={folder.key}
             count={events.length}
             memberNoun="liquidation"
-            tone="danger"
+            tone="critical"
             kindWord="Liquidations"
             aggregates={aggregates}
             folder

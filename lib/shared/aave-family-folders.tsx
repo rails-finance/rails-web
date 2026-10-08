@@ -31,7 +31,7 @@ import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/
 
 const LIQUIDATION: FolderRegisterEntry = {
   memberNoun: "liquidation",
-  tone: "danger",
+  tone: "critical",
   kindWord: "Liquidations",
 };
 
@@ -55,7 +55,7 @@ const MIXED: FolderRegisterEntry = {
  *  severity — see the header. */
 const MIXED_WITH_LIQUIDATION: FolderRegisterEntry = {
   ...MIXED,
-  tone: "danger",
+  tone: "critical",
   spineIcon: "warning",
 };
 

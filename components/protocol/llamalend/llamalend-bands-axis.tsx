@@ -174,7 +174,7 @@ export function LlamalendBandsAxis({
   const lead = converted ? (
     <span className="font-semibold text-red-600 dark:text-red-400">Fully converted</span>
   ) : inBand ? (
-    <span className="font-semibold text-caution-600 dark:text-caution-400">Converting now</span>
+    <span className="font-semibold text-tone-caution">Converting now</span>
   ) : (
     <>{Math.round(((price - pUp) / price) * 100)}% from soft-liquidation</>
   );

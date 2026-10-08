@@ -18,6 +18,7 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { spokenAmount } from "@/components/shared/mobile-spine";
 import { formatDate } from "@/lib/date";
+import type { Tone } from "@/lib/shared/tone";
 
 /**
  * Timeline run card — one row standing in for a stretch of consecutive
@@ -93,10 +94,10 @@ export interface TimelineRunCardProps {
   aggregates?: RunAggregate[];
   /** The T1 word's tone and the summed legs': "caution" for a change to the
    *  owner's position the owner did not make (redemptions, tick rebalances;
-   *  color-grammar.md §5), "danger" for terminal ones (liquidation, auction
+   *  color-grammar.md §5), "critical" for terminal ones (liquidation, auction
    *  settlement), "neutral" for runs that carry no adverse signal (custody
    *  transfers, with spineIcon="custody"). */
-  tone?: "caution" | "danger" | "neutral";
+  tone?: Tone | "neutral";
   /** Spine glyph — "warning" for adverse runs, "external" for third-party
    *  actions that aren't a loss (keeper queue fills). */
   spineIcon?: SpineIcon;
@@ -173,9 +174,9 @@ export const RunLandingContext = createContext(false);
 const MEMBERS_SKELETON_HEIGHT = 200;
 
 /** Verb color per tone — the amount itself stays foreground-bold. */
-const VERB_CLASSES: Record<"caution" | "danger" | "neutral", string> = {
-  caution: "text-caution-600 dark:text-caution-400",
-  danger: "text-red-600 dark:text-red-400",
+const VERB_CLASSES: Record<Tone | "neutral", string> = {
+  caution: "text-tone-caution",
+  critical: "text-tone-critical",
   neutral: "text-rb-500",
 };
 
@@ -299,7 +300,7 @@ export function TimelineRunCard({
         ? {
             icon: "warning" as const,
             warningLegs,
-            warningTone: tone === "danger" ? "critical" : "caution",
+            warningTone: tone === "critical" ? "critical" : "caution",
           }
         : spineIcon === "custody"
           ? // A custody run moved the asset between accounts: the plane, no

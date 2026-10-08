@@ -72,7 +72,7 @@ export const FRANKENCOIN_AUCTION_RUNS: TimelineRunSpec[] = [
             count={slices.length}
             memberNoun="auction slice"
             aggregates={aggregates}
-            tone="danger"
+            tone="critical"
             kindWord="Auction"
             folder
             firstTimestamp={events[0].timestamp}

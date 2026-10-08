@@ -50,6 +50,7 @@
 import type { RunAggregate } from "@/components/shared/timeline-run-card";
 import type { SpineIcon } from "@/components/shared/spine-column";
 import { scaleBaseUnits, type OpeningBucket, type OpeningFlowBucket } from "@/lib/shared/timeline-opening-balance";
+import type { Tone } from "@/lib/shared/tone";
 
 /** A folder handle valid ONLY within the response that carried it. Branded so
  *  it cannot be passed where an event key or an href belongs — see the header.
@@ -331,7 +332,7 @@ export interface FolderRegisterEntry {
    *  row draws the Σ glyph and the verbs beside each pair, never a word for
    *  the action. */
   memberNoun: string;
-  tone?: "caution" | "danger" | "neutral";
+  tone?: Tone | "neutral";
   spineIcon?: SpineIcon;
   kindWord?: string;
   muted?: boolean;

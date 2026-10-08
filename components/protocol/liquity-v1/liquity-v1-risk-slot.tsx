@@ -98,9 +98,7 @@ export function LiquityV1RiskDetail({ chain }: { chain: LiquityV1PositionChainRe
           {chain.recoveryMode ? (
             <>
               {" · "}
-              <span className="font-semibold text-caution-600 dark:text-caution-400">
-                Recovery Mode: at risk below the system ratio
-              </span>
+              <span className="font-semibold text-tone-caution">Recovery Mode: at risk below the system ratio</span>
             </>
           ) : (
             <>

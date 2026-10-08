@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import type { OffPar } from "@/lib/shared/usd-display";
 
-export const OFF_PAR_BAND = "text-caution-600 dark:text-caution-400";
+export const OFF_PAR_BAND = "text-tone-caution";
 
 export function OffParFigure({ off, children }: { off: OffPar | null | undefined; children: ReactNode }) {
   if (!off) return <>{children}</>;

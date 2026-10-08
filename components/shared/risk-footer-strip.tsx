@@ -92,7 +92,7 @@ export function RiskFigure({
   return (
     <div
       className={`${alignStart ? "text-left" : "text-right"} text-xs tabular-nums leading-relaxed ${
-        caution ? "font-semibold text-caution-600 dark:text-caution-400" : "text-rb-500"
+        caution ? "font-semibold text-tone-caution" : "text-rb-500"
       }`}
     >
       {label != null && <>{label}: </>}

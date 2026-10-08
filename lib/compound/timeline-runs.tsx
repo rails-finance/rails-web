@@ -62,7 +62,7 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             key={folder.key}
             count={count}
             memberNoun="liquidation"
-            tone="danger"
+            tone="critical"
             kindWord="Liquidations"
             aggregates={aggregates}
             folder
@@ -92,7 +92,7 @@ export const COMPOUND_LIQUIDATION_RUNS: TimelineRunSpec[] = [
  *  absorption is a debt row and a row per seized collateral. */
 const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   memberNoun: "event",
-  tone: "danger",
+  tone: "critical",
   kindWord: "Liquidations",
   readingLine: true,
 };

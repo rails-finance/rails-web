@@ -21,7 +21,7 @@ export type PositionOutcome = "closed" | "liquidated" | "expired" | "repaid" | "
 const GREY_BADGE = "bg-rb-500 text-white";
 const RED_BADGE = "bg-red-500 text-white";
 const CAUTION_BADGE = "bg-caution-500 text-white";
-const CAUTION_TEXT = "text-caution-600 dark:text-caution-400";
+const CAUTION_TEXT = "text-tone-caution";
 
 const OUTCOME: Record<PositionOutcome, { label: string; color: string; badge: string }> = {
   closed: { label: "Closed", color: "text-rb-500", badge: GREY_BADGE },

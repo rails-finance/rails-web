@@ -66,7 +66,7 @@ export const COMPOUND_V2_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             count={events.length}
             memberNoun="liquidation"
             aggregates={aggregates}
-            tone="danger"
+            tone="critical"
             kindWord="Liquidations"
             folder
             firstTimestamp={events[0].timestamp}
@@ -91,7 +91,7 @@ export const COMPOUND_V2_LIQUIDATION_RUNS: TimelineRunSpec[] = [
 
 const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   memberNoun: "liquidation",
-  tone: "danger",
+  tone: "critical",
   kindWord: "Liquidations",
 };
 

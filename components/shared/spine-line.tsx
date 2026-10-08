@@ -12,7 +12,8 @@
 // line; a list drawn in part runs it on past its last drawn node.
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { SPINE_COLORS, type WarningTone } from "@/components/shared/spine-column";
+import { SPINE_COLORS } from "@/components/shared/spine-column";
+import type { Tone } from "@/lib/shared/tone";
 
 /** How far the line runs out of the foot of a list drawn in part: the reach
  *  of the line into a next row's node (the list's 8px gap, the row's padding
@@ -26,7 +27,7 @@ interface Stretch {
   top: number;
   height: number;
   /** Dotted in this tone, else solid neutral ink. */
-  dotted: WarningTone | "default" | null;
+  dotted: Tone | "default" | null;
   /** Where the dashes start, so the first one meets the node's foot. */
   phase: number;
 }
@@ -55,7 +56,7 @@ export function SpineLine() {
         foot: number;
         marker: boolean;
         end: boolean;
-        undrawn: WarningTone | "default" | null;
+        undrawn: Tone | "default" | null;
         origin?: number;
       }[] = [];
       for (const el of list.querySelectorAll<HTMLElement>("[data-spine-node], [data-spine-tip]")) {
@@ -75,7 +76,7 @@ export function SpineLine() {
           foot: r.bottom - base.top,
           marker: el.getAttribute("data-spine-node") === "marker",
           end: el.hasAttribute("data-spine-end"),
-          undrawn: (el.getAttribute("data-spine-undrawn") as WarningTone | "default" | null) ?? null,
+          undrawn: (el.getAttribute("data-spine-undrawn") as Tone | "default" | null) ?? null,
         });
       }
       nodes.sort((a, b) => a.cy - b.cy);
@@ -90,7 +91,7 @@ export function SpineLine() {
         n.origin = origin;
       }
       const next: Stretch[] = [];
-      const push = (top: number, bottom: number, dotted: WarningTone | "default" | null, phase = 0) => {
+      const push = (top: number, bottom: number, dotted: Tone | "default" | null, phase = 0) => {
         if (!(bottom > top)) return;
         const last = next[next.length - 1];
         if (!dotted && last && !last.dotted && Math.abs(last.top + last.height - top) < 0.5) {

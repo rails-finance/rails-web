@@ -597,7 +597,7 @@ export function ChainTruthRow({
         : `${d.value < 0 ? "−" : "+"}${magnitude.startsWith("<") ? " " : ""}${magnitude}`;
     // On a redemption or a liquidation the word alone carries the tone; the
     // leg labels read muted.
-    const toneClass = d.tone === "caution" && !adverse ? "text-caution-600 dark:text-caution-400" : "text-rb-500";
+    const toneClass = d.tone === "caution" && !adverse ? "text-tone-caution" : "text-rb-500";
     // A token whose decimals did not load states no amount, at any width:
     // the spine draws no flank for it either.
     const unread = unreadOf(d.address, d.symbol);

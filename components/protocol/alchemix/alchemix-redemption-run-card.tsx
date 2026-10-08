@@ -86,14 +86,14 @@ export function AlchemixRedemptionRunCard({
   const figure =
     statedCount > 0 ? (
       <span className="inline-flex items-center gap-1.5 text-sm">
-        <span className="text-caution-600 dark:text-caution-400">Cleared</span>
+        <span className="text-tone-caution">Cleared</span>
         <Prov value={totalClearedExact} symbol={syntheticSymbol} info={prov}>
           <span className="font-bold text-foreground">{shown}</span>
         </Prov>
         <TokenChipIcon symbol={syntheticSymbol} size={16} />
         {taken && taken.value > 0 ? (
           <>
-            <span className="ml-1 text-caution-600 dark:text-caution-400">Took</span>
+            <span className="ml-1 text-tone-caution">Took</span>
             <Prov value={taken.exact} symbol={mytSymbol} info={taken.prov}>
               <span className="font-bold text-foreground">
                 <ExactTip

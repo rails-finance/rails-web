@@ -59,7 +59,7 @@ export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             key={folder.key}
             count={count}
             memberNoun="liquidation"
-            tone="danger"
+            tone="critical"
             kindWord="Liquidations"
             aggregates={aggregates}
             folder
@@ -85,7 +85,7 @@ export const MAKERDAO_LIQUIDATION_RUNS: TimelineRunSpec[] = [
 
 const LIQUIDATION_FOLDER: FolderRegisterEntry = {
   memberNoun: "liquidation",
-  tone: "danger",
+  tone: "critical",
   kindWord: "Liquidations",
 };
 

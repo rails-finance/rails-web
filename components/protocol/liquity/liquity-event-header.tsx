@@ -46,9 +46,9 @@ function getOperationStyle(operation: string, ctx: LiquityContext): OperationSty
       // semantic `positive` token (color-grammar.md §5: the Open/active green).
       return { label, color: "text-positive", bg: "bg-positive/20", badge: true };
     case "closeTrove":
-      return { label, color: "", bg: "bg-rb-500/20 dark:bg-rb-500/20", badge: true };
+      return { label, color: "", bg: "bg-rb-500/20", badge: true };
     case "liquidate":
-      return { label, color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
+      return { label, color: "text-foreground", bg: "bg-marker", badge: true };
     case "applyPendingDebt":
       return { label, color: "text-pink-700 dark:text-pink-400", bg: "bg-pink-500/20", badge: true };
     case "redeemCollateral":
@@ -56,7 +56,7 @@ function getOperationStyle(operation: string, ctx: LiquityContext): OperationSty
       return { label, color: "text-white", bg: "bg-caution-500", badge: true };
     case "adjustZombieTrove":
     case "adjustUnredeemableZombieTrove":
-      return { label, color: "text-foreground", bg: "bg-rb-200 dark:bg-rb-800", badge: true };
+      return { label, color: "text-foreground", bg: "bg-marker", badge: true };
     default:
       return { label, color: "", bg: "", badge: false };
   }
@@ -505,7 +505,7 @@ export function LiquityEventHeader({
         as part of a repayment or a borrow. No token moved for it. */}
       {redist && (
         <span className={`inline-flex items-center ${GAP} ${TXT}`}>
-          <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.from_liquidation}</span>
+          <span className="text-tone-caution">{L1_WORDS.from_liquidation}</span>
           {redistDebtCp && (
             <>
               <Prov value={redistDebtCp.value} symbol={redistDebtCp.symbol} info={redistDebtCp.info}>
@@ -520,9 +520,7 @@ export function LiquityEventHeader({
               <TokenChipIcon symbol={ctx.assetType ?? "BOLD"} size={ICON} />
             </>
           )}
-          {redistDebtCp && redistCollCp && (
-            <span className="text-caution-600 dark:text-caution-400">{L1_WORDS.and}</span>
-          )}
+          {redistDebtCp && redistCollCp && <span className="text-tone-caution">{L1_WORDS.and}</span>}
           {redistCollCp && (
             <>
               <Prov value={redistCollCp.value} symbol={redistCollCp.symbol} info={redistCollCp.info}>
@@ -582,7 +580,7 @@ export function LiquityEventHeader({
     <span className="evt-meta ml-auto inline-flex min-h-6 items-center gap-2">
       {ctx.operation === "redeemCollateral" && ctx.isZombieTrove && (
         <span
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold rounded bg-caution-500/15 text-caution-600 dark:text-caution-400"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-bold rounded bg-caution-500/15 text-tone-caution"
           title={
             stateAfter.debt === 0
               ? "Zombie trove fully redeemed — debt cleared, collateral now claimable"

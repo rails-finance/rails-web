@@ -61,7 +61,7 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 
 const LINK = "text-blue-500 hover:underline";
-const CLOSED = "text-caution-600 dark:text-caution-400";
+const CLOSED = "text-tone-caution";
 const TAG = "text-[10px] uppercase tracking-wide text-rb-500";
 
 // Display order for the class filter — stablecoin first, "other" last.

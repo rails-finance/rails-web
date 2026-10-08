@@ -194,6 +194,14 @@
      SVG `color`). See color-grammar.md §5. */
   --caution: var(--color-caution-500);
 
+  /* The two adverse tones (lib/shared/tone.ts): the glyph ink on the spine
+     (`--tone-*`) and the text (`--tone-*-text`, the `text-tone-*` utilities),
+     one place for both themes. */
+  --tone-caution: var(--caution);
+  --tone-critical: var(--color-red-500);
+  --tone-caution-text: var(--color-caution-600);
+  --tone-critical-text: var(--color-red-600);
+
   /* Notice panel (color-grammar.md §5) — the left-border + tinted-bg "this is a
      note, set apart from the UI furniture" treatment. Light defaults here; dark
      overrides in `.dark`. Consumed by the `notice-caution` utility. */
@@ -277,6 +285,9 @@
      rule so the panel reads against the dark canvas. */
   --notice-caution-bg: color-mix(in srgb, var(--color-caution-900) 20%, transparent);
   --notice-caution-border: var(--color-caution-500);
+
+  --tone-caution-text: var(--color-caution-400);
+  --tone-critical-text: var(--color-red-400);
 }
 
 @theme inline {
@@ -369,6 +380,12 @@ html.dark {
 
 /* Role utilities — one class per surface role, theme-aware via the vars above.
    `hover:`/`focus:` variants generate automatically; no `dark:` needed. */
+@utility text-tone-caution {
+  color: var(--tone-caution-text);
+}
+@utility text-tone-critical {
+  color: var(--tone-critical-text);
+}
 @utility bg-raised {
   background-color: var(--surface-raised);
 }

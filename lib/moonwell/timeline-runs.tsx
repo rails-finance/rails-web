@@ -57,6 +57,7 @@ import { isMoonwellEvent } from "@/lib/shared/types/event-shape";
 import type { BaseActivityEvent, MoonwellEventType } from "@/lib/shared/types/event-shape";
 import type { FolderRegisterEntry, ServedFolder, ServedFolderRegister } from "@/lib/shared/timeline-folder";
 import { MIN_ACTIVITY_RUN, isThirdParty } from "@/lib/moonwell/timeline-membership";
+import type { Tone } from "@/lib/shared/tone";
 
 /** What one kind contributes to a header — the verb, the summed figures, and
  *  the visual register a folder of ONLY this kind takes. */
@@ -64,7 +65,7 @@ interface KindSpec {
   eventType: MoonwellEventType;
   memberNoun: string;
   aggregatesOf: (events: BaseActivityEvent[]) => RunAggregate[];
-  tone: "caution" | "danger" | "neutral";
+  tone: Tone | "neutral";
   spineIcon: "custody" | "warning";
   kindWord?: string;
   muted: boolean;
@@ -129,7 +130,7 @@ const LIQUIDATION_SPEC: KindSpec = {
       })),
     ];
   },
-  tone: "danger",
+  tone: "critical",
   spineIcon: "warning",
   kindWord: "Liquidations",
   muted: false,
@@ -274,7 +275,7 @@ function folderCard(events: BaseActivityEvent[], folder: RunFolderMeta): ReactNo
       count={events.length}
       memberNoun={solo ? solo.memberNoun : "event"}
       aggregates={solo ? solo.aggregatesOf(events) : activityAggregates(buckets)}
-      tone={solo ? solo.tone : hasLiquidation ? "danger" : "neutral"}
+      tone={solo ? solo.tone : hasLiquidation ? "critical" : "neutral"}
       spineIcon={solo ? solo.spineIcon : hasLiquidation ? "warning" : "custody"}
       kindWord={solo?.kindWord ?? (hasLiquidation ? "Liquidation" : undefined)}
       // A folder holding a liquidation is drawn at full weight: it is the
@@ -321,7 +322,7 @@ export const MOONWELL_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFol
       : undefined;
   if (!solo)
     return folder.counts.some((c) => c.key === "liquidation")
-      ? { ...MIXED_FOLDER, tone: "danger", spineIcon: "warning", kindWord: "Liquidation", muted: false }
+      ? { ...MIXED_FOLDER, tone: "critical", spineIcon: "warning", kindWord: "Liquidation", muted: false }
       : MIXED_FOLDER;
   return {
     memberNoun: solo.memberNoun,

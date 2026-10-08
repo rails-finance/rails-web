@@ -56,7 +56,7 @@ export const DOLOMITE_LIQUIDATION_RUNS: TimelineRunSpec[] = [
             key={folder.key}
             count={count}
             memberNoun="liquidation"
-            tone="danger"
+            tone="critical"
             kindWord="Liquidations"
             aggregates={aggregates}
             folder

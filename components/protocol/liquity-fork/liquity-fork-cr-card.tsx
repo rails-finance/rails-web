@@ -59,16 +59,14 @@ export function LiquityForkCrCard({
           {branchGated && (
             <>
               {" · "}
-              <span className="font-semibold text-caution-600 dark:text-caution-400">
-                below the {pct(chain.ccr)} borrow gate
-              </span>
+              <span className="font-semibold text-tone-caution">below the {pct(chain.ccr)} borrow gate</span>
             </>
           )}
         </RiskFigure>
       )}
       {branchShutdownRisk && (
         <p
-          className={`basis-full ${alignStart ? "text-left" : "text-right"} text-[11px] leading-relaxed font-semibold text-caution-600 dark:text-caution-400`}
+          className={`basis-full ${alignStart ? "text-left" : "text-right"} text-[11px] leading-relaxed font-semibold text-tone-caution`}
         >
           The branch ratio sits below its {pct(chain.scr)} shutdown threshold (SCR) — the branch can be shut down and
           wound through urgent redemptions.
