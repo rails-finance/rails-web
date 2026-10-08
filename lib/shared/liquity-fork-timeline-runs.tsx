@@ -110,6 +110,9 @@ const OWNER_RUN_NOUN: Record<string, string> = {
 const BATCH_RATE_FOLDER: FolderRegisterEntry = {
   memberNoun: "batch rate change",
   tone: "neutral",
+  // Its members move nothing and draw the no-change glyph; the closed row
+  // draws it too.
+  spineIcon: "no-change",
   byOwner: false,
 };
 

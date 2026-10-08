@@ -173,7 +173,8 @@ export interface SpineColumnProps {
    *  flank where a row's leg numbers stand ("4.12% → 3.60%"). Unset, the
    *  glyph carries an up or down arrow. */
   rateSpan?: [number, number];
-  /** Direction for rate-change arrow or delegate badge */
+  /** Direction for rate-change arrow (none drawn when unset) or delegate
+   *  badge */
   iconDirection?: "up" | "down";
   /** The event, or the group's events, were not actioned by the owner (a
    *  third party's, or the protocol's): the line runs dotted from this node
@@ -946,12 +947,12 @@ export function SpineColumn({
                 {rateSpan[1].toFixed(2)}%
               </span>
             ) : undefined
-          ) : (
+          ) : iconDirection ? (
             <>
-              <DirectionArrow direction={iconDirection ?? "up"} size={Math.round(scale.arrowSize * 0.7)} />
+              <DirectionArrow direction={iconDirection} size={Math.round(scale.arrowSize * 0.7)} />
               <span />
             </>
-          ),
+          ) : undefined,
         );
       case "delegate":
         // A delegation is a people event, not a rate tweak: a person glyph

@@ -312,7 +312,9 @@ export function TimelineRunCard({
             { icon: "custody" as const }
           : netTokens.length > 0
             ? { tokens: netTokens }
-            : { icon: "none" as const })}
+            : // Nothing summed: the members' glyph alone, so the row's spine
+              // is never empty (a run of batch rate changes draws their ⊜).
+              { icon: spineIcon === "warning" ? ("none" as const) : spineIcon })}
       dotted={!actedByOwner}
       isLast={!!isLast}
     />

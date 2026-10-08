@@ -575,12 +575,14 @@ function ServedFolderRow({
   const state = folders.stateOf(folder.responseId);
   // Numbered from the folder's own ordinals BEFORE the filter narrows them, so
   // a member keeps the number it has in the position's history whichever day
-  // the reader selected.
+  // the reader selected. The route sends the members oldest first; they draw
+  // newest first, as the list around them runs.
   const shown =
     state?.status === "ready" && state.events
       ? state.events
           .map((event, i) => ({ event, eventNumber: folder.ordinalFirst + i }))
           .filter(({ event }) => !memberPasses || memberPasses(event))
+          .reverse()
       : undefined;
   // The newest shown member (the first on a tie), which carries the day's
   // mark on a page with day marks.

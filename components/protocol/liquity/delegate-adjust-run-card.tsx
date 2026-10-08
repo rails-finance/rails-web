@@ -109,9 +109,9 @@ export function DelegateAdjustRunCard({
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && toggle() };
   const hide = { ...words2.hide, hide: () => open && toggle() };
-  // No asset moved: no node, the words stand; the batch manager acted, so
-  // the line runs dotted.
-  const column = <SpineColumn icon="none" dotted isLast={!!isLast} />;
+  // No asset moved: the members' % glyph alone, no flank, and the words
+  // stand; the batch manager acted, so the line runs dotted.
+  const column = <SpineColumn icon="rate-change" dotted isLast={!!isLast} />;
 
   const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
   const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";

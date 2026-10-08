@@ -158,6 +158,8 @@ export function BasedollarEventCard({ event, isLast, eventNumber }: BasedollarEv
   return (
     <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
       <EventCard
+        // A batch manager moved the rate: not the owner's act.
+        byOwner={ctx.eventType === "setBatchManagerAnnualInterestRate" ? false : undefined}
         avatar={null}
         iconColumn={iconSlot}
         header={
