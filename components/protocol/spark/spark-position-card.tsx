@@ -736,7 +736,8 @@ export function SparkPositionCard({
           // dashed) on every listing view and until the page's read lands
           // (`chainHfStale`) — an unasserted layer, per the chain-truth
           // charter. A read wallet with no debt reads "No debt" (HF is
-          // undefined, ∞ in protocol terms).
+          // undefined, ∞ in protocol terms) — only when the card shows no debt
+          // either: the balances are the index's, which trails the live read.
           v.chainHfStale
             ? v.hfRead
               ? {
@@ -755,7 +756,9 @@ export function SparkPositionCard({
                 label: ratioLabel("pooled"),
                 labelTip: HF_TIP,
                 value:
-                  v.healthFactor == null ? (
+                  v.healthFactor == null && v.borrows.length > 0 ? (
+                    <StatDash />
+                  ) : v.healthFactor == null ? (
                     <StatValue color="text-rb-400">No debt</StatValue>
                   ) : (
                     <StatValue>
@@ -764,14 +767,20 @@ export function SparkPositionCard({
                   ),
                 // The liquidation read beneath HF — its tangible restatement
                 // (single collateral → oracle liq price, multi → 1 − 1/HF drop).
-                footnote: disclosing ? (
-                  <PositionCardDetail>
+                footnote:
+                  v.healthFactor == null && v.borrows.length > 0 ? (
+                    <div className="text-xs mt-0.5 text-rb-500">
+                      The Pool reads no debt{v.atBlock != null ? ` at block ${v.atBlock.toLocaleString("en-US")}` : ""};
+                      the balances shown predate the account&rsquo;s latest events
+                    </div>
+                  ) : disclosing ? (
+                    <PositionCardDetail>
+                      <LiquidationFootnote v={v} />
+                      {riskDetail}
+                    </PositionCardDetail>
+                  ) : (
                     <LiquidationFootnote v={v} />
-                    {riskDetail}
-                  </PositionCardDetail>
-                ) : (
-                  <LiquidationFootnote v={v} />
-                ),
+                  ),
               },
         ]}
       />

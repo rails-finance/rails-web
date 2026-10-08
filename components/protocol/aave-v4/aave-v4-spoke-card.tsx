@@ -499,6 +499,10 @@ function AaveV4SpokeCard({
                               {hfLabelV4(spoke.healthFactor)}
                             </Prov>
                           </StatValue>
+                        ) : spoke.borrowingSymbols.length > 0 ? (
+                          // Debt the card shows but could not price: no HF
+                          // can be worked out, and "∞" would say there is none.
+                          <StatDash />
                         ) : (
                           <StatDash>{"∞"}</StatDash>
                         ),

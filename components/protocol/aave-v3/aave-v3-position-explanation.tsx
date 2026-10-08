@@ -75,7 +75,22 @@ export function AaveV3PositionExplanation({
   const brand = v3Brand(v3Protocol(useV3Pool()));
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
   const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
-  if (!chain) return null;
+  // No live read (in flight, failed or stale): the pane still says what the
+  // card shows, so a borrowing position never opens on an empty pane.
+  if (!chain) {
+    if (!view || view.borrows.length === 0) return null;
+    return (
+      <ProseExplainer
+        paragraph={
+          <>
+            This position borrows {joinSymbols(view.borrows.map((r) => r.symbol))}
+            {view.supplies.length > 0 ? <> against {joinSymbols(view.supplies.map((r) => r.symbol))}</> : null}. The
+            health factor and the figures built on it come from the Pool&rsquo;s live read, which has not answered.
+          </>
+        }
+      />
+    );
+  }
   const hasDebt = chain.totalDebtUsd > 0;
   const supplySyms = chain.reserves.filter((r) => r.supplyBalanceRaw !== "0").map((r) => r.symbol);
   const collateralSyms = chain.reserves
