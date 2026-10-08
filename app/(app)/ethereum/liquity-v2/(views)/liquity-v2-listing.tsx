@@ -17,8 +17,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
+import { troveWords } from "@/lib/liquity/event-templates";
 import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
-import { TroveListError } from "@/components/troves/components/TroveListError";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -119,13 +119,13 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
 
   return (
     <ChainTruthListingPage<TroveSummary, LiquityV2ListFilters>
-      title="Liquity V2 Troves"
-      noun="Troves"
+      title={troveWords("listing_title")}
+      noun={troveWords("listing_noun")}
       basePath="/ethereum/liquity-v2"
       bookmarksProtocol="liquity-v2"
       defaults={LIQUITY_V2_LIST_DEFAULTS}
       sortOptions={LIQUITY_V2_SORT_OPTIONS}
-      searchPlaceholder="Address, ENS, or ID"
+      searchPlaceholder={troveWords("listing_search")}
       renderCard={(t) => (
         <LiquityPositionCard protocol="liquity-v2" v={viewFromTroveSummary(t, prices)} compact headerSet />
       )}
@@ -160,7 +160,6 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
           <HolderStrip {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE)} />
         ) : null
       }
-      renderError={(err) => <TroveListError message={err instanceof Error ? err.message : "Failed to load troves"} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

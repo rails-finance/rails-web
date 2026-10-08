@@ -21,7 +21,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AaveV4PositionListingCard } from "@/components/aave-v4/AaveV4PositionListingCard";
-import { AaveV4ListError } from "@/components/aave-v4/components/AaveV4ListError";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { fetchAaveV4SpokePositions, type AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
@@ -133,9 +132,6 @@ export function AaveV4Listing({ initialItems, initialTotal, initialKey, initialS
           })),
       })}
       onFilters={onFilters}
-      renderError={(err) => (
-        <AaveV4ListError message={err instanceof Error ? err.message : "Failed to load positions"} />
-      )}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

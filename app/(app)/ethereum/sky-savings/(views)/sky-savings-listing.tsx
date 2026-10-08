@@ -7,7 +7,6 @@
 import { useCallback, useRef } from "react";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
-import { ListingUnavailable } from "@/components/shared/chain-truth-listing";
 import { SkySavingsPositionCard } from "@/components/protocol/sky-savings/sky-savings-position-card";
 import { SkyGateStatement } from "@/components/protocol/sky-savings/sky-savings-gate-refusal";
 import {
@@ -99,13 +98,7 @@ export function SkySavingsListing({ initialItems, initialTotal, initialKey, init
         fetchPage: (filters, page) => fetchSkyListingPage(filters, page),
       })}
       onFilters={onFilters}
-      renderError={(err) =>
-        err instanceof SkyGateError ? (
-          <SkyGateStatement reason={err.reason} gate={null} />
-        ) : (
-          <ListingUnavailable noun="positions" />
-        )
-      }
+      renderError={(err) => (err instanceof SkyGateError ? <SkyGateStatement reason={err.reason} gate={null} /> : null)}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}

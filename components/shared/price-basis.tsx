@@ -1,9 +1,9 @@
 "use client";
 
 // Then / today on the event card (rails-ops standards/detail-page-anatomy.md,
-// "USD values on the timeline"; anatomy T2; ui-jobs 283). T2's price chip is a
-// control, "$4,490 then · $2,713 today": the event's prices by default, and
-// pressed to today the card's USD figures (its cells, the opened ledger's USD
+// "USD values on the timeline"; anatomy T2; ui-jobs 283, 309). T2's price chip
+// is a control, "$4,490 then": the event's prices by default, and pressed to
+// "$2,713 today" the card's USD figures (its cells, the opened ledger's USD
 // column, the closed cell's tooltip) stand at the latest block's price. The
 // choice is the card's, held in its state and never stored.
 //
@@ -101,9 +101,10 @@ export function todayUsdProv(what: string, symbol: string): Provenance {
   };
 }
 
-/** T2's price chip as a control: "$4,490 then · $2,713 today". `then` is the
- *  chip's figure as the card drew it before (its receipt with it); without a
- *  card to switch or a price today it stays that figure alone. */
+/** T2's price chip as a control: "$4,490 then" alone, a press turning it to
+ *  "$2,713 today" and a second press back (Miles, 8 Oct 2026; ui-jobs 309).
+ *  `then` is the chip's figure as the card drew it before (its receipt with
+ *  it); without a card to switch or a price today it stays that figure alone. */
 export function ThenTodayChip({
   symbol,
   then,
@@ -119,34 +120,23 @@ export function ThenTodayChip({
   const ctx = useContext(BasisContext);
   const today = useTodayPrice(symbol);
   if (!ctx || today == null || noToday) return <>{then}</>;
-  const side = (b: PriceBasis, figure: ReactNode, word: string) => (
+  const isToday = ctx.basis === "today";
+  const label = isToday
+    ? `${symbol} price at the latest block. Press for the price at this event.`
+    : `${symbol} price at this event. Press for the price at the latest block.`;
+  return (
     <button
       type="button"
-      aria-pressed={ctx.basis === b}
+      title={label}
       onClick={(e) => {
         e.stopPropagation();
-        ctx.setBasis(b);
+        ctx.setBasis(isToday ? "event" : "today");
       }}
-      className={`${CTRL_GHOST} min-h-6 gap-1 rounded-sm px-1.5 py-0.5 focus-ring ${ctx.basis === b ? CTRL_ON : CTRL_OFF}`}
-      data-price-basis={b}
-    >
-      {figure}
-      <span className="font-normal">{word}</span>
-    </button>
-  );
-  return (
-    <span
-      role="group"
-      aria-label={`${symbol} price: the event's or the latest block's`}
-      className="inline-flex items-center gap-0.5"
+      className={`${CTRL_GHOST} min-h-6 gap-1 rounded-sm px-1.5 py-0.5 focus-ring ${isToday ? CTRL_ON : CTRL_OFF}`}
       data-then-today=""
+      data-price-basis={ctx.basis}
     >
-      {side("event", then, "then")}
-      <span aria-hidden className="text-rb-400">
-        ·
-      </span>
-      {side(
-        "today",
+      {isToday ? (
         <Prov
           info={{
             kind: "chain-derived",
@@ -154,9 +144,12 @@ export function ThenTodayChip({
           }}
         >
           {format(today)}
-        </Prov>,
-        "today",
+        </Prov>
+      ) : (
+        then
       )}
-    </span>
+      <span className="font-normal">{isToday ? "today" : "then"}</span>
+      <span className="sr-only">, {label}</span>
+    </button>
   );
 }

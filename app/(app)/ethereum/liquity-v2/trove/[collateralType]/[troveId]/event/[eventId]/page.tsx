@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadTroveHistory } from "@/lib/liquity/trove-page-data";
-import { eventPagePlace } from "@/lib/liquity/event-page";
+import { eventHeadingWords, eventPagePlace } from "@/lib/liquity/event-page";
 import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { truncateTroveId } from "@/lib/liquity/share-card";
+import type { OraclePricesData } from "@/types/api/oracle";
 import EventView from "./event-view";
 
 interface Props {
@@ -20,7 +21,8 @@ export const dynamic = "force-dynamic";
 // segment names the EVENT, which the parent's metadata knows nothing about.
 // `loadTroveHistory` is the same `cache()`-wrapped read the page body makes,
 // so finding the event here costs no second backend round trip within one
-// request. The description is the adapter's (`page_words.description`).
+// request. The description is the adapter's (`page_words.description`); the
+// title's last words are the heading's (`eventHeadingWords`).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
   const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
@@ -28,6 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const history = await loadTroveHistory(collateralType, troveId);
   const event = history.events?.find((e) => e.id === decoded) ?? null;
   const place = eventPagePlace(history.events ?? [], decoded, history.hasMore ? history.totalEvents : null);
+  const currentPrice = history.prices?.[collateralType.toLowerCase() as keyof OraclePricesData];
+  const heading = eventHeadingWords(place, currentPrice);
   const description =
     place.event && history.trove
       ? liquityV2Explorer.eventPage({
@@ -42,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: truncateTroveId(troveId),
     market: `${collateralDisplay}/BOLD`,
     canonicalPath: `/ethereum/liquity-v2/trove/${collateralType}/${troveId}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: heading ?? event.actionLabel, timestamp: event.timestamp } : null,
     description: description ?? undefined,
   });
 }
