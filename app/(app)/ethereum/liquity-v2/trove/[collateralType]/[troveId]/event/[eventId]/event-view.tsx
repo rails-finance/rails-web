@@ -2,8 +2,8 @@
 
 // The Liquity V2 event page's client half (rails-ops TO-DO-ui-jobs 236): the
 // sub-nav the trove page has, then the event's card in its page mode with the
-// side column in the spine's place (liquity-event-page-aside.tsx: the title,
-// the paragraph, the facts table, the previous, next and timeline links). The card is
+// shared side column in the spine's place (components/shared/event-page-aside.tsx,
+// drawn from the contract lib/liquity/explorer.ts supplies). The card is
 // the timeline's `LiquityEventCard`, fed the replay the trove page feeds it
 // (lib/liquity/event-prose-position.ts is the same path for the exports), so
 // its levels and Copy for LLM are the timeline's.
@@ -19,9 +19,9 @@ import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDai
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
+import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { LiquityEventHeader } from "@/components/protocol/liquity/liquity-event-header";
-import { LiquityEventPageAside } from "@/components/protocol/liquity/liquity-event-page-aside";
 import { LiquityTroveMetaContext } from "@/components/protocol/liquity/event-prose-render";
 import { CollSurplusCtx } from "@/components/protocol/liquity-family/coll-surplus-context";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -72,7 +72,7 @@ export default function EventView({
   }, [owner, trove?.ownerEns, setWallets]);
 
   const place = useMemo(() => eventPagePlace(events ?? [], eventId, totalEvents), [events, eventId, totalEvents]);
-  const { events: liquityEvents, event, previous, next, n, total } = place;
+  const { events: liquityEvents, event, previous, n, total } = place;
 
   // A liquidated Trove's surplus, read at the head as the trove page reads it:
   // the liquidation's prose and the replay's surplus line take it.
@@ -174,7 +174,6 @@ export default function EventView({
       })
     : undefined;
 
-  const timelineHref = `${trovePath}?at=${encodeURIComponent(eventId)}`;
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -212,30 +211,19 @@ export default function EventView({
                         eventNumber={n}
                         currentPrice={currentPrice}
                         page={{
-                          aside: (
-                            <LiquityEventPageAside
-                              title={
-                                <LiquityEventHeader
-                                  ctx={event.context.data}
-                                  timestamp={event.timestamp}
-                                  txHash={event.txHash}
-                                  blockNumber={event.blockNumber}
-                                  title
-                                />
-                              }
-                              collSymbol={trove.collateralType}
-                              troveId={troveId}
-                              owner={holder.address}
-                              ownerEns={trove.ownerEns ?? null}
-                              lastOwner={holder.last}
-                              n={n}
-                              total={total}
-                              blockNumber={event.blockNumber}
+                          contract: liquityV2Explorer.eventPage({
+                            collateralType,
+                            troveId,
+                            trove,
+                            place: { ...place, event },
+                          }),
+                          title: (
+                            <LiquityEventHeader
+                              ctx={event.context.data}
+                              timestamp={event.timestamp}
                               txHash={event.txHash}
-                              previousHref={previous ? eventPath(previous.id) : null}
-                              nextHref={next ? eventPath(next.id) : null}
-                              timelineHref={timelineHref}
-                              eventId={event.id}
+                              blockNumber={event.blockNumber}
+                              title
                             />
                           ),
                         }}

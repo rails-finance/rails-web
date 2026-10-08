@@ -46,7 +46,7 @@ const READERS = [
   "components/protocol/liquity/liquity-event-header.tsx",
   "components/protocol/liquity/liquity-event-detail.tsx",
   "components/protocol/liquity/liquity-event-card.tsx",
-  "components/protocol/liquity/liquity-event-page-aside.tsx",
+  "lib/liquity/explorer.ts",
 ];
 /** Files that may hold no prose of their own. */
 const NO_PROSE = [

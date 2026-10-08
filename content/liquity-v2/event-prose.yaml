@@ -583,14 +583,8 @@ footer_words:
   block: |-
     block {block}
 
-# ── Copy for LLM: the control and the block's words ──
+# ── Copy for LLM: the block's words ──
 copy_words:
-  button: |-
-    Copy for LLM
-  copied: |-
-    Copied
-  button_label: |-
-    Copy this event as Markdown for an AI assistant
   links: |-
     Links:
   below: |-
@@ -598,44 +592,17 @@ copy_words:
   footer: |-
     Footer
 
-# ── The event page's actions: the row under the side column's title ──
-# The links, then the copy buttons; a copy button reads copy_words.copied for a
-# moment after the copy. Copy for LLM reads copy_words; View as Markdown opens
-# the text Copy for LLM copies, at the event page's URL with .md. A `_hint` is
-# the control's tooltip; `label` names the row for a screen reader.
+# ── The event page's actions row: the Trove's words ──
+# The row's shared words are lib/shared/event-page-words.ts; a `_hint` is a
+# control's tooltip.
 action_words:
-  label: |-
-    Event actions
-  in_timeline: |-
-    View in timeline
   in_timeline_hint: |-
     Open this event in the Trove's timeline
-  explorer: |-
-    Etherscan
-  explorer_hint: |-
-    Open the transaction's logs on Etherscan
-  view_markdown: |-
-    View as Markdown
-  view_markdown_hint: |-
-    Open this event as Markdown
-  copy_link: |-
-    Copy link
-  copy_link_hint: |-
-    Copy this page's address
-  copy_hash: |-
-    Copy transaction hash
-  copy_hash_hint: |-
-    Copy the transaction's hash
-  show_provenance: |-
-    Show provenance
-  hide_provenance: |-
-    Hide provenance
-  provenance_hint: |-
-    Click a value on this event to trace it
 
 # ── The event page: the side column beside the card ──
-# The column holds the paragraph, a table of facts the card does not show, and
-# the previous, next and timeline links. The metadata description is
+# The Trove's words in the shared column (components/shared/event-page-aside.tsx):
+# the paragraph and its timeline link, and the facts rows above the shared
+# ones (event, block, transaction). The metadata description is
 # `description`; {holder} is held_by or last_held_by (a closed Trove's owner is
 # its last one).
 page_words:
@@ -657,22 +624,8 @@ page_words:
     Holder
   last_holder: |-
     Last holder
-  event: |-
-    Event
-  event_of: |-
-    {n|count} of {total|count}
-  block: |-
-    Block
-  transaction: |-
-    Transaction
   copy_trove: |-
     Copy the Trove id
-  copied: |-
-    Copied
-  previous: |-
-    Previous event
-  next: |-
-    Next event
   explanation_heading: |-
     Event explanation
 

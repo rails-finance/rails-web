@@ -66,11 +66,6 @@ export function holderName(owner: string | null, ownerEns: string | null): strin
   return ownerEns || (owner ? short(owner) : CONTEXT_WORDS.owner_unknown);
 }
 
-/** The side column's "18 of 148". */
-export function eventOf(n: number, total: number): string {
-  return fillText(PAGE_WORDS.event_of, { n, total });
-}
-
 /** The page's metadata description: the Trove, its holder, the event's place
  *  and day, what the figures are, and the timeline sentence. */
 export function eventPageDescription(o: {

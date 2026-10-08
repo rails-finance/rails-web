@@ -9,7 +9,8 @@ import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
-import { LiquityEventMarkdownContext, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import type { EventPageMode } from "@/lib/shared/explorer-adapter";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -40,10 +41,10 @@ export interface LiquityEventCardProps {
   /** Live oracle price for this collateral — drives the "today" leg of the
    *  redemption P/L in the header and explainer. */
   currentPrice?: number;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): opened with no
-   *  chevron, its ledgers and T3 open with no toggles, and `aside` in the
-   *  spine's column. Unset, the card is the timeline's. */
-  page?: { aside: React.ReactNode };
+  /** The event page's card (rails-ops TO-DO-ui-jobs 236): its ledgers open
+   *  with no toggles, and the shared side column drawn from `contract` with
+   *  `title` as its h1. Unset, the card is the timeline's. */
+  page?: Omit<EventPageMode, "markdown">;
 }
 
 export function LiquityEventCard({
@@ -298,23 +299,14 @@ export function LiquityEventCard({
             : undefined
         }
         caption={rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx)}
-        {...(page
-          ? {
-              hideDetailChevron: true,
-              detailOpen: true,
-              pageAside: page.aside,
-            }
-          : {})}
+        page={
+          page && {
+            ...page,
+            markdown: buildMarkdown ? { build: buildMarkdown } : { missing: "the Trove's place is unread" },
+          }
+        }
       />
     </LiquityLedgerProvider>
   );
-  // The event page's side column renders inside the card and reads the Copy
-  // for LLM build from here.
-  return page ? (
-    <LedgerOpenContext.Provider value>
-      <LiquityEventMarkdownContext.Provider value={buildMarkdown}>{card}</LiquityEventMarkdownContext.Provider>
-    </LedgerOpenContext.Provider>
-  ) : (
-    card
-  );
+  return page ? <LedgerOpenContext.Provider value>{card}</LedgerOpenContext.Provider> : card;
 }

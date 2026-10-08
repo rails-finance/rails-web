@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadTroveHistory } from "@/lib/liquity/trove-page-data";
-import { eventPageDescription, eventPagePlace, troveHolder } from "@/lib/liquity/event-page";
+import { eventPagePlace } from "@/lib/liquity/event-page";
+import { liquityV2Explorer } from "@/lib/liquity/explorer";
 import { truncateTroveId } from "@/lib/liquity/share-card";
 import EventView from "./event-view";
 
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 // segment names the EVENT, which the parent's metadata knows nothing about.
 // `loadTroveHistory` is the same `cache()`-wrapped read the page body makes,
 // so finding the event here costs no second backend round trip within one
-// request. The description is `page_words.description`.
+// request. The description is the adapter's (`page_words.description`).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { collateralType, troveId, eventId } = await params;
   const collateralDisplay = collateralType === "WETH" ? "ETH" : collateralType;
@@ -27,19 +28,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const history = await loadTroveHistory(collateralType, troveId);
   const event = history.events?.find((e) => e.id === decoded) ?? null;
   const place = eventPagePlace(history.events ?? [], decoded, history.hasMore ? history.totalEvents : null);
-  const holder = troveHolder(history.trove);
   const description =
     place.event && history.trove
-      ? eventPageDescription({
-          collSymbol: history.trove.collateralType,
+      ? liquityV2Explorer.eventPage({
+          collateralType,
           troveId,
-          owner: holder.address,
-          ownerEns: history.trove.ownerEns ?? null,
-          lastOwner: holder.last,
-          n: place.n,
-          total: place.total,
-          timestamp: place.event.timestamp,
-        })
+          trove: history.trove,
+          place: { ...place, event: place.event },
+        }).description
       : null;
   return eventMetadata({
     session: "liquity-v2",

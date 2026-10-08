@@ -6,6 +6,8 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu } from "@/components/shared/event-card-menu";
+import { EventPageAside } from "@/components/shared/event-page-aside";
+import type { EventPageMode } from "@/lib/shared/explorer-adapter";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
@@ -118,10 +120,12 @@ export interface EventCardProps {
   /** A control at the right of the open card's (i) row (the Aave and
    *  Liquity families' calculator). */
   infoAction?: React.ReactNode;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): what stands in the
-   *  spine's column, beside the card from 640px and above it below. Set with
-   *  `hideDetailChevron` and `detailOpen`; unset, the card is the timeline's. */
-  pageAside?: React.ReactNode;
+  /** The event page's card (rails-ops TO-DO-ui-jobs 236): the shared side
+   *  column (`EventPageAside`, drawn from the family's contract) stands in the
+   *  spine's column, beside the card from 640px and above it below; the
+   *  header draws no chevron and the body stands open. Unset, the card is the
+   *  timeline's. */
+  page?: EventPageMode;
   /** The words after T3's (i): the button's on the timeline, the heading's
    *  on the event page. A family's strings file can replace the default. */
   explanationHeading?: string;
@@ -170,7 +174,7 @@ export function EventCard({
   spokenCaption,
   label,
   infoAction,
-  pageAside,
+  page,
   explanationHeading = "Event explanation",
   eventMenu = true,
   noChevron,
@@ -204,15 +208,15 @@ export function EventCard({
   const reactId = useId();
   const cardId = persistKey ?? reactId;
   const hasPanel = detail != null || !!detailLoading || !!detailError;
-  // The event page's card (`pageAside`): the explanation and the footer stand
+  // The event page's card (`page`): the explanation and the footer stand
   // open, with no toggle.
-  const pageMode = pageAside != null;
+  const pageMode = page != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
   // body opens beneath it.
   const inTimeline = !pageMode && phoneOpen != null && (captionCtx != null || phoneCaption != null);
 
-  const localOpen = isControlled ? !!detailOpenProp : detailOpenInternal;
+  const localOpen = pageMode || (isControlled ? !!detailOpenProp : detailOpenInternal);
   const showDetail = localOpen || (inTimeline && phoneOpen?.openId === cardId);
 
   // ── Receipts scope — the inspector's per-card roster ──────────────────
@@ -624,12 +628,12 @@ export function EventCard({
             {...(rowTarget ? rowClick : {})}
           >
             {showAvatar && avatar}
-            {pageMode ? (
-              // The event page: the column holds `pageAside`, stacked above
-              // the card below sm, where the row drops its side padding so the
-              // paragraph and the card share one width.
+            {page ? (
+              // The event page: the column holds the shared side column,
+              // stacked above the card below sm, where the row drops its side
+              // padding so the paragraph and the card share one width.
               <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-                {pageAside}
+                <EventPageAside page={page} />
               </div>
             ) : (
               <div className="spine-cell" data-anatomy="L3">
