@@ -15,6 +15,8 @@
 // latest open life — a closed prior epoch shows its replayed history alone.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { liquityV1Explorer } from "@/lib/liquity-v1/explorer";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
@@ -291,6 +293,10 @@ export default function LiquityV1TroveView({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const claimRow = useMemo(() => claimNow, [claimKey]);
   const timelineEvents = useMemo(() => (claimRow ? [...v1Events, claimRow] : v1Events), [v1Events, claimRow]);
+  // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the
+  // event's card in page mode with the shared column; no position card, no
+  // flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const tl = useTimelineEvents(timelineEvents, {
     storageKey: `liquity-v1-${wallet}-${selectedEpoch ?? "all"}`,
     protocolKey: "liquity-v1",
@@ -535,7 +541,7 @@ export default function LiquityV1TroveView({
           <DetailBodySkeleton />
         ) : (
           <>
-            {view && faceView && (
+            {!onEventPage && view && faceView && (
               <LiquityV1PositionCard
                 v={faceView}
                 receipts
@@ -601,7 +607,7 @@ export default function LiquityV1TroveView({
             )}
             {/* Lifetime flows: the bars and the line over the life's replay
               (lib/liquity-v1/flows.ts), in place of the tower (TO-DO-ui-jobs 206). */}
-            {view && (
+            {!onEventPage && view && (
               <LifetimeFlowsPanel
                 scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
                 read={flowsRead}
@@ -628,6 +634,7 @@ export default function LiquityV1TroveView({
               // — lets pinned mode (the per-event share route) force a landed
               // card's detail panel open on its first mount.
               persistKeyPrefix="liquity-v1"
+              eventPage={(slot) => liquityV1Explorer.eventPage({ ...slot, wallet })}
               closed={view ? view.status !== "open" : undefined}
               tl={tl}
               runs={LIQUITY_V1_REDEMPTION_RUNS}

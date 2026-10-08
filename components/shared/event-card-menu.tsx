@@ -1,34 +1,24 @@
 "use client";
 
-// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281), at the header's right end
-// before the number pill (ui-jobs 295). The position card's menu (C17,
-// `ToolsMenu` variant `card`) with the event's rows: open the event page (not
-// on that page), open the explorer, copy the page's link, then "Show
-// provenance", which arms the inspector on this event alone (ui-jobs 284). A copy row shows a
-// tick and "Copied" for a moment, as C17's rows do. Liquity V2 draws no menu:
-// its event page's aside carries the actions (ui-jobs 291), reusing
-// `useMenuCopied` and `eventMarkdownHref` from here.
+// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the header's
+// right end before the number pill (ui-jobs 295), the same on every family:
+// Open event page, and inside a group Hide or Show {n} grouped events. The
+// explorer link is the row's hash under Display's Transaction hashes (ui-jobs
+// 294); copy link and Show provenance are on the event page's actions row
+// (`components/shared/event-page-aside.tsx`), which reuses `useMenuCopied` and
+// `eventMarkdownHref` from here.
 
 import { createContext, useContext, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, ChevronUp, Link2 } from "lucide-react";
-import { Icon } from "@/components/icons/icon";
-import { ExplorerMark } from "@/components/shared/explorer-mark";
+import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
-import { useChainId } from "@/lib/shared/chain-context";
-import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 
-/** The menu's words; the explorer row reads "View on {the chain's explorer}". */
+/** The menu's words. */
 const WORDS = {
   menu: "Event menu",
   heading: "Event",
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
-  view_explorer_hint: "Open the transaction's logs",
-  copy_link: "Copy link to event page",
-  copy_link_hint: "Copy the page's address",
-  copied: "Copied",
-  provenance_hint: "Click a value on this event to trace it",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -69,43 +59,33 @@ export function eventMarkdownHref(shareHref: string): string {
  *  ("Hide 48 grouped events"). The same handler as the group's pill. */
 export const GroupHideContext = createContext<{ title: string; subtitle: string; hide: () => void } | null>(null);
 
+/** Whether the ⋮ has a row: the event page from anywhere but that page,
+ *  or a group's show or hide. */
+export function useEventMenuRows(shareHref: string | null, groupShow: boolean): boolean {
+  const pathname = usePathname();
+  const group = useContext(GroupHideContext);
+  const pagePath = shareHref?.split("?")[0] ?? null;
+  return groupShow || group != null || (pagePath != null && pathname !== pagePath);
+}
+
 export function EventCardMenu({
-  txHash,
   shareHref,
-  scopeId,
-  pageOnly,
   groupShow,
 }: {
-  txHash?: string;
   /** A closed group's row: its one item, "Show 48 grouped events", the only
    *  way to open the group (ui-jobs 250, third revision). */
   groupShow?: { title: string; subtitle: string; show: () => void };
-  /** Liquity V2's rows: the event page alone (the page's aside carries the
-   *  other actions, ui-jobs 291), and "Hide" inside an open group. */
-  pageOnly?: boolean;
-  /** The event card's receipts scope (the event's id), which the menu's
-   *  "Show provenance" row arms. */
-  scopeId: string;
   /** The event page's path (`useEventShareHref`); null outside a timeline,
-   *  where the page rows are left out. */
+   *  where the page row is left out. */
   shareHref: string | null;
 }) {
-  const chainId = useChainId();
   const pathname = usePathname();
-  const [copied, copy] = useMenuCopied();
   const group = useContext(GroupHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
-  const explorerTitle = `View on ${chainMeta(chainId).explorerName}`;
-  const tick = <Icon name="check" size={16} />;
 
   return (
-    <ToolsMenu
-      variant="event"
-      label={WORDS.menu}
-      heading={WORDS.heading}
-      provScope={pageOnly || groupShow ? undefined : { id: scopeId, hint: WORDS.provenance_hint }}
-    >
+    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading}>
       {(close) =>
         groupShow ? (
           <ToolsMenuItem
@@ -142,27 +122,6 @@ export function EventCardMenu({
                   close();
                   group.hide();
                 }}
-              />
-            )}
-            {!pageOnly && txHash && (
-              <ToolsMenuItem
-                item="view-explorer"
-                icon={<ExplorerMark chainId={chainId} />}
-                title={explorerTitle}
-                subtitle={WORDS.view_explorer_hint}
-                href={explorerUrl(chainId, "tx-logs", txHash)}
-                external
-                onClick={close}
-              />
-            )}
-            {shareHref && !pageOnly && (
-              <ToolsMenuItem
-                item="copy-link"
-                icon={copied === "link" ? tick : <Link2 size={16} className="-rotate-45" />}
-                title={WORDS.copy_link}
-                subtitle={copied === "link" ? WORDS.copied : WORDS.copy_link_hint}
-                copied={copied === "link"}
-                onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
               />
             )}
           </>

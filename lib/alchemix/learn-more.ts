@@ -338,7 +338,7 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
 }
 
 /** The Lifetime flows "?": what the chart sums, in which unit, and what it
- *  leaves out. Liquity V2's `liquityEconomicsContent` is the model. */
+ *  leaves out. Liquity V2's `liquityLifetimeFlowsContent` is the model. */
 export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
   title: "How the lifetime flows are counted",
   intro:

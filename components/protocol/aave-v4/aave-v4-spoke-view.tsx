@@ -24,6 +24,8 @@
 // live position reads chain-true throughout, not just the headline totals.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { aaveV4Explorer } from "@/lib/aave-v4/explorer";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -167,6 +169,10 @@ function AaveV4SpokePageInner({
 }: AaveV4SpokeViewProps) {
   const isValidWallet = /^0x[a-f0-9]{40}$/.test(wallet);
   const deployment = useAaveV4Deployment();
+  // The event route (rails-ops TO-DO-ui-jobs 236): the sub-nav and the
+  // event's card in page mode with the shared column; no position card, no
+  // flows panel.
+  const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
   const { apiRoot, session, oracleRoute } = deployment;
   // The listing filtered to this wallet — formed in one place (the wallet param
   // is `q`, read centrally by the shared listing driver). Feeds the "other
@@ -857,7 +863,7 @@ function AaveV4SpokePageInner({
             stat's "Liquidates at" caption. One receipts scope wraps the whole
             panel, so every traced figure — headline stats, footnotes,
             explanation bullets — lists in the card's Provenance section. */}
-        {activeCard && (
+        {!onEventPage && activeCard && (
           <ProvReceiptsScope registry={positionRegistry}>
             <div className="rounded-2xl bg-raised">
               <AaveV4SpokeCardSelector
@@ -892,7 +898,7 @@ function AaveV4SpokePageInner({
 
         {/* Lifetime-flow towers sit directly above the timeline — the towers are
             the aggregate of the same flows the event list itemizes below. */}
-        {activeGroup && hasUiHydrated ? (
+        {!onEventPage && activeGroup && hasUiHydrated ? (
           <AaveV4SpokeTowerBlock
             wallet={wallet}
             spokeName={spokeName}
@@ -912,6 +918,7 @@ function AaveV4SpokePageInner({
           // — lets pinned mode (the per-event share route) force a landed
           // card's detail panel open on its first mount.
           persistKeyPrefix="aave-v4"
+          eventPage={(slot) => aaveV4Explorer.eventPage({ ...slot, spokeName, wallet, deployment: deployment.key })}
           closed={positionClosed}
           tl={tl}
           notes={notes}

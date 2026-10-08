@@ -46,10 +46,22 @@ const READERS = [
   "components/protocol/liquity/liquity-event-header.tsx",
   "components/protocol/liquity/liquity-event-detail.tsx",
   "components/protocol/liquity/liquity-event-card.tsx",
-  "components/protocol/liquity/liquity-event-page-aside.tsx",
+  "lib/liquity/explorer.ts",
+];
+/** Files that print trove_words (the listing, the Trove and event pages, the run
+ *  card, the position card's explanation), scanned for the ids they read. */
+const TROVE_READERS = [
+  "app/(app)/ethereum/liquity-v2/(views)/liquity-v2-listing.tsx",
+  "app/(app)/ethereum/liquity-v2/trove/[collateralType]/[troveId]/trove-view.tsx",
+  "app/(app)/ethereum/liquity-v2/trove/[collateralType]/[troveId]/event/[eventId]/event-view.tsx",
+  "components/protocol/liquity/delegate-adjust-run-card.tsx",
+  "components/trove/use-trove-explanation-items.tsx",
+  "lib/liquity/trove-page-words.tsx",
 ];
 /** Files that may hold no prose of their own. */
 const NO_PROSE = [
+  ...TROVE_READERS,
+  "lib/liquity/trove-nodes.tsx",
   GENERATOR,
   LOADER,
   "lib/liquity/event-markdown.ts",
@@ -83,6 +95,7 @@ const WORD_SECTIONS = [
   "page_words",
   "group_words",
   "L5_words",
+  "trove_words",
   "fragments",
 ];
 const isLine = (s) => typeof s === "string" && s.trim() !== "" && !s.includes("\n");
@@ -314,6 +327,37 @@ for (const t of allTemplates)
     for (const p of g)
       if (p && "word" in p && !(p.word in d.L1_words)) fail(`${t.id}.L1: word "${p.word}" is not in L1_words`);
 
+// trove_words: the ids each call reads, and the values each call supplies. A
+// ternary first argument reads the literals after its `?`.
+const troveSupply = new Map();
+for (const file of TROVE_READERS) {
+  const src = stripComments(read(file));
+  for (const m of src.matchAll(/\btrove(?:Words|Nodes)\(/g)) {
+    const open = m.index + m[0].length;
+    let depth = 1;
+    let j = open;
+    let comma = -1;
+    for (; j < src.length && depth > 0; j++) {
+      const ch = src[j];
+      if ("([{".includes(ch)) depth++;
+      else if (")]}".includes(ch)) depth--;
+      else if (ch === "," && depth === 1 && comma < 0) comma = j;
+    }
+    const first = src.slice(open, comma < 0 ? j - 1 : comma);
+    const idArg = first.includes("?") ? first.slice(first.indexOf("?")) : first;
+    const ids = [...idArg.matchAll(/"([a-z_0-9]+)"/g)].map((x) => x[1]);
+    const keys = comma < 0 ? [] : objectKeys(src, comma);
+    for (const id of ids) {
+      if (!(id in d.trove_words)) failIn(file, `reads trove_words.${id}, which ${DATA} lacks`);
+      const set = troveSupply.get(id) ?? new Set();
+      keys.forEach((k) => set.add(k));
+      troveSupply.set(id, set);
+    }
+  }
+}
+for (const id of Object.keys(d.trove_words))
+  if (!troveSupply.has(id)) fail(`trove_words.${id} is read by no file in TROVE_READERS`);
+
 // ── 3. Placeholders ──────────────────────────────────────────────────────────
 
 const TOKEN = /\{([a-z_0-9]+)(?:\|([a-z_]+))?\}/g;
@@ -399,13 +443,15 @@ for (const src of Object.values(sources)) {
     addSupply(`${GROUP[m[1]]}.${m[2]}`, names);
   }
 }
-for (const sec of WORD_SECTIONS.filter((s) => s !== "fragments" && s !== "L5_words"))
+for (const sec of WORD_SECTIONS.filter((s) => s !== "fragments" && s !== "L5_words" && s !== "trove_words"))
   for (const [k, v] of Object.entries(d[sec])) {
     if (!isLine(v) || !/\{/.test(v)) continue;
     const allowed = wordSupply.get(`${sec}.${k}`);
     if (!allowed) fail(`${sec}.${k} has placeholders, and no fillText or wordsAround call fills it`);
     else placeholders(`${sec}.${k}`, v, allowed, false);
   }
+for (const [k, v] of Object.entries(d.trove_words))
+  if (isLine(v) && troveSupply.has(k)) placeholders(`trove_words.${k}`, v, troveSupply.get(k), false);
 for (const [k, v] of Object.entries(d.fragments))
   if (isLine(v)) placeholders(`fragments.${k}`, v, new Set(["x"]), false);
 
@@ -442,8 +488,11 @@ for (const [k, m] of Object.entries(d.L5)) {
 // ── 4. No prose outside the file ─────────────────────────────────────────────
 
 /** Source with comments blanked, line breaks kept. */
-const stripComments = (src) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")).replace(/(^|[^:"'`\\])\/\/.*$/gm, (_, p) => p);
+function stripComments(src) {
+  return src
+    .replace(/(^|[^:"'`\\])\/\/.*$/gm, (_, p) => p)
+    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+}
 const PROSE = [/(?<![\w-])[A-Za-z]{2,} [a-z]{2,}(?![\w-])/, /(?<![\w-])[A-Z][a-z]{2,}(?![\w-])/];
 for (const file of NO_PROSE) {
   const lines = stripComments(read(file)).split("\n");

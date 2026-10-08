@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { loadLiquityV1PositionTail } from "@/lib/liquity-v1/position-page-data";
+import { liquityV1EventPageDescription } from "@/lib/liquity-v1/explorer";
 import LiquityV1TrovePage from "../../page";
 
 interface Props {
@@ -34,19 +35,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: raw,
     canonicalPath: `/ethereum/liquity-v1/${raw}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    description: event ? liquityV1EventPageDescription(raw, event.timestamp) : undefined,
   });
 }
 
-// THIN: renders the exact same parent Trove page, same params — the nested
-// `event/[eventId]` segment sits inside the same `[wallet]` layout, so every
-// provider still wraps it, and `LiquityV1TroveView` (this page's client half)
-// never learns a new prop. It finds out it is on an event route from
-// `useParams().eventId` itself, inside `ChainTruthTimeline` — see that
-// component's pinned-mode branch. `searchParams` (`?epoch=`) is passed
-// through unchanged — the parent still reads it and selects the same life it
-// would on its own path. `params` here carries an extra `eventId` key the
-// parent's own `Props` type doesn't declare; passing the same promise through
-// is still structurally valid (the parent only reads `wallet` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent Trove page's
+// server half, same params and `?epoch=`; its client half
+// (`LiquityV1TroveView`) reads `eventId` from the route and draws the sub-nav
+// and the event's card in page mode with the shared column
+// (`ChainTruthTimeline`'s `eventPage`).
 export default async function LiquityV1EventPage({ params, searchParams }: Props) {
   return LiquityV1TrovePage({ params, searchParams });
 }

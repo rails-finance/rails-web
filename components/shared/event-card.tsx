@@ -5,7 +5,8 @@ import { useState, useCallback, useEffect, useContext, useId, useMemo, useRef, t
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
-import { EventCardMenu } from "@/components/shared/event-card-menu";
+import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
+import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
@@ -121,10 +122,6 @@ export interface EventCardSlots {
  *  event page's. */
 interface EventCardFrame {
   avatar?: ReactNode;
-  /** The event menu (⋮) in the header's right slot (ui-jobs 295). "page":
-   *  Liquity V2's, the event page alone (its page's aside carries the other
-   *  actions, ui-jobs 291), and "Hide" inside an open group. */
-  eventMenu?: boolean | "page";
   /** A group's closed row. "summary": the head opens the summary card with no
    *  chevron drawn (ui-jobs 250). "words": the head is words and draws no
    *  control; they open as the phone's card (a delegate run). */
@@ -150,10 +147,6 @@ interface EventCardFrame {
   /** The phone control's full name; unset, the spoken caption and the legs
    *  the column reports. */
   label?: string;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): what stands in the
-   *  spine's column, beside the card from 640px and above it below. Set, the
-   *  card stands open with no chevron; unset, the card is the timeline's. */
-  pageAside?: ReactNode;
   /** What the number column draws in place of the event's number: the
    *  boundary's count. */
   numberSlot?: ReactNode;
@@ -178,7 +171,7 @@ interface EventCardParts {
   explainer?: ReactNode;
   /** Teaser line at the top of the open explanation: the first bullet. */
   explainerTeaser?: ReactNode;
-  /** Transaction hash: the event menu, and the header's number pill when
+  /** Transaction hash: the footer, and the header's number pill when
    *  Display's "Transaction hashes" is on (ui-jobs 294). */
   txHash?: string;
   learnMore?: ReactNode;
@@ -230,14 +223,12 @@ const EXPLANATION_HEADING = "Event explanation";
 export function EventCard(props: EventCardProps) {
   const {
     avatar,
-    eventMenu = true,
     group,
     groupMenu,
     muted,
     phoneCaption,
     spokenCaption,
     label,
-    pageAside,
     numberSlot,
     detailOpen: detailOpenProp,
     onDetailToggle,
@@ -270,9 +261,13 @@ export function EventCard(props: EventCardProps) {
 
   const [detailOpenInternal, setDetailOpenInternal] = useState(false);
 
-  // The event page's card (`pageAside`) stands open; the boundary card's
-  // open is controlled.
-  const pageMode = pageAside != null;
+  // The event page's card (rails-ops TO-DO-ui-jobs 236), where the route's
+  // shell provides `EventPageContext`: the shared side column stands in the
+  // spine's column, beside the card from 640px and above it below; the
+  // header draws no chevron and the body, the explanation and the footer
+  // stand open with no toggle. The boundary card's open is controlled.
+  const page = useContext(EventPageContext);
+  const pageMode = page != null;
   const isControlled = pageMode || detailOpenProp !== undefined;
 
   // A warning event's legs, handed from the header to the spine.
@@ -418,8 +413,9 @@ export function EventCard(props: EventCardProps) {
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
   // the header on desktop, at the caption's right on a phone. A press on it
   // stays with the menu (Escape still reaches the menu's document listener).
+  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu);
   const headMenu =
-    !pageMode && ((eventMenu && txHash) || groupMenu) ? (
+    !pageMode && menuRows ? (
       <span
         className="-my-1 inline-flex items-center"
         data-event-head-menu=""
@@ -428,13 +424,7 @@ export function EventCard(props: EventCardProps) {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu
-          txHash={txHash}
-          shareHref={groupMenu ? null : shareHref}
-          scopeId={scopeId}
-          pageOnly={eventMenu === "page"}
-          groupShow={groupMenu}
-        />
+        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} />
       </span>
     ) : null;
 
@@ -661,12 +651,12 @@ export function EventCard(props: EventCardProps) {
             onFocus={onIntent}
           >
             {showAvatar && avatar}
-            {pageMode ? (
-              // The event page: the column holds `pageAside`, stacked above
-              // the card below sm, where the row drops its side padding so the
-              // paragraph and the card share one width.
+            {page ? (
+              // The event page: the column holds the shared side column,
+              // stacked above the card below sm, where the row drops its side
+              // padding so the paragraph and the card share one width.
               <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-                {pageAside}
+                <EventPageAside page={page} />
               </div>
             ) : (
               <div className="spine-cell" data-anatomy="L3">
@@ -690,8 +680,10 @@ export function EventCard(props: EventCardProps) {
               </div>
             )}
             <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
-              {t1}
-              {body}
+              <EventPageContext.Provider value={null}>
+                {t1}
+                {body}
+              </EventPageContext.Provider>
             </div>
             {/* The number column, at the row's far left, level with the
                 first node: the event's number, or the boundary's count. After

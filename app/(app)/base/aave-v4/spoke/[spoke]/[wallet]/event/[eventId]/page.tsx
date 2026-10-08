@@ -3,11 +3,12 @@ import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { spokeFromSlug } from "@/lib/aave-v4/spoke-meta";
 import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
+import { aaveV4EventHeading, aaveV4EventPageDescription } from "@/lib/aave-v4/explorer";
 import AaveV4BaseSpokePage from "../../page";
 
-// One event of an Aave V4 Base position: the parent page, pinned to the event
-// (ChainTruthTimeline reads `eventId` from the route). Same shape as the
-// Ethereum event route.
+// One event of an Aave V4 Base position on its page (rails-ops TO-DO-ui-jobs
+// 236): the parent page's server half; the client half draws the event page
+// from the route's `eventId`. Same shape as the Ethereum event route.
 
 interface Props {
   params: Promise<{ spoke: string; wallet: string; eventId: string }>;
@@ -30,7 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: rawWallet,
     market: spokeName,
     canonicalPath: `/base/aave-v4/spoke/${rawSpoke}/${rawWallet}/event/${encodeURIComponent(decoded)}`,
-    event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    event: event ? { actionLabel: aaveV4EventHeading(event), timestamp: event.timestamp } : null,
+    description: event ? aaveV4EventPageDescription(spokeName, rawWallet, event.timestamp) : undefined,
   });
 }
 

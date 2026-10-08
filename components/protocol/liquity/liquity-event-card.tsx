@@ -1,5 +1,6 @@
 "use client";
 
+import { useContext } from "react";
 import Link from "next/link";
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
@@ -9,7 +10,8 @@ import { Facehash } from "@/components/shared/facehash";
 import { LiquityEventHeader, liquityOperationLabel } from "./liquity-event-header";
 import { LiquityEventDetail, LiquityGas } from "./liquity-event-detail";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
-import { LiquityEventMarkdownContext, useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
+import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -40,10 +42,6 @@ export interface LiquityEventCardProps {
   /** Live oracle price for this collateral — drives the "today" leg of the
    *  redemption P/L in the header and explainer. */
   currentPrice?: number;
-  /** The event page's card (rails-ops TO-DO-ui-jobs 236): opened with no
-   *  chevron, its ledgers and T3 open with no toggles, and `aside` in the
-   *  spine's column. Unset, the card is the timeline's. */
-  page?: { aside: React.ReactNode };
 }
 
 export function LiquityEventCard({
@@ -57,8 +55,10 @@ export function LiquityEventCard({
   previousEvent,
   eventNumber,
   currentPrice,
-  page,
 }: LiquityEventCardProps) {
+  // The event page's card (rails-ops TO-DO-ui-jobs 236): its ledgers open
+  // with no toggles, and the column reads the Copy for LLM build.
+  const page = useContext(EventPageContext) != null;
   const ctx = event.context.data;
   const wallet = event.wallet;
   const prose = useLiquityEventProse(event, previousEvent, currentPrice);
@@ -237,8 +237,7 @@ export function LiquityEventCard({
 
   // Gas (owner-paid events only; the generator leaves a third party's out)
   // stands in T2's price row; a card that draws no price row keeps it in the
-  // footer. The card has no event menu: the header's number pill links to the
-  // event page, whose side column carries the actions (ui-jobs 291).
+  // footer.
   const priceRow = !!(ctx.stateBefore && ctx.stateAfter && prose.L2 && prose.L2.price > 0);
   const footerExtra = prose.footer.gasCost && !priceRow ? <LiquityGas footer={prose.footer} /> : undefined;
   const detailPart = (part: "cells" | "notes" | "price") => (
@@ -271,7 +270,7 @@ export function LiquityEventCard({
         txHash={event.txHash}
         blockNumber={event.blockNumber}
         eventNumber={eventNumber}
-        page={!!page}
+        page={page}
       />
     ),
     caption: rateSpan ? `Rate ${rateSpan[0].toFixed(2)}% → ${rateSpan[1].toFixed(2)}%` : liquityOperationLabel(ctx),
@@ -308,20 +307,10 @@ export function LiquityEventCard({
     learnMore: <LearnMore inline content={prose.L5.content} />,
   };
 
-  const card = (
-    <EventCard
-      slots={slots}
-      avatar={avatarOverride ?? avatarSlot}
-      footerExtra={footerExtra}
-      eventMenu="page"
-      pageAside={page?.aside}
-    />
-  );
-  // The event page's side column renders inside the card and reads the Copy
-  // for LLM build from here.
+  const card = <EventCard slots={slots} avatar={avatarOverride ?? avatarSlot} footerExtra={footerExtra} />;
   return page ? (
     <LedgerOpenContext.Provider value>
-      <LiquityEventMarkdownContext.Provider value={buildMarkdown}>{card}</LiquityEventMarkdownContext.Provider>
+      <EventMarkdownContext.Provider value={buildMarkdown}>{card}</EventMarkdownContext.Provider>
     </LedgerOpenContext.Provider>
   ) : (
     card

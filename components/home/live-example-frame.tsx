@@ -9,7 +9,7 @@ import { TroveSummaryStack } from "@/components/trove/TroveSummaryStack";
 import { ChainTruthTower } from "@/components/shared/chain-truth-tower";
 import { computeLiquityEconomics } from "@/lib/liquity/economics";
 import { liquityEconomicsExplanation } from "@/lib/liquity/economics-explanation";
-import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
+import { liquityLifetimeFlowsContent } from "@/lib/shared/learn-more-content";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
 import { SpineLine } from "@/components/shared/spine-line";
 import { SpineTipContext } from "@/components/shared/spine-column";
@@ -94,7 +94,7 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
                 data={result.data}
                 title="Lifetime flows"
                 explanation={liquityEconomicsExplanation(result.economics, result.economics._meta, now)}
-                learnMore={liquityEconomicsContent({ isBatched: result.economics._meta.isInBatch })}
+                learnMore={liquityLifetimeFlowsContent({ isBatched: result.economics._meta.isInBatch })}
                 // Stated, not left to default (ui-jobs 61): the hero belongs to
                 // no protocol, so it has no setting of its own to read and must
                 // not borrow one — a reader who put the tower away on an Aave

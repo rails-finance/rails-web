@@ -11,6 +11,7 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
+import { AAVE_V4_LABELS } from "@/lib/aave-v4/event-label";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ExternalActorChip } from "@/components/shared/external-actor-chip";
 import { eventLogProv, heldDebtRateProv, externalActorProv } from "@/lib/aave-v4/position-provenance";
@@ -31,12 +32,12 @@ export interface AaveV4TxGroup {
 type OperationStyle = { label: string; color: string; bg: string; badge: boolean };
 
 const STYLES: Record<string, OperationStyle> = {
-  supply: { label: "Supply", color: "", bg: "", badge: false },
-  withdraw: { label: "Withdraw", color: "", bg: "", badge: false },
-  borrow: { label: "Borrow", color: "", bg: "", badge: false },
-  repay: { label: "Repay", color: "", bg: "", badge: false },
-  liquidation: { label: "Liquidation", color: "text-red-400", bg: "bg-red-500/20", badge: true },
-  collateral_toggle: { label: "Collateral Toggle", color: "", bg: "", badge: false },
+  supply: { label: AAVE_V4_LABELS.supply, color: "", bg: "", badge: false },
+  withdraw: { label: AAVE_V4_LABELS.withdraw, color: "", bg: "", badge: false },
+  borrow: { label: AAVE_V4_LABELS.borrow, color: "", bg: "", badge: false },
+  repay: { label: AAVE_V4_LABELS.repay, color: "", bg: "", badge: false },
+  liquidation: { label: AAVE_V4_LABELS.liquidation, color: "text-red-400", bg: "bg-red-500/20", badge: true },
+  collateral_toggle: { label: AAVE_V4_LABELS.collateral_toggle, color: "", bg: "", badge: false },
 };
 
 // The emitted log + Solidity field each moved amount is read from — surfaced
@@ -113,14 +114,6 @@ export interface AaveV4EventHeaderProps {
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt (owner / tx sender / spoke caller). */
   externalBy?: string;
-}
-
-/** The word T1 states for the row, which the phone spine view's caption
- *  repeats: "Enable Supply" where the supply also enabled the collateral. */
-export function aaveV4Label(ctx: AaveV4Context): string {
-  const style = STYLES[ctx.eventType] ?? { label: ctx.eventType };
-  if (ctx.alsoToggledCollateral) return "Enable Supply";
-  return ctx.eventType === "collateral_toggle" ? (ctx.enabled ? "Enable" : "Disable") : style.label;
 }
 
 export function AaveV4EventHeader({

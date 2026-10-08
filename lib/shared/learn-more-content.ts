@@ -177,14 +177,14 @@ export function liquityPositionContent(opts: {
   };
 }
 
-// ── Liquity — Economics panel ────────────────────────────────────────────────
+// ── Liquity — Lifetime flows panel ───────────────────────────────────────────
 //
-// State-explainer for the trove economics panel (carry cost + lifetime debt/
-// collateral flows). Scoped to what that panel shows, distinct from the
+// State-explainer for the trove's Lifetime flows panel (carry cost + lifetime
+// debt/collateral flows). Scoped to what that panel shows, distinct from the
 // position panel's "About this position".
-export function liquityEconomicsContent(opts: { isBatched?: boolean } = {}): LearnMoreContent {
+export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About Lifetime flows",
     intro:
       "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime.",
     detailsHeading: "Key concepts:",

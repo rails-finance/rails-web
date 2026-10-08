@@ -6,7 +6,7 @@
 
 import type { BaseActivityEvent } from "@/lib/shared/types/activity";
 import { liquityTroveHistory } from "@/lib/liquity/event-prose-position";
-import { fillText } from "@/lib/liquity/event-prose";
+import { fillText, liquityEventProse } from "@/lib/liquity/event-prose";
 import { CONTEXT_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
 import { formatDateLong } from "@/lib/date";
 
@@ -66,11 +66,6 @@ export function holderName(owner: string | null, ownerEns: string | null): strin
   return ownerEns || (owner ? short(owner) : CONTEXT_WORDS.owner_unknown);
 }
 
-/** The side column's "18 of 148". */
-export function eventOf(n: number, total: number): string {
-  return fillText(PAGE_WORDS.event_of, { n, total });
-}
-
 /** The page's metadata description: the Trove, its holder, the event's place
  *  and day, what the figures are, and the timeline sentence. */
 export function eventPageDescription(o: {
@@ -94,4 +89,23 @@ export function eventPageDescription(o: {
     day: formatDateLong(o.timestamp),
   });
   return `${text} ${PAGE_WORDS.timeline_link}`;
+}
+
+/** The event's heading in words, for the browser title: the prose's L1 line
+ *  ("Repay · 100K BOLD") with its groups joined by spaces. Null where the
+ *  history lacks the event. */
+export function eventHeadingWords(place: EventPagePlace, currentPrice?: number): string | null {
+  const { event, previous } = place;
+  if (!event) return null;
+  const { L1 } = liquityEventProse({
+    ctx: event.context.data,
+    event,
+    previousEvent: previous,
+    currentEvent: event,
+    currentPrice,
+    ledger: null,
+    collDecimals: null,
+    debtDecimals: null,
+  });
+  return L1.split(" · ").join(" ");
 }

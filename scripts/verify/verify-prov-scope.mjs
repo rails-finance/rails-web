@@ -2,15 +2,14 @@
 // ---------------------------------------------------------------------------
 // "Show provenance" arms the inspector on one section: the position card (a
 // row of C17's ⋮, Liquity V2), Lifetime flows (a row of its ⋮), one event (a
-// row of the event's ⋮ on the other families, a button in the Liquity V2 event
-// page's actions row). Only the values inside that section become targets
+// button in the event page's actions row, ui-jobs 308). Only the values inside that section become targets
 // (`[data-prov-pickable]` inside `[data-prov-scope="<scope>"]`, none outside);
 // the halo and the Escape ladder are the page-level tool's, and putting the
 // mode down hands focus back to the control that armed it. The page-level tool
 // (H7.3, the Tools menu) still marks every section.
 //
 // Pages: the story Trove and its Repay #148 event page (Liquity V2), an Aave
-// V3 Core wallet, a Maple wallet (the event ⋮ in the phone sheet at 390).
+// V3 Core wallet.
 //
 // Run:  BASE=http://localhost:3111 node scripts/verify/verify-prov-scope.mjs
 
@@ -23,7 +22,6 @@ const TROVE =
 const EVENT_ID = "0x2a440f6541a008e23d3088f88bac08d0ded6884d3238cbe0c1eee4b8a3e158d4_3";
 const EVENT_PAGE = `${TROVE}/event/${EVENT_ID}`;
 const AAVE = "/ethereum/aave-v3/0xfe28854b855ab09a47adbd893a5f580cdffc5820?market=core";
-const MAPLE = "/ethereum/maple/0x9ec2d8dd95ee25975ba2a5bb4e9d50dd57b7c87a";
 
 let checked = 0;
 let failures = 0;
@@ -234,37 +232,12 @@ for (const width of [1280, 390]) {
   await ctx.close();
 }
 
-// ── 3. Aave V3 Core: an event's ⋮ arms that event; the Tools menu marks all ─
+// ── 3. Aave V3 Core: the Tools menu marks all ───────────────────────────
+// An event's "Show provenance" left the row's ⋮ for the event page's actions
+// row (ui-jobs 308), checked at 1280 and 390 in section 2.
 {
-  const { ctx, page, errors } = await open(1280, AAVE, "[data-event-id] [data-event-menu]");
+  const { ctx, page, errors } = await open(1280, AAVE, "[data-event-id]");
   const tag = "aave-v3 @1280";
-  const cards = page.locator("[data-event-id]");
-  const first = cards.nth(0);
-  const firstScope = await first.locator("[data-prov-scope]").first().getAttribute("data-prov-scope");
-  const menu = first.locator("[data-event-menu]").first();
-  const armed = await armScope(page, firstScope, { menu });
-  await page.waitForTimeout(500);
-  const m = await marks(page, firstScope);
-  const by = await marksBySection(page);
-  check(
-    `${tag}: the first event's ⋮ row arms that event alone`,
-    armed && m.inside > 0 && m.outside === 0,
-    `inside ${m.inside}, outside ${m.outside} ${JSON.stringify(by)}`,
-  );
-  const secondScope = await cards.nth(1).locator("[data-prov-scope]").first().getAttribute("data-prov-scope");
-  const second = await marks(page, secondScope);
-  const cardMarks = await marks(page, "position-card");
-  check(
-    `${tag}: another event and the card stay unmarked`,
-    second.inside === 0 && cardMarks.inside === 0,
-    `${second.inside} / ${cardMarks.inside}`,
-  );
-  await ladder(
-    page,
-    firstScope,
-    `[data-event-id="${await first.getAttribute("data-event-id")}"] [data-event-menu] > button`,
-    `${tag} event`,
-  );
   // The page-level tool (H7.3) marks every section.
   await armInspector(page);
   await page.waitForTimeout(500);
@@ -276,39 +249,6 @@ for (const width of [1280, 390]) {
   );
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
-  await ctx.close();
-}
-
-// ── 4. Maple at 390: the event ⋮ row in the phone sheet ────────────────────
-{
-  const { ctx, page, errors } = await open(390, MAPLE, "[data-event-id]");
-  const tag = "maple @390";
-  // The spine view: a card's header (and its ⋮) shows once its segment opens.
-  if ((await page.locator("[data-event-id] [data-event-menu]").count()) === 0)
-    await page
-      .locator("[data-spine-toggle]")
-      .first()
-      .click()
-      .catch(() => {});
-  const menu = page.locator("[data-event-menu]").first();
-  await menu.waitFor({ timeout: 10000 }).catch(() => {});
-  const scope = await menu.evaluate((el) => el.closest("[data-prov-scope]")?.getAttribute("data-prov-scope") ?? null);
-  await menu.locator(":scope > button").click();
-  const inSheet = await page
-    .waitForSelector('[role="dialog"] [data-prov-scope-toggle]', { timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
-  check(`${tag}: the event ⋮ opens as a sheet holding "Show provenance"`, inSheet);
-  const armed = inSheet ? await armScope(page, scope) : false;
-  await page.waitForTimeout(500);
-  const m = await marks(page, scope);
-  check(
-    `${tag}: the row arms that event alone`,
-    armed && m.inside > 0 && m.outside === 0,
-    `inside ${m.inside}, outside ${m.outside}`,
-  );
-  await ladder(page, scope, `[data-prov-scope="${scope}"] [data-event-menu] > button`, `${tag} event`);
   check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
   await ctx.close();
 }

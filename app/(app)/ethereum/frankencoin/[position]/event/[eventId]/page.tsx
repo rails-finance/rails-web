@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
 import { loadFrankencoinPositionTail } from "@/lib/frankencoin/position-page-data";
+import { frankencoinEventPageDescription } from "@/lib/frankencoin/explorer";
 import FrankencoinPositionPage from "../../page";
 
 interface Props {
@@ -29,18 +30,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     subject: position ?? raw,
     canonicalPath: `/ethereum/frankencoin/${position ?? raw}/event/${encodeURIComponent(decoded)}`,
     event: event ? { actionLabel: event.actionLabel, timestamp: event.timestamp } : null,
+    description:
+      event && position && tail?.position
+        ? frankencoinEventPageDescription(tail.position.collateralSymbol, position, event.timestamp)
+        : undefined,
   });
 }
 
-// THIN: renders the exact same parent position page, same params — the
-// nested `event/[eventId]` segment sits inside the same `[position]` layout,
-// so every provider still wraps it, and `FrankencoinPositionView` (this
-// page's client half) never learns a new prop. It finds out it is on an
-// event route from `useParams().eventId` itself, inside `ChainTruthTimeline`
-// — see that component's pinned-mode branch. `params` here carries an extra
-// `eventId` key the parent's own `Props` type doesn't declare; passing the
-// same promise through is still structurally valid (the parent only reads
-// `position` off it).
+// The event page (rails-ops TO-DO-ui-jobs 236): the parent position page's
+// server half, same params; its client half (`FrankencoinPositionView`) reads
+// `eventId` from the route and draws the sub-nav and the event's card in page
+// mode with the shared column (`ChainTruthTimeline`'s `eventPage`).
 export default async function FrankencoinEventPage({ params }: Props) {
   return FrankencoinPositionPage({ params });
 }

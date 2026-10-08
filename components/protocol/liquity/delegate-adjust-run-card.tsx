@@ -10,6 +10,7 @@ import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { UsersGlyph } from "./liquity-event-header";
 import { formatDate } from "@/lib/date";
+import { troveWords } from "@/lib/liquity/event-templates";
 
 /**
  * Delegate-adjust run card — one row standing in for a stretch of consecutive
@@ -65,13 +66,13 @@ export function DelegateAdjustRunCard({
 
   const rateProv = (which: "first" | "last", ts: number): Provenance => ({
     kind: "chain",
-    summary: `The delegate's annual interest rate after the ${which} adjustment of this run — the rate the contract logged at that adjustment. Open the run to see each event's receipt.`,
+    summary: troveWords("run_rate_summary", { which: troveWords(which === "first" ? "run_first" : "run_last") }),
     inputs: [
       {
-        label: `${which} adjustment`,
+        label: troveWords("run_rate_input", { which: troveWords(which === "first" ? "run_first" : "run_last") }),
         value: `${shortDate(ts)} ${shortDateYear(ts)}`,
         kind: "chain",
-        note: `one of the ${count} events collapsed into this row`,
+        note: troveWords("run_rate_note", { count }),
       },
     ],
   });
@@ -82,7 +83,7 @@ export function DelegateAdjustRunCard({
   // no node and the words stand (set C gives the spine the rate).
   const words = (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="text-sm font-medium text-rb-500">Adjusted</span>
+      <span className="text-sm font-medium text-rb-500">{troveWords("run_adjusted")}</span>
       {hasMovement && (
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-700 dark:text-pink-400 text-xs font-bold">
           <UsersGlyph />
@@ -113,10 +114,16 @@ export function DelegateAdjustRunCard({
   // stand; the batch manager acted, so the line runs dotted.
   const column = <SpineColumn icon="rate-change" dotted isLast={!!isLast} />;
 
-  const spokenRange = sameDay ? formatDate(fromTs) : `${formatDate(fromTs)} to ${formatDate(toTs)}`;
-  const movement = hasMovement ? `: ${fromRate.toFixed(2)}% to ${toRate.toFixed(2)}%` : "";
-  const by = managerName ? ` by ${managerName}` : "";
-  const countText = `${count.toLocaleString("en-US")} rate ${count === 1 ? "adjustment" : "adjustments"}`;
+  const spokenRange = sameDay
+    ? formatDate(fromTs)
+    : troveWords("run_range_days", { from: formatDate(fromTs), to: formatDate(toTs) });
+  const movement = hasMovement
+    ? troveWords("run_movement", { from: `${fromRate.toFixed(2)}%`, to: `${toRate.toFixed(2)}%` })
+    : "";
+  const by = managerName ? troveWords("run_by", { manager: managerName }) : "";
+  const countText = troveWords(count === 1 ? "run_count_one" : "run_count_many", {
+    count: count.toLocaleString("en-US"),
+  });
 
   return (
     <GroupFrame
@@ -132,13 +139,9 @@ export function DelegateAdjustRunCard({
           header={<div className="pl-5 pt-4 pb-3">{words}</div>}
           // On a phone the caption carries the word, the count and the range,
           // and the words open beneath it as the card.
-          phoneCaption={
-            <>
-              Adjusted ({count.toLocaleString("en-US")}) &middot; {range}
-            </>
-          }
-          spokenCaption={`Adjusted, ${spokenRange}`}
-          label={`${countText}${by}, ${spokenRange}${movement}`}
+          phoneCaption={troveWords("run_phone_caption", { count: count.toLocaleString("en-US"), range })}
+          spokenCaption={troveWords("run_spoken", { range: spokenRange })}
+          label={troveWords("run_label", { count_text: countText, by, range: spokenRange, movement })}
           detail={<div className="px-5 pt-4 pb-3">{words}</div>}
           group="words"
         />

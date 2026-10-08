@@ -194,15 +194,14 @@ async function eventIds(page) {
   return page.$$eval("[data-event-id]", (els) => els.map((e) => e.getAttribute("data-event-id")));
 }
 
-// The copy-link control is the event menu's "Copy link to event page" row, the
-// ⋮ at the header's right end, before the number pill (ui-jobs 295).
-const COPY_LINK = '[data-menu-item="copy-link"]';
+// The event page's link is the event menu's "Open event page" row, the ⋮ at
+// the header's right end (ui-jobs 295); copy link moved to the event page
+// (ui-jobs 308).
+const COPY_LINK = '[data-menu-item="view-page"]';
 
 async function copyEventLink(page) {
   if ((await page.locator(COPY_LINK).count()) === 0) await page.locator("[data-event-menu] > button").first().click();
-  await page.click(COPY_LINK);
-  await page.waitForSelector(`${COPY_LINK}[data-copied]`, { timeout: 5000 });
-  return page.evaluate(() => navigator.clipboard.readText());
+  return `${BASE}${await page.locator(COPY_LINK).first().getAttribute("href")}`;
 }
 
 // The header's number pill, a link to the event page (ui-jobs 291).
@@ -515,10 +514,9 @@ async function verifyFamilyOnce(
   // failed attempt leaves a screenshot and a state dump so the next flake
   // explains itself instead of being re-run blind.
   //
-  // Liquity V2 (`linkFrom: "pill"`) has no event menu (ui-jobs 291): the
-  // first card's number pill is the link, read without opening the card, and
-  // the copy-link button is on the event page's side column
-  // (`verifyLiquityMarkdown`).
+  // Liquity V2 (`linkFrom: "pill"`) reads the first card's number pill,
+  // without opening the card. The copy-link button is on the event page's
+  // side column (`verifyLiquityMarkdown`, ui-jobs 308).
   let posCtx = null;
   let posPage = null;
   let positionPath = null;
