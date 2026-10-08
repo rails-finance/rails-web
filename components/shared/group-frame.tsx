@@ -77,11 +77,9 @@ export function GroupFrame({
           </div>
         </GroupHideContext.Provider>
       ) : (
-        // The dotted segment runs on below the legs inside the frame, and its
-        // overshoot still reaches the next row's node.
-        <div className="pb-6" style={{ "--mspine-extra": "24px" } as React.CSSProperties}>
-          {closed}
-        </div>
+        // The dotted stretch below the group's node runs on through the
+        // frame's foot to the next row's node (spine-line.tsx).
+        <div className="pb-6">{closed}</div>
       )}
     </div>
   );

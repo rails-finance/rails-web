@@ -18,14 +18,7 @@ import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
-import {
-  EventCaptionContext,
-  SPINE_LINE_OVERSHOOT,
-  SpineRowContext,
-  isPhoneViewport,
-  spineLineStyle,
-  useSpineView,
-} from "@/components/shared/mobile-spine";
+import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
 import { EventDateContext, EventDayMarkContext } from "@/components/shared/event-time";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { formatDate } from "@/lib/date";
@@ -402,10 +395,7 @@ export function EventCard({
   const spoken = spokenCaption ?? (captionCtx ? `${kind}, ${formatDate(captionCtx.ts)}` : "");
   // The legs the column reports, for the phone control's name.
   const [legs, setLegs] = useState<string | null>(null);
-  // The line the column draws down to the next row, carried behind an opened
-  // body on a phone.
-  const [line, setLine] = useState<string | null>(null);
-  const rowSlot = useMemo(() => ({ setLegs, setLine }), []);
+  const rowSlot = useMemo(() => ({ setLegs }), []);
   const labelId = `${reactId}-label`;
   const panelId = `${reactId}-card`;
 
@@ -599,23 +589,7 @@ export function EventCard({
     </div>
   );
 
-  const body = !inTimeline
-    ? panel
-    : showDetail && (
-        // A stacking context, so on a phone the line below paints behind
-        // the card and shows only past its bottom edge.
-        <div className="spine-body relative isolate max-sm:mt-2">
-          {line && (
-            <div
-              aria-hidden
-              data-spine-line=""
-              className="absolute left-1/2 -z-10 w-px -translate-x-1/2 sm:hidden"
-              style={{ top: "calc(var(--card-pad) + 20px)", bottom: SPINE_LINE_OVERSHOOT, ...spineLineStyle(line) }}
-            />
-          )}
-          {panel}
-        </div>
-      );
+  const body = !inTimeline ? panel : showDetail && <div className="spine-body max-sm:mt-2">{panel}</div>;
 
   return (
     <SpineLegsContext.Provider value={spineLegs}>

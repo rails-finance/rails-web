@@ -438,7 +438,10 @@ body {
     align-items: stretch;
     justify-content: center;
   }
-  .spine-content {
+  /* Positioned, so the card paints over the list's line (spine-line.tsx). */
+  .spine-content,
+  .spine-body {
+    position: relative;
     min-width: 0;
   }
   .spine-num {

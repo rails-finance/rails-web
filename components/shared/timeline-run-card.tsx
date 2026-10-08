@@ -296,8 +296,8 @@ export function TimelineRunCard({
   const words2 = groupMenuWords(count, rangeText);
   const showMenu = { ...words2.show, show: () => !open && onToggle() };
   const hide = { ...words2.hide, hide: () => open && onToggle() };
-  /** The closed row's column: the node, then the summed legs, then the dotted
-   *  segment for the members not drawn. */
+  /** The closed row's column: the node, then the summed legs; the list's
+   *  line runs dotted below it for the members not drawn. */
   const legsColumn = (
     <SpineColumn
       {...(adverse

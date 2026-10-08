@@ -12,6 +12,7 @@ import { liquityEconomicsExplanation } from "@/lib/liquity/economics-explanation
 import { RedeemerSummary } from "@/components/protocol/liquity/redeemer-summary";
 import { liquityEconomicsContent } from "@/lib/shared/learn-more-content";
 import { LiquityEventCard } from "@/components/protocol/liquity/liquity-event-card";
+import { SpineLine } from "@/components/shared/spine-line";
 import { SpineTipContext } from "@/components/shared/spine-column";
 import { TimelineDisplayProvider } from "@/components/shared/timeline-display-context";
 import { EventDateContext } from "@/components/shared/event-time";
@@ -136,7 +137,8 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
         </div>
 
         <TimelineDisplayProvider>
-          <div className="space-y-2">
+          <div className="relative space-y-2">
+            <SpineLine />
             {visibleEvents.map((event, idx) => {
               if (!isLiquityEvent(event)) return null;
               const tempIdx = chronoIndexById.get(event.id) ?? 0;

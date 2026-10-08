@@ -98,7 +98,8 @@ import {
   timelineFilterPills,
   type TimelineDisplayItem,
 } from "@/components/shared/timeline-toolbar";
-import { ListNoteGap, SpineNoteGap, type GapItem } from "@/components/shared/spine-note-markers";
+import { NoteGap, type GapItem } from "@/components/shared/spine-note-markers";
+import { SpineLine } from "@/components/shared/spine-line";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { anchorMarketNotes, liveNoteGroup, type MarketNote } from "@/lib/shared/market-note";
 import { TIMELINE_PAGE_ROWS } from "@/lib/shared/timeline-opening-balance";
@@ -166,7 +167,8 @@ function clickToOpenIfClosed(id: string): void {
   if (typeof document === "undefined") return;
   const wrapper = document.getElementById(`event-${id}`);
   if (!wrapper || wrapper.querySelector(".rounded-b-xl.bg-raised")) return;
-  // The spine view's segment button first: there the header is not a control.
+  // The row's controls: the phone segment's button, then the header. Either
+  // opens the card at the viewport's width.
   const toggle = wrapper.querySelector('[data-spine-toggle], [role="button"]');
   if (toggle instanceof HTMLElement) toggle.click();
 }
@@ -1921,7 +1923,8 @@ function ChainTruthTimelineBody({
           <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
         ) : rows.length > 0 ? (
           <>
-            <div className="flex flex-col gap-2">
+            <div className="relative flex flex-col gap-2">
+              <SpineLine />
               <SpineKeyRow config={spineKey ?? DEFAULT_SPINE_KEY} />
               {/* The top is the NEWEST end, so the only omission that can stand
                 here is the TIP's — drawn when the newest events the page holds
@@ -1941,31 +1944,19 @@ function ChainTruthTimelineBody({
                   {liveWindow({ isFirst: !tipBoundaryAtTop })}
                 </SpineTipContext.Provider>
               )}
-              {/* The desktop markers reserve one target for the live notes; the
-                phone spine view draws them as markers above the newest event,
-                under the tip's dot, and reserves nothing while they load. */}
+              {/* From 640px the markers reserve one target for the live notes
+                while they load; a phone reserves nothing. */}
               {liveSkeletonAtTop && !liveSlotAtTop && (
                 <div aria-hidden className="hidden sm:block" style={{ height: 28 }} />
               )}
               {liveSlotAtTop && (
-                <SpineNoteGap
-                  notes={topNotes}
-                  datePrefixFor={headDatePrefix}
-                  head={{ tip: liveWindowAtTop ? null : tipSide }}
-                />
-              )}
-              {liveSlotAtTop && (
-                <ListNoteGap
+                <NoteGap
                   notes={topNotes}
                   datePrefixFor={headDatePrefix}
                   openIds={openNoteIds}
                   openAll={openAll}
                   onToggle={toggleNote}
-                  head={{
-                    tip: liveWindowAtTop ? null : tipSide,
-                    above: tipBoundaryAtTop || liveWindowAtTop,
-                    below: true,
-                  }}
+                  head={{ tip: liveWindowAtTop ? null : tipSide }}
                 />
               )}
               {/* The cut's moment, where it falls on a day with no events:
@@ -2093,19 +2084,15 @@ function ChainTruthTimelineBody({
                 // have happened before. The row itself is untouched — this only
                 // wraps it.
                 const rowLastIdx = row.kind === "run" ? row.flatIdx + row.events.length - 1 : row.flatIdx;
-                // Markers in the gap below: the phone spine view's, or the
-                // desktop's.
+                // Markers in the gap below, at both widths.
                 const noteRows = (
-                  <>
-                    <SpineNoteGap notes={rowNotes} datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)} />
-                    <ListNoteGap
-                      notes={rowNotes}
-                      datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
-                      openIds={openNoteIds}
-                      openAll={openAll}
-                      onToggle={toggleNote}
-                    />
-                  </>
+                  <NoteGap
+                    notes={rowNotes}
+                    datePrefixFor={(note) => noteDatePrefixAfter(note, rowLastIdx)}
+                    openIds={openNoteIds}
+                    openAll={openAll}
+                    onToggle={toggleNote}
+                  />
                 );
                 return (
                   <Fragment key={rowKey}>
@@ -2162,7 +2149,8 @@ function ChainTruthTimelineBody({
               rows: a lone glyph on an otherwise blank panel would state
               nothing at all, and "no events" would state something false. */}
             {effectiveBoundary && !tl.isFiltered ? (
-              <div className="flex flex-col gap-2">
+              <div className="relative flex flex-col gap-2">
+                <SpineLine />
                 <TimelineBoundaryCard
                   boundary={effectiveBoundary}
                   protocolKey={tl.protocolKey}
@@ -2176,15 +2164,15 @@ function ChainTruthTimelineBody({
                 {/* The markers stay when a filter hides every event (item
                     118): notes describe the market, not the account. */}
                 {tl.isFiltered && topNotes.length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <SpineNoteGap notes={topNotes} datePrefixFor={headDatePrefix} head={{ tip: null }} />
-                    <ListNoteGap
+                  <div className="relative flex flex-col gap-2">
+                    <SpineLine />
+                    <NoteGap
                       notes={topNotes}
                       datePrefixFor={headDatePrefix}
                       openIds={openNoteIds}
                       openAll={openAll}
                       onToggle={toggleNote}
-                      head={{ tip: null, above: false, below: false }}
+                      head={{ tip: null }}
                     />
                   </div>
                 )}

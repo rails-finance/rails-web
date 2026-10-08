@@ -50,8 +50,6 @@ export function useSpineView(): SpineViewState | null {
   return useContext(SpineViewContext);
 }
 
-const cssEscape = (s: string) => (typeof CSS !== "undefined" && CSS.escape ? CSS.escape(s) : s);
-
 /** Holds the one card open on a phone. When a tap closes a card above the
  *  tapped one, the tapped segment would jump up by that card's height; the
  *  layout effect scrolls it back to where it was. An opened card that runs
@@ -96,95 +94,12 @@ export const EventCaptionContext = createContext<EventCaption | null>(null);
  *  legs for the phone control's name. */
 export interface SpineRowSlot {
   setLegs: (legs: string | null) => void;
-  /** Where the column reports the line it draws down to the next segment
-   *  (`spineLineKey`), or null where it draws none, so an opened card can
-   *  carry the same line past itself. */
-  setLine?: (line: string | null) => void;
 }
 
 export const SpineRowContext = createContext<SpineRowSlot | null>(null);
 
 export function useSpineRow(): SpineRowSlot | null {
   return useContext(SpineRowContext);
-}
-
-// ── The line between segments ─────────────────────────────────────────────
-//
-// Each segment's column draws the line from its node down into the next
-// node's halo: `var(--card-pad) + 28px` past its own bottom, which is the list's
-// 8px gap, the next row's padding and its column's 16px top padding. Two
-// things lengthen it in the spine view, and both reach it without a prop:
-//
-//   - an opened card under the segment carries the same line behind itself,
-//     from where the column's line stops to the next segment (`SpineSegment`);
-//   - a gap holding market-note markers grows, and the line that ends in that
-//     gap is lengthened by the growth through `--mspine-extra`, set on the
-//     line element that precedes the gap (`useExtendLineAbove`).
-//
-// Every such line element carries `data-spine-line`, in the spine view only.
-
-/** The line a column draws, as a key that compares equal across renders:
- *  "d|<colour>" dotted, "s|<colour>" solid. */
-export function spineLineKey(dotted: boolean, rgb: string): string {
-  return `${dotted ? "d" : "s"}|${rgb}`;
-}
-
-/** The inline style a `spineLineKey` stands for. */
-export function spineLineStyle(key: string): React.CSSProperties {
-  const [kind, rgb] = [key.slice(0, 1), key.slice(2)];
-  return kind === "d"
-    ? { backgroundImage: `linear-gradient(to bottom, ${rgb} 50%, transparent 50%)`, backgroundSize: "1px 6px" }
-    : { backgroundColor: rgb };
-}
-
-/** How far a line overshoots the bottom of the row it is drawn in, to reach
- *  the next node's halo. */
-export const SPINE_LINE_OVERSHOOT = "calc(-1 * var(--card-pad) - 28px - var(--mspine-extra, 0px))";
-
-/** Lengthen the spine line that ends in this gap by `extra` px: the last
- *  `[data-spine-line]` before `ref` in the timeline. Recomputed when the rows
- *  around it change (a card or a folder opening above it). The desktop list
- *  view's stacked note markers pass `[data-list-line]`, which `SpineColumn`
- *  sets on its line outside the spine view. */
-export function useExtendLineAbove(
-  ref: React.RefObject<HTMLElement | null>,
-  extra: number,
-  enabled = true,
-  selector = "[data-spine-line]",
-) {
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || !enabled) return;
-    const root = el.closest("[data-timeline-rows-drawn]") ?? document.body;
-    let target: HTMLElement | null = null;
-    // Both widths' gaps are in the DOM, one of them hidden: only a drawn gap
-    // lengthens a drawn line.
-    const drawn = (e: HTMLElement) => e.getClientRects().length > 0;
-    const apply = () => {
-      let found: HTMLElement | null = null;
-      if (drawn(el))
-        for (const line of root.querySelectorAll<HTMLElement>(selector)) {
-          if (el.contains(line)) break;
-          if (line.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) {
-            if (drawn(line)) found = line;
-          } else break;
-        }
-      if (found === target) return;
-      target?.style.removeProperty("--mspine-extra");
-      target = found;
-      target?.style.setProperty("--mspine-extra", `${extra}px`);
-    };
-    apply();
-    const observer = new MutationObserver(apply);
-    observer.observe(root, { childList: true, subtree: true });
-    const mq = window.matchMedia(PHONE_QUERY);
-    mq.addEventListener?.("change", apply);
-    return () => {
-      observer.disconnect();
-      mq.removeEventListener?.("change", apply);
-      target?.style.removeProperty("--mspine-extra");
-    };
-  }, [ref, extra, enabled, selector]);
 }
 
 /** One row above the first event, under the two flanks, below 640px: what a

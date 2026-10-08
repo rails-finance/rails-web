@@ -268,14 +268,14 @@ export function MarketNoteRow({
   isLast = false,
   datePrefix = null,
   defaultOpen,
-  nodeControl,
+  opened,
 }: {
   note: MarketNote;
   /** Mount with the panel open (a note opened from its spine marker). */
   defaultOpen?: boolean;
-  /** The desktop marker's close control, laid over the node, which is then
-   *  drawn filled (spine-note-markers.tsx). */
-  nodeControl?: ReactNode;
+  /** Opened from its marker: the node draws the diamond filled, and the
+   *  gap's control over it puts the note back (spine-note-markers.tsx). */
+  opened?: boolean;
   /** The day stamp the timeline gives this row on its day-stamp rule
    *  (`noteDatePrefixAfter` in ChainTruthTimeline). A live note reads "Now". */
   datePrefix?: string | null;
@@ -292,8 +292,7 @@ export function MarketNoteRow({
   const body = useNoteBody(note);
   return (
     <NoteRowShell
-      icon={nodeControl ? "market-open" : "market"}
-      nodeControl={nodeControl}
+      icon={opened ? "market-open" : "market"}
       isFirst={isFirst}
       isLast={isLast}
       label={body.label}
@@ -531,14 +530,14 @@ export function LiveNoteGroupRow({
   group,
   isFirst = false,
   isLast = false,
-  nodeControl,
+  opened,
 }: {
   group: LiveNoteGroup;
   /** Spine terminus flags, as on a lone note row in the head slot. */
   isFirst?: boolean;
   isLast?: boolean;
-  /** The desktop marker's close control over the node (spine-note-markers.tsx). */
-  nodeControl?: ReactNode;
+  /** Opened from its marker: the node draws the diamond filled. */
+  opened?: boolean;
 }) {
   const scale = useTimelineScale();
   return (
@@ -548,8 +547,7 @@ export function LiveNoteGroupRow({
       style={{ "--card-pad": `${scale.cardPad}px`, padding: scale.cardPad } as React.CSSProperties}
     >
       <div className="spine-cell">
-        <SpineColumn icon={nodeControl ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
-        {nodeControl}
+        <SpineColumn icon={opened ? "market-open" : "market"} isFirst={isFirst} isLast={isLast} />
       </div>
       <div className="spine-content rounded-xl bg-note pb-1.5" role="group" aria-label={LIVE_GROUP_TITLE}>
         <div className="flex items-center gap-2 px-5 pb-1 pt-4">

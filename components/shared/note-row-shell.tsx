@@ -51,10 +51,6 @@ export interface NoteRowShellProps {
   /** Mount with the body open: a note opened from its spine marker opens
    *  straight to the row and its panel. */
   defaultOpen?: boolean;
-  /** A control laid over the node in the spine column (desktop only, like the
-   *  column): an opened market note's filled diamond, which puts the note back
-   *  to its marker. The column still draws the glyph and the line. */
-  nodeControl?: ReactNode;
 }
 
 export function NoteRowShell({
@@ -66,7 +62,6 @@ export function NoteRowShell({
   header,
   children,
   defaultOpen = false,
-  nodeControl,
 }: NoteRowShellProps) {
   const scale = useTimelineScale();
   const registry = useReceiptRegistry();
@@ -83,7 +78,6 @@ export function NoteRowShell({
       >
         <div className="spine-cell">
           <SpineColumn icon={icon} isFirst={isFirst} isLast={isLast} />
-          {nodeControl}
         </div>
         <div className="spine-content">
           {/* ── Header panel — what the row states at rest ──────────────── */}

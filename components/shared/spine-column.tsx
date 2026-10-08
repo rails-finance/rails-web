@@ -10,7 +10,7 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine, type SpineValProv } from "@/components/shared/activity-timeline";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import type { LinkedHoverHandlers } from "@/hooks/useLinkedHover";
-import { SPINE_LINE_OVERSHOOT, spineLineKey, spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
+import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 
@@ -204,12 +204,12 @@ export interface SpineColumnProps {
   undrawn?: boolean;
   /** Spine color tint — encodes subsystem or event category */
   color?: SpineColor;
-  /** The first node on the spine: nothing is drawn above it (a leading mask
-   *  covers the strip above the node). A LINE-END prop, not the tip — the
-   *  pulsing dot is `tip`'s alone. */
+  /** The first node on the spine. A LINE-END prop, not the tip — the
+   *  pulsing dot is `tip`'s alone. The list's line starts at the first node
+   *  it finds (spine-line.tsx). */
   isFirst?: boolean;
-  /** The last node on the spine: no trailing segment, and a mask over the
-   *  strip below the node. */
+  /** The last node on the spine: the list's line ends at it
+   *  (`data-spine-end`). */
   isLast: boolean;
   /** THE TIP OF THE TIMELINE — the newest event — and the one thing that
    *  draws the pulsing dot. "above": a lead-in line and the dot above the
@@ -762,31 +762,6 @@ export function PulsingDot({ dotClass = "bg-green-400", side }: { dotClass?: str
   );
 }
 
-/** Covers the spine tail from the previous card that extends into the space below
- *  the last card's icon. Bounded by the flex-1 parent (which spans from the icon's
- *  bottom to the card's bottom) so it never bleeds past the card boundary. */
-function SpineTrailingMask({ ground = "var(--background)" }: { ground?: string }) {
-  return (
-    <div
-      className="absolute left-1/2 -translate-x-1/2 z-10"
-      style={{ top: 0, bottom: 0, width: 12, backgroundColor: ground }}
-    />
-  );
-}
-
-/** The trailing mask's mirror: covers the strip above the first node (the
- *  column's top padding), so nothing reaches down into a spine terminus —
- *  a first row draws no line above itself, whatever stands there. The tip's lead-in sits
- *  above this mask (z-20) when this row is also the newest. */
-function SpineLeadingMask({ ground = "var(--background)" }: { ground?: string }) {
-  return (
-    <div
-      className="absolute left-1/2 -translate-x-1/2 z-10"
-      style={{ top: 0, height: 16, width: 12, backgroundColor: ground }}
-    />
-  );
-}
-
 /** The phone spine view's spoken legs, for the card button's name: "7,500
  *  BOLD repaid, 2 rETH withdrawn". */
 function spokenLegs(rows: SpineTokenRow[], unreadOf: ReturnType<typeof useUnreadTokenOf>): string | null {
@@ -953,52 +928,32 @@ export function SpineColumn({
   // still rides the provenance trace). The ≥sm / <sm hand-off to the card header
   // is owned by the layout (the `hidden sm:flex` spine column), not this flag.
   const spineValues = showTimelineValues;
-  // The masks and the node's halo take the page's ground.
+  // The node's halo takes the page's ground: the list's line (spine-line.tsx)
+  // stops 4px short of every glyph.
   const ground = "var(--background)";
 
-  // The lead-in dot takes a warning event's tone. The line is solid neutral
-  // ink, except the dotted segment that means "events not drawn" (a closed
-  // group, the boundary), which takes the tone too.
+  // The lead-in dot takes a warning event's tone. The line is the list's
+  // (spine-line.tsx), solid neutral ink, except the dotted stretch that means
+  // "events not drawn" below a closed group or the boundary, which takes the
+  // tone too: the node marks it (`data-spine-undrawn`), and at the foot of the
+  // list the row draws it.
   const effectiveColor: SpineColor = effectiveIcon === "warning" ? warningTone : color;
   const isDotted = !!undrawn;
   const spineRgb = SPINE_COLORS[isDotted ? effectiveColor : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
-  const spineStyle = isDotted
-    ? { backgroundImage: `linear-gradient(to bottom, ${spineRgb} 50%, transparent 50%)`, backgroundSize: "1px 6px" }
-    : { backgroundColor: spineRgb };
-  const spineClasses = "absolute left-1/2 -translate-x-1/2 w-px";
-  // The phone spine view: an opened card carries this line past itself.
-  const lineKey = !detached && !isLast ? spineLineKey(isDotted, spineRgb) : null;
-  const setLine = spineRow?.setLine;
-  useEffect(() => {
-    setLine?.(lineKey);
-  }, [setLine, lineKey]);
-
-  const spineEl = detached ? (
-    // Detached card: spine is bounded by the column itself, no overflow into neighbours.
-    <div className={spineClasses} style={{ top: 0, bottom: 0, ...spineStyle }} />
-  ) : isLast ? (
-    // A closed group at the end of the list keeps its undrawn segment, inside
-    // the row.
-    isDotted && <div className={spineClasses} style={{ top: 0, bottom: 8, ...spineStyle }} />
-  ) : (
-    // Overshoot past the card bottom just enough to reach into the *next*
-    // icon's halo (where it's masked by var(--background) box-shadow), then
-    // stop. Layout assumes the standard sibling spacing — space-y-2 (8px
-    // gap) + cardPad (4px) + SpineColumn pt-4 (16px) − halo radius (4px) ≈
-    // 24px from this card's bottom to the next halo's top edge; 28px lands
-    // a few px inside the halo for clean masking. Any further (the old
-    // 100px) and the spine bleeds past the next card entirely, leaving a
-    // bare tail visible below the bottom-most event.
-    // The line is also what a market-note marker gap below lengthens
-    // (`useExtendLineAbove`), so it is marked and reads the var: in the
-    // phone spine view as `data-spine-line`, in the list view as
-    // `data-list-line` (item 118's stacked desktop markers).
+  const nodeAttrs = {
+    ...(isDotted ? { "data-spine-undrawn": effectiveColor } : {}),
+    ...(isLast ? { "data-spine-end": "" } : {}),
+  };
+  const spineEl = isDotted && isLast && (
     <div
-      className={spineClasses}
-      data-spine-line=""
-      data-list-line=""
-      style={{ top: 0, bottom: SPINE_LINE_OVERSHOOT, ...spineStyle }}
+      className="absolute left-1/2 w-px -translate-x-1/2"
+      style={{
+        top: 0,
+        bottom: 8,
+        backgroundImage: `linear-gradient(to bottom, ${spineRgb} 50%, transparent 50%)`,
+        backgroundSize: "1px 6px",
+      }}
     />
   );
 
@@ -1025,7 +980,6 @@ export function SpineColumn({
       </div>
     </div>
   );
-  const leadingMask = isFirst && !detached && <SpineLeadingMask ground={ground} />;
 
   // Icon override mode — no token icons, just a semantic icon
   if (effectiveIcon) {
@@ -1353,8 +1307,9 @@ export function SpineColumn({
         // its figures re-state the card's, which carries them.
         data-prov-exempt=""
       >
-        {leadingMask}
         <div
+          data-spine-node=""
+          {...nodeAttrs}
           className={`relative z-10${nodeToggle ? " cursor-pointer" : ""}`}
           style={detached ? undefined : { backgroundColor: ground, boxShadow: `0 0 0 4px ${ground}` }}
           {...nodeProps}
@@ -1364,7 +1319,6 @@ export function SpineColumn({
         </div>
         <div className="flex-1 relative max-sm:min-h-9">
           {spineEl}
-          {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
           {tipBelow}
         </div>
       </div>
@@ -1380,8 +1334,9 @@ export function SpineColumn({
 
   return (
     <div className="flex max-w-full flex-col items-center relative px-1 pt-4 self-stretch" data-prov-exempt="">
-      {leadingMask}
       <div
+        data-spine-node=""
+        {...nodeAttrs}
         className={`relative z-10 flex flex-col gap-y-1 items-center${nodeToggle ? " cursor-pointer" : ""}`}
         {...nodeProps}
         style={
@@ -1466,7 +1421,6 @@ export function SpineColumn({
       </div>
       <div className="flex-1 relative max-sm:min-h-9">
         {spineEl}
-        {isLast && !detached && !isDotted && <SpineTrailingMask ground={ground} />}
         {tipBelow}
       </div>
     </div>
