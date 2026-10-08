@@ -18,7 +18,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LiquityPositionCard } from "@/components/protocol/liquity-family/liquity-position-card";
 import { viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
-import { TroveListError } from "@/components/troves/components/TroveListError";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
@@ -160,7 +159,6 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
           <HolderStrip {...liquityV2HolderStrip(items, total, prices, LIQUITY_V2_ITEMS_PER_PAGE)} />
         ) : null
       }
-      renderError={(err) => <TroveListError message={err instanceof Error ? err.message : "Failed to load troves"} />}
       initialItems={initialItems}
       initialTotal={initialTotal}
       initialKey={initialKey}
