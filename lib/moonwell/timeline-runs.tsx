@@ -281,6 +281,8 @@ function folderCard(events: BaseActivityEvent[], folder: RunFolderMeta): ReactNo
       // A folder holding a liquidation is drawn at full weight: it is the
       // row the account's story turns on.
       muted={solo ? solo.muted : !hasLiquidation}
+      // Every member is a third party's (the run's `isThirdParty` match).
+      byOwner={false}
       folder
       extraHeader={
         solo ? undefined : other > 0 ? (
@@ -304,6 +306,7 @@ const MIXED_FOLDER: FolderRegisterEntry = {
   tone: "neutral",
   spineIcon: "custody",
   muted: true,
+  byOwner: false,
 };
 
 /**
@@ -329,6 +332,7 @@ export const MOONWELL_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFol
     spineIcon: solo.spineIcon,
     kindWord: solo.kindWord,
     muted: solo.muted,
+    byOwner: false,
   };
 };
 

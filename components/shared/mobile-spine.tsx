@@ -96,6 +96,9 @@ export const EventCaptionContext = createContext<EventCaption | null>(null);
 export interface SpineRowSlot {
   legsId?: string;
   target: boolean;
+  /** False where the event was not actioned by the owner: its line runs
+   *  dotted to the next node. */
+  byOwner: boolean;
 }
 
 export const SpineRowContext = createContext<SpineRowSlot | null>(null);

@@ -335,6 +335,8 @@ export interface FolderRegisterEntry {
   tone?: Tone | "neutral";
   spineIcon?: SpineIcon;
   kindWord?: string;
+  /** Whether the members are the owner's actions (TimelineRunCard). */
+  byOwner?: boolean;
   muted?: boolean;
   /** A shape run's summary, drawn before its sums: "12 × deposit + share
    *  transfer". */

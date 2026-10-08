@@ -627,6 +627,7 @@ function ServedFolderRow({
       spineIcon={entry.spineIcon}
       // A shape run's label is its kind word too (the phone caption's).
       kindWord={entry.kindWord ?? entry.shapeLabel}
+      byOwner={entry.byOwner}
       muted={entry.muted}
       folder
       lead={

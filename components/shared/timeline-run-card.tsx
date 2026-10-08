@@ -104,6 +104,9 @@ export interface TimelineRunCardProps {
   /** The kind's word T1 states ("Redemptions"), in the run's tone. Unset:
    *  the member noun, plural. */
   kindWord?: string;
+  /** Whether the members are the owner's actions. Unset: not where the run is
+   *  adverse (redemptions, liquidations) or a third party's (`external`). */
+  byOwner?: boolean;
   /** A chronological slice of a longer stretch (`lib/shared/timeline-chunks.ts`):
    *  the summary card opens with the Σ glyph before the sums. */
   folder?: boolean;
@@ -186,6 +189,7 @@ export function TimelineRunCard({
   tone = "caution",
   spineIcon = "warning",
   kindWord: kindWordProp,
+  byOwner,
   folder,
   lead,
   extraHeader,
@@ -291,7 +295,9 @@ export function TimelineRunCard({
   const showMenu = { ...words2.show, show: () => !open && onToggle() };
   const hide = { ...words2.hide, hide: () => open && onToggle() };
   /** The closed row's column: the node, then the summed legs; the list's
-   *  line runs dotted below it for the members not drawn. */
+   *  line runs dotted below it where the members were not the owner's
+   *  actions (mobile decision 18). */
+  const actedByOwner = byOwner ?? !(adverse || spineIcon === "external");
   const legsColumn = (
     <SpineColumn
       {...(adverse
@@ -307,7 +313,7 @@ export function TimelineRunCard({
           : netTokens.length > 0
             ? { tokens: netTokens }
             : { icon: "none" as const })}
-      undrawn
+      dotted={!actedByOwner}
       isLast={!!isLast}
     />
   );

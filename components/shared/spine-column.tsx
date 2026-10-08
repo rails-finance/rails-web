@@ -175,9 +175,14 @@ export interface SpineColumnProps {
   rateSpan?: [number, number];
   /** Direction for rate-change arrow or delegate badge */
   iconDirection?: "up" | "down";
-  /** The segment below the node stands for events not drawn (a closed
-   *  group): dotted, in the warning tone or the neutral ink. Every other
-   *  line is solid. */
+  /** The event, or the group's events, were not actioned by the owner (a
+   *  third party's, or the protocol's): the line runs dotted from this node
+   *  to the next, in the warning tone or the neutral ink (mobile decision 18).
+   *  A warning node, `externalParty` and a row whose card names another actor
+   *  (`SpineRowSlot.byOwner` false) are dotted without it. */
+  dotted?: boolean;
+  /** The boundary card: the events before the oldest drawn row, a dotted
+   *  stretch inside the row below the node. */
   undrawn?: boolean;
   /** The last node on the spine: the list's line ends at it
    *  (`data-spine-end`). */
@@ -811,6 +816,7 @@ export function SpineColumn({
   warningLegs,
   iconDirection,
   rateSpan,
+  dotted,
   undrawn,
   isLast,
   tip,
@@ -869,19 +875,19 @@ export function SpineColumn({
   const ground = "var(--background)";
 
   // The lead-in dot takes a warning event's tone. The line is the list's
-  // (spine-line.tsx), solid neutral ink, except the dotted stretch that means
-  // "events not drawn" below a closed group or the boundary, which takes the
-  // tone too: the node marks it (`data-spine-undrawn`), and at the foot of the
-  // list the row draws it.
+  // (spine-line.tsx): solid neutral ink beside what the owner actioned, dotted
+  // beside what they did not, in the tone (mobile decision 18). The node marks
+  // it (`data-spine-dotted`); the boundary's stretch the row draws itself.
   const effectiveColor = effectiveIcon === "warning" ? warningTone : "default";
-  const isDotted = !!undrawn;
+  const isDotted =
+    !!dotted || !!undrawn || effectiveIcon === "warning" || !!externalParty || spineRow?.byOwner === false;
   const spineRgb = SPINE_COLORS[isDotted ? effectiveColor : "default"];
   const dotClass = DOT_COLORS[effectiveColor];
   const nodeAttrs = {
-    ...(isDotted ? { "data-spine-undrawn": effectiveColor } : {}),
+    ...(isDotted ? { "data-spine-dotted": effectiveColor } : {}),
     ...(isLast ? { "data-spine-end": "" } : {}),
   };
-  const spineEl = isDotted && isLast && (
+  const spineEl = undrawn && isLast && (
     <div
       className="absolute left-1/2 w-px -translate-x-1/2"
       style={{

@@ -129,6 +129,10 @@ export interface EventCardProps {
    *  a caller on the owner's position): the phone caption and the segment's
    *  label say "Redemption by 0x1234…abcd". */
   by?: string;
+  /** Whether the owner actioned the event. Unset: unless `by` names another
+   *  actor. False draws the spine dotted below the node (a protocol's own
+   *  event, a queue fill). */
+  byOwner?: boolean;
   /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
    *  "Received from 0x…". */
   custody?: { dir: "to" | "from"; address: string };
@@ -173,6 +177,7 @@ export function EventCard({
   groupMenu,
   numberSlot,
   by,
+  byOwner,
   custody,
 }: EventCardProps) {
   const scale = useTimelineScale();
@@ -399,9 +404,12 @@ export function EventCard({
       ? () => ((isPhoneViewport() && inTimeline ? phoneToggles : showChevron) ? toggleDetail() : undefined)
       : null,
   );
+  // Not actioned by the owner (another actor named, or the card says so):
+  // the spine runs dotted below the node (mobile decision 18).
+  const actedByOwner = byOwner ?? !by;
   const rowSlot = useMemo(
-    () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget }),
-    [inTimeline, legsId, rowTarget],
+    () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget, byOwner: actedByOwner }),
+    [inTimeline, legsId, rowTarget, actedByOwner],
   );
   const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
   const panelId = `${reactId}-card`;

@@ -5,9 +5,9 @@
 // is the head slot's pulsing dot where one is drawn, else the first node; the bottom
 // is the last node's centre. Every node (`data-spine-node`) and the dot
 // (`data-spine-tip`) take part wherever they are drawn, and the nodes' halo
-// keeps the line clear of the glyphs. Below a node marked
-// `data-spine-undrawn` (a closed group's) the stretch down to the next node is
-// dotted in the group's tone: the members not drawn (ui-jobs 250 point 5).
+// keeps the line clear of the glyphs. Below a node marked `data-spine-dotted`
+// (an event, or a group of them, the owner did not action) the stretch down to
+// the next node is dotted in the row's tone (mobile decision 18).
 // The last node of the list (`data-spine-end`, a row's `isLast`) ends the
 // line; a list drawn in part runs it on past its last drawn node.
 
@@ -76,7 +76,7 @@ export function SpineLine() {
           foot: r.bottom - base.top,
           marker: el.getAttribute("data-spine-node") === "marker",
           end: el.hasAttribute("data-spine-end"),
-          undrawn: (el.getAttribute("data-spine-undrawn") as Tone | "default" | null) ?? null,
+          undrawn: (el.getAttribute("data-spine-dotted") as Tone | "default" | null) ?? null,
         });
       }
       nodes.sort((a, b) => a.cy - b.cy);

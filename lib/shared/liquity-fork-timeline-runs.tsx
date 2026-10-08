@@ -110,6 +110,7 @@ const OWNER_RUN_NOUN: Record<string, string> = {
 const BATCH_RATE_FOLDER: FolderRegisterEntry = {
   memberNoun: "batch rate change",
   tone: "neutral",
+  byOwner: false,
 };
 
 export const LIQUITY_FORK_FOLDER_REGISTER: ServedFolderRegister = (folder: ServedFolder): FolderRegisterEntry =>

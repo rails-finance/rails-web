@@ -126,6 +126,8 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
             : undefined
         }
         by={extBy ?? undefined}
+        // A queue fill is the pool's act, not the owner's.
+        byOwner={ctx.eventType === "request_fill" ? false : undefined}
         iconColumn={iconSlot}
         caption={isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : undefined}
         header={
