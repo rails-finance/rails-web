@@ -15,11 +15,17 @@ import { type CompoundCoords } from "@/lib/compound/event-provenance";
 import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
-import { compoundExplainerTeaser, type CompoundEvent } from "@/lib/compound/explainer-clauses";
+import { compoundEventProse, type CompoundEvent } from "@/lib/compound/event-prose";
 import { useCompoundHeadSpec } from "./compound-event-header";
 import { useCompoundCells } from "./compound-event-detail";
 import type { CompoundPreviousRow } from "./compound-absorb-breakdown";
-import { CompoundEventExplainer, compoundLearnMoreContent } from "./compound-event-explainer";
+import {
+  CompoundEventExplainer,
+  CompoundExplainerTeaser,
+  compoundEchoFor,
+  compoundExternal,
+  isGroupedExplanation,
+} from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { compoundRowLabel } from "@/lib/compound/row-facts";
 
@@ -93,6 +99,15 @@ export function CompoundEventCard({
     ...(ctx.quoteUsd != null ? { quoteUsd: ctx.quoteUsd } : {}),
   };
   const kind = ctx.eventType;
+  // The card's teaser is the explanation's first sentence, which no read of
+  // the transaction changes; the pane below makes that read.
+  const prose = compoundEventProse({
+    ctx,
+    market: m,
+    siblings: sibs,
+    self: event,
+    external: compoundExternal(ctx, event.wallet, coords.chainId, false),
+  });
   const isTransfer =
     kind === "transfer_in" ||
     kind === "transfer_out" ||
@@ -181,12 +196,15 @@ export function CompoundEventCard({
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           siblings={sibs}
-          skipLead
         />
       ),
-      first: compoundExplainerTeaser(ctx, coords, sibs, event, m) ?? undefined,
+      first:
+        prose.L4.length > 0 ? (
+          <CompoundExplainerTeaser prose={prose} echo={(key) => compoundEchoFor(key, ctx, coords, m)} />
+        ) : undefined,
+      grouped: isGroupedExplanation(prose),
     },
-    learnMore: <LearnMore inline content={compoundLearnMoreContent(ctx)} />,
+    learnMore: <LearnMore inline content={prose.L5.content} />,
   };
 
   return <EventCard slots={slots} avatar={null} />;

@@ -37,7 +37,9 @@ export type Rounding =
   | "units4"
   | "units2"
   | "ratio_frac"
+  | "compound_amount"
   | "number"
+  | "usd_value"
   | "pct_plain"
   | "hf";
 

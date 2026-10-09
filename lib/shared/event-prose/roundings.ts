@@ -6,7 +6,8 @@ import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhol
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
-import { formatNumber } from "@/lib/utils/format";
+import { compoundAmount } from "@/lib/compound/row-facts";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
 import type { ProseValue, Rounding } from "./types";
 
@@ -105,7 +106,9 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   units2: (v) => num(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   ratio_frac: (v) =>
     `${(num(v) * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
-  number: (v) => formatNumber(Math.abs(num(v))),
+  compound_amount: (v) => compoundAmount(num(v)),
+  number: (v) => formatNumber(num(v)),
+  usd_value: (v) => formatUsdValue(num(v)),
   pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
   hf: (v) => hfLabelV4(num(v)),
 };
