@@ -1,12 +1,12 @@
 "use client";
 
-// Liquity V1 event header (chain-state tier) — adapter onto the shared ChainTruthRow
-// grammar. A Trove event moves BOTH axes at once (ETH collateral + LUSD debt), so the
+// Liquity V1 event head (chain-state tier) — the card's `head` slot (ui-jobs
+// 309), drawn by the shared ChainTruthRow. A Trove event moves BOTH axes at once (ETH collateral + LUSD debt), so the
 // row can carry two signed deltas. Each delta is after − before over two emitted
 // absolutes (chain-derived); traced via <Prov>. No USD, no collateral ratio — layers.
 
 import type { LiquityV1Context } from "@/lib/shared/types/event-shape";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   collDeltaProv,
   debtDeltaProv,
@@ -24,24 +24,12 @@ import {
 } from "@/lib/liquity-v1/event-figures";
 import { COLL_VERB, DEBT_VERB } from "@/lib/shared/liquity-fork-ops";
 
-export interface LiquityV1EventHeaderProps {
-  actionLabel: string;
-  ctx: LiquityV1Context;
-  timestamp: number;
-  txHash?: string;
-  blockNumber?: number;
-  eventNumber?: number;
-}
-
-export function LiquityV1EventHeader({
-  actionLabel,
-  ctx,
-  timestamp,
-  txHash,
-  blockNumber,
-  eventNumber,
-}: LiquityV1EventHeaderProps) {
-  const coords: LiquityV1Coords = { txHash, blockNumber };
+/** The row's spec: each side's signed change, a redemption's legs debt first. */
+export function liquityV1HeadSpec(
+  actionLabel: string,
+  ctx: LiquityV1Context,
+  coords: LiquityV1Coords,
+): ChainTruthRowSpec {
   const deltas: ChainTruthDelta[] = [];
 
   // A redemption borrows the V2 grammar, debt first: debt "Cleared", collateral
@@ -145,17 +133,11 @@ export function LiquityV1EventHeader({
   // A redemption names the debt first.
   if (isRedemption) deltas.sort((a, b) => Number(b.symbol === DEBT_SYMBOL) - Number(a.symbol === DEBT_SYMBOL));
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
-        status: isOpen ? "open" : undefined,
-        critical: ctx.eventType === "liquidation",
-        labelOnSpine: isRedemption,
-        deltas,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+    status: isOpen ? "open" : undefined,
+    critical: ctx.eventType === "liquidation",
+    labelOnSpine: isRedemption,
+    deltas,
+  };
 }

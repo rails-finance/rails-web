@@ -68,6 +68,7 @@ import { usePublishSpineLegs, WARNING_TONE_TEXT, type SpineWarningLeg } from "@/
 import { ClosedTokens, LedgerCell, usdAt } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
+import type { EventCellSpec } from "@/components/shared/event-cells";
 
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
  *  snapshot grid; the full string rides the tooltip + provenance trace. Passes
@@ -1207,6 +1208,185 @@ export function ChainTruthDetail({
       {extra != null && <div className="h-full">{extra}</div>}
     </div>
   );
+}
+
+/** A stat's figure as `ChainTruthDetail` prints it: on a ledger cell at the
+ *  decimals the opened ledger prints, the exact value in its tip, and the
+ *  symbol's name after it where the family asks for it. */
+function StatFigure({
+  side,
+  exact,
+  shown,
+  symbol,
+  label,
+  asIs,
+  word,
+}: {
+  side?: FlowSide;
+  exact: string;
+  shown: string;
+  symbol?: string;
+  label?: string;
+  asIs?: boolean;
+  word?: string;
+}) {
+  const ledgerSrc = useContext(EventLedgerContext);
+  let text = shown;
+  if (!asIs && side) {
+    const dec = ledgerSrc?.decimals?.(side) ?? null;
+    const m = /^([+−-]?)(.*)$/.exec(exact.trim());
+    const n = m ? Number(m[2].replace(/,/g, "")) : NaN;
+    if (dec != null && Number.isFinite(n) && n < 1e6) {
+      const t = ledgerFigure(n, dec, shown);
+      if (t !== shown) text = `${m![1] === "-" ? "−" : m![1]}${t}`;
+    }
+  }
+  return (
+    <>
+      <ExactTip always text={text} exact={exact} symbol={symbol} label={label} />
+      {word ? <span className="font-normal text-rb-500"> {word}</span> : null}
+    </>
+  );
+}
+
+/** A stat's after, or the line saying its token's decimals did not load. */
+function StatAfter(props: Parameters<typeof StatFigure>[0] & { address?: string }) {
+  const unread = useUnreadTokenOf()(props.address, props.symbol ?? "");
+  if (props.symbol && unread) return <TokenAmountNotLoaded address={unread.address} label={unread.label} />;
+  return <StatFigure {...props} />;
+}
+
+/** `ChainTruthDetail`'s stats as the shell's `cells` slot (ui-jobs 309): a
+ *  stat with a `ledger` side becomes a ledger cell, the rest stat cells, with
+ *  the figures, receipts, tips and sub-lines the grid draws. `changed` defaults
+ *  to true, as the grid's does. `inputs` names, by label, the cells a derived
+ *  cell follows ("Collateral ratio": ["collateral", "debt"]); a cell's key is
+ *  its ledger side, else its label in lower case. Not carried: a USD chip on a stat with no
+ *  ledger (no family on the slots draws one yet). */
+export function chainTruthCells(
+  stats: ChainTruthStat[],
+  opts: { symbolText?: boolean; inputs?: Record<string, string[]> } = {},
+): EventCellSpec[] {
+  return stats.map((s): EventCellSpec => {
+    const changed = s.changed ?? true;
+    const symbol = s.symbol || undefined;
+    const word = opts.symbolText ? symbol : undefined;
+    const t = s.transition;
+    const readable = (exact: string) => (s.readableLabel && symbol ? readableExact(exact, s.symbol) : undefined);
+    const heldAmount = Number(s.value);
+    const usd =
+      s.ledger && s.usd && usdShown(s.usd.value)
+        ? {
+            before:
+              s.usdBefore && t ? (
+                <Prov info={s.usdBefore.prov} value={formatUsdValue(s.usdBefore.value)}>
+                  {fmtUsdChip(s.usdBefore.value)}
+                </Prov>
+              ) : null,
+            after: (
+              <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
+                {fmtUsdChip(s.usd.value)}
+              </Prov>
+            ),
+            ...(s.symbol && heldAmount > 0
+              ? usdAt({
+                  price: s.usd.value / heldAmount,
+                  symbol: s.symbol,
+                  before: t ? Number(t.beforeExact) : null,
+                  after: heldAmount,
+                })
+              : {}),
+          }
+        : undefined;
+    const isp = s.interestSincePrevious;
+    const sub = [
+      ...(isp
+        ? [
+            {
+              content: (
+                <>
+                  <TipLabel text={isp.label ?? "Interest since previous event"} tip={isp.labelTip} />:{" "}
+                  <Prov info={isp.prov} value={isp.value} symbol={s.symbol}>
+                    <ExactTip
+                      always
+                      text={isp.display ?? transitionFigure(formatNumber(Number(isp.value)), isp.value)}
+                      exact={isp.value}
+                      symbol={s.symbol}
+                    />
+                  </Prov>{" "}
+                  {s.symbol}
+                  {isp.after}
+                </>
+              ),
+            },
+          ]
+        : []),
+      ...(s.sub != null ? [{ content: s.sub, changed }] : []),
+    ];
+    const common = {
+      key: s.ledger ?? s.label.toLowerCase(),
+      label: s.label,
+      changed,
+      inputs: opts.inputs?.[s.label],
+      value: {
+        before: t
+          ? {
+              text: (
+                <StatFigure
+                  side={s.ledger}
+                  exact={t.beforeExact}
+                  shown={t.shownAsIs ? t.before : transitionFigure(t.before, t.beforeExact, false)}
+                  asIs={t.shownAsIs}
+                  symbol={s.symbol}
+                  label={readable(t.beforeExact)}
+                />
+              ),
+              info: t.beforeProv,
+              value: t.beforeExact,
+            }
+          : undefined,
+        delta: t
+          ? {
+              text: (
+                <StatFigure
+                  side={s.ledger}
+                  exact={t.changeExact}
+                  shown={t.shownAsIs ? t.change : transitionFigure(t.change, t.changeExact)}
+                  asIs={t.shownAsIs}
+                  symbol={s.symbol}
+                  label={readable(t.changeExact)}
+                />
+              ),
+              info: t.changeProv,
+              value: t.changeExact,
+            }
+          : undefined,
+        after: {
+          text: (
+            <StatAfter
+              side={s.ledger}
+              exact={s.value}
+              shown={s.display ?? compactAmount(s.value)}
+              symbol={s.symbol}
+              address={s.address}
+              word={word}
+              label={
+                s.readableLabel && Number.isFinite(Number(s.value))
+                  ? readableName(Number(s.value), s.symbol, false)
+                  : undefined
+              }
+            />
+          ),
+          info: s.prov,
+          value: s.value,
+        },
+        icon: symbol,
+        iconAddress: s.address,
+      },
+      sub: sub.length > 0 ? sub : undefined,
+    };
+    return s.ledger ? { ...common, kind: "ledger", side: s.ledger, usd } : { ...common, kind: "stat" };
+  });
 }
 
 /** A cell's USD chip with no ledger: at the event's price, or at the latest

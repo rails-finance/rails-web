@@ -119,6 +119,28 @@ export interface EventCardSlots {
   band?: ReactNode;
   /** Run on pointer-over or focus of the row (a prefetch). */
   onIntent?: () => void;
+  /** A hook the shell runs while the body is open, for a family whose cells,
+   *  notes or price wait on a read a closed row must not make (Liquity V1's
+   *  receipt read): what it returns stands in for those slots, which hold
+   *  the closed card's values (the cells `pending`). */
+  useOpened?: () => EventCardOpened;
+}
+
+/** The slots `useOpened` returns once the body opens. */
+export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "price">>;
+
+/** The body of a card whose slots wait on `useOpened`: mounted with the open
+ *  panel, so its read starts when the card opens. */
+function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: () => EventCardOpened }) {
+  const opened = useOpened();
+  const price = opened.price ?? slots.price;
+  return (
+    <>
+      <EventCellGrid cells={opened.cells ?? slots.cells} />
+      {opened.notes ?? slots.notes}
+      {hasPriceRow(price) && <EventPriceRow price={price} />}
+    </>
+  );
 }
 
 /** What the shell takes beside a family's parts: the timeline's and the
@@ -204,13 +226,16 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
       />
     ),
     band: slots.band,
-    detail: (
+    detail: slots.useOpened ? (
+      <OpenedBody slots={slots} useOpened={slots.useOpened} />
+    ) : (
       <>
         <EventCellGrid cells={slots.cells} />
         {slots.notes}
       </>
     ),
-    price: slots.price,
+    // A card read on open draws its price row inside `OpenedBody`.
+    price: slots.useOpened ? undefined : slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
     txHash: event.txHash,

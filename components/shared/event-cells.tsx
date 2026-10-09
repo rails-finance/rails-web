@@ -56,6 +56,9 @@ export interface EventCellValue {
   none?: string;
   /** The token whose icon follows the after. */
   icon?: string;
+  /** The token's contract, where the family can name it: the icon asks the
+   *  icon CDNs by address where the house table does not know the symbol. */
+  iconAddress?: string;
 }
 
 interface EventCellCommon {
@@ -134,7 +137,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     );
   };
   const before = v.before;
-  const icon = v.icon ? <TokenChipIcon symbol={v.icon} size={16} /> : undefined;
+  const icon = v.icon ? <TokenChipIcon symbol={v.icon} address={v.iconAddress} size={16} /> : undefined;
   return (
     <>
       {v.lead != null ? (
