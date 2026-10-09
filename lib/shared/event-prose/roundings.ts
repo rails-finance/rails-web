@@ -8,6 +8,7 @@ import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
 import { compoundAmount } from "@/lib/compound/row-facts";
 import { formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
+import { hfLabelV4 } from "@/lib/aave-v4/format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -62,14 +63,6 @@ function fmtTokenPos(n: number): string {
   const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
   const s = n.toLocaleString("en-US", { maximumFractionDigits: decimals });
   return parseFloat(s) === 0 ? formatTinyNonZero(n) : s;
-}
-
-/** A health factor: four places below 1.1 (rounded down under 1, so a
- *  liquidatable account never reads 1.0000), two above, ">100" past the cap. */
-function fmtHf(hf: number): string {
-  if (hf >= 100) return ">100";
-  if (hf < 1) return (Math.floor(hf * 1e4 + 1e-9) / 1e4).toFixed(4);
-  return hf < 1.1 ? hf.toFixed(4) : hf.toFixed(2);
 }
 
 /** A collateral figure at the ledger's decimals. */
@@ -131,9 +124,9 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
     return n < 1 ? fmtTokenPos(n) : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   },
   token_pos: (v) => fmtTokenPos(Math.abs(num(v))),
-  hf: (v) => fmtHf(num(v)),
-  pct_plain: (v) => `${Number((num(v) * 100).toFixed(2))}%`,
   compound_amount: (v) => compoundAmount(num(v)),
   number: (v) => formatNumber(num(v)),
   usd_value: (v) => formatUsdValue(num(v)),
+  pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
+  hf: (v) => hfLabelV4(num(v)),
 };

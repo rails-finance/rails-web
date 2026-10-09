@@ -519,7 +519,6 @@ export default function CompoundV2PositionView({
                         chain={chain}
                         liquidationCount={liveView.liquidationCount}
                         captions={captions}
-                        txCount={liveView.txCount}
                         externalActivity={externalActivityWithOpening}
                       />
                     )

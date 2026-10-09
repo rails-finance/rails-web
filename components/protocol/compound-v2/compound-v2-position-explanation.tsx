@@ -1,99 +1,109 @@
 "use client";
 
-// Plain-language explanation of a Compound V2 position NOW — a SHORT status lead
-// (the verdict, one-two sentences) over a bullet list of the independent facts
-// (per-market composition, entered/unentered collateral, fixed-priced markets,
-// the risk figure, the margin as a ratio, the drop to liquidation, how a V2
-// liquidation runs). The position pane is an enumeration, not a causal story:
-// prose is reserved for the verdict; the facts stay as bullets (the charter's
-// position grammar). Built straight from the live account read (per-market
-// balances, entered-market membership, the protocol's oracle prices and
-// collateral factors, and its own liquidity/shortfall check).
-//
-// Every figure here is the same chain-state values shown on the cards around it — this
-// panel only narrates it, under the explanation-copy charter: what each number
-// MEANS, never how it was read.
+// The Compound V2 position card's explanation (zone Z1): a colon-terminated
+// lead, then bullets under Holdings, Risk, Rate and History when two of them
+// hold two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3).
+// The words are content/compound-v2/event-prose.yaml's `position_words`; this
+// file chooses which to say and draws each figure as the card does. An open
+// account's figures are the live account read (per-market balances, entered
+// markets, the protocol's oracle prices and collateral factors, and the
+// Comptroller's liquidity and shortfall); a closed one narrates from the
+// index alone, since a terminal account has no live state. The mechanisms
+// behind them are the card's "?" (position_* in the same file).
 
-import {
-  DEPRECATED_CONDITIONS,
-  DEPRECATED_CONSEQUENCE,
-  isCompoundV2Deprecated,
-} from "@/lib/compound-v2/deprecated-markets";
+import type { ReactNode } from "react";
+import { isCompoundV2Deprecated } from "@/lib/compound-v2/deprecated-markets";
 import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import type { CompoundV2PositionView } from "@/components/protocol/compound-v2/compound-v2-position-card";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { capacityShare } from "@/lib/shared/capacity-share";
-import { liquidationSentences } from "@/lib/shared/ctoken-liquidation-story";
-import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
+import { COMPOUND_V2_WORDS, positionWords } from "@/lib/compound-v2/event-templates";
+import { positionNodes } from "@/lib/compound-v2/position-nodes";
+import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 
-/** Oxford-join asset symbols ("ETH, USDC and WBTC"). */
+const GROUPS = ["holdings", "risk", "rate", "history"] as const;
+type Group = (typeof GROUPS)[number];
+type Bullet = { group: Group; node: ReactNode };
+
+const arrange = (bullets: Bullet[]) => {
+  const heading: Record<Group, string> = {
+    holdings: positionWords("heading_holdings"),
+    risk: positionWords("heading_risk"),
+    rate: positionWords("heading_rate"),
+    history: positionWords("heading_history"),
+  };
+  return arrangeByHeading(bullets, GROUPS, (g) => heading[g]);
+};
+
+/** Join symbols with commas and the file's "and" ("ETH, USDC and WBTC"). */
 function joinSymbols(syms: string[]): string {
-  if (syms.length === 0) return "";
-  if (syms.length === 1) return syms[0];
-  if (syms.length === 2) return `${syms[0]} and ${syms[1]}`;
-  return `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`;
+  if (syms.length <= 1) return syms[0] ?? "";
+  return `${syms.slice(0, -1).join(", ")} ${COMPOUND_V2_WORDS.and} ${syms[syms.length - 1]}`;
 }
 
 export function CompoundV2PositionExplanation({
   chain,
   liquidationCount,
   captions,
-  txCount,
   externalActivity,
 }: {
   /** The live chain read. Null until it lands:
    *  nothing is narrated, and the pane still mounts so its foot controls draw. */
   chain: CompoundV2ChainResponse | null;
-  /** Replayed liquidation count from the index — lets an open survivor's
+  /** Replayed liquidation count from the index: lets an open survivor's
    *  narration state the two-axis fact. Omit to skip the bullet. */
   liquidationCount?: number;
-  /** The card's stat captions (accrued interest) — the same computed values
-   *  the stat footnotes show. Omit to skip that bullet. */
+  /** The card's stat captions (the borrow rate). Omit to skip that bullet. */
   captions?: CompoundV2CardCaptions | null;
-  /** The card's transaction count (the count badge). Omit to skip. */
-  txCount?: number;
   /** Who executed the account's events, reduced over its whole timeline. The
    *  page derives it from the events already on the page; omit to skip the
-   *  operator bullet. */
+   *  operator bullets. */
   externalActivity?: ExternalActorSummary;
 }) {
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
-  const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   if (!chain) return null;
   const supplied = chain.markets.filter((m) => m.supplyUnderlying > 0);
   const entered = supplied.filter((m) => m.entered);
   const unentered = supplied.filter((m) => !m.entered);
   const disabledColl = supplied.filter((m) => m.entered && m.collateralDisabled);
-  const fixedPriced = chain.markets.filter((m) => !m.priceHasFeed && m.priceUsd != null);
   const borrowed = chain.markets.filter((m) => m.borrowUnderlying > 0);
   const hasDebt = borrowed.length > 0;
   const shortfall = chain.shortfallUsd > 0;
   const hf = chain.healthReplica;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
 
-  // ── the status lead (the verdict) — subject-first, one sentence, colon-
-  // terminated: the lead-in to the bullets (charter §4) ──────────────────────
-  const lead: React.ReactNode | null =
-    hasDebt && shortfall ? (
-      <>This position is liquidatable now — its borrowing has outgrown what its collateral covers:</>
-    ) : hasDebt ? (
-      <>This position borrows against its Compound V2 collateral and is currently healthy:</>
-    ) : entered.length > 0 ? (
-      <>This position supplies collateral and is debt-free, so its collateral is safe from liquidation:</>
-    ) : supplied.length > 0 ? (
-      <>This position only supplies — nothing is entered as collateral, so it backs no borrowing:</>
-    ) : null;
+  const leadId =
+    hasDebt && shortfall
+      ? "lead_liquidatable"
+      : hasDebt
+        ? "lead_borrowing"
+        : entered.length > 0
+          ? "lead_debt_free"
+          : supplied.length > 0
+            ? "lead_supply_only"
+            : null;
+  const lead: ReactNode | null =
+    leadId === "lead_liquidatable"
+      ? positionNodes("lead_liquidatable")
+      : leadId === "lead_borrowing"
+        ? positionNodes("lead_borrowing")
+        : leadId === "lead_debt_free"
+          ? positionNodes("lead_debt_free")
+          : leadId === "lead_supply_only"
+            ? positionNodes("lead_supply_only")
+            : null;
 
-  // ── the facts, as bullets ─────────────────────────────────────────────────
-  const list: React.ReactNode[] = [];
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
 
-  // The card's own USD headlines (strict guard: stated only when every
-  // contributing market is priced — the card degrades identically).
+  // The card's USD headlines (strict guard: stated only when every
+  // contributing market is priced; the card degrades identically).
   const sideUsd = (ms: typeof supplied, amount: (m: (typeof ms)[number]) => number): number | null => {
     let sum = 0;
     for (const m of ms) {
@@ -104,333 +114,184 @@ export function CompoundV2PositionExplanation({
   };
   const suppliedUsd = sideUsd(supplied, (m) => m.supplyUnderlying);
   const borrowedUsd = sideUsd(borrowed, (m) => m.borrowUnderlying);
-  if (suppliedUsd != null || borrowedUsd != null) {
-    list.push(
-      <>
-        At Compound&rsquo;s own oracle prices{" "}
-        {suppliedUsd != null && (
-          <>
-            the supplied markets are worth <H>{formatUsd(suppliedUsd)}</H>
-          </>
-        )}
-        {suppliedUsd != null && borrowedUsd != null && <> and </>}
-        {borrowedUsd != null && (
-          <>
-            the borrowed markets <H>{formatUsd(borrowedUsd)}</H>
-          </>
-        )}
-        .
-      </>,
+  if (suppliedUsd != null && borrowedUsd != null)
+    add(
+      "holdings",
+      "worth",
+      positionNodes("worth_both", {
+        supplied_usd: <H>{formatUsd(suppliedUsd)}</H>,
+        borrowed_usd: <H>{formatUsd(borrowedUsd)}</H>,
+      }),
     );
-  }
+  else if (suppliedUsd != null)
+    add("holdings", "worth", positionNodes("worth_supplied", { supplied_usd: <H>{formatUsd(suppliedUsd)}</H> }));
+  else if (borrowedUsd != null)
+    add("holdings", "worth", positionNodes("worth_borrowed", { borrowed_usd: <H>{formatUsd(borrowedUsd)}</H> }));
 
-  for (const m of supplied) {
-    list.push(
-      <>
-        Supplies{" "}
-        <H>
-          <AmountText value={m.supplyUnderlying} /> {m.symbol}
-        </H>
-        {m.priceUsd != null ? <> (worth {formatUsd(m.supplyUnderlying * m.priceUsd)})</> : null}
-        {m.supplyApr === 0 ? (
-          <>
-            , earning nothing: the market&rsquo;s reserve factor is 100%, so all the interest borrowers pay goes to
-            reserves.
-          </>
-        ) : (
-          <>
-            , earning the market&rsquo;s supply rate ({m.supplyApr != null ? (m.supplyApr * 100).toFixed(2) : "—"}%
-            APR).
-          </>
-        )}
-      </>,
+  if (entered.length > 0)
+    add("holdings", "entered", positionNodes("entered", { entered_syms: joinSymbols(entered.map((m) => m.symbol)) }));
+  if (unentered.length > 0)
+    add(
+      "holdings",
+      "unentered",
+      positionNodes("unentered", { unentered_syms: joinSymbols(unentered.map((m) => m.symbol)) }),
     );
-  }
-
-  if (entered.length > 0) {
-    list.push(
-      <>
-        The {joinSymbols(entered.map((m) => m.symbol))} supply is <H>entered as collateral</H>: the wallet entered its
-        market, which is what lets a supply count toward the borrow limit.
-      </>,
+  if (disabledColl.length > 0)
+    add(
+      "holdings",
+      "disabled",
+      positionNodes("disabled", { disabled_syms: joinSymbols(disabledColl.map((m) => m.symbol)) }),
     );
-  }
-
-  if (unentered.length > 0) {
-    list.push(
-      <>
-        The {joinSymbols(unentered.map((m) => m.symbol))} supply is <H>not entered as collateral</H>: supplying alone
-        doesn&rsquo;t enter a market, so it backs no borrowing. A liquidation can still seize it.
-      </>,
-    );
-  }
-
-  if (disabledColl.length > 0) {
-    list.push(
-      <>
-        The {joinSymbols(disabledColl.map((m) => m.symbol))} market is <H>disabled as collateral</H> — its collateral
-        factor is zero (governance turned it off), so the supply earns but backs nothing even though the market is
-        entered.
-      </>,
-    );
-  }
-
-  if (fixedPriced.length > 0) {
-    list.push(
-      <>
-        {joinSymbols(fixedPriced.map((m) => m.symbol))} {fixedPriced.length === 1 ? "is" : "are"} priced by a{" "}
-        <H>constant stored in the oracle, with no price feed behind it</H> — the number Compound itself uses
-        {fixedPriced.length === 1 && fixedPriced[0].priceUsd != null ? (
-          <> ({formatUsd(fixedPriced[0].priceUsd)})</>
-        ) : null}
-        , but nothing updates it.
-      </>,
-    );
-  }
 
   if (hasDebt) {
-    list.push(
-      <>
-        Borrows{" "}
-        {borrowed.map((m, i) => (
-          <span key={m.market}>
-            {i > 0 ? " and " : ""}
-            <H>
-              <AmountText value={m.borrowUnderlying} /> {m.symbol}
-            </H>
-            {m.borrowApr != null ? <> at {(m.borrowApr * 100).toFixed(2)}% APR</> : null}
-          </span>
-        ))}
-        {entered.length > 0 ? (
-          <>
-            {" "}
-            against {joinSymbols(entered.map((m) => m.symbol))} collateral counted at{" "}
-            {formatUsd(chain.collateralValueUsd)} by Compound&rsquo;s own risk check
-          </>
-        ) : null}
-        .
-      </>,
-    );
-    const deprecatedBorrows = borrowed.filter((m) => isCompoundV2Deprecated(m.market));
-    if (deprecatedBorrows.length > 0) {
-      list.push(
-        <>
-          The {joinSymbols(deprecatedBorrows.map((m) => m.symbol))} market
-          {deprecatedBorrows.length > 1 ? "s are" : " is"} <H>deprecated</H> ({DEPRECATED_CONDITIONS}):{" "}
-          {DEPRECATED_CONSEQUENCE}, so that borrow can be liquidated in full at any time.
-        </>,
-      );
-    }
-    list.push(
-      <>
-        Compound&rsquo;s own risk check reports{" "}
-        {shortfall ? (
-          <>
-            a {formatUsd(chain.shortfallUsd)} <H>shortfall</H> — the account is liquidatable now
-          </>
-        ) : (
-          <>
-            <H>{formatUsd(chain.liquidityUsd)}</H> of borrowing power still unused
-          </>
-        )}
-        .
-      </>,
+    // Compound's risk check: the borrowing room left, or the shortfall.
+    add(
+      "risk",
+      "verdict",
+      shortfall
+        ? positionNodes("shortfall", { shortfall: <H>{formatUsd(chain.shortfallUsd)}</H> })
+        : positionNodes("liquidity", { liquidity: <H>{formatUsd(chain.liquidityUsd)}</H> }),
     );
     if (chain.debtValueUsd > 0 && chain.collateralCapacityUsd > 0) {
       const share = capacityShare(chain.debtValueUsd, chain.collateralCapacityUsd);
-      list.push(
-        <>
-          The debt stands at <H>{share.text}</H> {share.ofThe} liquidation line — each market&rsquo;s collateral factor
-          sets both the borrowing limit and that line, one threshold — and the line sits at{" "}
-          <H>{formatUsd(chain.collateralCapacityUsd)}</H> of debt at current prices.
-        </>,
+      add(
+        "risk",
+        "liq-line",
+        share.beyond
+          ? positionNodes("liq_line_beyond", {
+              share: <H>{share.text}</H>,
+              line: <H>{formatUsd(chain.collateralCapacityUsd)}</H>,
+            })
+          : positionNodes("liq_line", {
+              share: <H>{share.text}</H>,
+              line: <H>{formatUsd(chain.collateralCapacityUsd)}</H>,
+            }),
       );
     }
-    if (hf != null) {
-      list.push(
-        <>
-          As one ratio, the borrowing limit is {hf.toFixed(2)}× the debt (1.0× is the shortfall line)
-          {chain.debtValueUsd > 0 && chain.collateralValueUsd > 0 ? (
-            <>, and the collateral is worth {(chain.collateralValueUsd / chain.debtValueUsd).toFixed(2)}× the debt</>
-          ) : null}
-          .
-        </>,
+    if (dropPct != null && dropPct > 0) add("risk", "drop", positionNodes("drop", { drop: <H>{dropPct}%</H> }));
+    const deprecatedBorrows = borrowed.filter((m) => isCompoundV2Deprecated(m.market));
+    if (deprecatedBorrows.length > 0) {
+      const syms = joinSymbols(deprecatedBorrows.map((m) => m.symbol));
+      add(
+        "risk",
+        "deprecated",
+        deprecatedBorrows.length === 1
+          ? positionNodes("deprecated_one", { deprecated_syms: syms })
+          : positionNodes("deprecated_many", { deprecated_syms: syms }),
       );
     }
-    if (captions?.borrowRate) {
-      list.push(
-        <>
-          The debt accrues at a <H>{captions.borrowRate.pct.toFixed(2)}%</H>
-          {captions.borrowRate.avg ? " average" : ""} borrow rate.
-        </>,
-      );
-    }
-    if (dropPct != null && dropPct > 0) {
-      list.push(
-        <>
-          The collateral basket can fall about <H>{dropPct}%</H> before the account is liquidatable.
-        </>,
-      );
-    }
-    list.push(
-      <>
-        A liquidation here repays at most {Math.round(chain.closeFactor * 100)}% of one borrowed market per call (the
-        close factor), or the whole borrow in a deprecated market, and the liquidator takes collateral worth that
-        repayment plus {Math.round(Math.max(0, chain.liquidationIncentive - 1) * 100)}%.
-      </>,
-    );
   } else if (entered.length > 0) {
-    list.push(
-      <>
-        Nothing is borrowed. At current oracle prices the entered collateral could back up to{" "}
-        {formatUsd(chain.liquidityUsd)} of borrowing — Compound&rsquo;s own liquidity figure.
-      </>,
+    add("risk", "idle", positionNodes("idle_room", { liquidity: formatUsd(chain.liquidityUsd) }));
+  }
+
+  // The rate: what the supply earns, and what the debt accrues at.
+  if (supplied.length > 0) {
+    const top = Math.max(...supplied.map((m) => m.supplyApr ?? 0));
+    if (top > 0) add("rate", "supply", positionNodes("earns_rate", { supply_apr: <H>{(top * 100).toFixed(2)}%</H> }));
+    else if (supplied.every((m) => m.supplyApr === 0)) add("rate", "supply", positionNodes("earns_nothing"));
+  }
+  if (hasDebt && captions?.borrowRate) {
+    const rate = <H>{captions.borrowRate.pct.toFixed(2)}%</H>;
+    add(
+      "rate",
+      "borrow",
+      captions.borrowRate.avg ? positionNodes("borrow_rate_avg", { rate }) : positionNodes("borrow_rate", { rate }),
     );
   }
 
-  // Accrued interest — the same aggregates the stat captions show ("incl. $X
-  // interest", hidden there below a cent), already included in the balances.
-  {
-    const s = captions?.supplyInterestUsd != null && captions.supplyInterestUsd >= 0.01;
-    const d = hasDebt && captions?.debtInterestUsd != null && captions.debtInterestUsd >= 0.01;
-    if (s || d) {
-      list.push(
-        <>
-          {s && (
-            <>
-              <H>{formatUsd(captions!.supplyInterestUsd as number)}</H> of the collateral is accrued supply interest
-            </>
-          )}
-          {s && d && <> and </>}
-          {d && (
-            <>
-              <H>{formatUsd(captions!.debtInterestUsd as number)}</H> of the debt is accrued borrow interest
-            </>
-          )}{" "}
-          — already included in the figures above:
-          {s && <> supply interest accrues into the exchange rate, growing the cToken claim itself</>}
-          {s && d && <>;</>}
-          {d && <> borrow interest accrues onto the debt between its own events</>}.
-        </>,
-      );
-    }
-  }
-
-  if (liquidationCount != null && liquidationCount > 0) {
-    list.push(
-      <>
-        The account has been liquidated <H>{liquidationCount}</H> time{liquidationCount === 1 ? "" : "s"} and remains
-        open — V2 liquidations are partial by design, and borrowers commonly continue after them.
-      </>,
+  if (liquidationCount != null && liquidationCount > 0)
+    add(
+      "history",
+      "liquidated",
+      positionNodes("liquidated_open", {
+        count: <H>{liquidationCount}</H>,
+        time_word: liquidationCount === 1 ? COMPOUND_V2_WORDS.time_one : COMPOUND_V2_WORDS.time_many,
+      }),
     );
-  }
 
-  if (txCount != null && txCount > 0) {
-    list.push(
-      <>
-        The account has recorded <H>{txCount}</H> transaction{txCount === 1 ? "" : "s"} to date.
-      </>,
-    );
-  }
-
-  // Who has been operating the account, across its whole timeline — the same
+  // Who has been operating the account, across its whole timeline: the same
   // externalActor() verdict each event card renders on its spine, reduced once
-  // so the pane can state the PATTERN rather than one row at a time (charter
-  // §5 item 7).
-  //
-  // Count-first and plurality-safe: an "operated by <name>" template is false
-  // wherever several actors share the work, and an address is never spoken in
-  // place of a name — the fact holds whether or not anything resolves. The
-  // identity stays unbolded: it has no chrome twin on the card, so bolding it
-  // would break the pane's reverse-completeness (charter §3).
-  //
-  // The mechanic is V2's own and is the strictest in the roster: repayBorrowBehalf
-  // is the ONLY entry point that names another account. mint, borrow, redeem and
-  // redeemUnderlying all act on msg.sender alone, so the remaining way value
-  // reaches an account from outside is an ordinary cToken transfer.
-  {
-    const ext = externalActivity;
-    if (ext && ext.external > 0) {
-      const others = ext.external - (ext.actors[0]?.count ?? 0);
-      list.push(
-        <>
-          {operatorLead(ext, null, "on this account’s timeline")}
-          {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-          the owner&rsquo;s. Compound V2 admits exactly one action a third party can take for an account unasked:
-          repaying its borrowing. Supplying, borrowing and redeeming all act on whoever calls them, and V2 has no way to
-          authorise anyone to act for the account — so an outside row here is always someone paying down this debt, or
-          cTokens arriving from another wallet.
-          {ext.actors.length === 1
-            ? leadName
-              ? ` All of it ran through ${leadName}.`
-              : " A single address accounts for all of it."
-            : leadName
-              ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
-              : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
-        </>,
+  // so the pane states the pattern. The count is plural-safe and an address is
+  // never spoken in place of a name; the identity stays unbolded since the
+  // card shows no twin of it.
+  const ext = externalActivity;
+  if (ext && ext.external > 0) {
+    if (ext.external === 1) {
+      add(
+        "history",
+        "operators",
+        positionNodes("operators_one", {
+          external: ext.external.toLocaleString("en-US"),
+          total: ext.total.toLocaleString("en-US"),
+        }),
       );
+      if (leadName) add("history", "operators-who", positionNodes("operators_one_named", { lead_name: leadName }));
+    } else {
+      add(
+        "history",
+        "operators",
+        positionNodes("operators", {
+          external: ext.external.toLocaleString("en-US"),
+          total: ext.total.toLocaleString("en-US"),
+        }),
+      );
+      if (ext.actors.length === 1)
+        add(
+          "history",
+          "operators-who",
+          leadName ? positionNodes("operators_all_named", { lead_name: leadName }) : positionNodes("operators_single"),
+        );
+      else if (leadName)
+        add("history", "operators-who", positionNodes("operators_most_named", { lead_name: leadName }));
+      else
+        add(
+          "history",
+          "operators-who",
+          positionNodes("operators_spread", {
+            actors: ext.actors.length.toLocaleString("en-US"),
+            top_count: ext.actors[0].count.toLocaleString("en-US"),
+          }),
+        );
     }
   }
 
-  if (lead == null && list.length === 0) return null;
+  if (lead == null && bullets.length === 0) return null;
 
-  return <ProseExplainer paragraph={lead} items={list.length > 0 ? list : undefined} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
 
-/** Closed/liquidated mood — narration from the index alone (a terminal
- *  account has no live state to read): the peaks, the closure, the
- *  liquidation record, the door back in. Figures bold only where the card's
- *  chrome shows the same figure (the peaks, the closure date, the counts). */
+/** Closed/liquidated mood: narration from the index alone (a terminal account
+ *  has no live state to read): the peaks and the liquidation record. Figures
+ *  bold where the card's chrome shows the same figure. */
 export function CompoundV2ClosedPositionExplanation({ v }: { v: CompoundV2PositionView }) {
   const liquidated = v.status === "liquidated";
   const peakText = (rs: { amount: number; symbol: string }[]) =>
     rs.map((r, i) => (
       <span key={r.symbol + i}>
-        {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
+        {i > 0 ? (i === rs.length - 1 ? ` ${COMPOUND_V2_WORDS.and} ` : ", ") : ""}
         <H>
           <AmountText value={r.amount} /> {r.symbol}
         </H>
       </span>
     ));
-  const closedDate = formatDate(v.lastActivityAt);
+  const lead = positionNodes(liquidated ? "closed_lead_liquidated" : "closed_lead");
 
-  const lead = liquidated ? (
-    <>This account closed with liquidation in its record — nothing remains supplied or borrowed:</>
-  ) : (
-    <>This account ran its course and closed — nothing remains supplied or borrowed:</>
-  );
-
-  const list: React.ReactNode[] = [];
-  if (v.peakSupplies.length > 0 || v.peakBorrows.length > 0) {
-    list.push(
-      <>
-        At its height the account
-        {v.peakSupplies.length > 0 && <> supplied as much as {peakText(v.peakSupplies)}</>}
-        {v.peakSupplies.length > 0 && v.peakBorrows.length > 0 && <> and</>}
-        {v.peakBorrows.length > 0 && <> owed as much as {peakText(v.peakBorrows)}</>} — each market&rsquo;s own highest
-        point across the account&rsquo;s life.
-      </>,
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
+  if (v.peakSupplies.length > 0)
+    add("history", "supplied", positionNodes("peak_supplied", { peak_supplies: peakText(v.peakSupplies) }));
+  if (v.peakBorrows.length > 0)
+    add("history", "owed", positionNodes("peak_owed", { peak_borrows: peakText(v.peakBorrows) }));
+  if (v.liquidationCount > 0)
+    add(
+      "history",
+      "liquidated",
+      positionNodes("liquidated_n", {
+        count: <H>{v.liquidationCount}</H>,
+        time_word: v.liquidationCount === 1 ? COMPOUND_V2_WORDS.time_one : COMPOUND_V2_WORDS.time_many,
+      }),
     );
-  }
-  if (v.liquidationCount > 0) {
-    list.push(
-      <>
-        The account was liquidated <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}.{" "}
-        {v.liquidations && v.liquidations.length > 0
-          ? liquidationSentences(v.liquidations).join(" ")
-          : "Each time a liquidator repaid part of what it owed and took collateral in exchange."}
-      </>,
-    );
-  }
-  list.push(
-    <>
-      Its last activity landed on <H>{closedDate}</H>, after <H>{v.txCount}</H> transaction
-      {v.txCount === 1 ? "" : "s"}.
-    </>,
-  );
-  list.push(
-    <>The wallet can come back at any time — a new supply or borrow reopens this same account&rsquo;s timeline.</>,
-  );
 
-  return <ProseExplainer paragraph={lead} items={list} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }

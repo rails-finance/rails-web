@@ -286,7 +286,14 @@ export function CompoundPositionExplanation({
   const ext = externalActivity;
   if (ext && ext.external > 0) {
     if (ext.external === 1) {
-      add("history", "operators", positionNodes("operators_one", { total: ext.total.toLocaleString("en-US") }));
+      add(
+        "history",
+        "operators",
+        positionNodes("operators_one", {
+          external: ext.external.toLocaleString("en-US"),
+          total: ext.total.toLocaleString("en-US"),
+        }),
+      );
       if (leadName) add("history", "operators-who", positionNodes("operators_one_named", { lead_name: leadName }));
     } else {
       add(
