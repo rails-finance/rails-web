@@ -327,6 +327,35 @@ export const absorbPriceProv = (
   ]),
 });
 
+/** The moved asset's USD price at the event's block, as the Lifetime flows
+ *  panel reads it (/api/compound/prices-at, the archive for a block not
+ *  stored yet). */
+export const cometPriceAtBlockProv = (sym: string, coords: CompoundCoords): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  verify: stateVerify("getPrice", coords.blockNumber),
+  summary: `${sym} price in USD at this event's block — the Comet's \`getPrice\` on the asset's configured price feed${atBlock(coords)}, in the market's quote unit; an ETH-quoted market's figure is multiplied by Comet's WETH/USD at the same block.`,
+  contract: cometContract(coords),
+  via: `Comet · getAssetInfoByAddress(asset).priceFeed → getPrice${atBlock(coords)}`,
+  inputs: eventInputs(coords),
+});
+
+/** A side's figure at an event from the position's replay: an asset this
+ *  event left alone, or the side's dollars where it holds several. */
+export const replayHeldProv = (
+  side: "collateral" | "debt",
+  before: boolean,
+  coords: CompoundCoords,
+  sym?: string,
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} this event${sym ? ` in ${sym}` : ", in USD"} — what the account ${side === "collateral" ? "held" : "owed"} ${before ? "just before the transaction ran" : "once the transaction had run"}, from the position's replay of its rows${sym ? "" : ": each asset's balance at Comet's oracle price at its latest priced row"}.`,
+  contract: cometContract(coords),
+  via: "the position's replay of its rows (lib/compound/flows.ts)",
+  inputs: eventInputs(coords),
+});
+
 // ── balances after an event (replay) ─────────────────────────────────────────
 
 /** Signed BASE balance AFTER this event. Ethereum (the index): the chain's

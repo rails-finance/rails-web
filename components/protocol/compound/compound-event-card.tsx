@@ -1,12 +1,14 @@
 "use client";
 
-// Composer: wires the Comet header / detail into the universal EventCard shell,
-// plus the Plain English explainer + Learn More modal (reference depth).
+// Composer: fills the shared event card's slots (components/shared/
+// event-card.tsx; ui-jobs 309) from a Comet event: the head, the Collateral
+// and Debt ledger cells, the rate note and the absorb breakdown as notes, the
+// price row, the explanation and the Learn More modal.
 
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type CompoundCoords } from "@/lib/compound/event-provenance";
@@ -14,9 +16,8 @@ import { useCometMarket } from "@/lib/compound/deployment-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { compoundExplainerTeaser, type CompoundEvent } from "@/lib/compound/explainer-clauses";
-import { CompoundEventHeader } from "./compound-event-header";
-import { CompoundEventDetail } from "./compound-event-detail";
-import { CompoundLedgerProvider } from "./compound-ledger";
+import { useCompoundHeadSpec } from "./compound-event-header";
+import { useCompoundCells } from "./compound-event-detail";
 import type { CompoundPreviousRow } from "./compound-absorb-breakdown";
 import { CompoundEventExplainer, compoundLearnMoreContent } from "./compound-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -130,59 +131,63 @@ export function CompoundEventCard({
             },
           ];
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isLiq
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
+  const head = useCompoundHeadSpec({
+    actionLabel: compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals),
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+  });
   // The collateral and debt cells open into their ledgers where the page ties
   // its timeline to the Lifetime flows panel.
-  return (
-    <CompoundLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? undefined}
-        iconColumn={iconSlot}
-        header={
-          <CompoundEventHeader
-            actionLabel={compoundRowLabel(ctx, event.actionLabel ?? "", m.baseDecimals)}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-          />
-        }
-        detail={
-          <CompoundEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            timestamp={event.timestamp}
-            eventId={event.id}
-            previous={prevRow(previous)}
-            previousTx={prevRow(previousTx)}
-          />
-        }
-        explainer={
-          <CompoundEventExplainer
-            ctx={ctx}
-            event={event}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            siblings={sibs}
-            skipLead
-          />
-        }
-        explainerTeaser={compoundExplainerTeaser(ctx, coords, sibs, event, m)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={compoundLearnMoreContent(ctx)} />}
-        persistKey={`compound:${event.id}`}
-      />
-    </CompoundLedgerProvider>
-  );
+  const { cells, ledgers, notes, prices } = useCompoundCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    timestamp: event.timestamp,
+    eventId: event.id,
+    previous: prevRow(previous),
+    previousTx: prevRow(previousTx),
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "compound",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells,
+    ledgers,
+    notes,
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
+    explainer: {
+      body: (
+        <CompoundEventExplainer
+          ctx={ctx}
+          event={event}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          siblings={sibs}
+          skipLead
+        />
+      ),
+      first: compoundExplainerTeaser(ctx, coords, sibs, event, m) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={compoundLearnMoreContent(ctx)} />,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }
