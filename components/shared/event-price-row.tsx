@@ -32,6 +32,15 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
+  /** The family's price format, for the figure then and today; whole
+   *  dollars where unset. */
+  format?: (usd: number) => string;
+  /** The figure as the family states it, in another unit than the dollar
+   *  ("1.080123" USDS for one sUSDS) or pinned ("≈$1.0000"): drawn as it
+   *  is, with no today press. */
+  text?: string;
+  /** Words before the figure ("1 sUSDS ="). */
+  lead?: string;
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -113,6 +122,33 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
   const { gas, prices, outcome } = price;
   const claimable = outcome?.claimable;
   const pl = outcome?.pl;
+  const chips = prices.map((p) => {
+    const icon = <TokenChipIcon symbol={p.symbol} size={14} />;
+    const format = p.format ?? usdWhole;
+    const figure = p.text ?? format(p.usd);
+    return (
+      <PriceChipShell key={`${p.lead ?? ""}${p.symbol}`} bare title={p.title}>
+        {p.lead && <span className="font-normal">{p.lead}</span>}
+        <ThenTodayChip
+          symbol={p.symbol}
+          format={format}
+          noToday={p.text != null}
+          then={
+            p.info ? (
+              <Prov info={p.info} value={p.value} icon={icon}>
+                {figure}
+              </Prov>
+            ) : (
+              <span className="inline-flex items-center gap-1">
+                {figure}
+                {icon}
+              </span>
+            )
+          }
+        />
+      </PriceChipShell>
+    );
+  });
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
@@ -136,29 +172,12 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
             )}
           </div>
         )}
-        {prices.map((p) => {
-          const icon = <TokenChipIcon symbol={p.symbol} size={14} />;
-          return (
-            <PriceChipShell key={p.symbol} bare title={p.title}>
-              <ThenTodayChip
-                symbol={p.symbol}
-                format={usdWhole}
-                then={
-                  p.info ? (
-                    <Prov info={p.info} value={p.value} icon={icon}>
-                      {usdWhole(p.usd)}
-                    </Prov>
-                  ) : (
-                    <span className="inline-flex items-center gap-1">
-                      {usdWhole(p.usd)}
-                      {icon}
-                    </span>
-                  )
-                }
-              />
-            </PriceChipShell>
-          );
-        })}
+        {/* Several chips stand together at the row's right end. */}
+        {prices.length > 1 ? (
+          <div className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">{chips}</div>
+        ) : (
+          chips
+        )}
       </div>
       {outcome?.today && (
         <div className="px-4 pb-2 text-xs text-rb-500" data-redemption-today="">

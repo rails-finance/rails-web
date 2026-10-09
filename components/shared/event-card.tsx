@@ -65,6 +65,9 @@ export interface EventCardEvent {
   blockNumber?: number;
   timestamp: number;
   number?: number;
+  /** The last of the card's event numbers, where it draws several logs (one
+   *  transaction's): the number reads "7–8". */
+  numberLast?: number;
 }
 
 /** Who acted, where the owner did not. */
@@ -99,7 +102,8 @@ export interface EventCardSlots {
   spine: SpineColumnProps;
   /** T1's head row, drawn by the shared `ChainTruthRow`. */
   head: ChainTruthRowSpec;
-  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"). */
+  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"); empty, the
+   *  timeline's word for the event. */
   caption: string;
   actor?: EventCardActor;
   /** T2's grid: the ordered cells, the cells to come while their figures are
@@ -200,6 +204,7 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
         spec={slots.head}
         timestamp={event.timestamp}
         eventNumber={event.number}
+        eventNumberLast={event.numberLast}
         variant={pageMode ? "page" : "row"}
       />
     ),
@@ -216,7 +221,8 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
     txHash: event.txHash,
     learnMore: slots.learnMore,
     persistKey: `${event.family}:${event.id}`,
-    caption: slots.caption,
+    // An empty kind leaves the timeline's word for the event.
+    caption: slots.caption || undefined,
     by: actor?.by,
     byOwner: actor?.byOwner,
     custody: actor?.custody,

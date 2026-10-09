@@ -56,6 +56,9 @@ export interface EventCellValue {
   none?: string;
   /** The token whose icon follows the after. */
   icon?: string;
+  /** Several lines in place of one figure, one per reserve, each drawn by
+   *  the family (Aave V4's Collateral and Debt). */
+  lines?: ReactNode[];
 }
 
 interface EventCellCommon {
@@ -70,6 +73,11 @@ interface EventCellCommon {
   value: EventCellValue;
   /** Lines under the value, each in the tone of what it qualifies. */
   sub?: { content: ReactNode; changed?: boolean }[];
+  /** The cell's tip, on its heading (a reading's block). */
+  tip?: string;
+  /** A stable handle a verifier reads the cell by: `data-figure` on the cell
+   *  and `data-figure-value` on its value. */
+  figure?: string;
 }
 
 export interface EventLedgerCellSpec extends EventCellCommon {
@@ -135,6 +143,14 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
   };
   const before = v.before;
   const icon = v.icon ? <TokenChipIcon symbol={v.icon} size={16} /> : undefined;
+  if (v.lines)
+    return (
+      <div className="flex flex-col gap-1">
+        {v.lines.map((l, i) => (
+          <div key={i}>{l}</div>
+        ))}
+      </div>
+    );
   return (
     <>
       {v.lead != null ? (
@@ -174,22 +190,33 @@ function Cell({ cell, heading }: { cell: EventCellSpec; heading: boolean }) {
       {s.content}
     </StatSubline>
   ));
+  const label = cell.tip ? <span title={cell.tip}>{cell.label}</span> : cell.label;
+  const data = cell.figure ? { "data-figure": cell.figure } : undefined;
+  const value = (node: ReactNode) => (cell.figure ? <div data-figure-value="">{node}</div> : node);
   if (cell.kind === "ledger")
     return (
-      <LedgerCell label={cell.label} side={cell.side} changed={heading}>
-        <StateTransition>
-          <ClosedTokens usd={cell.usd}>
-            <CellValue cell={cell} />
-          </ClosedTokens>
-        </StateTransition>
+      <LedgerCell label={label} side={cell.side} changed={heading} data={data}>
+        {value(
+          <StateTransition>
+            <ClosedTokens usd={cell.usd}>
+              <CellValue cell={cell} />
+            </ClosedTokens>
+          </StateTransition>,
+        )}
         {subs}
       </LedgerCell>
     );
   return (
-    <StatCard label={cell.label} changed={heading}>
-      <StateTransition>
-        <CellValue cell={cell} />
-      </StateTransition>
+    <StatCard label={label} changed={heading} data={data}>
+      {value(
+        cell.value.lines ? (
+          <CellValue cell={cell} />
+        ) : (
+          <StateTransition>
+            <CellValue cell={cell} />
+          </StateTransition>
+        ),
+      )}
       {subs}
     </StatCard>
   );
