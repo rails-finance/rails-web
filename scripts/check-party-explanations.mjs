@@ -184,6 +184,13 @@ function read(p) {
   }
 }
 
+/** The text of a family's strings file with its comment lines dropped, or
+ *  null where the family has none. */
+function stringsFileProse(proto) {
+  const text = read(join("content", proto, "event-prose.yaml"));
+  return text ? text.replace(/^[ \t]*#.*$/gm, " ") : null;
+}
+
 function listDir(p) {
   try {
     return readdirSync(p);
@@ -223,18 +230,6 @@ function proseOf(src) {
   }
   for (const m of code.matchAll(/"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)) runs.push(m[1] ?? m[2]);
   return runs.join(" ").replace(/\s+/g, " ");
-}
-
-/** The lines of a strings file's top-level sections, by name. */
-function yamlSections(text, names) {
-  const out = [];
-  let inside = false;
-  for (const line of text.split("\n")) {
-    const top = /^([A-Za-z_0-9]+):/.exec(line);
-    if (top) inside = names.includes(top[1]);
-    else if (inside && !/^\s*#/.test(line)) out.push(line);
-  }
-  return out.join("\n");
 }
 
 const protocols = listDir(COMPONENTS)
@@ -301,28 +296,28 @@ for (const proto of protocols) {
   }
   const positionPanes = compFiles.filter((f) => f.endsWith("-position-explanation.tsx")).map((f) => join(compDir, f));
 
-  // A family whose words moved into content/<proto>/event-prose.yaml: the event
-  // pane is the generator (which reads the actor signal) with the file's
-  // sentences, the position pane its component with the file's position words.
-  const strings = read(join("content", proto, "event-prose.yaml"));
-  const generator = join(LIB, proto, "event-prose.ts");
-  const stringsEvent =
-    strings && existsSync(generator)
-      ? `${stripComments(read(generator))}\n${yamlSections(strings, ["shared_sentences", "templates"])}`
-      : null;
-  const stringsPosition = strings ? yamlSections(strings, ["position_words"]) : "";
+  // A family whose words moved into a strings file (content/<proto>/event-prose.yaml,
+  // ui-jobs 314) says them there: the generator that picks the sentences is its
+  // event pane, and the file's text is what both panes print.
+  const strings = stringsFileProse(proto);
+  if (strings) {
+    const generator = join(LIB, proto, "event-prose.ts");
+    if (existsSync(generator)) eventPane = generator;
+  }
 
   const paneProse = {
-    event: existsSync(eventPane) ? stripComments(read(eventPane)) : stringsEvent,
+    event: existsSync(eventPane) ? stripComments(read(eventPane)) + (strings ? `\n${strings}` : "") : null,
     position:
       positionPanes.length > 0
-        ? positionPanes.map((f) => stripComments(read(f))).join("\n") + "\n" + stringsPosition
+        ? positionPanes.map((f) => stripComments(read(f))).join("\n") + (strings ? `\n${strings}` : "")
         : null,
   };
   const paneText = {
-    event: existsSync(eventPane) ? proseOf(read(eventPane)) : stringsEvent,
+    event: existsSync(eventPane) ? proseOf(read(eventPane)) + (strings ? ` ${strings}` : "") : null,
     position:
-      positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") + " " + stringsPosition : null,
+      positionPanes.length > 0
+        ? positionPanes.map((f) => proseOf(read(f))).join(" ") + (strings ? ` ${strings}` : "")
+        : null,
   };
 
   const checks = [];
@@ -408,7 +403,11 @@ for (const proto of protocols) {
     const src = stripComments(read(join(compDir, file)));
     if (!/ExternalActorSummary/.test(src)) continue;
     const handRolled = /"Of those/.test(src);
-    const routed = /\boperatorLead\(/.test(src);
+    // A strings file states a denominator: the count of the others' events
+    // beside the position's total, in one sentence.
+    const strings = stringsFileProse(proto);
+    const routed =
+      /\boperatorLead\(/.test(src) || (strings != null && /\{external\}[^\n]*\{total\}|\{total\}[^\n]*\{external\}/.test(strings));
     if (handRolled || !routed) {
       gaps++;
       const why = handRolled

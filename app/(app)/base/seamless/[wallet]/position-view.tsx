@@ -13,9 +13,9 @@
 // finished business in the part that matters — the supplies and borrows are all
 // behind it — even though the timeline is not frozen: repayments, withdrawals
 // and liquidations remain possible on a frozen reserve, so events keep arriving
-// and the sweep runs to the head like any other. The card's explanation
-// drawer says so once (<AaveV3PoolNotes frozen>), rather than the card face
-// differing from every other Aave-shaped card.
+// and the sweep runs to the head like any other. The card's "?" says so once
+// (content/aave-v3/event-prose.yaml, the position modals' Seamless wording),
+// rather than the card face differing from every other Aave-shaped card.
 //
 // Three reads, in the order they can answer: the Pool (fast, feeds the card),
 // the history (feeds the timeline, the Lifetime flows panel and the card's
@@ -37,7 +37,6 @@ import {
   AaveV3ClosedPositionExplanation,
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3PoolNotes, type AaveV3FrozenMarket } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
 import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
@@ -81,13 +80,7 @@ import { computeAaveV3CardCaptions, unpricedAaveV3FlowAddresses } from "@/lib/aa
 import { v3ViewFromChain, type V3SweptHistory } from "@/lib/aave-v3/chain-position-view";
 import { V3PoolProvider, type V3PoolIdentity } from "@/lib/aave-v3/pool-context";
 import { SEAMLESS_LIVE_CARD_DEPLOYMENT } from "@/lib/seamless/position-provenance";
-import {
-  SEAMLESS_CHAIN_ID,
-  SEAMLESS_FREEZE_BLOCK,
-  SEAMLESS_FREEZE_DATE,
-  SEAMLESS_FREEZE_TX,
-  SEAMLESS_POOL,
-} from "@/lib/seamless/asset-catalog";
+import { SEAMLESS_CHAIN_ID, SEAMLESS_POOL } from "@/lib/seamless/asset-catalog";
 import { fetchAaveV3Position, type AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 import {
   ChainTimelineUnavailable,
@@ -131,14 +124,6 @@ const POOL_IDENTITY: V3PoolIdentity = {
   protocol: "Seamless",
   address: SEAMLESS_POOL,
   positionRoute: POSITION_ROUTE,
-};
-
-/** The freeze, for the explanation drawer's one Seamless-specific sentence. */
-const FROZEN: AaveV3FrozenMarket = {
-  chainId: SEAMLESS_CHAIN_ID,
-  tx: SEAMLESS_FREEZE_TX,
-  block: SEAMLESS_FREEZE_BLOCK,
-  date: SEAMLESS_FREEZE_DATE,
 };
 
 /** What the card's transaction count counts, where the rows are not all in hand. */
@@ -678,26 +663,15 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                     // backs nothing (pre-3.2 accounting here), and the freeze.
                     explanation={
                       view.status !== "open" ? (
-                        <>
-                          <AaveV3ClosedPositionExplanation
-                            v={view}
-                            events={aaveEvents}
-                            folders={servedFolders}
-                            marketPhrase="Seamless market"
-                          />
-                          <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
-                        </>
+                        <AaveV3ClosedPositionExplanation v={view} events={aaveEvents} folders={servedFolders} />
                       ) : (
-                        <>
-                          <AaveV3PositionExplanation
-                            chain={data}
-                            captions={captions}
-                            view={view}
-                            externalActivity={externalActivity}
-                            lastBorrowRate={lastBorrowRate}
-                          />
-                          <AaveV3PoolNotes chain={data} collateralAccounting="pre-3.2" frozen={FROZEN} />
-                        </>
+                        <AaveV3PositionExplanation
+                          chain={data}
+                          captions={captions}
+                          view={view}
+                          externalActivity={externalActivity}
+                          lastBorrowRate={lastBorrowRate}
+                        />
                       )
                     }
                   />

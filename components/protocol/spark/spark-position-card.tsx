@@ -41,7 +41,7 @@ import {
 } from "@/lib/spark/event-provenance";
 import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark/position-provenance";
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
-import { sparkPositionContent } from "@/lib/spark/position-content";
+import { sparkPositionModal } from "@/lib/spark/event-templates";
 import { formatUsd } from "@/lib/shared/format-event";
 import { fmtLiqPrice, hfLabelV4 } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -502,7 +502,7 @@ export function SparkPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={sparkPositionContent({ status: v.status })}
+        learnMore={sparkPositionModal(v.status)}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -594,7 +594,7 @@ export function SparkPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={sparkPositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
+      learnMore={sparkPositionModal(v.status, v.borrows.length > 0)}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

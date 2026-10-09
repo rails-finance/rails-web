@@ -38,7 +38,15 @@ export type Rounding =
   | "units2"
   | "ratio_frac"
   | "morpho_amount"
-  | "fall_pct";
+  | "fall_pct"
+  | "token"
+  | "token_leg"
+  | "token_pos"
+  | "compound_amount"
+  | "number"
+  | "usd_value"
+  | "pct_plain"
+  | "hf";
 
 export type ProseValue = number | string | null;
 

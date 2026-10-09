@@ -1,0 +1,1296 @@
+# SparkLend prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a SparkLend account. The page reads
+# this file and nothing else; the code chooses which strings to say and fills
+# their figures (lib/spark/event-prose.ts for an event,
+# components/protocol/spark/spark-position-explanation.tsx for the position
+# card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  number: |-
+    a token amount as the site prints it (113.438, 44,912.562)
+  usd: |-
+    whole dollars ($4,490)
+  usd_cents: |-
+    dollars and cents ($1,143.12)
+  pct_plain: |-
+    a fraction as a percent, up to two places (0.078 → 7.8%)
+  hf: |-
+    a health factor as the card prints it (1.0848, 2.60, >100)
+  count: |-
+    a whole number, grouped (1,204)
+  date: |-
+    a UTC day (1 Sep 2025)
+  address: |-
+    an address, shortened and linked to the explorer
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  amount:
+    rounding: number
+    means: |-
+      the tokens the event moved, as the header prints it
+  symbol:
+    rounding: text
+    means: |-
+      the reserve's token symbol
+  coll_symbol:
+    rounding: text
+    means: |-
+      the collateral's token symbol on a liquidation
+  debt_symbol:
+    rounding: text
+    means: |-
+      the repaid debt's token symbol on a liquidation
+  seized:
+    rounding: number
+    means: |-
+      the collateral the liquidator received
+  cleared:
+    rounding: number
+    means: |-
+      the debt the liquidator repaid
+  fee:
+    rounding: number
+    means: |-
+      the collateral the Pool paid the Spark treasury as the liquidation's fee
+  fee_share:
+    rounding: pct_plain
+    means: |-
+      the share of the liquidation bonus SparkLend keeps as its fee
+  bonus:
+    rounding: pct_plain
+    means: |-
+      the collateral's liquidation bonus
+  premium:
+    rounding: pct_plain
+    means: |-
+      how much more the collateral taken was worth than the debt repaid
+  net_usd:
+    rounding: usd_cents
+    means: |-
+      the collateral given up less the debt cleared, at the block's prices
+  ltv:
+    rounding: pct_plain
+    means: |-
+      the share of the reserve's value that can back borrowing, or the account's loan-to-value on the position card
+  lt:
+    rounding: pct_plain
+    means: |-
+      the share of a reserve's value SparkLend counts toward covering debt
+  move:
+    rounding: pct_plain
+    means: |-
+      how far the collateral's oracle price moved since the previous event
+  move_symbol:
+    rounding: text
+    means: |-
+      the collateral whose price moved
+  hf_call:
+    rounding: hf
+    means: |-
+      the health factor when the liquidator called
+  hf_after:
+    rounding: hf
+    means: |-
+      the health factor once the transaction had run
+  fall_before:
+    rounding: pct_plain
+    means: |-
+      how far the collateral's value could fall against the debt before liquidation, before the event
+  fall_after:
+    rounding: pct_plain
+    means: |-
+      the same after the event
+  rate:
+    rounding: pct_plain
+    means: |-
+      the variable borrow rate a year
+  emode_from:
+    rounding: text
+    means: |-
+      the e-mode category the account was in
+  emode_to:
+    rounding: text
+    means: |-
+      the e-mode category the account moved to
+  liquidator:
+    rounding: address
+    means: |-
+      the account that called the liquidation
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  hf:
+    rounding: hf
+    means: |-
+      the account's health factor now
+  coll_usd:
+    rounding: usd
+    means: |-
+      the collateral at SparkLend's oracle prices now
+  coll_syms:
+    rounding: text
+    means: |-
+      the collateral assets, named
+  coll_count:
+    rounding: count
+    means: |-
+      how many collateral assets there are
+  debt_usd:
+    rounding: usd
+    means: |-
+      the debt at SparkLend's oracle prices now
+  debt_syms:
+    rounding: text
+    means: |-
+      the borrowed assets, named
+  debt_count:
+    rounding: count
+    means: |-
+      how many assets are borrowed
+  max_ltv:
+    rounding: pct_plain
+    means: |-
+      the most the account may borrow, as a share of its collateral's value
+  emode:
+    rounding: text
+    means: |-
+      the e-mode category the account is in
+  drop:
+    rounding: pct_plain
+    means: |-
+      how far the collateral's value can fall against the debt before liquidation
+  liq_price:
+    rounding: usd_cents
+    means: |-
+      the collateral's price at which a single-asset account is liquidated
+  room:
+    rounding: usd
+    means: |-
+      what the account could still borrow at current prices
+  tx_count:
+    rounding: count
+    means: |-
+      the account's transactions
+  tx_word:
+    rounding: text
+    means: |-
+      transaction or transactions
+  lead:
+    rounding: text
+    means: |-
+      the words that open the operator bullet, naming the events it counts
+  external:
+    rounding: count
+    means: |-
+      the events another account executed
+  were:
+    rounding: text
+    means: |-
+      was or were
+  peak_supply:
+    rounding: number
+    means: |-
+      the most each reserve supplied over the account's life, as the card prints it
+  peak_debt:
+    rounding: number
+    means: |-
+      the most each reserve owed over the account's life, as the card prints it
+  liq_count:
+    rounding: count
+    means: |-
+      the liquidations over the account's life
+  time_word:
+    rounding: text
+    means: |-
+      time or times
+  repays:
+    rounding: count
+    means: |-
+      the owner's repayments after the last liquidation
+  repay_word:
+    rounding: text
+    means: |-
+      repay or repays
+  withdrawals:
+    rounding: count
+    means: |-
+      the owner's withdrawals after the last liquidation
+  withdrawal_word:
+    rounding: text
+    means: |-
+      withdrawal or withdrawals
+  closed_on:
+    rounding: date
+    means: |-
+      the day the account's record closed
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  emode_none: |-
+    no e-mode category
+  emode_the: |-
+    the
+  emode_post: |-
+    e-mode category
+  unread: |-
+    The health factor before and after this transaction was not read. Reload to try again.
+  and: |-
+    and
+  was: |-
+    was
+  were: |-
+    were
+  tx_one: |-
+    transaction
+  tx_many: |-
+    transactions
+  time_one: |-
+    time
+  time_many: |-
+    times
+  repay_one: |-
+    repay
+  repay_many: |-
+    repays
+  withdrawal_one: |-
+    withdrawal
+  withdrawal_many: |-
+    withdrawals
+  more_one: |-
+    more reserve
+  more_many: |-
+    more reserves
+  operator_where: |-
+    on this account's timeline
+  verb_sent: |-
+    Sent
+  ledgers_fee: |-
+    A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card.
+  ledgers_shared: |-
+    Another of the owner's transactions shares this block, so the account is not read: the cells state the event's balances.
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk, Rate and History when two of them hold two or more
+# bullets. Risk holds at most four: borrowing against the limit, the fall to
+# liquidation, the room to borrow and the e-mode category. The health factor
+# stands in the lead. A closed account carries the lead and History.
+# Read by positionWords / positionNodes (lib/spark/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── The pane before the Pool read lands ──
+  reading: |-
+    Reading the account from the Pool…
+  unread: |-
+    The account was not read from the Pool. Reload to try again.
+  # ── An open account ──
+  lead_debt: |-
+    The account borrows against its supplied collateral, held at a {hf} health factor:
+  lead_debt_unread: |-
+    The account borrows against its supplied collateral:
+  lead_no_debt: |-
+    The account supplies collateral only and owes nothing, so none of it can be liquidated:
+  coll: |-
+    The collateral is worth {coll_usd}, held in {coll_syms}.
+  coll_many: |-
+    The collateral is worth {coll_usd}, spread across {coll_count} assets.
+  debt: |-
+    The debt is {debt_usd}, owed in {debt_syms}.
+  debt_many: |-
+    The debt is {debt_usd}, owed across {debt_count} assets.
+  ltv: |-
+    Borrowing stands at {ltv} of the collateral's value, against the {max_ltv} limit.
+  ltv_emode: |-
+    Borrowing stands at {ltv} of the collateral's value, against the {max_ltv} limit of the {emode} e-mode category.
+  drop: |-
+    A fall of about {drop} in the collateral's value against the debt would make the account liquidatable.
+  drop_single: |-
+    A fall of about {drop} in {symbol}, to {liq_price}, would make the account liquidatable.
+  capacity: |-
+    About {room} more could be borrowed at current prices.
+  rate: |-
+    The debt accrues at a {rate} borrow rate.
+  rate_avg: |-
+    The debts accrue at a {rate} average borrow rate.
+  history_cycling: |-
+    Most of its {tx_count} transactions were repeated borrowing and repaying.
+  history_flows: |-
+    Most of its {tx_count} transactions were supplying and withdrawing.
+  operators: |-
+    {lead}{external} {were} executed by an address other than the owner's.
+  # ── A closed or liquidated account ──
+  closed_lead_transfers: |-
+    This account's record has no Pool transaction: its balances arrived and left as spToken transfers:
+  closed_lead_transfer_out: |-
+    This account's record ended with its supplied balance moving to another account as an spToken transfer:
+  closed_lead_seized: |-
+    A liquidation took the last of this account's collateral to cover its debt:
+  closed_lead_liquidated: |-
+    This account closed with its debt repaid and its balances withdrawn, after at least one liquidation:
+  closed_lead_borrowed: |-
+    This account closed with its debt repaid and its collateral withdrawn:
+  closed_lead_supplied: |-
+    This account closed with its supplied balances withdrawn and nothing ever borrowed:
+  peaks_both: |-
+    At its height it held {peak_supply} supplied and owed {peak_debt}.
+  peaks_supply: |-
+    At its height it held {peak_supply} supplied.
+  peaks_debt: |-
+    At its height it owed {peak_debt} and held no lasting supply.
+  liquidated_times: |-
+    It was liquidated {liq_count} {time_word}, which is why its outcome reads Liquidated.
+  wind_both: |-
+    Afterwards the owner closed the account with {repays} {repay_word} and {withdrawals} {withdrawal_word}.
+  wind_repays: |-
+    Afterwards the owner closed the account with {repays} {repay_word}.
+  wind_withdrawals: |-
+    Afterwards the owner closed the account with {withdrawals} {withdrawal_word}.
+  closure_tx: |-
+    Its record closed on {closed_on}, after {tx_count} {tx_word}.
+  closure_liq_only: |-
+    Its record closed on {closed_on}; the liquidation calls are its only recorded events.
+  closure: |-
+    Its record closed on {closed_on}.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  hf.safer:
+    when: |-
+      the event raised the health factor, and the state read landed
+    text: |-
+      The account is safer: collateral value could now fall {fall_after} against the debt before liquidation, up from {fall_before}.
+  hf.less_safe:
+    when: |-
+      the event lowered the health factor, and the state read landed
+    text: |-
+      The account is less safe: collateral value could now fall {fall_after} against the debt before liquidation, down from {fall_before}.
+  hf.first:
+    when: |-
+      the account had no debt before and has some now
+    text: |-
+      The account now has debt: a {fall_after} fall in collateral value against it would make the account liquidatable.
+  hf.none:
+    when: |-
+      the account had debt before and has none now
+    text: |-
+      With no debt left, the account has no health factor and cannot be liquidated.
+  emode.between:
+    when: |-
+      the account changed e-mode category between the previous event and this one
+    text: |-
+      Since the previous event the account moved from {emode_from} to {emode_to}, a change the timeline has no row for.
+  emode.now:
+    when: |-
+      the account changed e-mode category in this transaction
+    text: |-
+      In this transaction the account moved from {emode_from} to {emode_to}.
+  delegated.add:
+    when: |-
+      another account sent the supply or repayment
+    text: |-
+      Another account executed this on the owner's behalf; supplying and repaying need no approval.
+  coll.on:
+    when: |-
+      the reserve's collateral switch is on and its liquidation threshold is above 1%
+    text: |-
+      The {symbol} counts as collateral, lending up to {ltv} of its value.
+  coll.off:
+    when: |-
+      the reserve's collateral switch is off
+    text: |-
+      The {symbol} does not back borrowing: its collateral switch is off, so it earns the supply rate only.
+  coll.zero:
+    when: |-
+      the switch is on and SparkLend gives the reserve a liquidation threshold of 0
+    text: |-
+      The {symbol} backs no borrowing: SparkLend counts it at 0% of its value, so it earns the supply rate only.
+  coll.low:
+    when: |-
+      the switch is on and the liquidation threshold is below 1%
+    text: |-
+      The {symbol} backs almost nothing: SparkLend counts it at {lt} of its value.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: spark.supply
+    title: |-
+      Supply
+    when: |-
+      supply
+    L5: supply
+    variants:
+      default: |-
+        always
+    sentences:
+      supply.what:
+        when: |-
+          always
+        text: |-
+          Supplied {amount} {symbol} to SparkLend.
+    order:
+      - supply.what
+      - delegated.add
+      - coll.on
+      - coll.off
+      - coll.zero
+      - coll.low
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [supply.what, delegated.add]
+      leaves: [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [coll.on, coll.off, coll.zero, coll.low]
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.withdraw
+    title: |-
+      Withdraw
+    when: |-
+      withdraw
+    L5: withdraw
+    variants:
+      partial: |-
+        the position still supplies some of the reserve
+      empty: |-
+        the withdrawal emptied the reserve
+    sentences:
+      withdraw.what:
+        when: |-
+          partial
+        text: |-
+          Withdrew {amount} {symbol} from SparkLend.
+      withdraw.what_empty:
+        when: |-
+          empty
+        text: |-
+          Withdrew {amount} {symbol} from SparkLend, emptying the position's supplied {symbol}.
+    order:
+      - withdraw.what
+      - withdraw.what_empty
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [withdraw.what, withdraw.what_empty]
+      leaves: [emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [withdraw.what, withdraw.what_empty]
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.borrow
+    title: |-
+      Borrow
+    when: |-
+      borrow
+    L5: borrow
+    variants:
+      default: |-
+        always
+    sentences:
+      borrow.what:
+        when: |-
+          always
+        text: |-
+          Borrowed {amount} {symbol} against the account's collateral.
+      borrow.rate:
+        when: |-
+          the row carries a variable borrow rate above 0
+        text: |-
+          The variable borrow rate at the time was {rate} a year.
+      delegated.borrow:
+        when: |-
+          another account sent the borrow
+        text: |-
+          Another account borrowed on the owner's behalf, using credit the owner had delegated to it.
+    order:
+      - borrow.what
+      - delegated.borrow
+      - borrow.rate
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [borrow.what, delegated.borrow]
+      leaves: [borrow.rate, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: repay
+    variants:
+      partial: |-
+        some of the reserve's debt remains
+      full: |-
+        the repayment cleared the reserve's debt
+    sentences:
+      repay.what:
+        when: |-
+          the wallet paid
+        text: |-
+          Repaid {amount} {symbol} of the account's debt.
+      repay.what_sptokens:
+        when: |-
+          the account paid from its spToken balance
+        text: |-
+          Repaid {amount} {symbol} of the account's debt using spTokens.
+      repay.cleared:
+        when: |-
+          full
+        text: |-
+          The account's {symbol} debt is cleared in full.
+    order:
+      - repay.what
+      - repay.what_sptokens
+      - delegated.add
+      - repay.cleared
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [repay.what, repay.what_sptokens, delegated.add]
+      leaves: [repay.cleared, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [repay.what, repay.what_sptokens]
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.transfer_in
+    title: |-
+      Transfer in
+    when: |-
+      transfer_in
+    L5: transfer
+    variants:
+      default: |-
+        always
+    sentences:
+      transfer_in.what:
+        when: |-
+          always
+        text: |-
+          Received {amount} {symbol} from another account as an spToken transfer.
+    order:
+      - transfer_in.what
+      - coll.on
+      - coll.off
+      - coll.zero
+      - coll.low
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [transfer_in.what]
+      leaves: [coll.on, coll.off, coll.zero, coll.low, emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [coll.on, coll.off, coll.zero, coll.low]
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.transfer_out
+    title: |-
+      Transfer out
+    when: |-
+      transfer_out to another account
+    L5: transfer
+    variants:
+      default: |-
+        always
+    sentences:
+      transfer_out.what:
+        when: |-
+          always
+        text: |-
+          Sent {amount} {symbol} to another account as an spToken transfer.
+    order:
+      - transfer_out.what
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [transfer_out.what]
+      leaves: [emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.gateway
+    title: |-
+      Withdraw as ETH
+    when: |-
+      transfer_out of WETH to the Spark WETH gateway
+    L5: withdraw
+    variants:
+      default: |-
+        always
+    sentences:
+      gateway.what:
+        when: |-
+          always
+        text: |-
+          Withdrew {amount} {symbol} as ETH through the Spark WETH gateway, the router Spark uses for ETH.
+      gateway.counts:
+        when: |-
+          always
+        text: |-
+          The Lifetime flows count this transfer as a withdrawal.
+    order:
+      - gateway.what
+      - gateway.counts
+      - emode.between
+      - emode.now
+      - hf.safer
+      - hf.less_safe
+      - hf.first
+      - hf.none
+    groups:
+      happened: [gateway.what, gateway.counts]
+      leaves: [emode.between, emode.now, hf.safer, hf.less_safe, hf.first, hf.none]
+    alternates:
+      - [emode.between, emode.now]
+      - [hf.safer, hf.less_safe, hf.first, hf.none]
+
+  - id: spark.fee
+    title: |-
+      Liquidation fee
+    when: |-
+      transfer_out to the Spark treasury in a liquidation's transaction
+    L5: liquidation
+    variants:
+      share: |-
+        the liquidation's bonus is known, so the fee's share of it can be said
+      plain: |-
+        the liquidation's bonus is not known
+    sentences:
+      fee.what:
+        when: |-
+          always
+        text: |-
+          Paid {fee} {symbol} of this position's collateral to the Spark treasury as the liquidation's protocol fee.
+      fee.share:
+        when: |-
+          share
+        text: |-
+          It is SparkLend's {fee_share} share of the liquidation bonus, paid in the same transaction.
+      fee.see:
+        when: |-
+          plain
+        text: |-
+          The liquidation in the same transaction sets out the rest.
+    order:
+      - fee.what
+      - fee.share
+      - fee.see
+    groups:
+      happened: [fee.what, fee.share, fee.see]
+    alternates:
+      - [fee.share, fee.see]
+
+  - id: spark.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation
+    L5: liquidation
+    variants:
+      default: |-
+        always
+    sentences:
+      liq.what:
+        when: |-
+          the row names the liquidator
+        text: |-
+          Liquidator {liquidator} repaid {cleared} {debt_symbol} of the debt and took {seized} {coll_symbol} of the collateral.
+      liq.what_anon:
+        when: |-
+          the row does not name the liquidator
+        text: |-
+          A liquidator repaid {cleared} {debt_symbol} of the debt and took {seized} {coll_symbol} of the collateral.
+      liq.why_fell:
+        when: |-
+          the state read landed and the collateral's price fell since the previous event
+        text: |-
+          {move_symbol}'s oracle price fell {move} since the previous event, taking the health factor to {hf_call}, below the liquidation line.
+      liq.why:
+        when: |-
+          the state read landed
+        text: |-
+          The health factor was {hf_call} when the liquidator called, below the liquidation line at 1.
+      liq.why_plain:
+        when: |-
+          the state read did not land
+        text: |-
+          The account's health factor had fallen below 1, so anyone could liquidate it.
+      liq.bonus:
+        when: |-
+          the collateral's bonus is known and SparkLend took a fee
+        text: |-
+          The {coll_symbol} liquidation bonus is {bonus}, and SparkLend keeps {fee_share} of it as a fee.
+      liq.bonus_nofee:
+        when: |-
+          the collateral's bonus is known and SparkLend took no fee
+        text: |-
+          The {coll_symbol} liquidation bonus is {bonus} of the debt repaid.
+      liq.premium:
+        when: |-
+          the bonus is not known but both legs are priced
+        text: |-
+          The collateral taken was worth {premium} more than the debt repaid.
+      liq.net:
+        when: |-
+          both legs are priced and the collateral given up is worth more than the debt cleared
+        text: |-
+          At the block's prices the account gave up {net_usd} more in collateral than the debt it cleared.
+      liq.after_ok:
+        when: |-
+          the account has debt left and its health factor is back at 1 or more
+        text: |-
+          The health factor is back to {hf_after}, so the account stays open.
+      liq.after_low:
+        when: |-
+          the account has debt left and its health factor is still below 1
+        text: |-
+          The health factor is still {hf_after}, below 1, so the account can be liquidated again.
+    order:
+      - liq.what
+      - liq.what_anon
+      - liq.why_fell
+      - liq.why
+      - liq.why_plain
+      - liq.bonus
+      - liq.bonus_nofee
+      - liq.premium
+      - liq.net
+      - liq.after_ok
+      - liq.after_low
+      - hf.none
+    groups:
+      happened: [liq.what, liq.what_anon, liq.why_fell, liq.why, liq.why_plain]
+      adds_up: [liq.bonus, liq.bonus_nofee, liq.premium, liq.net]
+      leaves: [liq.after_ok, liq.after_low, hf.none]
+    alternates:
+      - [liq.what, liq.what_anon]
+      - [liq.why_fell, liq.why, liq.why_plain]
+      - [liq.bonus, liq.bonus_nofee, liq.premium]
+      - [liq.after_ok, liq.after_low, hf.none]
+
+  - id: spark.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The account recorded a {event_type} event.
+    order:
+      - fallback.what
+    groups:
+      happened: [fallback.what]
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  SPARKLEND: |-
+    https://docs.spark.fi/products/sparklend
+  FEATURES: |-
+    https://docs.spark.fi/products/sparklend/guides/feature-overview#lending-and-borrowing
+  SUPPLYING: |-
+    https://docs.spark.fi/products/sparklend/guides/supplying-assets
+  SUPPLY_OPT_OUT: |-
+    https://docs.spark.fi/products/sparklend/guides/supplying-assets#can-i-opt-out-my-asset-from-being-used-as-a-collateral
+  BORROWING: |-
+    https://docs.spark.fi/products/sparklend/guides/borrowing-assets
+  BORROW_HEALTH: |-
+    https://docs.spark.fi/products/sparklend/guides/borrowing-assets#what-is-the-health-factor
+  BORROW_RATE: |-
+    https://docs.spark.fi/products/sparklend/guides/borrowing-assets#what-is-the-difference-between-transparent-and-variable-rate
+  REPAY_ASSET: |-
+    https://docs.spark.fi/products/sparklend/guides/borrowing-assets#what-asset-do-i-need-to-repay
+  REPAYING: |-
+    https://docs.spark.fi/products/sparklend/guides/repaying-your-loan
+  LIQUIDATIONS: |-
+    https://docs.spark.fi/products/sparklend/guides/liquidations#what-is-a-liquidation
+  CLOSE_FACTOR: |-
+    https://docs.spark.fi/products/sparklend/guides/liquidations#variable-liquidation-close-factor
+  PENALTY: |-
+    https://docs.spark.fi/products/sparklend/guides/liquidations#how-much-is-the-liquidation-penalty
+  EMODE: |-
+    https://docs.spark.fi/products/sparklend/guides/e-mode#high-efficiency-mode-e-mode
+  MARKETS: |-
+    https://docs.spark.fi/products/sparklend/guides/overview-of-markets#active-deprecated-and-frozen-markets
+  ORACLES: |-
+    https://docs.spark.fi/products/sparklend/guides/oracles
+  SPTOKEN: |-
+    https://docs.spark.fi/dev/sparklend/tokens/sptoken#what-it-is
+  SPTOKEN_TRANSFER: |-
+    https://docs.spark.fi/dev/sparklend/tokens/sptoken#can-i-transfer-sptokens
+  WETH_GATEWAY: |-
+    https://docs.spark.fi/dev/sparklend/periphery-contracts/wethgateway#withdraweth
+  REPAY_SPTOKENS: |-
+    https://docs.spark.fi/dev/sparklend/features/repay-with-sptokens
+  CREDIT_DELEGATION: |-
+    https://docs.spark.fi/dev/sparklend/features/credit-delegation
+  SUPPLY_CAPS: |-
+    https://docs.spark.fi/dev/sparklend/features/supply-borrow-caps#supply-caps
+  SECURITY: |-
+    https://docs.spark.fi/dev/security/security-and-audits#sparklend
+
+# ── The "?" modals (zone Z4): the event modals, the position card's and the
+# market page's. Each stops at the mechanism and hands it to a Quick Link; no
+# figure of one account appears here. ──
+L5:
+  supply:
+    title: |-
+      How Supplying Works
+    intro: |-
+      Supplying deposits an asset into SparkLend's Pool and mints spTokens to the wallet. The balance earns the reserve's supply rate, paid by borrowers.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral
+        text: |-
+          a supplied asset backs borrowing while its collateral switch is on; the owner can switch it off.
+      - bold: |-
+          spTokens
+        text: |-
+          the receipt for a supply, such as spWETH for WETH; its balance grows with interest and is needed to withdraw.
+      - bold: |-
+          One health factor
+        text: |-
+          all of a wallet's supply and debt on SparkLend is one account, so one health factor covers every asset.
+    links:
+      - label: |-
+          Supplying assets
+        doc: SUPPLYING
+      - label: |-
+          Opting out of collateral
+        doc: SUPPLY_OPT_OUT
+      - label: |-
+          spTokens
+        doc: SPTOKEN
+
+  withdraw:
+    title: |-
+      How Withdrawing Works
+    intro: |-
+      Withdrawing burns spTokens and returns the asset, interest included, from SparkLend's Pool to the wallet.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Limit
+        text: |-
+          with debt outstanding, the Pool refuses a withdrawal that would take the health factor below 1.
+      - bold: |-
+          Liquidity
+        text: |-
+          a withdrawal needs that much of the asset sitting unborrowed in the Pool.
+      - bold: |-
+          WETH gateway
+        text: |-
+          a withdrawal as ETH goes through the Spark WETH gateway, which takes the spWETH, withdraws the WETH and sends ETH on in one transaction.
+    links:
+      - label: |-
+          Supplying assets
+        doc: SUPPLYING
+      - label: |-
+          WETH gateway
+        doc: WETH_GATEWAY
+
+  borrow:
+    title: |-
+      How Borrowing Works
+    intro: |-
+      Borrowing draws an asset from the Pool against the account's collateral and mints variable debt that grows with interest until repaid.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrow limit
+        text: |-
+          the account may borrow up to a maximum loan-to-value; liquidation starts at a higher liquidation threshold.
+      - bold: |-
+          E-mode
+        text: |-
+          an account can pick one category of price-correlated assets; borrowing assets of that category then has higher borrowing power.
+      - bold: |-
+          Borrow rate
+        text: |-
+          a variable rate follows the reserve's supply and demand, while a transparent rate holds steady until Sky governance changes it.
+      - bold: |-
+          Credit delegation
+        text: |-
+          an owner can let another account borrow against its collateral by approving it on the debt token.
+    links:
+      - label: |-
+          Borrowing assets
+        doc: BORROWING
+      - label: |-
+          Variable and transparent rates
+        doc: BORROW_RATE
+      - label: |-
+          E-mode
+        doc: EMODE
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+
+  repay:
+    title: |-
+      How Repaying Works
+    intro: |-
+      Repaying returns the borrowed asset to the Pool and burns the matching debt, interest included. Anyone may repay for an account.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Same asset
+        text: |-
+          a loan is repaid in the asset borrowed, plus the interest accrued.
+      - bold: |-
+          Health
+        text: |-
+          less debt against the same collateral raises the health factor and the room left to borrow.
+      - bold: |-
+          With spTokens
+        text: |-
+          a repay can burn the account's spTokens of the same asset instead of tokens from the wallet.
+    links:
+      - label: |-
+          Repaying your loan
+        doc: REPAYING
+      - label: |-
+          Which asset to repay
+        doc: REPAY_ASSET
+      - label: |-
+          Repay with spTokens
+        doc: REPAY_SPTOKENS
+
+  liquidation:
+    title: |-
+      How Liquidations Work
+    intro: |-
+      A SparkLend account can be liquidated once its health factor falls below 1: its collateral no longer covers its debt at the oracle's prices. Anyone may liquidate it, and bots usually do.
+    extraParagraphs:
+      - |-
+        A liquidator repays part of one debt asset and receives collateral worth that debt plus a bonus. SparkLend keeps a share of the bonus as a fee, paid to the Spark treasury.
+      - |-
+        One liquidation repays up to half of the debt at a health factor between 0.95 and 1, and all of it at 0.95 or below. After a partial one the account stays open.
+    links:
+      - label: |-
+          What is a liquidation?
+        doc: LIQUIDATIONS
+      - label: |-
+          Variable close factor
+        doc: CLOSE_FACTOR
+      - label: |-
+          The liquidation penalty
+        doc: PENALTY
+
+  transfer:
+    title: |-
+      How spToken Transfers Work
+    intro: |-
+      Supplied balances on SparkLend are spTokens, ERC-20 tokens that can move between accounts. A transfer hands a supplied balance to another account without leaving the Pool.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Two that are not hand-overs
+        text: |-
+          a transfer to the Spark WETH gateway is a withdrawal as ETH, and one to the Spark treasury inside a liquidation is that liquidation's fee.
+      - bold: |-
+          Health still enforced
+        text: |-
+          the Pool refuses a transfer that would take the sender's health factor below 1.
+      - bold: |-
+          Interest rides along
+        text: |-
+          the balance grows with interest, and keeps growing in the receiving account.
+    links:
+      - label: |-
+          spTokens
+        doc: SPTOKEN
+      - label: |-
+          Can I transfer spTokens?
+        doc: SPTOKEN_TRANSFER
+
+  fallback:
+    title: |-
+      How SparkLend Positions Work
+    intro: |-
+      SparkLend, a lending market built by Spark on Aave V3's design, lets a wallet supply assets as collateral and borrow against them in one account.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Supply and collateral
+        text: |-
+          supplied assets earn interest and, while their collateral switch is on, back the account's borrowing.
+      - bold: |-
+          Borrowing and health factor
+        text: |-
+          borrowing draws against the pooled collateral, and the health factor measures how safely the debt is covered.
+      - bold: |-
+          One pooled account
+        text: |-
+          all of a wallet's supply and debt share one account and one health factor.
+    links:
+      - label: |-
+          SparkLend overview
+        doc: SPARKLEND
+      - label: |-
+          Lending and borrowing
+        doc: FEATURES
+      - label: |-
+          How SparkLend relates to Aave V3
+        doc: SECURITY
+
+  position_open:
+    title: |-
+      About This Position
+    intro: |-
+      A SparkLend position is one wallet's account on the Pool: what it supplied, what it borrowed against that, and how safely the debt is covered.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One account per wallet
+        text: |-
+          all of a wallet's supply backs all of its borrowing, under one health factor.
+      - bold: |-
+          Health factor
+        text: |-
+          the collateral, each asset counted up to its liquidation threshold, divided by the debt; below 1 the account can be liquidated.
+      - bold: |-
+          Loan-to-value
+        text: |-
+          the debt as a share of the collateral's value; the account may borrow up to a maximum, and liquidation starts higher.
+      - bold: |-
+          E-mode
+        text: |-
+          an account can choose one category of price-correlated assets, inside which borrowing power is higher; the card says whether it does.
+      - bold: |-
+          Delegated operation
+        text: |-
+          anyone can supply or repay for an account, but borrowing against it needs credit the owner delegated.
+    links:
+      - label: |-
+          The health factor
+        doc: BORROW_HEALTH
+      - label: |-
+          E-mode
+        doc: EMODE
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+      - label: |-
+          Liquidations
+        doc: LIQUIDATIONS
+
+  position_supply:
+    title: |-
+      About This Position
+    intro: |-
+      A SparkLend position is one wallet's account on the SparkLend Pool. This one supplies assets and owes nothing, so it has no health factor and cannot be liquidated.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One account per wallet
+        text: |-
+          all of a wallet's supply backs all of its borrowing, under one health factor once it borrows.
+      - bold: |-
+          spTokens
+        text: |-
+          the receipt for a supply, such as spWETH for WETH; its balance grows with interest and is needed to withdraw.
+      - bold: |-
+          Collateral
+        text: |-
+          a supplied asset backs borrowing while its collateral switch is on; the owner can switch it off.
+    links:
+      - label: |-
+          Supplying assets
+        doc: SUPPLYING
+      - label: |-
+          spTokens
+        doc: SPTOKEN
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      This account has repaid its debt and withdrawn its collateral. Its card shows the most each reserve ever held or owed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each reserve's peak is the largest balance it reached at any event, interest to then included; peaks of different reserves need not coincide.
+      - bold: |-
+          One account per wallet
+        text: |-
+          a new supply by the same wallet reopens this account.
+    links:
+      - label: |-
+          SparkLend overview
+        doc: SPARKLEND
+      - label: |-
+          Supplying assets
+        doc: SUPPLYING
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      This account was liquidated at least once, when its health factor fell below 1, and holds nothing now. Its card shows the most each reserve ever held or owed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each reserve's peak is the largest balance it reached at any event, interest to then included; peaks of different reserves need not coincide.
+      - bold: |-
+          Liquidated
+        text: |-
+          a liquidation repays part of the debt and takes collateral worth that plus a bonus, so an account often survives it and closes later.
+      - bold: |-
+          One account per wallet
+        text: |-
+          a new supply by the same wallet reopens this account.
+    links:
+      - label: |-
+          What is a liquidation?
+        doc: LIQUIDATIONS
+      - label: |-
+          Variable close factor
+        doc: CLOSE_FACTOR
+
+  market:
+    title: |-
+      How the market overview works
+    intro: |-
+      SparkLend is one Aave-V3-architecture Pool holding every reserve, with each wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from the Pool.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Reserve
+        text: |-
+          one listed asset in the Pool, with its supplied balance, its variable debt and the governance-set risk parameters.
+      - bold: |-
+          Utilisation and rates
+        text: |-
+          utilisation is borrowed ÷ supplied, the bar's blue fill, with the reserve's kink as a tick; rates rise with it, and Sky governance sets some.
+      - bold: |-
+          Limits
+        text: |-
+          loan-to-value caps what a wallet can borrow against a reserve, the liquidation threshold counts toward covering debt, and the bonus pays liquidators.
+      - bold: |-
+          Caps used
+        text: |-
+          how much of each side's cap is in use; Sky governance sets the caps and the Cap Automator scales them with market depth.
+      - bold: |-
+          Closed reserves
+        text: |-
+          a frozen reserve takes no new supply or borrowing while withdrawals and repayments continue; a deprecated one still works in full.
+    links:
+      - label: |-
+          Active, deprecated and frozen markets
+        doc: MARKETS
+      - label: |-
+          Oracles
+        doc: ORACLES
+      - label: |-
+          Supply and borrow caps
+        doc: SUPPLY_CAPS
+      - label: |-
+          Variable and transparent rates
+        doc: BORROW_RATE

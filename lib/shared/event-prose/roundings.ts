@@ -7,6 +7,9 @@ import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtMorphoAmount } from "@/lib/morpho/figure-format";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
+import { compoundAmount } from "@/lib/compound/row-facts";
+import { formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
+import { hfLabelV4 } from "@/lib/aave-v4/format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -49,6 +52,18 @@ function fmtSpan(seconds: number): string {
     return `${h} hour${h === 1 ? "" : "s"}`;
   }
   return `${(hours / 24).toFixed(1)} days`;
+}
+
+/** A token amount as the Aave family's rows print it: whole from 1,000, four
+ *  places from 1, significant places below, never a false zero. */
+function fmtTokenPos(n: number): string {
+  if (!isFinite(n) || n === 0) return "0";
+  const abs = Math.abs(n);
+  if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (abs >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  return parseFloat(s) === 0 ? formatTinyNonZero(n) : s;
 }
 
 /** A collateral figure at the ledger's decimals. */
@@ -109,4 +124,15 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
     const pct = num(v) * 100;
     return `${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`;
   },
+  token: (v) => formatNumber(Math.abs(num(v))),
+  token_leg: (v) => {
+    const n = Math.abs(num(v));
+    return n < 1 ? fmtTokenPos(n) : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  token_pos: (v) => fmtTokenPos(Math.abs(num(v))),
+  compound_amount: (v) => compoundAmount(num(v)),
+  number: (v) => formatNumber(num(v)),
+  usd_value: (v) => formatUsdValue(num(v)),
+  pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
+  hf: (v) => hfLabelV4(num(v)),
 };

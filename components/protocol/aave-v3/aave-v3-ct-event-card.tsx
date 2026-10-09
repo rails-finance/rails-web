@@ -14,7 +14,6 @@ import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type V3Coords } from "@/lib/aave-v3/event-provenance";
-import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
 import { aaveV3CtLabel, isAaveV3LossRow, useAaveV3HeadSpec } from "./aave-v3-ct-event-header";
 import { useAaveV3EventBody } from "./aave-v3-ct-event-detail";
 import { AaveFamilyLedgers } from "./aave-family-cells";
@@ -273,26 +272,23 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
     // The index carries no gas for the Aave family's rows and the position read
     // reads none, so the row states no owner-paid gas.
     price: { gas: null, prices: body.prices },
+    // The explanation reads the position state the card opens with, so the
+    // pane is the body alone, with no teaser.
     explainer: {
       body: (
-        <>
-          {body.rateNote}
-          <AaveV3EventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            owner={event.wallet}
-            market={market}
-            siblings={siblings}
-            previous={previous}
-            timestamp={event.timestamp}
-            skipLead
-          />
-        </>
+        <AaveV3EventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          owner={event.wallet}
+          market={market}
+          siblings={siblings}
+          previous={previous}
+          timestamp={event.timestamp}
+        />
       ),
-      first: aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings }) ?? undefined,
     },
-    learnMore: <LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />,
+    learnMore: <LearnMore inline content={aaveV3LearnMoreContent(ctx, v3Protocol(coords.pool), chainId, siblings)} />,
     onIntent: prefetch,
     onOpen,
   };

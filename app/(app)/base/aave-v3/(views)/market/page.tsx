@@ -13,7 +13,7 @@ import { AaveMarketPage } from "@/components/shared/aave-market-page";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
-import { aaveMarketOverviewContent } from "@/lib/shared/learn-more-content";
+import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 
 export default function AaveV3BaseMarketPage() {
   return (
@@ -26,7 +26,7 @@ export default function AaveV3BaseMarketPage() {
         protocolName="Aave V3"
         marketLabel="Aave V3 · Base"
         purpose="Aave V3's Base deployment: its own Pool, its own reserves and its own risk parameters, separate from the Ethereum market of the same name."
-        learnMore={aaveMarketOverviewContent("aave-v3-base")}
+        learnMore={aaveV3MarketModal("aave-v3-base")}
       />
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />

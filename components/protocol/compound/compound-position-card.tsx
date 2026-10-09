@@ -42,7 +42,7 @@ import {
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
-import { compoundPositionContent, type CompoundPositionDeployment } from "@/lib/compound/position-content";
+import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
 import { EXPLORERS_WITHOUT_LISTING } from "@/lib/shared/coverage";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -529,7 +529,7 @@ export function CompoundPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment })}
+        learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment })}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -620,7 +620,7 @@ export function CompoundPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment, side: eff.side })}
+      learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment, side: eff.side })}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

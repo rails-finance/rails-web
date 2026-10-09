@@ -9,7 +9,7 @@
 // Pool). Framing: present, don't rank — no score, no risk valence.
 
 import { AaveMarketPage } from "@/components/shared/aave-market-page";
-import { aaveMarketOverviewContent } from "@/lib/shared/learn-more-content";
+import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 
@@ -23,7 +23,7 @@ export default function AaveV3MarketPage() {
         protocolName="Aave V3"
         marketLabel="Aave V3 Core"
         purpose="The main Aave V3 market on Ethereum: one Pool, the broadest reserve roster, every account cross-collateralised under a shared health factor."
-        learnMore={aaveMarketOverviewContent("aave-v3")}
+        learnMore={aaveV3MarketModal("aave-v3")}
       />
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />

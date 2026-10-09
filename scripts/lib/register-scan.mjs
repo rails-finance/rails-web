@@ -338,10 +338,6 @@ export function genericRuleHits(src, file = "") {
 export const GENERIC_ALLOWLIST = {
   // Signed-balance mode-teller: why a deposit was a repayment (×2 variants).
   "lib/dolomite/explainer-clauses.tsx": ["A negative balance IS the debt here."],
-  // §2 misleading-figure caveat on the repay card's gap.
-  "lib/compound-v2/explainer-clauses.tsx": [
-    "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",
-  ],
   // §5.3 forward path after cancelling a withdrawal request.
   "lib/maple/explainer-clauses.tsx": ["A new request would join the back of the line."],
 };
