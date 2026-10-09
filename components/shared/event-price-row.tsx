@@ -32,6 +32,11 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
+  /** The figure as the family prints it, where its precision is not whole
+   *  dollars (a stablecoin's four places). */
+  display?: string;
+  /** The token's contract, for the icon. */
+  address?: string;
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -59,6 +64,15 @@ export function eventGas(gas: GasCost | null | undefined): EventGas | undefined 
 export function gasPrice(gas: GasCost | null | undefined): EventCardPrice | undefined {
   const g = eventGas(gas);
   return g ? { gas: g, prices: [] } : undefined;
+}
+
+/** The event's gas where the owner sent its transaction; none where a third
+ *  party paid or the index sends no gas. */
+export function ownerPaidGas(
+  event: { wallet: string; gas?: GasCost | null },
+  txFrom: string | null | undefined,
+): EventGas | undefined {
+  return txFrom != null && txFrom.toLowerCase() === event.wallet.toLowerCase() ? eventGas(event.gas) : undefined;
 }
 
 /** Whether the row has anything to draw. */
@@ -137,7 +151,8 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
           </div>
         )}
         {prices.map((p) => {
-          const icon = <TokenChipIcon symbol={p.symbol} size={14} />;
+          const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
+          const figure = p.display ?? usdWhole(p.usd);
           return (
             <PriceChipShell key={p.symbol} bare title={p.title}>
               <ThenTodayChip
@@ -146,11 +161,11 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
                 then={
                   p.info ? (
                     <Prov info={p.info} value={p.value} icon={icon}>
-                      {usdWhole(p.usd)}
+                      {figure}
                     </Prov>
                   ) : (
                     <span className="inline-flex items-center gap-1">
-                      {usdWhole(p.usd)}
+                      {figure}
                       {icon}
                     </span>
                   )

@@ -380,7 +380,10 @@ export default function CompoundV2PositionView({
     todayPrices: view?.priceByMarket,
     fixedPrices: view?.priceFixedByMarket,
   });
-  const ledgerData = useMemo(() => ({ states: flows.states, brand: "Compound" }), [flows.states]);
+  const ledgerData = useMemo(
+    () => ({ states: flows.states, brand: "Compound", pricesAt: flows.prices }),
+    [flows.states, flows.prices],
+  );
 
   // What each liquidation did, and a closed card's peaks as each row's balance
   // before and after it (interest included), where the page holds every row.

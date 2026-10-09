@@ -1,7 +1,8 @@
 "use client";
 
 // A Compound V2-family event card's account cells (anatomy T2.1; rails-ops
-// reference/lifetime-flows-scrubber.md, "Compound V2"): Collateral and Debt,
+// reference/lifetime-flows-scrubber.md, "Compound V2"), the ledger cells at
+// the head of the card's `cells` slot (ui-jobs 309): Collateral and Debt,
 // each the grid's full width and one row closed, that open into the side's
 // ledger as of the end of the event's transaction. With one asset the closed
 // cell states its tokens before → after (and its dollars after a thin divider
@@ -15,21 +16,20 @@
 // `CTokenLedgerContext`. Until the flows model lands the cells stand as
 // placeholder rows.
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
-import { DeltaToggle, StateTransition, changeTone } from "@/components/shared/state-transition";
 import { usdShown } from "@/lib/shared/usd-display";
+import type { EventCardLedgers } from "@/components/shared/event-card";
+import type { EventLedgerCellSpec } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
+import type { AtBlockPricePill } from "@/components/shared/liquidation-forensics";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
-import { LEDGER_PENDING } from "@/components/shared/event-ledger-context";
+import { LEDGER_PENDING, type EventLedgerSource } from "@/components/shared/event-ledger-context";
 import {
   AssetLedgers,
-  ClosedTokens,
   usdAt,
   DayCloseNote,
   EventLedgerContext,
-  LedgerCell,
   LedgerTable,
   SIDE_NAME,
   dayStamp,
@@ -52,6 +52,9 @@ export interface CTokenLedgerData {
    *  receipt token's (Dolomite's par × the market's index): `held` for the
    *  side's dollars, `token` for one market's tokens. */
   words?: { held: Record<FlowSide, string>; token: Record<FlowSide, string> };
+  /** Each market's USD price at an event's block, keyed "block:market",
+   *  where the page read it for the panel (Compound V2): the price row's. */
+  pricesAt?: ReadonlyMap<string, number> | null;
 }
 export const CTokenLedgerContext = createContext<CTokenLedgerData | null>(null);
 
@@ -89,20 +92,6 @@ function tokenProv(
     kind: "chain-derived",
     summary: `${symbol} ${side === "collateral" ? "supplied" : "owed"} ${before ? "before" : "after"} ${at} — ${before ? "just before the transaction ran" : "once the transaction had run"}: the market's ${words ? words.token[side] : side === "collateral" ? `supply (the ${receipt} balance × the exchange rate at the block)` : "debt (the emitted accountBorrows, and that less the act before it)"} as the row states it.`,
   };
-}
-
-/** The ledger's decimals for a side holding one asset, so the closed figures
- *  stand as the opened ledger prints them. */
-function sumFor(
-  side: FlowSide,
-  eventId: string,
-  state: CTokenEventState,
-  focus: ReturnType<typeof useFlowFocus>,
-  cum: ReturnType<typeof useEventCum>,
-): AssetSum | null {
-  const model = focus?.model;
-  if (!model || !cum || !focus) return null;
-  return eventAssetSum(model, focus.events, side, cum, eventId, state.balances[side], SUM_OPTS);
 }
 
 /** The opened cell: the side's ledger as of the event. */
@@ -188,31 +177,24 @@ function SideLedger({
   );
 }
 
-/** One side's closed figures: one asset's tokens before → after (and its
- *  dollars where shown), or several assets' dollars before → after. */
-function ClosedSide({
-  side,
-  state,
-  eventTs,
-  decimals,
-  brand,
-  receipt,
-  words,
-}: {
-  side: FlowSide;
-  state: CTokenEventState;
-  eventTs: number;
-  decimals: number | null;
-  brand: string;
-  receipt?: string;
-  words?: CTokenLedgerData["words"];
-}) {
+/** One side's closed figures as a ledger cell: one asset's tokens before →
+ *  after (and its dollars where shown), or several assets' dollars before →
+ *  after behind their icons. */
+function sideCell(
+  side: FlowSide,
+  state: CTokenEventState,
+  eventTs: number,
+  decimals: number | null,
+  data: CTokenLedgerData,
+): EventLedgerCellSpec {
+  const { brand, receipt, words } = data;
   const at = atWords(eventTs);
   const assets = state.balances[side];
   const moved = state.moved[side];
   const held = state.held[side];
   const before = state.heldBefore[side];
-  if (assets.length === 0) return <span className={`text-sm font-semibold ${changeTone(false)}`}>None</span>;
+  const base = { kind: "ledger" as const, side, key: side, label: SIDE_NAME[side], changed: moved };
+  if (assets.length === 0) return { ...base, value: { none: "None" } };
   const usdText = (v: number) => (v < 0.005 ? "$0" : fmtPositionUsd(v));
   if (assets.length === 1) {
     const a = assets[0];
@@ -220,130 +202,143 @@ function ClosedSide({
     const changed = moved && fmt(a.before) !== fmt(a.amount);
     const usd = a.price != null ? a.amount * a.price : null;
     const usdOn = usd != null && usdShown(usd);
-    return (
-      <StateTransition>
-        <ClosedTokens
-          usd={
-            usdOn && held != null
-              ? {
-                  before:
-                    changed && before != null ? (
-                      <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
-                    ) : null,
-                  after: <Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>,
-                  ...usdAt({ price: a.price, symbol: a.symbol, before: a.before, after: a.amount }),
-                }
-              : undefined
-          }
-        >
-          {changed && (
-            <DeltaToggle
-              size="sm"
-              before={<Prov info={tokenProv(side, a.symbol, at, true, receipt, words)}>{fmt(a.before)}</Prov>}
-              delta={
-                <Prov
-                  info={{
-                    kind: "chain-derived",
-                    summary: `${a.symbol} ${side === "collateral" ? "supply" : "debt"} change at ${at} — the balance after the transaction less the balance before it.`,
-                    formula: "after − before",
-                  }}
-                >
-                  {`${a.amount >= a.before ? "+" : "−"}${fmt(Math.abs(a.amount - a.before))}`}
-                </Prov>
-              }
-            />
-          )}
-          <Prov
-            info={tokenProv(side, a.symbol, at, false, receipt, words)}
-            icon={<TokenChipIcon symbol={a.symbol} size={16} />}
-          >
-            <span className={`text-sm font-semibold tabular-nums ${changeTone(moved)}`}>{fmt(a.amount)}</span>
-          </Prov>
-        </ClosedTokens>
-      </StateTransition>
-    );
+    return {
+      ...base,
+      value: {
+        before: changed
+          ? { text: fmt(a.before), info: tokenProv(side, a.symbol, at, true, receipt, words) }
+          : undefined,
+        delta: changed
+          ? {
+              text: `${a.amount >= a.before ? "+" : "−"}${fmt(Math.abs(a.amount - a.before))}`,
+              info: {
+                kind: "chain-derived",
+                summary: `${a.symbol} ${side === "collateral" ? "supply" : "debt"} change at ${at} — the balance after the transaction less the balance before it.`,
+                formula: "after − before",
+              },
+            }
+          : undefined,
+        after: { text: fmt(a.amount), info: tokenProv(side, a.symbol, at, false, receipt, words) },
+        icon: a.symbol,
+      },
+      usd:
+        usdOn && held != null
+          ? {
+              before:
+                changed && before != null ? (
+                  <Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>
+                ) : null,
+              after: <Prov info={heldProv(side, at, brand, false, receipt, words)}>{usdText(held)}</Prov>,
+              ...usdAt({ price: a.price, symbol: a.symbol, before: a.before, after: a.amount }),
+            }
+          : undefined,
+    };
   }
-  return (
-    <StateTransition>
-      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-        <InlineAssetCluster symbols={assets.map((a) => a.symbol)} size={18} overlap={5} />
-        {held == null ? (
-          <span className={`text-sm font-semibold ${changeTone(moved)}`}>
-            {assets.length.toLocaleString("en-US")} markets
-          </span>
-        ) : (
-          <>
-            {moved && before != null && Math.round(before) !== Math.round(held) && (
-              <DeltaToggle
-                size="sm"
-                before={<Prov info={heldProv(side, at, brand, true, receipt, words)}>{usdText(before)}</Prov>}
-                delta={null}
-              />
-            )}
-            <Prov info={heldProv(side, at, brand, false, receipt, words)}>
-              <span className={`text-sm font-semibold tabular-nums ${changeTone(moved)}`}>{usdText(held)}</span>
-            </Prov>
-          </>
-        )}
-      </span>
-    </StateTransition>
-  );
+  return {
+    ...base,
+    value: {
+      cluster: assets.map((a) => a.symbol),
+      ...(held == null
+        ? { after: { text: `${assets.length.toLocaleString("en-US")} markets` } }
+        : {
+            before:
+              moved && before != null && Math.round(before) !== Math.round(held)
+                ? { text: usdText(before), info: heldProv(side, at, brand, true, receipt, words) }
+                : undefined,
+            after: { text: usdText(held), info: heldProv(side, at, brand, false, receipt, words) },
+          }),
+    },
+  };
 }
 
-/** The card's Collateral and Debt cells, for the head of its T2 grid. Nothing
- *  on a page that does not tie its timeline to the Lifetime flows panel. */
-export function CTokenLedgerCells({ eventId, eventTs }: { eventId: string; eventTs: number }) {
+/** The card's Collateral and Debt ledger cells, for the head of its `cells`
+ *  slot, and the ledgers they open into. None on a page that does not tie its
+ *  timeline to the Lifetime flows panel; placeholder rows until the flows
+ *  model lands. */
+export function useCTokenLedgerCells(
+  eventId: string,
+  eventTs: number,
+): { cells: EventLedgerCellSpec[]; ledgers: EventCardLedgers } {
   const focus = useFlowFocus();
   const data = useContext(CTokenLedgerContext);
   const cum = useEventCum(eventId);
-  if (!focus || !data) return null;
-  const state = data.states?.get(eventId) ?? null;
-  // The flows model has not landed: the cells stand as placeholder rows.
-  if (!focus.model || !state)
-    return (
-      <EventLedgerContext.Provider value={LEDGER_PENDING}>
-        {(["collateral", "debt"] as const).map((side) => (
-          <LedgerCell key={side} label={SIDE_NAME[side]} side={side}>
-            {null}
-          </LedgerCell>
-        ))}
-      </EventLedgerContext.Provider>
-    );
-  const sides = (["collateral", "debt"] as const).filter(
-    (s) => s === "collateral" || focus.model!.buckets.some((b) => b.side === "debt"),
-  );
-  return (
-    <>
-      {sides.map((side) => {
-        const sum = sumFor(side, eventId, state, focus, cum);
-        const single = sum ? assetTokenSum(sum) : null;
-        const hasLines = sum != null && sum.lines.length > 0;
-        return (
-          <LedgerCell
-            key={side}
-            side={side}
-            label={SIDE_NAME[side]}
-            ledger={
-              sum && hasLines ? (
+  const model = focus?.model ?? null;
+  const state = model ? (data?.states?.get(eventId) ?? null) : null;
+  const sums = useMemo(() => {
+    if (!model || !state || !cum || !focus) return null;
+    const of = (side: FlowSide) =>
+      eventAssetSum(model, focus.events, side, cum, eventId, state.balances[side], SUM_OPTS);
+    return { collateral: of("collateral"), debt: of("debt") };
+  }, [model, state, cum, focus, eventId]);
+  const ready = model != null && state != null;
+  const src = useMemo<EventLedgerSource>(
+    () =>
+      ready && sums
+        ? {
+            has: (side) => (sums[side]?.lines.length ?? 0) > 0,
+            render: (side) => {
+              const sum = sums[side];
+              return sum ? (
                 <SideLedger side={side} eventId={eventId} eventTs={eventTs} state={state} sum={sum} />
-              ) : null
-            }
-            data={{ "data-ctoken-cell": side, "data-receipt-changed": state.moved[side] ? "true" : "false" }}
-          >
-            <ClosedSide
-              side={side}
-              state={state}
-              eventTs={eventTs}
-              decimals={single?.decimals ?? null}
-              brand={data.brand}
-              receipt={data.receipt}
-              words={data.words}
-            />
-          </LedgerCell>
-        );
-      })}
-    </>
+              ) : null;
+            },
+          }
+        : LEDGER_PENDING,
+    [ready, sums, eventId, eventTs, state],
   );
+  if (!focus || !data)
+    return { cells: [], ledgers: { none: "The page does not tie its timeline to the Lifetime flows panel." } };
+  const ledgers: EventCardLedgers = {
+    provider: (children) => <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>,
+  };
+  // The flows model has not landed: the cells stand as placeholder rows.
+  if (!ready)
+    return {
+      cells: (["collateral", "debt"] as const).map((side) => ({
+        kind: "ledger" as const,
+        side,
+        key: side,
+        label: SIDE_NAME[side],
+        changed: true,
+        value: {},
+      })),
+      ledgers,
+    };
+  const sides = (["collateral", "debt"] as const).filter(
+    (s) => s === "collateral" || model.buckets.some((b) => b.side === "debt"),
+  );
+  return {
+    cells: sides.map((side) => {
+      const sum = sums?.[side] ?? null;
+      const single = sum ? assetTokenSum(sum) : null;
+      return sideCell(side, state, eventTs, single?.decimals ?? null, data);
+    }),
+    ledgers,
+  };
+}
+
+/** The market's USD price at the event's block, where the page read it for
+ *  its Lifetime flows panel (`CTokenLedgerData.pricesAt`). */
+export function useCTokenPriceAt(block: number | undefined, market: string): number | null {
+  const p = useContext(CTokenLedgerContext)?.pricesAt?.get(`${block}:${market}`);
+  return block != null && p != null && p > 0 ? p : null;
+}
+
+/** At-block price pills as the price row's chips: the receipt and the
+ *  figure's precision kept, the oracle and its block in the tip. */
+export function pillPriceChips(
+  pills: AtBlockPricePill[],
+  brand: string,
+  display?: (n: number) => string,
+): EventPriceChip[] {
+  return pills.map((p) => ({
+    symbol: p.symbol,
+    usd: p.priceUsd,
+    address: p.address,
+    info: p.priceProv,
+    display: display ? display(p.priceUsd) : p.display != null ? `$${p.display}` : undefined,
+    title: `${p.symbol} price at this event: ${brand}'s ${p.note ?? "oracle at block"}`,
+  }));
 }
 
 /** Whether a side holds exactly one market at the event, that market's
