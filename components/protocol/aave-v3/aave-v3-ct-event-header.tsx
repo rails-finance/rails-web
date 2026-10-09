@@ -1,14 +1,14 @@
 "use client";
 
-// Aave V3 event header (ON-CHAIN VALUES tier) — adapter onto the shared ChainTruthRow
-// grammar. Maps the signed amount(s) this event moved into the shared row spec;
-// traces via <Prov>. No health factor, no USD, no borrow-rate pill — those are
-// layers, absent here (the bespoke aave-v3-event-header carries them, retained).
+// Aave V3 event head (T1): the card's `head` slot, drawn by the shared
+// ChainTruthRow. Maps the signed amount(s) this event moved into the shared row
+// spec, each traced via <Prov>; a swap states its two legs sold → bought and
+// names its venue as the party.
 
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { AssetFlow } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   assetsDeltaProv,
   seizedCollateralProv,
@@ -65,10 +65,8 @@ export const isAaveV3LossRow = (ctx: AaveV3Context): boolean =>
 
 export interface AaveV3CtEventHeaderProps {
   ctx: AaveV3Context;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -111,17 +109,16 @@ export function aaveV3CtLabel(ctx: AaveV3Context, isFee: boolean, chainId: Chain
         : (LABELS[ctx.eventType] ?? ctx.eventType);
 }
 
-export function AaveV3CtEventHeader({
+/** The row's head spec. */
+export function useAaveV3HeadSpec({
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
   feeOf,
-}: AaveV3CtEventHeaderProps) {
+}: AaveV3CtEventHeaderProps): ChainTruthRowSpec {
   const coords: V3Coords = {
     txHash,
     blockNumber,
@@ -130,7 +127,6 @@ export function AaveV3CtEventHeader({
     pool: useV3Pool(),
   };
   const deltas: ChainTruthDelta[] = [];
-  const sw = ctx.swap;
   const label = aaveV3CtLabel(ctx, !!feeOf, coords.chainId);
   const named = getProtocolContract(ctx.counterparty, coords.chainId ?? MAINNET_CHAIN_ID);
   const viaGateway = !feeOf && ctx.eventType === "transfer_out" && named?.kind === "gateway";
@@ -261,30 +257,24 @@ export function AaveV3CtEventHeader({
           }
         : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label,
-        critical: isAaveV3LossRow(ctx),
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-        custody: isTransferRow,
-        custodyLabel: isTransferRow,
-        deltas,
-        party,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.poolCaller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
-                  coords,
-                ),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label,
+    critical: isAaveV3LossRow(ctx),
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
+    custody: isTransferRow,
+    custodyLabel: isTransferRow,
+    deltas,
+    party,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.poolCaller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
+              coords,
+            ),
+          }
+        : undefined,
+  };
 }

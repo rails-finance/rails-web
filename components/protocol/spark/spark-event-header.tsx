@@ -1,12 +1,12 @@
 "use client";
 
-// SparkLend event header (chain-state tier) — adapter onto the shared ChainTruthRow
-// grammar. Maps the signed amount(s) this event moved into the shared row spec;
-// traces via <Prov>. No health factor, no USD — those are layers, absent here.
+// SparkLend event head (T1): the card's `head` slot, drawn by the shared
+// ChainTruthRow. Maps the signed amount(s) this event moved into the shared row
+// spec, each traced via <Prov>.
 
 import type { AssetFlow, SparkContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   assetsDeltaProv,
   seizedCollateralProv,
@@ -24,10 +24,8 @@ import { isGatewayWithdrawal } from "@/lib/spark/liquidation-fee";
 export interface SparkEventHeaderProps {
   actionLabel: string;
   ctx: SparkContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -48,18 +46,17 @@ export interface SparkEventHeaderProps {
  *  V3's "Transferred out"). */
 const TRANSFER_LABEL = { transfer_in: "Transfer in", transfer_out: "Transfer out" } as const;
 
-export function SparkEventHeader({
+/** The row's head spec. */
+export function sparkHeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
   feeOf,
-}: SparkEventHeaderProps) {
+}: SparkEventHeaderProps): ChainTruthRowSpec {
   const coords: SparkCoords = { txHash, blockNumber };
   const deltas: ChainTruthDelta[] = [];
 
@@ -133,32 +130,26 @@ export function SparkEventHeader({
         }
       : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label,
-        critical: ctx.eventType === "liquidation",
-        // A transfer is a custody row: `Transfer out 400 ◎ to 0x…`, the verb
-        // kept before the amounts (Aave V3's custodyLabel).
-        custody: isTransferRow,
-        custodyLabel: isTransferRow,
-        // The verb carries the direction; a liquidation keeps its signs.
-        unsignedDeltas: ctx.eventType !== "liquidation",
-        deltas,
-        party,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.poolCaller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
-                  coords,
-                ),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label,
+    critical: ctx.eventType === "liquidation",
+    // A transfer is a custody row: `Transfer out 400 ◎ to 0x…`, the verb
+    // kept before the amounts (Aave V3's custodyLabel).
+    custody: isTransferRow,
+    custodyLabel: isTransferRow,
+    // The verb carries the direction; a liquidation keeps its signs.
+    unsignedDeltas: ctx.eventType !== "liquidation",
+    deltas,
+    party,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.poolCaller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, poolCaller: ctx.poolCaller },
+              coords,
+            ),
+          }
+        : undefined,
+  };
 }

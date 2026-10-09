@@ -1,11 +1,10 @@
 "use client";
 
-// The SparkLend event card's account block (T2): the whole account before and
-// after the event's transaction — Collateral and Debt (the totals with each
-// reserve beneath, the Aave V3 family's cells), health factor, LTV against its
-// limits with what could still be borrowed, and the e-mode category (rails-ops
-// TO-DO-ui-jobs §213) — read from the chain at blocks N−1 and N
-// through the Aave V3 Base lane's loader (/api/chain/spark/position-state).
+// The SparkLend event card's account figures (T2), under the Aave V3 family's
+// Collateral and Debt cells (aave-family-cells.tsx): the health factor, LTV
+// against its limits with what could still be borrowed, and the e-mode
+// category (rails-ops TO-DO-ui-jobs §213) — read from the chain at blocks N−1
+// and N through the Aave V3 Base lane's loader (/api/chain/spark/position-state).
 // The receipts are the Aave V3 family's at-block receipts (SparkLend runs Aave
 // V3's account arithmetic), naming the SparkLend Pool.
 //
@@ -19,42 +18,24 @@
 // limits are each asset's figures; an account with no debt says it has no
 // health factor.
 
-import { Prov, type Provenance } from "@/components/shared/provenance";
-import { StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import type { ReactNode } from "react";
+import type { Provenance } from "@/components/shared/provenance";
+import type { EventCellValue, EventStatCellSpec } from "@/components/shared/event-cells";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
 import { emodeCategoryProv, healthFactorProv, type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { bpsPct, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
 import { emodeLabel, type SparkEventState } from "@/lib/spark/event-state";
-import { LtvCellBody, type TouchedLeg } from "@/components/protocol/aave-v3/aave-v3-position-state";
-import { AaveFamilyEventReceipt, type RiskItem } from "@/components/protocol/aave-v3/aave-family-event-receipt";
+import { fig, ltvCells } from "@/components/protocol/aave-v3/aave-family-cells";
+import type { Figure } from "@/components/protocol/aave-v3/aave-v3-position-state";
 
-interface Fig {
-  text: string;
-  value: string;
-  prov: Provenance;
-}
+type Fig = Figure;
 
-function Pair({ before, after, changed }: { before: Fig; after: Fig; changed: boolean }) {
-  return (
-    <StateTransition>
-      {changed && (
-        <>
-          <span className="text-sm font-semibold tabular-nums text-rb-500">
-            <Prov info={before.prov} value={before.value}>
-              {before.text}
-            </Prov>
-          </span>
-          <TransitionArrow size="sm" />
-        </>
-      )}
-      <span className={`text-sm font-semibold tabular-nums ${changed ? "" : "text-rb-500"}`}>
-        <Prov info={after.prov} value={after.value}>
-          {after.text}
-        </Prov>
-      </span>
-    </StateTransition>
-  );
-}
+/** Before → after, the before drawn where the event moved the figure. */
+const pair = (before: Fig, after: Fig, changed: boolean): EventCellValue => ({
+  ...(changed ? { before: fig(before) } : {}),
+  after: fig(after),
+  afterClass: `tabular-nums ${changed ? "text-foreground" : "text-rb-500"}`,
+});
 
 /** The at-call loan-to-value's receipt: the same balances and prices as the
  *  at-call health factor. */
@@ -82,30 +63,24 @@ function hfAtCallProv(coords: V3Coords, hf: number, endOfPrevious: number | null
   };
 }
 
-export function SparkAccountState({
+/** SparkLend's figures under the side cells, and the line naming a
+ *  liquidation's basis. */
+export function sparkRiskCells({
   state,
   raw,
   coords,
   isLiquidation,
-  touched = [],
   hfFormat = hfLabelV4,
-  eventId,
-  eventTs,
 }: {
-  /** The timeline event, for the card's lifetime sum. */
-  eventId?: string;
-  eventTs?: number;
   state: SparkEventState;
   raw: AaveV3PositionState;
   coords: V3Coords;
   isLiquidation: boolean;
-  /** The reserves the event touched: their rows always draw (§47, §52). */
-  touched?: TouchedLeg[];
   /** The explorer's health-factor format; SparkLend's by default. */
   hfFormat?: (hf: number | null) => string;
-}) {
+}): { cells: EventStatCellSpec[]; notes: ReactNode } {
   const acc = raw.account;
-  if (!acc) return null;
+  if (!acc) return { cells: [], notes: null };
   const { before, after } = state;
 
   const hfBeforeValue = isLiquidation && state.liqHfAtCall != null ? state.liqHfAtCall : before.hf;
@@ -152,27 +127,29 @@ export function SparkAccountState({
   const hfChanged = hfBeforeValue !== after.hf;
   const emodeChanged = state.emodeBefore.id !== state.emodeAfter.id;
 
-  // The row under the two side cells (aave-family-event-receipt.tsx):
-  // health factor, LTV, what can still be borrowed, and E-mode, which always
-  // draws ("None" says the limits are each asset's own).
-  const risk: RiskItem[] = [];
-  if (before.hf != null || after.hf != null)
-    risk.push({
-      key: "health-factor",
-      label: "Health factor",
-      body: <Pair before={hfFig(hfBeforeValue, "before")} after={hfFig(after.hf, "after")} changed={hfChanged} />,
-    });
-  else
-    risk.push({
-      key: "health-factor",
-      label: "Health factor",
-      body: (
-        <>
-          <span className="text-sm font-semibold text-rb-500">None</span>
-          <StatSubline>no debt, so no health factor</StatSubline>
-        </>
-      ),
-    });
+  const cells: EventStatCellSpec[] = [];
+  cells.push(
+    before.hf != null || after.hf != null
+      ? {
+          key: "health-factor",
+          kind: "stat",
+          label: "Health factor",
+          changed: hfChanged,
+          inputs: ["collateral", "debt"],
+          value: pair(hfFig(hfBeforeValue, "before"), hfFig(after.hf, "after"), hfChanged),
+          data: { "data-position-card": "health-factor" },
+        }
+      : {
+          key: "health-factor",
+          kind: "stat",
+          label: "Health factor",
+          changed: false,
+          inputs: ["collateral", "debt"],
+          value: { none: "None" },
+          sub: [{ content: "no debt, so no health factor" }],
+          data: { "data-position-card": "health-factor" },
+        },
+  );
   // The collateral the category covers, with its own figures outside it.
   const outside = raw.reserves.filter(
     (r) =>
@@ -183,48 +160,39 @@ export function SparkAccountState({
       r.liquidationThresholdBps != null &&
       r.symbol != null,
   );
-  risk.push({
-    key: "ltv",
-    label: "LTV",
-    body: <LtvCellBody state={raw} coords={coords} before={ltvBefore} part="ratio" />,
-  });
-  risk.push({
-    key: "borrowable",
-    label: "Still borrowable",
-    body: <LtvCellBody state={raw} coords={coords} part="borrowable" />,
-  });
-  risk.push({
+  cells.push(...ltvCells(raw, coords, ltvBefore));
+  // E-mode always draws ("None" says the limits are each asset's own).
+  cells.push({
     key: "emode",
+    kind: "stat",
     label: "E-mode",
-    body: (
-      <>
-        <Pair before={emodeFig("before")} after={emodeFig("after")} changed={emodeChanged} />
-        {state.emodeAfter.id !== 0 &&
-          state.emodeAfter.ltvBps != null &&
-          state.emodeAfter.liquidationThresholdBps != null && (
-            <StatSubline>
-              LTV {bpsPct(state.emodeAfter.ltvBps)} · liquidation at {bpsPct(state.emodeAfter.liquidationThresholdBps)}
-              {outside.length > 0
-                ? ` (outside e-mode: ${outside
-                    .map(
-                      (r) =>
-                        `${r.symbol} ${bpsPct(r.ltvBps as number)} · ${bpsPct(r.liquidationThresholdBps as number)}`,
-                    )
-                    .join(", ")})`
-                : ""}
-            </StatSubline>
-          )}
-        {state.emodeAfter.id === 0 && <StatSubline>limits are each asset&rsquo;s own</StatSubline>}
-      </>
-    ),
+    changed: emodeChanged,
+    value: pair(emodeFig("before"), emodeFig("after"), emodeChanged),
+    sub:
+      state.emodeAfter.id !== 0 && state.emodeAfter.ltvBps != null && state.emodeAfter.liquidationThresholdBps != null
+        ? [
+            {
+              content: `LTV ${bpsPct(state.emodeAfter.ltvBps)} · liquidation at ${bpsPct(state.emodeAfter.liquidationThresholdBps)}${
+                outside.length > 0
+                  ? ` (outside e-mode: ${outside
+                      .map((r) => `${r.symbol} ${bpsPct(r.ltvBps as number)} · ${bpsPct(r.liquidationThresholdBps as number)}`)
+                      .join(", ")})`
+                  : ""
+              }`,
+            },
+          ]
+        : state.emodeAfter.id === 0
+          ? [{ content: <>limits are each asset&rsquo;s own</> }]
+          : undefined,
+    data: { "data-position-card": "emode" },
   });
 
   // A liquidation's before figures are read at the prices the call ran at; the
   // end of the block before is the second basis, named here once.
   const priceMove = state.liqPriceMove;
-  const basis =
+  const notes =
     isLiquidation && state.liqHfAtCall != null ? (
-      <p className="mt-2 text-xs leading-relaxed text-rb-500" data-spark-liq-basis="">
+      <p className="leading-relaxed" data-spark-liq-basis="">
         Before: the balances before this transaction at the oracle prices the liquidation ran at
         {priceMove ? ` (${priceMove.symbol} ${usd2(priceMove.to)})` : ""}. At the end of the block before
         {priceMove ? `, with ${priceMove.symbol} at ${usd2(priceMove.from)},` : ""} the health factor was{" "}
@@ -232,20 +200,7 @@ export function SparkAccountState({
         {before.ltv != null ? ` and the loan-to-value ${(before.ltv * 100).toFixed(2)}%` : ""}.
       </p>
     ) : null;
-
-  return (
-    <div data-spark-account-state="ready">
-      <AaveFamilyEventReceipt
-        state={raw}
-        coords={coords}
-        touched={touched}
-        eventId={eventId}
-        eventTs={eventTs}
-        risk={risk}
-        notes={basis}
-      />
-    </div>
-  );
+  return { cells, notes };
 }
 
 /** An oracle price as the card's price chip states it ("$1,572.11"). */

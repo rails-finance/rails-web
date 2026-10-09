@@ -1,22 +1,25 @@
 "use client";
 
-// Composer: wires the Aave V3 ON-CHAIN VALUES header / detail / explainer into the
-// universal EventCard shell (chain-replayed values carry the chain-state
-// baseline; the plain-English explainer rides its own second-tier slot).
+// An Aave V3 event's card (Ethereum, Base, Seamless) on the shared shell's
+// slots (rails-ops reference/shared-event-card-spec.md §3, §4; ui-jobs 309
+// step 6): the spine, the head (aave-v3-ct-event-header.tsx), the cells, notes
+// and prices of T2 (aave-v3-ct-event-detail.tsx), the explanation and the
+// Learn-More "?".
 
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type V3Coords } from "@/lib/aave-v3/event-provenance";
 import { aaveV3ExplainerTeaser } from "@/lib/aave-v3/explainer-clauses";
-import { AaveV3CtEventHeader, aaveV3CtLabel, isAaveV3LossRow } from "./aave-v3-ct-event-header";
-import { AaveV3CtEventDetail } from "./aave-v3-ct-event-detail";
-import { useState } from "react";
+import { aaveV3CtLabel, isAaveV3LossRow, useAaveV3HeadSpec } from "./aave-v3-ct-event-header";
+import { useAaveV3EventBody } from "./aave-v3-ct-event-detail";
+import { AaveFamilyLedgers } from "./aave-family-cells";
 import { AaveV3EventExplainer, aaveV3LearnMoreContent } from "./aave-v3-event-explainer";
+import { useCallback, useState } from "react";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -70,8 +73,9 @@ const DIRECTION: Record<
 export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings, previous }: AaveV3CtEventCardProps) {
   const ctx = event.context.data;
   const chainId = useChainId();
-  // The (i)'s slot for the interest line and the prices.
-  const [notesSlot, setNotesSlot] = useState<HTMLElement | null>(null);
+  // Pointer-over or focus of the row starts the position reads the open card
+  // makes (this transaction's and the previous one's), so the state is
+  // usually in hand by the time the card opens.
   const prefetch = () => {
     if (!market) return;
     const wallet = event.wallet;
@@ -190,63 +194,89 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
         ]
       : undefined;
 
-  const iconSlot = isLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : isSwap && !isFlowSwap ? (
-    <SpineColumn icon="swap" swapLegs={swapLegs} swapAxis={swapAxis} isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isLoss
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : isSwap && !isFlowSwap
+      ? { icon: "swap", swapLegs, swapAxis, isLast: !!isLast }
+      : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  return (
-    <EventCard
-      avatar={null}
-      custody={
-        ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
+  const head = useAaveV3HeadSpec({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+    feeOf,
+  });
+  // The reads start when the card first opens.
+  const [active, setActive] = useState(false);
+  const onOpen = useCallback(() => setActive(true), []);
+  const body = useAaveV3EventBody({
+    active,
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    market,
+    feeOf,
+    fee,
+    previous,
+    // A liquidation fee's transfer states the liquidation's account: no ledger.
+    eventId: feeOf ? undefined : event.id,
+    eventTs: event.timestamp,
+  });
+  // The read lane (a market, and not a fee's row) opens its side cells into
+  // their ledgers once the read has landed; Seamless has no read.
+  const readLane = !!market && !feeOf;
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "aave-v3",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: aaveV3CtLabel(ctx, !!feeOf, chainId),
+    actor: {
+      by: extBy ?? undefined,
+      custody:
+        ctx.counterparty && isTransfer
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
-          : undefined
-      }
-      by={extBy ?? undefined}
-      iconColumn={iconSlot}
-      caption={aaveV3CtLabel(ctx, !!feeOf, chainId)}
-      header={
-        // The pointer on the header starts the position reads the open card
-        // makes (this transaction's and the previous one's), so the state is
-        // usually in hand by the time the card opens. `contents` keeps the
-        // layout; the pointer events still bubble through it.
-        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
-          <AaveV3CtEventHeader
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-            feeOf={feeOf}
-          />
-        </div>
-      }
-      detail={
-        <AaveV3CtEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          market={market}
-          feeOf={feeOf}
-          fee={fee}
-          previous={previous}
-          // A liquidation fee's transfer states the liquidation's account: no ledger.
-          eventId={feeOf ? undefined : event.id}
-          eventTs={event.timestamp}
-          notesSlot={notesSlot}
-        />
-      }
-      explainer={
+          : undefined,
+    },
+    cells: body.cells,
+    cellsData: body.cellsData,
+    ledgers: readLane
+      ? {
+          provider: (children) => (
+            <AaveFamilyLedgers
+              state={body.state}
+              coords={body.stateCoords}
+              eventId={event.id}
+              eventTs={event.timestamp}
+            >
+              {children}
+            </AaveFamilyLedgers>
+          ),
+        }
+      : {
+          none: feeOf
+            ? "A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card."
+            : "No position read on this lane: the cells state the event's balances.",
+        },
+    notes: body.notes,
+    // The index carries no gas for the Aave family's rows and the position read
+    // reads none, so the row states no owner-paid gas.
+    price: { gas: null, prices: body.prices },
+    explainer: {
+      body: (
         <>
-          <div ref={setNotesSlot} className="mb-2 empty:hidden" />
+          {body.rateNote}
           <AaveV3EventExplainer
             ctx={ctx}
             txHash={event.txHash}
@@ -259,11 +289,13 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
             skipLead
           />
         </>
-      }
-      explainerTeaser={aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />}
-      persistKey={`aave-v3:${event.id}`}
-    />
-  );
+      ),
+      first: aaveV3ExplainerTeaser(ctx, coords, { owner: event.wallet, siblings }) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={aaveV3LearnMoreContent(feeOf ?? ctx, v3Protocol(coords.pool))} />,
+    onIntent: prefetch,
+    onOpen,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }
