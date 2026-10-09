@@ -11,6 +11,7 @@ import type { LiquityContext } from "@/lib/shared/types/protocols/liquity";
 import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
+import { zombieTitle } from "@/lib/liquity/trove-page-words";
 import {
   collChangeProv,
   debtChangeProv,
@@ -127,10 +128,7 @@ export function liquityHeadSpec(
     if (ctx.isZombieTrove)
       spec.zombie = {
         word: L1_WORDS.zombie,
-        title:
-          stateAfter.debt === 0
-            ? "Zombie trove fully redeemed — debt cleared, collateral now claimable"
-            : "Zombie trove — debt below the minimum, redeemable until restored",
+        title: zombieTitle(stateAfter.debt === 0),
       };
   } else if (op === "liquidate") {
     spec.critical = true;

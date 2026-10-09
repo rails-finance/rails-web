@@ -9,7 +9,7 @@ import type { SpineColumnProps, SpineTokenRow, SpineWarningLeg } from "@/compone
 import { Facehash } from "@/components/shared/facehash";
 import { useLiquityHeadSpec } from "./liquity-head";
 import { liquityL1Label } from "@/lib/liquity/event-prose";
-import { LiquityEventDetail } from "./liquity-event-detail";
+import { LiquityRedeemerNote, useLiquityCells } from "./liquity-cells";
 import { isGroupedExplanation, LiquityEventExplainer, LiquityExplainerTeaser } from "./liquity-event-explainer";
 import { useLiquityEventMarkdown, useLiquityEventProse } from "./event-prose-render";
 import { EventMarkdownContext, EventPageContext } from "@/components/shared/event-page-aside";
@@ -268,18 +268,7 @@ export function LiquityEventCard({
         }
       : null,
   };
-  const detailPart = (part: "cells" | "notes") => (
-    <LiquityEventDetail
-      ctx={ctx}
-      txHash={event.txHash}
-      blockNumber={event.blockNumber}
-      previousEvent={previousEvent}
-      currentEvent={event}
-      currentPrice={currentPrice}
-      prose={prose}
-      part={part}
-    />
-  );
+  const cells = useLiquityCells({ ctx, txHash: event.txHash, blockNumber: event.blockNumber, prose });
 
   const head = useLiquityHeadSpec(ctx, coords);
   const slots: EventCardSlots = {
@@ -309,7 +298,7 @@ export function LiquityEventCard({
             : { dir: "to", address: ctx.transfer.toAddress }
           : undefined,
     },
-    cells: detailPart("cells"),
+    cells,
     ledgers: {
       provider: (children) => (
         <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp} accrualLabel={liquityAccrualLabel}>
@@ -317,7 +306,10 @@ export function LiquityEventCard({
         </LiquityLedgerProvider>
       ),
     },
-    notes: detailPart("notes"),
+    notes:
+      ctx.stateBefore && ctx.stateAfter && prose.L2 ? (
+        <LiquityRedeemerNote ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />
+      ) : undefined,
     price,
     explainer: {
       body: <LiquityEventExplainer prose={prose} ctx={ctx} coords={coords} />,

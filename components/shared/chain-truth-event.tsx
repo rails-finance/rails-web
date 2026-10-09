@@ -1039,7 +1039,7 @@ export function ChainTruthDetail({
         if (unread)
           return (
             <div key={i} className="h-full" data-not-loaded="">
-              <StatCard label={s.label}>
+              <StatCard label={s.label} changed={s.changed}>
                 <span className="text-sm font-semibold">
                   <TokenAmountNotLoaded address={unread.address} label={unread.label} />
                 </span>
@@ -1048,11 +1048,13 @@ export function ChainTruthDetail({
           );
         const wrap = (children: ReactNode) =>
           s.ledger ? (
-            <LedgerCell label={s.label} side={s.ledger}>
+            <LedgerCell label={s.label} side={s.ledger} changed={s.changed}>
               {children}
             </LedgerCell>
           ) : (
-            <StatCard label={s.label}>{children}</StatCard>
+            <StatCard label={s.label} changed={s.changed}>
+              {children}
+            </StatCard>
           );
         // A ledger cell keeps its tokens' before → after on one line.
         const usdOn = s.usd && usdShown(s.usd.value);

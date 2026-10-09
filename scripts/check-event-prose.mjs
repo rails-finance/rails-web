@@ -44,7 +44,7 @@ const READERS = [
   "lib/liquity/event-page.ts",
   "components/protocol/liquity/event-prose-render.tsx",
   "components/protocol/liquity/liquity-head.tsx",
-  "components/protocol/liquity/liquity-event-detail.tsx",
+  "components/protocol/liquity/liquity-cells.tsx",
   "components/protocol/liquity/liquity-event-card.tsx",
   "lib/liquity/explorer.ts",
 ];

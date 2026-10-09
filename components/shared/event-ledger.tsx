@@ -123,17 +123,28 @@ export function PendingBar({ className = "w-24" }: { className?: string }) {
  *  full-width rows of a closed ledger cell's height; each name in `stats` is a
  *  half-width cell under them (health factor, LTV, rate), as the loaded
  *  card lays them. The swap to the loaded cells moves nothing sideways. */
-export function T2Skeleton({ stats = [], data }: { stats?: string[]; data?: Record<string, string> }) {
+export function T2Skeleton({
+  ledgers = [
+    { label: "Collateral", side: "collateral" },
+    { label: "Debt", side: "debt" },
+  ],
+  stats = [],
+  data,
+}: {
+  /** The full-width ledger cells, in order. */
+  ledgers?: { label: string; side: FlowSide }[];
+  stats?: string[];
+  data?: Record<string, string>;
+}) {
   return (
     <EventLedgerContext.Provider value={LEDGER_PENDING}>
       <div className="px-5 py-2" aria-busy="true" data-t2-skeleton="" {...data}>
         <div className="grid grid-cols-1 items-start gap-2.5 sm:grid-flow-row-dense sm:grid-cols-2">
-          <LedgerCell label="Collateral" side="collateral">
-            {null}
-          </LedgerCell>
-          <LedgerCell label="Debt" side="debt">
-            {null}
-          </LedgerCell>
+          {ledgers.map((l) => (
+            <LedgerCell key={l.side} label={l.label} side={l.side}>
+              {null}
+            </LedgerCell>
+          ))}
           {stats.map((label) => (
             <StatCard key={label} label={label}>
               <PendingBar />
@@ -170,7 +181,11 @@ export function LedgerCell({
   data,
   className = "",
   alignRight,
+  changed,
 }: {
+  /** Whether this event moved the cell's value: the heading is muted where it
+   *  did not (ui-jobs 243). Unset, the heading stands in the foreground. */
+  changed?: boolean;
   /** Closed, set the figures at the right of the name's row (default: on a
    *  card with ledgers). False: the name's row holds the toggle alone and
    *  the figures stand under it (the state card's asset lists). */
@@ -232,7 +247,7 @@ export function LedgerCell({
   const nameRow = (
     <span className="flex min-h-5 max-w-full shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
       {side && <SideSwatch side={side} />}
-      {label}
+      {changed === false ? <span className="text-rb-500">{label}</span> : label}
       {toggle && <span className="-ml-1 inline-flex items-center">{toggle}</span>}
     </span>
   );

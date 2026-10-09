@@ -104,11 +104,16 @@ export function StatCard({
   label,
   children,
   data,
+  changed,
 }: {
   label: ReactNode;
   children: ReactNode;
   /** Data attributes for the cell. */
   data?: Record<string, string>;
+  /** Whether this event moved the cell's value: on a card whose cells open
+   *  into ledgers the heading is muted where it did not (ui-jobs 243). Unset,
+   *  the heading stands in the foreground. */
+  changed?: boolean;
 }) {
   // On a card whose account cells open into ledgers, every cell is one row
   // as the ledger cells are (components/shared/event-ledger.tsx): its label
@@ -121,7 +126,11 @@ export function StatCard({
         data-stat-row=""
         {...data}
       >
-        <div className="flex min-h-5 items-center text-sm font-semibold text-foreground">{label}</div>
+        <div
+          className={`flex min-h-5 items-center text-sm font-semibold ${changed === false ? "text-rb-500" : "text-foreground"}`}
+        >
+          {label}
+        </div>
         <div className="flex flex-1 basis-36 flex-col items-end text-right">{children}</div>
       </div>
     );

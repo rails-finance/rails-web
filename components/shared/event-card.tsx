@@ -33,6 +33,7 @@ import {
 import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
+import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -52,8 +53,7 @@ function ExplanationNotLoaded({ tokens }: { tokens: UnreadToken[] }) {
 
 /* ── The slots (rails-ops reference/shared-event-card-spec.md §3; ui-jobs 309) ──
  * A family on the shell supplies data and words in these; the shell decides
- * which parts exist and where they sit. A slot typed `ReactNode` here takes a
- * typed shape in a later step of 309: `cells` in step 4. */
+ * which parts exist and where they sit. */
 
 /** The event the card stands for. The shell builds the card's open-state key
  *  from `family` and `id`, and the menu from `txHash`. */
@@ -102,8 +102,9 @@ export interface EventCardSlots {
   /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"). */
   caption: string;
   actor?: EventCardActor;
-  /** T2's grid. */
-  cells: ReactNode;
+  /** T2's grid: the ordered cells, the cells to come while their figures are
+   *  read, or the reason the event has none. */
+  cells: EventCells;
   ledgers: EventCardLedgers;
   /** T2's price row: the owner-paid gas, the prices the cells value, the
    *  outcome. The row draws where one of them is present. */
@@ -205,7 +206,7 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
     band: slots.band,
     detail: (
       <>
-        {slots.cells}
+        <EventCellGrid cells={slots.cells} />
         {slots.notes}
       </>
     ),

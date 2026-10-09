@@ -56,20 +56,6 @@ export function eventInputs(coords: EventCoords | undefined, extra: ProvInput[] 
 export const fieldSeg = (field: string, raw?: string | null): string =>
   raw != null && raw !== "" ? `${field}: ${raw}` : field;
 
-/** The via segments for a value summed from several log fields — the primary
- *  field always, secondary fields only when their raw is present and nonzero
- *  (they're almost always 0 and would drown the line). */
-export function fieldSumSeg(
-  primary: { f: string; raw?: string | null },
-  ...rest: { f: string; raw?: string | null }[]
-): string {
-  const parts = [fieldSeg(primary.f, primary.raw)];
-  for (const r of rest) {
-    if (r.raw != null && r.raw !== "" && !/^-?0$/.test(r.raw)) parts.push(fieldSeg(r.f, r.raw));
-  }
-  return parts.join(" + ");
-}
-
 /** Log-anatomy via segments driven by the backend's origin envelope — the
  *  pipeline's own {event, param, raw, scale}, stamped in rails-server beside
  *  the SQL column selections. The envelope is AUTHORITATIVE when delivered:
@@ -105,8 +91,9 @@ export function scalingOf(
     : { raw, places, why: `${unit.token} amounts have ${places} decimal places` };
 }
 
-/** Envelope-driven sum via — fieldSumSeg with each part's name/raw preferring
- *  its origin envelope. All parts share the primary's event and scale. */
+/** The via segments for a value summed from several log fields, each part's
+ *  name/raw preferring its origin envelope; a secondary part only where its
+ *  raw is present and nonzero. All parts share the primary's event and scale. */
 export function originSumSeg(
   primary: { o?: OriginEnvelope | null; f: string; raw?: string | null },
   rest: Array<{ o?: OriginEnvelope | null; f: string; raw?: string | null }>,
