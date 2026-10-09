@@ -9,18 +9,16 @@
 //       wallet at ≥sm.
 //   T2  this Trove's claimable collateral going to zero, and what the claim
 //       paid in all (the pool pays the owner's whole balance, so one claim can
-//       cover several Troves).
+//       cover several Troves), as cells; the collateral's price in the price
+//       row (ui-jobs 309).
 //   T3  the credit it paid out, and whether other Troves shared the claim.
 //   T4  how the pool holds and pays a surplus.
 
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
-import {
-  ChainTruthDetail,
-  ChainTruthRow,
-  chainTruthDeltaValue,
-  type ChainTruthStat,
-} from "@/components/shared/chain-truth-event";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { chainTruthDeltaValue, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import { statCell } from "@/components/shared/chain-truth-cells";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -38,8 +36,6 @@ import {
   claimPaidUsdAtBlockProv,
   claimPriceProv,
 } from "@/lib/shared/liquity-coll-surplus-provenance";
-import { StatCard, StatSubline, StateTransition } from "@/components/shared/state-transition";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { useLiquityV1EventReadState } from "@/lib/liquity-v1/use-event-read";
 import { claimPaidUsdProv, eventPriceProv } from "@/lib/liquity-v1/event-provenance";
 import { fmtUsd } from "@/lib/liquity-v1/event-figures";
@@ -187,61 +183,73 @@ export function CollSurplusClaimCard({
     fork ? { family: "fork", fork } : { family: v1 ? "liquity-v1" : "liquity-v2", protocolName: d.protocolName },
   );
 
+  const claimable = statCell(stats[0], "claimable");
+  const paidStat = stats[1];
+  const cells: EventCellSpec[] = [claimable];
+  if (paidStat) {
+    const paid = statCell(paidStat, "paid");
+    // The pool pays in collateral; its worth at the claim's block is a line
+    // under it.
+    if (paidStat.usd)
+      paid.sub = [
+        {
+          content: (
+            <>
+              worth{" "}
+              <Prov info={paidStat.usd.prov} value={fmtUsd(paidStat.usd.value)}>
+                {fmtUsd(paidStat.usd.value)}
+              </Prov>{" "}
+              at this block
+            </>
+          ),
+          changed: true,
+        },
+        ...(paid.sub ?? []),
+      ];
+    cells.push(paid);
+  }
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: persistPrefix,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine: { tokens: [{ symbol: d.symbol, direction: "left", value: d.amount, verb: "claimed" }], isLast: !!isLast },
+    head: {
+      label: "",
+      deltas: [{ value: d.amount, symbol: d.symbol, prov: amountProv, label: event.actionLabel, axisVerb: true }],
+    },
+    caption: event.actionLabel,
+    cells,
+    ledgers: { none: "the claim pays out of the surplus pool, outside the Trove's flows" },
+    // The collateral's price at the claim's block, from the branch's feed
+    // (Liquity V1: Liquity's feed, read with the receipt).
+    price: showPrice
+      ? {
+          prices:
+            price != null && priceProv != null
+              ? [
+                  {
+                    symbol: d.symbol,
+                    usd: price,
+                    format: fmtUsd,
+                    info: priceProv,
+                    title: `${v1 ? "Liquity's price feed" : `The ${d.symbol} branch's price feed`}, at this block`,
+                  },
+                ]
+              : [],
+        }
+      : undefined,
+    explainer: { body: rest.length > 0 ? <ProseExplainer items={rest} /> : null, first: lead },
+    learnMore: <LearnMore inline content={learnMore} />,
+  };
+
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={
-        <SpineColumn
-          tokens={[
-            {
-              symbol: d.symbol,
-              direction: "left",
-              value: d.amount,
-              verb: "claimed",
-            },
-          ]}
-          isLast={!!isLast}
-        />
-      }
-      header={
-        <ChainTruthRow
-          spec={{
-            label: "",
-            deltas: [{ value: d.amount, symbol: d.symbol, prov: amountProv, label: event.actionLabel, axisVerb: true }],
-          }}
-          timestamp={event.timestamp}
-          eventNumber={eventNumber}
-        />
-      }
-      detail={
-        <ChainTruthDetail
-          stats={stats}
-          extra={
-            showPrice ? (
-              <StatCard label={`${d.symbol} price`}>
-                {price != null && priceProv != null ? (
-                  <StateTransition>
-                    <Prov info={priceProv}>
-                      <span className="text-sm font-semibold tabular-nums text-rb-500">{fmtUsd(price)}</span>
-                    </Prov>
-                    <TokenChipIcon symbol={d.symbol} size={16} />
-                  </StateTransition>
-                ) : (
-                  <span className="text-sm font-semibold text-rb-500">…</span>
-                )}
-                <StatSubline>
-                  {v1 ? "Liquity's price feed" : `The ${d.symbol} branch's price feed`}, at this block
-                </StatSubline>
-              </StatCard>
-            ) : undefined
-          }
-        />
-      }
-      explainer={rest.length > 0 ? <ProseExplainer items={rest} /> : undefined}
-      explainerTeaser={lead}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={learnMore} />}
-      persistKey={`${persistPrefix}:${event.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }
