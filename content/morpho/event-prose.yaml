@@ -738,6 +738,8 @@ doc_urls:
     https://docs.morpho.org/developers/contracts/blue/#withdrawcollateral
   CONTRACT_AUTHORIZATION: |-
     https://docs.morpho.org/developers/contracts/blue/#setauthorization
+  PENDLE_PT: |-
+    https://docs.pendle.finance/pendle-academy/cheatsheet-for-the-impatient/pt-yt-lp-cheatsheet#principal-token-pt
 
 # ── The "?" modals (zone Z4): the event modals and the position card's. Each
 # stops at the mechanism and hands it to a Quick Link; no figure of one
@@ -773,6 +775,7 @@ L5:
         only: pt
         text: |-
           a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+        sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
           Collateral, LTV & Health
@@ -995,6 +998,7 @@ L5:
         only: pt
         text: |-
           a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+        sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
           Variable rate market
@@ -1040,6 +1044,7 @@ L5:
         only: pt
         text: |-
           a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+        sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
           Variable rate market
@@ -1077,6 +1082,7 @@ L5:
         only: pt
         text: |-
           a PT redeems for one unit of its underlying token at maturity and trades below that until then, so its oracle price rises toward maturity.
+        sources: [{ label: "Pendle docs: Principal Token", doc: PENDLE_PT }]
     links:
       - label: |-
           Liquidation incentive factor
