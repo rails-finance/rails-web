@@ -7,10 +7,11 @@
 //        and sUSDS on a deposit or withdrawal; sUSDS and its USDS worth on a
 //        transfer, with the other address), who deposited when it was another
 //        address, and the referral code a deposit carried.
-//   T2 — the opened card: sUSDS held and its worth before → after, the
-//        interest earned to date and since the previous event, the share price and the Savings Rate at
-//        the event's block, the referral code.
-//   T3 — the explanation of this event's figures (sky-savings-event-explainer).
+//   T2 — the opened card: sUSDS held and its worth before → after as cells,
+//        the interest earned to date and since the previous event under the
+//        worth; one sUSDS's worth in the price row; the Savings Rate at the
+//        event's block and the referral code as notes (ui-jobs 309).
+//   T3 — the explanation of this event's figures (lib/sky-savings/explainer-clauses.tsx).
 //   T4 — the lesson for the kind (lib/sky-savings/learn-more.ts).
 //
 // Spine: the wallet is on the left and the savings module on the right. A
@@ -18,16 +19,20 @@
 // transfer is custody (the paper plane): shares went to or came from another
 // address and nothing crossed the module.
 
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import {
-  ChainTruthDetail,
-  ChainTruthRow,
+  compactAmount,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
 } from "@/components/shared/chain-truth-event";
-import { StatCard } from "@/components/shared/state-transition";
+import { statCell } from "@/components/shared/chain-truth-cells";
+import { ExactTip } from "@/components/shared/amount-text";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov } from "@/components/shared/provenance";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { formatCompact, withRealMinus } from "@/lib/utils/format";
@@ -59,8 +64,7 @@ import {
   type SkyEventCoords,
 } from "@/lib/sky-savings/provenance";
 import { skyEventContent } from "@/lib/sky-savings/learn-more";
-import { skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
-import { SkySavingsEventExplainer } from "./sky-savings-event-explainer";
+import { skyEventBullets, skyInterestSince, type SkyPreviousEvent } from "@/lib/sky-savings/explainer-clauses";
 
 export type SkySavingsEvent = BaseActivityEvent & { context: { protocol: "sky-savings"; data: SkySavingsContext } };
 
@@ -200,127 +204,152 @@ export function SkySavingsEventCard({
   const since = skyInterestSince(c, previous);
   // Omitted where the balance was empty in between (nothing to earn).
   const sinceRaw = since != null && previous && since !== BigInt(0) ? since : null;
-  const stats: ChainTruthStat[] = [
-    {
-      label: "sUSDS held",
-      value: exact(t.sharesAfter),
-      symbol: SUSDS.symbol,
-      address: SUSDS.address,
-      prov: eventSharesAfterProv(coords, c.sharesAfter),
-      changed: sharesChanged,
-      transition: sharesChanged
+  const held: ChainTruthStat = {
+    label: "sUSDS held",
+    value: exact(t.sharesAfter),
+    symbol: SUSDS.symbol,
+    address: SUSDS.address,
+    prov: eventSharesAfterProv(coords, c.sharesAfter),
+    changed: sharesChanged,
+    transition: sharesChanged
+      ? {
+          before: formatCompact(units(t.sharesBefore)),
+          beforeExact: exact(t.sharesBefore),
+          beforeProv: eventSharesBeforeProv(coords, t.sharesBefore.toString()),
+          change: signedCompact(t.sharesDelta),
+          changeExact: signedExact(t.sharesDelta),
+          changeProv: sharesProv,
+        }
+      : undefined,
+  };
+  const worth: ChainTruthStat = {
+    label: "Worth in USDS",
+    value: exact(t.valueAfter),
+    symbol: USDS.symbol,
+    address: USDS.address,
+    prov: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
+    changed: sharesChanged,
+    transition: sharesChanged
+      ? {
+          before: formatCompact(units(t.valueBefore)),
+          beforeExact: exact(t.valueBefore),
+          beforeProv: eventValueProv(coords, "before", t.valueBefore.toString(), t.sharesBefore.toString(), c.chi),
+          change: signedCompact(t.valueAfter - t.valueBefore),
+          changeExact: signedExact(t.valueAfter - t.valueBefore),
+          changeProv: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
+        }
+      : undefined,
+    // A deposit, withdrawal or transfer moves USDS in or out at the share
+    // price of its block, so interest earned stands still across it; what
+    // moved it is the time since the previous event. Its lines stand muted.
+    interestSincePrevious:
+      sinceRaw != null && previous
         ? {
-            before: formatCompact(units(t.sharesBefore)),
-            beforeExact: exact(t.sharesBefore),
-            beforeProv: eventSharesBeforeProv(coords, t.sharesBefore.toString()),
-            change: signedCompact(t.sharesDelta),
-            changeExact: signedExact(t.sharesDelta),
-            changeProv: sharesProv,
+            value: exact(sinceRaw),
+            display: fixed6(sinceRaw),
+            after: previous.rateChanges
+              ? `, across ${previous.rateChanges.count} Savings Rate change${previous.rateChanges.count === 1 ? "" : "s"}, ${pctString(previous.rateChanges.from)} → ${pctString(previous.rateChanges.to)}`
+              : undefined,
+            prov: eventInterestSinceProv(
+              coords,
+              sinceRaw.toString(),
+              previous.blockNumber,
+              previous.ctx.valueAfter,
+              t.valueBefore.toString(),
+            ),
           }
         : undefined,
-    },
+  };
+  const earnedExact = withRealMinus(exact(t.earnedAfter));
+  const worthCell = statCell(worth, "worth", { symbolText: true, inputs: ["held"] });
+  worthCell.sub = [
     {
-      label: "Worth in USDS",
-      value: exact(t.valueAfter),
-      symbol: USDS.symbol,
-      address: USDS.address,
-      prov: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
-      changed: sharesChanged,
-      transition: sharesChanged
-        ? {
-            before: formatCompact(units(t.valueBefore)),
-            beforeExact: exact(t.valueBefore),
-            beforeProv: eventValueProv(coords, "before", t.valueBefore.toString(), t.sharesBefore.toString(), c.chi),
-            change: signedCompact(t.valueAfter - t.valueBefore),
-            changeExact: signedExact(t.valueAfter - t.valueBefore),
-            changeProv: eventValueProv(coords, "after", c.valueAfter, c.sharesAfter, c.chi),
-          }
-        : undefined,
-    },
-    {
-      label: "Interest earned since the first event",
-      value: withRealMinus(exact(t.earnedAfter)),
-      // A first deposit's one wei of rounding reads 0.000 here; T3 states it.
-      display: t.earnedAfter < BigInt(0) && t.earnedAfter > BigInt(-1_000_000) ? "0.000" : undefined,
-      symbol: USDS.symbol,
-      address: USDS.address,
-      prov: eventEarnedProv(coords, "after", c.earnedAfter),
-      // A deposit, withdrawal or transfer moves USDS in or out at the share
-      // price of its block, so interest earned stands still across it; what
-      // moved it is the time since the previous event.
-      changed: false,
-      interestSincePrevious:
-        sinceRaw != null && previous
-          ? {
-              value: exact(sinceRaw),
-              display: fixed6(sinceRaw),
-              after: previous.rateChanges
-                ? `, across ${previous.rateChanges.count} Savings Rate change${previous.rateChanges.count === 1 ? "" : "s"}, ${pctString(previous.rateChanges.from)} → ${pctString(previous.rateChanges.to)}`
-                : undefined,
-              prov: eventInterestSinceProv(
-                coords,
-                sinceRaw.toString(),
-                previous.blockNumber,
-                previous.ctx.valueAfter,
-                t.valueBefore.toString(),
-              ),
-            }
-          : undefined,
-    },
-    {
-      label: "One sUSDS worth",
-      value: rayExact(c.chi),
-      display: rayNumber(c.chi).toFixed(6),
-      symbol: USDS.symbol,
-      address: USDS.address,
-      prov: eventChiProv(coords, c.chi, c.usdsSource === "log"),
-      changed: false,
-      sub: (
+      content: (
         <>
-          Savings Rate{" "}
-          <Prov info={eventRateProv(coords, c.ssr, rateText)} value={rateText}>
-            <span>{rateText}</span>
-          </Prov>
+          Interest earned since the first event:{" "}
+          <Prov info={eventEarnedProv(coords, "after", c.earnedAfter)} value={earnedExact} symbol={USDS.symbol}>
+            <ExactTip
+              always
+              // A first deposit's one wei of rounding reads 0.000 here; T3
+              // states it.
+              text={
+                t.earnedAfter < BigInt(0) && t.earnedAfter > BigInt(-1_000_000) ? "0.000" : compactAmount(earnedExact)
+              }
+              exact={earnedExact}
+              symbol={USDS.symbol}
+            />
+          </Prov>{" "}
+          {USDS.symbol}
         </>
       ),
     },
+    ...(worthCell.sub ?? []),
   ];
-  const detail = (
-    <>
-      <ChainTruthDetail
-        stats={stats}
-        symbolText
-        extra={
-          referralProv && c.referral != null ? (
-            <StatCard label="Referral code">
-              <Prov info={referralProv} value={String(c.referral)}>
-                <span className="text-sm font-semibold tabular-nums text-foreground">{c.referral}</span>
-              </Prov>
-            </StatCard>
-          ) : undefined
-        }
-      />
-    </>
+  const cells: EventCellSpec[] = [statCell(held, "held", { symbolText: true }), worthCell];
+  const chiText = rayNumber(c.chi).toFixed(6);
+  const price: EventCardPrice = {
+    prices: [
+      {
+        symbol: USDS.symbol,
+        usd: rayNumber(c.chi),
+        text: chiText,
+        lead: "1 sUSDS =",
+        info: eventChiProv(coords, c.chi, c.usdsSource === "log"),
+        value: rayExact(c.chi),
+        title: "One sUSDS worth in USDS at this block",
+      },
+    ],
+  };
+  const notes = (
+    <div className="flex flex-wrap gap-x-4 px-5 pb-2 text-xs text-rb-500" data-sky-notes="">
+      <span>
+        Savings Rate{" "}
+        <Prov info={eventRateProv(coords, c.ssr, rateText)} value={rateText}>
+          <span>{rateText}</span>
+        </Prov>
+      </span>
+      {referralProv && c.referral != null ? (
+        <span>
+          Referral code{" "}
+          <Prov info={referralProv} value={String(c.referral)}>
+            <span className="tabular-nums text-foreground">{c.referral}</span>
+          </Prov>
+        </span>
+      ) : null}
+    </div>
   );
 
   // ── the spine ─────────────────────────────────────────────────────────────
-  const iconColumn =
-    kind === "self" || tokens.length === 0 ? (
-      <SpineColumn icon="no-change" isLast={!!isLast} />
-    ) : (
-      <SpineColumn tokens={tokens} isLast={!!isLast} />
-    );
+  const spine: SpineColumnProps =
+    kind === "self" || tokens.length === 0 ? { icon: "no-change", isLast: !!isLast } : { tokens, isLast: !!isLast };
+  const bullets = skyEventBullets(c, previous);
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "sky-savings",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: spec,
+    caption: LABEL[kind],
+    cells,
+    ledgers: { none: "no flows panel on Sky Savings" },
+    notes,
+    price,
+    explainer: {
+      body: bullets.length > 1 ? <ProseExplainer items={bullets.slice(1)} /> : null,
+      first: bullets[0],
+    },
+    learnMore: <LearnMore inline content={skyEventContent(kind)} />,
+  };
 
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconColumn}
-      header={<ChainTruthRow spec={spec} timestamp={event.timestamp} eventNumber={eventNumber} />}
-      detail={detail}
-      explainer={<SkySavingsEventExplainer ctx={c} previous={previous} />}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={skyEventContent(kind)} />}
-      persistKey={`sky-savings:${event.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }
