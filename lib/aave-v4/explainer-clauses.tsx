@@ -76,7 +76,7 @@ const EPS = 1e-4;
 // The emitted log + Solidity field each moved amount is read from — the SAME
 // maps the header uses, so a prose figure and the header figure share a
 // provenance identity (entry key) and locate together. Keep in lockstep with
-// aave-v4-event-header.tsx.
+// components/protocol/aave-v4/aave-v4-head.tsx.
 const AMOUNT_LABEL: Record<string, string> = {
   supply: "Amount supplied",
   withdraw: "Amount withdrawn",

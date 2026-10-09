@@ -306,8 +306,13 @@ export interface ChainTruthRowSpec {
   /** The zombie flag before the time: a redemption that left the debt under
    *  the minimum. */
   zombie?: { word: string; title: string };
-  /** "2 of 3": the event's place among the position's events in one block. */
-  sameBlock?: { index: number; count: number };
+  /** "2 of 3": the event's place among the position's events in one block.
+   *  `title` replaces the chip's tip; `lead` draws it first, before the label
+   *  (Aave V4's operations in one transaction). */
+  sameBlock?: { index: number; count: number; title?: string; lead?: boolean };
+  /** A token the event names without moving any (a collateral toggle's
+   *  reserve): its icon, then `text`, after the amounts. */
+  asset?: { symbol: string; address?: string; text: string };
 }
 
 /** The row's sizes: the timeline's head, or the event page's title. */
@@ -629,6 +634,18 @@ export function ChainTruthRow({
   const headChevron = useEventHeadChevron();
   const counter = eventNumber != null ? <EventNumberPill number={eventNumber} last={eventNumberLast} /> : null;
 
+  const sameBlockChip = spec.sameBlock && (
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-sunken text-rb-500"
+      title={
+        spec.sameBlock.title ??
+        `This trove had ${spec.sameBlock.count} events in the same block; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the block recorded them`
+      }
+    >
+      {spec.sameBlock.index} of {spec.sameBlock.count}
+    </span>
+  );
+
   // `evt-meta`: below sm this span becomes the header's first row
   // (app/globals.css). Its 24px line puts the icon, date, time and number on
   // the card chevron's centre line, and its direct children sit on one
@@ -644,14 +661,7 @@ export function ChainTruthRow({
           <span className="hidden md:inline">{spec.zombie.word}</span>
         </span>
       )}
-      {spec.sameBlock && (
-        <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-sunken text-rb-500"
-          title={`This trove had ${spec.sameBlock.count} events in the same block; this is event ${spec.sameBlock.index} of ${spec.sameBlock.count}, in the order the block recorded them`}
-        >
-          {spec.sameBlock.index} of {spec.sameBlock.count}
-        </span>
-      )}
+      {spec.sameBlock && !spec.sameBlock.lead && sameBlockChip}
       {variant === "page" ? (
         <PageMeta timestamp={timestamp} counter={counter} />
       ) : (
@@ -853,10 +863,18 @@ export function ChainTruthRow({
 
   const cluster = (
     <>
+      {spec.sameBlock?.lead && sameBlockChip}
       {labelNode}
       {spec.ratePill?.lead && rateNode}
       {spec.ratePill?.lead && managerNode}
       {deltaNodes}
+
+      {spec.asset && (
+        <span className={`inline-flex items-center ${sz.gap} ${sz.txt}`}>
+          <TokenChipIcon symbol={spec.asset.symbol} address={spec.asset.address} size={sz.icon} />
+          <span>{spec.asset.text}</span>
+        </span>
+      )}
 
       {redist && redist.deltas.length > 0 && (
         <span className={`inline-flex items-center ${sz.gap} ${sz.txt}`}>

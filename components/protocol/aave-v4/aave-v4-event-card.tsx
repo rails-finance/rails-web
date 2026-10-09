@@ -1,19 +1,19 @@
 "use client";
 
-// Composer: wires the Aave V4 header / detail / explainer into the universal
-// EventCard shell. Mirrors LiquityEventCard's pattern.
+// Composer: fills the shared event card's slots for an Aave V4 event — the
+// head (aave-v4-head), the cells and prices (aave-v4-event-detail), the
+// explanation. Mirrors LiquityEventCard's pattern (ui-jobs 309).
 //
 // SpineColumn shares the universal event-card API, so the icon-column logic is
 // identical across protocols.
 
-import { EventCard } from "@/components/shared/event-card";
-import { EventCellGrid } from "@/components/shared/event-cells";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { eventGas } from "@/components/shared/event-price-row";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { AaveV4EventHeader, type AaveV4TxGroup } from "./aave-v4-event-header";
+import { useAaveV4HeadSpec, type AaveV4TxGroup } from "./aave-v4-head";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
 import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
@@ -70,31 +70,36 @@ export function AaveV4EventCard({
   // undefined and falls back to the symbol lookup exactly as before.
   const symAddress = soleFlowAddress(event.flows, ctx.reserveSymbol);
 
-  const iconSlot = isLiquidation ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : isCollateralToggle ? (
-    // The toggle's own check/cross badge is the event's MEANING, so it keeps
-    // the icon corner even when a third party flipped it — the dotted spine and
-    // the header's "by …" chip carry that fact instead.
-    <SpineColumn
-      tokens={[{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }]}
-      externalParty={!!extBy}
-      isLast={!!isLast}
-    />
-  ) : alsoToggled ? (
-    <SpineColumn
-      tokens={[{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }]}
-      externalParty={!!extBy}
-      isLast={!!isLast}
-    />
-  ) : (
-    <SpineColumn
-      tokens={[{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }]}
-      externalParty={!!extBy}
-      isLast={!!isLast}
-    />
-  );
+  const spine: SpineColumnProps = isLiquidation
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : isCollateralToggle
+      ? // The toggle's check/cross badge is the event's MEANING, so it keeps
+        // the icon corner even when a third party flipped it — the dotted
+        // spine and the header's "by …" chip carry that fact instead.
+        {
+          tokens: [{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }],
+          externalParty: !!extBy,
+          isLast: !!isLast,
+        }
+      : alsoToggled
+        ? {
+            tokens: [{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }],
+            externalParty: !!extBy,
+            isLast: !!isLast,
+          }
+        : {
+            tokens: [{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }],
+            externalParty: !!extBy,
+            isLast: !!isLast,
+          };
 
+  const head = useAaveV4HeadSpec({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    txGroup,
+    externalBy: extBy ?? undefined,
+  });
   // T2: the snapshot as cells (no flows panel: the cells stand as rows), the
   // prices at this block and the gas in the price row (ui-jobs 309).
   const { cells, prices } = useAaveV4Cells({
@@ -105,41 +110,41 @@ export function AaveV4EventCard({
     previousRate,
   });
 
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "aave-v4",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: aaveV4Label(ctx),
+    actor: { by: extBy ?? undefined },
+    cells,
+    ledgers: { none: "no flows panel on Aave V4 yet" },
+    price: { gas: eventGas(event.gas), prices },
+    explainer: {
+      body: (
+        <AaveV4EventExplainer
+          ctx={ctx}
+          event={event}
+          siblings={siblings ?? [event]}
+          previousRate={previousRate}
+          debtLifeInterest={debtLifeInterest}
+          skipLead
+        />
+      ),
+      first: aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event),
+    },
+    learnMore: <LearnMore inline content={aaveV4LearnMoreContent(ctx)} />,
+  };
+
   return (
     <EventLedgerContext.Provider value={ROW_CELLS}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? undefined}
-        caption={aaveV4Label(ctx)}
-        iconColumn={iconSlot}
-        header={
-          <AaveV4EventHeader
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            txGroup={txGroup}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-          />
-        }
-        detail={<EventCellGrid cells={cells} />}
-        explainer={
-          <AaveV4EventExplainer
-            ctx={ctx}
-            event={event}
-            siblings={siblings ?? [event]}
-            previousRate={previousRate}
-            debtLifeInterest={debtLifeInterest}
-            skipLead
-          />
-        }
-        price={{ gas: eventGas(event.gas), prices }}
-        explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={aaveV4LearnMoreContent(ctx)} />}
-        persistKey={`aave-v4:${event.id}`}
-      />
+      <EventCard slots={slots} avatar={null} />
     </EventLedgerContext.Provider>
   );
 }
