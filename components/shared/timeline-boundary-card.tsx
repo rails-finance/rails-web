@@ -342,12 +342,18 @@ export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLa
             </span>
           ) : undefined
         }
-        iconColumn={<SpineColumn icon="none" undrawn isLast={isLast} />}
-        header={header}
-        detail={hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />}
+        slots={{
+          spine: { icon: "none", undrawn: true, isLast },
+          head: { row: header },
+          caption: "",
+          cells: { none: "The events past the boundary are counted in the body's stat cards." },
+          ledgers: { none: "The boundary stands for events the page does not draw." },
+          notes: hasStats || hasState || b.pending || horizon ? detail : <div className="px-5 py-2" />,
+          explainer: { body: explainer },
+          learnMore: null,
+        }}
         detailOpen={open}
         onDetailToggle={setOpen}
-        explainer={explainer}
       />
       {requestOpen && (
         <FeedbackModal

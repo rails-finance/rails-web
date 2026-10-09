@@ -9,9 +9,9 @@
 //
 // Figures render through <Prov>: a header DELTA echoes the header receipt (same
 // prov builder + signed value → same entry key, WITH the token symbol the row
-// registers); a detail after-value / rate echoes the detail-grid receipt (which
-// the shared ChainTruthDetail registers WITHOUT a symbol prop, so these echoes
-// omit `symbol` to key-match). An echo never forms its own receipt row — it is a
+// registers); a cell's after-value / rate echoes the cell's receipt (which the
+// shared cells grid registers WITHOUT a symbol prop, so these echoes omit
+// `symbol` to key-match). An echo never forms a receipt row — it is a
 // locator only, resolving to the primary on click.
 //
 // ── Fill-standard notes (charter §5) ─────────────────────────────────────────

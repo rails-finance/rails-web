@@ -116,7 +116,7 @@ export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, pre
         heldProv: {
           kind: "derived",
           summary:
-            "The claim before the interest since the pool's previous row: the claim after this event less that interest.",
+            "The claim before the interest since the pool's previous row — the claim after this event less the interest the pool's rate built on it since that row.",
           via: "claim after − interest since the previous row",
           formula: "claim after − interest since previous row",
         },

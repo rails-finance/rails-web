@@ -10,7 +10,7 @@ import { Calculator } from "lucide-react";
 
 import { EventCard } from "@/components/shared/event-card";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
-import { SpineColumn, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
+import { type SpineColumnProps, type SpineIcon, type SpineTokenRow } from "@/components/shared/spine-column";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
@@ -298,27 +298,25 @@ export function TimelineRunCard({
    *  line runs dotted below it where the members were not the owner's
    *  actions (mobile decision 18). */
   const actedByOwner = byOwner ?? !(adverse || spineIcon === "external");
-  const legsColumn = (
-    <SpineColumn
-      {...(adverse
-        ? {
-            icon: "warning" as const,
-            warningLegs,
-            warningTone: tone === "critical" ? "critical" : "caution",
-          }
-        : spineIcon === "custody"
-          ? // A custody run moved the asset between accounts: the plane, no
-            // flank (a transfer is neither direction).
-            { icon: "custody" as const }
-          : netTokens.length > 0
-            ? { tokens: netTokens }
-            : // Nothing summed: the members' glyph alone, so the row's spine
-              // is never empty (a run of batch rate changes draws their ⊜).
-              { icon: spineIcon === "warning" ? ("none" as const) : spineIcon })}
-      dotted={!actedByOwner}
-      isLast={!!isLast}
-    />
-  );
+  const legsColumn: SpineColumnProps = {
+    ...(adverse
+      ? {
+          icon: "warning" as const,
+          warningLegs,
+          warningTone: tone === "critical" ? "critical" : "caution",
+        }
+      : spineIcon === "custody"
+        ? // A custody run moved the asset between accounts: the plane, no
+          // flank (a transfer is neither direction).
+          { icon: "custody" as const }
+        : netTokens.length > 0
+          ? { tokens: netTokens }
+          : // Nothing summed: the members' glyph alone, so the row's spine
+            // is never empty (a run of batch rate changes draws their ⊜).
+            { icon: spineIcon === "warning" ? ("none" as const) : spineIcon }),
+    dotted: !actedByOwner,
+    isLast: !!isLast,
+  };
   // T1's word: the shape a served folder names, else the kind ("Redemptions",
   // "Transfers"), in the run's tone.
   const kindWord = kindWordProp ?? `${memberPlural.charAt(0).toUpperCase()}${memberPlural.slice(1)}`;
@@ -512,9 +510,17 @@ export function TimelineRunCard({
       closed={
         <EventCard
           avatar={null}
-          iconColumn={legsColumn}
           groupMenu={showMenu}
-          header={head}
+          slots={{
+            spine: legsColumn,
+            head: { row: head },
+            caption: "",
+            cells: { none: "A run's figures are its members' sums, stated in the summary." },
+            ledgers: { none: "A run's ledgers are its members'." },
+            notes: hasSums ? summary : undefined,
+            explainer: { body: null },
+            learnMore: null,
+          }}
           phoneCaption={
             <>
               {kindWord} {countMark} &middot; {range}
@@ -522,7 +528,6 @@ export function TimelineRunCard({
           }
           spokenCaption={`${kindWord}, ${spokenRange}`}
           label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
-          detail={hasSums ? summary : undefined}
           group="summary"
           muted={muted}
         />

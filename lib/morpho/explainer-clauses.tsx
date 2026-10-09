@@ -204,9 +204,9 @@ function morphoEventSlotsBase(
       {amt(Math.abs(delta))} {movedSym}
     </Fig>
   );
-  // After-balances echo the detail grid's Collateral / Debt stats. The shared
-  // ChainTruthDetail registers those receipts with NO symbol (the ticker rides
-  // an icon, not a `symbol` prop), so these echoes omit `symbol` too — the
+  // After-balances echo the card's Collateral / Debt cells. The shared cells
+  // grid registers those receipts with NO symbol (the ticker rides an icon),
+  // so these echoes omit `symbol` too — the
   // entry key is label|value|"" on both sides, and the locator link resolves.
   const collAfterFig = () => (
     <Fig echo info={collateralAfterProv(collSym, coords)} value={formatNumber(Number(ctx.collateralAfter))}>

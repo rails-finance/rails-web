@@ -446,8 +446,8 @@ function eventSlots(
     </Fig>
   );
 
-  // After-balance echoes: the detail grid registers these with NO symbol prop
-  // (the shared ChainTruthDetail tows the token as an icon), so the echo key's
+  // After-balance echoes: the cells grid registers these with NO symbol prop
+  // (the token rides as an icon), so the echo key's
   // symbol part is empty — build these WITHOUT a symbol.
   const collAfterFig = () => (
     <Fig info={b.collAfterProv(coords, ctx.origin?.coll)} value={fmtColl(ctx.collAfter)}>

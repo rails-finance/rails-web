@@ -1,12 +1,11 @@
 "use client";
 
 // A family's `ChainTruthStat` list as the card's `cells` slot (ui-jobs 309,
-// rails-ops reference/shared-event-card-spec.md §3). The families that drew
-// `ChainTruthDetail` keep their stat builders and their receipts; this states
-// each stat as a typed cell for the shell's grid (components/shared/
-// event-cells.tsx), with the figures written as `ChainTruthDetail` writes
-// them: the exact decimal on hover, a figure under 0.01 in the site's number
-// format, a ledger cell's figures at the decimals its opened ledger prints.
+// rails-ops reference/shared-event-card-spec.md §3). A family keeps its stat
+// builders and their receipts; this states each stat as a typed cell for the
+// shell's grid (components/shared/event-cells.tsx): the exact decimal on
+// hover, a figure under 0.01 in the site's number format, a ledger cell's
+// figures at the decimals its opened ledger prints.
 
 import { useContext, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";

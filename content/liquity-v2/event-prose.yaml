@@ -683,6 +683,10 @@ trove_words:
     {which} adjustment
   run_rate_note: |-
     one of the {count} events collapsed into this row
+  run_cells_none: |-
+    The run moves the rate alone; its words are the body.
+  run_ledgers_none: |-
+    A rate adjustment moves no asset.
   # ── The position card's explanation: the lead and bullets under the stats ──
   # A {name} is a figure or a linked value the hook draws in its receipt; the rest is the sentence.
   # The bullets sit under the four headings below (rails-ops standards/prose-limits-and-zones.md

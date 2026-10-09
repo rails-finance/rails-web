@@ -3,7 +3,7 @@
 // Shared renderer for the "chain-state tier" timeline (Morpho + MakerDAO): the
 // pared-down explorers that show only the chain's own values. The row grammar —
 // plain-text label, neutral signed deltas with token glyphs, the shared
-// EventTime, and a boxed StatCard snapshot grid — lives here, once, so the two
+// EventTime, and the stat type the cells are built from — lives here, once, so the two
 // protocols can't drift apart. Each protocol supplies a small spec via its own
 // adapter (where the provenance + field mapping live); this file owns the look.
 //
@@ -39,17 +39,7 @@ import { useEnsName } from "@/lib/ens/use-ens-names";
 import { AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/date";
 import { formatTimestamp, shortDate, shortDateYear } from "@/lib/shared/format-event";
-import {
-  DeltaToggle,
-  StatCard,
-  StatSubline,
-  StateTransition,
-  ValuePill,
-  changeTone,
-} from "@/components/shared/state-transition";
-import { offPar, usdShown } from "@/lib/shared/usd-display";
-import { todayUsdProv, useTodayBasisPrices } from "@/components/shared/price-basis";
-import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
+import { usdShown } from "@/lib/shared/usd-display";
 import { fmtHeaderMagnitude, useHeaderValueHideClass } from "@/lib/shared/header-values";
 import {
   decimalSub,
@@ -65,7 +55,7 @@ import { TipLabel } from "@/components/shared/tip-label";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { usePublishSpineLegs, WARNING_TONE_TEXT, type SpineWarningLeg } from "@/components/shared/spine-column";
-import { ClosedTokens, LedgerCell, usdAt } from "@/components/shared/event-ledger";
+import { usdAt } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import type { EventCellSpec } from "@/components/shared/event-cells";
@@ -1008,227 +998,7 @@ function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }
   );
 }
 
-export function ChainTruthDetail({
-  stats,
-  symbolText = false,
-  extra,
-  lead,
-}: {
-  stats: ChainTruthStat[];
-  /** Cells before the stats: a family's account cells that open into their
-   *  ledgers (components/shared/ctoken-event-ledger.tsx). */
-  lead?: ReactNode;
-  /** One more cell after the stats, for a figure that is not an amount (an
-   *  event's price at its block). */
-  extra?: ReactNode;
-  /** Print the symbol as a word after each figure, beside its icon. For a
-   *  protocol whose figures carry units a reader could confuse (a vault share
-   *  count beside the asset underneath it). Off everywhere else. */
-  symbolText?: boolean;
-}) {
-  // USD chips (stat.usd) follow the shared display flag, like the richer tiers.
-  const unreadOf = useUnreadTokenOf();
-  const ledgerSrc = useContext(EventLedgerContext);
-  const todayOf = useTodayBasisPrices();
-  // A ledger cell's closed figures stand at the decimals its opened ledger
-  // prints ("1,037.52"); a figure of a million or more keeps its compact form.
-  const atLedger = (side: FlowSide | undefined, exact: string, shown: string): string => {
-    const dec = side ? (ledgerSrc?.decimals?.(side) ?? null) : null;
-    const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
-    const n = m ? Number(m[2].replace(/,/g, "")) : NaN;
-    if (dec == null || !Number.isFinite(n) || n >= 1e6) return shown;
-    const text = ledgerFigure(n, dec, shown);
-    return text === shown ? shown : `${m![1] === "-" ? "\u2212" : m![1]}${text}`;
-  };
-  // The before→after toggle surfaces a reconstructed before (after − change).
-  // Every leaf is on-chain (the replayed after, the logged delta), so the before
-  // is chain-derived — it belongs in the chain-state view alongside the after it
-  // pairs with, not behind the interpretation toggle. It renders in both views;
-  // its `<Prov>` carries the chain-derived provenance either way. (The before-prov
-  // each protocol supplies must be tagged `chain-derived`; an off-chain leaf would
-  // keep it `derived` and it would collapse here, as it should.)
-  return (
-    // px-5 py-2 mirrors the Liquity / Aave detail bodies so the snapshot grid
-    // sits inset from the shared bg-raised detail surface, not flush to its edge.
-    <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
-      {lead}
-      {stats.map((s, i) => {
-        const changed = s.changed ?? true;
-        const unread = s.symbol ? unreadOf(s.address, s.symbol) : undefined;
-        if (unread)
-          return (
-            <div key={i} className="h-full" data-not-loaded="">
-              <StatCard label={s.label} changed={s.changed}>
-                <span className="text-sm font-semibold">
-                  <TokenAmountNotLoaded address={unread.address} label={unread.label} />
-                </span>
-              </StatCard>
-            </div>
-          );
-        const wrap = (children: ReactNode) =>
-          s.ledger ? (
-            <LedgerCell label={s.label} side={s.ledger} changed={s.changed}>
-              {children}
-            </LedgerCell>
-          ) : (
-            <StatCard label={s.label} changed={s.changed}>
-              {children}
-            </StatCard>
-          );
-        // A ledger cell keeps its tokens' before → after on one line.
-        const usdOn = s.usd && usdShown(s.usd.value);
-        const heldAmount = Number(s.value);
-        const ledgerUsd =
-          s.ledger && s.usd && usdOn
-            ? {
-                before:
-                  s.usdBefore && s.transition ? (
-                    <Prov info={s.usdBefore.prov} value={formatUsdValue(s.usdBefore.value)}>
-                      {fmtUsdChip(s.usdBefore.value)}
-                    </Prov>
-                  ) : null,
-                after: (
-                  <Prov info={s.usd.prov} value={formatUsdValue(s.usd.value)}>
-                    {fmtUsdChip(s.usd.value)}
-                  </Prov>
-                ),
-                ...(s.symbol && heldAmount > 0
-                  ? usdAt({
-                      price: s.usd.value / heldAmount,
-                      symbol: s.symbol,
-                      before: s.transition ? Number(s.transition.beforeExact) : null,
-                      after: heldAmount,
-                    })
-                  : {}),
-              }
-            : undefined;
-        const tokensWrap = (kids: ReactNode) =>
-          s.ledger ? <ClosedTokens usd={ledgerUsd}>{kids}</ClosedTokens> : <>{kids}</>;
-        return (
-          <div key={i} className={s.ledger ? "contents" : "h-full"}>
-            {wrap(
-              <>
-                <StateTransition>
-                  {tokensWrap(
-                    <>
-                      {s.transition && (
-                        <DeltaToggle
-                          before={
-                            <Prov info={s.transition.beforeProv} value={s.transition.beforeExact}>
-                              <ExactTip
-                                always
-                                text={
-                                  s.transition.shownAsIs
-                                    ? s.transition.before
-                                    : atLedger(
-                                        s.ledger,
-                                        s.transition.beforeExact,
-                                        transitionFigure(s.transition.before, s.transition.beforeExact, false),
-                                      )
-                                }
-                                exact={s.transition.beforeExact}
-                                symbol={s.symbol}
-                                label={s.readableLabel ? readableExact(s.transition.beforeExact, s.symbol) : undefined}
-                              />
-                            </Prov>
-                          }
-                          delta={
-                            <Prov info={s.transition.changeProv} value={s.transition.changeExact}>
-                              <ExactTip
-                                always
-                                text={
-                                  s.transition.shownAsIs
-                                    ? s.transition.change
-                                    : atLedger(
-                                        s.ledger,
-                                        s.transition.changeExact,
-                                        transitionFigure(s.transition.change, s.transition.changeExact),
-                                      )
-                                }
-                                exact={s.transition.changeExact}
-                                symbol={s.symbol}
-                                label={s.readableLabel ? readableExact(s.transition.changeExact, s.symbol) : undefined}
-                              />
-                            </Prov>
-                          }
-                          size="sm"
-                        />
-                      )}
-                      <Prov
-                        info={s.prov}
-                        value={s.value}
-                        icon={s.symbol ? <TokenChipIcon symbol={s.symbol} address={s.address} size={16} /> : undefined}
-                      >
-                        <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>
-                          <ExactTip
-                            always
-                            text={atLedger(s.ledger, s.value, s.display ?? compactAmount(s.value))}
-                            exact={s.value}
-                            symbol={s.symbol}
-                            label={
-                              s.readableLabel && Number.isFinite(Number(s.value))
-                                ? readableName(Number(s.value), s.symbol, false)
-                                : undefined
-                            }
-                          />
-                          {symbolText && s.symbol ? <span className="font-normal text-rb-500"> {s.symbol}</span> : null}
-                        </span>
-                      </Prov>
-                    </>,
-                  )}
-                  {s.usd &&
-                    usdOn &&
-                    (s.ledger ? null : (
-                      // The after-balance valued at the event-block oracle price —
-                      // the bordered chip the Liquity V2 / Aave V4 details use
-                      // (`3.0321 [ $7,062 ] ◊`). The exact 2-dp figure rides the
-                      // receipt; the chip shows whole dollars.
-                      <UsdChip
-                        usd={s.usd}
-                        amount={heldAmount}
-                        symbol={s.symbol}
-                        today={todayOf(s.symbol)}
-                        changed={changed}
-                      />
-                    ))}
-                </StateTransition>
-                {s.interestSincePrevious && (
-                  <StatSubline>
-                    <TipLabel
-                      text={s.interestSincePrevious.label ?? "Interest since previous event"}
-                      tip={s.interestSincePrevious.labelTip}
-                    />
-                    :{" "}
-                    <Prov info={s.interestSincePrevious.prov} value={s.interestSincePrevious.value} symbol={s.symbol}>
-                      <ExactTip
-                        always
-                        text={
-                          s.interestSincePrevious.display ??
-                          transitionFigure(
-                            formatNumber(Number(s.interestSincePrevious.value)),
-                            s.interestSincePrevious.value,
-                          )
-                        }
-                        exact={s.interestSincePrevious.value}
-                        symbol={s.symbol}
-                      />
-                    </Prov>{" "}
-                    {s.symbol}
-                    {s.interestSincePrevious.after}
-                  </StatSubline>
-                )}
-                {s.sub && <StatSubline changed={changed}>{s.sub}</StatSubline>}
-              </>,
-            )}
-          </div>
-        );
-      })}
-      {extra != null && <div className="h-full">{extra}</div>}
-    </div>
-  );
-}
-
-/** A stat's figure as `ChainTruthDetail` prints it: on a ledger cell at the
+/** A stat's figure in a cell: on a ledger cell at the
  *  decimals the opened ledger prints, the exact value in its tip, and the
  *  symbol's name after it where the family asks for it. */
 function StatFigure({
@@ -1274,7 +1044,7 @@ function StatAfter(props: Parameters<typeof StatFigure>[0] & { address?: string 
   return <StatFigure {...props} />;
 }
 
-/** `ChainTruthDetail`'s stats as the shell's `cells` slot (ui-jobs 309): a
+/** A `ChainTruthStat` list as the shell's `cells` slot (ui-jobs 309): a
  *  stat with a `ledger` side becomes a ledger cell, the rest stat cells, with
  *  the figures, receipts, tips and sub-lines the grid draws. `changed` defaults
  *  to true, as the grid's does. `inputs` names, by label, the cells a derived
@@ -1405,34 +1175,4 @@ export function chainTruthCells(
     };
     return s.ledger ? { ...common, kind: "ledger", side: s.ledger, usd } : { ...common, kind: "stat" };
   });
-}
-
-/** A cell's USD chip with no ledger: at the event's price, or at the latest
- *  block's where the card is set to today; a dollar stablecoin off par states
- *  its price after it (lib/shared/usd-display.ts `offPar`). */
-function UsdChip({
-  usd,
-  amount,
-  symbol,
-  today,
-  changed,
-}: {
-  usd: { value: number; prov: Provenance };
-  amount: number;
-  symbol: string | undefined;
-  today: number | null;
-  changed: boolean;
-}) {
-  const atToday = today != null && symbol != null && amount > 0;
-  const value = atToday ? amount * today : usd.value;
-  const off = offPar(atToday ? today : amount > 0 ? usd.value / amount : null, symbol);
-  return (
-    <OffParFigure off={off}>
-      <Prov info={atToday ? todayUsdProv(`${symbol} held`, symbol) : usd.prov} value={formatUsdValue(value)}>
-        <ValuePill changed={changed}>
-          <span className={off?.band ? OFF_PAR_BAND : undefined}>{fmtUsdChip(value)}</span>
-        </ValuePill>
-      </Prov>
-    </OffParFigure>
-  );
 }

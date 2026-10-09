@@ -2,8 +2,7 @@
 
 // A family's `ChainTruthStat`s as cells for the card's `cells` slot
 // (components/shared/event-cells.tsx; ui-jobs 309): the figures, receipts,
-// exact-value tips and interest line `ChainTruthDetail` draws, typed for the
-// shell's grid, so the shell owns the colours and the heading tone (ui-jobs
+// exact-value tips and interest line of each stat, typed for the shell's grid, so the shell owns the colours and the heading tone (ui-jobs
 // 243). A stat with a `ledger` side becomes that side's ledger cell. A stat's
 // `usd` chip is not carried: a family on the slots states prices in the price
 // row.

@@ -4,7 +4,7 @@ import { useContext, useId, useState } from "react";
 import type { ReactNode } from "react";
 
 import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { GroupFrame, GroupNumbersContext, groupMenuWords, groupRangeText } from "@/components/shared/group-frame";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -112,7 +112,7 @@ export function DelegateAdjustRunCard({
   const hide = { ...words2.hide, hide: () => open && toggle() };
   // No asset moved: the members' % glyph alone, no flank, and the words
   // stand; the batch manager acted, so the line runs dotted.
-  const column = <SpineColumn icon="rate-change" dotted isLast={!!isLast} />;
+  const column: SpineColumnProps = { icon: "rate-change", dotted: true, isLast: !!isLast };
 
   const spokenRange = sameDay
     ? formatDate(fromTs)
@@ -134,15 +134,23 @@ export function DelegateAdjustRunCard({
       closed={
         <EventCard
           avatar={null}
-          iconColumn={column}
           groupMenu={showMenu}
-          header={<div className="pl-5 pt-4 pb-3">{words}</div>}
+          slots={{
+            spine: column,
+            head: { row: <div className="pl-5 pt-4 pb-3">{words}</div> },
+            caption: "",
+            cells: { none: troveWords("run_cells_none") },
+            ledgers: { none: troveWords("run_ledgers_none") },
+            // On a phone the words open beneath the caption as the card.
+            notes: <div className="px-5 pt-4 pb-3">{words}</div>,
+            explainer: { body: null },
+            learnMore: null,
+          }}
           // On a phone the caption carries the word, the count and the range,
           // and the words open beneath it as the card.
           phoneCaption={troveWords("run_phone_caption", { count: count.toLocaleString("en-US"), range })}
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}
           label={troveWords("run_label", { count_text: countText, by, range: spokenRange, movement })}
-          detail={<div className="px-5 pt-4 pb-3">{words}</div>}
           group="words"
         />
       }

@@ -13,7 +13,7 @@
 //
 // Figures render through <Prov>: an `echo` when the same figure already has a
 // primary receipt on the card's detail grid (credit principal, repay total,
-// collateral). ChainTruthDetail registers each of those with NO `symbol` prop
+// collateral). The cells grid registers each of those with NO `symbol` prop
 // (the token rides as an icon), so an echo omits `symbol` too — the receipt
 // entryKey is `label|value|symbol`, and the value mirrors the grid's own `fmt`
 // (formatNumber(Number(h))) so the two keys match byte-for-byte. The FIXED

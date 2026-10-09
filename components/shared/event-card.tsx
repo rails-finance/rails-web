@@ -97,11 +97,16 @@ export interface EventCardExplainer {
   grouped?: boolean;
 }
 
-export interface EventCardSlots {
-  event: EventCardEvent;
+/** T1 as drawn by a card standing for several events or none (a run, the
+ *  timeline's boundary, the Lifetime flows moment): its words, span and
+ *  counts, laid out by the card. */
+export interface EventCardHeadRow {
+  row: ReactNode;
+}
+
+/** The slot every card fills, whatever it stands for. */
+interface EventCardSlotsCommon {
   spine: SpineColumnProps;
-  /** T1's head row, drawn by the shared `ChainTruthRow`. */
-  head: ChainTruthRowSpec;
   /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"); empty, the
    *  timeline's word for the event. */
   caption: string;
@@ -136,6 +141,22 @@ export interface EventCardSlots {
   useOpened?: () => EventCardOpened;
 }
 
+/** An event's card: T1's head row drawn by the shared `ChainTruthRow`. */
+interface EventCardSlotsOfEvent {
+  event: EventCardEvent;
+  head: ChainTruthRowSpec;
+}
+
+/** A card standing for several events or none: no event of its own, so no
+ *  stored open state and no footer. With no cells, notes or price it has no
+ *  body to open. */
+interface EventCardSlotsStandIn {
+  event?: undefined;
+  head: EventCardHeadRow;
+}
+
+export type EventCardSlots = EventCardSlotsCommon & (EventCardSlotsOfEvent | EventCardSlotsStandIn);
+
 /** The slots `useOpened` returns once the body opens. */
 export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "price">>;
 
@@ -153,8 +174,8 @@ function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: ()
   );
 }
 
-/** What the shell takes beside a family's parts: the timeline's and the
- *  event page's. */
+/** What the shell takes beside the slots: the timeline's and the event
+ *  page's. */
 interface EventCardFrame {
   avatar?: ReactNode;
   /** A group's closed row. "summary": the head opens the summary card with no
@@ -190,54 +211,52 @@ interface EventCardFrame {
   onDetailToggle?: (isOpen: boolean) => void;
 }
 
-/** The parts a family not yet on the slots passes; 309's later steps move
- *  each family onto `slots`. */
-interface EventCardParts {
-  slots?: undefined;
+/** A card's slots as the shell draws them. */
+interface EventCardDrawn {
   iconColumn: ReactNode;
   header: ReactNode;
-  /** A full-width strip under the header (the `band` slot). */
   band?: ReactNode;
   detail?: ReactNode;
-  /** T2's price row, under the detail (the `price` slot). */
   price?: EventCardPrice;
   explainer?: ReactNode;
   /** Teaser line at the top of the open explanation: the first bullet. */
   explainerTeaser?: ReactNode;
-  /** Transaction hash: the footer, and the header's number pill when
-   *  Display's "Transaction hashes" is on (ui-jobs 294). */
+  /** The footer, and the header's number pill when Display's "Transaction
+   *  hashes" is on (ui-jobs 294). */
   txHash?: string;
   learnMore?: ReactNode;
-  /** Stable, globally-unique id for this card. When set (and the detail panel
-   *  is uncontrolled), the expanded/collapsed state is persisted to
-   *  localStorage and restored on reload / back-navigation. */
+  /** The key the open state is kept under in localStorage (uncontrolled
+   *  cards only), restored on reload and back-navigation. */
   persistKey?: string;
-  /** The phone caption's kind, where the card's label differs from the
-   *  event's `actionLabel` (which the timeline provides by default). */
   caption?: string;
   by?: string;
   byOwner?: boolean;
   custody?: EventCardActor["custody"];
 }
 
-export type EventCardProps = EventCardFrame & ({ slots: EventCardSlots } | EventCardParts);
+export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
 
-/** A slotted card's parts, as the shell draws them. */
-function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts, "slots"> {
+/** The slots, as the shell draws them. */
+function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
   const { event, actor, explainer } = slots;
+  // A stand-in card with nothing under its row (a run with no sums) opens
+  // nothing.
+  const bodyless = !event && "none" in slots.cells && slots.notes == null && !hasPriceRow(slots.price);
   return {
     iconColumn: <SpineColumn {...slots.spine} />,
-    header: (
+    header: slots.event ? (
       <ChainTruthRow
         spec={slots.head}
-        timestamp={event.timestamp}
-        eventNumber={event.number}
-        eventNumberLast={event.numberLast}
+        timestamp={slots.event.timestamp}
+        eventNumber={slots.event.number}
+        eventNumberLast={slots.event.numberLast}
         variant={pageMode ? "page" : "row"}
       />
+    ) : (
+      slots.head.row
     ),
     band: slots.band,
-    detail: slots.useOpened ? (
+    detail: bodyless ? undefined : slots.useOpened ? (
       <OpenedBody slots={slots} useOpened={slots.useOpened} />
     ) : (
       <>
@@ -249,9 +268,9 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
     price: slots.useOpened ? undefined : slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
-    txHash: event.txHash,
+    txHash: event?.txHash,
     learnMore: slots.learnMore,
-    persistKey: `${event.family}:${event.id}`,
+    persistKey: event ? `${event.family}:${event.id}` : undefined,
     // An empty kind leaves the timeline's word for the event.
     caption: slots.caption || undefined,
     by: actor?.by,
@@ -285,7 +304,7 @@ export function EventCard(props: EventCardProps) {
   // stand open with no toggle. The boundary card's open is controlled.
   const page = useContext(EventPageContext);
   const pageMode = page != null;
-  const parts = props.slots ? partsOf(props.slots, pageMode) : props;
+  const drawn = drawnOf(props.slots, pageMode);
   const {
     iconColumn,
     header,
@@ -301,10 +320,8 @@ export function EventCard(props: EventCardProps) {
     by,
     byOwner,
     custody,
-  } = parts;
-  const ledgers = props.slots?.ledgers;
-  const onIntent = props.slots?.onIntent;
-  const onOpen = props.slots?.onOpen;
+  } = drawn;
+  const { ledgers, onIntent, onOpen } = props.slots;
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
   const showAvatar = !singleWallet && !!avatar;

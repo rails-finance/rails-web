@@ -17,7 +17,6 @@
 
 import { EventHeadChevron } from "@/components/shared/event-number-pill";
 import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
 import { EventCaptionContext } from "@/components/shared/mobile-spine";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -655,11 +654,18 @@ export function FlowMomentCard({
       <div id="flow-moment" data-flow-moment={moment.day} data-anatomy="L4" className="rounded-xl">
         <EventCard
           avatar={null}
-          iconColumn={<SpineColumn icon="moment" isLast={false} tip={null} />}
-          header={header}
-          detail={detail}
-          explainer={explainer}
-          caption="Position at close"
+          slots={{
+            spine: { icon: "moment", isLast: false, tip: null },
+            head: { row: header },
+            caption: "Position at close",
+            // The sides are drawn as ledger cells against the moment's model,
+            // in the notes' place.
+            cells: { none: "The moment states each side's balances at the close in its ledger cells." },
+            ledgers: { none: "Each side's cell opens the Lifetime flows ledger the moment reads." },
+            notes: detail,
+            explainer: { body: explainer },
+            learnMore: null,
+          }}
         />
       </div>
     </EventCaptionContext.Provider>

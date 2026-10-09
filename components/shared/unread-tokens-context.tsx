@@ -3,8 +3,8 @@
 // The tokens a rendered event (or collapsed run) names whose `decimals` did not
 // load, handed down to the shared row pieces through context. The timeline
 // provides it around every card and run it renders (chain-truth-timeline.tsx),
-// so ChainTruthRow, ChainTruthDetail, SpineColumn, TimelineRunCard and
-// EventCard state "Not loaded" for such a token without each protocol's card
+// so ChainTruthRow, the cells (chain-truth-cells.tsx), SpineColumn,
+// TimelineRunCard and EventCard state "Not loaded" for such a token without each protocol's card
 // mapping it: they match a figure's token by the address or symbol it already
 // carries (lib/shared/decimals-unread.ts `unreadToken`).
 
