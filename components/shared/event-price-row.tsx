@@ -32,6 +32,9 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
+  /** The price as the family prints it, where whole dollars would lose the
+   *  decimals its cells' USD figures rest on (the Aave family's). */
+  display?: string;
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -146,11 +149,11 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
                 then={
                   p.info ? (
                     <Prov info={p.info} value={p.value} icon={icon}>
-                      {usdWhole(p.usd)}
+                      {p.display ?? usdWhole(p.usd)}
                     </Prov>
                   ) : (
                     <span className="inline-flex items-center gap-1">
-                      {usdWhole(p.usd)}
+                      {p.display ?? usdWhole(p.usd)}
                       {icon}
                     </span>
                   )

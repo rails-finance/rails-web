@@ -105,6 +105,9 @@ export interface EventCardSlots {
   /** T2's grid: the ordered cells, the cells to come while their figures are
    *  read, or the reason the event has none. */
   cells: EventCells;
+  /** Data attributes on the grid: the state of the read its figures come
+   *  from ("data-position-state": "ready"). */
+  cellsData?: Record<string, string>;
   ledgers: EventCardLedgers;
   /** T2's price row: the owner-paid gas, the prices the cells value, the
    *  outcome. The row draws where one of them is present. */
@@ -119,6 +122,9 @@ export interface EventCardSlots {
   band?: ReactNode;
   /** Run on pointer-over or focus of the row (a prefetch). */
   onIntent?: () => void;
+  /** Run while the body is open: a family whose cells need a read starts it
+   *  here, so a closed card asks for nothing. */
+  onOpen?: () => void;
 }
 
 /** What the shell takes beside a family's parts: the timeline's and the
@@ -206,7 +212,7 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
     band: slots.band,
     detail: (
       <>
-        <EventCellGrid cells={slots.cells} />
+        <EventCellGrid cells={slots.cells} data={slots.cellsData} />
         {slots.notes}
       </>
     ),
@@ -267,6 +273,7 @@ export function EventCard(props: EventCardProps) {
   } = parts;
   const ledgers = props.slots?.ledgers;
   const onIntent = props.slots?.onIntent;
+  const onOpen = props.slots?.onOpen;
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
   const showAvatar = !singleWallet && !!avatar;
@@ -298,6 +305,9 @@ export function EventCard(props: EventCardProps) {
 
   const localOpen = pageMode || (isControlled ? !!detailOpenProp : detailOpenInternal);
   const showDetail = localOpen || (inTimeline && phoneOpen?.openId === cardId);
+  useEffect(() => {
+    if (showDetail) onOpen?.();
+  }, [showDetail, onOpen]);
 
   // ── Receipts scope — the inspector's per-card roster ──────────────────
   // Every <Prov> value inside this card reports into a per-card registry; the
