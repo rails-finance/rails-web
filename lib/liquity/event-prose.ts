@@ -23,28 +23,16 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   CONTEXT_WORDS,
   FOOTER_WORDS,
-  GROUP_WORDS,
   L1_WORDS,
   L2_WORDS,
   L5,
-  PLACEHOLDERS,
-  SHARED_SENTENCES,
-  TEMPLATES,
+  PROSE,
   type EventTemplate,
   type L5Key,
-  type Rounding,
-  type SentenceTemplate,
 } from "@/lib/liquity/event-templates";
-import {
-  fmtAccrued,
-  fmtColl,
-  fmtCr,
-  fmtDebt,
-  fmtRate,
-  fmtRateChange,
-  fmtRateNum,
-  fmtUsdWhole,
-} from "@/lib/liquity/figure-format";
+import type { EventProseCore, ProseSentence as SharedSentence } from "@/lib/shared/event-prose/types";
+import { short, num } from "@/lib/shared/event-prose/roundings";
+import { fmtColl, fmtDebt, fmtRateChange, fmtRateNum, fmtUsdWhole } from "@/lib/liquity/figure-format";
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { liquityBeforeAmounts, liquityEventSafety } from "@/lib/liquity/event-safety";
@@ -62,7 +50,7 @@ import {
 import { collChangeProv, debtChangeProv, liquityRedistOnAdjust } from "@/lib/liquity/event-provenance";
 import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import { getBatchManagerByAddress, getBatchManagerName } from "@/lib/liquity/batch-managers";
-import { formatDate, formatMonthDay } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { formatGasCost } from "@/lib/shared/format-event";
 import { usdShown } from "@/lib/shared/usd-display";
 
@@ -71,31 +59,7 @@ import { usdShown } from "@/lib/shared/usd-display";
 /** The receipt a figure echoes on the page (components/protocol/liquity/
  *  event-prose-render.tsx maps each to its provenance builder). */
 export type EchoKey = "coll_change" | "debt_change" | "rate_after" | "upfront_fee" | "redist_debt" | "redist_coll";
-export type Emphasis = EchoKey | "bold";
-
-export interface ProseSeg {
-  text: string;
-  /** The placeholder this text fills. */
-  name?: string;
-  emph?: Emphasis;
-  /** A ratio pair: the page bolds whichever form the viewer's ratio setting shows. */
-  pair?: { cr: string; ltv: string };
-  /** An address the page links to the explorer. */
-  address?: string;
-  tone?: "manager" | "address";
-}
-
-export interface ProseSentence {
-  sentence_id: string;
-  text: string;
-  uses: string[];
-  segs: ProseSeg[];
-  /** The `group_words` id it sits under; set only when the explanation is
-   *  grouped (`grouped`). */
-  group?: string;
-}
-
-export type ProseValue = number | string | null;
+export type ProseSentence = SharedSentence<EchoKey>;
 
 export interface LiquityL2 {
   showGrid: boolean;
@@ -139,16 +103,9 @@ export interface LiquityL2 {
   lines: string[];
 }
 
-export interface LiquityEventProse {
-  template: { id: string; variant: string; version: string };
-  title: string;
+export interface LiquityEventProse extends EventProseCore<L5Key, EchoKey> {
   L1: string;
   L2: LiquityL2 | null;
-  /** L4: the teaser is the first sentence. */
-  L4: ProseSentence[];
-  /** A liquidation's payout legs, under the bullets. */
-  list: ProseSentence[];
-  L5: { key: L5Key; content: LearnMoreContent };
   footer: {
     gas: string | null;
     /** The gas the owner paid, for the card's gas figure (ui-jobs 289). */
@@ -158,7 +115,6 @@ export interface LiquityEventProse {
     tx: string;
     block: number;
   };
-  values: Record<string, ProseValue>;
 }
 
 export interface LiquityProseInput {
@@ -179,188 +135,17 @@ export interface LiquityProseInput {
   surplusClaimedAt?: number | null;
 }
 
-// ── Rounding ─────────────────────────────────────────────────────────────────
-
-const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-
-/** The old explanation's free figure: whole from 1,000, four places from 1. */
-function fmtAmount(n: number): string {
-  if (!isFinite(n) || n === 0) return "0";
-  const abs = Math.abs(n);
-  if (abs >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  if (abs >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
-  return n.toLocaleString("en-US", { maximumFractionDigits: decimals });
-}
-
-function fmtUsdCents(value: number): string {
-  if (value < 0.01) return "< $0.01";
-  if (value < 1) return `$${value.toFixed(2)}`;
-  return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDay(tsSeconds: number): string {
-  const d = new Date(tsSeconds * 1000);
-  const sameYear = d.getUTCFullYear() === new Date().getUTCFullYear();
-  const base = formatMonthDay(d);
-  return sameYear ? base : `${base}, ${String(d.getUTCFullYear()).slice(-2)}`;
-}
-
-function fmtSpan(seconds: number): string {
-  const hours = seconds / 3600;
-  if (hours < 24) {
-    const h = Math.max(1, Math.round(hours));
-    return `${h} hour${h === 1 ? "" : "s"}`;
-  }
-  return `${(hours / 24).toFixed(1)} days`;
-}
-
-interface FmtEnv {
-  values: Record<string, ProseValue>;
-  collDecimals: number | null;
-}
-
-const num = (v: ProseValue): number => (typeof v === "number" ? v : Number(v));
-
-/** A collateral figure at the ledger's decimals. */
-const collAt = (n: number, dec: number | null) => ledgerFigure(n, dec, fmtColl(n));
-
-/** Each rounding, as the file's `roundings` (ROUNDINGS) describes it. */
-const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEnv) => string> = {
-  coll: (v, _n, env) => collAt(num(v), env.collDecimals),
-  coll_trim: (v, _n, env) => {
-    const t = collAt(num(v), env.collDecimals);
-    return t.includes(".") ? t.replace(/\.?0+$/, "") : t;
-  },
-  debt: (v) => fmtDebt(num(v)),
-  accrued: (v) => fmtAccrued(num(v)),
-  accrued_signed: (v) => `${num(v) >= 0 ? "+" : "−"}${fmtAccrued(Math.abs(num(v)))}`,
-  amount: (v) => fmtAmount(num(v)),
-  usd: (v) => fmtUsdWhole(num(v)),
-  usd_about: (v) =>
-    num(v) >= 10_000 ? `about $${(Math.round(num(v) / 1000) * 1000).toLocaleString("en-US")}` : fmtUsdWhole(num(v)),
-  usd_cents: (v) => fmtUsdCents(num(v)),
-  ratio: (v) => fmtCr(num(v)),
-  ratio_whole: (v, _n, env) => {
-    const b = env.values.cr_before_same_price;
-    const a = env.values.cr_after;
-    const alike = typeof b === "number" && typeof a === "number" && Math.round(b) === Math.round(a);
-    return alike ? fmtCr(num(v)) : `${Math.round(num(v))}%`;
-  },
-  ratio_pair: (v) => `${fmtCr(num(v))} (LTV ${(10000 / num(v)).toFixed(2)}%)`,
-  rate: (v) => fmtRate(num(v)),
-  rate_step: (v, name, env) => {
-    const step = fmtRateChange(num(env.values.rate_before), num(env.values.rate_after));
-    return name === "rate_before" ? step.before : step.after;
-  },
-  pct_whole: (v) => `${Math.round(Math.abs(num(v)) * 100)}%`,
-  pct3: (v) => `${num(v).toFixed(3)}%`,
-  count: (v) => num(v).toLocaleString("en-US"),
-  compact: (v) => fmtHeaderMagnitude(Math.abs(num(v))),
-  date: (v) => formatDate(num(v)),
-  day_short: (v) => fmtDay(num(v)),
-  span: (v) => fmtSpan(num(v)),
-  manager: (v, name, env) => {
-    const n = env.values[`${name}_name`];
-    return typeof n === "string" && n ? `${n} (${short(String(v))})` : short(String(v));
-  },
-  address: (v) => short(String(v)),
-  text: (v) => String(v ?? ""),
-};
-
-const TOKEN = /\{([a-z_0-9]+)(?:\|([a-z_]+))?\}/g;
+// ── The engine's functions over this file ────────────────────────────────────
 
 /** The placeholders a string reads. */
-export function placeholdersOf(text: string): { name: string; rounding: Rounding }[] {
-  return [...text.matchAll(TOKEN)].map((m) => ({
-    name: m[1],
-    rounding: (m[2] as Rounding | undefined) ?? PLACEHOLDERS[m[1]]?.rounding ?? "text",
-  }));
-}
-
-/** Fill a string's placeholders. A placeholder the values lack is an error in
- *  the generator, so it throws. */
-function fill(
-  text: string,
-  env: FmtEnv,
-  emph: Record<string, Emphasis> = {},
-): { text: string; segs: ProseSeg[]; uses: string[] } {
-  const segs: ProseSeg[] = [];
-  const uses: string[] = [];
-  let at = 0;
-  for (const m of text.matchAll(TOKEN)) {
-    const i = m.index ?? 0;
-    if (i > at) segs.push({ text: text.slice(at, i) });
-    const name = m[1];
-    const rounding = (m[2] as Rounding | undefined) ?? PLACEHOLDERS[name]?.rounding ?? "text";
-    const v = env.values[name];
-    if (v === undefined || v === null) throw new Error(`event prose: no value for {${name}} in "${text}"`);
-    const out = ROUNDING[rounding](v, name, env);
-    const seg: ProseSeg = { text: out, name };
-    if (emph[name]) seg.emph = emph[name];
-    if (rounding === "ratio_pair") seg.pair = { cr: fmtCr(num(v)), ltv: `${(10000 / num(v)).toFixed(2)}%` };
-    if (rounding === "manager" || rounding === "address") {
-      seg.address = String(v);
-      seg.tone = rounding;
-    }
-    segs.push(seg);
-    if (!uses.includes(name)) uses.push(name);
-    at = i + m[0].length;
-  }
-  if (at < text.length) segs.push({ text: text.slice(at) });
-  return { text: segs.map((s) => s.text).join(""), segs, uses };
-}
-
-/** A string's text around the named placeholders, the others filled: for a
- *  page that wraps those figures in their receipts. `names` in the order
- *  they appear; the result has one more piece than `names`. */
-export function wordsAround(text: string, names: string[], values: Record<string, ProseValue> = {}): string[] {
-  const out: string[] = [];
-  let rest = text;
-  for (const name of names) {
-    const at = rest.indexOf(`{${name}}`);
-    if (at < 0) throw new Error(`event prose: no {${name}} in "${text}"`);
-    out.push(fillText(rest.slice(0, at), values));
-    rest = rest.slice(at + name.length + 2);
-  }
-  out.push(fillText(rest, values));
-  return out;
-}
-
+export const placeholdersOf = PROSE.placeholdersOf;
+/** A string's text around the named placeholders, the others filled. */
+export const wordsAround = PROSE.wordsAround;
 /** Fill a string's placeholders to text. */
-export function fillText(text: string, values: Record<string, ProseValue>, collDecimals: number | null = null): string {
-  return fill(text, { values, collDecimals }).text;
-}
-
-// ── Templates ────────────────────────────────────────────────────────────────
-
-const BY_ID = new Map(TEMPLATES.map((t) => [t.id, t]));
-
-export function liquityTemplate(id: string): EventTemplate {
-  const t = BY_ID.get(id);
-  if (!t) throw new Error(`event prose: no template ${id}`);
-  return t;
-}
-
-/** A sentence of the template, or a shared one it lists. */
-function sentenceOf(t: EventTemplate, id: string): SentenceTemplate {
-  const s = t.sentences[id] ?? (t.order.includes(id) ? SHARED_SENTENCES[id] : undefined);
-  if (!s) throw new Error(`event prose: ${t.id} has no sentence ${id}`);
-  return s;
-}
-
-/** A short content hash of a template's strings: the sidecar's version, so a
- *  regenerated export shows which templates changed. */
-export function templateVersion(t: EventTemplate): string {
-  const shared = t.order.filter((id) => SHARED_SENTENCES[id]).map((id) => SHARED_SENTENCES[id].text);
-  const src = JSON.stringify([t.title, t.L1, Object.values(t.sentences).map((s) => s.text), shared, t.groups]);
-  let h = 2166136261;
-  for (let i = 0; i < src.length; i++) {
-    h ^= src.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0).toString(16).padStart(8, "0");
-}
+export const fillText = PROSE.fillText;
+export const liquityTemplate = PROSE.template;
+/** L4 as the explanation prints it (lib/shared/event-prose/engine.ts). */
+export const explanationRuns = PROSE.explanationRuns;
 
 // ── L1 ───────────────────────────────────────────────────────────────────────
 
@@ -418,52 +203,7 @@ export function liquityL1Label(ctx: LiquityContext): string {
   }
 }
 
-function l1Line(t: EventTemplate, values: Record<string, ProseValue>, env: FmtEnv): string {
-  const groups: string[] = [];
-  for (const group of t.L1) {
-    const words: string[] = [];
-    let missing = false;
-    for (const p of group) {
-      if ("word" in p) {
-        words.push(L1_WORDS[p.word]);
-        continue;
-      }
-      const v = values[p.figure];
-      if (v == null || (typeof v === "number" && !(Math.abs(v) > 0))) {
-        missing = true;
-        break;
-      }
-      let text = ROUNDING[p.rounding ?? PLACEHOLDERS[p.figure]?.rounding ?? "text"](v, p.figure, env);
-      if (p.sign) text = `${num(values[`${p.figure}_sign`]) < 0 ? "−" : "+"}${text}`;
-      words.push(p.symbol ? `${text} ${values[p.symbol]}` : text);
-    }
-    if (!missing && words.length) groups.push(words.join(" "));
-  }
-  return groups.join(" · ");
-}
-
 // ── The generator ────────────────────────────────────────────────────────────
-
-class Speaker {
-  private said = new Map<string, ProseSentence>();
-  private t: EventTemplate;
-  private env: FmtEnv;
-  constructor(t: EventTemplate, env: FmtEnv) {
-    this.t = t;
-    this.env = env;
-  }
-  say(id: string, emph?: Record<string, Emphasis>): void {
-    const s = sentenceOf(this.t, id);
-    const f = fill(s.text, this.env, emph);
-    this.said.set(id, { sentence_id: id, text: f.text, uses: f.uses, segs: f.segs });
-  }
-  /** The sentences said, in the template's order; the list apart. */
-  out(): { L4: ProseSentence[]; list: ProseSentence[] } {
-    const L4 = this.t.order.filter((id) => this.said.has(id)).map((id) => this.said.get(id)!);
-    const list = (this.t.list ?? []).filter((id) => this.said.has(id)).map((id) => this.said.get(id)!);
-    return { L4, list };
-  }
-}
 
 function pick(ctx: LiquityContext): { id: string; variant: string } {
   const op = ctx.troveOperation;
@@ -556,12 +296,10 @@ function l5For(key: L5Key, ctx: LiquityContext, variant: string): LearnMoreConte
 export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const { ctx, event, previousEvent, currentEvent, currentPrice, ledger, surplusClaimedAt } = input;
   const collDecimals = input.collDecimals ?? null;
-  const values: Record<string, ProseValue> = {};
-  const env: FmtEnv = { values, collDecimals };
   const sel = pick(ctx);
   const variant = sel.variant;
-  const t = liquityTemplate(sel.id);
-  const sp = new Speaker(t, env);
+  const run = PROSE.start(liquityTemplate(sel.id), collDecimals);
+  const { t, values, env, sp } = run;
   const v = values;
 
   const collSym = ctx.collateralType;
@@ -929,10 +667,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     v.redist_l1 = parts.join(` ${L1_WORDS.and} `);
   }
 
-  const said = sp.out();
-  const all = grouped(t, [...said.L4, ...said.list]);
-  const L4 = all.slice(0, said.L4.length);
-  const list = all.slice(said.L4.length);
+  const said = PROSE.finish(run, variant);
   const paid = event.gas && event.gas.gasCostEth > 0 && !PASSIVE.has(ctx.operation) ? event.gas : null;
   const gas = paid
     ? ctx.noChangeRun
@@ -941,12 +676,12 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     : null;
 
   return {
-    template: { id: t.id, variant, version: templateVersion(t) },
-    title: t.title,
-    L1: l1Line(t, values, env),
+    template: said.template,
+    title: said.title,
+    L1: PROSE.l1Line(t, values, env, L1_WORDS),
     L2: stateBefore && stateAfter ? liquityL2(input, accrual!) : null,
-    L4,
-    list,
+    L4: said.L4,
+    list: said.list,
     L5: { key: t.L5, content: l5For(t.L5, ctx, variant) },
     footer: {
       gas,
@@ -957,47 +692,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     },
     values,
   };
-}
-
-// ── L4's groups ──────────────────────────────────────────────────────────────
-
-/** The sentences said, each with its group, when the explanation is grouped:
- *  two or more groups hold two or more bullets each (ui-jobs 282). A grouped
- *  explanation heads every group that has a bullet, one-bullet groups
- *  included. Otherwise the sentences come back as said, with no group. */
-function grouped(t: EventTemplate, said: ProseSentence[]): ProseSentence[] {
-  const groupOf = new Map<string, string>();
-  for (const [g, ids] of Object.entries(t.groups)) for (const id of ids) groupOf.set(id, g);
-  const sizes = new Map<string, number>();
-  for (const s of said) {
-    const g = groupOf.get(s.sentence_id);
-    if (g == null) return said;
-    sizes.set(g, (sizes.get(g) ?? 0) + 1);
-  }
-  const draw = [...sizes.values()].filter((n) => n >= 2).length >= 2;
-  return draw ? said.map((s) => ({ ...s, group: groupOf.get(s.sentence_id) })) : said;
-}
-
-const GROUP_RANK = new Map(Object.keys(GROUP_WORDS).map((g, i) => [g, i]));
-
-/** L4 as the explanation prints it: one run with no heading, or one run per
- *  group under its heading, in `group_words` order and the template's order
- *  within each. A liquidation's payout legs follow the bullets in the flat
- *  form and sit in their group in the grouped one. */
-export function explanationRuns(p: LiquityEventProse): {
-  group: string | null;
-  heading: string | null;
-  sentences: ProseSentence[];
-}[] {
-  const all = [...p.L4, ...p.list];
-  if (!all.some((s) => s.group)) return all.length ? [{ group: null, heading: null, sentences: all }] : [];
-  const runs: { group: string; heading: string; sentences: ProseSentence[] }[] = [];
-  for (const s of [...all].sort((a, b) => GROUP_RANK.get(a.group!)! - GROUP_RANK.get(b.group!)!)) {
-    const last = runs[runs.length - 1];
-    if (last?.group === s.group) last.sentences.push(s);
-    else runs.push({ group: s.group!, heading: GROUP_WORDS[s.group!], sentences: [s] });
-  }
-  return runs;
 }
 
 /** The replay's debt buckets that lower the debt. */

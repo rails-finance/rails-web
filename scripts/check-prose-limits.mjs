@@ -3,10 +3,10 @@
 // strings files (rails-ops standards/prose-limits-and-zones.md, sections 2, 3,
 // 6 and 7.1; ui-jobs item 314).
 //
-// STRICT (item 314, step 2): the Liquity V2 strings file is inside the limits,
-// and `pnpm check` fails on the next string over them. The other families'
-// extracted sentences are a heuristic read of JSX, so they are listed for each
-// family's sweep job and do not fail the check.
+// STRICT (item 314): every family with a strings file (Liquity V2 and Liquity
+// V1 today) is inside the limits, and `pnpm check` fails on the next string
+// over them. The other families' extracted sentences are a heuristic read of
+// JSX, so they are listed for each family's sweep job and do not fail the check.
 //
 //   node scripts/check-prose-limits.mjs              strict: exit 1 on any failure
 //   node scripts/check-prose-limits.mjs --report     list failures, exit 0
@@ -20,9 +20,10 @@
 //   Z2 event sentences, shared sentences, payout legs: content/*/event-prose.yaml
 //       `templates`, `shared_sentences`. The pane's worst case is computed from
 //       each template's `order`, `list` and `groups`.
-//   Z1 position card explanation: the `trove_words` strings of the position card
-//       (Z1_IDS below).
-//   Z4 modals: the `L5` section.
+//   Z1 position card explanation: the family's Z1 strings (Z1_STRINGS below:
+//       Liquity V2's listed `trove_words`, Liquity V1's `position_words`).
+//   Z4 modals: the `L5` section. Links also from `info`, `claim_links` and a
+//       concept's `sources`; a `doc` id resolves through the file's `doc_urls`.
 //   Z3 Lifetime flows: skipped, the pane is TSX (lib/liquity/economics-explanation.tsx).
 //   Other families: the sentences the register scan extracts
 //       (scripts/lib/register-scan.mjs extractCopyUnits) from lib/<proto>/explainer-clauses.tsx
@@ -102,7 +103,7 @@ const Z2_HEADINGS = [
 ];
 const Z1_HEADINGS = ["Holdings", "Risk", "Rate", "History"];
 
-/** The position card's explanation strings in trove_words (Z1). A lead ends in a colon. */
+/** Liquity V2's position card explanation strings in trove_words (Z1). A lead ends in a colon. */
 const Z1_IDS = [
   "liq_lead", "liq_lifecycle", "liq_nft", "closed_lead_redeemed", "closed_lead_repaid",
   "closed_peak_debt", "closed_peak_coll", "closed_lifecycle", "open_lead", "debt_breakdown",
@@ -110,8 +111,24 @@ const Z1_IDS = [
   "rate_cost_delegate", "rate_cost_owner", "debt_in_front", "queue_share", "nft_held",
   "counts_both", "counts_owner", "counts_redeemed",
 ];
-/** Z1 placeholders that are names or links. Every other one ({coll}, {debt}, {range}, ...) is a figure. */
+/** Liquity V2's Z1 placeholders that are names or links. Every other one ({coll}, {debt}, {range}, ...) is a figure. */
 const Z1_NAME_PLACEHOLDERS = new Set(["id", "owner", "nft", "coll_type", "delegate", "name", "time_word", "tx_word", "manager", "by"]);
+/**
+ * Each family's Z1 strings: the section, the ids (null: every id of the section
+ * but its headings) and how a placeholder is told to be a figure ("names": every
+ * placeholder but Z1_NAME_PLACEHOLDERS; "placeholders": the file's placeholders
+ * table, as Z2 reads it). A family missing here has no Z1 strings in its file.
+ */
+const Z1_STRINGS = {
+  "liquity-v2": { section: "trove_words", ids: Z1_IDS, figures: "names" },
+  "liquity-v1": { section: "position_words", ids: null, figures: "placeholders" },
+};
+const z1Ids = (family, d) => {
+  const z = Z1_STRINGS[family];
+  if (!z) return [];
+  return z.ids ?? Object.keys(d[z.section] ?? {}).filter((k) => !/^(group|heading)_/.test(k));
+};
+
 /** Modal placeholders that are branch or mode constants (modal grammar 1). Any other placeholder is an instance figure. */
 const MODAL_CONSTANT_PLACEHOLDERS = new Set(["min_cr", "max_ltv", "coll_type", "delegate", "delegate_name"]);
 /** Roundings whose placeholder is a name or a link. */
@@ -506,24 +523,27 @@ function faqTable() {
   return out;
 }
 
-const cardLabelWords = (d) => {
+const cardLabelWords = (family, d) => {
   const set = new Set();
   const add = (s) => typeof s === "string" && set.add(s.toLowerCase());
-  for (const sec of ["L1_words", "page_words", "group_words"]) Object.values(d[sec] ?? {}).forEach(add);
-  for (const [k, v] of Object.entries(d.trove_words ?? {}))
-    if (!Z1_IDS.includes(k) && typeof v === "string" && v.split(/\s+/).length <= 4) add(v);
+  for (const sec of ["L1_words", "page_words", "group_words", "words"]) Object.values(d[sec] ?? {}).forEach(add);
+  const z = Z1_STRINGS[family];
+  const ids = z1Ids(family, d);
+  for (const [k, v] of Object.entries(z ? (d[z.section] ?? {}) : {}))
+    if (!ids.includes(k) && typeof v === "string" && v.split(/\s+/).length <= 4) add(v);
   return set;
 };
 
 function checkStringsFile({ family, rel }) {
   const src = new Source(rel, read(rel));
   const d = parseContent(read(rel));
-  const out = { sentences: 0, pane: [] };
+  const out = { sentences: 0, pane: [], z1: 0 };
   const figNameZ2 = (name) => {
     const r = d.placeholders?.[name]?.rounding;
     return r != null && !NAME_ROUNDINGS.has(r);
   };
-  const figNameZ1 = (name) => !Z1_NAME_PLACEHOLDERS.has(name);
+  const z1 = Z1_STRINGS[family];
+  const figNameZ1 = z1?.figures === "placeholders" ? figNameZ2 : (name) => !Z1_NAME_PLACEHOLDERS.has(name);
 
   // Z2: shared sentences, then each template's own sentences and payout legs.
   for (const [id, s] of Object.entries(d.shared_sentences ?? {})) {
@@ -545,17 +565,19 @@ function checkStringsFile({ family, rel }) {
   checkHeadingSet(rel, d.group_words, d.templates ?? []);
 
   // Z1: the position card's strings.
-  for (const id of Z1_IDS) {
-    const text = d.trove_words?.[id];
+  const sec = z1?.section;
+  for (const id of z1Ids(family, d)) {
+    const text = d[sec]?.[id];
     if (typeof text !== "string") {
-      fail({ file: rel, id: `trove_words.${id}`, zone: "Z1", rule: "Z1 string listed in the check is gone (update Z1_IDS)", count: 0, limit: 0 });
+      fail({ file: rel, id: `${sec}.${id}`, zone: "Z1", rule: "Z1 string listed in the check is gone (update Z1_STRINGS)", count: 0, limit: 0 });
       continue;
     }
-    checkBullet({ src, file: rel, id: `trove_words.${id}`, zone: "Z1", path: ["trove_words", id] }, text, "Z1", { lead: text.trim().endsWith(":"), isFig: figNameZ1 });
+    out.z1++;
+    checkBullet({ src, file: rel, id: `${sec}.${id}`, zone: "Z1", path: [sec, id] }, text, "Z1", { lead: text.trim().endsWith(":"), isFig: figNameZ1 });
   }
-  for (const k of Object.keys(d.trove_words ?? {}))
-    if (/^(group|heading)_/.test(k) && !Z1_HEADINGS.includes(d.trove_words[k]))
-      fail({ file: rel, id: `trove_words.${k}`, zone: "Z1", rule: `heading outside ${Z1_HEADINGS.join(", ")}`, count: 1, limit: 0 });
+  for (const k of Object.keys((sec && d[sec]) ?? {}))
+    if (/^(group|heading)_/.test(k) && !Z1_HEADINGS.includes(d[sec][k]))
+      fail({ file: rel, id: `${sec}.${k}`, zone: "Z1", rule: `heading outside ${Z1_HEADINGS.join(", ")}`, count: 1, limit: 0 });
 
   // Z4: modals.
   const faq = faqTable();
@@ -567,15 +589,15 @@ function checkStringsFile({ family, rel }) {
 
 // ── Term check, first half (listing only) ────────────────────────────────────
 
-function termListing(rel, d) {
+function termListing(family, rel, d) {
   const glossary = new Map();
   for (const [name, m] of Object.entries(d.L5 ?? {}))
     for (const x of m.details ?? []) glossary.set(x.bold.toLowerCase().replace(/&/g, "and"), `L5.${name}`);
-  const card = cardLabelWords(d);
+  const card = cardLabelWords(family, d);
   const strings = [
     ...Object.entries(d.shared_sentences ?? {}).map(([id, s]) => [`shared_sentences.${id}`, s.text]),
     ...(d.templates ?? []).flatMap((t) => Object.entries(t.sentences ?? {}).map(([id, s]) => [`${t.id}/${id}`, s.text])),
-    ...Z1_IDS.map((id) => [`trove_words.${id}`, d.trove_words?.[id] ?? ""]),
+    ...z1Ids(family, d).map((id) => [`${Z1_STRINGS[family].section}.${id}`, d[Z1_STRINGS[family].section]?.[id] ?? ""]),
   ];
   for (const [id, text] of strings)
     for (const [term, modal] of glossary) {
@@ -686,17 +708,22 @@ function linkChecks(parsed) {
     if (!ok) fail({ file, id, zone: "Z4", rule: family ? `link host is not ${family}'s official documentation` : "link host is in no family's official documentation list", count: 0, limit: 0, got: url });
   };
 
-  // Strings files: modal links, video, faq ids, and any URL in any string.
+  // Strings files: modal links, concept sources, video, faq and doc ids.
   const faq = faqTable();
   for (const { family, rel, d } of parsed) {
-    for (const [name, m] of Object.entries(d.L5 ?? {})) {
-      for (const [i, l] of (m.links ?? []).entries()) {
-        const url = l.url ?? faq[l.faq];
-        if (!url) fail({ file: rel, id: `L5.${name}.links[${i}]`, zone: "Z4", rule: `faq id ${l.faq} resolves to no url`, count: 0, limit: 0 });
-        else judge({ file: rel, id: `L5.${name}.links[${i}]`, url, family });
-      }
-      if (m.video?.url) judge({ file: rel, id: `L5.${name}.video`, url: m.video.url, family });
+    const link = (id, l) => {
+      const url = l.url ?? (l.faq !== undefined ? faq[l.faq] : d.doc_urls?.[l.doc]);
+      if (!url) fail({ file: rel, id, zone: "Z4", rule: `${l.faq !== undefined ? `faq id ${l.faq}` : `doc id ${l.doc}`} resolves to no url`, count: 0, limit: 0 });
+      else judge({ file: rel, id, url, family });
+    };
+    const modals = [...Object.entries(d.L5 ?? {}).map(([n, m]) => [`L5.${n}`, m]), ...(d.info ? [["info", d.info]] : [])];
+    for (const [name, m] of modals) {
+      for (const [i, l] of (m.links ?? []).entries()) link(`${name}.links[${i}]`, l);
+      for (const [i, x] of (m.details ?? []).entries())
+        for (const [j, l] of (x.sources ?? []).entries()) link(`${name}.details[${i}].sources[${j}]`, l);
+      if (m.video?.url) judge({ file: rel, id: `${name}.video`, url: m.video.url, family });
     }
+    for (const [i, l] of (d.claim_links ?? []).entries()) link(`claim_links[${i}]`, l);
   }
 
   // TS modals: URL literals in the learn-more files, attributed to the family
@@ -813,12 +840,14 @@ if (SELF_TEST) selfTest();
 const parsed = [];
 const panes = [];
 let sentenceCount = 0;
+let z1Count = 0;
 for (const f of contentFiles()) {
   const { d, out } = checkStringsFile(f);
   parsed.push({ ...f, d });
   panes.push(...out.pane.map((p) => ({ ...p, file: f.rel })));
   sentenceCount += out.sentences;
-  termListing(f.rel, d);
+  z1Count += out.z1;
+  termListing(f.family, f.rel, d);
 }
 const others = otherFamilies();
 const links = linkChecks(parsed);
@@ -842,7 +871,7 @@ const tally = (rows, key) => {
   return [...m].sort((a, b) => b[1] - a[1]);
 };
 console.log(`\ncheck:prose-limits${REPORT ? " (report mode)" : ""}`);
-console.log(`  scanned: ${contentFiles().length} strings file(s), ${sentenceCount} event/shared sentences, ${Z1_IDS.length} Z1 strings, ${panes.length} templates (Z2 panes), ${others.files} clause/pane files with ${others.units} units for other families, ${links.checked} links`);
+console.log(`  scanned: ${contentFiles().length} strings file(s), ${sentenceCount} event/shared sentences, ${z1Count} Z1 strings, ${panes.length} templates (Z2 panes), ${others.files} clause/pane files with ${others.units} units for other families, ${links.checked} links`);
 console.log("  Z3 Lifetime flows: skipped, the pane is TSX (lib/liquity/economics-explanation.tsx) until its words move into a strings file");
 console.log("  Reveal size: no reveal exists in a strings file yet; the rule is exercised by --self-test");
 console.log(`  failures: ${failures.length}`);
