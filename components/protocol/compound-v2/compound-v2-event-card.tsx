@@ -19,12 +19,16 @@ import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { type CompoundV2Coords } from "@/lib/compound-v2/event-provenance";
-import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
-import { compoundV2ExplainerTeaser, type CompoundV2Event } from "@/lib/compound-v2/explainer-clauses";
+import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
 import { compoundV2HeadSpec } from "./compound-v2-event-header";
 import { useCompoundV2Cells } from "./compound-v2-event-detail";
-import { CompoundV2EventExplainer, compoundV2LearnMoreContent } from "./compound-v2-event-explainer";
+import {
+  CompoundV2EventExplainer,
+  CompoundV2ExplainerTeaser,
+  compoundV2EchoCoords,
+  compoundV2EchoFor,
+  isGroupedExplanation,
+} from "./compound-v2-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { ownerPaidGas } from "@/components/shared/event-price-row";
 
@@ -79,15 +83,14 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
 
   const dir = DIRECTION[ctx.eventType];
   const isTransfer = ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out";
-  const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
-  const catalogCSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
-  const coords: CompoundV2Coords = {
-    txHash: event.txHash,
+  const coords = compoundV2EchoCoords(ctx, event);
+  const prose = compoundV2EventProse({
+    ctx,
+    siblings: sibs,
+    self: event,
+    externalBy: extBy ?? undefined,
     blockNumber: event.blockNumber,
-    ctoken: market?.ctoken,
-    marketLabel: catalogCSym,
-    account: event.wallet,
-  };
+  });
   // The address goes to the icon chip, which can only ask a CDN about a
   // contract; the symbol alone sends it to the house table. It is looked up
   // under the DISPLAYED `symbol`, because the address has to identify the same
@@ -162,12 +165,14 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
     notes,
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
     explainer: {
-      body: (
-        <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} skipLead />
-      ),
-      first: compoundV2ExplainerTeaser(ctx, coords, sibs, event, extBy ?? undefined) ?? undefined,
+      body: <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} />,
+      first:
+        prose.L4.length > 0 ? (
+          <CompoundV2ExplainerTeaser prose={prose} echo={(key) => compoundV2EchoFor(key, ctx, coords)} />
+        ) : undefined,
+      grouped: isGroupedExplanation(prose),
     },
-    learnMore: <LearnMore inline content={compoundV2LearnMoreContent(ctx)} />,
+    learnMore: <LearnMore inline content={prose.L5.content} />,
   };
 
   return <EventCard slots={slots} avatar={null} />;
