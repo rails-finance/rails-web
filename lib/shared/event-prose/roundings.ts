@@ -8,6 +8,7 @@ import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
 import { compoundAmount } from "@/lib/compound/row-facts";
 import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { hfLabelV4 } from "@/lib/aave-v4/format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -108,4 +109,6 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   compound_amount: (v) => compoundAmount(num(v)),
   number: (v) => formatNumber(num(v)),
   usd_value: (v) => formatUsdValue(num(v)),
+  pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
+  hf: (v) => hfLabelV4(num(v)),
 };

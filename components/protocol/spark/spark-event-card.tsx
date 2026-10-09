@@ -13,7 +13,7 @@ import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type SparkCoords } from "@/lib/spark/event-provenance";
-import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
+import { SPARK_WORDS } from "@/lib/spark/event-templates";
 import { sparkHeadSpec } from "./spark-event-header";
 import { useSparkEventBody } from "./spark-event-detail";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
@@ -183,9 +183,7 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
           ),
         }
       : {
-          none: feeOf
-            ? "A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card."
-            : "Another of the owner's transactions shares this block, so the account is not read: the cells state the event's balances.",
+          none: feeOf ? SPARK_WORDS.ledgers_fee : SPARK_WORDS.ledgers_shared,
         },
     notes: body.notes,
     // The index carries no gas for SparkLend's rows and the account read reads
@@ -202,10 +200,8 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
           reserveAddress={reserveAddress}
           siblings={siblings}
           previous={previous}
-          skipLead
         />
       ),
-      first: sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings }) ?? undefined,
     },
     learnMore: <LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />,
     onIntent: prefetch,

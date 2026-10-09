@@ -8,7 +8,7 @@
 // the listing's per-asset facets (?supply= / ?borrow=).
 
 import { AaveMarketPage } from "@/components/shared/aave-market-page";
-import { aaveMarketOverviewContent } from "@/lib/shared/learn-more-content";
+import { sparkModal } from "@/lib/spark/event-templates";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 
@@ -22,7 +22,7 @@ export default function SparkMarketPage() {
         protocolName="SparkLend"
         marketLabel="SparkLend"
         purpose="The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against sDAI, ETH and BTC collateral."
-        learnMore={aaveMarketOverviewContent("spark")}
+        learnMore={sparkModal("market")}
         assetHref={(symbol, side) =>
           `/ethereum/spark?${side === "supply" ? "supply" : "borrow"}=${encodeURIComponent(symbol)}`
         }

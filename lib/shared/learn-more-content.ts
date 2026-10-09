@@ -641,24 +641,21 @@ export function aaveV4BaseHubContent(): LearnMoreContent {
 }
 
 // Page-level explainer for the V3-family market-overview surfaces
-// (/aave-v3/market, /spark/market) — the single-market counterpart of
+// (/aave-v3/market) — the single-market counterpart of
 // aaveV4HubsContent. Layer-2 mechanics only, no snapshot numbers, so it reads
 // identically on any block. Concepts mirror what the band and the reserve list
 // show: reserves, rates and the kink, LTV, LT, bonus, caps, closed states, price.
-export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "seamless" | "spark"): LearnMoreContent {
-  const spark = market === "spark";
+export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "seamless"): LearnMoreContent {
   const onBase = market === "aave-v3-base";
   const seamless = market === "seamless";
-  const name = spark ? "SparkLend" : seamless ? "Seamless" : "Aave V3";
+  const name = seamless ? "Seamless" : "Aave V3";
   return {
     title: "How the market overview works",
     intro: seamless
       ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork rather than an Aave deployment, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
-      : spark
-        ? "SparkLend is a single Aave-V3-architecture market: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with SparkLend's own oracle."
-        : onBase
-          ? "Aave V3 on Base is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a separate deployment from Aave V3 on Ethereum — its own reserves, its own risk parameters, its own oracle — so a wallet's position on one says nothing about its position on the other. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
-          : "Aave V3 Core is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with Aave's own oracle.",
+      : onBase
+        ? "Aave V3 on Base is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a separate deployment from Aave V3 on Ethereum — its own reserves, its own risk parameters, its own oracle — so a wallet's position on one says nothing about its position on the other. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
+        : "Aave V3 Core is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with Aave's own oracle.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -667,9 +664,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Utilisation & rates",
-        text: spark
-          ? "utilisation is borrowed ÷ supplied per reserve, and every SparkLend borrow rate follows it along a curve. DAI's and USDS's curve rises to a target that follows a rate Sky governance sets, so a governance change moves them too."
-          : "utilisation is borrowed ÷ supplied per reserve; the interest-rate curve prices borrowing from it, and suppliers earn the borrow interest net of the reserve factor.",
+        text: "utilisation is borrowed ÷ supplied per reserve; the interest-rate curve prices borrowing from it, and suppliers earn the borrow interest net of the reserve factor.",
       },
       {
         bold: "Utilisation bar",
@@ -689,9 +684,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Caps used",
-        text: spark
-          ? "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. SparkLend's CapAutomator keeps each live cap a short step above use and raises it automatically up to a governance-set maximum, so use is measured against that maximum; where the automator holds no setting for a reserve, against the live cap. A cap of one token closes that side, and the largest value the field can hold means no cap."
-          : "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. Governance closes a side by setting its cap to one whole token, which reads as closed; a cap of 0 means no cap.",
+        text: "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. Governance closes a side by setting its cap to one whole token, which reads as closed; a cap of 0 means no cap.",
       },
       {
         bold: "Closed to new business",
@@ -716,22 +709,17 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
           { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
           { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
         ]
-      : spark
+      : onBase
         ? [
-            { label: "SparkLend docs", url: "https://docs.spark.fi/products/sparklend" },
-            { label: "Spark FAQ", url: "https://docs.spark.fi/faq" },
+            { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
+            { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
+            { label: "Aave on Base", url: "https://app.aave.com/markets/?marketName=proto_base_v3" },
           ]
-        : onBase
-          ? [
-              { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-              { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
-              { label: "Aave on Base", url: "https://app.aave.com/markets/?marketName=proto_base_v3" },
-            ]
-          : [
-              { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-              { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
-              { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-            ],
+        : [
+            { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
+            { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
+            { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+          ],
   };
 }
 
@@ -1158,213 +1146,16 @@ export function aaveV3EventFallbackContent(protocol: V3Protocol = "Aave V3"): Le
   };
 }
 
-// ── Spark (SparkLend) — Event-card modals ────────────────────────────────────
+// ── Spark (SparkLend) — doc links of the Lifetime flows modals ───────────────
 //
-// SparkLend is an Aave V3 fork with the same single-Pool, cross-collateralised
-// account model, so these mirror the V3 modals, one per act, in Spark's terms:
-// raw DAI's liquidation threshold is an on-chain epsilon, DAI and USDS share a
-// rate model pegged to a Sky-set rate, e-mode categories, the liquidation fee
-// to the Spark treasury, the WETH gateway. Links are Spark's docs
-// (docs.spark.fi redirects to docs.spark.finance; checked 2026-09-29).
+// The event, position and market modals are content/spark/event-prose.yaml's.
+// These links serve the economics modals below (Z3, still TSX).
 
 const SPARK_DOC_URLS = {
   SPARKLEND: "https://docs.spark.fi/products/sparklend",
   LIQUIDATIONS: "https://docs.spark.fi/products/sparklend/guides/liquidations",
-  EMODE: "https://docs.spark.fi/products/sparklend/guides/e-mode",
-  BORROWING: "https://docs.spark.fi/products/sparklend/guides/borrowing-assets",
   FAQ: "https://docs.spark.fi/faq",
 } as const;
-
-/** Sky's stablecoins, whose borrow rate follows a Sky-set rate. */
-const SKY_RATE_ASSETS = new Set(["DAI", "USDS"]);
-
-/** How the borrow rate moves (read from the rate strategy SparkLend points DAI
- *  and USDS at, 0x8a95…fdd, 2026-09-29: base 0, the first slope the rate
- *  source's APR plus a spread, kink at 80% utilisation). */
-function sparkRateDetail(symbol?: string): { bold: string; text: string } {
-  return symbol && SKY_RATE_ASSETS.has(symbol)
-    ? {
-        bold: `${symbol}'s rate`,
-        text: "DAI and USDS share one rate model. Below 80% utilisation the rate rises in a straight line from 0 to a target: a rate Sky governance sets, read on chain, plus a fixed spread. Above 80% it climbs steeply. So both a governance change and the reserve's utilisation move it.",
-      }
-    : {
-        bold: "Variable rate",
-        text: "debt accrues interest every second at the reserve's variable borrow rate, which rises with the reserve's utilisation: gently up to its target utilisation, steeply beyond it.",
-      };
-}
-
-const SPARK_EMODE_DETAIL = {
-  bold: "E-mode",
-  text: "an account can choose one e-mode category of price-correlated assets (ETH-correlated, or stablecoins). Collateral inside the category then counts at the category's loan-to-value and liquidation threshold, higher than the asset's own, and the account may borrow only assets of that category. Sky governance sets the categories and their figures.",
-};
-
-const SPARK_HEALTH_DETAIL = {
-  bold: "One health factor",
-  text: "all of a wallet's supply and debt on SparkLend is one account: health factor = Σ (collateral value × its liquidation threshold) ÷ debt value. Below 1 the account can be liquidated.",
-};
-
-export function sparkSupplyWithdrawContent(eventType: "supply" | "withdraw", symbol?: string): LearnMoreContent {
-  if (eventType === "supply")
-    return {
-      title: "How Supplying Works",
-      intro:
-        "Supplying deposits an asset into SparkLend's Pool, which mints spTokens to the wallet. The balance earns the reserve's supply rate, paid by borrowers, and grows in place.",
-      detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Collateral",
-          text: "a supplied asset backs borrowing while its collateral switch is on and its liquidation threshold is above 0. The stablecoins USDC, USDT, USDS and PYUSD have a threshold of 0 on SparkLend and earn interest only.",
-        },
-        ...(symbol === "DAI"
-          ? [
-              {
-                bold: "DAI",
-                text: "raw DAI's liquidation threshold is 0.01%, so DAI supply earns interest but backs almost nothing; sDAI is the collateral form.",
-              },
-            ]
-          : []),
-        SPARK_HEALTH_DETAIL,
-      ],
-      links: [
-        { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
-        { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
-      ],
-    };
-  return {
-    title: "How Withdrawing Works",
-    intro:
-      "Withdrawing burns spTokens and returns the asset from SparkLend's Pool to the wallet, interest included. A withdrawal as ETH goes through the Spark WETH gateway: the wallet sends its spWETH to the gateway, which withdraws the WETH and sends ETH on in the same transaction.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Limit",
-        text: "with debt outstanding, the Pool refuses a withdrawal that would take the health factor below 1 or leave the debt above what the remaining collateral may carry.",
-      },
-      {
-        bold: "Liquidity",
-        text: "a withdrawal needs that much of the asset sitting unborrowed in the Pool; at full utilisation it waits for repayments or new supply.",
-      },
-    ],
-    links: [
-      { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
-      { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
-    ],
-  };
-}
-
-export function sparkBorrowRepayContent(eventType: "borrow" | "repay", symbol?: string): LearnMoreContent {
-  if (eventType === "borrow")
-    return {
-      title: "How Borrowing Works",
-      intro:
-        "Borrowing draws an asset from the Pool against the account's collateral and mints variable debt tokens that grow with interest until repaid.",
-      detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Borrow limit",
-          text: "the account may borrow up to its maximum loan-to-value: each collateral's LTV averaged by value. Liquidation starts higher, at the averaged liquidation threshold, where the health factor reaches 1.",
-        },
-        SPARK_EMODE_DETAIL,
-        sparkRateDetail(symbol),
-      ],
-      links: [
-        { label: "Borrowing assets", url: SPARK_DOC_URLS.BORROWING },
-        { label: "E-mode", url: SPARK_DOC_URLS.EMODE },
-        { label: "Liquidations", url: SPARK_DOC_URLS.LIQUIDATIONS },
-      ],
-    };
-  return {
-    title: "How Repaying Works",
-    intro:
-      "Repaying returns the borrowed asset to the Pool and burns the matching debt, accrued interest included. Anyone may repay on an account's behalf.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Health",
-        text: "less debt against the same collateral raises the health factor and the room left to borrow.",
-      },
-      {
-        bold: "With spTokens",
-        text: "a repay can burn the account's own spTokens of the same asset in place of tokens from the wallet.",
-      },
-      sparkRateDetail(symbol),
-    ],
-    links: [
-      { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
-      { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
-    ],
-  };
-}
-
-export function sparkLiquidationContent(): LearnMoreContent {
-  return {
-    title: "How Liquidations Work",
-    intro:
-      "A SparkLend account can be liquidated once its health factor falls below 1: its collateral, counted up to each asset's liquidation threshold, no longer covers its debt at the oracle's prices. Anyone may liquidate it; in practice automated bots do.",
-    extraParagraphs: [
-      "A liquidator repays part of one debt asset and receives collateral worth that debt plus a bonus set per collateral asset (or per e-mode category, where the collateral is in the account's category). SparkLend keeps a share of the bonus as a protocol fee, sent to the Spark treasury as spTokens in the same transaction.",
-      "How much one liquidation may repay depends on the health factor: up to 50% of the debt in the asset repaid while the factor is between 0.95 and 1, up to 100% at 0.95 or below. After a partial liquidation the account stays open and can be liquidated again.",
-    ],
-    links: [
-      { label: "Liquidations", url: SPARK_DOC_URLS.LIQUIDATIONS },
-      { label: "E-mode", url: SPARK_DOC_URLS.EMODE },
-    ],
-  };
-}
-
-export function sparkTransferContent(): LearnMoreContent {
-  return {
-    title: "How spToken Transfers Work",
-    intro:
-      "Supplied balances on SparkLend are spTokens, ERC-20s that can move between accounts. A transfer hands a supplied balance to another account without leaving the Pool.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Two that are not moves between owners",
-        text: "a transfer to the Spark WETH gateway is how a withdrawal to ETH works, and this explorer shows and counts it as one; a transfer to the Spark treasury inside a liquidation is that liquidation's fee.",
-      },
-      {
-        bold: "Health still enforced",
-        text: "the Pool refuses a transfer that would take the sender's health factor below 1.",
-      },
-      {
-        bold: "Interest rides along",
-        text: "the amount is what the spTokens were worth at that moment, and it keeps earning the supply rate in the receiving account.",
-      },
-    ],
-    links: [
-      { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
-      { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
-    ],
-  };
-}
-
-export function sparkEventFallbackContent(): LearnMoreContent {
-  return {
-    title: "How SparkLend Positions Work",
-    intro:
-      "SparkLend (an Aave V3 fork built by Spark) lets a wallet supply assets as collateral and borrow against them inside one cross-collateralised account, where a single shared health factor governs the whole position.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Supply & collateral",
-        text: "supplied assets earn interest and, unless disabled, back the account's borrowing as collateral (raw DAI is the exception — its threshold is an on-chain epsilon; sDAI carries the real collateral role).",
-      },
-      {
-        bold: "Borrowing & health factor",
-        text: "borrowing draws against the pooled collateral; the health factor measures how safely the combined debt is covered.",
-      },
-      {
-        bold: "One pooled account",
-        text: "all of a wallet's supply and debt share one account and one health factor on a single mainnet Pool.",
-      },
-    ],
-    links: [
-      { label: "SparkLend overview", url: SPARK_DOC_URLS.SPARKLEND },
-      { label: "Spark FAQ", url: SPARK_DOC_URLS.FAQ },
-    ],
-  };
-}
 
 // ── Moonwell (Ethereum L1) — Event-card modals ───────────────────────────────
 //

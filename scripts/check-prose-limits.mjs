@@ -124,6 +124,7 @@ const Z1_STRINGS = {
   "liquity-v1": { section: "position_words", ids: null, figures: "placeholders" },
   compound: { section: "position_words", ids: null, figures: "placeholders" },
   "compound-v2": { section: "position_words", ids: null, figures: "placeholders" },
+  spark: { section: "position_words", ids: null, figures: "placeholders" },
 };
 const z1Ids = (family, d) => {
   const z = Z1_STRINGS[family];
