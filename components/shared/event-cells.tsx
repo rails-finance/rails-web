@@ -57,17 +57,32 @@ export interface EventCellValue {
   none?: string;
   /** The token whose icon follows the after. */
   icon?: string;
+  /** The token's address, where the family names it (the icon resolves a mark
+   *  from it). */
+  iconAddress?: string;
+  /** An icon per asset after the after, where the figure totals several (a
+   *  side's dollars over its reserves); each carries its balance's receipt
+   *  and a tip naming it. */
+  icons?: EventCellIcon[];
   /** Several lines in place of one figure, one per reserve, each drawn by
    *  the family (Aave V4's Collateral and Debt). */
   lines?: ReactNode[];
-  /** The icon's token contract, where the symbol alone does not name a mark. */
-  iconAddress?: string;
   /** The icons of the assets a side holds, before its figures: a side holding
    *  several states its dollars behind them. */
   cluster?: string[];
   /** A figure after the after, in its line: the after's dollars as a chip,
    *  on a stat cell (a ledger cell states its dollars through `usd`). */
   chip?: ReactNode;
+}
+
+/** One asset's icon in a cell's cluster. */
+export interface EventCellIcon {
+  symbol: string;
+  address?: string;
+  info?: Provenance;
+  value?: string;
+  /** The tip: the asset's balance ("1.25 WETH"). */
+  title?: string;
 }
 
 interface EventCellCommon {
@@ -82,6 +97,8 @@ interface EventCellCommon {
   value: EventCellValue;
   /** Lines under the value, each in the tone of what it qualifies. */
   sub?: { content: ReactNode; changed?: boolean }[];
+  /** Data attributes for the cell. */
+  data?: Record<string, string>;
   /** The cell's tip, on its heading (a reading's block). */
   tip?: string;
   /** A stable handle a verifier reads the cell by: `data-figure` on the cell
@@ -152,6 +169,24 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
   };
   const before = v.before;
   const icon = v.icon ? <TokenChipIcon symbol={v.icon} address={v.iconAddress} size={16} /> : undefined;
+  const icons = v.icons?.length ? (
+    <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
+      {v.icons.map((a) => {
+        const mark = (
+          <span title={a.title}>
+            <TokenChipIcon symbol={a.symbol} address={a.address} size={16} filterable={false} />
+          </span>
+        );
+        return a.info ? (
+          <Prov key={a.address ?? a.symbol} info={a.info} value={a.value}>
+            {mark}
+          </Prov>
+        ) : (
+          <span key={a.address ?? a.symbol}>{mark}</span>
+        );
+      })}
+    </span>
+  ) : null;
   if (v.lines)
     return (
       <div className="flex flex-col gap-1">
@@ -190,6 +225,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
           </Figure>
         )
       )}
+      {icons}
       {v.chip}
     </>
   );
@@ -202,7 +238,7 @@ function Cell({ cell, heading }: { cell: EventCellSpec; heading: boolean }) {
     </StatSubline>
   ));
   const label = cell.tip ? <span title={cell.tip}>{cell.label}</span> : cell.label;
-  const data = cell.figure ? { "data-figure": cell.figure } : undefined;
+  const data = cell.figure || cell.data ? { ...cell.data, ...(cell.figure ? { "data-figure": cell.figure } : {}) } : undefined;
   const value = (node: ReactNode) => (cell.figure ? <div data-figure-value="">{node}</div> : node);
   if (cell.kind === "ledger")
     return (
@@ -233,21 +269,23 @@ function Cell({ cell, heading }: { cell: EventCellSpec; heading: boolean }) {
   );
 }
 
-/** The grid, drawn from the `cells` slot. */
-export function EventCellGrid({ cells }: { cells: EventCells }) {
+/** The grid, drawn from the `cells` slot. `data` marks the grid (the
+ *  state of the read its figures come from). */
+export function EventCellGrid({ cells, data }: { cells: EventCells; data?: Record<string, string> }) {
   if ("none" in cells) return null;
   if ("pending" in cells)
     return (
       <T2Skeleton
         ledgers={cells.pending.flatMap((c) => (c.kind === "ledger" ? [{ label: c.label, side: c.side }] : []))}
         stats={cells.pending.flatMap((c) => (c.kind === "stat" ? [c.label] : []))}
+        data={data}
       />
     );
   const byKey = new Map(cells.map((c) => [c.key, c]));
   const heading = (c: EventCellSpec) => c.changed || !!c.inputs?.some((k) => byKey.get(k)?.changed);
   const ordered = [...cells.filter((c) => c.kind === "ledger"), ...cells.filter((c) => c.kind === "stat")];
   return (
-    <div className="px-5 py-2">
+    <div className="px-5 py-2" {...data}>
       <div className="grid grid-cols-1 gap-2.5 sm:grid-flow-row-dense sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
         {ordered.map((c) => (
           <Cell key={c.key} cell={c} heading={heading(c)} />

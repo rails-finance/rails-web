@@ -68,6 +68,7 @@
 // it, when a date filter leaves it standing, or when a permalink lands in it.
 // On a client-grouped page the flag still bypasses the run specs, as before.
 
+import { LedgerAssetFilterContext } from "@/components/shared/event-ledger";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
 import { useFlowFocus, useFlowFocusState, useRewindParam } from "@/components/shared/flow-focus-context";
 import { FlowDayMark, utcDay } from "@/components/shared/flow-day-mark";
@@ -525,12 +526,20 @@ export function ChainTruthTimeline(props: ChainTruthTimelineProps) {
   // boundaries the server would compute. The position's served event count
   // and its row count move on both, so the pair is the answer's identity.
   const tip = `${props.tl.totalCount}:${props.tl.servedRowCount ?? props.tl.sortedEvents.length}`;
+  // The toolbar's asset filter, where it narrows: an opened card's multi-asset
+  // ledger shows the same assets (ui-jobs 306).
+  const assetFilter =
+    props.tl.assetOptions.length > 1 && props.tl.visibleAssetKeys.size < props.tl.assetOptions.length
+      ? props.tl.visibleAssetKeys
+      : null;
   return (
     <SingleWalletProvider value={true}>
       <TimelineDisplayProvider>
-        <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
-          <ChainTruthTimelineBody {...props} />
-        </FolderMembersProvider>
+        <LedgerAssetFilterContext.Provider value={assetFilter}>
+          <FolderMembersProvider readMembers={props.readFolderMembers} tip={tip}>
+            <ChainTruthTimelineBody {...props} />
+          </FolderMembersProvider>
+        </LedgerAssetFilterContext.Provider>
       </TimelineDisplayProvider>
     </SingleWalletProvider>
   );

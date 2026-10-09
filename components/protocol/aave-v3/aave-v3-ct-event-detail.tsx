@@ -1,45 +1,43 @@
 "use client";
 
-// Aave V3 event detail (ON-CHAIN VALUES tier) — adapter onto the shared
-// ChainTruthDetail grid. Each stat is a balance the event moved: a liquidation
-// shows both sides (collateral seized + debt cleared), a swap both legs.
+// Aave V3 event body (rails-ops reference/shared-event-card-spec.md §4; ui-jobs
+// 309 step 6): the parts of the card's T2 the shell draws, built from the
+// event's row and the position read around its transaction.
 //
 // Two lanes, decided by whether the card carries its market:
 //   • Ethereum (Core / Prime / EtherFi) and Base read the position state around
 //     the event's transaction when the card opens (rails-ops TO-DO-ui-jobs §19;
-//     Base from the chain at blocks N−1 and N): the
-//     touched balance's exact before → after, interest included, and the whole
-//     account beneath the grid (AaveV3PositionStateBlock). While that is read,
-//     and where it cannot be, a stat shows the event's own change and no balance.
-//     RULE (§47): one statement of a balance. Once the read lands and the block
-//     draws the reserve's row, the grid's cell for it gives way — the row carries
-//     the same before/after/change receipts plus the collateral switch, and the
-//     event's own change keeps its receipt on the header. The block hides dust
-//     rows behind a count line (§52), but never the row the grid gave way for.
-//     A row the index valued at the chain balance (ctx.balanceBasis "chain",
-//     decision 0033) states that balance from the row itself while the read is
-//     pending or unavailable, and the interest the lane accrued since the
-//     transaction that last moved it.
+//     Base from the chain at blocks N−1 and N): the account's Collateral and
+//     Debt cells with each reserve's exact before → after, interest included,
+//     then the health factor, LTV, what can still be borrowed and eMode
+//     (aave-family-cells.tsx). While that is read the cells stand as
+//     placeholders; where it cannot be, a cell states the event's change.
+//     RULE (§47): one statement of a balance. A reserve the read lists is
+//     stated by its side cell alone, and the event's change keeps its
+//     receipt on the header. A row the index valued at the chain balance
+//     (ctx.balanceBasis "chain", decision 0033) states that balance from the
+//     row where the read is unavailable, and the interest the lane
+//     accrued since the transaction that last moved it.
 //   • Seamless, and a Base event sharing its block with another of the
 //     owner's transactions, state the row's balance, before → after: the chain
 //     balance where the replay valued it, else the principal replayed from the
 //     per-reserve deltas.
 // USD rides the oracle price at the event's block — the at-block read on the
-// Ethereum lane, the captured price (mig 092) on the principal lane — and the
-// captured price's footnote pill sits under the grid. A block with no price
-// keeps the card token-only.
+// read lane, the captured price (mig 092) on the principal lane — and the
+// prices the figures use stand in the price row. A block with no price keeps
+// the card token-only. The interest since the previous event is a sub-line of
+// the side it accrued on; the rates behind it stay in the explanation.
 
-import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
 import type { AaveV3SwapLegAction, AaveV3SwapPoolEvent } from "@/lib/shared/types/event-shape";
 import type { Provenance } from "@/components/shared/provenance";
-import {
-  ChainTruthDetail,
-  chainTruthDeltaValue,
-  reconstructTransition,
-  type ChainTruthStat,
-} from "@/components/shared/chain-truth-event";
-import { T2Skeleton } from "@/components/shared/event-ledger";
+import { chainTruthDeltaValue, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { EventCells, EventLedgerCellSpec } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import type { FlowSide } from "@/lib/shared/flows-timeline";
+import { ACCOUNT_CELL_HEADS, aaveV3RiskCells, accountSideCells, interestSubs, priceChips, rowCell } from "./aave-family-cells";
 import {
   supplyAfterProv,
   debtAfterProv,
@@ -66,18 +64,14 @@ import {
   type V3Coords,
 } from "@/lib/aave-v3/event-provenance";
 import { Prov } from "@/components/shared/provenance";
-import { StatSubline } from "@/components/shared/state-transition";
 import {
   LiquidationFiguresNotLoaded,
   LiquidationForensics,
   buildLiquidationForensics,
-  AtBlockPriceFootnote,
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { signedAmount } from "./aave-v3-ct-event-header";
 import {
-  AaveV3PositionStateBlock,
-  StateInterestLine,
   exactLeg,
   exactUsd,
   reserveSymbol,
@@ -99,7 +93,7 @@ import {
   sincePrevious,
   type AaveV3PositionState,
 } from "@/lib/aave-v3/position-state";
-import { AmountText } from "@/components/shared/amount-text";
+import { AmountText, ExactTip } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
 import { v3Protocol } from "@/lib/aave-v3/protocol-name";
@@ -127,9 +121,25 @@ export interface AaveV3CtEventDetailProps {
   /** The timeline event: the card's lifetime sum and its link to the chart. */
   eventId?: string;
   eventTs?: number;
-  /** Where the card's (i) takes the interest line and the prices, which sit
-   *  behind it (components/protocol/aave-v3/aave-family-event-receipt.tsx). */
-  notesSlot?: HTMLElement | null;
+  /** The card has opened: the reads start then, so a closed card asks for
+   *  nothing. */
+  active?: boolean;
+}
+
+/** The card's T2 parts, and the read they came from. */
+export interface AaveV3EventBody {
+  cells: EventCells;
+  /** The grid's data attributes: the read's state. */
+  cellsData?: Record<string, string>;
+  /** Lines under the grid: a liquidation's figures, a fee's, a missing read. */
+  notes?: ReactNode;
+  /** The prices the cells' USD figures use. */
+  prices: EventPriceChip[];
+  /** The rates behind the interest sub-lines, for the explanation. */
+  rateNote?: ReactNode;
+  /** The read around the transaction, where it landed. */
+  state?: AaveV3PositionState;
+  stateCoords: V3Coords;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -178,7 +188,7 @@ interface Axis {
   price?: { usd: number };
 }
 
-export function AaveV3CtEventDetail({
+export function useAaveV3EventBody({
   ctx,
   txHash,
   blockNumber,
@@ -187,10 +197,9 @@ export function AaveV3CtEventDetail({
   feeOf,
   fee,
   previous,
-  eventId,
   eventTs,
-  notesSlot,
-}: AaveV3CtEventDetailProps) {
+  active = true,
+}: AaveV3CtEventDetailProps): AaveV3EventBody {
   const coords: V3Coords = {
     txHash,
     blockNumber,
@@ -200,14 +209,15 @@ export function AaveV3CtEventDetail({
   };
   // A fee row shares the liquidation's transaction, so the read around the
   // transaction would restate the liquidation: it states its own change only.
-  const state = useAaveV3PositionState({ wallet, market: feeOf ? undefined : market, block: blockNumber, txHash });
+  const readMarket = feeOf || !active ? undefined : market;
+  const state = useAaveV3PositionState({ wallet, market: readMarket, block: blockNumber, txHash });
   const ready = state?.status === "ready" ? state.data : undefined;
   // The previous transaction's state (the explainer reads the same one): the
   // interest line runs from that event's after-balance, so T2 and T3 chain
   // event to event.
   const prevState = useAaveV3PositionState({
     wallet,
-    market: feeOf ? undefined : market,
+    market: readMarket,
     block: previous?.blockNumber,
     txHash: previous?.txHash,
   });
@@ -228,7 +238,12 @@ export function AaveV3CtEventDetail({
   const touched: TouchedLeg[] = [];
   // The interest line of a stat that gave way to the block's row: drawn under
   // the grid, so the row still states it.
-  const interestLines: (NonNullable<ChainTruthStat["interestSincePrevious"]> & { symbol: string })[] = [];
+  const interestLines: (NonNullable<ChainTruthStat["interestSincePrevious"]> & {
+    symbol: string;
+    side: "supply" | "debt";
+  })[] = [];
+  // The sides whose balance the event moved (ui-jobs 243).
+  const moved = new Set<"supply" | "debt">();
   // The balances whose interest line runs from the previous event: the note
   // under them states the reserve's rate at both ends.
   const rated: { reserve: string; symbol: string; side: "supply" | "debt" }[] = [];
@@ -291,8 +306,16 @@ export function AaveV3CtEventDetail({
     interestSincePrevious: interestOf(a),
   });
 
-  /** The axis' stat, or null where the position block below states the balance. */
+  /** Each balance stat's side, for its cell. */
+  const sideOf = new Map<ChainTruthStat, FlowSide>();
+  /** The axis' stat, or null where the read's side cell states the balance. */
   const statFor = (a: Axis): ChainTruthStat | null => {
+    if (Number(a.change ?? "0") !== 0) moved.add(a.side);
+    const s = axisStat(a);
+    if (s) sideOf.set(s, a.side === "supply" ? "collateral" : "debt");
+    return s;
+  };
+  const axisStat = (a: Axis): ChainTruthStat | null => {
     if (!state) return rowStat(a);
     const r = ready ? findReserve(ready, a.reserve, a.symbol) : undefined;
     // While the read is pending or where it failed, a row the index valued
@@ -320,7 +343,7 @@ export function AaveV3CtEventDetail({
     if (legHeld(leg)) {
       touched.push({ reserve: r.reserve, side: a.side });
       const line = interestOf(a);
-      if (line) interestLines.push({ ...line, symbol: a.symbol });
+      if (line) interestLines.push({ ...line, symbol: a.symbol, side: a.side });
       return null;
     }
     const before = humanOf(leg.before, r.decimals);
@@ -386,6 +409,8 @@ export function AaveV3CtEventDetail({
   const push = (s: ChainTruthStat | null) => {
     if (s) stats.push(s);
   };
+  // The rows behind a swap, and the netted leg: lines under the grid.
+  const extras: ChainTruthStat[] = [];
   const sym = ctx.reserveSymbol ?? "—";
 
   if (ctx.eventType === "liquidation") {
@@ -504,7 +529,7 @@ export function AaveV3CtEventDetail({
     const netted =
       s.givenAction === "transfer_out" && (s.events ?? []).some((e) => e.leftover && e.action === "supply");
     if (netted)
-      stats.push({
+      extras.push({
         label: "Sold, net",
         value: fmt(ctx.amount),
         symbol: sym,
@@ -525,7 +550,7 @@ export function AaveV3CtEventDetail({
       // above (or in the position block): its row would say it twice.
       if (s.kind === "debt_swap" && e.leg === "given" && e.action === "repay") continue;
       const eSym = e.symbol ?? "—";
-      stats.push({
+      extras.push({
         label: e.leftover
           ? e.action === "repay"
             ? s.kind === "debt_swap"
@@ -686,60 +711,54 @@ export function AaveV3CtEventDetail({
   // The interest line runs from the two position reads where both landed; a
   // previous read that failed leaves the supply interest on the collateral out.
   const prevUnread = !!ready && !!previous && prevState?.status === "unavailable";
+  // The interest since the previous event, under the side it accrued on: from
+  // the two position reads where both landed, else the stated balance's own
+  // since its last move.
+  const subs: Partial<Record<"supply" | "debt", NonNullable<EventLedgerCellSpec["sub"]>>> =
+    ready && prevReady ? interestSubs(ready, prevReady, stateCoords) : {};
+  const addSub = (side: "supply" | "debt", content: ReactNode) => {
+    subs[side] = [...(subs[side] ?? []), { content }];
+  };
+  if (!(ready && prevReady))
+    for (const l of interestLines)
+      addSub(
+        l.side,
+        <span data-interest-since="" data-interest-side={l.side}>
+          {l.label ?? "Interest since previous event"}:{" "}
+          <Prov info={l.prov} value={l.value} symbol={l.symbol}>
+            <span title={l.value}>
+              <AmountText value={Number(l.value)} />
+            </span>
+          </Prov>{" "}
+          {l.symbol}
+        </span>,
+      );
+  if (prevUnread)
+    addSub("supply", <>Supply interest on the collateral is left out: the position after the previous event was not read.</>);
 
-  // Behind the card's (i): the interest since the previous event, the rates
-  // behind it, and every price the card's USD figures use. Without a slot (a
-  // card outside a timeline) they stay under the grid.
-  const readNotes = (
-    <div data-card-read-notes="">
-      {/* The interest line: from the two position reads where both landed,
-          else the given-way balance's since its last move. */}
-      {ready && prevReady ? (
-        <div className="pb-1">
-          <StateInterestLine here={ready} prev={prevReady} coords={stateCoords} />
-        </div>
-      ) : (
-        interestLines.map((l) => (
-          <div key={`${l.label ?? ""}:${l.symbol}`} className="pb-1">
-            <StatSubline>
-              {l.label ?? "Interest since previous event"}:{" "}
-              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
-                <span title={l.value}>
-                  <AmountText value={Number(l.value)} />
-                </span>
-              </Prov>{" "}
-              {l.symbol}
-            </StatSubline>
-          </div>
-        ))
-      )}
-      {prevUnread && (
-        <div className="pb-1">
-          <StatSubline>
-            Supply interest on the collateral is left out: the position after the previous event was not read.
-          </StatSubline>
-        </div>
-      )}
-      {ready && prevReady && rated.length > 0 && (
-        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
-      )}
-      {pricePills.length > 0 && (
-        <div className="pb-2">
-          <AtBlockPriceFootnote pills={pricePills} />
-        </div>
-      )}
-    </div>
-  );
+  // The balances the event's row states: a ledger cell on its side where no
+  // read stands, a plain cell where the read lists the account without it.
+  const balanceStats = stats.filter((st) => sideOf.has(st));
+  const rowCells = balanceStats.map((st, i) => rowCell(st, `row-${i}`, ready ? undefined : sideOf.get(st)));
+  const risk = ready ? aaveV3RiskCells(ready, stateCoords, ctx.eventType === "liquidation") : null;
+  // Before the card opens, a card with a read to make stands as the read's
+  // placeholders.
+  const waiting = state?.status === "loading" || (!active && !!market && !feeOf);
+  const cells: EventCells =
+    waiting
+      ? { pending: ACCOUNT_CELL_HEADS }
+      : ready && risk
+        ? [...accountSideCells({ state: ready, coords: stateCoords, touched, moved, eventTs, sub: subs }), ...risk.cells, ...rowCells]
+        : rowCells.length > 0
+          ? rowCells
+          : { none: "The event moved no balance the card can state." };
+  // The amounts behind a swap (the bought token, the rows it merged, a netted
+  // leg): lines under the grid.
+  const lines = [...stats.filter((st) => !sideOf.has(st)), ...extras];
 
-  return (
+  const notes = (
     <>
-      {/* Until the position read lands the area stands as the loaded grid's
-          placeholders (T2Skeleton); a failed read keeps the row's own figures. */}
-      {state?.status === "loading" ? (
-        <T2Skeleton stats={["Health factor", "LTV", "Still borrowable"]} data={{ "data-position-state": "loading" }} />
-      ) : (
-        stats.length > 0 && <ChainTruthDetail stats={stats} />
-      )}
+      {lines.length > 0 && <EventRowLines rows={lines} />}
       {state?.status === "unavailable" && (
         <div
           className="px-5 pb-2 text-sm text-rb-500"
@@ -751,16 +770,7 @@ export function AaveV3CtEventDetail({
             : "The position at this block was not read. Reload to try again."}
         </div>
       )}
-      {ready && (
-        <AaveV3PositionStateBlock
-          state={ready}
-          coords={stateCoords}
-          touched={touched}
-          liquidation={ctx.eventType === "liquidation"}
-          eventId={eventId}
-          eventTs={eventTs}
-        />
-      )}
+      {risk?.notes && <div className="space-y-0.5 px-5 pb-2 text-xs text-rb-500">{risk.notes}</div>}
       {forensics && <LiquidationForensics {...forensics} rowCells />}
       {ctx.eventType === "liquidation" && unread && <LiquidationFiguresNotLoaded tokens={unread} />}
       {fee && ctx.collateralSymbol && !unread && (
@@ -784,10 +794,48 @@ export function AaveV3CtEventDetail({
           the liquidation&rsquo;s card.
         </div>
       )}
-      {notesSlot
-        ? createPortal(readNotes, notesSlot)
-        : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
     </>
+  );
+
+  return {
+    cells,
+    cellsData:
+      waiting
+        ? { "data-position-state": "loading" }
+        : ready
+          ? { "data-position-state": "ready", "data-position-complete": ready.complete ? "true" : "false" }
+          : undefined,
+    notes,
+    prices: priceChips(pricePills),
+    rateNote:
+      ready && prevReady && rated.length > 0 ? (
+        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
+      ) : undefined,
+    state: ready,
+    stateCoords,
+  };
+}
+
+/** The amounts behind an event that are not a balance (a swap's bought token,
+ *  the rows a swap merged): one line each, the figure with its receipt. */
+function EventRowLines({ rows }: { rows: ChainTruthStat[] }) {
+  return (
+    <div className="space-y-1 px-5 pb-2 text-sm" data-event-row-lines="">
+      {rows.map((r, i) => (
+        <div key={i} className="text-rb-500" data-event-row-line="">
+          {r.label}{" "}
+          <Prov
+            info={r.prov}
+            value={r.value}
+            icon={r.symbol ? <TokenChipIcon symbol={r.symbol} address={r.address} size={14} /> : undefined}
+          >
+            <span className="font-semibold tabular-nums text-foreground">
+              <ExactTip always text={r.display ?? formatCompact(Number(r.value))} exact={r.value} symbol={r.symbol} />
+            </span>
+          </Prov>
+        </div>
+      ))}
+    </div>
   );
 }
 

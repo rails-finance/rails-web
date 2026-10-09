@@ -1,7 +1,8 @@
 "use client";
 
-// SparkLend event detail — adapter onto the shared ChainTruthDetail grid, at
-// V3 parity. The touched reserve's resulting on-chain balance after this event,
+// SparkLend event body (rails-ops reference/shared-event-card-spec.md §4;
+// ui-jobs 309 step 6): the parts of the card's T2 the shell draws, at V3
+// parity. The touched reserve's resulting on-chain balance after this event,
 // replayed from the per-reserve deltas, with the before→after transition traced
 // through the log's raw uint256 (origin envelope) — plus the pooled-account
 // basket: every reserve's running balance after this event, since a SparkLend
@@ -16,16 +17,18 @@
 // move under the value.
 //
 // RULE (rails-ops TO-DO-ui-jobs §47, §213): once the account read lands, the
-// account block's Collateral and Debt cells state every reserve, and the grid
-// gives way for the event's own reserve; the basket gives way to those cells,
-// the interest line runs from the two reads, and the price chip lists every
-// price the USD figures use. While the read is pending or where it failed, the
-// grid, the basket and the captured price stand.
+// Collateral and Debt cells state every reserve (aave-family-cells.tsx), and
+// the event's reserve is stated there alone; the basket gives way to those
+// cells, the interest since the previous event is a sub-line of its side, and
+// the price row lists every price the USD figures use. While the read is
+// pending the cells stand as placeholders; where it failed, the event's
+// balance, the basket and the captured price stand.
 
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
 import type { SparkContext, SparkSnapshotItem } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
-import { T2Skeleton } from "@/components/shared/event-ledger";
+import type { ReactNode } from "react";
+import { reconstructTransition, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { EventCells, EventLedgerCellSpec } from "@/components/shared/event-cells";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
   supplyAfterProv,
@@ -47,21 +50,22 @@ import {
 import {
   LiquidationForensics,
   buildLiquidationForensics,
-  AtBlockPriceFootnote,
   type AtBlockPricePill,
 } from "@/components/shared/liquidation-forensics";
 import { formatNumber } from "@/lib/utils/format";
 import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import { SPARK_POOL_IDENTITY } from "@/lib/spark/pool-identity";
-import { SparkAccountState } from "./spark-account-state";
-import { createPortal } from "react-dom";
-import { StatSubline } from "@/components/shared/state-transition";
+import { sparkRiskCells } from "./spark-account-state";
 import { AmountText } from "@/components/shared/amount-text";
+import { statePricePills, type TouchedLeg } from "@/components/protocol/aave-v3/aave-v3-position-state";
 import {
-  StateInterestLine,
-  statePricePills,
-  type TouchedLeg,
-} from "@/components/protocol/aave-v3/aave-v3-position-state";
+  ACCOUNT_CELL_HEADS,
+  accountSideCells,
+  interestSubs,
+  priceChips,
+  rowCell,
+} from "@/components/protocol/aave-v3/aave-family-cells";
+import type { AaveV3EventBody } from "@/components/protocol/aave-v3/aave-v3-ct-event-detail";
 import { findReserve, legHeld } from "@/lib/aave-v3/position-state";
 import { useSparkEventState } from "./use-spark-event-state";
 
@@ -75,11 +79,10 @@ export interface SparkEventDetailProps {
   market?: "spark";
   reserveAddress?: string;
   previous?: { blockNumber: number; txHash: string };
-  /** The timeline event: the card's lifetime sum and its link to the chart. */
-  eventId?: string;
+  /** The timeline event's time. */
   eventTs?: number;
-  /** Where the card's (i) takes the interest line and the prices. */
-  notesSlot?: HTMLElement | null;
+  /** The card has opened: the reads start then. */
+  active?: boolean;
 }
 
 /** Interest below this reads as "<0.000001" and says nothing; the line is left
@@ -151,7 +154,7 @@ function BasketList({
   );
 }
 
-export function SparkEventDetail({
+export function useSparkEventBody({
   ctx,
   txHash,
   blockNumber,
@@ -159,12 +162,21 @@ export function SparkEventDetail({
   market,
   reserveAddress,
   previous,
-  eventId,
   eventTs,
-  notesSlot,
-}: SparkEventDetailProps) {
+  active = true,
+}: SparkEventDetailProps): AaveV3EventBody {
   const coords: SparkCoords = { txHash, blockNumber };
-  const read = useSparkEventState({ ctx, wallet, market, blockNumber, txHash, reserveAddress, previous });
+  const read = useSparkEventState({
+    ctx,
+    wallet,
+    market: active ? market : undefined,
+    blockNumber,
+    txHash,
+    reserveAddress,
+    previous,
+  });
+  // Before the card opens, a card with a read to make stands as its placeholders.
+  const waiting = read.status === "loading" || (!active && !!market);
   const v3Coords: V3Coords = { txHash, blockNumber, wallet, stateRead: "chain-at-block", pool: SPARK_POOL_IDENTITY };
   const stats: ChainTruthStat[] = [];
   // Once the account read lands, its Collateral and Debt cells state every
@@ -179,7 +191,13 @@ export function SparkEventDetail({
     symbol: string;
     side: "supply" | "debt";
   })[] = [];
+  // The sides whose balance the event moved (ui-jobs 243), and each stated
+  // balance's side.
+  const moved = new Set<"supply" | "debt">();
+  const sideOf = new Map<ChainTruthStat, "supply" | "debt">();
   const push = (s: ChainTruthStat, reserve: string | undefined, symbol: string, side: "supply" | "debt") => {
+    if (s.transition || Number(ctx.assetsDelta) !== 0) moved.add(side);
+    sideOf.set(s, side);
     const r = ready ? findReserve(ready, reserve, symbol) : undefined;
     if (r && r.decimals != null && legHeld(side === "supply" ? r.supply : r.debt)) {
       touched.push({ reserve: r.reserve, side });
@@ -353,68 +371,50 @@ export function SparkEventDetail({
   const readPills = ready?.sources.market ? statePricePills(ready, v3Coords, touched) : [];
   const pricePills = readPills.length > 0 ? readPills : ctxPills;
 
-  // Behind the card's (i): the interest since the previous event and every
-  // price the card's USD figures use.
-  const readNotes = (
-    <div data-card-read-notes="">
-      {ready && read.prevRaw && (
-        <div className="pb-1">
-          <StateInterestLine here={ready} prev={read.prevRaw} coords={v3Coords} />
-        </div>
-      )}
-      {ready &&
-        !read.prevRaw &&
-        laneLines.map((l) => (
-          <div key={`${l.side}:${l.symbol}`} className="pb-1">
-            <StatSubline>
-              {l.side === "debt" ? "Interest on the debt" : "Supply interest"} since this balance last moved:{" "}
-              <Prov info={l.prov} value={l.value} symbol={l.symbol}>
-                <span title={l.value}>
-                  <AmountText value={Number(l.value)} />
-                </span>
-              </Prov>{" "}
-              {l.symbol}
-            </StatSubline>
-          </div>
-        ))}
-      {ready && previous && read.prevUnread && (
-        <div className="pb-1">
-          <StatSubline>
-            Supply interest on the collateral is left out: the position after the previous event was not read.
-          </StatSubline>
-        </div>
-      )}
-      {pricePills.length > 0 && (
-        <div className="pb-2">
-          <AtBlockPriceFootnote pills={pricePills} />
-        </div>
-      )}
-    </div>
-  );
+  // The interest since the previous event, under the side it accrued on.
+  const subs: Partial<Record<"supply" | "debt", NonNullable<EventLedgerCellSpec["sub"]>>> =
+    ready && read.prevRaw ? interestSubs(ready, read.prevRaw, v3Coords) : {};
+  const addSub = (side: "supply" | "debt", content: ReactNode) => {
+    subs[side] = [...(subs[side] ?? []), { content }];
+  };
+  if (ready && !read.prevRaw)
+    for (const l of laneLines)
+      addSub(
+        l.side,
+        <span data-interest-since="" data-interest-side={l.side}>
+          {l.side === "debt" ? "Interest on the debt" : "Supply interest"} since this balance last moved:{" "}
+          <Prov info={l.prov} value={l.value} symbol={l.symbol}>
+            <span title={l.value}>
+              <AmountText value={Number(l.value)} />
+            </span>
+          </Prov>{" "}
+          {l.symbol}
+        </span>,
+      );
+  if (ready && previous && read.prevUnread)
+    addSub("supply", <>Supply interest on the collateral is left out: the position after the previous event was not read.</>);
 
-  return (
-    <div>
-      {read.status !== "loading" && stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {read.status === "ready" && read.state && read.raw ? (
-        <SparkAccountState
-          state={read.state}
-          raw={read.raw}
-          coords={v3Coords}
-          isLiquidation={ctx.eventType === "liquidation"}
-          touched={touched}
-          eventId={eventId}
-          eventTs={eventTs}
-        />
-      ) : read.status === "loading" ? (
-        <T2Skeleton
-          stats={["Health factor", "LTV", "Still borrowable"]}
-          data={{ "data-spark-account-state": "loading" }}
-        />
-      ) : read.status === "unavailable" && !read.lasting ? (
+  const risk = read.status === "ready" && read.state && ready ? sparkRiskCells({ state: read.state, raw: ready, coords: v3Coords, isLiquidation: ctx.eventType === "liquidation" }) : null;
+  const rowCells = stats.map((st, i) =>
+    rowCell(st, `row-${i}`, ready ? undefined : sideOf.get(st) === "debt" ? "debt" : "collateral"),
+  );
+  const cells: EventCells =
+    waiting
+      ? { pending: ACCOUNT_CELL_HEADS }
+      : ready && risk
+        ? [...accountSideCells({ state: ready, coords: v3Coords, touched, moved, eventTs, sub: subs }), ...risk.cells, ...rowCells]
+        : rowCells.length > 0
+          ? rowCells
+          : { none: "The event moved no balance the card can state." };
+
+  const notes = (
+    <>
+      {read.status === "unavailable" && !read.lasting && (
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
           The account before and after this transaction was not read. Reload to try again.
         </div>
-      ) : null}
+      )}
+      {risk?.notes && <div className="px-5 pb-2 text-xs text-rb-500">{risk.notes}</div>}
       {forensics && (
         <LiquidationForensics
           {...forensics}
@@ -425,14 +425,29 @@ export function SparkEventDetail({
         />
       )}
       {showBasket && (
-        <div className="mt-3 grid grid-cols-2 gap-4 border-t border-rb-200/60 pt-3 dark:border-rb-500/20">
+        <div className="mx-5 mb-2 grid grid-cols-2 gap-4 border-t border-rb-200/60 pt-3 dark:border-rb-500/20">
           <BasketList label="All supplied · after" items={supplies} coords={coords} side="supply" />
           <BasketList label="All borrowed · after" items={debts} coords={coords} side="debt" />
         </div>
       )}
-      {notesSlot
-        ? createPortal(readNotes, notesSlot)
-        : notesSlot === undefined && <div className="px-5">{readNotes}</div>}
-    </div>
+    </>
   );
+
+  return {
+    cells,
+    cellsData:
+      waiting
+        ? { "data-spark-account-state": "loading", "data-position-state": "loading" }
+        : ready && risk
+          ? {
+              "data-spark-account-state": "ready",
+              "data-position-state": "ready",
+              "data-position-complete": ready.complete ? "true" : "false",
+            }
+          : undefined,
+    notes,
+    prices: priceChips(pricePills),
+    state: ready,
+    stateCoords: v3Coords,
+  };
 }

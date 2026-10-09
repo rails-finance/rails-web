@@ -16,7 +16,7 @@
 // behind a small switch over the rows. The figures come from
 // lib/shared/event-ledger.ts; a family's card provides its ledgers to its
 // cells through EventLedgerContext (components/protocol/liquity-family/
-// liquity-ledger.tsx, components/protocol/aave-v3/aave-family-event-receipt.tsx).
+// liquity-ledger.tsx, components/protocol/aave-v3/aave-family-cells.tsx).
 
 import {
   createContext,
@@ -814,8 +814,23 @@ export function LedgerTable({
   );
 }
 
+/** The assets the timeline's asset filter shows (the toolbar's "Assets"
+ *  control), where it narrows the list; null where it shows every asset.
+ *  A card's multi-asset ledger narrows its rows to the same assets. */
+export const LedgerAssetFilterContext = createContext<ReadonlySet<string> | null>(null);
+
+/** A side holding at least this many assets is wide: opened, it shows the
+ *  assets the event touched (ui-jobs 306). */
+const WIDE_SIDE = 3;
+
 /** A side holding several assets: one short ledger per asset, each closing on
- *  its balance, then the side's total in USD (the assets add only there). */
+ *  its balance, then the side's total in USD (the assets add only there).
+ *
+ *  RULE (ui-jobs 306): a wide side opens on the assets the event touched (an
+ *  asset with a row for this event), with a line "Show all N reserves" in the
+ *  manner of the dust line, which shows every asset; the timeline's asset
+ *  filter narrows the rows to the assets it shows. The side's total stands
+ *  over every asset either way. The choice is not kept per card. */
 export function AssetLedgers({
   side,
   assets,
@@ -825,6 +840,7 @@ export function AssetLedgers({
   totalUsdBeforeProv,
   usdShownFor,
   provsFor,
+  assetWord = "reserves",
 }: {
   side: FlowSide;
   assets: Ledger[];
@@ -837,10 +853,23 @@ export function AssetLedgers({
   usdShownFor: (l: Ledger) => boolean;
   /** An asset's receipts, where the card states its own. */
   provsFor?: (l: Ledger) => LedgerProvs | undefined;
+  /** What the side's assets are called in the "Show all" line. */
+  assetWord?: string;
 }) {
-  const shown = assets.map((a) =>
+  const filter = useContext(LedgerAssetFilterContext);
+  const [all, setAll] = useState(false);
+  const touched = assets.filter((a) => a.rows.some((r) => r.role === "event"));
+  const narrowed = filter
+    ? assets.filter((a) => a.symbol != null && filter.has(a.symbol))
+    : assets.length >= WIDE_SIDE && touched.length > 0
+      ? touched
+      : assets;
+  const listed = all || narrowed.length === 0 ? assets : narrowed;
+  const hidden = assets.length - narrowed.length;
+  const shown = listed.map((a) =>
     usdShownFor(a) ? a : { ...a, usd: null, rows: a.rows.filter((r) => r.tokens).map((r) => ({ ...r, usd: null })) },
   );
+  const priceable = assets.map((a) => (usdShownFor(a) ? a : { ...a, usd: null }));
   const cols = useCols(
     true,
     shown.some((a) => a.usd != null),
@@ -852,7 +881,7 @@ export function AssetLedgers({
   // Set to today, the side restates only where every priced asset has a
   // price today; its total is then the assets' dollars at those prices.
   const todayOf = useTodayBasisPrices();
-  const priced = shown.filter((a) => a.usd != null);
+  const priced = priceable.filter((a) => a.usd != null);
   const repriced = priced.map((a) => {
     const p = todayOf(a.symbol);
     return p != null ? ledgerAtPrice(a, p) : null;
@@ -897,6 +926,26 @@ export function AssetLedgers({
             provs={provsFor?.(a)}
           />
         ))}
+        {hidden > 0 && narrowed.length > 0 && (
+          <div className="col-span-full pt-2">
+            <button
+              type="button"
+              className="text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+              data-ledger-show-all={assets.length}
+              aria-expanded={all}
+              onClick={(e) => {
+                e.stopPropagation();
+                setAll((v) => !v);
+              }}
+            >
+              {all
+                ? filter
+                  ? `Show the ${assetWord} the filter shows`
+                  : `Show the ${assetWord} this event touched`
+                : `Show all ${assets.length} ${assetWord}`}
+            </button>
+          </div>
+        )}
         {usd && <div aria-hidden className={`${RULE} mt-3`} />}
         {usd && (
           <div

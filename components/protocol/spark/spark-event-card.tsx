@@ -1,21 +1,24 @@
 "use client";
 
-// Composer: wires the SparkLend header / detail / explainer into the universal
-// EventCard shell — the reference-depth card (uplifted from the chain-state
-// baseline; the plain-English explainer rides its own second-tier slot).
+// A SparkLend event's card on the shared shell's slots (rails-ops
+// reference/shared-event-card-spec.md §3, §4; ui-jobs 309 step 6): the spine,
+// the head (spark-event-header.tsx), the cells, notes and prices of T2
+// (spark-event-detail.tsx, the Aave V3 family's cells), the explanation and
+// the Learn-More "?".
 
 import type { BaseActivityEvent, SparkContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type SparkCoords } from "@/lib/spark/event-provenance";
 import { sparkExplainerTeaser } from "@/lib/spark/explainer-clauses";
-import { SparkEventHeader } from "./spark-event-header";
-import { SparkEventDetail } from "./spark-event-detail";
-import { useState } from "react";
+import { sparkHeadSpec } from "./spark-event-header";
+import { useSparkEventBody } from "./spark-event-detail";
 import { SparkEventExplainer, sparkLearnMoreContent } from "./spark-event-explainer";
+import { AaveFamilyLedgers } from "@/components/protocol/aave-v3/aave-family-cells";
+import { useCallback, useState } from "react";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { prefetchAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import type { AaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
@@ -52,8 +55,6 @@ const DIRECTION: Record<
 };
 
 export function SparkEventCard({ event, isLast, eventNumber, market, siblings, previous }: SparkEventCardProps) {
-  // The (i)'s slot for the interest line and the prices.
-  const [notesSlot, setNotesSlot] = useState<HTMLElement | null>(null);
   const ctx = event.context.data;
   // A transfer to the Spark treasury in a liquidation's transaction is that
   // liquidation's fee (lib/spark/liquidation-fee.ts): it reads the
@@ -125,69 +126,91 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
             },
           ];
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isLiq
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  return (
-    <EventCard
-      avatar={null}
-      by={extBy ?? undefined}
-      iconColumn={iconSlot}
-      header={
-        // The pointer on the header starts the account reads the open card
-        // makes (this transaction's and the previous one's).
-        <div className="contents" onPointerOver={prefetch} onFocus={prefetch}>
-          <SparkEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-            feeOf={feeOf}
-          />
-        </div>
-      }
-      detail={
-        <SparkEventDetail
+  // The reads start when the card first opens.
+  const [active, setActive] = useState(false);
+  const onOpen = useCallback(() => setActive(true), []);
+  const body = useSparkEventBody({
+    active,
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    market: stateMarket,
+    reserveAddress,
+    previous,
+    eventTs: event.timestamp,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "spark",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: sparkHeadSpec({
+      actionLabel: event.actionLabel,
+      ctx,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      externalBy: extBy ?? undefined,
+      wallet: event.wallet,
+      flows: event.flows,
+      feeOf,
+    }),
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells: body.cells,
+    cellsData: body.cellsData,
+    ledgers: stateMarket
+      ? {
+          provider: (children) => (
+            <AaveFamilyLedgers
+              state={body.state}
+              coords={body.stateCoords}
+              eventId={event.id}
+              eventTs={event.timestamp}
+            >
+              {children}
+            </AaveFamilyLedgers>
+          ),
+        }
+      : {
+          none: feeOf
+            ? "A liquidation fee's row states the fee; the account's ledgers are on the liquidation's card."
+            : "Another of the owner's transactions shares this block, so the account is not read: the cells state the event's balances.",
+        },
+    notes: body.notes,
+    // The index carries no gas for SparkLend's rows and the account read reads
+    // none, so the row states no owner-paid gas.
+    price: { gas: null, prices: body.prices },
+    explainer: {
+      body: (
+        <SparkEventExplainer
           ctx={ctx}
           txHash={event.txHash}
           blockNumber={event.blockNumber}
-          wallet={event.wallet}
+          owner={event.wallet}
           market={stateMarket}
           reserveAddress={reserveAddress}
+          siblings={siblings}
           previous={previous}
-          eventId={event.id}
-          eventTs={event.timestamp}
-          notesSlot={notesSlot}
+          skipLead
         />
-      }
-      explainer={
-        <>
-          <div ref={setNotesSlot} className="mb-2 empty:hidden" />
-          <SparkEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            owner={event.wallet}
-            market={stateMarket}
-            reserveAddress={reserveAddress}
-            siblings={siblings}
-            previous={previous}
-            skipLead
-          />
-        </>
-      }
-      explainerTeaser={sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings })}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />}
-      persistKey={`spark:${event.id}`}
-    />
-  );
+      ),
+      first: sparkExplainerTeaser(ctx, coords, { owner: event.wallet, siblings }) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={sparkLearnMoreContent(feeOf ?? ctx)} />,
+    onIntent: prefetch,
+    onOpen,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }
