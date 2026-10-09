@@ -1,6 +1,6 @@
 "use client";
 
-// Alchemist transaction header: adapter onto the shared ChainTruthRow grammar.
+// Alchemist transaction header: the card's `head` slot, in the shared ChainTruthRow grammar.
 //
 // ONE TRANSACTION, ONE ROW. An opening emits two or three logs from two
 // contracts and they arrive here together, so the row states the whole
@@ -47,7 +47,7 @@
 //    delta stays in the header, which is what those two flags already mean.
 
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
-import { ChainTruthRow, type ChainTruthDelta, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   custodyPathInTx,
   openingInTx,
@@ -64,7 +64,7 @@ import {
   type AlchemixCoords,
 } from "@/lib/alchemix/event-provenance";
 import { selfLiquidationSplit } from "@/lib/alchemix/self-liquidation";
-import { collateralTakenRaw, useReadingBefore, type AlchemixReading } from "@/lib/alchemix/readings-before";
+import { collateralTakenRaw, type AlchemixReading } from "@/lib/alchemix/readings-before";
 
 const WAD = 1e18;
 
@@ -92,26 +92,6 @@ const AXIS_VERB: Record<string, string> = {
  *  self-liquidation is not here: the holder chose it, and it draws the close
  *  mark (alchemix-event-card). */
 export const ALCHEMIX_CAUTION = new Set(["force_repay", "redemption", "batch_liquidated", "fee_shortfall"]);
-
-export interface AlchemixEventHeaderProps {
-  /** The legs of ONE transaction that this card DRAWS, in log order. It holds
-   *  one element for a transaction that emitted one of this position's logs,
-   *  and for a leg a reader's type filter has left standing alone. */
-  legs: AlchemistEvent[];
-  /** Every row sharing the transaction, filtered or not. A `transfer` cannot
-   *  tell a position's mint or its forwarding hop from a later change of owner
-   *  without them, and a filter must not turn one into the other. */
-  siblings: AlchemistEvent[];
-  /** The vault share ticker for this line, from the position's own row. */
-  mytSymbol: string;
-  timestamp: number;
-  eventNumber?: number;
-  /** The last of the card's event numbers, where it draws several logs. */
-  eventNumberLast?: number;
-  /** Each leg's own coordinates; the emitter differs between the Alchemist and
-   *  the position NFT, so a receipt cannot borrow another leg's. */
-  coordsFor: (leg: AlchemistEvent) => AlchemixCoords;
-}
 
 /** One leg's own row spec. `combined` swaps the single-axis rows over to the
  *  per-axis verb grammar (rule 3) and drops the custody legs' chips, which the
@@ -429,22 +409,6 @@ export function combineLegSpecs(
 /** The token id these legs belong to, from the first leg that names one. */
 export function legTokenId(legs: AlchemistEvent[]): string | null {
   return legs.find((l) => l.context.data.tokenId != null)?.context.data.tokenId ?? null;
-}
-
-export function AlchemixEventHeader({
-  legs,
-  siblings,
-  mytSymbol,
-  timestamp,
-  eventNumber,
-  eventNumberLast,
-  coordsFor,
-}: AlchemixEventHeaderProps) {
-  const before = useReadingBefore(legs[0].context.data.stateAtBlockFromReading?.blockNumber);
-  const spec = alchemixHeaderSpec(legs, siblings, mytSymbol, coordsFor, before);
-  return (
-    <ChainTruthRow spec={spec} timestamp={timestamp} eventNumber={eventNumber} eventNumberLast={eventNumberLast} />
-  );
 }
 
 /** The row the header draws, for a card that echoes a header figure onto its

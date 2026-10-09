@@ -68,6 +68,12 @@ export function TransmuterPositionView({
   const mytSymbol = p.claim?.claimed?.symbol ?? p.mytSymbol ?? "vault shares";
   const state = transmuterState(p);
   const holder = p.owner ?? p.claim?.claimer ?? null;
+  // Who held the position (its creator, its owner, the address that claimed
+  // it): a leg one of them sent paid the gas.
+  const holders = useMemo(
+    () => [p.creator, p.owner, p.claim?.claimer].flatMap((a) => (a ? [a.toLowerCase()] : [])),
+    [p.creator, p.owner, p.claim?.claimer],
+  );
   const now = useMountedNow();
   const maturity = transmuterMaturityEstimate(p, now == null ? null : now * 1000);
 
@@ -119,6 +125,7 @@ export function TransmuterPositionView({
               key={legs[0].id}
               legs={legs}
               mytSymbol={mytSymbol}
+              holders={holders}
               isLast={meta.isLast}
               early={early}
             />
@@ -126,7 +133,7 @@ export function TransmuterPositionView({
         },
       },
     ],
-    [mytSymbol, ridersByTx, early],
+    [mytSymbol, ridersByTx, early, holders],
   );
 
   const economics = useMemo(
@@ -245,6 +252,7 @@ export function TransmuterPositionView({
               <TransmuterEventCard
                 legs={withRiders([event as TransmuterEvent], ridersByTx)}
                 mytSymbol={mytSymbol}
+                holders={holders}
                 isLast={meta.isLast}
                 eventNumber={meta.eventNumber}
                 early={early}

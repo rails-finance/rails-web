@@ -395,3 +395,30 @@ export const ALCHEMIX_V2: LearnMoreContent = {
   ],
   links: [ALCHEMIX_DOCS.v3Migration],
 };
+
+/** The "?" on a Transmuter position's event. */
+export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
+  title: "How the Transmuter works",
+  intro:
+    "The Transmuter takes an alAsset and converts it into vault shares over a fixed term. A stake opens a position, held as an NFT, that converts a little every block until it matures.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Stake",
+      text: "the alAsset sent in when the position opens. The Transmuter holds it until the claim.",
+    },
+    {
+      bold: "Maturity",
+      text: "the block by which the whole stake has converted. Before it, only the part of the term that has passed has converted.",
+    },
+    {
+      bold: "Claim",
+      text: "ends the position and burns its NFT. It pays out the converted part in vault shares and hands back the alAsset still to convert.",
+    },
+    {
+      bold: "Early exit fee",
+      text: "a claim before maturity gives up part of the alAsset still to convert, which the Transmuter keeps.",
+    },
+  ],
+  links: [ALCHEMIX_DOCS.transmuter],
+};
