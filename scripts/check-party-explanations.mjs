@@ -407,7 +407,7 @@ for (const proto of protocols) {
     // beside the position's total, in one sentence.
     const strings = stringsFileProse(proto);
     const routed =
-      /\boperatorLead\(/.test(src) || (strings != null && /\{external\}[^\n]*\{total\}/.test(strings));
+      /\boperatorLead\(/.test(src) || (strings != null && /\{external\}[^\n]*\{total\}|\{total\}[^\n]*\{external\}/.test(strings));
     if (handRolled || !routed) {
       gaps++;
       const why = handRolled
