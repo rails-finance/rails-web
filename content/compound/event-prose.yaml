@@ -276,9 +276,9 @@ position_words:
   idle_capacity: |-
     At current prices the collateral could back up to {room} of borrowing.
   operators: |-
-    {external} of {total} events here were executed by someone other than the owner.
+    Of the {total} events here, {external} were executed by an address other than the owner's.
   operators_one: |-
-    One of {total} events here was executed by someone other than the owner.
+    Of the {total} events here, {external} was executed by an address other than the owner's.
   operators_one_named: |-
     That one ran through {lead_name}.
   operators_all_named: |-
