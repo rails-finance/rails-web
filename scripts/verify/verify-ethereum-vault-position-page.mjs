@@ -731,12 +731,12 @@ async function pageText(browser, url) {
       ),
       timelineRows: [
         ...document.querySelectorAll(
-          "[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [aria-label*='consecutive']",
+          "[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [data-group-frame='closed'] [role='button'][aria-expanded][aria-label]",
         ),
       ].map((el) => {
         const label = el.getAttribute("aria-label");
-        if (label && / consecutive /.test(label)) {
-          const m = /^(\d[\d,]*) consecutive (\w+?)s? —/.exec(label);
+        if (label && el.closest("[data-group-frame]")) {
+          const m = /^(\d[\d,]*) ([^,]+?)s?, /.exec(label);
           return { kind: "run", count: m ? Number(m[1].replace(/,/g, "")) : null, member: m ? m[2] : null };
         }
         // The block is NOT read here: a collapsed card renders no detail

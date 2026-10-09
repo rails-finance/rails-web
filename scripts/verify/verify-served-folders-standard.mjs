@@ -76,6 +76,15 @@
 
 import { chromium } from "playwright";
 import { bypassHeaders } from "./lib/host.mjs";
+import {
+  CLOSED_GROUP,
+  GROUP_FRAME,
+  GROUP_HEADER,
+  HEADER_IN_GROUP,
+  OPEN_GROUP,
+  groupCount,
+  openGroup,
+} from "./lib/group-rows.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(",").map((s) => s.trim())) : null;
@@ -138,7 +147,9 @@ const EMPTY_LABELS = [
 
 const TOGGLE = "Collapse like events";
 const FOLDER_READ = /\/timeline\/folder\?/;
-const FOLDER_HEADER = '[role="button"][aria-expanded][aria-label*=" consecutive "]';
+// A folder is a group frame since ui-jobs 250 (lib/group-rows.mjs): its
+// closed header is named by its label, and its ⋮ opens the members.
+const FOLDER_HEADER = GROUP_HEADER;
 
 let failures = 0;
 let counted = 0;
@@ -194,8 +205,8 @@ async function countLine(page) {
 
 async function folderRows(page) {
   return page
-    .waitForSelector(FOLDER_HEADER, { timeout: 120_000 })
-    .then(() => page.locator(FOLDER_HEADER).count())
+    .waitForSelector(GROUP_FRAME, { timeout: 120_000 })
+    .then(() => page.locator(GROUP_FRAME).count())
     .catch(() => 0);
 }
 
@@ -274,31 +285,15 @@ async function runServed(f) {
       bodyText.includes("including one") ? 'a header still reads "including one …"' : "clean",
     );
 
-    // S3 — one click, one read, its members drawn.
+    // S3 — one open from the folder's ⋮, one read, its members drawn.
     await page.waitForTimeout(SETTLE_MS);
     const before = reads.length;
-    const header = page.locator(`${FOLDER_HEADER}[aria-expanded="false"]`).first();
-    const label = (await header.getAttribute("aria-label")) ?? "";
-    const count = Number((/^([\d,]+) consecutive/.exec(label)?.[1] ?? "0").replace(/,/g, ""));
+    const frame = page.locator(CLOSED_GROUP).first();
+    const label = (await frame.locator(HEADER_IN_GROUP).first().getAttribute("aria-label")) ?? "";
+    const count = groupCount(label);
     const cardsBefore = await page.locator("[data-event-id]").count();
     const answered = page.waitForResponse((r) => FOLDER_READ.test(r.url()), { timeout: 240_000 }).catch(() => null);
-    let expanded = false;
-    for (let attempt = 0; attempt < 6 && !expanded; attempt++) {
-      await header.click();
-      expanded = await page
-        .waitForFunction(
-          ([sel, lbl]) =>
-            [...document.querySelectorAll(sel)].some(
-              (el) =>
-                el.getAttribute("aria-label")?.startsWith(lbl.split(" — ")[0]) &&
-                el.getAttribute("aria-expanded") === "true",
-            ),
-          [FOLDER_HEADER, label],
-          { timeout: 2500 },
-        )
-        .then(() => true)
-        .catch(() => false);
-    }
+    const expanded = await openGroup(page, frame);
     const response = expanded ? await answered : null;
     const grew = response
       ? await page
@@ -330,7 +325,7 @@ async function runServed(f) {
     const line = await countLine(page);
     const folders = line ? await folderRows(page) : 0;
     if (folders > 0) await page.waitForTimeout(SETTLE_MS);
-    const open = await page.locator(`${FOLDER_HEADER}[aria-expanded="true"]`).count();
+    const open = await page.locator(OPEN_GROUP).count();
     check(
       id("S2 a stored collapseRuns:false makes no folder read and opens no folder"),
       folders > 0 && reads.length === 0 && open === 0,
@@ -374,7 +369,7 @@ async function runNeverEmpty(f, name) {
     // Read only once folders are drawn: an absent dot on an empty page says nothing.
     // The cut is applied after hydration, so the folders are counted again
     // here, after SETTLE_MS: the one straddling the cut stands.
-    const cutFolders = await page.locator(FOLDER_HEADER).count();
+    const cutFolders = await page.locator(GROUP_FRAME).count();
     const tipRows = await page.locator('[data-boundary-row="tip"]').count();
     const viewRows = await page.locator('[data-boundary-row="view"]').count();
     const dots = await page.locator("[data-spine-tip]").count();

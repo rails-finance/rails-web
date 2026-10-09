@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { CLOSED_GROUP, HEADER_IN_GROUP, groupCount, openGroup } from "./lib/group-rows.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const SPECIMENS = {
@@ -10,9 +11,11 @@ const SPECIMENS = {
     url: `/ethereum/asymmetry/ysyBOLD/44200710175298985045867238413926232399816914621841575154462571678280218005739`,
     pill: "3.20%",
   },
+  // Rate pills state two places on every family since ui-jobs 309 step 2
+  // (Miles, 8 Oct 2026: "two places everywhere"); the fork pill read "2.3%" before.
   ebisuIndividual: {
     url: `/ethereum/ebisu/sUSDe/87142273507301491546594869769469556221191943811042234974226220181932990285269`,
-    pill: "2.3%",
+    pill: "2.30%",
   },
   asymRun: {
     url: `/ethereum/asymmetry/sUSDS/8309122898133156698498852897464396224593631760337811282458430493454418132410`,
@@ -44,22 +47,7 @@ async function load(page, url) {
 // Since row-cut batch 7 (web 2026-09-28) rails-server groups the fork
 // timelines: the page draws the folders the grouped answer's `rowPlan` names,
 // each carrying its member count and its debt and collateral legs in raw units.
-// The page words them debt first: "Cleared" the debt, "Reduced" the collateral.
-
-/** fmtSpine + fmtHeaderMagnitude (components/shared/activity-timeline.tsx,
- *  lib/shared/header-values.ts) — the compact form the folder header draws. */
-function fmtHeaderMagnitude(n) {
-  const a = Math.abs(n);
-  if (!a || !isFinite(a)) return "";
-  if (a < 0.01) return "<0.01";
-  if (a >= 1_000_000) return `${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000) {
-    const k = a / 1_000;
-    return a >= 10_000 ? `${Math.round(k)}K` : `${parseFloat(k.toFixed(1))}K`;
-  }
-  if (a >= 1) return a.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  return parseFloat(a.toFixed(4)).toString();
-}
+// The page words them debt first: "cleared" the debt, "reduced" the collateral.
 
 /** A leg's raw amount at its decimals, as a float for the compact form. */
 const legValue = (leg) => Number(BigInt(leg.amount)) / 10 ** leg.decimals;
@@ -147,14 +135,16 @@ await run("ebisu individual pill + detail", async (page) => {
   const ok = await load(page, SPECIMENS.ebisuIndividual.url);
   assert(ok, "page rendered cards");
   const ps = await pills(page);
-  const indiv = ps.find((p) => p.text === "2.3%");
-  assert(indiv, `individual pill "2.3%" present (1dp)`);
+  const indiv = ps.find((p) => p.text === SPECIMENS.ebisuIndividual.pill);
+  assert(indiv, `individual pill "${SPECIMENS.ebisuIndividual.pill}" present (2dp)`);
   const m = indiv.color.match(/\d+/g).map(Number);
   assert(!(m[0] > 150 && m[1] < 90), `individual pill NOT pink (neutral ${indiv.color})`);
   assert(indiv.visible, "individual pill visible at 1280px");
   // Expand the "Increase interest rate" card → its detail grid carries the paired
   // "Interest rate" stat with the same 2-dp value (the receipt identity).
-  const header = page.locator("text=/Increase interest rate/i").first();
+  // The card's hidden label span carries the words too since 309 (`7bfc37d`);
+  // the press goes to the visible header.
+  const header = page.locator("text=/Increase interest rate/i").locator("visible=true").first();
   assert((await header.count()) > 0, 'header reads "Increase interest rate"');
   await header.click();
   await page.waitForTimeout(600);
@@ -199,41 +189,39 @@ await run("asymmetry run folder", async (page) => {
   );
   assert(expected.length > 0, `the grouped answer holds at least one redemption folder (${expected.length})`);
 
-  const rows = page.locator('[aria-label*="consecutive redemptions"]');
-  assert((await rows.count()) > 0, `run folder rows rendered, named by their members (${await rows.count()})`);
-  const row = rows.first();
+  // Since ui-jobs 250 (`9301aba`) a folder is a group frame (lib/group-rows.mjs):
+  // its header is named "72 redemptions, 1 Sep 2026 to 27 Sep 2026: cleared
+  // 2,010 USDaf, reduced 1,798 sUSDS" (the sums at `spokenAmount`'s places),
+  // and its ⋮ "Show 72 grouped events" opens the members.
+  const frames = page.locator(CLOSED_GROUP, { has: page.locator(`${HEADER_IN_GROUP}[aria-label*=" redemptions, "]`) });
+  assert((await frames.count()) > 0, `run folder rows rendered, named by their members (${await frames.count()})`);
+  const frame = frames.first();
+  const row = frame.locator(HEADER_IN_GROUP).first();
   const closedAria = await row.getAttribute("aria-label");
-  assert(/expand the run$/.test(closedAria), `closed row offers the expand toggle ("${closedAria}")`);
 
   const first = expected[0];
-  const stated = Number((closedAria.match(/^([\d,]+) consecutive redemptions/) ?? [])[1]?.replace(/,/g, ""));
+  const stated = groupCount(closedAria);
   assert(stated === first.count, `row states ${stated} members — the count its folder holds (${first.count})`);
 
-  // The header draws the compact form (fmtHeaderMagnitude); the exact figure
-  // rides the provenance trace, so the compact form is what is compared.
-  const text = await row.innerText();
-  const figure = (verb) => (text.match(new RegExp(`${verb}\\s*(<0\\.01|[0-9][0-9.,]*[KM]?)`)) ?? [])[1];
-  const cleared = fmtHeaderMagnitude(first.cleared);
-  const reduced = fmtHeaderMagnitude(first.reduced);
+  const spoken = (v) =>
+    Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 1 ? 2 : 4 });
+  const figure = (verb) => (closedAria.match(new RegExp(`${verb} ([0-9][0-9.,]*)`)) ?? [])[1];
+  const cleared = spoken(first.cleared);
+  const reduced = spoken(first.reduced);
   assert(
-    figure("Cleared") === cleared,
-    `"Cleared ${cleared}" is the Σ of the folder's debt deltas (row says ${figure("Cleared")})`,
+    figure("cleared") === cleared,
+    `"cleared ${cleared}" is the Σ of the folder's debt deltas (row says ${figure("cleared")})`,
   );
   assert(
-    figure("Reduced") === reduced,
-    `"Reduced ${reduced}" is the Σ of the folder's collateral deltas (row says ${figure("Reduced")})`,
+    figure("reduced") === reduced,
+    `"reduced ${reduced}" is the Σ of the folder's collateral deltas (row says ${figure("reduced")})`,
   );
-
   assert(
-    text.indexOf("Cleared") >= 0 && text.indexOf("Cleared") < text.indexOf("Reduced"),
-    "the row names the debt first (Cleared before Reduced)",
+    closedAria.indexOf("cleared") >= 0 && closedAria.indexOf("cleared") < closedAria.indexOf("reduced"),
+    "the row names the debt first (cleared before reduced)",
   );
 
-  await row.click();
-  await page.waitForTimeout(600);
-  const openAria = await row.getAttribute("aria-label");
-  assert(/collapse the run$/.test(openAria), `the click flips the aria to the collapse toggle ("${openAria}")`);
-  assert((await row.getAttribute("aria-expanded")) === "true", "aria-expanded reads true while the folder is open");
+  assert(await openGroup(page, frame), 'the folder\'s ⋮ "Show grouped events" opens the members');
 });
 
 // ── 4. V2 regression — the shared-module pills still render on V2 ──

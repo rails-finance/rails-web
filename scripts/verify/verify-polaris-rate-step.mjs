@@ -378,6 +378,17 @@ await showNoteRows(context);
 for (const f of FIXTURES) {
   const key = `${f.market}/${f.id}`;
   const page = await open(context, polarisUrl(f.market, f.id));
+  // The notes draw after the page's reads land, which under load is after the
+  // count line: wait for the historical rows the route derives, up to 60 s.
+  await page
+    .waitForFunction(
+      ([sel, want]) =>
+        [...document.querySelectorAll(sel)].filter((e) => !e.getAttribute("data-market-note").endsWith("-head"))
+          .length >= want,
+      [RATE_STEP_SELECTOR, f.want],
+      { timeout: 60000 },
+    )
+    .catch(() => {});
   const allIds = await page
     .locator(RATE_STEP_SELECTOR)
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-market-note")));
@@ -546,7 +557,7 @@ const tableRows = (m) => (m.match(/^\| \d+ \| /gm) ?? []).length;
 check(
   '4. the markdown export states "Market notes: 3" (2 rate-step + 1 price-gap) and adds no row to the event table',
   /\*\*Market notes:\*\*\s*3\b/.test(md) && tableRows(md) === fixtureNotes["usdp/27"].count,
-  `table rows ${tableRows(md)}, route says ${fixtureNotes["usdp/27"].count}; "Market notes" line ${md.includes("Market notes") ? "present" : "absent"}`,
+  `table rows ${tableRows(md)}, route says ${fixtureNotes["usdp/27"].count}; "Market notes" line ${md.match(/\*\*Market notes:\*\*[^\n]*/)?.[0] ?? "absent"}`,
 );
 const annotationCount = (md.match(/market note: the USDp market's primary rate was /g) ?? []).length;
 check(

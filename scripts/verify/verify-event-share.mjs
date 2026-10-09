@@ -76,6 +76,7 @@
 //   BASE=http://localhost:3101 FAMILIES=spark,fluid node scripts/verify/verify-event-share.mjs
 
 import { chromium } from "playwright";
+import { CLOSED_GROUP, GROUP_FRAME, openGroup } from "./lib/group-rows.mjs";
 import { openPositionCards } from "./lib/position-card.mjs";
 import {
   exhaustPaging,
@@ -127,7 +128,8 @@ const EXPLANATION_FROM_FIRST_PAINT = new Set([
   "dolomite-closed",
   "llamalend",
   "llamalend-closed",
-  "liquity-v1",
+  // Retired for liquity-v1 (ui-jobs 236): its event route is the event's page,
+  // which draws no position card, so no Explanation pane carries the link.
 ]);
 
 let failures = 0;
@@ -874,7 +876,7 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
   const { ctx, page } = await open(1280, pageUrl, { flattenRuns: false });
   await page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   const presses = await exhaustPaging(page);
-  const folderRows = await page.locator('[aria-expanded][aria-label*="consecutive"]').count();
+  const folderRows = await page.locator(GROUP_FRAME).count();
   check(`${name}: at least one folder row drew (1)`, folderRows > 0, `${folderRows}, ${presses} presses`);
   // THE COUNT LINE HAS TWO SHAPES AND ONLY ONE OF THEM IS THE SETTLED PAGE.
   // Until the position's lifetime figures land the line states what is listed
@@ -1011,12 +1013,9 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
   await failPage.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   // The folder may be below the first render window here too.
   await exhaustPaging(failPage);
-  await failPage.waitForSelector('[aria-expanded][aria-label*="consecutive"]', { timeout: 60000 }).catch(() => {});
-  await failPage
-    .locator('[aria-expanded][aria-label*="consecutive"]')
-    .first()
-    .click()
-    .catch(() => {});
+  // A folder is a group frame since ui-jobs 250; its ⋮ opens the members.
+  await failPage.waitForSelector(CLOSED_GROUP, { timeout: 60000 }).catch(() => {});
+  await openGroup(failPage, failPage.locator(CLOSED_GROUP).first()).catch(() => {});
   await failPage.waitForTimeout(2000);
   check(
     `${name}: a failed members read states itself (5)`,

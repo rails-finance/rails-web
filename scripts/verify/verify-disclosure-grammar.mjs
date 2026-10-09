@@ -28,6 +28,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
 
 const TROVE =
   "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154";
@@ -125,6 +126,7 @@ const headerLayout = (card) =>
     const pillLast = !!p && lineItems.every((el) => el.getBoundingClientRect().right <= p.right + 0.5);
     return {
       pillLast,
+      pillInHead: !!pill,
       chev: !!chev && vis(chev),
       menu: !!menu,
       menuBeforePill: !!menu && !!p && menu.getBoundingClientRect().right <= p.left + 0.5,
@@ -292,9 +294,15 @@ const headerLayout = (card) =>
   await pill.waitFor({ timeout: 120000 }).catch(() => {});
   await card.scrollIntoViewIfNeeded();
   const layout = await headerLayout(card).catch(() => null);
+  // Repointed (ui-jobs 309 step 11): since ui-jobs 250 the number stands in
+  // the row's number column, and every timeline card's ⋮
+  // carries "View event page" (the number is plain text), Liquity V2's too.
   check(
-    "2d. #148: the chevron stands in the header, the pill last on the line, no ⋮",
-    !!layout && layout.chev && layout.pillLast && !layout.menu,
+    "2d. #148: the chevron stands in the header, the number in the number column",
+    !!layout &&
+      layout.chev &&
+      !layout.pillInHead &&
+      (await card.locator("[data-number-column] [data-event-number]").count()) > 0,
     JSON.stringify(layout),
   );
   const headGap = await card
@@ -358,8 +366,9 @@ const headerLayout = (card) =>
     t3Gap != null && t3Gap >= 0 && t3Gap <= 8 && t3Name === "Show event explanation",
     `${t3Gap}px, ${t3Name}`,
   );
-  const menus = await card.locator("[data-event-menu]").count();
-  check("2i. #148: no event ⋮ on the opened card", menus === 0, `${menus} found`);
+  // 2i retired (ui-jobs 309 step 11): "no event ⋮ on the opened card". Since
+  // ui-jobs 250 the event page is reached from the row's ⋮ ("View event page")
+  // on every family, Liquity V2 included, and the number is plain text.
   check("2j. no page error", errors.length === 0, errors.join("; "));
   await ctx.close();
 }
@@ -403,8 +412,10 @@ const headerLayout = (card) =>
   const card = page.locator("[data-event-id]").first();
   const layout = await headerLayout(card).catch(() => null);
   check(
-    "4a. the event ⋮ stands in the header before the pill, the pill last on the line",
-    !!layout && layout.chev && layout.menu && layout.menuBeforePill && layout.pillLast,
+    // Repointed (ui-jobs 309 step 11): the number left the header for the
+    // number column with ui-jobs 250.
+    "4a. the event ⋮ stands in the header, the number in the number column",
+    !!layout && layout.chev && layout.menu && !layout.pillInHead,
     JSON.stringify(layout),
   );
   await card.locator("[data-event-head-menu] [data-event-menu] > button").click();
@@ -496,9 +507,10 @@ async function allHeads(page) {
   return out;
 }
 
+/** Open the first group (a redemption run): from its ⋮ since ui-jobs 250. */
 async function openFolder(page) {
-  const folder = page.getByText(/^Cleared/).first();
-  if (await folder.count()) await folder.click().catch(() => {});
+  const folder = page.locator(CLOSED_GROUP).first();
+  if (await folder.count()) await openGroup(page, folder).catch(() => {});
   await page.waitForTimeout(2500);
 }
 
@@ -581,12 +593,10 @@ async function waitHeads(page) {
   await waitHeads(page);
   const { card } = cardWith(page, 148);
   await card.scrollIntoViewIfNeeded().catch(() => {});
-  const repay = await headItems(card.locator('[data-anatomy="T1"]')).catch(() => null);
-  check(
-    "5i. 390: Repay #148 reads Repay, the amount, the icon, the chevron",
-    !!repay && repay.last && repay.items[0] === "Repay" && repay.items.includes("IMG"),
-    JSON.stringify(repay?.items),
-  );
+  // 5i retired (ui-jobs 309 step 11): "390: Repay #148 reads Repay, the
+  // amount, the icon, the chevron". Below 640px the timeline draws no T1
+  // header; the caption on the spine carries the row and the spine its
+  // amounts and icons (mobile decision 16, event-card.tsx).
   const heads = await allHeads(page);
   const strays = heads.filter((h) => !h.last);
   check("5j. 390: every Liquity head ends on its chevron", strays.length === 0, JSON.stringify(strays));

@@ -51,6 +51,7 @@
 //     non-stale, non-zero position before any render assertion is believed.
 
 import { chromium } from "playwright";
+import { CLOSED_GROUP, HEADER_IN_GROUP, openGroup } from "./lib/group-rows.mjs";
 import { openPositionCards } from "./lib/position-card.mjs";
 
 const PORT = process.argv[2] ?? "3457";
@@ -237,35 +238,36 @@ const noDollar = (name, text) => {
   check("two-axis outcome line renders", /The position is closed\.|remains open/.test(t));
   check("Owner Set at Mint initialization row renders", /Owner Set at Mint/.test(t));
   // The 5 slices collapse into one run row (10 events: a Challenge Succeeded
-  // and its Auction Settlement echo per bid). Since 2026-09-02 that row speaks
-  // the folder grammar — `ea7778c0` made it a folder, `b87e8087` replaced its
-  // "Auction settled ×5" label with a calculator glyph beside the summed pairs,
-  // and `207d8ee7` dropped the "Show all 5" hint — so the count is stated by
-  // the row's aria-label and the row's text is the two sums. Pinned from the
-  // live page 2026-09-19; the auction closed in Apr 2025, so its sums (2 WETH
-  // sold, 2.4K ZCHF raised — the five slices above added up) cannot move.
-  const run = page.locator('[role="button"][aria-label^="5 consecutive auction slices"]');
-  const runCount = await run.count();
-  const runText = runCount === 1 ? (await run.innerText()).replace(/\s+/g, " ").trim() : "";
+  // and its Auction Settlement echo per bid). Since ui-jobs 250 (`9301aba`)
+  // the row is a group frame (lib/group-rows.mjs): its header is named "5
+  // auction slices, 7 Apr 2025 to 8 Apr 2025: sold 2 WETH, raised 2,435 ZCHF",
+  // its text the spine's two sums and "Auction (5)", and its ⋮ "Show 10
+  // grouped events" opens the members. Pinned from the live page; the auction
+  // closed in Apr 2025, so its sums (the five slices above added up) cannot move.
+  const runFrame = page.locator(CLOSED_GROUP, {
+    has: page.locator(`${HEADER_IN_GROUP}[aria-label^="5 auction slices,"]`),
+  });
+  const runCount = await runFrame.count();
+  const runLabel =
+    runCount === 1 ? ((await runFrame.locator(HEADER_IN_GROUP).first().getAttribute("aria-label")) ?? "") : "";
+  const runText = runCount === 1 ? (await runFrame.innerText()).replace(/\s+/g, " ").trim() : "";
   const rowsCollapsed = await page.locator("[data-event-id]").count();
   check(
     "auction run card collapses the settlement echoes",
     runCount === 1 &&
-      (await run.getAttribute("aria-expanded")) === "false" &&
-      /^Sold 2 Raised 2\.4K\b/.test(runText) &&
+      /: sold 2 WETH, raised 2,435 ZCHF$/.test(runLabel) &&
+      /^2 2\.4K Auction \(5\)/.test(runText) &&
       !/Auction Settlement/.test(t) &&
       rowsCollapsed === 9,
-    `${runCount} run row(s), text "${runText}", ${rowsCollapsed} event rows at rest (19 events, 10 of them inside the run)`,
+    `${runCount} run row(s), label "${runLabel}", text "${runText}", ${rowsCollapsed} event rows at rest (19 events, 10 of them inside the run)`,
   );
-  // A missing run card already failed above — the click must not turn that
-  // one cause into a crash that discards every later check. And the page SSRs,
-  // so a single click can land before React attaches the handler and be
-  // discarded silently; re-assert the expanded state each poll and click again.
+  // A missing run card already failed above — the open must not turn that
+  // one cause into a crash that discards every later check.
   let expanded = "";
+  if (runCount === 1) await openGroup(page, runFrame.first());
   for (let attempt = 0; attempt < 12; attempt++) {
     expanded = await page.evaluate(() => document.body.innerText);
     if (/Auction Settlement/.test(expanded)) break;
-    await run.click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(400);
   }
   const settlements = (expanded.match(/Auction Settlement/g) ?? []).length;
@@ -300,7 +302,10 @@ const noDollar = (name, text) => {
     "system: the capital's two accounts + the pool render",
     /Equity \(FPS holders\)/.test(t) && /Borrowers' reserve/.test(t) && /Reserve pool, total/.test(t),
   );
-  check("system: FCS wrapping FPS one to one is stated", /FCS, the share token in Frankencoin['’]s docs, wraps FPS one to one/.test(t));
+  check(
+    "system: FCS wrapping FPS one to one is stated",
+    /FCS, the share token in Frankencoin['’]s docs, wraps FPS one to one/.test(t),
+  );
   check("system: FPS price renders in ZCHF (never USD)", /FPS price\s*\n\s*[\d.,]+ ZCHF/.test(t));
   check("system: the Leadrate renders as a percent", /Base rate \(Leadrate\)\s*\n\s*[\d.]+%/.test(t));
   check(

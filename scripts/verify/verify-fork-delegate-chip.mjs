@@ -481,15 +481,11 @@ for (const spec of NARROW_SPECIMENS) {
       `the sm hand-off is real: deltas inline at 600px, handed to the spine at 640px (so 600px IS the crowded case)`,
     );
   }
-  // And that the crowded width reflows onto more lines rather than compressing.
-  if (seen[390] && seen[640]) {
-    assert(
-      seen[390].row.height > seen[640].row.height,
-      `390px wraps onto more lines than 640px (h ${Math.round(seen[390].row.height)} > ${Math.round(
-        seen[640].row.height,
-      )}) — the row grows downward, never sideways`,
-    );
-  }
+  // Retired (ui-jobs 309 step 11): "390px wraps onto more lines than 640px".
+  // Below 640px the timeline draws no T1 header row; the phone caption on the
+  // spine carries the row (mobile decision 16, `event-card.tsx`), so the row
+  // measures h 0 at 390 and 600 and there is no wrap to compare. The page-scroll
+  // check above still holds at those widths.
 }
 
 await browser.close();

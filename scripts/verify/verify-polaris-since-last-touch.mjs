@@ -219,7 +219,10 @@ for (const f of FIXTURES) {
   check(`${f.n}. ${tag}: the live window row renders, exactly once`, present);
   if (!present) continue;
 
-  const closedFigures = await block.locator("span.tabular-nums").allInnerTexts();
+  // The row's figures are signed; the block number the row now states also
+  // carries `tabular-nums`, and is left out.
+  const signed = (texts) => texts.filter((t) => /^[+−-]/.test(t.trim()));
+  const closedFigures = signed(await block.locator("span.tabular-nums").allInnerTexts());
   const opened = await openRow(page, block);
   check(
     `${f.n}. ${tag}: the row rests closed on its headline and opens on its header control`,
@@ -232,7 +235,7 @@ for (const f of FIXTURES) {
   // Four figures while open: the header's ECHO of the total, then the body's
   // feed, protocol and total. The echo is one fact stated twice, so it is
   // compared against the total rather than parsed as a fourth term.
-  const allFigures = await block.locator("span.tabular-nums").allInnerTexts();
+  const allFigures = signed(await block.locator("span.tabular-nums").allInnerTexts());
   const figures = allFigures.slice(1);
   shownFigures[tag] = figures;
   check(

@@ -840,8 +840,8 @@ async function readPage(page) {
       cutRows: root === document ? cutRows.length : root.querySelectorAll('[data-boundary-row="cut"]').length,
       /** Drawn event rows. Zero is the shape where the card still stands. */
       rowCount: root.querySelectorAll("[data-event-id]").length,
-      /** Served folder headers (a grouped page): one row each. */
-      folderRows: root.querySelectorAll('[role="button"][aria-expanded][aria-label*=" consecutive "]').length,
+      /** Served folders (a grouped page): one group frame each since ui-jobs 250. */
+      folderRows: root.querySelectorAll("[data-group-frame]").length,
       label,
       state,
       offerInCard,

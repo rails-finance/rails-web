@@ -550,11 +550,16 @@ check(
 
 const exportPage = await open(context, troveUrl(TROVE_A));
 const copyMarkdown = async () => {
-  await exportPage
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await exportPage.getByRole("menuitem", { name: /Copy Position/i }).click();
+  // A press before hydration is lost: pressed until the menu shows its row.
+  const item = exportPage.getByRole("menuitem", { name: /Copy Position/i });
+  for (let attempt = 0; attempt < 8 && !(await item.isVisible().catch(() => false)); attempt++) {
+    await exportPage
+      .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
+      .first()
+      .click();
+    await item.waitFor({ state: "visible", timeout: 4000 }).catch(() => {});
+  }
+  await item.click();
   await exportPage.waitForTimeout(500);
   return exportPage.evaluate(() => navigator.clipboard.readText());
 };

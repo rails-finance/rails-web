@@ -104,6 +104,7 @@
 // "this folder's members appeared" from "the list got longer".
 //
 import { chromium } from "playwright";
+import { CLOSED_GROUP, HEADER_IN_GROUP, groupCount, openGroup } from "./lib/group-rows.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 /** F3 — the page Miles was reading: a $58M position whose whole life is share
@@ -246,7 +247,11 @@ check(
 const f3Page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
 await f3Page.goto(pageUrl(F3), { waitUntil: "networkidle", timeout: 180_000 });
 await f3Page.waitForSelector("[data-vault-timeline-rows]", { timeout: 60_000 });
-const FOLDER = "[data-vault-timeline-rows] [aria-label*='consecutive']";
+// A folder is a group frame since ui-jobs 250 (lib/group-rows.mjs): its closed
+// header is named "5 transfers, 8 Oct 2026 to 9 Oct 2026: received 127,651
+// waEthUSDC", and its ⋮ opens the members in the folder's place.
+const FOLDER_FRAME = `[data-vault-timeline-rows] ${CLOSED_GROUP}`;
+const FOLDER = `${FOLDER_FRAME} ${HEADER_IN_GROUP}`;
 const EVENT = "[data-vault-timeline-rows] [data-event-id]";
 
 const f3Dom = await f3Page.evaluate(
@@ -275,7 +280,7 @@ const f3Dom = await f3Page.evaluate(
       // carries the aria-label that says how many members it stands for.
       order: [...document.querySelectorAll(`${folderSel}, ${eventSel}`)].map((el) => {
         const label = el.getAttribute("aria-label");
-        const m = label && /^(\d[\d,]*) consecutive (\w+?)s? —/.exec(label);
+        const m = label && /^(\d[\d,]*) ([^,]+?)s?, /.exec(label);
         return m
           ? { kind: "run", count: Number(m[1].replace(/,/g, "")), member: m[2] }
           : { kind: "event", id: el.getAttribute("data-event-id") };
@@ -335,12 +340,11 @@ const markers = () =>
     ({ folderSel, eventSel }) =>
       [...document.querySelectorAll(`${folderSel}, ${eventSel}`)].map((el) => {
         const label = el.getAttribute("aria-label");
-        const m = label && /^(\d[\d,]*) consecutive/.exec(label);
+        const m = label && /^(\d[\d,]*) [^,]+, /.exec(label);
         return m ? `f:${m[1].replace(/,/g, "")}` : `e:${el.getAttribute("data-event-id")}`;
       }),
     { folderSel: FOLDER, eventSel: EVENT },
   );
-const headerText = (i) => f3Page.locator(FOLDER).nth(i).innerText();
 
 const folders = [];
 if (f3Dom.folders === 0) {
@@ -348,16 +352,12 @@ if (f3Dom.folders === 0) {
   skip("R3 no folder mixes an inbound with an outbound transfer", "no folder was drawn — see R1b");
   skip("R3b every folder's own kind is one this script expects to collapse", "no folder was drawn — see R1b");
 } else {
+  // An opened folder leaves the closed set, so the next closed one is first.
   for (let i = 0; i < f3Dom.folders; i++) {
-    const stated = (await headerText(i)).replace(/\s+/g, " ").trim();
-    const claim = Number(
-      (/^(\d[\d,]*) consecutive/.exec(await f3Page.locator(FOLDER).nth(i).getAttribute("aria-label")) ?? [
-        "",
-        "0",
-      ])[1].replace(/,/g, ""),
-    );
+    const stated = (await f3Page.locator(FOLDER).first().getAttribute("aria-label")) ?? "";
+    const claim = groupCount(stated);
     const before = await markers();
-    await f3Page.locator(FOLDER).nth(i).click();
+    await openGroup(f3Page, f3Page.locator(FOLDER_FRAME).first());
     await f3Page.waitForFunction(
       ({ sel, was }) => document.querySelectorAll(sel).length > was,
       { sel: EVENT, was: before.filter((m) => m.startsWith("e:")).length },
@@ -380,7 +380,8 @@ if (f3Dom.folders === 0) {
   // own claim about how many rows it stands for.
   const sumBad = [];
   for (const f of folders) {
-    const m = /(Received|Sent|Minted|Burned|Deposited|Withdrawn)\s+(<?[\d,.]+[KM]?)/.exec(f.stated);
+    // The label states the Σ at `spokenAmount`'s places ("received 127,651").
+    const m = /(received|sent|minted|burned|deposited|withdrawn)\s+(<?[\d,.]+[KM]?)/i.exec(f.stated);
     const parsed = m ? parseCompact(m[2]) : null;
     const kinds = new Set(f.members.map((e) => e?.kind));
     const own =

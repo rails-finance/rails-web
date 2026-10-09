@@ -228,6 +228,7 @@
 //  holds the whole of it (TO-DO-ui-jobs §58).
 //
 import { chromium } from "playwright";
+import { openGroup } from "./lib/group-rows.mjs";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector, getAddress } from "viem";
 import { base } from "viem/chains";
 import fs from "node:fs";
@@ -673,7 +674,10 @@ async function createdBlockOf(vault, head) {
 // ── the page and the route ──────────────────────────────────────────────────
 
 const browser = await chromium.launch();
-const context = await browser.newContext({ viewport: { width: 1280, height: 2000 }, extraHTTPHeaders: bypassHeaders() });
+const context = await browser.newContext({
+  viewport: { width: 1280, height: 2000 },
+  extraHTTPHeaders: bypassHeaders(),
+});
 // Every note draws its row, as at rest before the markers (lib/market-notes.mjs).
 await showNoteRows(context);
 
@@ -779,16 +783,17 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
   //   everything else — read AFTER every run has been expanded, so the row
   //     for every log in the life is mounted and checks 4e, 5c and 10b compare
   //     row for row as they always did.
-  // Expanding is the reader's own click, on the rows whose label says "expand
-  // the run"; the labels flip to "collapse" as they open, which is what stops
-  // the loop.
+  // Expanding is the group's ⋮ "Show N grouped events" (ui-jobs 250); an
+  // opened group leaves the closed set, which is what stops the loop.
   const collapsed = await page
-    .locator("[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [aria-label*='consecutive']")
+    .locator(
+      "[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [data-group-frame='closed'] [role='button'][aria-expanded][aria-label]",
+    )
     .evaluateAll((els) =>
       els.map((el) => {
         const label = el.getAttribute("aria-label");
-        if (label && / consecutive /.test(label)) {
-          const m = /^(\d[\d,]*) consecutive (\w+?)s? —/.exec(label);
+        if (label && el.closest("[data-group-frame]")) {
+          const m = /^(\d[\d,]*) ([^,]+?)s?, /.exec(label);
           return { kind: "run", count: m ? Number(m[1].replace(/,/g, "")) : null, member: m ? m[2] : null };
         }
         return { kind: "event", id: el.getAttribute("data-event-id") };
@@ -796,9 +801,10 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     );
   const runsPainted = collapsed.filter((r) => r.kind === "run").length;
   for (let guard = 0; guard < 40; guard++) {
-    const toOpen = page.locator("[data-vault-timeline-rows] [aria-label*='expand the run']");
+    // A group opens from its ⋮ since ui-jobs 250 (lib/group-rows.mjs).
+    const toOpen = page.locator("[data-vault-timeline-rows] [data-group-frame='closed']");
     if ((await toOpen.count()) === 0) break;
-    await toOpen.first().click({ force: true });
+    if (!(await openGroup(page, toOpen.first()))) break;
     await page.waitForTimeout(250);
   }
   // The note rows as the page actually drew them, in DOM order, each with the

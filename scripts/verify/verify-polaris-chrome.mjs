@@ -194,7 +194,8 @@ for (const id of ["175", "166"]) {
   const header = await card.evaluate((el) => {
     const spans = [...el.querySelectorAll("span")];
     const claim = spans.find((s) => s.textContent === "Claimable");
-    const figure = claim?.parentElement?.querySelector("span.tabular-nums")?.textContent ?? "";
+    // The figure follows the word since the shared head row (ui-jobs 309 step 2).
+    const figure = claim?.nextElementSibling?.textContent ?? "";
     const text = (el.textContent ?? "").replace(/\s+/g, " ");
     return { figure, text, order: [text.indexOf("Seized"), text.indexOf("Cleared"), text.indexOf("Claimable")] };
   });
@@ -363,7 +364,17 @@ async function checkModal(name, { title, links }) {
   const n = await btns.count();
   check("5a. the markets page carries its inline learn-more triggers", n >= 2, `${n} triggers`);
   for (let i = 0; i < n; i++) {
-    await btns.nth(i).click();
+    // A press before hydration is lost: pressed until the modal shows.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await btns.nth(i).click();
+      const shown = await page
+        .locator(MODAL)
+        .first()
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (shown) break;
+    }
     await checkModal(`markets page inline #${i + 1}`, await readModalLinks(page));
   }
   await page.close();

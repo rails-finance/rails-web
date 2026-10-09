@@ -186,7 +186,13 @@ for (const c of cards) {
   if (row.debt > 0 && row.coll > 0) {
     const want = expectedIcrPct(row, m);
     const got = parseNum((c.valueText.match(/([\d,]+\.\d+)%/) ?? [])[1]);
-    if (!c.valueText.includes("≈") || !Number.isFinite(got) || Math.abs(got - want) > 0.05) {
+    // Above 10,000% the card states "over 10,000%" (lib/polaris/ratio-format.ts,
+    // POLARIS_RATIO_CEILING_PCT).
+    const capped = want > 10_000;
+    if (
+      !c.valueText.includes("≈") ||
+      (capped ? !c.valueText.includes("over 10,000%") : !Number.isFinite(got) || Math.abs(got - want) > 0.05)
+    ) {
       ratioBad.push(`${row.market}/${row.cdpId}: shown "${c.valueText}" vs expected ≈ ${want.toFixed(1)}%`);
     }
     const wantLiq = `${fmtLiq(expectedLiqPrice(row, m))} ${row.stableSymbol}`;
@@ -384,6 +390,13 @@ if (!probeLine) {
 const page6 = await context.newPage();
 await page6.goto(`${BASE}/sepolia/polaris/usdp/8`, { waitUntil: "domcontentloaded", timeout: 180000 });
 await page6.waitForTimeout(6000);
+// Since ui-jobs 272 the prices sit in a menu at the wallet row's right end
+// (`[data-latest-prices]`, H7.2): open it, pressing until it reads open.
+const pricesTrigger = page6.locator("[data-latest-prices] > button[aria-haspopup]").first();
+for (let i = 0; i < 6 && (await pricesTrigger.getAttribute("aria-expanded").catch(() => null)) !== "true"; i++) {
+  await pricesTrigger.click({ timeout: 10000 }).catch(() => {});
+  await page6.waitForTimeout(800);
+}
 const strip = await page6.evaluate(() => {
   const pills = [...document.querySelectorAll("span[title]")]
     .filter((el) => el.className.includes("tabular-nums") && el.className.includes("cursor-default"))

@@ -34,12 +34,13 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-known-contract-chips.mjs
 
 import { chromium } from "playwright";
+import { CLOSED_GROUP, GROUP_FRAME, openGroup } from "./lib/group-rows.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
 const COW_ICON = "/icons/protocols/cow.png";
-// The served-folder header and its read, as verify-served-folders-standard.mjs
-// selects them.
-const FOLDER_HEADER = '[role="button"][aria-expanded][aria-label*=" consecutive "]';
+// The served folder and its read, as verify-served-folders-standard.mjs
+// selects them (a group frame since ui-jobs 250, lib/group-rows.mjs).
+const FOLDER_HEADER = GROUP_FRAME;
 const FOLDER_READ = /\/timeline\/folder\?/;
 
 const FIXTURES = [
@@ -102,7 +103,7 @@ for (const fx of FIXTURES) {
     // parent is the chip. A served timeline may hold the transfer rows in a
     // folder ("Sent ×4" on 0xfe28, two CoW swaps ten blocks apart), and a
     // folder header carries no chip. So wait for either, then open every
-    // closed folder the way a reader does, one click and one folder read each.
+    // closed folder the way a reader does, from its ⋮, one folder read each.
     await page.waitForFunction(
       (folderHeader) =>
         document.querySelector(folderHeader) ||
@@ -113,10 +114,10 @@ for (const fx of FIXTURES) {
       { timeout: 90000 },
     );
     for (let i = 0; i < 12; i++) {
-      const closed = page.locator(`${FOLDER_HEADER}[aria-expanded="false"]`).first();
+      const closed = page.locator(CLOSED_GROUP).first();
       if ((await closed.count()) === 0) break;
       const answered = page.waitForResponse((r) => FOLDER_READ.test(r.url()), { timeout: 120000 }).catch(() => null);
-      await closed.click();
+      if (!(await openGroup(page, closed))) break;
       await answered;
     }
     await page.waitForFunction(

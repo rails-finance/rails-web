@@ -18,16 +18,6 @@
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
 
-/** The price chip sits behind the card's (i) (rails-ops TO-DO-ui-jobs 141):
- *  open it before reading the chip. */
-async function openInfo(card) {
-  const b = card.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
-  if (await b.count()) {
-    await b.click();
-    await card.page().waitForTimeout(300);
-  }
-}
-
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
@@ -197,19 +187,25 @@ function cardFor(page, n) {
   return badge.locator("xpath=ancestor::*[@data-event-id][1]");
 }
 
-/** Expand event N's card by clicking its header's click-to-toggle area. */
+/** Expand event N's card by clicking its header's click-to-toggle area. The
+ *  number stands in the row's number column since ui-jobs 250, outside the
+ *  header's `role=button`, so the header is found from the card. */
 async function expandCard(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
-  const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
   const card = cardFor(page, n);
-  const before = (await card.boundingBox())?.height ?? 0;
+  const clickable = card.locator('[data-anatomy="T1"] [role="button"]').first();
   // A click that lands before React has attached the handler is swallowed, so
-  // click again until the card has grown.
+  // click again until the header reads open; a click is only sent while it
+  // reads closed, so a late first open is never closed again.
   for (let attempt = 0; attempt < 6; attempt += 1) {
+    if ((await clickable.getAttribute("aria-expanded")) === "true") return;
     await clickable.click();
-    await page.waitForTimeout(500);
-    if (((await card.boundingBox())?.height ?? 0) > before + 20) return;
+    await page
+      .waitForFunction((el) => el.getAttribute("aria-expanded") === "true", await clickable.elementHandle(), {
+        timeout: 3000,
+      })
+      .catch(() => {});
   }
 }
 
@@ -244,6 +240,16 @@ async function sideUsdText(card, side) {
  *  TO-DO-ui-jobs §19), and its USD chips arrive with that answer: wait for it
  *  before reading them. */
 async function positionStateSettled(proto, card) {
+  if (proto === "spark") {
+    // Spark reads the account when the card first opens (ui-jobs 309 step 6,
+    // `onOpen`); its cells hold placeholders until the read lands.
+    await card
+      .locator('[data-ledger-cell="collateral"] [data-prov-covered]', { hasText: "$" })
+      .first()
+      .waitFor({ timeout: 90000 })
+      .catch(() => {});
+    return;
+  }
   if (proto !== "aave-v3") return;
   await card
     .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
@@ -327,15 +333,17 @@ async function runProtocol(proto, wallet, cases) {
       );
     }
 
-    await openInfo(card);
-    const footnote = card.getByText(/oracle at block/).first();
-    check(`${proto}: priced ordinary AtBlockPriceFootnote pill renders`, (await footnote.count()) > 0);
+    // Since ui-jobs 309 step 6 the price at the block stands in the card's
+    // price row as a then/today chip, its source ("oracle at block") in the
+    // chip's tip.
+    const footnote = card.locator(`[data-price-row] [title*="oracle at block"][title^="${symbol} "]`).first();
+    check(`${proto}: priced ordinary price-row chip renders`, (await footnote.count()) > 0);
     if ((await footnote.count()) > 0) {
-      const text = await card.locator("text=/oracle at block/").first().locator("xpath=..").innerText();
+      const text = await footnote.innerText();
       check(
-        `${proto}: footnote reads "${symbol} ${priceText} · oracle at block"`,
-        text.includes(symbol) && text.includes(priceText),
-        text.replace(/\s+/g, " ").trim(),
+        `${proto}: the chip reads "${priceText}", its tip "${symbol} … oracle at block"`,
+        text.includes(priceText),
+        `${text.replace(/\s+/g, " ").trim()} · tip "${await footnote.getAttribute("title")}"`,
       );
     }
 
@@ -405,9 +413,11 @@ async function runProtocol(proto, wallet, cases) {
       bodyText.includes(premiumPct),
       bodyText.match(/[+−-]\d+\.\d{2}%/)?.[0] ?? "no percent found",
     );
+    const priceRow = (await card.locator("[data-price-row]").allInnerTexts()).join(" ");
     check(
-      `${proto}: footnote prices both legs (${collSymbol} ${collPrice}, ${debtSymbol} ${debtPrice})`,
-      bodyText.includes(collPrice) && bodyText.includes(debtPrice),
+      `${proto}: the price row prices both legs (${collSymbol} ${collPrice}, ${debtSymbol} ${debtPrice})`,
+      priceRow.includes(collPrice) && priceRow.includes(debtPrice),
+      priceRow.replace(/\s+/g, " ").trim().slice(0, 160),
     );
 
     const panelText = await openReceiptFor(page, card, seizedUsd);

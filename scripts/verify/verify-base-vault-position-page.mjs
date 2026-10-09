@@ -229,6 +229,7 @@
 // tested the distrust path; wait for the tag to move and run again.
 //
 import { chromium } from "playwright";
+import { openGroup } from "./lib/group-rows.mjs";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
 import { base } from "viem/chains";
 import fs from "node:fs";
@@ -635,9 +636,10 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false }
   }
   if (expandRuns)
     for (let guard = 0; guard < 40; guard++) {
-      const toOpen = page.locator("[data-vault-timeline-rows] [aria-label*='expand the run']");
+      // A group opens from its ⋮ since ui-jobs 250 (lib/group-rows.mjs).
+      const toOpen = page.locator("[data-vault-timeline-rows] [data-group-frame='closed']");
       if ((await toOpen.count()) === 0) break;
-      await toOpen.first().click({ force: true });
+      if (!(await openGroup(page, toOpen.first()))) break;
       await page.waitForTimeout(250);
     }
   const out = await page.evaluate(() => {
@@ -693,12 +695,12 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false }
       // Both selectors in ONE query, so the array is in document order.
       timelineRows: [
         ...document.querySelectorAll(
-          "[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [aria-label*='consecutive']",
+          "[data-vault-timeline-rows] [data-event-id], [data-vault-timeline-rows] [data-group-frame='closed'] [role='button'][aria-expanded][aria-label]",
         ),
       ].map((el) => {
         const label = el.getAttribute("aria-label");
-        if (label && / consecutive /.test(label)) {
-          const m = /^(\d[\d,]*) consecutive (\w+?)s? —/.exec(label);
+        if (label && el.closest("[data-group-frame]")) {
+          const m = /^(\d[\d,]*) ([^,]+?)s?, /.exec(label);
           return { kind: "run", count: m ? Number(m[1].replace(/,/g, "")) : null, member: m ? m[2] : null };
         }
         return { kind: "event", id: el.getAttribute("data-event-id") };

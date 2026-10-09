@@ -59,8 +59,8 @@
 //   H0–H4 (exploiter, in a browser) the page asks for rows, the count line
 //       states the whole history (the flat page states a cut when the history
 //       is deeper than the flat preload, and the whole history when not), no boundary
-//       is drawn, the heatmap counts every event, and the export note counts
-//       the folders' members
+//       is drawn, and the export note counts the folders' members (H3, the
+//       heatmap, is retired: the page has no date-range control)
 //
 // ── PROVED IT CAN FAIL, 2026-09-13, BASE=http://localhost:3000 ─────────────
 // Green: 48 checks with the browser arm, 42 without. Each break applied ALONE
@@ -754,57 +754,11 @@ async function runPage(f, got, noteIds) {
     );
     check(id("H2 no boundary is drawn"), line != null && boundaries === 0, `${boundaries} boundary element(s)`);
 
-    // H3 — the heatmap, at whatever grain the grid chose.
-    await page.click("[data-date-control]");
-    await page.waitForSelector("[data-heatmap-grain] [data-cell-at]", { timeout: 60_000 });
-    let grid = null;
-    let prev = "";
-    for (let i = 0; i < 10; i++) {
-      const read = await page.evaluate(() => {
-        const root = document.querySelector("[data-heatmap-grain]");
-        return {
-          grain: root?.getAttribute("data-heatmap-grain") ?? null,
-          cells: [...(root?.querySelectorAll("[data-cell-at][data-cell-live]") ?? [])].map((el) => {
-            const m = /·\s*([\d,]+)\s*event/.exec(el.getAttribute("title") ?? "");
-            return [el.getAttribute("data-cell-at"), m ? Number(m[1].replace(/,/g, "")) : 0];
-          }),
-        };
-      });
-      const s = JSON.stringify(read);
-      if (s === prev) {
-        grid = read;
-        break;
-      }
-      prev = s;
-      await page.waitForTimeout(700);
-    }
-    if (!grid) grid = JSON.parse(prev);
-    const bucketOf = (ts) => {
-      if (grid.grain === "months") {
-        const d = new Date(ts * 1000);
-        return String(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000);
-      }
-      return String(Math.floor(ts / 86400) * 86400);
-    };
-    const want = new Map();
-    for (const e of got.whole.events) want.set(bucketOf(e.timestamp), (want.get(bucketOf(e.timestamp)) ?? 0) + 1);
-    const drawn = new Map(grid.cells.filter(([, n]) => n > 0));
-    const keys = new Set([...want.keys(), ...drawn.keys()]);
-    const gaps = [...keys].filter((k) => (want.get(k) ?? 0) !== (drawn.get(k) ?? 0));
-    const sum = [...drawn.values()].reduce((a, n) => a + n, 0);
-    check(
-      id("H3 the heatmap counts every event, each on its own day"),
-      gaps.length === 0 && sum === got.whole.events.length,
-      `grain ${grid.grain}: draws ${fmt(sum)} over ${drawn.size} cell(s), the history has ${fmt(got.whole.events.length)}${
-        gaps.length
-          ? ` — ${gaps.length} cell(s) differ (e.g. ${gaps
-              .slice(0, 3)
-              .map((k) => `${k}: ${drawn.get(k) ?? 0} vs ${want.get(k) ?? 0}`)
-              .join(", ")})`
-          : ""
-      }`,
-    );
-    await page.keyboard.press("Escape");
+    // H3 retired (ui-jobs 309 step 11): "the heatmap counts every event". A
+    // page tied to its Lifetime flows chart draws no date-range control since
+    // 1 Oct 2026 (`dates: false` in moonwell-base-view.tsx; the chart's
+    // scrubber and "Show timeline to {date}" navigate it), so no heatmap is
+    // drawn to count.
 
     // H4 — the export menu's scope note.
     const members = got.folders.reduce((n, x) => n + x.count, 0);

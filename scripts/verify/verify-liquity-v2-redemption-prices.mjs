@@ -17,8 +17,8 @@
 //
 // Run (from the web repo root; needs a checkout of rails-server-onboarding
 // beside it with workers/liquity-processor/node_modules installed):
-//   node --experimental-transform-types --no-warnings \
-//     scripts/verify/verify-liquity-v2-redemption-prices.mjs
+//   node scripts/verify/verify-liquity-v2-redemption-prices.mjs
+// (it re-runs itself with --experimental-transform-types)
 // Needs ALCHEMY_URL (mainnet archive eth_call) in .env.local — read, never
 // printed. Three arms (ARM=A,B,C selects):
 //   A  the five redemption cases above: about nine requests each;
@@ -34,7 +34,19 @@ import { mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+
+// The server's prices module is TypeScript with an `enum`, which needs type
+// transformation. run-all starts every verifier with a
+// plain `node`, so re-exec once with the flag.
+if (!process.execArgv.includes("--experimental-transform-types")) {
+  const r = spawnSync(
+    process.execPath,
+    ["--experimental-transform-types", "--no-warnings", fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+    { stdio: "inherit" },
+  );
+  process.exit(r.status ?? 1);
+}
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SERVER = process.env.SERVER_REPO ?? path.resolve(ROOT, "..", "rails-server-onboarding");

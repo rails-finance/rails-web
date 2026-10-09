@@ -118,7 +118,9 @@ async function findSoftLiq(want = "soft", pages = 12, perPage = 100) {
       // "soft": in the bands and not liquidatable (the card's "In
       // soft-liquidation"); "liquidatable": health(user, true) below 0.
       if (want === "soft" ? !row.inSoftLiq || row.liquidatable !== false : !row.liquidatable) continue;
-      const cRes = await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${row.controller}&user=${row.user}`);
+      const cRes = await hostFetch(
+        `${BASE}/api/chain/llamalend/position?controller=${row.controller}&user=${row.user}`,
+      );
       if (!cRes.ok) continue;
       const chain = await cRes.json();
       if (chain.chainStale) continue;
@@ -557,11 +559,12 @@ try {
   // liquidation row carries a Collateral stat, and none prints a zero the
   // chain never stated: the partial rows' figures are the read's.
   {
-    // The read is two archive calls per row; give it time to land.
+    // The read is two archive calls per row; give it time to land. A card is
+    // its `data-event-id` row.
     await page
       .waitForFunction(
         () =>
-          [...document.querySelectorAll("div.flex.w-full.items-start.relative.rounded-xl")]
+          [...document.querySelectorAll("[data-event-id]")]
             .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
             .every((c) => /Collateral/.test(c.innerText)),
         null,
@@ -569,7 +572,7 @@ try {
       )
       .catch(() => {});
     const perRow = await page.evaluate(() =>
-      [...document.querySelectorAll("div.flex.w-full.items-start.relative.rounded-xl")]
+      [...document.querySelectorAll("[data-event-id]")]
         .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
         .map((c) => /Collateral/.test(c.innerText)),
     );
@@ -606,7 +609,9 @@ try {
   };
   const es = async (block) =>
     (
-      await hostFetch(`${BASE}/api/chain/llamalend/event-state?controller=${NR.controller}&user=${NR.user}&block=${block}`)
+      await hostFetch(
+        `${BASE}/api/chain/llamalend/event-state?controller=${NR.controller}&user=${NR.user}&block=${block}`,
+      )
     ).json();
   const addColl = await es(25305369);
   check(
@@ -721,7 +726,8 @@ try {
   }
   check(
     "inband: net sold WBTC stated on the card and in its explanation",
-    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) && /Sold by the AMM and not bought back:\s*0\.0\d+ WBTC/.test(body),
+    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) &&
+      /Sold by the AMM and not bought back:\s*0\.0\d+ WBTC/.test(body),
   );
   check(
     "inband: flows put the converted balance on the collateral bar",
@@ -782,12 +788,14 @@ try {
   );
   // Round 3: open every row and its explanation, wait for the reads.
   {
-    const cards = page.locator("div.flex.w-full.items-start.relative.rounded-xl");
+    // The card is its `data-event-id` row and its header the T1 tier's
+    // `role=button` (event-card.tsx).
+    const cards = page.locator("[data-event-id]");
     const nc = await cards.count();
     for (let i = 0; i < nc; i++) {
       await cards
         .nth(i)
-        .locator('[role="button"], button')
+        .locator('[data-anatomy="T1"] [role="button"]')
         .first()
         .click({ timeout: 3000 })
         .catch(() => {});
@@ -892,7 +900,9 @@ try {
   {
     // P1: the 2 Jan borrow lowers health; the chain says which side is which.
     const es = await (
-      await hostFetch(`${BASE}/api/chain/llamalend/event-state?controller=${R4.controller}&user=${R4.user}&block=18917707`)
+      await hostFetch(
+        `${BASE}/api/chain/llamalend/event-state?controller=${R4.controller}&user=${R4.user}&block=18917707`,
+      )
     ).json();
     const hb = Number(es.before?.healthRaw) / 1e18;
     const ha = Number(es.after?.healthRaw) / 1e18;
@@ -937,8 +947,7 @@ try {
     // loan's panel states the position at its close.
     check(
       "r4 P4: a closed loan's Lifetime flows stand at its close",
-      /At close, 10 Mar '24/.test(body) &&
-        /Bars: all 4 days with events, from 20 Dec 2023/.test(body),
+      /At close, 10 Mar '24/.test(body) && /Bars: all 4 days with events, from 20 Dec 2023/.test(body),
     );
     check(
       "r4 P7: a closed, never-liquidated card says so and where the AMM sold",

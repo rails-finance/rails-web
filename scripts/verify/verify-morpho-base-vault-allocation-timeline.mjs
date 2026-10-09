@@ -156,6 +156,7 @@
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
 import { base } from "viem/chains";
 import { chromium } from "playwright";
+import { openGroup } from "./lib/group-rows.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -391,9 +392,9 @@ async function readPage(vault, holder) {
   // of consecutive same-kind rows is painted as ONE collapsed folder and its
   // members are not in the document at all. A panel that is not mounted is not
   // a panel that says nothing — it is a row this script never saw — so every
-  // run is opened by the reader's own click before the rows are, and the
-  // panels below are then the whole life's. The labels flip from "expand the
-  // run" to "collapse" as they open, which is what stops the loop.
+  // run is opened from its ⋮ before the rows are read, and the panels below
+  // are then the whole life's. An opened group leaves the closed set, which is
+  // what stops the loop.
   //     FAIL 10d — "page rows [], own walk rows [2]" (case study) and
   //                "page rows [1], own walk rows [1, 2]" (wide vault)
   //     🔑 The wide vault's line is the one that reads clearly: ONE of its two
@@ -407,9 +408,10 @@ async function readPage(vault, holder) {
   // folder: 6b "0 of 0 bands", 10b "0 rule paragraphs", on a page that was
   // right.
   for (let guard = 0; guard < 40; guard++) {
-    const toOpen = page.locator("[data-vault-timeline-rows] [aria-label*='expand the run']");
+    // A group opens from its ⋮ since ui-jobs 250 (lib/group-rows.mjs).
+    const toOpen = page.locator("[data-vault-timeline-rows] [data-group-frame='closed']");
     if ((await toOpen.count()) === 0) break;
-    await toOpen.first().click({ force: true });
+    if (!(await openGroup(page, toOpen.first()))) break;
     await page.waitForTimeout(250);
   }
 

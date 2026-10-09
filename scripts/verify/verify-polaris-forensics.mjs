@@ -14,10 +14,11 @@
 //      "5%", the at-block price pill, and NO "$" anywhere in the row.
 //   2. The same rows' Explanation pane states the valued sentence and the
 //      collateral-ratio-at-fire sentence.
-//   3. usdp/166's OPEN row carries "Gas for this transaction: 0.0018 ETH" —
-//      702,311 gas × 2,599,796,780 wei, both read from the rails-server
-//      timeline route on 2026-09-10 and pinned here; and the LIQUIDATION row
-//      carries no gas clause (the liquidator sent that transaction).
+//   3. usdp/166's OPEN row's price row carries "Gas 0.0018 ETH" (ui-jobs 309
+//      step 3 moved it out of T3) — 702,311 gas × 2,599,796,780 wei, both read
+//      from the rails-server timeline route on 2026-09-10 and pinned here; and
+//      the LIQUIDATION row carries no gas clause (the liquidator sent that
+//      transaction).
 //   4. /coverage/sepolia shows the Polaris "Liquidation forensics" cell filled.
 //   5. usdp/175's markdown export carries the same valued legs, premium and
 //      collateral ratio at fire, so the LLM's view cannot lag the page.
@@ -156,7 +157,13 @@ async function expandRow(page, eventId) {
   const row = page.locator(`[data-event-id="${eventId}"]`);
   if ((await row.count()) === 0) return null;
   await row.scrollIntoViewIfNeeded();
-  await row.getByRole("button").first().click();
+  // The header is the T1 tier's `role=button` (the row's first button is the
+  // spine's phone control since ui-jobs 250); a click before hydration is lost.
+  const head = row.locator('[data-anatomy="T1"] [role="button"]').first();
+  for (let attempt = 0; attempt < 6 && (await head.getAttribute("aria-expanded")) !== "true"; attempt++) {
+    await head.click();
+    await page.waitForTimeout(500);
+  }
   await page.waitForTimeout(300);
   return (await row.innerText()).replace(/\s+/g, " ");
 }
@@ -167,7 +174,10 @@ async function readExplanation(page, eventId) {
   const btn = row.getByRole("button", { name: /explanation/i }).first();
   if ((await btn.count()) === 0) return null;
   if ((await btn.getAttribute("aria-expanded")) !== "true") await btn.click();
-  await page.waitForTimeout(300);
+  // The pane mounts its bullets after the toggle; wait for them before reading.
+  await page
+    .waitForFunction((el) => /Event explanation\s*•/.test(el.innerText), await row.elementHandle(), { timeout: 15000 })
+    .catch(() => {});
   return (await row.innerText()).replace(/\s+/g, " ");
 }
 
@@ -298,14 +308,23 @@ for (const f of FIXTURES) {
 
 // ── 3. the gas clause on the holder's own open ─────────────────────────────
 
-const wantGas = `Gas for this transaction: ${fmtGasEth((GAS_FIXTURE.gasUsed * GAS_FIXTURE.gasPrice) / 1e18)} ETH.`;
+// Since ui-jobs 309 step 3 the gas stands in the card's price row (the fuel
+// button, `data-gas`), and the T3 sentence is gone; a press switches USD and
+// ETH, so the figure is read in ETH.
+const wantGas = `${fmtGasEth((GAS_FIXTURE.gasUsed * GAS_FIXTURE.gasPrice) / 1e18)} ETH`;
 const pageGas = await open(context, polarisUrl(GAS_FIXTURE.market, GAS_FIXTURE.id));
 await expandRow(pageGas, GAS_FIXTURE.eventKey);
-const openText = await readExplanation(pageGas, GAS_FIXTURE.eventKey);
+const gasButton = pageGas.locator(`[data-event-id="${GAS_FIXTURE.eventKey}"] [data-price-row] [data-gas]`).first();
+await gasButton.waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
+if ((await gasButton.count()) && (await gasButton.getAttribute("data-gas-unit")) !== "eth") {
+  await gasButton.click();
+  await pageGas.waitForTimeout(300);
+}
+const gasLabel = (await gasButton.count()) ? ((await gasButton.getAttribute("aria-label")) ?? "") : null;
 check(
-  `3. usdp/166's open row states "${wantGas}" (${GAS_FIXTURE.gasUsed} gas × ${GAS_FIXTURE.gasPrice} wei)`,
-  openText != null && openText.includes(wantGas),
-  openText ? openText.slice(0, 700) : "row not found",
+  `3. usdp/166's open row's price row states gas ${wantGas} (${GAS_FIXTURE.gasUsed} gas × ${GAS_FIXTURE.gasPrice} wei)`,
+  gasLabel != null && gasLabel.startsWith(`Gas ${wantGas}`),
+  gasLabel ?? "no gas in the price row",
 );
 await pageGas.close();
 

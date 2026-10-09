@@ -31,16 +31,6 @@ import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 
-/** The price chip sits behind the card's (i) (rails-ops TO-DO-ui-jobs 141):
- *  open it before reading the chip. */
-async function openInfo(card) {
-  const b = card.locator('button[aria-label^="Show"][aria-label$="explanation"]').first();
-  if (await b.count()) {
-    await b.click();
-    await card.page().waitForTimeout(300);
-  }
-}
-
 const ONLY = process.env.EXPLORER;
 const EXPLORERS = [
   {
@@ -154,20 +144,20 @@ async function showAll(page, max = 25) {
   }
 }
 
-/** The whole card — header panel and the detail panel that mounts beside it
- *  (EventCard's `min-w-0 grow` content tier). */
+/** The whole card, header and the detail panel: the row's `data-event-id`
+ *  element. The number stands in the row's number column since ui-jobs 250,
+ *  outside the header's `role=button` and the content tier, so both are found
+ *  from the row. */
 function cardFor(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
-  return badge.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " min-w-0 ") and contains(concat(" ", normalize-space(@class), " "), " grow ")][1]',
-  );
+  return badge.locator("xpath=ancestor::*[@data-event-id][1]");
 }
 
 async function expandCard(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   await badge.scrollIntoViewIfNeeded();
-  const clickable = badge.locator('xpath=ancestor::div[@role="button"][1]');
+  const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
   await clickable.click();
   await page.waitForTimeout(250);
 }
@@ -417,20 +407,20 @@ async function runExplorer(x) {
       .first()
       .waitFor({ timeout: 60000 })
       .catch(() => {});
-    await openInfo(card);
-    const pill = card.getByText(/oracle at block/).first();
-    check(`${x.key} ordinary #${n}: AtBlockPriceFootnote pill renders`, (await pill.count()) > 0);
+    // Since ui-jobs 309 step 6 the price at the block is a then/today chip in
+    // the card's price row, "<symbol> at the oracle at block" its tip.
+    const pill = card.locator(`[data-price-row] [title^="${d.reserveSymbol} "][title*="oracle at block"]`).first();
+    check(`${x.key} ordinary #${n}: the price row's at-block chip renders`, (await pill.count()) > 0);
     if ((await pill.count()) > 0) {
-      const text = (await pill.locator("xpath=..").innerText()).replace(/\s+/g, " ").trim();
+      const text = `${await pill.getAttribute("title")} ${(await pill.innerText()).replace(/\s+/g, " ").trim()}`;
       check(
-        `${x.key} ordinary #${n}: pill names ${d.reserveSymbol} at its at-block price`,
-        text.includes(d.reserveSymbol) && roundsTo(text.replace(d.reserveSymbol, ""), d.price.usd),
+        `${x.key} ordinary #${n}: chip names ${d.reserveSymbol} at its at-block price`,
+        roundsTo(text.replace(/^.*?\$/, ""), d.price.usd),
         `"${text}" vs ${d.price.usd}`,
       );
-      // Opened by the pill's own "oracle at block" text: the reserve symbol
-      // finds the header's amount first (aave-v3-base #5, seamless #65), and
-      // that receipt is the amount's, not the price's.
-      const receipt = await openReceiptFor(own.page, card, "oracle at block");
+      // Opened on the chip: the reserve symbol finds the header's amount
+      // first (aave-v3-base #5, seamless #65), whose receipt is the amount's.
+      const receipt = await openReceiptFor(own.page, pill, "$");
       check(
         `${x.key} ordinary #${n}: the pill's receipt names IAaveOracle getAssetPrice at the block`,
         !!receipt && /getAssetPrice/.test(receipt) && !/Untraced input/.test(receipt),
@@ -541,8 +531,11 @@ async function runExplorer(x) {
       .catch(() => {});
     const readPriced = (await card.locator('[data-position-state="ready"] [data-account-total]').count()) > 0;
     if (readPriced) {
-      await openInfo(card);
-      const receipt = await openReceiptFor(own.page, card, "oracle at block");
+      const receipt = await openReceiptFor(
+        own.page,
+        card.locator('[data-price-row] [title*="oracle at block"]').first(),
+        "$",
+      );
       check(
         `${x.key} unpriced #${n}: its price chip is the position read's (getAssetPrice read at the block)`,
         !!receipt && /getAssetPrice read at block/.test(receipt),
@@ -550,8 +543,8 @@ async function runExplorer(x) {
       );
     } else
       check(
-        `${x.key} unpriced #${n}: renders token-only (no "oracle at block" pill)`,
-        (await card.getByText(/oracle at block/).count()) === 0,
+        `${x.key} unpriced #${n}: renders token-only (no "oracle at block" chip)`,
+        (await card.locator('[data-price-row] [title*="oracle at block"]').count()) === 0,
       );
     if (own.page !== page) await own.page.close();
     tokenOnlyEvidence += 1;
