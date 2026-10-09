@@ -18,7 +18,7 @@ import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import { chainTruthDeltaValue, type ChainTruthStat } from "@/components/shared/chain-truth-event";
-import { statCell } from "@/components/shared/chain-truth-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -65,6 +65,7 @@ export function CollSurplusClaimCard({
   fork?: LiquityForkLearnMoreParams;
 }) {
   const d = event.context.data;
+  const toCells = useStatCells();
   const at = { txHash: event.txHash, blockNumber: event.blockNumber };
   const amountProv = claimAmountProv(d, at);
   const others = claimOthers(d);
@@ -183,31 +184,8 @@ export function CollSurplusClaimCard({
     fork ? { family: "fork", fork } : { family: v1 ? "liquity-v1" : "liquity-v2", protocolName: d.protocolName },
   );
 
-  const claimable = statCell(stats[0], "claimable");
-  const paidStat = stats[1];
-  const cells: EventCellSpec[] = [claimable];
-  if (paidStat) {
-    const paid = statCell(paidStat, "paid");
-    // The pool pays in collateral; its worth at the claim's block is a line
-    // under it.
-    if (paidStat.usd)
-      paid.sub = [
-        {
-          content: (
-            <>
-              worth{" "}
-              <Prov info={paidStat.usd.prov} value={fmtUsd(paidStat.usd.value)}>
-                {fmtUsd(paidStat.usd.value)}
-              </Prov>{" "}
-              at this block
-            </>
-          ),
-          changed: true,
-        },
-        ...(paid.sub ?? []),
-      ];
-    cells.push(paid);
-  }
+  // Paid states its dollars at the claim's block as a chip after the figure.
+  const cells: EventCellSpec[] = toCells(stats.map((st, i) => ({ ...st, key: i === 0 ? "claimable" : "paid" })));
   const slots: EventCardSlots = {
     event: {
       id: event.id,

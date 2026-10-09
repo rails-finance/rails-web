@@ -21,6 +21,8 @@ export interface EventGas {
   usd: number;
   /** The run's transaction count, where the gas covers a no-change run. */
   run?: number | null;
+  /** The figure's receipt; drawn as a <Prov> where given. */
+  info?: Provenance;
 }
 
 /** A symbol's price at the event, as a then/today chip. */
@@ -32,15 +34,22 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
-  /** The family's price format, for the figure then and today; whole
-   *  dollars where unset. */
-  format?: (usd: number) => string;
-  /** The figure as the family states it, in another unit than the dollar
-   *  ("1.080123" USDS for one sUSDS) or pinned ("≈$1.0000"): drawn as it
-   *  is, with no today press. */
-  text?: string;
-  /** Words before the figure ("1 sUSDS ="). */
-  lead?: string;
+  /** The figure as the family prints it, where its precision is not whole
+   *  dollars (a stablecoin's four places). */
+  display?: string;
+  /** The token's contract, for the icon where the house table does not know
+   *  the symbol. */
+  address?: string;
+  /** A price in another unit than dollars (Polaris prices pETH in its debt
+   *  token): its format, and no "today" side, since the page's Prices chip
+   *  states dollars. Unset: whole dollars, with the then/today press. */
+  unit?: { format: (n: number) => string };
+  /** A dollar price at the family's precision, where whole dollars would
+   *  lose it (a collateral near $1). Unset: whole dollars. */
+  format?: (n: number) => string;
+  /** The symbol's name before the figure and a source note after it
+   *  ("pETH 4,861.78 · oracle at block"), the icon first. */
+  named?: { note: string };
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -50,11 +59,35 @@ export interface EventOutcome {
   pl?: { usd: number; word: string };
   /** A line under the row (the redeemed collateral at the latest price). */
   today?: string | null;
+  /** The outcome in words ("Partially liquidated"), with its receipt. */
+  word?: { text: string; info?: Provenance };
+}
+
+/** A figure the row states as it is, with no then/today press: a fee the
+ *  event charged (f(x)'s protocol fee, in the token it was taken in). */
+export interface EventPriceFigure {
+  key: string;
+  /** Words before the figure ("Fee"). */
+  label?: string;
+  /** The token the figure prices or counts: its icon leads. */
+  symbol?: string;
+  /** The token's contract, for the icon where the house table does not know
+   *  the symbol. */
+  address?: string;
+  text: string;
+  /** Words after the figure ("per wstETH"). */
+  unit?: string;
+  info?: Provenance;
+  value?: string;
+  /** The figure's tip. */
+  title?: string;
 }
 
 export interface EventCardPrice {
   gas?: EventGas | null;
   prices: EventPriceChip[];
+  /** Figures stated as they are, after the price chips. */
+  figures?: EventPriceFigure[];
   outcome?: EventOutcome | null;
 }
 
@@ -70,9 +103,26 @@ export function gasPrice(gas: GasCost | null | undefined): EventCardPrice | unde
   return g ? { gas: g, prices: [] } : undefined;
 }
 
+/** The event's gas where the owner sent its transaction; none where a third
+ *  party paid or the index sends no gas. */
+export function ownerPaidGas(
+  event: { wallet: string; gas?: GasCost | null },
+  txFrom: string | null | undefined,
+): EventGas | undefined {
+  return txFrom != null && txFrom.toLowerCase() === event.wallet.toLowerCase() ? eventGas(event.gas) : undefined;
+}
+
 /** Whether the row has anything to draw. */
 export function hasPriceRow(p: EventCardPrice | null | undefined): p is EventCardPrice {
-  return !!p && (!!p.gas || p.prices.length > 0 || !!p.outcome?.claimable || !!p.outcome?.pl);
+  return (
+    !!p &&
+    (!!p.gas ||
+      p.prices.length > 0 ||
+      !!p.figures?.length ||
+      !!p.outcome?.claimable ||
+      !!p.outcome?.pl ||
+      !!p.outcome?.word)
+  );
 }
 
 const usdWhole = (n: number): string =>
@@ -111,7 +161,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{figure(unit)}</span>
+      <span>{gas.info ? <Prov info={gas.info}>{figure(unit)}</Prov> : figure(unit)}</span>
     </button>
   );
 }
@@ -122,30 +172,49 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
   const { gas, prices, outcome } = price;
   const claimable = outcome?.claimable;
   const pl = outcome?.pl;
+  const word = outcome?.word;
   const chips = prices.map((p) => {
-    const icon = <TokenChipIcon symbol={p.symbol} size={14} />;
-    const format = p.format ?? usdWhole;
-    const figure = p.text ?? format(p.usd);
-    return (
-      <PriceChipShell key={`${p.lead ?? ""}${p.symbol}`} bare title={p.title}>
-        {p.lead && <span className="font-normal">{p.lead}</span>}
-        <ThenTodayChip
-          symbol={p.symbol}
-          format={format}
-          noToday={p.text != null}
-          then={
+    const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
+    const format = p.unit?.format ?? p.format ?? usdWhole;
+    const text = p.display ?? format(p.usd);
+    const chip = (
+      <ThenTodayChip
+        symbol={p.symbol}
+        format={format}
+        noToday={p.unit != null}
+        then={
+          p.named ? (
             p.info ? (
-              <Prov info={p.info} value={p.value} icon={icon}>
-                {figure}
+              <Prov info={p.info} value={p.value ?? text} symbol={p.symbol}>
+                {text}
               </Prov>
             ) : (
-              <span className="inline-flex items-center gap-1">
-                {figure}
-                {icon}
-              </span>
+              text
             )
-          }
-        />
+          ) : p.info ? (
+            <Prov info={p.info} value={p.value} icon={icon}>
+              {text}
+            </Prov>
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              {text}
+              {icon}
+            </span>
+          )
+        }
+      />
+    );
+    return (
+      <PriceChipShell key={p.symbol} bare title={p.title}>
+        {p.named ? (
+          <span className="inline-flex items-center gap-1 font-normal tabular-nums text-rb-500">
+            {icon}
+            {p.symbol} {chip}
+            <span className="text-rb-400">· {p.named.note}</span>
+          </span>
+        ) : (
+          chip
+        )}
       </PriceChipShell>
     );
   });
@@ -153,6 +222,11 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
         {gas && <EventGasButton gas={gas} />}
+        {word && (
+          <span className="text-xs font-semibold text-foreground" data-price-outcome="">
+            {word.info ? <Prov info={word.info}>{word.text}</Prov> : word.text}
+          </span>
+        )}
         {(claimable || pl) && (
           <div className="inline-flex items-center gap-4 flex-wrap text-xs">
             {claimable && (
@@ -178,6 +252,29 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
         ) : (
           chips
         )}
+        {price.figures?.map((f) => {
+          const icon = f.symbol ? <TokenChipIcon symbol={f.symbol} address={f.address} size={14} /> : null;
+          const figure = f.info ? (
+            <Prov info={f.info} value={f.value ?? f.text}>
+              {f.text}
+            </Prov>
+          ) : (
+            f.text
+          );
+          return (
+            <span
+              key={f.key}
+              className="inline-flex items-center gap-1 text-xs tabular-nums text-rb-500"
+              title={f.title}
+              data-price-figure={f.key}
+            >
+              {f.label && <span>{f.label}</span>}
+              {icon}
+              <span className="font-semibold text-foreground">{figure}</span>
+              {f.unit && <span>{f.unit}</span>}
+            </span>
+          );
+        })}
       </div>
       {outcome?.today && (
         <div className="px-4 pb-2 text-xs text-rb-500" data-redemption-today="">

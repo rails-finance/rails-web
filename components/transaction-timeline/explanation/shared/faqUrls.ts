@@ -14,6 +14,13 @@ export const FAQ_URLS = {
   COLLATERAL_TYPES: "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-types-of-collateral-can-i-use",
   NFT_TROVES:
     "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#how-many-troves-loans-can-i-open-with-the-same-address",
+  MAX_LTV: "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-is-the-max-loan-to-value-ltv",
+  STABILITY_POOL_EMPTY:
+    "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#what-mechanisms-are-in-place-if-the-stability-pool-is-empty",
+  LIQUIDATOR_COMPENSATION:
+    "https://docs.liquity.org/v2-faq/borrowing-and-liquidations#how-am-i-compensated-for-liquidating-a-trove",
+  REDEMPTION_PROTECTION: "https://docs.liquity.org/v2-faq/redemptions-and-delegation#how-can-i-stay-protected",
+  REDEMPTION_FEE: "https://docs.liquity.org/v2-faq/redemptions-and-delegation#is-there-a-redemption-fee",
 } as const;
 
 // Aave V4 link atoms — the canonical aave.com docs/help anchors used by the

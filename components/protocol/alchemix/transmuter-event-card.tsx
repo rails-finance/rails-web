@@ -28,7 +28,7 @@ import {
   type ChainTruthStat,
   chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
-import { statCell } from "@/components/shared/chain-truth-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { ALCHEMIX_TRANSMUTER } from "@/lib/alchemix/learn-more";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -325,6 +325,7 @@ export function TransmuterEventCard({
   isLast?: boolean;
   eventNumber?: number;
 }) {
+  const toCells = useStatCells();
   const lead = legs[0];
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
   const tokens = spineTokens(legs, mytSymbol);
@@ -356,7 +357,10 @@ export function TransmuterEventCard({
     caption: chainTruthCaption(spec) ?? "",
     // The logs' figures are the event's cells: a Transmuter position has no
     // reading.
-    cells: stats.length > 0 ? stats.map((s, i) => statCell(s, `log-${i}`)) : { none: "the logs state no amount" },
+    cells:
+      stats.length > 0
+        ? toCells(stats.map((s, i) => ({ ...s, key: `log-${i}` })))
+        : { none: "the logs state no amount" },
     ledgers: { none: "no flows panel on the Transmuter" },
     price: gasPrice(gas),
     // The first sentence is the teaser, which the pane draws as its lead

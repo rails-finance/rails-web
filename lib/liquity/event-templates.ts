@@ -80,6 +80,9 @@ export interface EventTemplate {
   /** Each sentence's group (a `group_words` id): the heading it sits under
    *  when the explanation is grouped (lib/liquity/event-prose.ts, `grouped`). */
   groups: Record<string, string[]>;
+  /** Lists of sentences the generator says at most one of; read by the prose
+   *  limits check (scripts/check-prose-limits.mjs) for the pane's worst case. */
+  alternates?: string[][];
 }
 
 /** A modal as the file writes it: links by FAQ id or URL; the interest-rate
@@ -111,7 +114,6 @@ interface ProseFile {
   group_words: Words;
   L5_words: Words;
   trove_words: Words;
-  fragments: Words;
   shared_sentences: Record<string, SentenceTemplate>;
   templates: EventTemplate[];
   L5: Record<L5Key, L5Data>;
@@ -142,7 +144,6 @@ export const GROUP_WORDS = FILE.group_words;
  *  explanation: the words around the events. Read through troveWords. */
 const TROVE_WORDS = FILE.trove_words;
 /** Parts of a sentence the generator joins. */
-export const FRAGMENTS = FILE.fragments;
 /** Sentences more than one template says. */
 export const SHARED_SENTENCES = FILE.shared_sentences;
 export const TEMPLATES = FILE.templates;

@@ -30,7 +30,7 @@ import {
   type ChainTruthRowSpec,
   type ChainTruthStat,
 } from "@/components/shared/chain-truth-event";
-import { statCell } from "@/components/shared/chain-truth-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { ExactTip } from "@/components/shared/amount-text";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import { Prov } from "@/components/shared/provenance";
@@ -97,6 +97,7 @@ export function SkySavingsEventCard({
   previous?: SkyPreviousEvent | null;
 }) {
   const c = event.context.data;
+  const toCells = useStatCells(true);
   const coords: SkyEventCoords = { block: event.blockNumber, txHash: event.txHash, holder: c.holder };
   const kind = c.eventType;
   const t = skyTransition(c);
@@ -261,7 +262,10 @@ export function SkySavingsEventCard({
         : undefined,
   };
   const earnedExact = withRealMinus(exact(t.earnedAfter));
-  const worthCell = statCell(worth, "worth", { symbolText: true, inputs: ["held"] });
+  const [heldCell, worthCell] = toCells([
+    { ...held, key: "held" },
+    { ...worth, key: "worth", inputs: ["held"] },
+  ]);
   worthCell.sub = [
     {
       content: (
@@ -285,15 +289,19 @@ export function SkySavingsEventCard({
     },
     ...(worthCell.sub ?? []),
   ];
-  const cells: EventCellSpec[] = [statCell(held, "held", { symbolText: true }), worthCell];
+  const cells: EventCellSpec[] = [heldCell, worthCell];
   const chiText = rayNumber(c.chi).toFixed(6);
+  // One sUSDS's worth in USDS at the block, in the price row.
   const price: EventCardPrice = {
-    prices: [
+    prices: [],
+    figures: [
       {
+        key: "chi",
+        label: "1 sUSDS =",
         symbol: USDS.symbol,
-        usd: rayNumber(c.chi),
+        address: USDS.address,
         text: chiText,
-        lead: "1 sUSDS =",
+        unit: USDS.symbol,
         info: eventChiProv(coords, c.chi, c.usdsSource === "log"),
         value: rayExact(c.chi),
         title: "One sUSDS worth in USDS at this block",

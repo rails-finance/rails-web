@@ -1,21 +1,22 @@
 "use client";
 
-// Composer: wires the MakerDAO header / detail into the universal EventCard
-// shell, with the Plain English explainer + per-mechanic Learn More alongside
-// the chain-state detail grid (reference depth).
+// MakerDAO's event card on the shared shell's slots (ui-jobs 309 step 8): the
+// head from makerdao-event-header.tsx, T2 from makerdao-cells.tsx, the
+// explanation and the Learn More from makerdao-event-explainer.tsx. The index
+// carries no gas for Maker's rows, so the price row states none.
 
 import type { BaseActivityEvent, MakerDAOContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 
 import { debtDeltaOf, type MakerCoords } from "@/lib/makerdao/event-provenance";
 import { makerdaoExplainerTeaser } from "@/lib/makerdao/explainer-clauses";
-import { MakerDAOEventHeader } from "./makerdao-event-header";
+import { useMakerHeadSpec } from "./makerdao-event-header";
 import { MakerLedgerProvider } from "./makerdao-ledger";
-import { MakerDAOEventDetail } from "./makerdao-event-detail";
+import { useMakerCells, useMakerOpened } from "./makerdao-cells";
 import { MakerDAOEventExplainer, makerdaoLearnMoreContent, useMakerRowExtras } from "./makerdao-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { openedForSigner, useMakerVaultHistory } from "@/lib/makerdao/vault-history";
@@ -93,58 +94,68 @@ export function MakerDAOEventCard({ event, isLast, eventNumber }: MakerDAOEventC
           : []),
       ];
 
-  const iconSlot =
-    isGrab || isLseLiq ? (
-      <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-    ) : isGive ? (
-      // An ownership handover is a people event with no token flow — the person
-      // glyph with the join badge marks the new owner taking over; dotted spine
-      // (nothing moved in the urn).
-      <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
-    ) : (
-      <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-    );
+  const spine: SpineColumnProps =
+    isGrab || isLseLiq
+      ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+      : isGive
+        ? // An ownership handover is a people event with no token flow — the
+          // person glyph with the join badge marks the new owner taking over;
+          // dotted spine (nothing moved in the urn).
+          { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+        : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <MakerLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? undefined}
-        iconColumn={iconSlot}
-        header={
-          <MakerDAOEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-            ownership={isGive ? history.ownership.get(event.id) : undefined}
-            txContext={isGive ? history.txContext.get(makerTxHashOf(event)) : undefined}
-          />
-        }
-        detail={
-          <MakerDAOEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />
-        }
-        explainer={
-          <MakerDAOEventExplainer
-            ctx={ctx}
-            eventId={event.id}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            skipLead
-          />
-        }
-        explainerTeaser={makerdaoExplainerTeaser(ctx, coords, extras)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />}
-        persistKey={`makerdao:${event.id}`}
-      />
-    </MakerLedgerProvider>
-  );
+  const head = useMakerHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+    ownership: isGive ? history.ownership.get(event.id) : undefined,
+    txContext: isGive ? history.txContext.get(makerTxHashOf(event)) : undefined,
+  });
+  const cells = useMakerCells(ctx, coords, event.id);
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "makerdao",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells,
+    // The Collateral and Debt cells open into their ledgers where the page
+    // ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <MakerLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </MakerLedgerProvider>
+      ),
+    },
+    useOpened: () => useMakerOpened(ctx, coords, event.id, undefined),
+    explainer: {
+      body: (
+        <MakerDAOEventExplainer
+          ctx={ctx}
+          eventId={event.id}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          skipLead
+        />
+      ),
+      first: makerdaoExplainerTeaser(ctx, coords, extras),
+    },
+    learnMore: <LearnMore inline content={makerdaoLearnMoreContent(ctx, extras.leftover != null)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

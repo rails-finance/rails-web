@@ -49,8 +49,8 @@
 import type { ReactNode } from "react";
 import type { AlchemixStateAtBlockFromReading } from "@/lib/shared/types/event-shape";
 import { type ChainTruthStat, type ChainTruthTransition } from "@/components/shared/chain-truth-event";
-import type { EventCells, EventStatCellSpec } from "@/components/shared/event-cells";
-import { statCell } from "@/components/shared/chain-truth-cells";
+import type { EventCellSpec, EventCells } from "@/components/shared/event-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatTinyNonZero, formatUnitsExact } from "@/lib/utils/format";
 import {
   carriedReadingProv,
@@ -166,6 +166,7 @@ export function useAlchemixReadingCells({
 }: AlchemixStateAtBlockProps): AlchemixReadingCells {
   const unit = useAlchemixUnderlying();
   const ratios = useAlchemixLineRatios();
+  const toCells = useStatCells(true);
   // Rule 3's exception, for a block with no reading of its own: the reading in
   // force there, carried on debt and collateral only (lib/alchemix/readings-before).
   const inForce = useReadingInForce(state && state.status !== "stated" ? eventBlock : null);
@@ -196,8 +197,10 @@ export function useAlchemixReadingCells({
       const tip = `Unchanged by ${legCount > 1 ? "this transaction" : "this event"}: the reading at block ${block(inForce.blockNumber)}, the last before it`;
       return {
         cells: [
-          statCell(carried("Debt", inForce.debtRaw, syntheticSymbol), "debt", { symbolText: true, tip }),
-          statCell(carried("Collateral", inForce.collateralRaw, mytSymbol), "collateral", { symbolText: true, tip }),
+          ...toCells([
+            { ...carried("Debt", inForce.debtRaw, syntheticSymbol), key: "debt" },
+            { ...carried("Collateral", inForce.collateralRaw, mytSymbol), key: "collateral" },
+          ]).map((c) => ({ ...c, tip })),
         ],
         note: null,
       };
@@ -319,8 +322,8 @@ export function useAlchemixReadingCells({
       : "this event";
   // Rule 2, in each cell's tip: the reading belongs to the block.
   const tip = `${before ? `Before and after ${subjectWord}` : `After ${subjectWord}`}: getCDP read at block ${block(atBlock)}${before ? ` and at block ${block(before.blockNumber)}` : ""}`;
-  const cell = (s: ChainTruthStat | null, key: string, inputs?: string[]) =>
-    s ? statCell(s, key, { symbolText: true, tip, inputs }) : null;
+  const cell = (s: ChainTruthStat | null, key: string, inputs?: string[]): EventCellSpec | null =>
+    s ? { ...toCells([{ ...s, key, inputs }])[0], tip } : null;
   const ratioCell = cell(ratioStat, "ratio", ["debt", "collateral"]);
   if (ratioCell && ratios)
     ratioCell.sub = [
@@ -346,7 +349,7 @@ export function useAlchemixReadingCells({
     cell(axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw), "collateral"),
     cell(axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw), "set-aside"),
     ratioCell,
-  ].filter((c): c is EventStatCellSpec => c != null);
+  ].filter((c): c is EventCellSpec => c != null);
 
   return { cells: cells.length > 0 ? cells : { none: "the reading states no figure" }, note: null };
 }

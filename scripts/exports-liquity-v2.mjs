@@ -371,7 +371,6 @@ function catalogue() {
     FOOTER_WORDS,
     CONTEXT_WORDS,
     COPY_WORDS,
-    FRAGMENTS,
     L5,
   } = templates;
   const ph = (text) =>
@@ -421,12 +420,6 @@ function catalogue() {
     ...Object.entries(CONTEXT_WORDS).map(([k, v]) => `| context.${k} | ${v} |`),
     ...Object.entries(FOOTER_WORDS).map(([k, v]) => `| footer.${k} | ${v} |`),
     ...Object.entries(COPY_WORDS).map(([k, v]) => `| copy.${k} | ${v} |`),
-    "",
-    "## Fragments",
-    "",
-    "| Id | Words |",
-    "|---|---|",
-    ...Object.entries(FRAGMENTS).map(([k, v]) => `| ${k} | ${v} |`),
     "",
     "## Shared sentences",
     "",

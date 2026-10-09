@@ -1,7 +1,11 @@
 "use client";
 
-// Frankencoin event detail — adapter onto the shared ChainTruthDetail grid.
-// The minting family renders the position's three ledger lanes — collateral /
+// Frankencoin's T2 (ui-jobs 309 step 8): the card's `cells` and `notes`
+// slots. Cells for the position's Collateral and Debt, the price an event
+// sold at and the owner-declared liquidation price, and the collateral and
+// debt figures a challenge or a forced sale moved; the terms an event did not
+// change, the parties and the rest of a sale's split stand as notes. The
+// minting family renders the position's three ledger lanes — collateral /
 // minted / the owner-declared liq. price — each an EMITTED ABSOLUTE equal to
 // the position's stored state at that block, with before→after transitions
 // built from the row's own two absolutes (MintingUpdate carries no delta
@@ -14,11 +18,9 @@
 
 import type { ReactNode } from "react";
 import type { FrankencoinContext } from "@/lib/shared/types/event-shape";
-import {
-  ChainTruthDetail,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+import type { ChainTruthStat, ChainTruthTransition } from "@/components/shared/chain-truth-event";
+import { StatNotes, useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import type { EventCells } from "@/components/shared/event-cells";
 import {
   mintedAfterProv,
   collateralAfterProv,
@@ -33,7 +35,7 @@ import {
   challengeReceiptProv,
   type FrankencoinCoords,
 } from "@/lib/frankencoin/event-provenance";
-import { formatExact, formatNumber, formatUnitsExact } from "@/lib/utils/format";
+import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { hubAddress, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import {
@@ -53,7 +55,7 @@ import { dateTimeText, phaseText, spanText, useFrankencoinPageFacts } from "@/li
 import { formatDate } from "@/lib/date";
 import type { FrankencoinOpeningRead } from "@/lib/sources/chain/frankencoin-event";
 
-export interface FrankencoinEventDetailProps {
+export interface FrankencoinCellsProps {
   ctx: FrankencoinContext;
   txHash?: string;
   blockNumber?: number;
@@ -130,7 +132,22 @@ function transitionOf(
   };
 }
 
-export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, timestamp }: FrankencoinEventDetailProps) {
+/** The cell a stat stands as, by its label; null for a note. */
+function cellKey(label: string): string | null {
+  if (label === "Collateral" || label === "Collateral deposited") return "collateral";
+  if (label === "Collateral challenged" || label === "Bought from the challenger" || label === "Collateral sold")
+    return "collateral";
+  if (label === "Debt" || label === "Debt cleared") return "debt";
+  if (label.startsWith("Price ·")) return "price";
+  if (label.startsWith("Liq. price")) return "liq";
+  return null;
+}
+
+/** One Frankencoin event's cells and notes. */
+export function useFrankencoinCells({ ctx, txHash, blockNumber, eventId, timestamp }: FrankencoinCellsProps): {
+  cells: EventCells;
+  notes: ReactNode;
+} {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   const sym = ctx.collateralSymbol;
   const dec = ctx.collateralDecimals;
@@ -552,8 +569,18 @@ export function FrankencoinEventDetail({ ctx, txHash, blockNumber, eventId, time
     }
   }
 
-  if (stats.length === 0) return null;
-  return <ChainTruthDetail stats={stats} />;
+  const asCells: ChainTruthCellStat[] = [];
+  const asNotes: ChainTruthStat[] = [];
+  for (const st of stats) {
+    const key = cellKey(st.label);
+    if (key && !asCells.some((c) => c.key === key)) asCells.push({ ...st, key });
+    else asNotes.push(st);
+  }
+  const cellList = useChainTruthCells(asCells);
+  return {
+    cells: cellList.length > 0 ? cellList : { none: "The event moved no balance of the position" },
+    notes: asNotes.length > 0 ? <StatNotes stats={asNotes} /> : undefined,
+  };
 }
 
 /** The debt lane's sub-line: the receipt's split of the ZCHF that moved. */

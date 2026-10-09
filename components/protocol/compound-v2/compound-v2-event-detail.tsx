@@ -1,7 +1,9 @@
 "use client";
 
-// Compound V2 event detail — adapter onto the shared ChainTruthDetail grid.
-// The lanes an event touches, with before→after transitions:
+// Compound V2 event cells (ui-jobs 309): the card's `cells` slot — the
+// account's Collateral and Debt ledger cells (components/shared/
+// ctoken-event-ledger.tsx), then the market's cells for the lanes the
+// event touches, with before→after transitions:
 //   supply rows  — mint, redeem, transfers and seize legs: the supply balance
 //                  (cTokens × exchangeRateStored at the row's block, with the
 //                  interest since the previous supply row beneath it) beside
@@ -18,12 +20,16 @@
 //                  Transfer — it just wasn't the borrower's act.
 
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
+import type { ReactNode } from "react";
 import {
-  ChainTruthDetail,
   reconstructTransition,
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
+import { useStatCells } from "@/components/shared/chain-truth-stat-cell";
+import type { EventCardLedgers } from "@/components/shared/event-card";
+import type { EventCells } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   assetsDeltaProv,
@@ -45,23 +51,29 @@ import {
   liqClearedValueProv,
   liqPremiumProv,
   liqIncentiveRefProv,
+  priceAtBlockProv,
   type CompoundV2Coords,
 } from "@/lib/compound-v2/event-provenance";
 import { COMPOUND_V2_ADDRESSES, COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
-import { CTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
+import {
+  pillPriceChips,
+  useCTokenLedgerCells,
+  useCTokenPriceAt,
+  useCTokenSoleAsset,
+} from "@/components/shared/ctoken-event-ledger";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
 import { compoundV2LiquidationValues } from "@/lib/compound-v2/liquidation-values";
 import { formatCompact, formatExact, formatNumber, formatUsdValue, formatPrice } from "@/lib/utils/format";
 
-export interface CompoundV2EventDetailProps {
+export interface CompoundV2CellsInput {
   ctx: CompoundV2Context;
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
   /** The timeline event, for the account cells' ledgers. */
-  eventId?: string;
-  eventTs?: number;
+  eventId: string;
+  eventTs: number;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -181,14 +193,13 @@ function supplyStat(ctx: CompoundV2Context, cSym: string, coords: CompoundV2Coor
   };
 }
 
-export function CompoundV2EventDetail({
-  ctx,
-  txHash,
-  blockNumber,
-  wallet,
-  eventId,
-  eventTs,
-}: CompoundV2EventDetailProps) {
+/** The card's cells, ledgers, notes and prices. */
+export function useCompoundV2Cells({ ctx, txHash, blockNumber, wallet, eventId, eventTs }: CompoundV2CellsInput): {
+  cells: EventCells;
+  ledgers: EventCardLedgers;
+  notes: ReactNode;
+  prices: EventPriceChip[];
+} {
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const cSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
   const coords: CompoundV2Coords = {
@@ -203,8 +214,9 @@ export function CompoundV2EventDetail({
   // opens with the account's Collateral and Debt cells; a market's own
   // balance cell goes where its side holds that market alone, since the
   // account cell states the same tokens.
-  const soleSupply = useCTokenSoleAsset(eventId ?? "", "collateral");
-  const soleDebt = useCTokenSoleAsset(eventId ?? "", "debt");
+  const soleSupply = useCTokenSoleAsset(eventId, "collateral");
+  const soleDebt = useCTokenSoleAsset(eventId, "debt");
+  const account = useCTokenLedgerCells(eventId, eventTs);
 
   const supply = ctx.side === "supply" && soleSupply !== ctx.marketSymbol ? supplyStat(ctx, cSym, coords) : undefined;
   if (supply) stats.push(supply);
@@ -298,13 +310,29 @@ export function CompoundV2EventDetail({
   const values = ctx.eventType === "liquidation" ? compoundV2LiquidationValues(ctx) : undefined;
   const collM = ctx.collateralMarket ? COMPOUND_V2_MARKET_BY_KEY[ctx.collateralMarket] : undefined;
 
-  return (
+  // The price row: a liquidation's two legs where Compound's oracle spoke USD
+  // at the block (the breakdown keeps them in ETH before the switch), else
+  // the market's price at the block where the Lifetime flows panel read it.
+  const usdLegs = forensics != null && values?.numeraire === "USD";
+  const priceAt = useCTokenPriceAt(blockNumber, ctx.market);
+  const prices: EventPriceChip[] = usdLegs
+    ? pillPriceChips(forensics.pricePills, "Compound", formatUsdValue)
+    : priceAt != null && ctx.eventType !== "liquidation"
+      ? [
+          {
+            symbol: ctx.marketSymbol,
+            usd: priceAt,
+            display: formatUsdValue(priceAt),
+            info: priceAtBlockProv(ctx.marketSymbol, coords),
+            title: `${ctx.marketSymbol} price at this event: Compound's ${oracleNote(blockNumber)}`,
+          },
+        ]
+      : [];
+  const statCells = useStatCells(stats);
+
+  const notes = (
     <>
-      <ChainTruthDetail
-        stats={stats}
-        lead={eventId != null && eventTs != null ? <CTokenLedgerCells eventId={eventId} eventTs={eventTs} /> : null}
-      />
-      {forensics && <LiquidationForensics {...forensics} />}
+      {forensics && <LiquidationForensics {...forensics} pricePills={usdLegs ? [] : forensics.pricePills} />}
       {ctx.eventType === "mint" && wallet && blockNumber != null && (
         <CTokenMembershipLine
           protocol="compound-v2"
@@ -340,4 +368,11 @@ export function CompoundV2EventDetail({
       )}
     </>
   );
+  const cells = [...account.cells, ...statCells];
+  return {
+    cells: cells.length > 0 ? cells : { none: "The event moved no balance." },
+    ledgers: account.ledgers,
+    notes,
+    prices,
+  };
 }

@@ -26,6 +26,7 @@ import { pwnAssetSymbolOverride } from "@/lib/pwn/asset-catalog";
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { decimalsUnreadField, unreadTokensOf } from "@/lib/shared/decimals-unread";
+import { firstLogOfTx, gasOnFirstRow } from "@/lib/shared/index-gas";
 
 export interface PwnTimelineResult {
   wallet: string;
@@ -147,6 +148,8 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
     return override ? { ...base, symbol: override, named: true } : base;
   };
 
+  // The transaction's gas on its first row (lib/shared/index-gas.ts).
+  const firstLog = firstLogOfTx(rows);
   const events: BaseActivityEvent[] = rows.map((r) => {
     const tx = r.tx_hash;
     const kind = r.action as PwnEventType;
@@ -191,6 +194,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
       originalDefaultTimestamp: r.original_default_timestamp ?? undefined,
       extendedDefaultTimestamp: r.extended_default_timestamp ?? undefined,
       extendedBy: kind === "extended" ? (r.tx_from?.toLowerCase() ?? undefined) : undefined,
+      ...(r.tx_from ? { txFrom: r.tx_from.toLowerCase() } : {}),
       defaulted: kind === "claimed" ? (r.defaulted ?? undefined) : undefined,
       isOpen: kind === "created",
     };
@@ -241,6 +245,7 @@ export async function buildPwnTimeline(rows: MvRow[], walletRaw: string): Promis
       actionType: kind,
       actionLabel: LABELS[kind] ?? kind,
       flows,
+      ...gasOnFirstRow(r, firstLog),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       context: { protocol: "pwn", data: ctx },
       ...decimalsUnreadField(unread),

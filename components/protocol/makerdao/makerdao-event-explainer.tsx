@@ -21,7 +21,7 @@ import { makerdaoVaultContent, makerdaoLiquidationContent } from "@/lib/shared/l
 import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { makerdaoEventSlots, type MakerRowExtras } from "@/lib/makerdao/explainer-clauses";
 import { makerOwnerAt, openedForSigner, useMakerVaultHistory, type MakerEvent } from "@/lib/makerdao/vault-history";
-import { useIlkAtRow } from "./makerdao-event-detail";
+import { useIlkAtRow } from "./makerdao-cells";
 
 export interface MakerDAOEventExplainerProps {
   ctx: MakerDAOContext;

@@ -1,17 +1,17 @@
 "use client";
 
-// Composer: wires the Liquity V1 header / detail / explainer into the universal
-// EventCard shell (chain-replayed values carry the chain-state baseline; the
-// plain-English explainer rides its own second-tier slot). A Trove event moves
-// two axes, so the spine can show two token flows (ETH collateral + LUSD debt);
-// a liquidation / redemption shows the warning spine instead.
+// The Liquity V1 event card on the shared shell's slots (rails-ops
+// reference/shared-event-card-spec.md §3; ui-jobs 309 step 5). A Trove event
+// moves two axes, so the spine can show two token flows (ETH collateral + LUSD
+// debt); a liquidation / redemption shows the warning spine instead. T2 waits
+// on the receipt read, which starts when the card opens (`useOpened`).
 
 import type { BaseActivityEvent, LiquityV1Context } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 
-import { LiquityV1EventHeader } from "./liquity-v1-event-header";
-import { LiquityV1EventDetail } from "./liquity-v1-event-detail";
+import { liquityV1HeadSpec } from "./liquity-v1-event-header";
+import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityV1ExplainerTeaser } from "@/lib/liquity-v1/explainer-clauses";
@@ -90,59 +90,60 @@ export function LiquityV1EventCard({
         ] as (SpineTokenRow | null)[]
       ).filter((t): t is SpineTokenRow => t !== null);
 
-  const iconSlot = isWarning ? (
-    <SpineColumn icon="warning" warningTone={isLiq ? "critical" : "caution"} isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens && tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isWarning
+    ? { icon: "warning", warningTone: isLiq ? "critical" : "caution", isLast: !!isLast }
+    : { tokens: tokens && tokens.length > 0 ? tokens : undefined, isLast: !!isLast };
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        iconColumn={iconSlot}
-        header={
-          <LiquityV1EventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-          />
-        }
-        detail={
-          <LiquityV1EventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            currentPrice={currentPrice}
-            gas={event.gas}
-          />
-        }
-        explainer={
-          <LiquityV1EventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            currentPrice={currentPrice}
-            ownerOutcome={isLiq ? ownerOutcome : null}
-            skipLead
-          />
-        }
-        explainerTeaser={
-          liquityV1ExplainerTeaser(ctx, coords) ? (
-            <InLedgerFigures build={() => liquityV1ExplainerTeaser(ctx, coords)} />
-          ) : null
-        }
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={liquityV1LearnMoreContent(ctx)} />}
-        persistKey={`liquity-v1:${event.id}`}
-      />
-    </LiquityLedgerProvider>
-  );
+  const opened = {
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    currentPrice,
+    gas: event.gas,
+  };
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "liquity-v1",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: liquityV1HeadSpec(event.actionLabel, ctx, coords),
+    caption: event.actionLabel,
+    // Collateral, Debt and Collateral ratio; V1 has no interest rate. The
+    // figures, the price row and the notes are built once the card opens.
+    cells: { pending: LIQUITY_V1_CELL_HEADS },
+    useOpened: () => useLiquityV1Opened(opened),
+    // The Collateral and Debt cells open into their ledgers where the page
+    // ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <LiquityLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </LiquityLedgerProvider>
+      ),
+    },
+    explainer: {
+      body: (
+        <LiquityV1EventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          currentPrice={currentPrice}
+          ownerOutcome={isLiq ? ownerOutcome : null}
+          skipLead
+        />
+      ),
+      first: liquityV1ExplainerTeaser(ctx, coords) ? (
+        <InLedgerFigures build={() => liquityV1ExplainerTeaser(ctx, coords)} />
+      ) : undefined,
+    },
+    learnMore: <LearnMore inline content={liquityV1LearnMoreContent(ctx)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

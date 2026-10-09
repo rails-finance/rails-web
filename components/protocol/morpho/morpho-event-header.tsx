@@ -1,13 +1,13 @@
 "use client";
 
-// Morpho event header (chain-state tier) — adapter onto the shared ChainTruthRow
-// grammar. Maps the single signed amount this event moved (loan or collateral
+// Morpho event header (chain-state tier): the card's `head` slot, drawn by the
+// shared ChainTruthRow. Maps the single signed amount this event moved (loan or collateral
 // side) into the shared row spec; traces via <Prov>. No health factor, no USD —
 // those are layers, absent from the baseline.
 
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   assetsDeltaProv,
   externalActorProv,
@@ -21,10 +21,8 @@ import { useCaptureSource } from "@/lib/shared/capture-source";
 export interface MorphoEventHeaderProps {
   actionLabel: string;
   ctx: MorphoContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -37,17 +35,16 @@ export interface MorphoEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function MorphoEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useMorphoHeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
-}: MorphoEventHeaderProps) {
+}: Omit<MorphoEventHeaderProps, "timestamp" | "eventNumber">): ChainTruthRowSpec {
   const coords: MorphoCoords = {
     txHash,
     blockNumber,
@@ -82,25 +79,19 @@ export function MorphoEventHeader({
       debtSide: true,
     });
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical: ctx.eventType === "liquidation",
-        deltas,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.caller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-                  coords,
-                ),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical: ctx.eventType === "liquidation",
+    deltas,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.caller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+              coords,
+            ),
+          }
+        : undefined,
+  };
 }

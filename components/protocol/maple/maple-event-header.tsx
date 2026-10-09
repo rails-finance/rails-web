@@ -9,7 +9,7 @@
 
 import type { AssetFlow, MapleContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   flankedLegProv,
   sharesLegProv,
@@ -47,7 +47,8 @@ export interface MapleEventHeaderProps {
 /** The row's words for a share transfer: what the wallet did with shares. */
 export const TRANSFER_LABEL = { transfer_in: "Shares received", transfer_out: "Shares sent" } as const;
 
-export function MapleEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useMapleHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -58,7 +59,7 @@ export function MapleEventHeader({
   wallet,
   flows,
   requestAt,
-}: MapleEventHeaderProps) {
+}: MapleEventHeaderProps): ChainTruthRowSpec {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const deltas: ChainTruthDelta[] = [];
 
@@ -126,35 +127,29 @@ export function MapleEventHeader({
           }
         : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: isTransfer ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL] : actionLabel,
-        // A transfer is a custody row: `Shares received 400 ◎ from 0x…`, the
-        // verb kept before the amount.
-        custody: isTransfer,
-        custodyLabel: isTransfer,
-        // The label says the direction; a sign read as a loss on a fill.
-        unsignedDeltas: true,
-        deltas,
-        note,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.caller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-                  coords,
-                ),
-                tip: isTransfer
-                  ? "“by” is the address that sent the transaction; “from” is the wallet the shares came from."
-                  : undefined,
-              }
-            : undefined,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: isTransfer ? TRANSFER_LABEL[ctx.eventType as keyof typeof TRANSFER_LABEL] : actionLabel,
+    // A transfer is a custody row: `Shares received 400 ◎ from 0x…`, the
+    // verb kept before the amount.
+    custody: isTransfer,
+    custodyLabel: isTransfer,
+    // The label says the direction; a sign read as a loss on a fill.
+    unsignedDeltas: true,
+    deltas,
+    note,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.caller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+              coords,
+            ),
+            tip: isTransfer
+              ? "“by” is the address that sent the transaction; “from” is the wallet the shares came from."
+              : undefined,
+          }
+        : undefined,
+    party,
+  };
 }

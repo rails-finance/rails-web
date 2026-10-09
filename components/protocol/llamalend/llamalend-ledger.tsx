@@ -25,6 +25,31 @@ import { tokenLedger } from "@/lib/shared/event-ledger";
 import type { FlowSegment, FlowSide } from "@/lib/shared/flows-timeline";
 import { flowSegmentProv } from "@/lib/shared/flows-timeline-provenance";
 import { LL } from "@/lib/llamalend/flows";
+import type { LlamalendContext } from "@/lib/shared/types/event-shape";
+import type { LlamalendCoords } from "@/lib/llamalend/event-provenance";
+import { ConvertedFigure, useLlamalendConverted } from "./llamalend-cells";
+
+/** The event the card states, for the Collateral ledger's Converted row. */
+interface LlamalendLedgerEvent {
+  ctx: LlamalendContext;
+  coords: LlamalendCoords;
+}
+
+/** The Collateral ledger's last row: the borrowed token the AMM held from sold
+ *  collateral, before → after the event, where there was any. It is in the
+ *  borrowed token, so it stands after the collateral's total. */
+function ConvertedRow({ ctx, coords }: LlamalendLedgerEvent) {
+  const c = useLlamalendConverted(ctx, coords);
+  if (!c) return null;
+  return (
+    <div className="flex items-baseline gap-2 py-1 text-sm text-rb-500" data-ledger-row="converted">
+      <span>Converted{c.soft ? ", in soft-liquidation" : ""}</span>
+      <span className="ml-auto whitespace-nowrap text-right font-semibold text-foreground tabular-nums">
+        <ConvertedFigure c={c} />
+      </span>
+    </div>
+  );
+}
 
 /** Which cells open into ledgers: the Collateral and the Debt. Null without
  *  a model. */
@@ -33,7 +58,17 @@ export function useLlamalendLedgerCells(): { debt: boolean } | null {
   return useMemo(() => (model ? { debt: model.buckets.some((b) => b.key === LL.borrowed) } : null), [model]);
 }
 
-function LlamalendLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: string; eventTs: number }) {
+function LlamalendLedger({
+  side,
+  eventId,
+  eventTs,
+  event,
+}: {
+  side: FlowSide;
+  eventId: string;
+  eventTs: number;
+  event?: LlamalendLedgerEvent;
+}) {
   const focus = useFlowFocus();
   const cum = useEventCum(eventId);
   const model = focus?.model;
@@ -60,6 +95,7 @@ function LlamalendLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: 
         totalUsdProv={flowSegmentProv(held, side, at, false, model.daily)}
         daily={model.daily}
       />
+      {side === "collateral" && event && <ConvertedRow {...event} />}
       <DayCloseNote cum={cum} eventTs={eventTs} />
     </>
   );
@@ -70,10 +106,13 @@ function LlamalendLedger({ side, eventId, eventTs }: { side: FlowSide; eventId: 
 export function LlamalendLedgerProvider({
   eventId,
   eventTs,
+  event,
   children,
 }: {
   eventId: string;
   eventTs: number;
+  /** The event, for the Collateral ledger's Converted row. */
+  event?: LlamalendLedgerEvent;
   children: ReactNode;
 }) {
   const focus = useFlowFocus();
@@ -89,10 +128,10 @@ export function LlamalendLedgerProvider({
         : has && cells
           ? {
               has: (side) => (side === "debt" ? cells.debt : true),
-              render: (side) => <LlamalendLedger side={side} eventId={eventId} eventTs={eventTs} />,
+              render: (side) => <LlamalendLedger side={side} eventId={eventId} eventTs={eventTs} event={event} />,
             }
           : null,
-    [pending, has, cells, eventId, eventTs],
+    [pending, has, cells, eventId, eventTs, event],
   );
   return <EventLedgerContext.Provider value={src}>{children}</EventLedgerContext.Provider>;
 }

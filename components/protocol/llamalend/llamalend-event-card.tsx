@@ -1,7 +1,10 @@
 "use client";
 
-// Composer: wires the LlamaLend header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// LlamaLend's event card on the shared shell's slots (ui-jobs 309 step 8): the
+// head from llamalend-event-header.tsx, T2 from llamalend-cells.tsx (read
+// when the card opens), the explanation and the Learn More from
+// llamalend-event-explainer.tsx. Gas stands in the price row where the owner
+// signed the transaction (lib/shared/index-gas.ts).
 //
 // A third-party hard liquidation is critical-toned on the spine and never
 // renders a token-flow chip that reads like a send — a taking is not
@@ -9,15 +12,17 @@
 // the user's own close from soft-liquidation and flows normally.
 
 import type { BaseActivityEvent, LlamalendContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
+import { useMemo } from "react";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { LlamalendLedgerProvider } from "./llamalend-ledger";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { type LlamalendCoords } from "@/lib/llamalend/event-provenance";
 import { llamalendExplainerTeaser } from "@/lib/llamalend/explainer-clauses";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { LlamalendEventHeader } from "./llamalend-event-header";
-import { LlamalendEventDetail } from "./llamalend-event-detail";
+import { useLlamalendHeadSpec } from "./llamalend-event-header";
+import { LLAMALEND_HEADS, useLlamalendOpened } from "./llamalend-cells";
 import { LlamalendEventExplainer, llamalendLearnMoreContent } from "./llamalend-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { LlamalendLoanMark, LlamalendNextRow, LlamalendPreviousStated } from "@/lib/llamalend/event-figures";
@@ -94,58 +99,82 @@ export function LlamalendEventCard({
       value: Math.abs(debt),
     });
 
-  const iconSlot = isBorrowerLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens.length > 0 ? tokens : undefined} isLast={!!isLast} />
+  const spine: SpineColumnProps = isBorrowerLoss
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : { tokens: tokens.length > 0 ? tokens : undefined, isLast: !!isLast };
+
+  const head = useLlamalendHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    wallet: event.wallet,
+    flows: event.flows,
+    loanMark,
+  });
+  // The owner's gas: a liquidator's taking, and a row where the page's wallet
+  // liquidated someone else, are not the position's cost.
+  const gas = isBorrowerLoss || ctx.role === "liquidator" ? undefined : ownerPaidGas(event, ctx.txFrom);
+  const price = gas ? { gas, prices: [] } : undefined;
+  const ledgerEvent = useMemo(
+    () => ({
+      ctx,
+      coords: { txHash: event.txHash, blockNumber: event.blockNumber, controller: ctx.controller, user: event.wallet },
+    }),
+    [ctx, event.txHash, event.blockNumber, event.wallet],
   );
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <LlamalendLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        iconColumn={iconSlot}
-        header={
-          <LlamalendEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            wallet={event.wallet}
-            flows={event.flows}
-            loanMark={loanMark}
-          />
-        }
-        detail={
-          <LlamalendEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            previousStated={previousStated}
-          />
-        }
-        explainer={
-          <LlamalendEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            skipLead
-            loanMark={loanMark}
-            marketDiscount={marketDiscount}
-            next={next}
-          />
-        }
-        explainerTeaser={llamalendExplainerTeaser(ctx, coords, loanMark)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={llamalendLearnMoreContent(ctx, controllerHasApprovals ?? null)} />}
-        persistKey={`llamalend:${event.id}`}
-      />
-    </LlamalendLedgerProvider>
-  );
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "llamalend",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    cells: { pending: LLAMALEND_HEADS },
+    // The Collateral and Debt cells open into their ledgers where the page
+    // ties its timeline to the Lifetime flows panel; the Collateral ledger
+    // closes on what the AMM had converted.
+    ledgers: {
+      provider: (children) => (
+        <LlamalendLedgerProvider eventId={event.id} eventTs={event.timestamp} event={ledgerEvent}>
+          {children}
+        </LlamalendLedgerProvider>
+      ),
+    },
+    price,
+    useOpened: () =>
+      useLlamalendOpened({
+        ctx,
+        txHash: event.txHash,
+        blockNumber: event.blockNumber,
+        wallet: event.wallet,
+        previousStated,
+        price,
+      }),
+    explainer: {
+      body: (
+        <LlamalendEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          skipLead
+          loanMark={loanMark}
+          marketDiscount={marketDiscount}
+          next={next}
+        />
+      ),
+      first: llamalendExplainerTeaser(ctx, coords, loanMark),
+    },
+    learnMore: <LearnMore inline content={llamalendLearnMoreContent(ctx, controllerHasApprovals ?? null)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

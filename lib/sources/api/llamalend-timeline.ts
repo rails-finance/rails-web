@@ -40,6 +40,7 @@ import type {
 } from "@/lib/shared/types/event-shape";
 import type { LlamalendMarketMap } from "@/lib/sources/chain/llamalend-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { firstLogOfTx, gasOnFirstRow } from "@/lib/shared/index-gas";
 
 export interface LlamalendTimelineResult {
   controller: string;
@@ -172,6 +173,8 @@ export function buildLlamalendTimeline(
   const borrowedSymbol = m?.borrowedSymbol ?? "borrowed (raw)";
   const borrowedDecimals = m?.borrowedDecimals ?? 0;
 
+  // The transaction's gas on its first row (lib/shared/index-gas.ts).
+  const firstLog = firstLogOfTx(rows);
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
     const isLiq = r.action === "liquidation";
@@ -332,6 +335,7 @@ export function buildLlamalendTimeline(
       blockNumber: Number(r.block_number),
       timestamp: Number(r.block_timestamp),
       wallet: user,
+      ...gasOnFirstRow(r, firstLog),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       actionType: kind,
       actionLabel,

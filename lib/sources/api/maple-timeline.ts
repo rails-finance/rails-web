@@ -19,6 +19,7 @@ import { maplePoolOf, MAPLE_SHARE_DECIMALS } from "@/lib/maple/asset-catalog";
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { firstLogOfTx, gasOnFirstRow } from "@/lib/shared/index-gas";
 
 export interface MapleTimelineResult {
   wallet: string;
@@ -144,6 +145,8 @@ export function buildMapleTimeline(rows: MvRow[], walletRaw: string): MapleTimel
   const wallet = walletRaw.toLowerCase();
   const poolOf = maplePoolOf;
 
+  // The transaction's gas on its first row (lib/shared/index-gas.ts).
+  const firstLog = firstLogOfTx(rows);
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
     const kind = r.action as MapleEventType;
@@ -161,6 +164,7 @@ export function buildMapleTimeline(rows: MvRow[], walletRaw: string): MapleTimel
       blockNumber: Number(r.block_number),
       timestamp: Number(r.block_timestamp),
       wallet,
+      ...gasOnFirstRow(r, firstLog),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
     };
 

@@ -11,7 +11,7 @@
 
 import type { AssetFlow, FluidContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   colDeltaProv,
   debtDeltaProv,
@@ -46,7 +46,8 @@ export interface FluidEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function FluidEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useFluidHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -56,7 +57,7 @@ export function FluidEventHeader({
   externalBy,
   wallet,
   flows,
-}: FluidEventHeaderProps) {
+}: FluidEventHeaderProps): ChainTruthRowSpec {
   const supplySym = ctx.supplySymbol ?? "DEX shares";
   const borrowSym = ctx.borrowSymbol ?? "DEX shares";
   const supplyAddr = soleFlowAddress(flows, ctx.supplySymbol);
@@ -125,26 +126,20 @@ export function FluidEventHeader({
         ? { prefix: "to", address: ctx.transferTo, prov: ownerProv(coords, ctx.transferTo) }
         : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical: isLiq,
-        deltas,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.initiator
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, initiator: ctx.initiator },
-                  coords,
-                ),
-              }
-            : undefined,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical: isLiq,
+    deltas,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.initiator
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, initiator: ctx.initiator },
+              coords,
+            ),
+          }
+        : undefined,
+    party,
+  };
 }

@@ -1,13 +1,14 @@
 "use client";
 
-// Polaris event detail — adapter onto the shared ChainTruthDetail grid.
-// A touch renders the CDP's two resulting figures (collateral / debt — each the
+// Polaris event body (T2) — the card's `cells`, `notes` and the at-block price
+// for its price row (ui-jobs 309). A touch renders the CDP's two resulting
+// figures (collateral / debt — each the
 // log's own `_newColl` / `_newDebt`) with before→after transitions built from
 // the lag columns, then the protocol's own legs grouped as the twelve-field
 // log states them: interest · gains · the PSM shares · a settlement mint. The
-// rate in force at the touch closes the grid as a line, not a pill. A
+// rate in force at the touch stands under the grid as a line. A
 // liquidation renders the pool/redistribution split and the liquidator's
-// compensation; a transfer renders from → to.
+// compensation; a transfer states from → to as a note, with no cells.
 //
 // The grid is native units throughout. A liquidation adds one valued block
 // beneath it — the shared LiquidationForensics, fed by
@@ -16,19 +17,13 @@
 // never in dollars.
 
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
-import {
-  ChainTruthDetail,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+import type { ReactNode } from "react";
+import { chainTruthCells, type ChainTruthStat, type ChainTruthTransition } from "@/components/shared/chain-truth-event";
+import type { EventCells } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
 import { LinkedAddress } from "@/components/shared/linked-address";
-import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { Prov } from "@/components/shared/provenance";
-import {
-  AtBlockPriceFootnote,
-  LiquidationForensics,
-  type AtBlockPricePill,
-} from "@/components/shared/liquidation-forensics";
+import { LiquidationForensics } from "@/components/shared/liquidation-forensics";
 import {
   POLARIS_LIQ_CONSTANTS,
   buildPolarisLiquidationForensics,
@@ -66,10 +61,12 @@ const PRIMARY_RATE_TIP =
  *  values the liquidation legs in the same unit. */
 const priceFormat = polarisValueFormat;
 
-export interface PolarisEventDetailProps {
-  ctx: PolarisContext;
-  txHash?: string;
-  blockNumber?: number;
+/** The opened card's parts. */
+export interface PolarisEventBody {
+  cells: EventCells;
+  notes?: ReactNode;
+  /** pETH at the block in the market's unit, for the price row. */
+  price?: EventPriceChip;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Math.abs(Number(human))));
@@ -129,41 +126,43 @@ function crTransitionOf(
   };
 }
 
-export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDetailProps) {
-  const focus = useFlowFocus();
-  const coords: PolarisCoords = { txHash, blockNumber, market: ctx.market, cdpId: ctx.cdpId };
+/** `ledgers`: the page ties its timeline to the Lifetime flows panel, so the
+ *  Collateral and Debt cells open into their ledgers. */
+export function polarisEventBody(ctx: PolarisContext, coords: PolarisCoords, ledgers: boolean): PolarisEventBody {
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
 
   if (ctx.eventType === "transfer") {
-    return (
-      <div className="text-xs text-rb-500">
-        <Prov info={transferProv(coords)}>
-          <span>
-            Custody moved
-            {ctx.fromAddr ? (
-              <>
-                {" "}
-                from <LinkedAddress address={ctx.fromAddr} />
-              </>
-            ) : null}
-            {ctx.toAddr ? (
-              <>
-                {" "}
-                to <LinkedAddress address={ctx.toAddr} />
-              </>
-            ) : null}{" "}
-            — the CDP&rsquo;s collateral and debt did not change.
-          </span>
-        </Prov>
-      </div>
-    );
+    return {
+      cells: { none: "a transfer moves no collateral or debt" },
+      notes: (
+        <div className="px-5 py-2 text-xs text-rb-500">
+          <Prov info={transferProv(coords)}>
+            <span>
+              Custody moved
+              {ctx.fromAddr ? (
+                <>
+                  {" "}
+                  from <LinkedAddress address={ctx.fromAddr} />
+                </>
+              ) : null}
+              {ctx.toAddr ? (
+                <>
+                  {" "}
+                  to <LinkedAddress address={ctx.toAddr} />
+                </>
+              ) : null}{" "}
+              — the CDP&rsquo;s collateral and debt did not change.
+            </span>
+          </Prov>
+        </div>
+      ),
+    };
   }
 
   // The Collateral and Debt cells open into the Lifetime flows ledgers where
   // the page has the panel; while its model is on its way they stand as
   // placeholder rows (components/protocol/polaris/polaris-ledger.tsx).
-  const ledgers = focus != null;
 
   const stats: ChainTruthStat[] = [];
   /** A protocol leg, signed by what it does to the CDP: "+" adds to the
@@ -315,50 +314,50 @@ export function PolarisEventDetail({ ctx, txHash, blockNumber }: PolarisEventDet
   const forensics =
     ctx.eventType === "liquidate" ? buildPolarisLiquidationForensics(ctx, coords, ctx.market) : undefined;
 
-  // The forensics block carries the at-block price pill itself, so the
-  // standalone footnote is withheld wherever it renders — one price pill on a
-  // row, never two.
-  const priceFootnote: AtBlockPricePill[] =
+  // The forensics block carries the at-block price pill, so the price
+  // row's pill is withheld wherever it renders: one price pill on a row,
+  // never two. The price is in the market's unit, so it has no "today" side.
+  const price: EventPriceChip | undefined =
     ctx.priceAtBlock && !forensics
-      ? [
-          {
-            symbol: PETH.symbol,
-            address: PETH.address,
-            priceUsd: ctx.priceAtBlock.pethInDebt,
-            priceProv: atBlockPriceProv(coords, ctx.priceAtBlock, ctx.market),
-            note: "oracle at block",
-            noToday: true,
-          },
-        ]
-      : [];
+      ? {
+          symbol: PETH.symbol,
+          address: PETH.address,
+          usd: ctx.priceAtBlock.pethInDebt,
+          info: atBlockPriceProv(coords, ctx.priceAtBlock, ctx.market),
+          unit: { format: priceFormat(ctx.market) },
+          named: { note: "oracle at block" },
+        }
+      : undefined;
 
-  return (
-    <div className="space-y-2">
-      {stats.length > 0 && (
-        <ChainTruthDetail
-          // In full, three decimals — the row's and the card's rule — with the
-          // token named after each figure.
-          stats={stats.map((st) => (st.symbol && st.display == null ? { ...st, display: st.value } : st))}
-          symbolText
-        />
-      )}
-      {forensics && <LiquidationForensics {...forensics} />}
-      {priceFootnote.length > 0 && (
-        <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={priceFootnote} format={priceFormat(ctx.market)} />
-        </div>
-      )}
-      {ctx.primaryRate != null && (
-        // px-5 mirrors the stat grid's inset so the line sits on the cards' left edge.
-        // The figure only: the "set by the market, not the holder" clause lives in the
-        // explanation bullet and the receipt, not here as well.
-        <div className="px-5 text-xs text-rb-500 tabular-nums">
-          <Prov info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={`${(ctx.primaryRate * 100).toFixed(2)}%`}>
-            <span>{(ctx.primaryRate * 100).toFixed(2)}%</span>
-          </Prov>{" "}
-          <TipLabel text="primary rate in force" tip={PRIMARY_RATE_TIP} />
-        </div>
-      )}
-    </div>
-  );
+  const notes =
+    forensics || ctx.primaryRate != null ? (
+      <>
+        {forensics && <LiquidationForensics {...forensics} />}
+        {ctx.primaryRate != null && (
+          // px-5 mirrors the grid's inset so the line sits on the cells' left
+          // edge. The figure only: the "set by the market, not the holder"
+          // clause lives in the explanation bullet and the receipt.
+          <div className="px-5 py-1 text-xs text-rb-500 tabular-nums">
+            <Prov info={rateInForceProv(coords, ctx.raw?.primaryRate)} value={`${(ctx.primaryRate * 100).toFixed(2)}%`}>
+              <span>{(ctx.primaryRate * 100).toFixed(2)}%</span>
+            </Prov>{" "}
+            <TipLabel text="primary rate in force" tip={PRIMARY_RATE_TIP} />
+          </div>
+        )}
+      </>
+    ) : undefined;
+
+  return {
+    // In full, three decimals — the row's and the card's rule — with the
+    // token named after each figure.
+    cells:
+      stats.length > 0
+        ? chainTruthCells(
+            stats.map((st) => (st.symbol && st.display == null ? { ...st, display: st.value } : st)),
+            { symbolText: true, inputs: { "Collateral ratio": ["collateral", "debt"] } },
+          )
+        : { none: "the event carries no figure of the CDP" },
+    notes,
+    price,
+  };
 }

@@ -9,7 +9,7 @@
 
 import type { AssetFlow, DolomiteContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   movedDeltaProv,
   liquidationDebtProv,
@@ -23,10 +23,8 @@ import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 export interface DolomiteEventHeaderProps {
   actionLabel: string;
   ctx: DolomiteContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict). */
   externalBy?: string;
   /** The account owner, for the receipt's owner row. */
@@ -39,17 +37,15 @@ export interface DolomiteEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function DolomiteEventHeader({
+export function dolomiteHeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
-}: DolomiteEventHeaderProps) {
+}: DolomiteEventHeaderProps): ChainTruthRowSpec {
   const coords: DolomiteCoords = {
     txHash,
     blockNumber,
@@ -104,26 +100,20 @@ export function DolomiteEventHeader({
                 }
               : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out",
-        deltas,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.caller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-                  coords,
-                ),
-              }
-            : undefined,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out",
+    deltas,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.caller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+              coords,
+            ),
+          }
+        : undefined,
+    party,
+  };
 }

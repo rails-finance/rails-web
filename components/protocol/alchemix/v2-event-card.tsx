@@ -31,7 +31,7 @@ import {
   type ChainTruthStat,
   chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
-import { statCell } from "@/components/shared/chain-truth-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-event";
 import type { GasCost } from "@/lib/shared/types/event-shape";
@@ -263,6 +263,7 @@ export function AlchemixV2EventCard({
 }) {
   const d = event.context.data;
   const a = movedAmount(d);
+  const toCells = useStatCells();
   const spineProps: SpineColumnProps =
     // Repayment styling, no warning: the holder's own action closes with the
     // dead-end arrow on a solid (agency) spine, the same register as V3's
@@ -284,7 +285,10 @@ export function AlchemixV2EventCard({
     head: spec,
     caption: chainTruthCaption(spec) ?? "",
     // The log's figures are the event's cells: V2 took no reading.
-    cells: stats.length > 0 ? stats.map((s, i) => statCell(s, `log-${i}`)) : { none: "the log states no amount" },
+    cells:
+      stats.length > 0
+        ? toCells(stats.map((s, i) => ({ ...s, key: `log-${i}` })))
+        : { none: "the log states no amount" },
     ledgers: { none: "no flows panel on the V2 Alchemist" },
     notes:
       stats.length > 0 ? (

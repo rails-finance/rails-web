@@ -22,6 +22,7 @@ import {
 import { ClosedTokens, LedgerCell, T2Skeleton, type ClosedUsdFigures } from "@/components/shared/event-ledger";
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** A figure in a cell: as the family formats it, with its receipt. */
@@ -59,6 +60,14 @@ export interface EventCellValue {
   /** Several lines in place of one figure, one per reserve, each drawn by
    *  the family (Aave V4's Collateral and Debt). */
   lines?: ReactNode[];
+  /** The icon's token contract, where the symbol alone does not name a mark. */
+  iconAddress?: string;
+  /** The icons of the assets a side holds, before its figures: a side holding
+   *  several states its dollars behind them. */
+  cluster?: string[];
+  /** A figure after the after, in its line: the after's dollars as a chip,
+   *  on a stat cell (a ledger cell states its dollars through `usd`). */
+  chip?: ReactNode;
 }
 
 interface EventCellCommon {
@@ -142,7 +151,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     );
   };
   const before = v.before;
-  const icon = v.icon ? <TokenChipIcon symbol={v.icon} size={16} /> : undefined;
+  const icon = v.icon ? <TokenChipIcon symbol={v.icon} address={v.iconAddress} size={16} /> : undefined;
   if (v.lines)
     return (
       <div className="flex flex-col gap-1">
@@ -153,6 +162,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     );
   return (
     <>
+      {v.cluster && v.cluster.length > 0 && <InlineAssetCluster symbols={v.cluster} size={18} overlap={5} />}
       {v.lead != null ? (
         <span className="inline-flex items-center gap-1" data-cell-lead="">
           <span className="text-sm font-semibold text-foreground tabular-nums">{v.lead}</span>
@@ -180,6 +190,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
           </Figure>
         )
       )}
+      {v.chip}
     </>
   );
 }

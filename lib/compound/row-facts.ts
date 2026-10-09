@@ -78,16 +78,6 @@ export function compoundRowLabel(ctx: CompoundContext, fallback: string, baseDec
   return isNeg(after) ? "Withdraw and borrow" : "Withdraw";
 }
 
-/** The base-balance caption for a row's before → after: which side of zero
- *  the balance stood on, or "Base balance" where the row crossed it. */
-export function compoundBaseCaption(before: string | null, after: string): string {
-  if (before == null) return isNeg(after) ? "Borrowed (base)" : "Lent (base)";
-  const neg = isNeg(before) || isNeg(after);
-  const pos = isPos(before) || isPos(after);
-  if (neg && pos) return "Base balance";
-  return neg ? "Borrowed (base)" : "Lent (base)";
-}
-
 /** One precision for a row's moved amount wherever it is printed — the row's
  *  spine, its state grid and its prose: four decimals below one, three above
  *  (the spine's own compact form keeps two past 1,000). */

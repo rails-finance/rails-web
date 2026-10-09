@@ -1,9 +1,11 @@
 "use client";
 
-// Liquity V1 event detail (the opened card, T2) — the Liquity V2 grid: the
-// Trove's collateral (with its USD value at this block), its debt (with what
-// the event added or burned itemised), its collateral ratio before → after and
-// the ETH price at this block.
+// Liquity V1 event detail (the opened card, T2), as the shell's slots (ui-jobs
+// 309 step 5) — the Liquity V2 grid: the Trove's collateral (with its USD value
+// at this block), its debt (with what the event added or burned itemised) and
+// its collateral ratio before → after; no interest rate, which V1 does not
+// have. The ETH price at this block and the owner's gas stand in the price
+// row; a redemption's outcome and a liquidation's route stand under the grid.
 //
 // Before and after are the captured TroveUpdated absolutes, formatted from
 // their decimal strings (lib/liquity-v1/event-figures.ts), so consecutive cards
@@ -16,21 +18,11 @@
 
 import type { ReactNode } from "react";
 import type { GasCost, LiquityV1Context } from "@/lib/shared/types/event-shape";
-import { EventPriceRow, gasPrice } from "@/components/shared/event-price-row";
+import { eventGas, type EventCardPrice } from "@/components/shared/event-price-row";
+import type { EventCardOpened } from "@/components/shared/event-card";
+import type { EventCellHead, EventCellSpec, EventFigure } from "@/components/shared/event-cells";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import {
-  ClosedLabel,
-  DeltaToggle,
-  PriceChipShell,
-  StatCard,
-  StatSubline,
-  StateTransition,
-  changeTone,
-} from "@/components/shared/state-transition";
-import { ThenTodayChip } from "@/components/shared/price-basis";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { ClosedTokens, LedgerCell, PendingBar, usdAt, type ClosedUsdFigures } from "@/components/shared/event-ledger";
-import { ledgerFigure, useLedgerDecimals } from "@/components/shared/event-ledger-context";
+import { PendingBar, usdAt } from "@/components/shared/event-ledger";
 import { usdShown } from "@/lib/shared/usd-display";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
@@ -76,20 +68,6 @@ import {
 } from "@/lib/liquity-v1/use-event-read";
 import { formatUsdValue } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
-
-export interface LiquityV1EventDetailProps {
-  ctx: LiquityV1Context;
-  txHash?: string;
-  blockNumber?: number;
-  /** The Trove's owner — the receipt read filters the fee and transfers on it. */
-  wallet?: string;
-  /** The PriceFeed price now, for a redemption's net outcome at today's price. */
-  currentPrice?: number | null;
-  /** The transaction's gas from the index; the receipt read supplies it where
-   *  the row carries none. Stated on the owner's events only: a
-   *  redemption's or a liquidation's gas is its caller's. */
-  gas?: GasCost;
-}
 
 const P = ({ info, value, children }: { info?: Provenance; value?: string; children: ReactNode }) =>
   info ? (
@@ -147,53 +125,40 @@ function buildV1LiquidationForensics(
   };
 }
 
-function Transition({
-  before,
-  after,
-  showBefore,
-  closed,
-  delta,
-  symbol,
-  usd,
-  provBefore,
-  provAfter,
-}: {
-  before: string;
-  after: string;
-  showBefore: boolean;
-  closed?: boolean;
-  delta?: ReactNode;
-  symbol?: string;
-  /** The side's dollars, a tooltip on the figure (a cell with a ledger). */
-  usd?: ClosedUsdFigures;
-  provBefore?: Provenance;
-  provAfter?: Provenance;
-}) {
-  const changed = before !== after;
-  const figures = (
-    <>
-      {showBefore && <DeltaToggle before={<P info={provBefore}>{before}</P>} delta={closed ? null : (delta ?? null)} />}
-      {closed ? (
-        <ClosedLabel />
-      ) : (
-        <P info={provAfter}>
-          <span className={`text-sm font-semibold tabular-nums ${changeTone(changed)}`}>{after}</span>
-        </P>
-      )}
-      {symbol && <TokenChipIcon symbol={symbol} size={16} />}
-    </>
-  );
-  return <StateTransition>{usd ? <ClosedTokens usd={usd}>{figures}</ClosedTokens> : figures}</StateTransition>;
+/** The cells before the body opens: the grid's three, drawn as placeholders. */
+export const LIQUITY_V1_CELL_HEADS: EventCellHead[] = [
+  { kind: "ledger", side: "collateral", label: "Collateral" },
+  { kind: "ledger", side: "debt", label: "Debt" },
+  { kind: "stat", label: "Collateral ratio" },
+];
+
+const fig = (text: EventFigure["text"], info?: Provenance, n?: number): EventFigure => ({ text, info, n });
+
+export interface LiquityV1OpenedArgs {
+  ctx: LiquityV1Context;
+  txHash?: string;
+  blockNumber?: number;
+  /** The Trove's owner — the receipt read filters the fee and transfers on it. */
+  wallet?: string;
+  /** The PriceFeed price now, for a redemption's net outcome at today's price. */
+  currentPrice?: number | null;
+  /** The transaction's gas from the index; the receipt read supplies it where
+   *  the row carries none. Stated on the owner's events only: a
+   *  redemption's or a liquidation's gas is its caller's. */
+  gas?: GasCost;
 }
 
-export function LiquityV1EventDetail({
+/** The opened card's cells, notes and price row (the shell's `useOpened`):
+ *  the receipt read starts when the card opens, and a figure that waits on it
+ *  stands as a pending bar until it lands. */
+export function useLiquityV1Opened({
   ctx,
   txHash,
   blockNumber,
   wallet,
   currentPrice,
   gas,
-}: LiquityV1EventDetailProps) {
+}: LiquityV1OpenedArgs): EventCardOpened {
   const coords: LiquityV1Coords = { txHash, blockNumber, wallet };
   const { read, pending: readPending } = useLiquityV1EventReadState(txHash, wallet);
   const s = sidesOf(ctx);
@@ -209,25 +174,65 @@ export function LiquityV1EventDetail({
   const isLiq = ctx.eventType === "liquidation";
   const isRedemption = ctx.eventType === "redemption";
   const ends = isClose || isLiq || (isRedemption && s.debtAfter <= EPS);
+  const CLOSED = "CLOSED";
 
   // ── Collateral ──
+  // The shell states the closed figures at the decimals the opened ledger
+  // prints (`n`).
   const collChanged = Math.abs(s.collDelta) > EPS;
-  // The closed cells state their figures at the decimals the opened ledger prints.
-  const collDec = useLedgerDecimals("collateral");
-  const debtDec = useLedgerDecimals("debt");
-  const fc = (n: number) => ledgerFigure(n, collDec, fmtEth(n));
-  const fl = (n: number) => ledgerFigure(n, debtDec, fmtLusd(n));
-  const collBeforeStr = fc(s.collBefore);
-  const collAfterStr = fc(s.collAfter);
-  const collDeltaStr = `${s.collDelta >= 0 ? "+" : "−"}${fc(Math.abs(s.collDelta))}`;
+  const collShowBefore = !isOpen && collChanged;
   const usdAfter = price != null && s.collAfter > EPS ? s.collAfter * price : null;
   const usdBefore = price != null && s.collBefore > EPS ? s.collBefore * price : null;
+  const collateral: EventCellSpec = {
+    kind: "ledger",
+    side: "collateral",
+    key: "collateral",
+    label: "Collateral",
+    changed: collChanged,
+    value: {
+      before: collShowBefore ? fig(fmtEth(s.collBefore), collBeforeProv(coords), s.collBefore) : undefined,
+      delta:
+        collShowBefore && !ends
+          ? {
+              text: fmtEth(Math.abs(s.collDelta)),
+              n: Math.abs(s.collDelta),
+              sign: s.collDelta >= 0 ? "+" : "−",
+              info: collDeltaProv(coords, { after: ctx.collAfter, before: ctx.collBefore }),
+            }
+          : undefined,
+      ...(ends ? { closed: CLOSED } : { after: fig(fmtEth(s.collAfter), collAfterProv(coords), s.collAfter) }),
+      icon: COLLATERAL_SYMBOL,
+    },
+    usd:
+      usdAfter != null && usdShown(usdAfter)
+        ? {
+            before:
+              (isRedemption || isLiq) && usdBefore != null && usdShown(usdBefore) ? (
+                <P
+                  info={collUsdAtBlockProv(coords, { coll: ctx.collBefore, priceUsd: price as number, side: "before" })}
+                >
+                  {fmtUsd(usdBefore)}
+                </P>
+              ) : null,
+            after: (
+              <P info={collUsdAtBlockProv(coords, { coll: ctx.collAfter, priceUsd: price as number, side: "after" })}>
+                {fmtUsd(usdAfter)}
+              </P>
+            ),
+            ...usdAt({
+              price,
+              symbol: COLLATERAL_SYMBOL,
+              before: Number(ctx.collBefore),
+              after: Number(ctx.collAfter),
+            }),
+          }
+        : undefined,
+    sub: collChanged ? undefined : [{ content: "unchanged" }],
+  };
 
   // ── Debt ──
   const debtChanged = Math.abs(s.debtDelta) > EPS;
-  const debtBeforeStr = fl(s.debtBefore);
-  const debtAfterStr = fl(s.debtAfter);
-  const debtDeltaStr = `${s.debtDelta >= 0 ? "+" : "−"}${fl(Math.abs(s.debtDelta))}`;
+  const debtShowBefore = !isOpen && debtChanged;
 
   // What the debt change was made of, where the receipt says.
   const fee = read?.borrowingFee != null ? Number(read.borrowingFee) : null;
@@ -288,181 +293,116 @@ export function LiquityV1EventDetail({
       </span>,
     );
   }
+  const debt: EventCellSpec = {
+    kind: "ledger",
+    side: "debt",
+    key: "debt",
+    label: "Debt",
+    changed: debtChanged,
+    value: {
+      before: debtShowBefore ? fig(fmtLusd(s.debtBefore), debtBeforeProv(coords), s.debtBefore) : undefined,
+      delta:
+        debtShowBefore && !ends
+          ? {
+              text: fmtLusd(Math.abs(s.debtDelta)),
+              n: Math.abs(s.debtDelta),
+              sign: s.debtDelta >= 0 ? "+" : "−",
+              info: debtDeltaProv(coords, { after: ctx.debtAfter, before: ctx.debtBefore }),
+            }
+          : undefined,
+      ...(ends ? { closed: CLOSED } : { after: fig(fmtLusd(s.debtAfter), debtAfterProv(coords), s.debtAfter) }),
+      icon: DEBT_SYMBOL,
+    },
+    sub:
+      debtLines.length > 0
+        ? [
+            {
+              changed: true,
+              content: debtLines.map((l, i) => (
+                <span key={i}>
+                  {i > 0 && " · "}
+                  {l}
+                </span>
+              )),
+            },
+          ]
+        : !debtChanged
+          ? [{ content: "unchanged" }]
+          : undefined,
+  };
 
   // ── Collateral ratio, both sides at this block's price ──
   const crBefore = isOpen ? null : ratioOf(s.collBefore, s.debtBefore, price);
   const crAfter = ends ? null : ratioOf(s.collAfter, s.debtAfter, price);
   const crBeforeStr = crBefore != null ? fmtPct(crBefore) : null;
   const crAfterStr = crAfter != null ? fmtPct(crAfter) : null;
+  const crShowBefore = crBeforeStr != null && crBeforeStr !== crAfterStr;
+  const ratioProv = (side: "before" | "after") =>
+    price != null
+      ? ratioAtBlockProv(coords, {
+          coll: side === "before" ? ctx.collBefore : ctx.collAfter,
+          debt: side === "before" ? ctx.debtBefore : ctx.debtAfter,
+          priceUsd: price,
+          side,
+        })
+      : undefined;
+  const ratio: EventCellSpec = {
+    kind: "stat",
+    key: "ratio",
+    label: "Collateral ratio",
+    changed: crShowBefore || (crBeforeStr == null && crAfterStr != null),
+    inputs: ["collateral", "debt"],
+    value:
+      crBeforeStr == null && crAfterStr == null
+        ? ends
+          ? { closed: CLOSED }
+          : price == null && readPending
+            ? { after: fig(<PendingBar />), afterClass: "text-rb-500" }
+            : { none: price == null ? "…" : "N/A" }
+        : {
+            before: crShowBefore ? fig(crBeforeStr, ratioProv("before")) : undefined,
+            ...(ends ? { closed: CLOSED } : { after: fig(crAfterStr ?? "", ratioProv("after")) }),
+          },
+    sub: [{ content: "minimum 110%" }],
+  };
 
+  // ── Notes: a redemption's outcome, a liquidation's forensics and route ──
   const forensics = isLiq ? buildV1LiquidationForensics(ctx, coords) : undefined;
-
-  const ownerPaid = isOpen || isClose || ctx.eventType === "adjustTrove";
-  const paid = ownerPaid ? (gas ?? read?.gas ?? null) : null;
-  const ownerGas = gasPrice(
-    paid ? { ...paid, gasCostUsd: read?.priceUsd ? paid.gasCostEth * read.priceUsd : 0 } : undefined,
-  );
-
-  return (
+  const notes = (
     <>
-      <div className="px-5 py-2">
-        <div className="grid grid-cols-1 gap-2.5 sm:auto-rows-fr sm:grid-cols-2 sm:has-[[data-ledger-span]]:auto-rows-auto">
-          <LedgerCell label="Collateral" side="collateral">
-            <Transition
-              before={collBeforeStr}
-              after={collAfterStr}
-              showBefore={!isOpen && collChanged}
-              closed={ends}
-              symbol={COLLATERAL_SYMBOL}
-              provBefore={collBeforeProv(coords)}
-              provAfter={collAfterProv(coords)}
-              delta={
-                <P info={collDeltaProv(coords, { after: ctx.collAfter, before: ctx.collBefore })}>{collDeltaStr}</P>
-              }
-              usd={
-                usdAfter != null && usdShown(usdAfter)
-                  ? {
-                      before:
-                        (isRedemption || isLiq) && usdBefore != null && usdShown(usdBefore) ? (
-                          <P
-                            info={collUsdAtBlockProv(coords, {
-                              coll: ctx.collBefore,
-                              priceUsd: price as number,
-                              side: "before",
-                            })}
-                          >
-                            {fmtUsd(usdBefore)}
-                          </P>
-                        ) : null,
-                      after: (
-                        <P
-                          info={collUsdAtBlockProv(coords, {
-                            coll: ctx.collAfter,
-                            priceUsd: price as number,
-                            side: "after",
-                          })}
-                        >
-                          {fmtUsd(usdAfter)}
-                        </P>
-                      ),
-                      ...usdAt({
-                        price,
-                        symbol: COLLATERAL_SYMBOL,
-                        before: Number(ctx.collBefore),
-                        after: Number(ctx.collAfter),
-                      }),
-                    }
-                  : undefined
-              }
-            />
-            {!collChanged && <StatSubline>unchanged</StatSubline>}
-          </LedgerCell>
-
-          <LedgerCell label="Debt" side="debt">
-            <Transition
-              before={debtBeforeStr}
-              after={debtAfterStr}
-              showBefore={!isOpen && debtChanged}
-              closed={ends}
-              symbol={DEBT_SYMBOL}
-              provBefore={debtBeforeProv(coords)}
-              provAfter={debtAfterProv(coords)}
-              delta={
-                <P info={debtDeltaProv(coords, { after: ctx.debtAfter, before: ctx.debtBefore })}>{debtDeltaStr}</P>
-              }
-            />
-            {debtLines.length > 0 ? (
-              <StatSubline changed>
-                {debtLines.map((l, i) => (
-                  <span key={i}>
-                    {i > 0 && " · "}
-                    {l}
-                  </span>
-                ))}
-              </StatSubline>
-            ) : !debtChanged ? (
-              <StatSubline>unchanged</StatSubline>
-            ) : null}
-          </LedgerCell>
-
-          <StatCard label="Collateral ratio">
-            {crBeforeStr == null && crAfterStr == null ? (
-              ends ? (
-                <StateTransition>
-                  <ClosedLabel />
-                </StateTransition>
-              ) : (
-                <span className="text-sm font-semibold text-rb-500">
-                  {price == null ? readPending ? <PendingBar /> : "…" : "N/A"}
-                </span>
-              )
-            ) : (
-              <Transition
-                before={crBeforeStr ?? ""}
-                after={crAfterStr ?? ""}
-                showBefore={crBeforeStr != null && crBeforeStr !== crAfterStr}
-                closed={ends}
-                provBefore={
-                  price != null
-                    ? ratioAtBlockProv(coords, {
-                        coll: ctx.collBefore,
-                        debt: ctx.debtBefore,
-                        priceUsd: price,
-                        side: "before",
-                      })
-                    : undefined
-                }
-                provAfter={
-                  price != null
-                    ? ratioAtBlockProv(coords, {
-                        coll: ctx.collAfter,
-                        debt: ctx.debtAfter,
-                        priceUsd: price,
-                        side: "after",
-                      })
-                    : undefined
-                }
-              />
-            )}
-            <StatSubline>minimum 110%</StatSubline>
-          </StatCard>
-
-          <StatCard label="ETH price">
-            {price != null ? (
-              <StateTransition>
-                <span className="text-sm font-semibold tabular-nums text-rb-500">
-                  <ThenTodayChip
-                    symbol={COLLATERAL_SYMBOL}
-                    format={fmtUsd}
-                    then={<P info={eventPriceProv(coords, price)}>{fmtUsd(price)}</P>}
-                  />
-                </span>
-                <TokenChipIcon symbol={COLLATERAL_SYMBOL} size={16} />
-              </StateTransition>
-            ) : (
-              <span className="text-sm font-semibold text-rb-500">{readPending ? <PendingBar /> : "…"}</span>
-            )}
-            <StatSubline>Liquity&apos;s price feed, at this block</StatSubline>
-          </StatCard>
-        </div>
-      </div>
-
       {isRedemption && split && (
         <RedemptionOutcome ctx={ctx} coords={coords} split={split} surplus={surplus} currentPrice={currentPrice} />
       )}
-
       {forensics && <LiquidationForensics {...forensics} />}
       {isLiq && read?.liquidation ? (
         <LiquidationRoute read={read} coords={coords} surplusClaimed={surplus?.claimed ?? null} />
       ) : isLiq && readPending ? (
         <LiquidationRoutePending />
       ) : null}
-      {/* T2's price row: the gas the owner paid, in USD at the receipt's
-          ETH price. The row moves into the shell's price slot with V1's
-          step of ui-jobs 309. */}
-      {ownerGas && <EventPriceRow price={ownerGas} />}
     </>
   );
+
+  // ── The price row: the gas the owner paid, in USD at the receipt's ETH
+  // price, and ETH at Liquity's price feed for this block ──
+  const ownerPaid = isOpen || isClose || ctx.eventType === "adjustTrove";
+  const paid = ownerPaid ? (gas ?? read?.gas ?? null) : null;
+  const priceRow: EventCardPrice = {
+    gas: eventGas(paid ? { ...paid, gasCostUsd: read?.priceUsd ? paid.gasCostEth * read.priceUsd : 0 } : undefined),
+    prices:
+      price != null
+        ? [
+            {
+              symbol: COLLATERAL_SYMBOL,
+              usd: price,
+              info: eventPriceProv(coords, price),
+              title: "ETH at Liquity's price feed, at this block",
+              format: fmtUsd,
+            },
+          ]
+        : [],
+  };
+
+  return { cells: [collateral, debt, ratio], notes, price: priceRow };
 }
 
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {

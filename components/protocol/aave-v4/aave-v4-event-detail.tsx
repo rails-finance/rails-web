@@ -345,7 +345,7 @@ export function useAaveV4Cells({ ctx, txHash, blockNumber, wallet, previousRate 
       changed: true,
       value: {
         before: { text: ctx.enabled ? "No" : "Yes" },
-        after: { text: ctx.enabled ? "Yes" : "No", info: undefined },
+        after: { text: ctx.enabled ? "Yes" : "No" },
         afterClass: ctx.enabled ? "text-green-400" : undefined,
       },
     });
@@ -548,13 +548,12 @@ export function useAaveV4Cells({ ctx, txHash, blockNumber, wallet, previousRate 
 
   // The price row's chips: one per distinct asset in the snapshot (collateral
   // + debt), each its historic price at this block. The ≈ prefix on a
-  // stablecoin source tells a pinned $1 from a market price, so that figure
-  // stands as it is.
+  // stablecoin source tells a pinned $1 from a market price.
   const chips: EventPriceChip[] = pricePills.map((p) => ({
     symbol: p.symbol,
     usd: p.usd,
     format: fmtUnitPrice,
-    text: p.source === "stablecoin" ? `≈${fmtUnitPrice(p.usd)}` : undefined,
+    display: p.source === "stablecoin" ? `≈${fmtUnitPrice(p.usd)}` : undefined,
     info: pricePillProv(p.symbol, p.source, p.block, blockNumber),
     title: pricePillTitle(p.symbol, p.source, p.block, blockNumber),
   }));
