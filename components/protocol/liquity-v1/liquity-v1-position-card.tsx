@@ -27,7 +27,7 @@ import {
 } from "@/lib/liquity-v1/event-provenance";
 import { entireCollateralProv, entireDebtProv } from "@/lib/liquity-v1/position-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { liquityV1PositionContent, type LiquityV1EndedBy } from "@/lib/liquity-v1/position-content";
+import { liquityV1PositionModal, type LiquityV1EndedBy } from "@/lib/liquity-v1/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
@@ -161,7 +161,7 @@ export function LiquityV1PositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={liquityV1PositionContent({ status: v.status, endedBy })}
+        learnMore={liquityV1PositionModal(v.status, endedBy)}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -237,7 +237,7 @@ export function LiquityV1PositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={liquityV1PositionContent({ status: v.status })}
+      learnMore={liquityV1PositionModal(v.status)}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

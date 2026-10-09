@@ -1,0 +1,1169 @@
+# Liquity V1 prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a Liquity V1 Trove. The page reads
+# this file and nothing else; the code chooses which strings to say and fills
+# their figures (lib/liquity-v1/event-prose.ts for an event,
+# components/protocol/liquity-v1/liquity-v1-position-explanation.tsx for the
+# position card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  units4: |-
+    up to four places at the card ledger's decimals (2.5, 10.1234)
+  units2: |-
+    two places, grouped (1,800.00)
+  ratio_frac: |-
+    a ratio given as a fraction, as a percent at two places (1.4852 → 148.52%)
+  pct_whole: |-
+    whole percent of a fraction (0.32 → 32%), unsigned
+  usd: |-
+    whole dollars ($4,490)
+  date: |-
+    a UTC day (1 Sep 2025)
+  span: |-
+    a duration as the page writes it (3 months)
+  count: |-
+    a whole number, grouped (1,204)
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  coll_change:
+    rounding: units4
+    means: |-
+      the ETH the event moved, as the header prints it
+  debt_change:
+    rounding: units2
+    means: |-
+      the LUSD debt the event moved, as the header prints it
+  received:
+    rounding: units2
+    means: |-
+      the LUSD the owner received on an open or a draw, as the header prints it
+  repaid:
+    rounding: units2
+    means: |-
+      the LUSD the owner paid to close the Trove: the debt less the 200 LUSD reserve
+  liq_distance_before:
+    rounding: pct_whole
+    means: |-
+      how far ETH could fall before the event, at this block's price, until the Trove reached 110%
+  liq_distance_after:
+    rounding: pct_whole
+    means: |-
+      the same after the event
+  act:
+    rounding: text
+    means: |-
+      the owner's last act before a liquidation (withdrawal, borrow)
+  act_date:
+    rounding: date
+    means: |-
+      the day of that act
+  near_ratio:
+    rounding: ratio_frac
+    means: |-
+      the collateral ratio that act left
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  coll:
+    rounding: units4
+    means: |-
+      the ETH the Trove holds now
+  debt:
+    rounding: units2
+    means: |-
+      the LUSD the Trove owes now
+  coll_usd:
+    rounding: usd
+    means: |-
+      that ETH at Liquity's price feed now
+  pending_eth:
+    rounding: units4
+    means: |-
+      ETH passed to the Trove by liquidations and not yet recorded on it
+  pending_lusd:
+    rounding: units2
+    means: |-
+      LUSD debt passed to the Trove the same way
+  icr:
+    rounding: ratio_frac
+    means: |-
+      the Trove's collateral ratio now
+  drop:
+    rounding: pct_whole
+    means: |-
+      how far ETH can fall before the Trove reaches 110%
+  capacity:
+    rounding: count
+    means: |-
+      the LUSD the Trove could still borrow before its ratio reaches the limit
+  limit:
+    rounding: pct_whole
+    means: |-
+      the borrowing limit: 110%, or 150% in Recovery Mode
+  debt_in_front:
+    rounding: count
+    means: |-
+      the LUSD debt redemptions would clear before this Trove
+  queue_share:
+    rounding: pct_whole
+    means: |-
+      that debt as a share of all the debt in the queue
+  tcr:
+    rounding: ratio_frac
+    means: |-
+      the system's total collateral ratio now
+  ccr:
+    rounding: pct_whole
+    means: |-
+      the total ratio below which Recovery Mode starts (150%)
+  ended:
+    rounding: date
+    means: |-
+      the day the Trove life ended
+  eth_taken:
+    rounding: units4
+    means: |-
+      the ETH redemptions took over the life
+  eth_back:
+    rounding: units4
+    means: |-
+      the ETH the owner took back on closing
+  surplus:
+    rounding: units4
+    means: |-
+      the ETH a full redemption or a capped liquidation left for the owner
+  claimed:
+    rounding: date
+    means: |-
+      the day the owner claimed it
+  net_then:
+    rounding: usd
+    means: |-
+      the redemptions' net for the owner at each redemption's price
+  net_now:
+    rounding: usd
+    means: |-
+      the same at the latest block's price
+  liq_ratio:
+    rounding: ratio_frac
+    means: |-
+      the collateral ratio at the liquidation's price
+  kept:
+    rounding: units2
+    means: |-
+      the LUSD received over the life less the LUSD repaid
+  eth_lost:
+    rounding: units4
+    means: |-
+      the ETH the liquidation took
+  usd_lost:
+    rounding: usd
+    means: |-
+      that ETH at the liquidation's price
+  eth_withdrawn:
+    rounding: units4
+    means: |-
+      the ETH the owner withdrew over the life
+  eth_redeemed:
+    rounding: units4
+    means: |-
+      the ETH redemptions took over the life
+  peak_coll:
+    rounding: units4
+    means: |-
+      the most ETH the life held
+  peak_debt:
+    rounding: units2
+    means: |-
+      the most LUSD debt the life owed
+  duration:
+    rounding: span
+    means: |-
+      how long the life was active
+  opened:
+    rounding: date
+    means: |-
+      the day of the life's first event
+  tx_count:
+    rounding: count
+    means: |-
+      the owner's transactions over the life
+  tx_word:
+    rounding: text
+    means: |-
+      transaction or transactions
+  redemption_count:
+    rounding: count
+    means: |-
+      the redemptions over the life
+  redemption_word:
+    rounding: text
+    means: |-
+      redemption or redemptions
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  act_withdraw: |-
+    withdrawal
+  act_borrow: |-
+    borrow
+  act_both: |-
+    withdrawal and borrow
+  tx_one: |-
+    transaction
+  tx_many: |-
+    transactions
+  redemption_one: |-
+    redemption
+  redemption_many: |-
+    redemptions
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk and History when two of them hold two or more bullets
+# (Liquity V1 has no rate). Risk holds at most four: the ratio and its runway,
+# the room to borrow, the redemption queue, Recovery Mode while it is on.
+# Read by positionWords / positionNodes (lib/liquity-v1/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_history: |-
+    History
+  # ── An open Trove ──
+  lead_debt: |-
+    The Trove holds {coll} ETH of collateral against {debt} LUSD of debt:
+  lead_no_debt: |-
+    The Trove holds {coll} ETH of collateral and owes nothing:
+  coll_worth: |-
+    That collateral is worth {coll_usd} at Liquity's price feed now.
+  debt_parts: |-
+    The debt includes the 200 LUSD liquidation reserve and the one-time borrowing fees.
+  pending: |-
+    Liquidations have passed this Trove {pending_eth} ETH and {pending_lusd} LUSD, added at its next transaction.
+  no_debt: |-
+    With no debt, the Trove cannot be liquidated or redeemed against.
+  coll_ratio: |-
+    The collateral ratio is {icr}, against the 110% minimum.
+  ratio_drop: |-
+    At a collateral ratio of {icr}, ETH can fall about {drop} before the Trove can be liquidated.
+  capacity: |-
+    About {capacity} LUSD more could be borrowed before the ratio falls to {limit}.
+  queue: |-
+    {debt_in_front} LUSD of debt would be redeemed before this Trove, {queue_share} of all the debt.
+  queue_no_share: |-
+    {debt_in_front} LUSD of debt would be redeemed before this Trove.
+  recovery_on: |-
+    The system is in Recovery Mode: its total collateral ratio is {tcr}, below {ccr}.
+  # ── A life the index still has open and the chain has closed ──
+  superseded_owner: |-
+    The chain shows this Trove closed by its owner:
+  superseded_redeemed: |-
+    The chain shows this Trove fully redeemed:
+  superseded_liquidated: |-
+    The chain shows this Trove liquidated:
+  superseded_none: |-
+    The chain has no record of this Trove at the current head:
+  superseded_lag: |-
+    The history here ends before that event, so the figures show the Trove as last recorded.
+  superseded_joins: |-
+    The closing event joins the timeline once it is recorded.
+  # ── A closed or liquidated life ──
+  closed_lead_liquidated: |-
+    This Trove life ended in liquidation on {ended}:
+  closed_lead_liquidated_undated: |-
+    This Trove life ended in liquidation:
+  closed_lead_redeemed: |-
+    This Trove life ended fully redeemed on {ended}:
+  closed_lead_redeemed_undated: |-
+    This Trove life ended fully redeemed:
+  closed_lead_owner: |-
+    The owner closed this Trove life on {ended}:
+  closed_lead_owner_undated: |-
+    The owner closed this Trove life:
+  redemptions_took: |-
+    Redemptions took {eth_taken} ETH over this life.
+  redemption_took: |-
+    A redemption took {eth_taken} ETH.
+  owner_took_back: |-
+    The owner took back {eth_back} ETH.
+  owner_took_back_rest: |-
+    The owner took back the remaining {eth_back} ETH.
+  surplus_waiting: |-
+    {surplus} ETH went to the surplus pool, where it waits for the owner to claim it.
+  surplus_claimed_on: |-
+    {surplus} ETH went to the surplus pool, and the owner claimed it on {claimed}.
+  surplus_claimed: |-
+    {surplus} ETH went to the surplus pool, and the owner claimed it.
+  surplus_left: |-
+    {surplus} ETH went to the surplus pool for the owner.
+  net_both: |-
+    The redemptions netted the owner {net_then} at their prices, and {net_now} against holding the ETH.
+  net_both_one: |-
+    The redemption netted the owner {net_then} at its price, and {net_now} against holding the ETH.
+  net_then: |-
+    The redemptions netted the owner {net_then} at their prices.
+  net_then_one: |-
+    The redemption netted the owner {net_then} at its price.
+  liq_ratio_below: |-
+    Its collateral ratio was {liq_ratio} at liquidation, below the 110% minimum.
+  liq_ratio_recovery: |-
+    Its collateral ratio was {liq_ratio} at liquidation; only Recovery Mode allowed it.
+  kept_net: |-
+    The owner kept {kept} LUSD: what it received less what it repaid.
+  kept_all: |-
+    The owner kept the {kept} LUSD received over the Trove's life.
+  kept_none: |-
+    The owner received and repaid {kept} LUSD over the Trove's life.
+  lost: |-
+    The liquidation took {eth_lost} ETH, worth {usd_lost} at the liquidation price.
+  withdrew_redeemed: |-
+    Over the life the owner withdrew {eth_withdrawn} ETH and redemptions took {eth_redeemed} ETH.
+  withdrew: |-
+    Over the life the owner withdrew {eth_withdrawn} ETH.
+  peaks: |-
+    At its height it held {peak_coll} ETH against {peak_debt} LUSD of debt.
+  active: |-
+    It was active for {duration} from {opened}.
+  counts_both: |-
+    It recorded {tx_count} owner {tx_word} and {redemption_count} {redemption_word}.
+  counts_owner: |-
+    It recorded {tx_count} owner {tx_word}.
+  counts_redeemed: |-
+    It recorded {redemption_count} {redemption_word} and no owner transactions.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  draw.no_fee:
+    when: |-
+      the draw's borrowing fee was zero, which happens only in Recovery Mode
+    text: |-
+      No borrowing fee was charged because the system was in Recovery Mode.
+  liq.after:
+    when: |-
+      the Trove has debt and a price at this block, and ETH can fall before it reaches 110%
+    text: |-
+      ETH would need to fall {liq_distance_after} from this block's price for the Trove to reach liquidation.
+  liq.safer:
+    when: |-
+      the event raised the room above 110%
+    text: |-
+      The Trove is safer: ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+  liq.less_safe:
+    when: |-
+      the event lowered the room above 110%
+    text: |-
+      The Trove is less safe: ETH would now need to fall {liq_distance_after} to reach liquidation, against {liq_distance_before} before.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: liquity1.open
+    title: |-
+      Open
+    when: |-
+      openTrove
+    L5: open
+    variants:
+      default: |-
+        always
+    sentences:
+      open.what:
+        when: |-
+          the row does not carry the LUSD the owner received
+        text: |-
+          The owner opened the Trove with {coll_change} ETH of collateral and {debt_change} LUSD of debt.
+      open.what_received:
+        when: |-
+          the row carries the LUSD the owner received
+        text: |-
+          The owner opened the Trove with {coll_change} ETH of collateral and received {received} LUSD.
+    order:
+      - open.what
+      - open.what_received
+      - draw.no_fee
+      - liq.after
+    groups:
+      happened: [open.what, open.what_received]
+      adds_up: [draw.no_fee]
+      leaves: [liq.after]
+    alternates:
+      - [open.what, open.what_received]
+
+  - id: liquity1.adjust
+    title: |-
+      Adjust
+    when: |-
+      adjustTrove: the owner added or withdrew ETH, borrowed or repaid, or both
+    L5: adjust
+    variants:
+      add: |-
+        added ETH only
+      withdraw: |-
+        withdrew ETH only
+      borrow: |-
+        borrowed only
+      repay: |-
+        repaid only
+      add_borrow: |-
+        added ETH and borrowed
+      add_repay: |-
+        added ETH and repaid
+      withdraw_borrow: |-
+        withdrew ETH and borrowed
+      withdraw_repay: |-
+        withdrew ETH and repaid
+    sentences:
+      add.what:
+        when: |-
+          add, add_borrow, add_repay
+        text: |-
+          The owner added {coll_change} ETH of collateral.
+      withdraw.what:
+        when: |-
+          withdraw, withdraw_borrow, withdraw_repay
+        text: |-
+          The owner withdrew {coll_change} ETH of collateral.
+      borrow.what:
+        when: |-
+          borrow, add_borrow, withdraw_borrow, where the row does not carry the LUSD received
+        text: |-
+          The owner borrowed more, raising the debt by {debt_change} LUSD.
+      borrow.what_received:
+        when: |-
+          borrow, add_borrow, withdraw_borrow, where the row carries the LUSD received
+        text: |-
+          The owner borrowed {received} LUSD more.
+      repay.what:
+        when: |-
+          repay, add_repay, withdraw_repay
+        text: |-
+          The owner repaid {debt_change} LUSD of debt.
+    order:
+      - add.what
+      - withdraw.what
+      - borrow.what
+      - borrow.what_received
+      - repay.what
+      - draw.no_fee
+      - liq.safer
+      - liq.less_safe
+    groups:
+      happened: [add.what, withdraw.what, borrow.what, borrow.what_received, repay.what]
+      adds_up: [draw.no_fee]
+      leaves: [liq.safer, liq.less_safe]
+    alternates:
+      - [add.what, withdraw.what]
+      - [borrow.what, borrow.what_received, repay.what]
+      - [liq.safer, liq.less_safe]
+
+  - id: liquity1.close
+    title: |-
+      Close
+    when: |-
+      closeTrove
+    L5: close
+    variants:
+      default: |-
+        always
+    sentences:
+      close.what:
+        when: |-
+          always
+        text: |-
+          The owner closed the Trove, repaying {repaid} LUSD and taking back {coll_change} ETH.
+    order:
+      - close.what
+    groups:
+      happened: [close.what]
+
+  - id: liquity1.redemption
+    title: |-
+      Redemption
+    when: |-
+      redemption
+    L5: redemption
+    variants:
+      partial: |-
+        the Trove kept some debt
+      full: |-
+        the redemption cleared the whole debt and closed the Trove
+    sentences:
+      redeem.what:
+        when: |-
+          partial
+        text: |-
+          An LUSD holder redeemed {debt_change} LUSD against this Trove for {coll_change} ETH.
+      redeem.what_full:
+        when: |-
+          full
+        text: |-
+          An LUSD holder's redemption cleared the Trove's whole {debt_change} LUSD debt and closed it.
+      redeem.why:
+        when: |-
+          always
+        text: |-
+          This Trove's collateral ratio was among the lowest at the time, so the redemption reached it.
+    order:
+      - redeem.what
+      - redeem.what_full
+      - redeem.why
+      - liq.safer
+    groups:
+      happened: [redeem.what, redeem.what_full, redeem.why]
+      leaves: [liq.safer]
+    alternates:
+      - [redeem.what, redeem.what_full]
+
+  - id: liquity1.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation
+    L5: liquidation
+    variants:
+      below_min: |-
+        the ratio at the liquidation's price was below 110%
+      recovery: |-
+        the ratio was 110% or more, so Recovery Mode allowed it
+      unpriced: |-
+        the row carries no price yet
+    sentences:
+      liq.what:
+        when: |-
+          always
+        text: |-
+          The Trove was liquidated, losing {coll_change} ETH of collateral and clearing {debt_change} LUSD of debt.
+      liq.why_below:
+        when: |-
+          below_min
+        text: |-
+          Its collateral ratio was below the 110% minimum, so anyone could liquidate it.
+      liq.why_recovery:
+        when: |-
+          recovery
+        text: |-
+          Its collateral ratio was above 110%, so only Recovery Mode made the liquidation possible.
+      liq.near_line:
+        when: |-
+          the owner's last withdrawal or borrow took the ratio near the line
+        text: |-
+          The owner's {act} on {act_date} had left the collateral ratio at {near_ratio}.
+    order:
+      - liq.what
+      - liq.why_below
+      - liq.why_recovery
+      - liq.near_line
+    groups:
+      happened: [liq.what, liq.why_below, liq.why_recovery, liq.near_line]
+    alternates:
+      - [liq.why_below, liq.why_recovery]
+
+  - id: liquity1.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The Trove recorded a {event_type} event.
+    order:
+      - fallback.what
+    groups:
+      happened: [fallback.what]
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  BORROW_HOW: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#how-can-i-borrow-with-liquity
+  TROVE: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#what-is-a-trove
+  FEES: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#do-i-have-to-pay-fees-as-a-borrower
+  FEE_CALC: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#how-is-the-borrowing-fee-calculated
+  COLLATERAL_RATIO: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#what-is-the-collateral-ratio
+  RESERVE: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#what-is-the-liquidation-reserve
+  REDEEMED_AGAINST: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#what-happens-if-my-trove-is-redeemed-against
+  REDISTRIBUTION: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing#why-did-the-collateral-and-debt-of-my-trove-increase-without-my-intervention
+  REDEMPTIONS: |-
+    https://docs.liquity.org/liquity-v1/faq/lusd-redemptions#what-are-redemptions
+  REDEMPTION_LOSS: |-
+    https://docs.liquity.org/liquity-v1/faq/lusd-redemptions#as-a-borrower-do-i-lose-money-if-im-redeemed-against
+  REDEMPTION_AVOID: |-
+    https://docs.liquity.org/liquity-v1/faq/lusd-redemptions#how-can-i-avoid-being-redeemed-against
+  LIQUIDATIONS: |-
+    https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations#what-are-liquidations
+  LIQUIDATOR: |-
+    https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations#who-can-liquidate-troves
+  SP_EMPTY: |-
+    https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations#what-happens-if-the-stability-pool-is-empty-when-liquidations-occur
+  RECOVERY_MODE: |-
+    https://docs.liquity.org/liquity-v1/faq/recovery-mode#what-is-recovery-mode
+  RECOVERY_LIQUIDATIONS: |-
+    https://docs.liquity.org/liquity-v1/faq/recovery-mode#how-do-liquidations-work-in-recovery-mode
+  RECOVERY_CAP: |-
+    https://docs.liquity.org/liquity-v1/faq/recovery-mode#how-much-of-a-troves-collateral-can-be-liquidated-in-recovery-mode
+  WHAT_IS_LIQUITY: |-
+    https://docs.liquity.org/liquity-v1/faq/general#what-is-liquity
+  FAQ_GENERAL: |-
+    https://docs.liquity.org/liquity-v1/faq/general
+  FAQ_BORROWING: |-
+    https://docs.liquity.org/liquity-v1/faq/borrowing
+  FAQ_REDEMPTIONS: |-
+    https://docs.liquity.org/liquity-v1/faq/lusd-redemptions
+  FAQ_LIQUIDATIONS: |-
+    https://docs.liquity.org/liquity-v1/faq/stability-pool-and-liquidations
+  FAQ_RECOVERY: |-
+    https://docs.liquity.org/liquity-v1/faq/recovery-mode
+
+# ── The "?" modals (zone Z4): the event modals, the position card's and the
+# Lifetime flows panel's. Each stops at the mechanism and hands it to a Quick
+# Link; no figure of one Trove appears here. ──
+L5:
+  open:
+    title: |-
+      How Opening a Trove Works
+    intro: |-
+      A Liquity V1 Trove holds ETH as collateral and mints LUSD, a dollar stablecoin, against it. The loan charges no interest.
+    stepsHeading: |-
+      Opening a Trove:
+    steps:
+      - |-
+        The owner deposits ETH and chooses how much LUSD to receive.
+      - |-
+        The debt is the LUSD received, a one-time borrowing fee and the 200 LUSD liquidation reserve.
+      - |-
+        The debt must be at least 2,000 LUSD, and the collateral ratio at least 110%.
+      - |-
+        In Recovery Mode a new Trove needs a collateral ratio of 150% or more.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrowing fee
+        text: |-
+          a one-time charge on each draw, from 0.5% to 5% of the LUSD drawn, and zero in Recovery Mode.
+      - bold: |-
+          Liquidation reserve
+        text: |-
+          200 LUSD added to the debt to pay a liquidator's gas; the owner does not repay it on closing.
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the dollar value of the ETH divided by the LUSD debt.
+    links:
+      - label: |-
+          How can I borrow with Liquity?
+        doc: BORROW_HOW
+      - label: |-
+          Do I have to pay fees as a borrower?
+        doc: FEES
+      - label: |-
+          What is the Liquidation Reserve?
+        doc: RESERVE
+      - label: |-
+          What is Recovery Mode?
+        doc: RECOVERY_MODE
+
+  adjust:
+    title: |-
+      How Adjusting a Trove Works
+    intro: |-
+      An adjustment adds or withdraws ETH, borrows more LUSD or repays some of the debt, without closing the Trove.
+    stepsHeading: |-
+      Limits:
+    steps:
+      - |-
+        Adding ETH or repaying raises the collateral ratio and is allowed at any time.
+      - |-
+        Withdrawing or borrowing lowers the ratio, which must stay at 110% or more.
+      - |-
+        A repayment must leave at least 2,000 LUSD of debt; to go lower, the owner closes the Trove.
+      - |-
+        In Recovery Mode no ETH can be withdrawn, and new debt needs a ratio of 150% or more.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrowing fee
+        text: |-
+          a one-time charge on each draw, from 0.5% to 5% of the LUSD drawn, and zero in Recovery Mode.
+      - bold: |-
+          Recovery Mode
+        text: |-
+          the state the system enters when the total collateral ratio of all Troves falls below 150%.
+    links:
+      - label: |-
+          What is the collateral ratio?
+        doc: COLLATERAL_RATIO
+      - label: |-
+          How is the borrowing fee calculated?
+        doc: FEE_CALC
+      - label: |-
+          What is Recovery Mode?
+        doc: RECOVERY_MODE
+
+  close:
+    title: |-
+      How Closing a Trove Works
+    intro: |-
+      Closing repays the Trove's debt and returns all its ETH to the owner in one transaction.
+    stepsHeading: |-
+      Limits:
+    steps:
+      - |-
+        The owner repays the debt less the 200 LUSD liquidation reserve.
+      - |-
+        A Trove cannot close while the system is in Recovery Mode.
+      - |-
+        The same address can then open a new Trove.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidation reserve
+        text: |-
+          200 LUSD added to the debt to pay a liquidator's gas; the owner does not repay it on closing.
+      - bold: |-
+          Recovery Mode
+        text: |-
+          the state the system enters when the total collateral ratio of all Troves falls below 150%.
+    links:
+      - label: |-
+          What is a Trove?
+        doc: TROVE
+      - label: |-
+          What is the Liquidation Reserve?
+        doc: RESERVE
+      - label: |-
+          What is Recovery Mode?
+        doc: RECOVERY_MODE
+
+  redemption:
+    title: |-
+      How Redemptions Work
+    intro: |-
+      Anyone holding LUSD can swap it for ETH at $1 per LUSD, at the protocol's ETH price. This holds LUSD near a dollar.
+    stepsHeading: |-
+      What happens to a redeemed Trove:
+    steps:
+      - |-
+        Redemptions start with the Troves at the lowest collateral ratios, whatever their level.
+      - |-
+        The LUSD cancels debt, and ETH worth the same amount leaves the Trove to the redeemer.
+      - |-
+        The collateral ratio rises, because both sides fall by the same dollar amount.
+      - |-
+        A redemption that clears the whole debt closes the Trove, and the owner claims the ETH left.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Redemption fee
+        text: |-
+          paid by the redeemer out of the ETH received: 0.5% plus a base rate that rises with recent redemptions.
+      - bold: |-
+          Net outcome
+        text: |-
+          at the redemption price the owner neither gains nor loses, and gives up exposure to the ETH taken.
+    links:
+      - label: |-
+          What are redemptions?
+        doc: REDEMPTIONS
+      - label: |-
+          What happens if my Trove is redeemed against?
+        doc: REDEEMED_AGAINST
+      - label: |-
+          Do I lose money if I'm redeemed against?
+        doc: REDEMPTION_LOSS
+      - label: |-
+          How can I avoid being redeemed against?
+        doc: REDEMPTION_AVOID
+
+  liquidation:
+    title: |-
+      How Liquidation Works
+    intro: |-
+      Anyone can liquidate a Trove whose collateral ratio is below 110%. The whole Trove closes, and the owner keeps the LUSD borrowed but loses the ETH.
+    stepsHeading: |-
+      Where the debt and the ETH go:
+    steps:
+      - |-
+        The Stability Pool's LUSD pays off the debt, and its depositors receive the ETH.
+      - |-
+        If the pool holds too little LUSD, the rest passes to the other Troves by their collateral.
+      - |-
+        The liquidator receives the 200 LUSD reserve and 0.5% of the Trove's ETH.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Stability Pool
+        text: |-
+          a pool of LUSD deposited by anyone, which pays off liquidated debt in exchange for the ETH.
+      - bold: |-
+          Recovery Mode
+        text: |-
+          while the total collateral ratio of all Troves is below 150%, a Trove below that total can also be liquidated.
+      - bold: |-
+          Capped loss
+        text: |-
+          in Recovery Mode the loss stops at ETH worth 110% of the debt, and the owner can claim the rest.
+    links:
+      - label: |-
+          What are liquidations?
+        doc: LIQUIDATIONS
+      - label: |-
+          Who can liquidate Troves?
+        doc: LIQUIDATOR
+      - label: |-
+          What if the Stability Pool is empty?
+        doc: SP_EMPTY
+      - label: |-
+          How do liquidations work in Recovery Mode?
+        doc: RECOVERY_LIQUIDATIONS
+
+  fallback:
+    title: |-
+      How Liquity V1 Troves Work
+    intro: |-
+      Liquity V1 lends LUSD against ETH with no interest. Each address holds one Trove at a time.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the ETH's dollar value divided by the LUSD debt; below 110% the Trove can be liquidated.
+      - bold: |-
+          Redemptions
+        text: |-
+          LUSD holders swap LUSD for ETH at $1, starting with the lowest-ratio Troves.
+      - bold: |-
+          Liquidation reserve
+        text: |-
+          200 LUSD added to the debt to pay a liquidator's gas; the owner does not repay it on closing.
+      - bold: |-
+          Recovery Mode
+        text: |-
+          the state the system enters when the total collateral ratio of all Troves falls below 150%.
+    links:
+      - label: |-
+          What is Liquity?
+        doc: WHAT_IS_LIQUITY
+      - label: |-
+          What is a Trove?
+        doc: TROVE
+      - label: |-
+          What are redemptions?
+        doc: REDEMPTIONS
+      - label: |-
+          What are liquidations?
+        doc: LIQUIDATIONS
+
+  position_open:
+    title: |-
+      About This Position
+    intro: |-
+      The card states what backs the LUSD debt now, and how close the Trove is to redemption and to liquidation.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the ETH's dollar value at the protocol's price divided by the LUSD debt, which must stay at 110% or more.
+      - bold: |-
+          No interest
+        text: |-
+          the debt changes only when the owner borrows or repays, or a redemption or liquidation reaches the Trove.
+      - bold: |-
+          Redemption queue
+        text: |-
+          LUSD holders redeem against the lowest-ratio Troves first, so the debt ahead of a Trove goes before it.
+      - bold: |-
+          Redistribution
+        text: |-
+          when the Stability Pool runs short, a liquidated Trove's debt and ETH pass to the other Troves by their collateral.
+      - bold: |-
+          Recovery Mode
+        text: |-
+          while the total collateral ratio of all Troves is below 150%, a Trove below that total can be liquidated above 110%.
+    links:
+      - label: |-
+          What is the collateral ratio?
+        doc: COLLATERAL_RATIO
+      - label: |-
+          How can I avoid being redeemed against?
+        doc: REDEMPTION_AVOID
+      - label: |-
+          Why did my Trove's collateral and debt increase?
+        doc: REDISTRIBUTION
+      - label: |-
+          What is Recovery Mode?
+        doc: RECOVERY_MODE
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      The owner closed this Trove: they repaid its debt and took back all its ETH. The card shows the most ETH and debt it held.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Closing
+        text: |-
+          the owner repays the debt less the 200 LUSD liquidation reserve and receives all the ETH.
+      - bold: |-
+          Full redemption
+        text: |-
+          when redemptions clear the whole debt, the Trove closes and the owner claims the ETH left.
+      - bold: |-
+          Liquidation reserve
+        text: |-
+          200 LUSD added to the debt to pay a liquidator's gas; the owner does not repay it on closing.
+    links:
+      - label: |-
+          What is a Trove?
+        doc: TROVE
+      - label: |-
+          What is the Liquidation Reserve?
+        doc: RESERVE
+      - label: |-
+          What happens if my Trove is redeemed against?
+        doc: REDEEMED_AGAINST
+
+  position_redeemed:
+    title: |-
+      About This Position
+    intro: |-
+      Redemptions cleared the whole of this Trove's debt, which closed it. The card shows the ETH left for the owner while it is unclaimed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Full redemption
+        text: |-
+          when redemptions clear the whole debt, the Trove closes and the owner claims the ETH left.
+      - bold: |-
+          Surplus pool
+        text: |-
+          where the ETH a full redemption leaves waits until the owner's wallet claims it.
+      - bold: |-
+          Liquidation reserve
+        text: |-
+          200 LUSD added to the debt to pay a liquidator's gas; the owner does not repay it on closing.
+    links:
+      - label: |-
+          What happens if my Trove is redeemed against?
+        doc: REDEEMED_AGAINST
+      - label: |-
+          Do I lose money if I'm redeemed against?
+        doc: REDEMPTION_LOSS
+      - label: |-
+          What is the Liquidation Reserve?
+        doc: RESERVE
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      This Trove was liquidated. The card shows the most ETH and LUSD debt it held.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidation
+        text: |-
+          below 110%, or below the system's total ratio in Recovery Mode, anyone can liquidate the whole Trove.
+      - bold: |-
+          Stability Pool
+        text: |-
+          a pool of LUSD deposited by anyone, which pays off liquidated debt in exchange for the ETH.
+      - bold: |-
+          Redistribution
+        text: |-
+          when the Stability Pool runs short, a liquidated Trove's debt and ETH pass to the other Troves by their collateral.
+      - bold: |-
+          Capped loss
+        text: |-
+          in Recovery Mode the loss stops at ETH worth 110% of the debt, and the owner can claim the rest.
+    links:
+      - label: |-
+          What are liquidations?
+        doc: LIQUIDATIONS
+      - label: |-
+          What if the Stability Pool is empty?
+        doc: SP_EMPTY
+      - label: |-
+          How much collateral can a Recovery Mode liquidation take?
+        doc: RECOVERY_CAP
+
+  flows:
+    title: |-
+      About the Lifetime Flows
+    intro: |-
+      This panel adds up what moved in and out of the Trove over its life, from each of its events.
+    stepsHeading: |-
+      How to read it:
+    steps:
+      - |-
+        The collateral bar counts ETH in and out; the solid part is still deposited.
+      - |-
+        The debt bar counts LUSD borrowed, fees, the reserve and redistributed debt against what left.
+      - |-
+        Each flow is valued at Liquity's ETH price at its block, and LUSD at $1.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          No interest
+        text: |-
+          the debt changes only when the owner borrows or repays, or a redemption or liquidation reaches the Trove.
+      - bold: |-
+          Debt taken on
+        text: |-
+          each draw adds the LUSD received plus a one-time fee, and opening adds the 200 LUSD reserve.
+    links:
+      - label: |-
+          How is the borrowing fee calculated?
+        doc: FEE_CALC
+      - label: |-
+          What are redemptions?
+        doc: REDEMPTIONS
+      - label: |-
+          What are liquidations?
+        doc: LIQUIDATIONS
+
+# ── The Quick Links of the "Claim collateral" modal (its words are shared by
+# every Liquity family, lib/shared/learn-more-content.ts) ──
+claim_links:
+  - label: |-
+      What are liquidations?
+    doc: LIQUIDATIONS
+  - label: |-
+      What happens if my Trove is redeemed against?
+    doc: REDEEMED_AGAINST
+  - label: |-
+      How much collateral can a Recovery Mode liquidation take?
+    doc: RECOVERY_CAP
+
+# ── The info page (/ethereum/liquity-v1/info, zone Z5): the protocol and its terms ──
+info:
+  title: |-
+    About Liquity V1
+  intro: |-
+    Liquity V1 is a borrowing protocol on Ethereum, launched in 2021 and not upgradeable. Borrowers lock ETH and mint LUSD against it, with no interest. Four mechanisms keep LUSD backed: a minimum collateral ratio, liquidation into the Stability Pool, redemptions, and Recovery Mode.
+  detailsHeading: |-
+    Terms:
+  details:
+    - bold: |-
+        Trove
+      text: |-
+        one borrower's loan: the ETH they deposited and the LUSD debt against it. One address holds one Trove at a time; each Trove it opens after closing one is a new life on this explorer.
+      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
+    - bold: |-
+        LUSD
+      text: |-
+        the dollar stablecoin a Trove mints. Anyone can redeem LUSD for $1 of ETH from the Troves, which keeps its price near a dollar.
+      sources: [{ label: "Liquity V1 FAQ", doc: FAQ_GENERAL }]
+    - bold: |-
+        Collateral ratio
+      text: |-
+        the ETH's dollar value at the protocol's price, divided by the LUSD debt. Below 110% a Trove can be liquidated.
+      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
+    - bold: |-
+        Stability Pool
+      text: |-
+        a pool of LUSD deposited by anyone. When a Trove is liquidated, the pool's LUSD clears its debt and the depositors receive its ETH, worth up to 10% more than the LUSD they gave up.
+      sources: [{ label: "Stability Pool and liquidations FAQ", doc: FAQ_LIQUIDATIONS }]
+    - bold: |-
+        Redemption
+      text: |-
+        swapping LUSD for ETH at $1 per LUSD. The LUSD cancels debt in the lowest-ratio Troves first, and ETH of equal value leaves them to the redeemer.
+      sources: [{ label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
+    - bold: |-
+        Recovery Mode
+      text: |-
+        the state the system enters when the total collateral ratio of all Troves falls below 150%. Troves below the system ratio can then be liquidated, and withdrawals and new debt are restricted until the ratio recovers.
+      sources: [{ label: "Recovery Mode FAQ", doc: FAQ_RECOVERY }]
+    - bold: |-
+        Fees
+      text: |-
+        a one-time borrowing fee on each draw (0.5% to 5%) and a redemption fee paid by redeemers. Both rise after redemptions and fall back over time.
+      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }, { label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
+    - bold: |-
+        Liquidation reserve
+      text: |-
+        200 LUSD of every Trove's debt is minted to the reserve pool (Liquity's gas pool) when it opens. It stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.
+      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
+  links:
+    - label: |-
+        Liquity V1 FAQ
+      doc: FAQ_GENERAL
+    - label: |-
+        Borrowing FAQ
+      doc: FAQ_BORROWING
+    - label: |-
+        Stability Pool and liquidations FAQ
+      doc: FAQ_LIQUIDATIONS
+    - label: |-
+        Recovery Mode FAQ
+      doc: FAQ_RECOVERY

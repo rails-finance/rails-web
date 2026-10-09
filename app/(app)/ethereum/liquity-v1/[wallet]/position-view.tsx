@@ -64,7 +64,8 @@ import { LiquityV1FlowsNote } from "@/lib/shared/liquity-flows-explanation";
 import { liquityV1FlowEvents, liquityV1FlowTxs } from "@/lib/liquity-v1/flows";
 import { useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { liquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
-import { liquityV1EconomicsContent, liquityV1RedemptionOutcome } from "@/lib/liquity-v1/economics-explanation";
+import { liquityV1RedemptionOutcome } from "@/lib/liquity-v1/economics-explanation";
+import { liquityV1Modal } from "@/lib/liquity-v1/event-templates";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import {
   useLiquityV1EventReads,
@@ -623,7 +624,7 @@ export default function LiquityV1TroveView({
                     />
                   </div>
                 }
-                learnMore={liquityV1EconomicsContent()}
+                learnMore={liquityV1Modal("flows")}
                 outcome={liquityV1RedemptionOutcome(redemptions, priceNow)}
               />
             )}

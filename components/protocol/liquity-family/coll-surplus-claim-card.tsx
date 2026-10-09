@@ -28,6 +28,7 @@ import { formatNum } from "@/lib/shared/format-event";
 import type { BaseActivityEvent, CollSurplusClaimContext } from "@/lib/shared/types/event-shape";
 import type { LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
 import { liquityCollSurplusClaimContent } from "@/lib/shared/learn-more-content";
+import { liquityV1ClaimLinks } from "@/lib/liquity-v1/event-templates";
 import { claimOthers } from "@/lib/shared/liquity-coll-surplus-claim";
 import {
   claimAmountProv,
@@ -181,7 +182,11 @@ export function CollSurplusClaimCard({
   ].filter((n) => n != null);
 
   const learnMore = liquityCollSurplusClaimContent(
-    fork ? { family: "fork", fork } : { family: v1 ? "liquity-v1" : "liquity-v2", protocolName: d.protocolName },
+    fork
+      ? { family: "fork", fork }
+      : v1
+        ? { family: "liquity-v1", protocolName: d.protocolName, links: liquityV1ClaimLinks() }
+        : { family: "liquity-v2", protocolName: d.protocolName },
   );
 
   // Paid states its dollars at the claim's block as a chip after the figure.

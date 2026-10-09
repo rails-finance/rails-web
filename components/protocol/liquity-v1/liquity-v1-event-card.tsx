@@ -14,11 +14,9 @@ import { liquityV1HeadSpec } from "./liquity-v1-event-header";
 import { LIQUITY_V1_CELL_HEADS, useLiquityV1Opened } from "./liquity-v1-event-detail";
 import { LiquityV1EventExplainer, liquityV1LearnMoreContent } from "./liquity-v1-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { liquityV1ExplainerTeaser } from "@/lib/liquity-v1/explainer-clauses";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL, LIQUITY_V1_ADDRESSES } from "@/lib/liquity-v1/asset-catalog";
 import { LIQUITY_V1_RESERVE } from "@/lib/liquity-v1/event-figures";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
-import { InLedgerFigures } from "@/components/shared/event-ledger-context";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
 
 export interface LiquityV1EventCardProps {
@@ -127,6 +125,8 @@ export function LiquityV1EventCard({
         </LiquityLedgerProvider>
       ),
     },
+    // The pane draws every bullet: whether it groups them waits on the
+    // receipt read, which starts only when the card opens.
     explainer: {
       body: (
         <LiquityV1EventExplainer
@@ -134,14 +134,9 @@ export function LiquityV1EventCard({
           txHash={event.txHash}
           blockNumber={event.blockNumber}
           wallet={event.wallet}
-          currentPrice={currentPrice}
           ownerOutcome={isLiq ? ownerOutcome : null}
-          skipLead
         />
       ),
-      first: liquityV1ExplainerTeaser(ctx, coords) ? (
-        <InLedgerFigures build={() => liquityV1ExplainerTeaser(ctx, coords)} />
-      ) : undefined,
     },
     learnMore: <LearnMore inline content={liquityV1LearnMoreContent(ctx)} />,
   };

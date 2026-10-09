@@ -1,41 +1,57 @@
 "use client";
 
-// Plain-language, data-driven explanation of a Liquity V1 Trove — the Trove
-// analog of the Spark / Aave position explanations, built straight from the
-// chain-state response (getEntireDebtAndColl + PriceFeed + getCurrentICR @
-// head): a few neutral bullets describing the holding, the ratio, the distance
-// to liquidation, the redemption queue and — when present — pending
-// redistribution rewards. Rendered inside the position card's Explanation
-// heading-button (the V4/trove grammar) via the card's `explanation` prop.
-//
-// Every figure here is the same chain-state values shown (and <Prov>-traced) on the
-// surfaces around it — this panel only narrates it. Third person throughout.
+// The Liquity V1 position card's explanation (zone Z1): a colon-terminated
+// lead, then bullets under Holdings, Risk and History when two of them hold
+// two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3;
+// Liquity V1 has no rate). The words are content/liquity-v1/event-prose.yaml's
+// `position_words`; this file chooses which to say and draws each figure as
+// the card does (its receipt, or the card's amount format). The open Trove's
+// figures are the chain read at head; an ended life's are its replayed record.
+// The mechanisms behind them are the card's "?" (position_* in the same file).
 
+import type { ReactNode } from "react";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
 import type { LiquityV1PositionView } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { Prov } from "@/components/shared/provenance";
-import { peakCollateralProv, peakDebtProv } from "@/lib/liquity-v1/event-provenance";
+import { peakCollateralProv, peakDebtProv, surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatDate, formatDuration } from "@/lib/date";
 import { pct } from "@/components/shared/ratio-bar";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { liquityV1LiquidationContent } from "@/lib/shared/learn-more-content";
-import { surplusClaimableProv } from "@/lib/liquity-v1/event-provenance";
 import type { LiquityV1Surplus } from "@/lib/liquity-v1/use-event-read";
 import type { LiquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
-import { liquityV1OutcomeSentences, liquityV1RouteSentences } from "@/lib/liquity-v1/explainer-clauses";
 import { fmtEth, fmtLusd, fmtPct, fmtUsdSigned } from "@/lib/liquity-v1/event-figures";
 import type { LiquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
+import { liquityV1Modal, positionWords, V1_WORDS } from "@/lib/liquity-v1/event-templates";
+import { positionNodes } from "@/lib/liquity-v1/position-nodes";
+import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 
 const DUST = 1e-9;
+/** An ETH figure below this rounds to nothing at four places. */
+const EPS_ETH = 5e-5;
+
+const GROUPS = ["holdings", "risk", "history"] as const;
+type Group = (typeof GROUPS)[number];
+type Bullet = { group: Group; node: ReactNode };
+
+const arrange = (bullets: Bullet[]) => {
+  const heading: Record<Group, string> = {
+    holdings: positionWords("heading_holdings"),
+    risk: positionWords("heading_risk"),
+    history: positionWords("heading_history"),
+  };
+  return arrangeByHeading(bullets, GROUPS, (g) => heading[g]);
+};
+
+const pctOf = (ratio: number) => `${(ratio * 100).toFixed(0)}%`;
 
 export function LiquityV1PositionExplanation({
   chain,
 }: {
-  /** The live chain read. Null until it lands:
-   *  nothing is narrated, and the pane still mounts so its foot controls draw. */
+  /** The live chain read. Null until it lands: nothing is narrated, and the
+   *  pane still mounts so its foot controls draw. */
   chain: LiquityV1PositionChainResponse | null;
 }) {
   if (!chain || chain.chainStale || chain.troveStatus !== "active") return null;
@@ -45,195 +61,118 @@ export function LiquityV1PositionExplanation({
   const liqPrice = hasDebt && chain.coll > 0 ? (chain.debt * chain.mcr) / chain.coll : null;
   const dropPct = liqPrice != null && chain.price > 0 ? Math.round((1 - liqPrice / chain.price) * 100) : null;
 
-  // Status lead — subject-first, one sentence, two figures, colon-terminated
-  // (charter §4). The ETH and LUSD figures are on the card's stat row, so they
-  // carry the highlight.
-  const lead = (
-    <>
-      The Trove holds{" "}
-      <H>
-        <AmountText value={chain.coll} /> ETH
-      </H>{" "}
-      of collateral
-      {hasDebt ? (
-        <>
-          {" "}
-          against{" "}
+  // The ETH and LUSD figures are on the card's stat row, so they carry the highlight.
+  const coll = (
+    <H>
+      <AmountText value={chain.coll} />
+    </H>
+  );
+  const lead = hasDebt
+    ? positionNodes("lead_debt", {
+        coll,
+        debt: (
           <H>
-            <AmountText value={chain.debt} /> LUSD
-          </H>{" "}
-          of debt:
-        </>
-      ) : (
-        <> and owes nothing:</>
-      )}
-    </>
-  );
+            <AmountText value={chain.debt} />
+          </H>
+        ),
+      })
+    : positionNodes("lead_no_debt", { coll });
 
-  const bullets: React.ReactNode[] = [];
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
 
-  if (collUsd > 0) {
-    // The USD value has no stat-row twin on this card, so it stays muted.
-    bullets.push(
-      <span key="worth">
-        At the ETH price from Liquity&rsquo;s price feed now, that collateral is worth {fmtUsd(collUsd).display}.
-      </span>,
+  if (collUsd > 0) add("holdings", "worth", positionNodes("coll_worth", { coll_usd: fmtUsd(collUsd).display }));
+  if (hasDebt) add("holdings", "parts", positionNodes("debt_parts"));
+  if (chain.pendingEthReward > DUST || chain.pendingLusdReward > DUST)
+    add(
+      "holdings",
+      "pending",
+      positionNodes("pending", {
+        pending_eth: <AmountText value={chain.pendingEthReward} />,
+        pending_lusd: <AmountText value={chain.pendingLusdReward} />,
+      }),
     );
-  }
 
-  if (!hasDebt) {
-    bullets.push(
-      <span key="no-debt">
-        Liquidation and redemption both act on debt, so with none outstanding the collateral answers to the owner alone.
-      </span>,
-    );
-  } else {
-    bullets.push(
-      <span key="interest-free">
-        Liquity V1 charges no interest, so the LUSD figure is the Trove&rsquo;s whole debt: the LUSD received, the
-        one-time borrowing fees, the 200 LUSD liquidation reserve, and any debt shared out to it from liquidations the
-        Stability Pool could not cover.
-      </span>,
-    );
-    if (chain.icr != null) {
-      bullets.push(
-        <span key="ratio">
-          The collateral ratio is <H>{(chain.icr * 100).toFixed(1)}%</H> — the collateral is worth{" "}
-          {chain.icr.toFixed(2)}× the debt.
-        </span>,
-      );
-      bullets.push(
-        <span key="liq-line">
-          Below <H>{(chain.mcr * 100).toFixed(0)}%</H> anyone can liquidate the Trove: the Stability Pool takes its debt
-          and its ETH, and the owner keeps the LUSD borrowed.
-        </span>,
-      );
-    }
-    if (liqPrice != null && dropPct != null && dropPct > 0) {
-      bullets.push(
-        <span key="drop">
-          ETH can fall about <H>{dropPct}%</H> (to <H>{fmtUsd(liqPrice).display}</H>) before liquidation.
-        </span>,
-      );
-    }
-    {
-      // Borrowing headroom to the active minimum — the risk row's own formula
-      // (coll × price ÷ active ratio − debt), so the figures twin.
-      const activeRatio = chain.recoveryMode ? chain.ccr : chain.mcr;
-      const headroomLusd = Math.max(0, (chain.coll * chain.price) / activeRatio - chain.debt);
-      if (chain.icr != null && headroomLusd > 0) {
-        bullets.push(
-          <span key="headroom">
-            About{" "}
+  if (!hasDebt) add("risk", "no-debt", positionNodes("no_debt"));
+  else {
+    // One bullet for the ratio and its runway to liquidation, then the room to
+    // borrow (the risk row's formula: coll × price ÷ active ratio − debt).
+    const icr = chain.icr != null ? <H>{(chain.icr * 100).toFixed(1)}%</H> : null;
+    if (icr && dropPct != null && dropPct > 0)
+      add("risk", "ratio", positionNodes("ratio_drop", { icr, drop: <H>{dropPct}%</H> }));
+    else if (icr) add("risk", "ratio", positionNodes("coll_ratio", { icr }));
+    const activeRatio = chain.recoveryMode ? chain.ccr : chain.mcr;
+    const headroom = Math.max(0, (chain.coll * chain.price) / activeRatio - chain.debt);
+    if (chain.icr != null && headroom > 0)
+      add(
+        "risk",
+        "capacity",
+        positionNodes("capacity", {
+          capacity: (
             <H>
-              <AmountText value={headroomLusd} format="compact" /> LUSD
-            </H>{" "}
-            more could be borrowed before the Trove&rsquo;s ratio falls to {(activeRatio * 100).toFixed(0)}%.
-          </span>,
-        );
-      }
-    }
-    if (chain.debtInFront != null && chain.trovesAhead != null) {
-      bullets.push(
-        <span key="queue">
-          Redemptions repay the lowest-ratio Troves first: <AmountText value={chain.debtInFront} format="compact" />{" "}
-          LUSD across {chain.trovesAhead} Trove
-          {chain.trovesAhead === 1 ? "" : "s"} would be redeemed before this one.
-          {chain.queueDebtTotal != null && chain.queueDebtTotal > 0 && (
-            <>
-              {" "}
-              That is <H>{pct(Math.min(1, chain.debtInFront / chain.queueDebtTotal))}</H> of all the debt in the queue,
-              so a redemption reaches this Trove only after that share has been redeemed.
-            </>
-          )}
-        </span>,
+              <AmountText value={headroom} format="compact" />
+            </H>
+          ),
+          limit: pctOf(activeRatio),
+        }),
+      );
+    if (chain.debtInFront != null) {
+      const inFront = <AmountText value={chain.debtInFront} format="compact" />;
+      add(
+        "risk",
+        "queue",
+        chain.queueDebtTotal != null && chain.queueDebtTotal > 0
+          ? positionNodes("queue", {
+              debt_in_front: inFront,
+              queue_share: <H>{pct(Math.min(1, chain.debtInFront / chain.queueDebtTotal))}</H>,
+            })
+          : positionNodes("queue_no_share", { debt_in_front: inFront }),
       );
     }
   }
 
-  if (chain.pendingEthReward > DUST || chain.pendingLusdReward > DUST) {
-    bullets.push(
-      <span key="pending">
-        Redistribution from past liquidations has not yet been applied to the recorded Trove:{" "}
-        <AmountText value={chain.pendingEthReward} /> ETH and <AmountText value={chain.pendingLusdReward} /> LUSD are
-        pending, applied on the Trove&rsquo;s next operation.
-      </span>,
-    );
-  }
-
-  // Recovery Mode, named with the system's ratio now, and the modal that
-  // explains it with liquidation and the Stability Pool.
-  const howLiquidation = (
-    <span className="ml-1 inline-flex align-middle">
-      <LearnMore inline content={liquityV1LiquidationContent()} />
-    </span>
-  );
-  if (chain.tcr > 0) {
-    bullets.push(
-      chain.recoveryMode ? (
-        <span key="recovery">
-          The system is in <H>Recovery Mode</H>: the total collateral ratio of all Troves is{" "}
-          <H>{(chain.tcr * 100).toFixed(1)}%</H>, below {(chain.ccr * 100).toFixed(0)}%. Until it recovers, a Trove
-          below that ratio can be liquidated, collateral cannot be withdrawn, and new debt needs a{" "}
-          {(chain.ccr * 100).toFixed(0)}% ratio.{howLiquidation}
+  // Recovery Mode while it is on, with the system's ratio; the "?" beside it
+  // opens the liquidation modal, which carries Recovery Mode as a concept.
+  if (chain.tcr > 0 && chain.recoveryMode)
+    add(
+      "risk",
+      "system",
+      <>
+        {positionNodes("recovery_on", { tcr: <H>{(chain.tcr * 100).toFixed(1)}%</H>, ccr: pctOf(chain.ccr) })}
+        <span className="ml-1 inline-flex align-middle">
+          <LearnMore inline content={liquityV1Modal("liquidation")} />
         </span>
-      ) : (
-        <span key="system-ratio">
-          Recovery Mode is off: the total collateral ratio of all Troves is <H>{(chain.tcr * 100).toFixed(1)}%</H>,
-          above the {(chain.ccr * 100).toFixed(0)}% below which Recovery Mode starts. In Recovery Mode a Trove below the
-          system&rsquo;s ratio can be liquidated, even above 110%.{howLiquidation}
-        </span>
-      ),
+      </>,
     );
-  }
 
-  return <ProseExplainer paragraph={lead} items={bullets} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
 
 // ── An indexed-open life the chain has moved past ─────────────────────────────
 //
-// The index can lag the chain: a life still marked open in the index whose live
-// read finds the Trove closed (by owner, redemption, or liquidation). The live
-// risk surfaces gate on an ACTIVE Trove and stay off — but the Explanation
-// floor is never empty, so this narrates the divergence: what the chain says
-// happened, and that the indexed history ends before that closing event.
+// The index can lag the chain: a life still open in the index whose live read
+// finds the Trove closed. The live risk surfaces gate on an active Trove and
+// stay off; the explanation says what the chain shows and that the history
+// ends before it.
 
 export function LiquityV1SupersededExplanation({ chain }: { chain: LiquityV1PositionChainResponse }) {
   if (chain.chainStale || chain.troveStatus === "active") return null;
-
-  const outcome =
-    chain.troveStatus === "closedByOwner" ? (
-      <>
-        was <H>closed by its owner</H> — the LUSD debt repaid and the ETH collateral withdrawn
-      </>
-    ) : chain.troveStatus === "closedByRedemption" ? (
-      <>
-        was <H>fully redeemed against</H> — its LUSD debt cancelled at $1 face value, with any collateral surplus left
-        claimable by the owner
-      </>
-    ) : chain.troveStatus === "closedByLiquidation" ? (
-      <>
-        was <H>liquidated</H> — its collateral ratio fell below the protocol&rsquo;s liquidation threshold, the ETH
-        collateral seized and the LUSD debt cleared
-      </>
-    ) : (
-      <>
-        has <H>no record</H> at the current head
-      </>
-    );
-
+  const status = chain.troveStatus;
+  const lead =
+    status === "closedByOwner"
+      ? positionNodes("superseded_owner")
+      : status === "closedByRedemption"
+        ? positionNodes("superseded_redeemed")
+        : status === "closedByLiquidation"
+          ? positionNodes("superseded_liquidated")
+          : positionNodes("superseded_none");
   return (
     <ProseExplainer
-      paragraph={<>This Trove {outcome}:</>}
+      paragraph={lead}
       items={[
-        <span key="lag">
-          The history shown here ends before that closing event, so the figures above describe the Trove as it was last
-          recorded. The closing entry joins the timeline once it lands.
-        </span>,
-        <span key="no-live">
-          The risk surfaces (collateral ratio, liquidation runway, redemption queue) describe an active Trove only, so
-          they are not shown here.
-        </span>,
+        <span key="lag">{positionNodes("superseded_lag")}</span>,
+        <span key="joins">{positionNodes("superseded_joins")}</span>,
       ]}
     />
   );
@@ -241,19 +180,11 @@ export function LiquityV1SupersededExplanation({ chain }: { chain: LiquityV1Posi
 
 // ── Past lives ────────────────────────────────────────────────────────────────
 //
-// A closed or liquidated epoch narrates its OWN recorded figures, past tense —
-// the Explanation floor is never empty, and it describes only the mode present.
-// Everything here is the epoch's replayed index record (peaks, counts, last
-// activity); nothing reads the live chain, because the live risk surfaces (CR,
-// runway, redemption queue) describe the CURRENT Trove and would be false
-// about a past life.
-//
-// A V1 Trove life ends by one of THREE mechanisms, and the record says which:
-// the owner closed it (last event closeTrove), a redemption cleared the last
-// of its debt (last event redemption, debt to zero), or a liquidation took it
-// (status liquidated). 3,210 of the 8,366 closed lives in the frozen capture —
-// 38% — ended by redemption, so the closed lead derives the mechanism from the
-// life's final event rather than assuming an owner exit.
+// A closed or liquidated life states its recorded figures, past tense.
+// Nothing reads the live chain: the live risk surfaces describe the current
+// Trove. A V1 life ends by one of three mechanisms: the owner closed it (last
+// event closeTrove), a redemption cleared the last of its debt (last event
+// redemption), or a liquidation took it (status liquidated).
 
 export function LiquityV1ClosedEpochExplanation({
   v,
@@ -261,271 +192,187 @@ export function LiquityV1ClosedEpochExplanation({
   lastAction,
   surplus,
   ownerOutcome,
-  outcomePending,
   redemptions,
   priceNow,
   ethBack,
-  eventTally,
 }: {
   v: LiquityV1PositionView;
-  /** Unix seconds of the life's first captured event — the "active from"
-   *  anchor. Null when the timeline hasn't loaded; the tenure clause drops. */
+  /** Unix seconds of the life's first captured event. Null while the timeline loads. */
   openedAt?: number | null;
-  /** The life's final event type — the closure mechanism's witness. Null while
-   *  the timeline loads; the lead falls back to the owner-exit reading (the
-   *  majority mechanism for closed lives). */
+  /** The life's final event type. Null while the timeline loads; the lead
+   *  falls back to the owner's close. */
   lastAction?: string | null;
-  /** ETH the closing left in the CollSurplusPool, with its claim status. */
+  /** ETH the ending left in the CollSurplusPool, with its claim status. */
   surplus?: LiquityV1Surplus | null;
-  /** A liquidated life: what it left its owner and where the liquidation's
-   *  debt and ETH went. */
+  /** A liquidated life: what it left its owner. */
   ownerOutcome?: LiquityV1OwnerOutcome | null;
   /** The outcome's reads are still on their way. */
   outcomePending?: boolean;
-  /** The life's redemptions, for the closed lead's net outcome. Null on a
-   *  windowed page or with an unpriced row: the clause drops. */
+  /** The life's redemptions. Null on a windowed page or with an unpriced row. */
   redemptions?: LiquityV1RedemptionTotals | null;
-  /** The price feed's ETH price now (the net against having held the ETH). */
+  /** The price feed's ETH price now. */
   priceNow?: number | null;
   /** ETH the ending sent back to the owner: all of it at an owner close, the
    *  surplus on a full redemption. */
   ethBack?: number | null;
-  /** How the timeline's events divide, to say what the counter counts. Null
-   *  on a windowed page. */
+  /** How the timeline's events divide. */
   eventTally?: { total: number; owner: number; claim: boolean } | null;
 }) {
   if (v.status !== "closed" && v.status !== "liquidated") return null;
   const liquidated = v.status === "liquidated";
   const redeemed = !liquidated && lastAction === "redemption";
-  const endedOn = v.lastActivityAt > 0 ? formatDate(v.lastActivityAt) : null;
+  const ended = v.lastActivityAt > 0 ? formatDate(v.lastActivityAt) : null;
+  const lead = ended
+    ? positionNodes(liquidated ? "closed_lead_liquidated" : redeemed ? "closed_lead_redeemed" : "closed_lead_owner", {
+        ended,
+      })
+    : positionNodes(
+        liquidated
+          ? "closed_lead_liquidated_undated"
+          : redeemed
+            ? "closed_lead_redeemed_undated"
+            : "closed_lead_owner_undated",
+      );
 
-  // Status lead (charter §4): how the life ended, with at most two figures,
-  // the ETH redemptions took and the ETH that went back to the owner. The net
-  // of the redemptions for the owner is the first bullet.
-  const claimed = surplus?.claimed ?? null;
-  const netThen = redemptions ? redemptions.lusdRedeemed - redemptions.ethValueAtRedemption : null;
-  const netNow =
-    redemptions && priceNow != null && priceNow > 0 ? redemptions.lusdRedeemed - redemptions.ethTaken * priceNow : null;
-  const redemptionClause = redemptions ? (
-    <>
-      {redemptions.count === 1 ? "a redemption" : "redemptions"} took {fmtEth(redemptions.ethTaken)} ETH
-    </>
-  ) : null;
-  const backFig =
-    ethBack != null && ethBack > DUST ? (
-      redeemed && surplus ? (
-        <Prov info={surplusClaimableProv(surplus)}>{fmtEth(surplus.surplus)} ETH</Prov>
-      ) : (
-        <>{fmtEth(ethBack)} ETH</>
-      )
-    ) : null;
-  const lead = liquidated ? (
-    <>
-      This Trove life ended in <H>liquidation</H>
-      {endedOn ? <> on {endedOn}</> : null}:
-    </>
-  ) : redeemed ? (
-    <>
-      This Trove life ended <H>fully redeemed</H>
-      {endedOn ? <> on {endedOn}</> : null}
-      {redemptionClause && <>, after {redemptionClause}</>}
-      {backFig && (
-        <>
-          {redemptionClause ? ", and the other " : ", and "}
-          {backFig} went to the surplus pool for the owner
-          {claimed ? (
-            <>, who claimed it{claimed.timestamp != null && <> on {formatDate(claimed.timestamp)}</>}</>
-          ) : surplus && surplus.claimable > DUST ? (
-            <>, where it waits to be claimed</>
-          ) : null}
-        </>
-      )}
-      :
-    </>
-  ) : (
-    <>
-      This Trove life was <H>closed by its owner</H>
-      {endedOn ? <> on {endedOn}</> : null}
-      {redemptionClause && <>, after {redemptionClause}</>}
-      {backFig && (
-        <>
-          , and the owner took back {redemptionClause ? "the remaining " : ""}
-          {backFig}
-        </>
-      )}
-      :
-    </>
-  );
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
+  const eth = (n: number) => <H>{fmtEth(n)}</H>;
 
-  const bullets: React.ReactNode[] = [];
-
-  const hl = (children: React.ReactNode) => <H>{children}</H>;
-  const route = ownerOutcome?.route ?? null;
-  if (!liquidated && redemptions && netThen != null) {
-    const plural = redemptions.count === 1 ? "" : "s";
-    bullets.push(
-      <span key="net">
-        {redemptions.count === 1 ? "The redemption" : "The redemptions"} cancelled LUSD debt at $1 per LUSD and took ETH
-        of equal value: a net of {fmtUsdSigned(Math.abs(netThen) < 0.005 ? 0 : netThen)} to the owner at the redemption
-        price{plural}
-        {netNow != null && <>, and {fmtUsdSigned(netNow)} against having held the ETH</>}.
-      </span>,
+  // ── Holdings: where the ETH and the LUSD went ──
+  if (liquidated && ownerOutcome) {
+    const o = ownerOutcome;
+    const kept = o.lusdReceived - o.lusdRepaid;
+    add(
+      "holdings",
+      "kept",
+      kept > 0.005 && o.lusdRepaid > 0.005
+        ? positionNodes("kept_net", { kept: <H>{fmtLusd(kept)}</H> })
+        : kept > 0.005
+          ? positionNodes("kept_all", { kept: <H>{fmtLusd(o.lusdReceived)}</H> })
+          : positionNodes("kept_none", { kept: <H>{fmtLusd(o.lusdRepaid)}</H> }),
+    );
+    add(
+      "holdings",
+      "lost",
+      positionNodes("lost", { eth_lost: eth(o.ethLost), usd_lost: fmtUsd(o.ethLost * o.liquidationPrice).display }),
+    );
+    if (o.ethWithdrawn > EPS_ETH && o.ethRedeemed > EPS_ETH)
+      add(
+        "holdings",
+        "out",
+        positionNodes("withdrew_redeemed", { eth_withdrawn: eth(o.ethWithdrawn), eth_redeemed: eth(o.ethRedeemed) }),
+      );
+    else if (o.ethWithdrawn > EPS_ETH)
+      add("holdings", "out", positionNodes("withdrew", { eth_withdrawn: eth(o.ethWithdrawn) }));
+    else if (o.ethRedeemed > EPS_ETH)
+      add("holdings", "out", positionNodes("redemptions_took", { eth_taken: eth(o.ethRedeemed) }));
+  } else if (!liquidated && redemptions) {
+    add(
+      "holdings",
+      "taken",
+      positionNodes(redemptions.count === 1 ? "redemption_took" : "redemptions_took", {
+        eth_taken: eth(redemptions.ethTaken),
+      }),
     );
   }
-  bullets.push(
-    liquidated && ownerOutcome && route ? (
-      <span key="outcome">
-        {ownerOutcome.liquidationRatio != null && (
-          <>
-            Its collateral ratio was {hl(fmtPct(ownerOutcome.liquidationRatio))} at liquidation
-            {ownerOutcome.liquidationRatio < 1.1 ? ", below the 110% minimum" : ""}.{" "}
-          </>
-        )}
-        {liquityV1RouteSentences(route, hl).map((sentence, i) => (
-          <span key={i}>
-            {i > 0 && " "}
-            {sentence}
-          </span>
-        ))}
-      </span>
-    ) : liquidated && outcomePending ? (
-      <span key="outcome">
-        Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
-        LUSD debt cleared.
-      </span>
-    ) : liquidated ? (
-      <span key="outcome">
-        Its collateral ratio fell below the level at which it could be liquidated: the ETH collateral was seized and the
-        LUSD debt cleared, by the Stability Pool or shared out to other Troves. The owner kept the LUSD borrowed.
-      </span>
-    ) : redeemed && redemptions ? (
-      <span key="outcome">The last 200 LUSD of its debt, the liquidation reserve, was burned.</span>
-    ) : redeemed ? (
-      <span key="outcome">
-        A redemption cancelled the last of its LUSD debt at $1 per LUSD and took ETH of equal value; the 200 LUSD
-        liquidation reserve was burned.
-      </span>
-    ) : (
-      <span key="outcome">
-        The owner repaid the LUSD debt less the 200 LUSD liquidation reserve, which was burned
-        {backFig ? null : <>, and took back the ETH collateral</>}.
-      </span>
-    ),
-  );
-
-  if (redeemed && backFig && surplus && !claimed && surplus.claimable > DUST) {
-    bullets.push(
-      <span key="claim-how">
-        The owner&apos;s wallet claims it with claimCollateral(), which pays the whole balance.
-      </span>,
+  if (!liquidated && !redeemed && ethBack != null && ethBack > DUST)
+    add(
+      "holdings",
+      "back",
+      positionNodes(redemptions ? "owner_took_back_rest" : "owner_took_back", { eth_back: eth(ethBack) }),
+    );
+  if (surplus && (liquidated || redeemed)) {
+    const claimed = surplus.claimed;
+    const fig = (
+      <Prov info={surplusClaimableProv(surplus)}>
+        <H>{fmtEth(claimed ? surplus.surplus : surplus.claimable > DUST ? surplus.claimable : surplus.surplus)}</H>
+      </Prov>
+    );
+    add(
+      "holdings",
+      "surplus",
+      claimed
+        ? claimed.timestamp != null
+          ? positionNodes("surplus_claimed_on", { surplus: fig, claimed: formatDate(claimed.timestamp) })
+          : positionNodes("surplus_claimed", { surplus: fig })
+        : surplus.claimable > DUST
+          ? positionNodes("surplus_waiting", { surplus: fig })
+          : positionNodes("surplus_left", { surplus: fig }),
     );
   }
 
-  if (liquidated && ownerOutcome)
-    liquityV1OutcomeSentences(ownerOutcome, hl).forEach((sentence, i) =>
-      bullets.push(<span key={`owner-${i}`}>{sentence}</span>),
-    );
-
-  // A redeemed life's surplus is in the lead; a liquidation's (a capped
-  // Recovery Mode liquidation) is stated here.
-  if (surplus && (liquidated || !backFig)) {
-    bullets.push(
-      <span key="surplus">
-        {surplus.claimed ? (
-          <>
-            <Prov info={surplusClaimableProv(surplus)}>
-              <AmountText value={surplus.surplus} /> ETH
-            </Prov>{" "}
-            left over, claimed by the owner
-            {surplus.claimed.timestamp != null && <> on {formatDate(surplus.claimed.timestamp)}</>}.
-          </>
-        ) : (
-          <>
-            <Prov info={surplusClaimableProv(surplus)}>
-              <H>
-                <AmountText value={surplus.claimable} /> ETH
-              </H>
-            </Prov>{" "}
-            left over in the surplus pool, claimable by the owner&apos;s wallet with claimCollateral().
-          </>
-        )}
-      </span>,
+  // ── Risk: the ratio the liquidation came at ──
+  if (liquidated && ownerOutcome?.liquidationRatio != null) {
+    const r = ownerOutcome.liquidationRatio;
+    add(
+      "risk",
+      "ratio",
+      positionNodes(r < 1.1 ? "liq_ratio_below" : "liq_ratio_recovery", { liq_ratio: <H>{fmtPct(r)}</H> }),
     );
   }
 
-  if (v.peakCollateral > 0 || v.peakDebt > 0) {
-    bullets.push(
-      <span key="peaks">
-        At its height it held{" "}
-        <Prov info={peakCollateralProv()}>
-          <H>{fmtEth(v.peakCollateral)} ETH</H>
-        </Prov>{" "}
-        against{" "}
-        <Prov info={peakDebtProv()}>
-          <H>{fmtLusd(v.peakDebt)} LUSD</H>
-        </Prov>{" "}
-        of debt — the highest figures this life recorded, each its own lifetime maximum.
-      </span>,
+  // ── History: the redemptions' net, the peaks, the life's span and counts ──
+  if (!liquidated && redemptions) {
+    const netThen = redemptions.lusdRedeemed - redemptions.ethValueAtRedemption;
+    const netNow = priceNow != null && priceNow > 0 ? redemptions.lusdRedeemed - redemptions.ethTaken * priceNow : null;
+    const one = redemptions.count === 1;
+    const then = fmtUsdSigned(Math.abs(netThen) < 0.005 ? 0 : netThen);
+    add(
+      "history",
+      "net",
+      netNow != null
+        ? positionNodes(one ? "net_both_one" : "net_both", { net_then: then, net_now: fmtUsdSigned(netNow) })
+        : positionNodes(one ? "net_then_one" : "net_then", { net_then: then }),
+    );
+  }
+  if (v.peakCollateral > 0 || v.peakDebt > 0)
+    add(
+      "history",
+      "peaks",
+      positionNodes("peaks", {
+        peak_coll: (
+          <Prov info={peakCollateralProv()}>
+            <H>{fmtEth(v.peakCollateral)}</H>
+          </Prov>
+        ),
+        peak_debt: (
+          <Prov info={peakDebtProv()}>
+            <H>{fmtLusd(v.peakDebt)}</H>
+          </Prov>
+        ),
+      }),
+    );
+  if (openedAt != null && openedAt > 0 && v.lastActivityAt > openedAt)
+    add(
+      "history",
+      "active",
+      positionNodes("active", {
+        duration: <H>{formatDuration(openedAt, v.lastActivityAt)}</H>,
+        opened: formatDate(openedAt),
+      }),
+    );
+  if (v.txCount > 0 || v.redemptionCount > 0) {
+    const txWord = v.txCount === 1 ? V1_WORDS.tx_one : V1_WORDS.tx_many;
+    const redemptionWord = v.redemptionCount === 1 ? V1_WORDS.redemption_one : V1_WORDS.redemption_many;
+    add(
+      "history",
+      "counts",
+      v.txCount > 0 && v.redemptionCount > 0
+        ? positionNodes("counts_both", {
+            tx_count: <H>{v.txCount}</H>,
+            tx_word: txWord,
+            redemption_count: <H>{v.redemptionCount}</H>,
+            redemption_word: redemptionWord,
+          })
+        : v.txCount > 0
+          ? positionNodes("counts_owner", { tx_count: <H>{v.txCount}</H>, tx_word: txWord })
+          : positionNodes("counts_redeemed", {
+              redemption_count: <H>{v.redemptionCount}</H>,
+              redemption_word: redemptionWord,
+            }),
     );
   }
 
-  const tenure = openedAt != null && openedAt > 0 && v.lastActivityAt > openedAt;
-  if (v.txCount > 0 || tenure) {
-    bullets.push(
-      <span key="activity">
-        {tenure ? (
-          <>
-            It was active for <H>{formatDuration(openedAt as number, v.lastActivityAt)}</H>, from{" "}
-            {formatDate(openedAt as number)} to {formatDate(v.lastActivityAt)}, with
-          </>
-        ) : (
-          <>Over this life it recorded</>
-        )}{" "}
-        {v.txCount > 0 ? (
-          <>
-            <H>{v.txCount}</H> owner transaction{v.txCount === 1 ? "" : "s"}
-          </>
-        ) : (
-          <>no owner transactions beyond its closing event</>
-        )}
-        {v.redemptionCount > 0 ? (
-          <>
-            {" "}
-            and <H>{v.redemptionCount}</H> redemption{v.redemptionCount === 1 ? "" : "s"}
-          </>
-        ) : null}
-        .
-      </span>,
-    );
-  }
-
-  // The counter counts owner transactions; the timeline also lists the
-  // redemptions, the liquidation and the surplus claim, and one transaction
-  // can change the Trove more than once. Said where the two numbers differ.
-  if (eventTally && v.txCount > 0 && eventTally.total !== v.txCount) {
-    const parts: string[] = [];
-    const many = eventTally.owner > v.txCount;
-    parts.push(
-      many
-        ? `${eventTally.owner} changes the owner made in ${v.txCount === 1 ? "that one transaction" : `those ${v.txCount} transactions`} (one transaction can change the Trove more than once)`
-        : v.txCount === 1
-          ? "that transaction"
-          : `those ${v.txCount} transactions`,
-    );
-    if (v.redemptionCount > 0)
-      parts.push(v.redemptionCount === 1 ? "the redemption" : `the ${v.redemptionCount} redemptions`);
-    if (v.liquidationCount > 0) parts.push("the liquidation");
-    if (eventTally.claim) parts.push("the surplus claim");
-    const list =
-      parts.length === 1
-        ? parts[0]
-        : `${parts.slice(0, -1).join(", ")}${parts.length > 2 ? "," : ""} and ${parts[parts.length - 1]}`;
-    bullets.push(
-      <span key="tally">
-        The timeline&rsquo;s {eventTally.total} events are {list}.
-      </span>,
-    );
-  }
-
-  return <ProseExplainer paragraph={lead} items={bullets} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
