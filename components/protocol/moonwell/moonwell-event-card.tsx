@@ -1,18 +1,21 @@
 "use client";
 
-// Composer: wires the Moonwell header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// Composer: fills the shared event card's slots (components/shared/
+// event-card.tsx; ui-jobs 309) from a Moonwell event: the head, the account's
+// Collateral and Debt ledger cells with the market's cells after them, the
+// forensics and the Comptroller's lines as notes, the price row and the
+// explanation.
 
 import type { BaseActivityEvent, MoonwellContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
 import { moonwellExplainerTeaser } from "@/lib/moonwell/explainer-clauses";
-import { MoonwellEventHeader } from "./moonwell-event-header";
-import { MoonwellEventDetail } from "./moonwell-event-detail";
+import { useMoonwellHeadSpec } from "./moonwell-event-header";
+import { useMoonwellCells } from "./moonwell-event-detail";
 import { MoonwellEventExplainer, moonwellLearnMoreContent } from "./moonwell-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
@@ -93,41 +96,47 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
             },
           ];
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isLiq
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  return (
-    <EventCard
-      avatar={null}
-      by={extBy ?? undefined}
-      iconColumn={iconSlot}
-      header={
-        <MoonwellEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <MoonwellEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          eventId={event.id}
-          eventTs={event.timestamp}
-        />
-      }
-      explainer={
+  const head = useMoonwellHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+  });
+  const { cells, ledgers, notes, prices } = useMoonwellCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    eventId: event.id,
+    eventTs: event.timestamp,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "moonwell",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells,
+    ledgers,
+    notes,
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
+    explainer: {
+      body: (
         <MoonwellEventExplainer
           ctx={ctx}
           txHash={event.txHash}
@@ -136,11 +145,11 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
           externalBy={extBy ?? undefined}
           skipLead
         />
-      }
-      explainerTeaser={moonwellExplainerTeaser(ctx, coords, extBy ?? undefined)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={moonwellLearnMoreContent(ctx, coords.chainId)} />}
-      persistKey={`moonwell:${event.id}`}
-    />
-  );
+      ),
+      first: moonwellExplainerTeaser(ctx, coords, extBy ?? undefined) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={moonwellLearnMoreContent(ctx, coords.chainId)} />,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }

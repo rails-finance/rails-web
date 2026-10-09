@@ -308,16 +308,15 @@ export function useFluidCells({
   const price: EventCardPrice | undefined = isLiq
     ? {
         gas: price0?.gas,
-        prices: price0?.prices ?? [],
-        figures: [
-          ...(price0?.figures ?? []),
+        prices: [
+          ...(price0?.prices ?? []),
           ...(forensics && oracle && ctx.supplySymbol && ctx.borrowSymbol
             ? [
                 {
-                  key: "oracle",
                   symbol: ctx.supplySymbol,
-                  text: formatNumber(oracle.debtPerCol),
-                  unit: `${ctx.borrowSymbol} per ${ctx.supplySymbol}`,
+                  usd: oracle.debtPerCol,
+                  unit: { format: (n: number) => `${formatNumber(n)} ${ctx.borrowSymbol}` },
+                  named: { note: "vault oracle at block" },
                   info: atBlockOraclePriceProv(
                     ctx.supplySymbol,
                     ctx.borrowSymbol,
@@ -327,11 +326,11 @@ export function useFluidCells({
                     oracle.source,
                   ),
                   value: String(oracle.debtPerCol),
-                  title: "The vault oracle at this block",
                 },
               ]
             : []),
         ],
+        figures: price0?.figures,
         outcome: {
           word: {
             text: ctx.fullyLiquidated ? "Fully liquidated" : "Partially liquidated",

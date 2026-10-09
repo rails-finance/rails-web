@@ -14,8 +14,7 @@
 import type { BaseActivityEvent, LlamalendContext } from "@/lib/shared/types/event-shape";
 import { useMemo } from "react";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { LlamalendLedgerProvider } from "./llamalend-ledger";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 
@@ -117,9 +116,8 @@ export function LlamalendEventCard({
   });
   // The owner's gas: a liquidator's taking, and a row where the page's wallet
   // liquidated someone else, are not the position's cost.
-  const price = gasPrice(
-    isBorrowerLoss || ctx.role === "liquidator" ? undefined : ownerPaidGas(event.gas, ctx.txFrom, event.wallet),
-  );
+  const gas = isBorrowerLoss || ctx.role === "liquidator" ? undefined : ownerPaidGas(event, ctx.txFrom);
+  const price = gas ? { gas, prices: [] } : undefined;
   const ledgerEvent = useMemo(
     () => ({
       ctx,

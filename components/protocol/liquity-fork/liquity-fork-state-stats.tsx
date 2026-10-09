@@ -10,6 +10,9 @@
 //   Collateral ratio  before → after, both at the block's price
 //   Interest rate     before → after, with the cost per year under it
 //
+// The branch price the cells are valued at stands in the card's price row
+// (liquity-fork-event-card.tsx).
+//
 // A batch manager's change (server mig 342) takes the V2 batch row's cells: the
 // rate before → after with its cost per year, the Trove's debt at the change,
 // and the premature-adjustment fee it carried.
@@ -29,7 +32,7 @@ import {
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import { formatCompact, formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatCompact, formatNumber } from "@/lib/utils/format";
 import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { AmountText } from "@/components/shared/amount-text";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
@@ -320,6 +323,7 @@ export function liquityForkStateStats(
     display: gridFigure(ctx.collAfter, forkCollAmount),
     symbol: ctx.collateralSymbol,
     prov: p.collAfterProv(coords, ctx.origin?.coll),
+    changed: Number(ctx.collDelta) !== 0,
     transition: atForkPrecision(
       reconstructTransition({
         after: ctx.collAfter,
@@ -414,6 +418,7 @@ export function liquityForkStateStats(
     display: gridFigure(ctx.debtAfter),
     symbol: debtSymbol,
     prov: p.debtAfterProv(coords, ctx.origin?.debt),
+    changed: Number(ctx.debtDelta) !== 0,
     transition: atForkPrecision(
       reconstructTransition({
         after: ctx.debtAfter,
@@ -471,18 +476,5 @@ export function liquityForkStateStats(
   const rc = rateCell();
   if (rc) stats.push(rc);
 
-  // The price the cells are valued at, where no other cell on the card states
-  // it: a redemption states the price its log emitted, a liquidation's
-  // forensics the price it acted at.
-  if (f.price != null && ctx.eventType !== "liquidate" && ctx.priceAtBlock?.source !== "redemption-event-price") {
-    stats.push({
-      label: `${ctx.collateralSymbol} price`,
-      value: formatUsdValue(f.price),
-      display: formatUsdValue(f.price),
-      symbol: "",
-      prov: p.atBlockPriceProv(coords, f.price),
-      changed: false,
-    });
-  }
   return stats;
 }

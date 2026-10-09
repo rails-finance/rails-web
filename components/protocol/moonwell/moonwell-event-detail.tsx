@@ -1,7 +1,9 @@
 "use client";
 
-// Moonwell event detail — adapter onto the shared ChainTruthDetail grid. The
-// lanes an event touches, with before→after transitions:
+// Moonwell event cells (ui-jobs 309): the card's `cells` slot — the account's
+// Collateral and Debt ledger cells (components/shared/ctoken-event-ledger.tsx),
+// then the market's cells for the lanes the event touches, with
+// before→after transitions:
 //   supply rows  — mint, redeem and transfers: the supply balance (mTokens ×
 //                  exchangeRateStored at the row's block, with the interest
 //                  since the previous supply row beneath it) beside the mToken
@@ -14,21 +16,21 @@
 //                  and beneath them the valued two-leg breakdown at the
 //                  Comptroller's own oracle read at the block (mig 195) once
 //                  the filler has priced it — token-only until then.
-//   every row    — the event market's oracle-at-block price as a footnote
-//                  pill when the index carries it.
+//   every row    — the event market's oracle-at-block price in the price row
+//                  when the index carries it.
 
 import type { MoonwellContext } from "@/lib/shared/types/event-shape";
+import type { ReactNode } from "react";
 import {
-  ChainTruthDetail,
   reconstructTransition,
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import {
-  AtBlockPriceFootnote,
-  LiquidationForensics,
-  type LiquidationForensicsProps,
-} from "@/components/shared/liquidation-forensics";
+import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
+import { useStatCells } from "@/components/shared/chain-truth-stat-cell";
+import type { EventCardLedgers } from "@/components/shared/event-card";
+import type { EventCells } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
 import {
   assetsDeltaProv,
   mTokensDeltaProv,
@@ -62,16 +64,16 @@ import {
 } from "@/lib/utils/format";
 import { CTokenLiquidationBreakdown } from "@/components/shared/ctoken-liquidation-breakdown";
 import { CTokenMembershipLine } from "@/components/shared/ctoken-membership-line";
-import { CTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
+import { pillPriceChips, useCTokenLedgerCells, useCTokenSoleAsset } from "@/components/shared/ctoken-event-ledger";
 
-export interface MoonwellEventDetailProps {
+export interface MoonwellCellsInput {
   ctx: MoonwellContext;
   txHash?: string;
   blockNumber?: number;
   wallet?: string;
   /** The timeline event, for the account cells' ledgers. */
-  eventId?: string;
-  eventTs?: number;
+  eventId: string;
+  eventTs: number;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Number(human)));
@@ -204,7 +206,13 @@ function supplyStat(ctx: MoonwellContext, mSym: string, coords: MoonwellCoords):
   };
 }
 
-export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet, eventId, eventTs }: MoonwellEventDetailProps) {
+/** The card's cells, ledgers, notes and prices. */
+export function useMoonwellCells({ ctx, txHash, blockNumber, wallet, eventId, eventTs }: MoonwellCellsInput): {
+  cells: EventCells;
+  ledgers: EventCardLedgers;
+  notes: ReactNode;
+  prices: EventPriceChip[];
+} {
   const dep = useMoonwellDeployment();
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
   const mSym = coords.marketLabel ?? `m${ctx.marketSymbol}`;
@@ -213,8 +221,9 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet, eventId,
   // opens with the account's Collateral and Debt cells; a market's own
   // balance cell goes where its side holds that market alone, since the
   // account cell states the same tokens.
-  const soleSupply = useCTokenSoleAsset(eventId ?? "", "collateral");
-  const soleDebt = useCTokenSoleAsset(eventId ?? "", "debt");
+  const soleSupply = useCTokenSoleAsset(eventId, "collateral");
+  const soleDebt = useCTokenSoleAsset(eventId, "debt");
+  const account = useCTokenLedgerCells(eventId, eventTs);
 
   const supply = ctx.side === "supply" && soleSupply !== ctx.marketSymbol ? supplyStat(ctx, mSym, coords) : undefined;
   if (supply) stats.push(supply);
@@ -282,33 +291,36 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet, eventId,
   }
 
   // The valued two-leg breakdown beneath the grid once BOTH legs are priced
-  // at the block; an ordinary row shows its market's price as a footnote.
+  // at the block. The price row carries its two legs' prices, else the
+  // market's price at the block.
   const forensics =
     ctx.eventType === "liquidation" ? buildMoonwellLiqForensics(ctx, coords, dep.comptroller.address) : undefined;
-  const footnote =
-    !forensics && ctx.priceAtBlock
-      ? [
-          {
-            symbol: ctx.marketSymbol,
-            priceUsd: ctx.priceAtBlock.usd,
-            priceProv: atBlockPriceProv(ctx.marketSymbol, coords, ctx.oracleAtBlock, ctx.raw?.priceRaw),
-            note: oracleNote(blockNumber),
-          },
-        ]
-      : [];
+  const prices: EventPriceChip[] = pillPriceChips(
+    forensics
+      ? forensics.pricePills
+      : ctx.priceAtBlock
+        ? [
+            {
+              symbol: ctx.marketSymbol,
+              priceUsd: ctx.priceAtBlock.usd,
+              priceProv: atBlockPriceProv(ctx.marketSymbol, coords, ctx.oracleAtBlock, ctx.raw?.priceRaw),
+              note: oracleNote(blockNumber),
+            },
+          ]
+        : [],
+    "Moonwell",
+    (n) => `$${pillPrice(n)}`,
+  );
+  const statCells = useStatCells(stats);
 
   const collMSym =
     ctx.eventType === "liquidation" && ctx.collateralMarket
       ? dep.market(ctx.collateralMarket, ctx.collateralSymbol).mSymbol
       : `m${ctx.collateralSymbol ?? ""}`;
 
-  return (
+  const notes = (
     <>
-      <ChainTruthDetail
-        stats={stats}
-        lead={eventId != null && eventTs != null ? <CTokenLedgerCells eventId={eventId} eventTs={eventTs} /> : null}
-      />
-      {forensics && <LiquidationForensics {...forensics} />}
+      {forensics && <LiquidationForensics {...forensics} pricePills={[]} />}
       {ctx.eventType === "liquidation" && wallet && blockNumber != null && ctx.collateralMarket && (
         <CTokenLiquidationBreakdown
           protocol={coords.chainId === BASE_CHAIN_ID ? "moonwell-base" : "moonwell"}
@@ -341,11 +353,13 @@ export function MoonwellEventDetail({ ctx, txHash, blockNumber, wallet, eventId,
           comptroller={{ name: dep.comptroller.name, address: dep.comptroller.address }}
         />
       )}
-      {footnote.length > 0 && (
-        <div className="px-5 pb-2">
-          <AtBlockPriceFootnote pills={footnote} format={pillPrice} />
-        </div>
-      )}
     </>
   );
+  const cells = [...account.cells, ...statCells];
+  return {
+    cells: cells.length > 0 ? cells : { none: "The event moved no balance." },
+    ledgers: account.ledgers,
+    notes,
+    prices,
+  };
 }

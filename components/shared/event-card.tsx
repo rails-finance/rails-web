@@ -94,14 +94,6 @@ export interface EventCardExplainer {
   grouped?: boolean;
 }
 
-/** What an opened card reads (a market or a position at the event's block):
- *  the parts that stand in place of `cells`, `notes` and `price` once read. */
-export interface EventCardOpened {
-  cells?: EventCells;
-  notes?: ReactNode;
-  price?: EventCardPrice;
-}
-
 export interface EventCardSlots {
   event: EventCardEvent;
   spine: SpineColumnProps;
@@ -127,29 +119,25 @@ export interface EventCardSlots {
   band?: ReactNode;
   /** Run on pointer-over or focus of the row (a prefetch). */
   onIntent?: () => void;
-  /** A hook the shell runs only while T2 is drawn, for the parts that read
-   *  the chain when the card opens; what it returns stands in place of
-   *  `cells`, `notes` and `price`. */
+  /** A hook the shell runs while the body is open, for a family whose cells,
+   *  notes or price wait on a read a closed row must not make (Liquity V1's
+   *  receipt read): what it returns stands in for those slots, which hold
+   *  the closed card's values (the cells `pending`). */
   useOpened?: () => EventCardOpened;
 }
 
-/** T2's body from the slots: the grid, the notes, the price row; with
- *  `useOpened`, what it reads stands in place of each. */
-function SlotBody({ slots }: { slots: EventCardSlots }) {
-  const { useOpened } = slots;
-  return useOpened ? <OpenedBody slots={slots} useOpened={useOpened} /> : <BodyParts {...slots} />;
-}
+/** The slots `useOpened` returns once the body opens. */
+export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "price">>;
 
+/** The body of a card whose slots wait on `useOpened`: mounted with the open
+ *  panel, so its read starts when the card opens. */
 function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: () => EventCardOpened }) {
-  const o = useOpened();
-  return <BodyParts cells={o.cells ?? slots.cells} notes={o.notes ?? slots.notes} price={o.price ?? slots.price} />;
-}
-
-function BodyParts({ cells, notes, price }: { cells: EventCells; notes?: ReactNode; price?: EventCardPrice }) {
+  const opened = useOpened();
+  const price = opened.price ?? slots.price;
   return (
     <>
-      <EventCellGrid cells={cells} />
-      {notes}
+      <EventCellGrid cells={opened.cells ?? slots.cells} />
+      {opened.notes ?? slots.notes}
       {hasPriceRow(price) && <EventPriceRow price={price} />}
     </>
   );
@@ -239,13 +227,14 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
     ),
     band: slots.band,
     detail: slots.useOpened ? (
-      <SlotBody slots={slots} />
+      <OpenedBody slots={slots} useOpened={slots.useOpened} />
     ) : (
       <>
         <EventCellGrid cells={slots.cells} />
         {slots.notes}
       </>
     ),
+    // A card read on open draws its price row inside `OpenedBody`.
     price: slots.useOpened ? undefined : slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
@@ -325,7 +314,13 @@ export function EventCard(props: EventCardProps) {
   const datePrefix = useContext(EventDateContext);
   const dayMark = useContext(EventDayMarkContext);
   const reactId = useId();
-  const cardId = persistKey ?? reactId;
+  // The card's ids name the event where the card has one (its share path's
+  // id, one card per event on a page), so they hold whatever the tree above
+  // the card looks like: a useId alone differed between server and client on
+  // the timeline and event pages when the page hydrated in pieces.
+  const shareEventId = eventIdFromShareHref(shareHref);
+  const domId = shareEventId ? `evt-${shareEventId.replace(/[^A-Za-z0-9_-]/g, "_")}` : reactId;
+  const cardId = persistKey ?? domId;
   const hasPanel = detail != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
@@ -493,8 +488,8 @@ export function EventCard(props: EventCardProps) {
   // The row's name, the same at both widths: the spoken caption, then the
   // legs the column states under `legsId` ("Repay, 6 June 2026: 7,500 BOLD
   // repaid"); a group passes its whole `label`.
-  const labelId = `${reactId}-label`;
-  const legsId = `${reactId}-legs`;
+  const labelId = `${domId}-label`;
+  const legsId = `${domId}-legs`;
   // The whole row is the card's click target (row-target.ts): from 640px
   // where the header is the control, below it where the segment's button
   // is. Hovering it lights the header (`.evt-row-target` in globals.css).
@@ -512,7 +507,7 @@ export function EventCard(props: EventCardProps) {
     [inTimeline, legsId, rowTarget, actedByOwner],
   );
   const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
-  const panelId = `${reactId}-card`;
+  const panelId = `${domId}-card`;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   // A timeline row's T1 surface is the desktop header's; under 640px it is the

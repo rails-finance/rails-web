@@ -299,6 +299,26 @@ export const liqAtBlockPriceProv = (sym: string, numeraire: "ETH" | "USD", coord
   inputs: eventInputs(coords),
 });
 
+/** A market's USD price at an ordinary event's block, as the Lifetime flows
+ *  panel reads it (/api/compound-v2/prices-at, the archive for a pair not
+ *  stored): the oracle's getUnderlyingPrice there, over its USDC price in
+ *  the oracle's ETH years. */
+export const priceAtBlockProv = (sym: string, coords: CompoundV2Coords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "oracle",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Re-run comptroller.oracle() at block ${coords.blockNumber}, then that oracle's getUnderlyingPrice for this market at the same block`
+        : "Re-run comptroller.oracle() then that oracle's getUnderlyingPrice for this market",
+  },
+  summary: `${sym} price in USD at this event's block — Compound's oracle \`getUnderlyingPrice\` for this market, read from whichever oracle \`comptroller.oracle()\` had registered at that block. Before block 10,678,764 the oracle speaks ETH, and the dollar figure is that price over the oracle's USDC price at the same block.`,
+  contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+  via: `comptroller.oracle() · getUnderlyingPrice${atBlock(coords)}`,
+  inputs: eventInputs(coords),
+});
+
 /** Seized-collateral leg value — seizeTokens × the collateral cToken's
  *  exchangeRateStored(at block) → underlying, valued at that market's
  *  oracle-at-block price. */

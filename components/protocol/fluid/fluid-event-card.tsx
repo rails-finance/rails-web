@@ -7,8 +7,7 @@
 
 import type { FluidContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FluidLedgerProvider } from "./fluid-ledger";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
@@ -142,7 +141,10 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
   // first row is the mint. A liquidation is the liquidator's.
   const owner = ctx.ownerAt ?? event.wallet;
   const gasRow = openedBy?.gas ?? event.gas;
-  const price = gasPrice(isLiq ? undefined : ownerPaidGas(gasRow, ctx.txFrom ?? openedBy?.context.data.txFrom, owner));
+  const gas = isLiq
+    ? undefined
+    : ownerPaidGas({ wallet: owner, gas: gasRow }, ctx.txFrom ?? openedBy?.context.data.txFrom);
+  const price = gas ? { gas, prices: [] } : undefined;
   const body = useFluidCells({
     ctx,
     txHash: event.txHash,

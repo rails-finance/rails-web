@@ -16,8 +16,7 @@
 
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 
@@ -180,7 +179,7 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
     notes: body.notes,
     // The owner's gas; a challenger's, a bidder's or a buyer's transaction is
     // theirs.
-    price: gasPrice(ownerPaidGas(event.gas, ctx.txFrom, event.wallet)),
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices: [] },
     explainer: {
       body: (
         <FrankencoinEventExplainer

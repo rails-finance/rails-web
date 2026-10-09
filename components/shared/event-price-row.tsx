@@ -21,6 +21,8 @@ export interface EventGas {
   usd: number;
   /** The run's transaction count, where the gas covers a no-change run. */
   run?: number | null;
+  /** The figure's receipt; drawn as a <Prov> where given. */
+  info?: Provenance;
 }
 
 /** A symbol's price at the event, as a then/today chip. */
@@ -32,6 +34,22 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
+  /** The figure as the family prints it, where its precision is not whole
+   *  dollars (a stablecoin's four places). */
+  display?: string;
+  /** The token's contract, for the icon where the house table does not know
+   *  the symbol. */
+  address?: string;
+  /** A price in another unit than dollars (Polaris prices pETH in its debt
+   *  token): its format, and no "today" side, since the page's Prices chip
+   *  states dollars. Unset: whole dollars, with the then/today press. */
+  unit?: { format: (n: number) => string };
+  /** A dollar price at the family's precision, where whole dollars would
+   *  lose it (a collateral near $1). Unset: whole dollars. */
+  format?: (n: number) => string;
+  /** The symbol's name before the figure and a source note after it
+   *  ("pETH 4,861.78 · oracle at block"), the icon first. */
+  named?: { note: string };
 }
 
 /** A chain-derived outcome of the event, in the family's words. */
@@ -45,9 +63,8 @@ export interface EventOutcome {
   word?: { text: string; info?: Provenance };
 }
 
-/** A figure the row states as it is, with no then/today press: a price in a
- *  token's units (Morpho's oracle in the loan token, Frankencoin's in ZCHF),
- *  or a fee the event charged. */
+/** A figure the row states as it is, with no then/today press: a fee the
+ *  event charged (f(x)'s protocol fee, in the token it was taken in). */
 export interface EventPriceFigure {
   key: string;
   /** Words before the figure ("Fee"). */
@@ -84,6 +101,15 @@ export function eventGas(gas: GasCost | null | undefined): EventGas | undefined 
 export function gasPrice(gas: GasCost | null | undefined): EventCardPrice | undefined {
   const g = eventGas(gas);
   return g ? { gas: g, prices: [] } : undefined;
+}
+
+/** The event's gas where the owner sent its transaction; none where a third
+ *  party paid or the index sends no gas. */
+export function ownerPaidGas(
+  event: { wallet: string; gas?: GasCost | null },
+  txFrom: string | null | undefined,
+): EventGas | undefined {
+  return txFrom != null && txFrom.toLowerCase() === event.wallet.toLowerCase() ? eventGas(event.gas) : undefined;
 }
 
 /** Whether the row has anything to draw. */
@@ -135,7 +161,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{figure(unit)}</span>
+      <span>{gas.info ? <Prov info={gas.info}>{figure(unit)}</Prov> : figure(unit)}</span>
     </button>
   );
 }
@@ -176,25 +202,47 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
           </div>
         )}
         {prices.map((p) => {
-          const icon = <TokenChipIcon symbol={p.symbol} size={14} />;
-          return (
-            <PriceChipShell key={p.symbol} bare title={p.title}>
-              <ThenTodayChip
-                symbol={p.symbol}
-                format={usdWhole}
-                then={
+          const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
+          const format = p.unit?.format ?? p.format ?? usdWhole;
+          const text = p.display ?? format(p.usd);
+          const chip = (
+            <ThenTodayChip
+              symbol={p.symbol}
+              format={format}
+              noToday={p.unit != null}
+              then={
+                p.named ? (
                   p.info ? (
-                    <Prov info={p.info} value={p.value} icon={icon}>
-                      {usdWhole(p.usd)}
+                    <Prov info={p.info} value={p.value ?? text} symbol={p.symbol}>
+                      {text}
                     </Prov>
                   ) : (
-                    <span className="inline-flex items-center gap-1">
-                      {usdWhole(p.usd)}
-                      {icon}
-                    </span>
+                    text
                   )
-                }
-              />
+                ) : p.info ? (
+                  <Prov info={p.info} value={p.value} icon={icon}>
+                    {text}
+                  </Prov>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    {text}
+                    {icon}
+                  </span>
+                )
+              }
+            />
+          );
+          return (
+            <PriceChipShell key={p.symbol} bare title={p.title}>
+              {p.named ? (
+                <span className="inline-flex items-center gap-1 font-normal tabular-nums text-rb-500">
+                  {icon}
+                  {p.symbol} {chip}
+                  <span className="text-rb-400">· {p.named.note}</span>
+                </span>
+              ) : (
+                chip
+              )}
             </PriceChipShell>
           );
         })}

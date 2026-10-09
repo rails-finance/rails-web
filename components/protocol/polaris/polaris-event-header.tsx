@@ -1,7 +1,8 @@
 "use client";
 
-// Polaris event header — adapter onto the shared ChainTruthRow grammar. Maps
-// each touch's own log figures into the row spec; traces via <Prov>.
+// Polaris event head — the card's `head` slot (ui-jobs 309), drawn by the
+// shared ChainTruthRow. Maps each touch's log figures into the row spec;
+// traces via <Prov>.
 //
 // NO RATE PILL, by decision: Polaris rates are algorithmic — the market sets
 // them, the holder never chose one — and the pill grammar marks a rate the
@@ -22,7 +23,7 @@
 // the same way.
 
 import type { PolarisContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { ledgerFieldProv, liquidatorProv, transferProv, type PolarisCoords } from "@/lib/polaris/event-provenance";
 import { polarisLiquidationDeltas } from "@/lib/polaris/liquidation-legs";
@@ -30,29 +31,13 @@ import { CR_CHIP_TITLE, crChipText, polarisCrAtEvent, polarisCrReceipt } from "@
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 
-export interface PolarisEventHeaderProps {
-  actionLabel: string;
-  ctx: PolarisContext;
-  timestamp: number;
-  txHash?: string;
-  blockNumber?: number;
-  eventNumber?: number;
-}
-
 const num = (s?: string): number => {
   const n = Number(s ?? "0");
   return Number.isFinite(n) ? n : 0;
 };
 
-export function PolarisEventHeader({
-  actionLabel,
-  ctx,
-  timestamp,
-  txHash,
-  blockNumber,
-  eventNumber,
-}: PolarisEventHeaderProps) {
-  const coords: PolarisCoords = { txHash, blockNumber, market: ctx.market, cdpId: ctx.cdpId };
+/** The row's spec, with the ratio chip where Display shows the collateral ratio. */
+export function usePolarisHeadSpec(actionLabel: string, ctx: PolarisContext, coords: PolarisCoords): ChainTruthRowSpec {
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
   // The trailing ratio chip, behind the Collateral Ratio display flag: the
@@ -190,23 +175,17 @@ export function PolarisEventHeader({
         ? { prefix: "to", address: ctx.toAddr, prov: transferProv(coords) }
         : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        // The empty-label combined-adjust grammar keys off the HOLDER's own
-        // deltas, not the row's deltas overall — a touch with only a PSM leg
-        // (no holder deposit/withdraw/borrow/repay) keeps `actionLabel`, or a
-        // dropped verb would read as if the PSM's own share was the holder's
-        // action.
-        label: isOpen ? "Open" : isAdjust && holderDeltaCount > 0 ? "" : actionLabel,
-        status: isOpen ? "open" : undefined,
-        critical: ctx.eventType === "liquidate",
-        deltas: shown,
-        party,
-        ratioChip,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    // The empty-label combined-adjust grammar keys off the HOLDER's own
+    // deltas, not the row's deltas overall — a touch with only a PSM leg
+    // (no holder deposit/withdraw/borrow/repay) keeps `actionLabel`, or a
+    // dropped verb would read as if the PSM's own share was the holder's
+    // action.
+    label: isOpen ? "Open" : isAdjust && holderDeltaCount > 0 ? "" : actionLabel,
+    status: isOpen ? "open" : undefined,
+    critical: ctx.eventType === "liquidate",
+    deltas: shown,
+    party,
+    ratioChip,
+  };
 }

@@ -8,7 +8,7 @@
 
 import type { AssetFlow, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   assetsDeltaProv,
   transferAmountProv,
@@ -22,10 +22,8 @@ import { useMoonwellCoords, useMoonwellDeployment } from "@/lib/moonwell/deploym
 export interface MoonwellEventHeaderProps {
   actionLabel: string;
   ctx: MoonwellContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -40,17 +38,15 @@ export interface MoonwellEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function MoonwellEventHeader({
+export function useMoonwellHeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
-}: MoonwellEventHeaderProps) {
+}: MoonwellEventHeaderProps): ChainTruthRowSpec {
   const dep = useMoonwellDeployment();
   const coords = useMoonwellCoords({ market: ctx.market, symbol: ctx.marketSymbol, txHash, blockNumber, wallet });
   const mSym = coords.marketLabel ?? `m${ctx.marketSymbol}`;
@@ -139,42 +135,36 @@ export function MoonwellEventHeader({
             }
           : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical: ctx.eventType === "liquidation",
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-        custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
-        deltas,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.caller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-                  coords,
-                ),
-                // A contract made the repayment for the wallet that sent the
-                // transaction (a liquidation bot's contract, say): both named.
-                ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
-                  ? {
-                      prefix: "sent by",
-                      tip: (
-                        <>
-                          {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
-                          {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
-                        </>
-                      ),
-                    }
-                  : {}),
-              }
-            : undefined,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical: ctx.eventType === "liquidation",
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
+    custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
+    deltas,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.caller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+              coords,
+            ),
+            // A contract made the repayment for the wallet that sent the
+            // transaction (a liquidation bot's contract, say): both named.
+            ...(ctx.eventType === "repay" && ctx.caller.toLowerCase() !== ctx.txFrom.toLowerCase()
+              ? {
+                  prefix: "sent by",
+                  tip: (
+                    <>
+                      {ctx.txFrom.slice(0, 6)}…{ctx.txFrom.slice(-4)} sent the transaction. The contract{" "}
+                      {ctx.caller.slice(0, 6)}…{ctx.caller.slice(-4)} it called made the repayment.
+                    </>
+                  ),
+                }
+              : {}),
+          }
+        : undefined,
+    party,
+  };
 }

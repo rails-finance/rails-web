@@ -342,8 +342,6 @@ export const GENERIC_ALLOWLIST = {
   "lib/compound-v2/explainer-clauses.tsx": [
     "Interest accrues continuously, so any gap from the previous event’s figure is that interest, not new borrowing.",
   ],
-  // The no-change-adjust mode's moral (zero-delta bot retries).
-  "content/liquity-v2/event-prose.yaml": ["Each attempt costs the sender only gas."],
   // §5.3 forward path after cancelling a withdrawal request.
   "lib/maple/explainer-clauses.tsx": ["A new request would join the back of the line."],
 };

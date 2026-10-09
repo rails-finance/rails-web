@@ -23,8 +23,7 @@
 
 import type { BaseActivityEvent, FxContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { fxExternalActor } from "@/lib/fx/external-actor";
@@ -164,7 +163,8 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
   // The owner-paid rule (above): an operate or a transfer the owner in force
   // signed.
   const ownTx = ctx.eventType === "operate" || isTransfer;
-  const price = gasPrice(ownTx ? ownerPaidGas(event.gas, ctx.txFrom, ctx.ownerAt ?? event.wallet) : undefined);
+  const gas = ownTx ? ownerPaidGas({ wallet: ctx.ownerAt ?? event.wallet, gas: event.gas }, ctx.txFrom) : undefined;
+  const price = gas ? { gas, prices: [] } : undefined;
   const normalizedSymbol = meta?.normalizedSymbol ?? ctx.poolSymbol;
 
   const slots: EventCardSlots = {

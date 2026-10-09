@@ -8,8 +8,7 @@
 // the other rows draw no ledger.
 
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -176,7 +175,7 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventC
         }
       : { none: "A row that moves no collateral or credit has no ledger" },
     notes: body.notes,
-    price: gasPrice(ownerPaidGas(event.gas, ctx.txFrom, event.wallet)),
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices: [] },
     explainer: {
       body: <PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />,
       first: pwnExplainerTeaser(ctx, coords, sibs, event),

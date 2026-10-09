@@ -11,9 +11,8 @@
 
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import type { EventCellSpec } from "@/components/shared/event-cells";
-import { gasPrice } from "@/components/shared/event-price-row";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { PlainNumber } from "@/components/shared/event-number-pill";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
 import { Prov } from "@/components/shared/provenance";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fluidTransferContent } from "@/lib/shared/learn-more-content";
@@ -110,7 +109,8 @@ export function FluidRoundTripCard({ hops, operates, isLast, numbers }: FluidRou
     known.length === hops.length && known.length > 0 ? { n: Math.min(...known), last: Math.max(...known) } : null;
   // The transaction's gas, where its first row is a hop and the holder it
   // started from signed it.
-  const gas = gasPrice(ownerPaidGas(hops.find((h) => h.gas)?.gas, first.context.data.txFrom, home));
+  const paid = ownerPaidGas({ wallet: home, gas: hops.find((h) => h.gas)?.gas }, first.context.data.txFrom);
+  const gas = paid ? { gas: paid, prices: [] } : undefined;
 
   const slots: EventCardSlots = {
     event: {

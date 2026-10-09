@@ -3,8 +3,8 @@
 // the USD leg stays 0 and the card states the ETH figure. A transaction's gas
 // stands on its first row only (the lowest log index among the position's rows
 // in it), so a transaction that logged several of the position's events states
-// its gas once. Whether the owner paid it is the card's call: it reads the
-// row's `txFrom`.
+// its gas once. Whether the owner paid it is the card's call
+// (components/shared/event-price-row.tsx `ownerPaidGas`).
 
 import type { GasCost } from "@/lib/shared/types/event-shape";
 
@@ -40,16 +40,4 @@ export function gasOnFirstRow(r: GasRow, first: Map<string, number>): { gas?: Ga
   if (first.get((r.tx_hash ?? "").toLowerCase()) !== r.log_index) return {};
   const gas = indexRowGas(r);
   return gas ? { gas } : {};
-}
-
-/** The owner-paid rule: a row states its transaction's gas where the owner
- *  signed it. A third party's act (a liquidator, a keeper, a lender's claim,
- *  a caller on the owner's position) is not the owner's cost. */
-export function ownerPaidGas(
-  gas: GasCost | undefined,
-  txFrom: string | undefined | null,
-  owner: string | undefined | null,
-): GasCost | undefined {
-  if (!gas || !txFrom || !owner) return undefined;
-  return txFrom.toLowerCase() === owner.toLowerCase() ? gas : undefined;
 }

@@ -16,7 +16,7 @@ import { reconstructTransition, type ChainTruthTransition } from "@/components/s
 import { useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { EventCardOpened } from "@/components/shared/event-card";
-import type { EventCardPrice, EventPriceFigure } from "@/components/shared/event-price-row";
+import type { EventCardPrice, EventPriceChip } from "@/components/shared/event-price-row";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   collateralAfterProv,
@@ -447,31 +447,28 @@ export function useMorphoOpened(
 
   // The collateral's price in the loan token (Morpho's unit; no USD), where
   // the cells value collateral.
-  const figure: EventPriceFigure | null =
+  const chip: EventPriceChip | null =
     !lender && move
       ? {
-          key: "oracle",
           symbol: collSym,
           address: soleFlowAddress(flows, collSym),
-          text: fmtMorphoPrice(move.price),
-          unit: `${loanSym} per ${collSym}`,
+          usd: move.price,
+          unit: { format: (n) => `${fmtMorphoPrice(n)} ${loanSym}` },
+          named: { note: `market oracle at ${atBlockText(move.priceBlock, move.priceBlockTime)}` },
           info: move.liquidationPrice
             ? liqPriceUsedProv(collSym, loanSym, coords, move.price, move.priceBlock)
             : atBlockOraclePriceProv(collSym, loanSym, coords, move.price),
           value: String(move.price),
-          title: `The market oracle at ${atBlockText(move.priceBlock, move.priceBlockTime)}`,
         }
       : null;
 
   const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows, read) : undefined;
   return {
     cells: [...cells, ...riskCells],
-    // The forensics' price pill gives way to the price row's figure.
+    // The forensics' price pill gives way to the price row's chip.
     notes: forensics ? (
-      <LiquidationForensics {...forensics} pricePills={figure ? [] : forensics.pricePills} />
+      <LiquidationForensics {...forensics} pricePills={chip ? [] : forensics.pricePills} />
     ) : undefined,
-    price: figure
-      ? { gas: price?.gas, prices: price?.prices ?? [], figures: [...(price?.figures ?? []), figure] }
-      : price,
+    price: chip ? { gas: price?.gas, prices: [...(price?.prices ?? []), chip], figures: price?.figures } : price,
   };
 }

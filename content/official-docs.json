@@ -1,5 +1,5 @@
 {
-  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere.",
+  "note": "Family key to the hosts of the protocol's official documentation (rails-ops/standards/prose-limits-and-zones.md, 4.3; Miles, 8 Oct 2026). check:prose-limits fails a modal or strings-file link whose host is not in its family's list. A family key is the content/<dir> name where a strings file exists, the roster id elsewhere. aave.com covers its /docs, /help and /faq pages; fxprotocol.gitbook.io, ebisu.gitbook.io and developers.skyeco.com are official by Miles's ruling (8 Oct 2026, ui-jobs 315).",
   "families": {
     "liquity-v2": ["docs.liquity.org"],
     "liquity-v1": ["docs.liquity.org"],
@@ -13,6 +13,8 @@
     "makerdao": ["docs.makerdao.com"],
     "alchemix": ["docs.alchemix.fi"],
     "fx": ["fxprotocol.gitbook.io"],
+    "ebisu": ["ebisu.gitbook.io"],
+    "sky-savings": ["developers.skyeco.com"],
     "pwn": ["docs.pwn.xyz"],
     "moonwell": ["docs.moonwell.fi"],
     "maple": ["docs.maple.finance"],

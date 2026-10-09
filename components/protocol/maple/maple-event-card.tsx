@@ -7,8 +7,7 @@
 
 import type { BaseActivityEvent, MapleContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
-import { ownerPaidGas } from "@/lib/shared/index-gas";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
@@ -169,7 +168,7 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
     },
     notes: body.notes,
     // The wallet's gas; a fill is the pool's transaction.
-    price: gasPrice(ownerPaidGas(event.gas, ctx.txFrom, event.wallet)),
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices: [] },
     explainer: {
       body: (
         <MapleEventExplainer

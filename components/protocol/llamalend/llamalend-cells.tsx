@@ -436,19 +436,18 @@ export function useLlamalendOpened({
     forensics && atBlock && needsPrice
       ? {
           gas: price0?.gas,
-          prices: price0?.prices ?? [],
-          figures: [
-            ...(price0?.figures ?? []),
+          prices: [
+            ...(price0?.prices ?? []),
             {
-              key: "oracle",
               symbol: cSym,
-              text: fmtPrice(atBlock.price),
-              unit: `${bSym} per ${cSym}`,
+              usd: atBlock.price,
+              unit: { format: (n) => `${fmtPrice(n)} ${bSym}` },
+              named: { note: "AMM oracle at block" },
               info: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw),
               value: String(atBlock.price),
-              title: "The AMM's oracle price at this block",
             },
           ],
+          figures: price0?.figures,
         }
       : price0;
 

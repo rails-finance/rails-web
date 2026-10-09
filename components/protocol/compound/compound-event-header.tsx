@@ -8,7 +8,7 @@
 import type { AssetFlow, CompoundContext } from "@/lib/shared/types/event-shape";
 import { isCompoundBulker } from "@/lib/compound/bulkers";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   movedDeltaProv,
   absorbDebtClearedProv,
@@ -25,10 +25,8 @@ import { formatExactDecimal } from "@/lib/utils/format";
 export interface CompoundEventHeaderProps {
   actionLabel: string;
   ctx: CompoundContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -42,17 +40,15 @@ export interface CompoundEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function CompoundEventHeader({
+export function useCompoundHeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
-}: CompoundEventHeaderProps) {
+}: CompoundEventHeaderProps): ChainTruthRowSpec {
   const m = useCometMarket(ctx.market);
   const coords: CompoundCoords = {
     comet: m.comet,
@@ -105,37 +101,31 @@ export function CompoundEventHeader({
         }
       : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical,
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-        custody: transferOut || transferIn,
-        // The verb carries the direction at every width (the SparkLend rule,
-        // TO-DO 184); an absorb keeps its signs.
-        unsignedDeltas: !critical,
-        deltas,
-        party,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.funder
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, funder: ctx.funder },
-                  coords,
-                ),
-                ...(isCompoundBulker(ctx.funder, coords.chainId)
-                  ? {
-                      tip: "This account sent the transaction, and the tokens came through Compound's Bulker. Open the row to see whether the wallet acted.",
-                    }
-                  : {}),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical,
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
+    custody: transferOut || transferIn,
+    // The verb carries the direction at every width (the SparkLend rule,
+    // TO-DO 184); an absorb keeps its signs.
+    unsignedDeltas: !critical,
+    deltas,
+    party,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.funder
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, funder: ctx.funder },
+              coords,
+            ),
+            ...(isCompoundBulker(ctx.funder, coords.chainId)
+              ? {
+                  tip: "This account sent the transaction, and the tokens came through Compound's Bulker. Open the row to see whether the wallet acted.",
+                }
+              : {}),
+          }
+        : undefined,
+  };
 }
