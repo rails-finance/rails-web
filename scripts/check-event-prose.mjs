@@ -241,6 +241,72 @@ const FAMILIES = {
       "components/protocol/spark/spark-event-card.tsx",
     ],
   },
+  "aave-v3": {
+    generator: "lib/aave-v3/event-prose.ts",
+    loader: "lib/aave-v3/event-templates.ts",
+    entry: "export function aaveV3EventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "aave3",
+    fallback: "aave3.fallback",
+    builtVariants: (gen) =>
+      // A swap's variant is its kind.
+      /variant: s\.kind/.test(gen)
+        ? ["debt_swap", "repay_with_collateral", "supply_from_swap", "withdraw_and_swap", "collateral_swap"].map(
+            (k) => ["aave3.swap", k],
+          )
+        : [],
+    wordConsts: { V3_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/aave-v3/event-prose.ts",
+      "lib/aave-v3/event-templates.ts",
+      "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
+      "components/protocol/aave-v3/aave-v3-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/aave-v3/aave-v3-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/aave-v3/event-prose.ts",
+      "lib/aave-v3/event-templates.ts",
+      "lib/aave-v3/event-state.ts",
+      "lib/aave-v3/position-nodes.tsx",
+      "components/protocol/aave-v3/aave-v3-event-explainer.tsx",
+    ],
+  },
+  morpho: {
+    generator: "lib/morpho/event-prose.ts",
+    loader: "lib/morpho/event-templates.ts",
+    entry: "export function morphoEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "morpho",
+    fallback: "morpho.fallback",
+    builtVariants: () => [],
+    wordConsts: { MORPHO_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/morpho/event-prose.ts",
+      "lib/morpho/event-templates.ts",
+      "components/protocol/morpho/morpho-event-explainer.tsx",
+      "components/protocol/morpho/morpho-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/morpho/morpho-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/morpho/event-prose.ts",
+      "lib/morpho/event-templates.ts",
+      "lib/morpho/position-nodes.tsx",
+      "components/protocol/morpho/morpho-event-explainer.tsx",
+      "components/protocol/morpho/morpho-event-card.tsx",
+    ],
+  },
   moonwell: {
     generator: "lib/moonwell/event-prose.ts",
     loader: "lib/moonwell/event-templates.ts",

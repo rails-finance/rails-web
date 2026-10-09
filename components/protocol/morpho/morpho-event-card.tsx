@@ -2,7 +2,8 @@
 
 // Morpho's event card on the shared shell's slots (ui-jobs 309 step 8): the
 // head from morpho-event-header.tsx, T2 from morpho-cells.tsx, the
-// explanation and the Learn More from morpho-event-explainer.tsx.
+// explanation and the Learn More from morpho-event-explainer.tsx. The pane draws
+// every bullet: whether it groups them waits on the market read at the block.
 
 import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
@@ -17,7 +18,6 @@ import { MorphoLedgerProvider } from "./morpho-ledger";
 import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { type MorphoCoords } from "@/lib/morpho/event-provenance";
-import { morphoExplainerTeaser } from "@/lib/morpho/explainer-clauses";
 
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
@@ -127,16 +127,7 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     price,
     useOpened: () => useMorphoOpened(ctx, coords, event.flows, cells, price),
     explainer: {
-      body: (
-        <MorphoEventExplainer
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventId={event.id}
-          skipLead
-        />
-      ),
-      first: morphoExplainerTeaser(ctx, coords),
+      body: <MorphoEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} eventId={event.id} />,
     },
     learnMore: <LearnMore inline content={morphoLearnMoreContent(ctx)} />,
   };

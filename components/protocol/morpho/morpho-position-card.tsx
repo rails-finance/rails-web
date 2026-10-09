@@ -42,7 +42,8 @@ import type { MorphoCoords } from "@/lib/morpho/event-provenance";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
-import { morphoPositionContent, type MorphoPositionDeployment } from "@/lib/morpho/position-content";
+import { morphoPositionModal, type MorphoPositionModalOpts } from "@/lib/morpho/event-templates";
+import { isPendlePt } from "@/lib/morpho/pendle-pt";
 import { morphoHasDebt } from "@/lib/morpho/position-legs";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -201,10 +202,11 @@ export function MorphoPositionCard({
     ) : (
       <AssetAmount value={value} symbol={v.loanSymbol} address={v.loanToken} />
     );
-  // The "?" cell every state panel owns — the same content function serves
-  // Morpho on Ethereum and Morpho Blue on Base; only the deployment named by
-  // the card's own session changes the prose.
-  const positionDeployment: MorphoPositionDeployment = session === "morpho-base" ? "morpho-base" : "morpho";
+  // The "?" cell every state panel owns: the same modals serve Morpho on
+  // Ethereum and Morpho Blue on Base; only the deployment the card's session
+  // names, and a Pendle principal token as collateral, change the prose.
+  const positionModal = (o: Pick<MorphoPositionModalOpts, "status" | "hasDebt" | "peakDebt">) =>
+    morphoPositionModal({ ...o, base: session === "morpho-base", pt: isPendlePt(v.collateralSymbol) });
 
   const leadingIdentity = (
     <span className="contents text-xs font-semibold text-rb-500">
@@ -240,11 +242,7 @@ export function MorphoPositionCard({
           receipts={receipts}
           explanation={explanation}
           viewHref={viewHref}
-          learnMore={morphoPositionContent({
-            status: v.status,
-            deployment: positionDeployment,
-            peakDebt: "unrecorded",
-          })}
+          learnMore={positionModal({ status: v.status, peakDebt: "unrecorded" })}
           disclosureKey={disclosureKey}
         >
           <ClosedPositionStats
@@ -287,7 +285,7 @@ export function MorphoPositionCard({
         rowExtra={rowExtra}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={morphoPositionContent({ status: v.status, deployment: positionDeployment, hasDebt })}
+        learnMore={positionModal({ status: v.status, hasDebt })}
         disclosureKey={disclosureKey}
       >
         <OpenPositionStats
@@ -383,9 +381,8 @@ export function MorphoPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={morphoPositionContent({
+        learnMore={positionModal({
           status: v.status,
-          deployment: positionDeployment,
           peakDebt: v.peaksPartial ? "unrecorded" : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? "owed" : "principal",
         })}
         disclosureKey={disclosureKey}
@@ -469,11 +466,7 @@ export function MorphoPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={morphoPositionContent({
-        status: v.status,
-        deployment: positionDeployment,
-        hasDebt: morphoHasDebt(v.borrowSharesRaw),
-      })}
+      learnMore={positionModal({ status: v.status, hasDebt: morphoHasDebt(v.borrowSharesRaw) })}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

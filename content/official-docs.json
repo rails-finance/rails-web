@@ -7,7 +7,7 @@
     "aave-v4": ["aave.com"],
     "seamless": ["docs.seamlessprotocol.com"],
     "spark": ["docs.spark.fi"],
-    "morpho": ["docs.morpho.org"],
+    "morpho": ["docs.morpho.org", "docs.pendle.finance"],
     "compound": ["docs.compound.finance"],
     "compound-v2": ["docs.compound.finance"],
     "makerdao": ["docs.makerdao.com"],

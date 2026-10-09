@@ -787,12 +787,7 @@ export default function AaveV3PositionDetail({
                   // view (where pool-wide rate context belongs).
                   explanation={
                     cardView.status !== "open" ? (
-                      <AaveV3ClosedPositionExplanation
-                        v={cardView}
-                        events={aaveEvents}
-                        folders={servedFolders}
-                        countNote={countNote}
-                      />
+                      <AaveV3ClosedPositionExplanation v={cardView} events={aaveEvents} folders={servedFolders} />
                     ) : (
                       // Passed before the Pool read lands (the Fluid treatment):
                       // the pane, and the copy-view link at its foot, mount with
@@ -802,8 +797,6 @@ export default function AaveV3PositionDetail({
                         captions={captions}
                         view={liveView}
                         externalActivity={externalActivity}
-                        marketName={MARKET_NAME[market] ?? "Core"}
-                        countNote={countNote}
                       />
                     )
                   }

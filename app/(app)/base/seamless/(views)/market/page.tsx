@@ -15,7 +15,7 @@ import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
-import { aaveMarketOverviewContent } from "@/lib/shared/learn-more-content";
+import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 
 export default function SeamlessMarketPage() {
   return (
@@ -59,7 +59,7 @@ export default function SeamlessMarketPage() {
         protocolName="Seamless"
         marketLabel="Seamless · Base"
         purpose="An Aave V3 fork on Base with its own Pool, reserves, risk parameters and oracle — frozen since April 2025 and winding down."
-        learnMore={aaveMarketOverviewContent("seamless")}
+        learnMore={aaveV3MarketModal("seamless")}
       />
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
