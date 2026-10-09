@@ -1,19 +1,22 @@
 "use client";
 
-// Composer: wires the Maple header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// Maple's event card on the shared shell's slots (ui-jobs 309 step 8): the head
+// from maple-event-header.tsx, T2 from maple-cells.tsx, the explanation and
+// the Learn More from maple-event-explainer.tsx. Gas stands in the price row
+// where the wallet signed the transaction (lib/shared/index-gas.ts).
 
 import type { BaseActivityEvent, MapleContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
+import { ownerPaidGas } from "@/lib/shared/index-gas";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
 import { flankedLegProv, sharesLegProv, type MapleCoords } from "@/lib/maple/event-provenance";
 import { mapleExplainerTeaser } from "@/lib/maple/explainer-clauses";
-import { MapleEventHeader, TRANSFER_LABEL } from "./maple-event-header";
-import { MapleEventDetail } from "./maple-event-detail";
+import { TRANSFER_LABEL, useMapleHeadSpec } from "./maple-event-header";
+import { useMapleCells } from "./maple-cells";
 import { MapleEventExplainer, mapleLearnMoreContent } from "./maple-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import type { MapleRowTimes } from "@/lib/maple/row-times";
@@ -112,63 +115,74 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
               : []),
           ];
 
-  const iconSlot = <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />;
+  const head = useMapleHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+    requestAt: times?.requestAt,
+  });
+  const body = useMapleCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    timestamp: event.timestamp,
+    prevAt: times?.prevAt,
+    eventId: event.id,
+  });
 
-  // The pool claim opens into its ledger where the page ties its timeline to
-  // the Lifetime flows panel and the panel shows this pool.
-  return (
-    <MapleLedgerProvider eventId={event.id} eventTs={event.timestamp} pool={ctx.pool}>
-      <EventCard
-        avatar={null}
-        custody={
-          ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
-            ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
-            : undefined
-        }
-        by={extBy ?? undefined}
-        // A queue fill is the pool's act, not the owner's.
-        byOwner={ctx.eventType === "request_fill" ? false : undefined}
-        iconColumn={iconSlot}
-        caption={isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : undefined}
-        header={
-          <MapleEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-            requestAt={times?.requestAt}
-          />
-        }
-        detail={
-          <MapleEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            timestamp={event.timestamp}
-            prevAt={times?.prevAt}
-            eventId={event.id}
-          />
-        }
-        explainer={
-          <MapleEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            skipLead
-          />
-        }
-        explainerTeaser={mapleExplainerTeaser(ctx, coords)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={mapleLearnMoreContent(ctx)} />}
-        persistKey={`maple:${event.id}`}
-      />
-    </MapleLedgerProvider>
-  );
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "maple",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine: { tokens, externalParty: !!extBy, isLast: !!isLast },
+    head,
+    caption: isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : event.actionLabel,
+    actor: {
+      by: extBy ?? undefined,
+      byOwner: ctx.eventType === "request_fill" ? false : undefined,
+      custody:
+        ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
+          ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }
+          : undefined,
+    },
+    cells: body.cells,
+    // The claim opens into its ledger: the pool's flows where the page's
+    // panel shows this pool, else its Held and Interest rows.
+    ledgers: {
+      provider: (children) => (
+        <MapleLedgerProvider eventId={event.id} eventTs={event.timestamp} pool={ctx.pool} held={body.held}>
+          {children}
+        </MapleLedgerProvider>
+      ),
+    },
+    notes: body.notes,
+    // The wallet's gas; a fill is the pool's transaction.
+    price: gasPrice(ownerPaidGas(event.gas, ctx.txFrom, event.wallet)),
+    explainer: {
+      body: (
+        <MapleEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          skipLead
+        />
+      ),
+      first: mapleExplainerTeaser(ctx, coords),
+    },
+    learnMore: <LearnMore inline content={mapleLearnMoreContent(ctx)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

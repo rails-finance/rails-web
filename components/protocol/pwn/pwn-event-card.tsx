@@ -1,17 +1,22 @@
 "use client";
 
-// Composer: wires the PWN header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// PWN's event card on the shared shell's slots (ui-jobs 309 step 8): the head
+// from pwn-event-header.tsx, T2 from pwn-cells.tsx, the explanation and the
+// Learn More from pwn-event-explainer.tsx. Gas stands in the price row where
+// the viewed wallet signed the transaction (lib/shared/index-gas.ts). A flow
+// row's Collateral and Debt open into the loan's ledgers (pwn-ledger.tsx);
+// the other rows draw no ledger.
 
-import type { PwnContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
+import { ownerPaidGas } from "@/lib/shared/index-gas";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { rowRepay, type PwnCoords } from "@/lib/pwn/event-provenance";
 import { pwnExplainerTeaser, type PwnEvent } from "@/lib/pwn/explainer-clauses";
-import { PwnEventHeader, fullAmount } from "./pwn-event-header";
-import { PwnEventDetail } from "./pwn-event-detail";
+import { fullAmount, usePwnHeadSpec } from "./pwn-event-header";
+import { usePwnCells } from "./pwn-cells";
 import { PwnEventExplainer, pwnLearnMoreContent } from "./pwn-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { PwnLedgerProvider } from "./pwn-ledger";
@@ -123,50 +128,60 @@ export function PwnEventCard({ event, isLast, eventNumber, siblings }: PwnEventC
           ? ("extend" as const)
           : undefined;
 
-  const iconSlot = isSeizure ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : lifecycleIcon ? (
-    <SpineColumn icon={lifecycleIcon} isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isSeizure
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : lifecycleIcon
+      ? { icon: lifecycleIcon, isLast: !!isLast }
+      : { tokens, isLast: !!isLast };
 
-  return (
-    <PwnLedgerProvider
-      eventId={event.id}
-      eventTs={event.timestamp}
-      flowRow={ctx.eventType === "created" || ctx.eventType === "paid_back" || isSeizure}
-    >
-      <EventCard
-        avatar={null}
-        iconColumn={iconSlot}
-        header={
-          <PwnEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            flows={event.flows}
-          />
+  const head = usePwnHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    flows: event.flows,
+  });
+  const body = usePwnCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    timestamp: event.timestamp,
+    siblings: sibs,
+    eventId: event.id,
+  });
+  const flowRow = ctx.eventType === "created" || ctx.eventType === "paid_back" || isSeizure;
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "pwn",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    cells: body.cells,
+    ledgers: flowRow
+      ? {
+          provider: (children) => (
+            <PwnLedgerProvider eventId={event.id} eventTs={event.timestamp} flowRow>
+              {children}
+            </PwnLedgerProvider>
+          ),
         }
-        detail={
-          <PwnEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            timestamp={event.timestamp}
-            siblings={sibs}
-            eventId={event.id}
-          />
-        }
-        explainer={<PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />}
-        explainerTeaser={pwnExplainerTeaser(ctx, coords, sibs, event)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={pwnLearnMoreContent(ctx)} />}
-        persistKey={`pwn:${event.id}`}
-      />
-    </PwnLedgerProvider>
-  );
+      : { none: "A row that moves no collateral or credit has no ledger" },
+    notes: body.notes,
+    price: gasPrice(ownerPaidGas(event.gas, ctx.txFrom, event.wallet)),
+    explainer: {
+      body: <PwnEventExplainer ctx={ctx} event={event} siblings={sibs} skipLead />,
+      first: pwnExplainerTeaser(ctx, coords, sibs, event),
+    },
+    learnMore: <LearnMore inline content={pwnLearnMoreContent(ctx)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

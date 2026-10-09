@@ -94,6 +94,14 @@ export interface EventCardExplainer {
   grouped?: boolean;
 }
 
+/** What an opened card reads (a market or a position at the event's block):
+ *  the parts that stand in place of `cells`, `notes` and `price` once read. */
+export interface EventCardOpened {
+  cells?: EventCells;
+  notes?: ReactNode;
+  price?: EventCardPrice;
+}
+
 export interface EventCardSlots {
   event: EventCardEvent;
   spine: SpineColumnProps;
@@ -119,6 +127,32 @@ export interface EventCardSlots {
   band?: ReactNode;
   /** Run on pointer-over or focus of the row (a prefetch). */
   onIntent?: () => void;
+  /** A hook the shell runs only while T2 is drawn, for the parts that read
+   *  the chain when the card opens; what it returns stands in place of
+   *  `cells`, `notes` and `price`. */
+  useOpened?: () => EventCardOpened;
+}
+
+/** T2's body from the slots: the grid, the notes, the price row; with
+ *  `useOpened`, what it reads stands in place of each. */
+function SlotBody({ slots }: { slots: EventCardSlots }) {
+  const { useOpened } = slots;
+  return useOpened ? <OpenedBody slots={slots} useOpened={useOpened} /> : <BodyParts {...slots} />;
+}
+
+function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: () => EventCardOpened }) {
+  const o = useOpened();
+  return <BodyParts cells={o.cells ?? slots.cells} notes={o.notes ?? slots.notes} price={o.price ?? slots.price} />;
+}
+
+function BodyParts({ cells, notes, price }: { cells: EventCells; notes?: ReactNode; price?: EventCardPrice }) {
+  return (
+    <>
+      <EventCellGrid cells={cells} />
+      {notes}
+      {hasPriceRow(price) && <EventPriceRow price={price} />}
+    </>
+  );
 }
 
 /** What the shell takes beside a family's parts: the timeline's and the
@@ -204,13 +238,15 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
       />
     ),
     band: slots.band,
-    detail: (
+    detail: slots.useOpened ? (
+      <SlotBody slots={slots} />
+    ) : (
       <>
         <EventCellGrid cells={slots.cells} />
         {slots.notes}
       </>
     ),
-    price: slots.price,
+    price: slots.useOpened ? undefined : slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
     txHash: event.txHash,

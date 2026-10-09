@@ -41,11 +41,36 @@ export interface EventOutcome {
   pl?: { usd: number; word: string };
   /** A line under the row (the redeemed collateral at the latest price). */
   today?: string | null;
+  /** The outcome in words ("Partially liquidated"), with its receipt. */
+  word?: { text: string; info?: Provenance };
+}
+
+/** A figure the row states as it is, with no then/today press: a price in a
+ *  token's units (Morpho's oracle in the loan token, Frankencoin's in ZCHF),
+ *  or a fee the event charged. */
+export interface EventPriceFigure {
+  key: string;
+  /** Words before the figure ("Fee"). */
+  label?: string;
+  /** The token the figure prices or counts: its icon leads. */
+  symbol?: string;
+  /** The token's contract, for the icon where the house table does not know
+   *  the symbol. */
+  address?: string;
+  text: string;
+  /** Words after the figure ("per wstETH"). */
+  unit?: string;
+  info?: Provenance;
+  value?: string;
+  /** The figure's tip. */
+  title?: string;
 }
 
 export interface EventCardPrice {
   gas?: EventGas | null;
   prices: EventPriceChip[];
+  /** Figures stated as they are, after the price chips. */
+  figures?: EventPriceFigure[];
   outcome?: EventOutcome | null;
 }
 
@@ -63,7 +88,15 @@ export function gasPrice(gas: GasCost | null | undefined): EventCardPrice | unde
 
 /** Whether the row has anything to draw. */
 export function hasPriceRow(p: EventCardPrice | null | undefined): p is EventCardPrice {
-  return !!p && (!!p.gas || p.prices.length > 0 || !!p.outcome?.claimable || !!p.outcome?.pl);
+  return (
+    !!p &&
+    (!!p.gas ||
+      p.prices.length > 0 ||
+      !!p.figures?.length ||
+      !!p.outcome?.claimable ||
+      !!p.outcome?.pl ||
+      !!p.outcome?.word)
+  );
 }
 
 const usdWhole = (n: number): string =>
@@ -113,10 +146,16 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
   const { gas, prices, outcome } = price;
   const claimable = outcome?.claimable;
   const pl = outcome?.pl;
+  const word = outcome?.word;
   return (
     <>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2" data-price-row="">
         {gas && <EventGasButton gas={gas} />}
+        {word && (
+          <span className="text-xs font-semibold text-foreground" data-price-outcome="">
+            {word.info ? <Prov info={word.info}>{word.text}</Prov> : word.text}
+          </span>
+        )}
         {(claimable || pl) && (
           <div className="inline-flex items-center gap-4 flex-wrap text-xs">
             {claimable && (
@@ -157,6 +196,29 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
                 }
               />
             </PriceChipShell>
+          );
+        })}
+        {price.figures?.map((f) => {
+          const icon = f.symbol ? <TokenChipIcon symbol={f.symbol} address={f.address} size={14} /> : null;
+          const figure = f.info ? (
+            <Prov info={f.info} value={f.value ?? f.text}>
+              {f.text}
+            </Prov>
+          ) : (
+            f.text
+          );
+          return (
+            <span
+              key={f.key}
+              className="inline-flex items-center gap-1 text-xs tabular-nums text-rb-500"
+              title={f.title}
+              data-price-figure={f.key}
+            >
+              {f.label && <span>{f.label}</span>}
+              {icon}
+              <span className="font-semibold text-foreground">{figure}</span>
+              {f.unit && <span>{f.unit}</span>}
+            </span>
           );
         })}
       </div>

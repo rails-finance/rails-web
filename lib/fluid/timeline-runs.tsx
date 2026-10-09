@@ -110,7 +110,9 @@ const logIndex = (e: BaseActivityEvent): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLast: boolean }) {
+function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLast: boolean; eventNumbers?: number[] }) {
+  // Each member's event number, for the round trip's range.
+  const numberOf = new Map(run.map((e, i) => [e.id, meta.eventNumbers?.[i] ?? 0]));
   const members = run.filter(isFluidEvent).sort((a, b) => logIndex(b) - logIndex(a));
   const nft = members[0].context.data.nftId;
   const mint = members.find((m) => m.context.data.eventType === "mint") ?? null;
@@ -140,7 +142,14 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLas
   if (drawnAsRoundTrip) {
     cards.push({
       key: `roundtrip_${hops[0].id}`,
-      node: (last) => <FluidRoundTripCard hops={hops} operates={operatesIn(sibs, nft)} isLast={last} />,
+      node: (last) => (
+        <FluidRoundTripCard
+          hops={hops}
+          operates={operatesIn(sibs, nft)}
+          isLast={last}
+          numbers={hops.map((h) => numberOf.get(h.id) ?? 0)}
+        />
+      ),
     });
   }
   for (const m of members) {

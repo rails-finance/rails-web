@@ -7,7 +7,7 @@
 
 import type { AssetFlow, PwnContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   creditAdvancedProv,
   collateralSeizedProv,
@@ -40,7 +40,8 @@ export const fullAmount = (v: number): string => formatNumber(Math.abs(v));
 /** "22 Feb 2024" from a unix-seconds integer string. */
 const dateOfTs = (v?: string): string | null => (v == null ? null : formatDate(Number(v)));
 
-export function PwnEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function usePwnHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -48,7 +49,7 @@ export function PwnEventHeader({
   blockNumber,
   eventNumber,
   flows,
-}: PwnEventHeaderProps) {
+}: PwnEventHeaderProps): ChainTruthRowSpec {
   const coords: PwnCoords = { txHash, blockNumber, loanId: ctx.loanId, version: ctx.version };
   const deltas: ChainTruthDelta[] = [];
   const creditAddress = soleFlowAddress(flows, ctx.creditSymbol);
@@ -114,11 +115,5 @@ export function PwnEventHeader({
         }
       : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{ label: actionLabel, critical: isSeizure, deltas, unsignedDeltas: true, note, party }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return { label: actionLabel, critical: isSeizure, deltas, unsignedDeltas: true, note, party };
 }

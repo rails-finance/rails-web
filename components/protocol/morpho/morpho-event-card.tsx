@@ -1,18 +1,18 @@
 "use client";
 
-// Composer: wires the Morpho header / detail into the universal EventCard shell,
-// with the Plain English explainer + per-mechanic Learn More alongside the
-// chain-state detail grid.
+// Morpho's event card on the shared shell's slots (ui-jobs 309 step 8): the
+// head from morpho-event-header.tsx, T2 from morpho-cells.tsx, the
+// explanation and the Learn More from morpho-event-explainer.tsx.
 
 import type { BaseActivityEvent, MorphoContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { gasPrice } from "@/components/shared/event-price-row";
 import { useMorphoNeighbours } from "@/lib/morpho/timeline-neighbours";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { MorphoEventHeader } from "./morpho-event-header";
-import { MorphoEventDetail } from "./morpho-event-detail";
+import { useMorphoHeadSpec } from "./morpho-event-header";
+import { useMorphoCells, useMorphoOpened } from "./morpho-cells";
 import { MorphoLedgerProvider } from "./morpho-ledger";
 import { MorphoEventExplainer, morphoLearnMoreContent } from "./morpho-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -49,9 +49,9 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
   // The first event of its transaction, which states the transaction's gas.
   const firstInTx = (useMorphoNeighbours(event.id)?.earlierInTx.length ?? 0) === 0;
   // Third-party action: the owner (onBehalf) neither signed the tx nor made
-  // the Morpho call. Such events badge the token
-  // icon pink, and the header names the actor in a "by …" chip — but the flow
-  // itself still renders. WHO acted annotates WHAT moved; it never replaces it.
+  // the Morpho call. Such events badge the token icon pink, and the head
+  // names the actor in a "by …" chip — but the flow still renders.
+  // WHO acted annotates WHAT moved; it never replaces it.
   const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, event.wallet);
 
   // The chain and the capture lane are route facts read from context, so the
@@ -64,73 +64,81 @@ export function MorphoEventCard({ event, isLast, eventNumber }: MorphoEventCardP
     source: useCaptureSource(),
   };
   // The spine chip needs the token's address, not its symbol: Morpho Blue is
-  // permissionless, the house symbol → address table names a fraction of what
-  // appears here, and an unnamed symbol reaches neither icon CDN and draws its
-  // initial letter. The event already knows the contract — its flows record the
-  // transfer that happened — and soleFlowAddress reads it under the same
-  // single-match rule the header uses, so a symbol two flows share resolves to
-  // nothing rather than to the wrong brand mark.
-  const tokens =
-    isLiq || mag === 0
-      ? undefined
-      : [
-          {
-            symbol: sym,
-            address: soleFlowAddress(event.flows, sym),
-            direction: DIRECTION[ctx.eventType],
-            value: mag,
-          },
-        ];
+  // permissionless, and an unnamed symbol reaches neither icon CDN and draws
+  // its initial letter. The event's flows record the transfer; soleFlowAddress
+  // reads it under the single-match rule.
+  const spine: SpineColumnProps = isLiq
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : {
+        tokens:
+          mag === 0
+            ? undefined
+            : [
+                {
+                  symbol: sym,
+                  address: soleFlowAddress(event.flows, sym),
+                  direction: DIRECTION[ctx.eventType],
+                  value: mag,
+                },
+              ],
+        externalParty: !!extBy,
+        isLast: !!isLast,
+      };
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const head = useMorphoHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    externalBy: extBy ?? undefined,
+    wallet: event.wallet,
+    flows: event.flows,
+  });
+  const cells = useMorphoCells(ctx, coords, event.flows);
+  // The liquidator pays a liquidation's gas and a third party pays an acted
+  // row's: neither is the owner's cost, so neither is stated. A transaction
+  // carrying several events (Add Collateral and Borrow) states it on the
+  // first of them.
+  const price = gasPrice(isLiq || extBy || !firstInTx ? undefined : event.gas);
 
-  // The Collateral (or Supplied) and Debt cells open into their ledgers where
-  // the page ties its timeline to the Lifetime flows panel.
-  return (
-    <MorphoLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? undefined}
-        iconColumn={iconSlot}
-        header={
-          <MorphoEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={event.wallet}
-            flows={event.flows}
-          />
-        }
-        detail={
-          <MorphoEventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} flows={event.flows} />
-        }
-        explainer={
-          <MorphoEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventId={event.id}
-            skipLead
-          />
-        }
-        // The liquidator pays a liquidation's gas and a third party pays an
-        // acted row's: neither is the owner's cost, so neither is stated. A
-        // transaction carrying several events (Add Collateral and Borrow)
-        // states it on the first of them.
-        price={gasPrice(isLiq || extBy || !firstInTx ? undefined : event.gas)}
-        explainerTeaser={morphoExplainerTeaser(ctx, coords)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={morphoLearnMoreContent(ctx)} />}
-        persistKey={`morpho:${event.id}`}
-      />
-    </MorphoLedgerProvider>
-  );
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "morpho",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells,
+    // The Collateral (or Supplied) and Debt cells open into their ledgers
+    // where the page ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <MorphoLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </MorphoLedgerProvider>
+      ),
+    },
+    price,
+    useOpened: () => useMorphoOpened(ctx, coords, event.flows, cells, price),
+    explainer: {
+      body: (
+        <MorphoEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          eventId={event.id}
+          skipLead
+        />
+      ),
+      first: morphoExplainerTeaser(ctx, coords),
+    },
+    learnMore: <LearnMore inline content={morphoLearnMoreContent(ctx)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

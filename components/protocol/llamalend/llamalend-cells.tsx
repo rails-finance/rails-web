@@ -1,13 +1,16 @@
 "use client";
 
-// LlamaLend event detail — adapter onto the shared ChainTruthDetail grid.
-// Two lanes: the position's collateral and debt AFTER the event — the same-tx
+// LlamaLend's T2 (ui-jobs 309 step 8): the card's `cells`, `notes` and
+// `price` slots, read when the card opens. Collateral, Debt, Health and Band
+// ticks; what the AMM had converted stands as a row of the Collateral ledger
+// (components/protocol/llamalend/llamalend-ledger.tsx), or as a note where
+// the page has no ledger. Two lanes: the position's collateral and debt AFTER the event — the same-tx
 // UserState after-image, the Controller's own emitted ABSOLUTES (the replay
 // is a lag over them, never a running sum), each traced to `state` because a
 // user_state read at the block reproduces it. The band tick pair rides the
 // debt lane's receipt when the after-image carries it. ⚠️ What this grid can
-// NEVER show: the converted/soft-liquidation amount — no event carries it;
-// the position page's live chain card does.
+// not state from the event alone: the converted/soft-liquidation amount — no
+// event carries it; the read at the block does.
 //
 // Liquidation rows additionally carry the forensics card: the valued two-leg
 // seizure (unconverted collateral at AMM.price_oracle read back AT the
@@ -18,14 +21,19 @@
 // safe state. A partial liquidation emits no after-image, so the stat grid
 // may be absent while the forensics still renders: the taking is stated.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { LlamalendContext } from "@/lib/shared/types/event-shape";
+import type { ChainTruthTransition } from "@/components/shared/chain-truth-event";
 import {
-  ChainTruthDetail,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
-import { Prov } from "@/components/shared/provenance";
+  EventNotes,
+  NoteLine,
+  useChainTruthCells,
+  type ChainTruthCellStat,
+} from "@/components/shared/chain-truth-cells";
+import type { EventCardOpened } from "@/components/shared/event-card";
+import type { EventCellHead } from "@/components/shared/event-cells";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useLlamalendEventState } from "@/lib/llamalend/use-event-state";
 import {
   fmtBandPrice,
@@ -53,7 +61,7 @@ import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useLlamalendLedgerCells } from "./llamalend-ledger";
 
-export interface LlamalendEventDetailProps {
+export interface LlamalendCellsProps {
   ctx: LlamalendContext;
   txHash?: string;
   blockNumber?: number;
@@ -166,7 +174,15 @@ function buildLlamalendLiqForensics(
   };
 }
 
-export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previousStated }: LlamalendEventDetailProps) {
+/** The opened card: the position read at block − 1 and at the block. */
+export function useLlamalendOpened({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  previousStated,
+  price: price0,
+}: LlamalendCellsProps & { price?: EventCardPrice }): EventCardOpened {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   const isLiq = ctx.eventType === "liquidation";
   // Fetch only when a collateral leg exists — a fully-converted seizure is
@@ -207,7 +223,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
     };
   };
 
-  const stats: ChainTruthStat[] = [];
+  const stats: ChainTruthCellStat[] = [];
   // The cells that open into the Lifetime flows ledgers, where the page has
   // them; while the model is on its way, they stand as placeholder rows. A row
   // where the page's wallet liquidated someone else's position is no event of
@@ -237,6 +253,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
       : undefined;
     const sold = f ? soldSincePrevious(previousStated, f) : null;
     stats.push({
+      key: "collateral",
       label: "Collateral",
       value: fmt(collAfterStr),
       display: fmtColl(Number(collAfterStr)),
@@ -265,34 +282,9 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
     });
   }
 
-  // Converted: the borrowed token the AMM held from sold collateral, where
-  // there was any on either side of the event.
-  if (f && state && ((f.convBefore ?? 0) > 0 || (f.convAfter ?? 0) > 0)) {
-    const t = transition(
-      `${bSym} converted`,
-      "Controller.user_state(user)[1]",
-      f.convBefore,
-      f.convAfter,
-      state.before.convertedRaw,
-      formatNumber,
-    );
-    stats.push({
-      label: "Converted",
-      value: formatUnitsExact(state.after.convertedRaw ?? "0", ctx.borrowedDecimals),
-      display: formatNumber(f.convAfter ?? 0),
-      symbol: bSym,
-      prov: stateAtBlockProv(
-        `${bSym} converted`,
-        "Controller.user_state(user)[1]",
-        block,
-        coords,
-        state.after.convertedRaw,
-      ),
-      changed: t != null,
-      transition: t,
-      sub: f.hadLoan && (f.convBefore ?? 0) > 0 ? <>In soft-liquidation at this block.</> : undefined,
-    });
-  }
+  // Converted: the borrowed token the AMM held from sold collateral — a row
+  // of the Collateral ledger, or a note where the page has no ledger.
+  const converted = useLlamalendConverted(ctx, coords);
 
   const debtAfterStr =
     ctx.debtAfter ?? (f && state ? formatUnitsExact(state.after.debtRaw ?? "0", ctx.borrowedDecimals) : null);
@@ -308,6 +300,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
         )
       : undefined;
     stats.push({
+      key: "debt",
       label: "Debt",
       value: fmt(debtAfterStr),
       symbol: bSym,
@@ -340,6 +333,8 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
   if (f && state && f.healthAfter == null && f.healthBefore != null) {
     // The event closed the loan: health before it, and no loan after.
     stats.push({
+      key: "health",
+      inputs: ["collateral", "debt"],
       label: "Health",
       value: `${f.healthBefore * 100}%`,
       display: "no loan",
@@ -372,6 +367,8 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
           )
         : undefined;
     stats.push({
+      key: "health",
+      inputs: ["collateral", "debt"],
       label: "Health",
       value: after != null ? `${after * 100}%` : "0",
       display: after != null ? fmtHealth(after) : "no loan",
@@ -397,6 +394,7 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
   if (n1 != null && n2 != null && !closedHere) {
     const bandsMoved = f != null && f.n1Before != null && f.n1Before !== Number(n1);
     stats.push({
+      key: "bands",
       label: "Band ticks",
       value: `${n1} … ${n2}`,
       symbol: "",
@@ -430,13 +428,123 @@ export function LlamalendEventDetail({ ctx, txHash, blockNumber, wallet, previou
   }
 
   const forensics = isLiq ? buildLlamalendLiqForensics(ctx, coords, atBlock) : undefined;
+  const cellList = useChainTruthCells(stats);
 
-  if (stats.length === 0 && !forensics) return null;
+  // The price row: the AMM's oracle at the block, where the liquidation's
+  // valuation read it (in the borrowed token).
+  const price: EventCardPrice | undefined =
+    forensics && atBlock && needsPrice
+      ? {
+          gas: price0?.gas,
+          prices: price0?.prices ?? [],
+          figures: [
+            ...(price0?.figures ?? []),
+            {
+              key: "oracle",
+              symbol: cSym,
+              text: fmtPrice(atBlock.price),
+              unit: `${bSym} per ${cSym}`,
+              info: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw),
+              value: String(atBlock.price),
+              title: "The AMM's oracle price at this block",
+            },
+          ],
+        }
+      : price0;
+
+  const ledgered = cells != null || flowsPending;
+  const notes: ReactNode[] = [];
+  if (converted && (!ledgered || !own)) notes.push(<ConvertedNote key="converted" c={converted} />);
+  if (forensics)
+    notes.push(<LiquidationForensics key="forensics" {...forensics} pricePills={price ? [] : forensics.pricePills} />);
+
+  return {
+    cells: stats.length > 0 ? cellList : { pending: LLAMALEND_HEADS },
+    notes: notes.length ? <>{notes}</> : undefined,
+    price,
+  };
+}
+
+/** The cells to come while the position is read at the block. */
+export const LLAMALEND_HEADS: EventCellHead[] = [
+  { kind: "ledger", side: "collateral", label: "Collateral" },
+  { kind: "ledger", side: "debt", label: "Debt" },
+  { kind: "stat", label: "Health" },
+  { kind: "stat", label: "Band ticks" },
+];
+
+/** What the AMM had converted: the borrowed token it held from sold
+ *  collateral, before → after the event. */
+export interface LlamalendConverted {
+  symbol: string;
+  after: string;
+  afterExact: string;
+  afterProv: Provenance;
+  before?: string;
+  beforeExact?: string;
+  beforeProv?: Provenance;
+  /** In soft-liquidation at this block. */
+  soft: boolean;
+}
+
+/** What the AMM had converted around the event, where there was any on
+ *  either side of it (the position read at block − 1 and at the block). */
+export function useLlamalendConverted(ctx: LlamalendContext, coords: LlamalendCoords): LlamalendConverted | null {
+  const { blockNumber, user: wallet } = coords;
+  const state = useLlamalendEventState(ctx, blockNumber, wallet);
+  const f = state ? llamalendEventFigures(ctx, state) : null;
+  if (!f || !state || !((f.convBefore ?? 0) > 0 || (f.convAfter ?? 0) > 0)) return null;
+  const block = blockNumber ?? 0;
+  const bSym = ctx.borrowedSymbol;
+  const figure = `${bSym} converted`;
+  const getter = "Controller.user_state(user)[1]";
+  const b = f.convBefore;
+  const a = f.convAfter ?? 0;
+  const moved = b != null && Math.abs(a - b) > Math.max(Math.abs(b), Math.abs(a), 1) * 1e-12;
+  return {
+    symbol: bSym,
+    after: formatNumber(a),
+    afterExact: formatUnitsExact(state.after.convertedRaw ?? "0", ctx.borrowedDecimals),
+    afterProv: stateAtBlockProv(figure, getter, block, coords, state.after.convertedRaw),
+    ...(moved && b != null
+      ? {
+          before: formatNumber(b),
+          beforeExact: String(b),
+          beforeProv: stateAtBlockProv(figure, getter, block - 1, coords, state.before.convertedRaw),
+        }
+      : {}),
+    soft: f.hadLoan && (f.convBefore ?? 0) > 0,
+  };
+}
+
+/** The converted figure, before → after. */
+export function ConvertedFigure({ c }: { c: LlamalendConverted }) {
   return (
     <>
-      {stats.length > 0 && <ChainTruthDetail stats={stats} />}
-      {forensics && <LiquidationForensics {...forensics} />}
+      {c.before != null && c.beforeProv && (
+        <span className="font-normal text-rb-500">
+          <Prov info={c.beforeProv} value={c.beforeExact}>
+            {c.before}
+          </Prov>{" "}
+          →{" "}
+        </span>
+      )}
+      <Prov info={c.afterProv} value={c.afterExact}>
+        {c.after}
+      </Prov>{" "}
+      <span className="font-normal text-rb-500">{c.symbol}</span>
     </>
+  );
+}
+
+function ConvertedNote({ c }: { c: LlamalendConverted }) {
+  return (
+    <EventNotes>
+      <NoteLine label="Converted">
+        <ConvertedFigure c={c} />
+        {c.soft && <span className="font-normal text-rb-500"> · in soft-liquidation at this block</span>}
+      </NoteLine>
+    </EventNotes>
   );
 }
 

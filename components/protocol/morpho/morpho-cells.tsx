@@ -1,19 +1,22 @@
 "use client";
 
-// Morpho event detail (chain-state tier) — adapter onto the shared
-// ChainTruthDetail grid. The position's collateral after this event, replayed
-// from the deltas, and its debt: the borrow shares at the market's totals at the
-// row where the answer carries it (Ethereum, and the Base index), the borrowed
-// principal otherwise (the Base sweep). On Base the supply likewise. Each value traces via <Prov>. The side this event
-// didn't touch is muted.
+// Morpho's T2 (ui-jobs 309 step 8): the card's `cells`, `notes` and `price`
+// slots. The position's collateral after this event, replayed from the
+// deltas, and its debt: the borrow shares at the market's totals at the row
+// where the answer carries it (Ethereum, and the Base index), the borrowed
+// principal otherwise (the Base sweep). On Base the supply likewise. Opened,
+// the market read at the event's block adds Health factor, LTV and the borrow
+// rate, the oracle price in the loan token to the price row (no USD: the
+// charter), and a liquidation's forensics under the grid. Each value traces
+// via <Prov>; the side this event didn't touch is muted.
 
+import type { ReactNode } from "react";
 import type { AssetFlow, MorphoContext } from "@/lib/shared/types/event-shape";
-import {
-  ChainTruthDetail,
-  reconstructTransition,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+import { reconstructTransition, type ChainTruthTransition } from "@/components/shared/chain-truth-event";
+import { useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import type { EventCardOpened } from "@/components/shared/event-card";
+import type { EventCardPrice, EventPriceFigure } from "@/components/shared/event-price-row";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   collateralAfterProv,
@@ -41,8 +44,6 @@ import {
   morphoLifProv,
   type MorphoCoords,
 } from "@/lib/morpho/event-provenance";
-import { Prov } from "@/components/shared/provenance";
-import { StatCard, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
 import { PendingBar } from "@/components/shared/event-ledger";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import {
@@ -56,25 +57,11 @@ import {
   atBlockText,
   subDecimal,
   type MorphoAtBlock,
-  type MorphoHealthMove,
 } from "@/lib/morpho/use-market-at-block";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { formatNumber } from "@/lib/utils/format";
-import { useChainId } from "@/lib/shared/chain-context";
-import { useCaptureSource } from "@/lib/shared/capture-source";
-import { useMorphoLedgerCells } from "./morpho-ledger";
 
-export interface MorphoEventDetailProps {
-  ctx: MorphoContext;
-  txHash?: string;
-  blockNumber?: number;
-  /** The event's own asset flows. Not data for the grid — the grid's figures
-   *  all come from `ctx` — but the only place on this card that names the
-   *  CONTRACT behind a symbol. MorphoContext carries `loanSymbol` and
-   *  `collateralSymbol` and no addresses, and Morpho Blue is permissionless, so
-   *  a symbol here identifies nothing the icon chip can look up. */
-  flows?: AssetFlow[];
-}
+import { useMorphoLedgerCells } from "./morpho-ledger";
 
 const fmt = (human: string): string => formatNumber(Number(human));
 /** A running balance the answer did not carry is stated, never filled in. */
@@ -175,133 +162,22 @@ function buildMorphoLiqForensics(
   };
 }
 
-/** The before → after pair of one figure, in the grid's stat look. */
-function MoveCard({
+/** A cell held while the market read is in flight. */
+const pendingCell = (key: string, label: string, inputs?: string[]): EventCellSpec => ({
+  kind: "stat",
+  key,
   label,
-  before,
-  after,
-  beforeProv,
-  afterProv,
-  note,
-}: {
-  label: string;
-  before: string;
-  after: string;
-  beforeProv: Parameters<typeof Prov>[0]["info"];
-  afterProv: Parameters<typeof Prov>[0]["info"];
-  note?: React.ReactNode;
-}) {
-  return (
-    <StatCard label={label}>
-      <StateTransition>
-        <span className="text-sm font-semibold tabular-nums text-rb-500">
-          <Prov info={beforeProv}>{before}</Prov>
-        </span>
-        <TransitionArrow size="sm" />
-        <span className="text-sm font-semibold tabular-nums">
-          <Prov info={afterProv}>{after}</Prov>
-        </span>
-      </StateTransition>
-      {note && <div className="mt-0.5 text-xs text-rb-500">{note}</div>}
-    </StatCard>
-  );
-}
+  changed: false,
+  ...(inputs ? { inputs } : {}),
+  value: { after: { text: <PendingBar /> } },
+});
 
-/** Health factor, LTV and the borrow rate around the event — the market read
- *  at the end of block N − 1 (price) and N (rate). A cell holds its place while
- *  the read is in flight; a failed read draws nothing. */
-function MorphoRiskCards({
-  ctx,
-  coords,
-  read,
-  move,
-}: {
-  ctx: MorphoContext;
-  coords: MorphoCoords;
-  read: MorphoAtBlock;
-  move: MorphoHealthMove | null;
-}) {
-  const debtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
-  const anyDebt = Number(ctx.debtBefore ?? 0) > 1e-6 || Number(ctx.debtAfter ?? ctx.borrowedAfter ?? 0) > 1e-6;
-  if (!anyDebt || ctx.debtAfter == null) return null;
-  if (read.status === "loading")
-    return (
-      <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2" data-t2-skeleton="">
-        {["Health factor", "LTV", ...(debtSide ? ["Market borrow rate"] : [])].map((label) => (
-          <StatCard key={label} label={label}>
-            <PendingBar />
-          </StatCard>
-        ))}
-      </div>
-    );
-  if (read.status !== "ok" || !move) return null;
-  const collSym = ctx.collateralSymbol;
-  const loanSym = ctx.loanSymbol;
-  const vals = (side: "before" | "after") => ({
-    collateral: String(side === "before" ? move.collBefore : move.collAfter),
-    debt: String(side === "before" ? move.debtBefore : move.debtAfter),
-    price: move.price,
-    priceBlock: move.priceBlock,
-    lltv: move.lltv,
-    liquidation: move.liquidationPrice,
-  });
-  const hfText = (hf: number | null) => (hf == null ? "no debt" : fmtMorphoHf(hf));
-  const ltvText = (l: number | null) =>
-    l == null ? "no debt" : l > 0 && l < 0.001 ? "<0.1%" : `${(l * 100).toFixed(1)}%`;
-  const priceNote = move.liquidationPrice ? (
-    <>
-      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at{" "}
-      {atBlockText(move.priceBlock, move.priceBlockTime)}: the price the liquidation ran at
-    </>
-  ) : (
-    <>
-      at {collSym} {fmtMorphoPrice(move.price)} {loanSym}, the market oracle at{" "}
-      {atBlockText(move.priceBlock, move.priceBlockTime)}
-    </>
-  );
-  const apr = read.at.borrowApr;
-  return (
-    <div className="grid grid-cols-1 gap-2.5 px-5 py-2 sm:grid-cols-2">
-      <MoveCard
-        label="Health factor"
-        before={hfText(move.hfBefore)}
-        after={hfText(move.hfAfter)}
-        beforeProv={morphoHealthAtEventProv("health factor", "before", collSym, loanSym, coords, vals("before"))}
-        afterProv={morphoHealthAtEventProv("health factor", "after", collSym, loanSym, coords, vals("after"))}
-        note={priceNote}
-      />
-      <MoveCard
-        label={`LTV (liquidation at ${(move.lltv * 100).toFixed(1)}%)`}
-        before={ltvText(move.ltvBefore)}
-        after={ltvText(move.ltvAfter)}
-        beforeProv={morphoHealthAtEventProv("LTV", "before", collSym, loanSym, coords, vals("before"))}
-        afterProv={morphoHealthAtEventProv("LTV", "after", collSym, loanSym, coords, vals("after"))}
-      />
-      {debtSide && apr != null && (
-        <StatCard label="Market borrow rate">
-          <span className="text-sm font-semibold tabular-nums">
-            <Prov info={morphoBorrowRateAtBlockProv(coords, read.at.block, apr)}>{(apr * 100).toFixed(2)}% APR</Prov>
-          </span>
-          <div className="mt-0.5 text-xs text-rb-500">
-            at the end of {atBlockText(read.at.block, read.at.timestamp)}; it moves with the market&rsquo;s utilization,
-            the share of its supplied {loanSym} that is lent out
-          </div>
-        </StatCard>
-      )}
-    </div>
-  );
-}
-
-export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEventDetailProps) {
-  const chainId = useChainId();
-  const coords: MorphoCoords = {
-    txHash,
-    blockNumber,
-    marketId: ctx.marketId,
-    chainId,
-    source: useCaptureSource(),
-  };
-  const read = useMorphoAtBlock(ctx.marketId, blockNumber, chainId);
+/** The position's cells: Collateral, Debt (or Borrowed), Supplied. */
+export function useMorphoCells(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  flows: AssetFlow[] | undefined,
+): EventCellSpec[] {
   // Which cells open into the Lifetime flows ledgers, where the page has them.
   const cells = useMorphoLedgerCells();
   // The page ties its timeline to the flows panel and the model has not landed:
@@ -312,8 +188,8 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   // The address for each axis, read off the event's own flows under the
   // single-match rule (soleFlowAddress): a symbol two flows share resolves to
   // nothing rather than to whichever contract happened to come first. Only the
-  // side this event actually moved has a flow to name, so the untouched axis —
-  // muted here anyway — keeps whatever the house table can make of its symbol.
+  // side this event moved has a flow to name, so the untouched axis keeps
+  // whatever the house table can make of its symbol.
   const collAddr = soleFlowAddress(flows, ctx.collateralSymbol);
   const loanAddr = soleFlowAddress(flows, ctx.loanSymbol);
   const collActive = ctx.side === "collateral" || ctx.eventType === "liquidation";
@@ -322,8 +198,9 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   // Only the axis this event's single `assetsDelta` describes (ctx.side) gets a
   // reconstructed before — on a liquidation both sides move but only that side
   // has a clean asset delta (the other's change is in shares, not assets).
-  const stats: ChainTruthStat[] = [
+  const stats: ChainTruthCellStat[] = [
     {
+      key: "collateral",
       label: "Collateral",
       value: fmtAfter(ctx.collateralAfter),
       symbol: ctx.collateralSymbol,
@@ -351,6 +228,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
           // What the position owed: shares × the market's totals at the row.
           // Before = after − change, the change being debt after − debt before;
           // the gap from the previous row's after is the interest between.
+          key: "debt",
           label: "Debt",
           value: fmt(ctx.debtAfter),
           display: fmtMorphoAmount(ctx.debtAfter),
@@ -382,15 +260,16 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
             : {}),
         }
       : {
+          key: "debt",
           label: "Borrowed",
           value: fmtAfter(ctx.borrowedAfter),
           symbol: ctx.loanSymbol,
           address: loanAddr,
           prov: borrowedAfterProv(ctx.loanSymbol, coords),
           changed: borrActive,
-          // Gated on the debt axis actually moving: a lender-side supply or
-          // withdraw also rides `side: "loan"`, and its delta belongs to the
-          // supplied axis below, not to the borrowed one.
+          // Gated on the debt axis moving: a lender-side supply or withdraw
+          // also rides `side: "loan"`, and its delta belongs to the supplied
+          // axis below.
           transition:
             ctx.side === "loan" && borrActive
               ? reconstructTransition({
@@ -404,22 +283,22 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
   ];
 
   // The lender axis — Base only, whose rows include Supply and Withdraw; the
-  // Ethereum index carries no lender rows. The Ethereum grid is unchanged.
-  const lenderActive = ctx.eventType === "supply" || ctx.eventType === "withdraw";
+  // Ethereum index carries no lender rows.
   if (ctx.suppliedAfter != null && ctx.supplyBefore != null) {
     // The chain's supply: shares × the market's totals at the row (Base index).
     // The gap from the previous row's after is the interest earned, net of any
     // bad debt socialised between; a loss is named as a change.
     const gap = ctx.supplyGapSincePrevious;
     stats.push({
+      key: "supplied",
       label: "Supplied",
       value: fmt(ctx.suppliedAfter),
       symbol: ctx.loanSymbol,
       address: loanAddr,
       prov: supplyAfterProv(ctx.loanSymbol, coords),
       ...(cells?.collateral === "supply" || (flowsPending && lenderEv) ? { ledger: "collateral" as const } : {}),
-      changed: lenderActive || Boolean(gap),
-      transition: lenderActive
+      changed: lenderEv || Boolean(gap),
+      transition: lenderEv
         ? reconstructTransition({
             after: ctx.suppliedAfter,
             change: ctx.supplyChange,
@@ -439,6 +318,7 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
     });
   } else if (ctx.suppliedAfter != null) {
     stats.push({
+      key: "supplied",
       label: "Supplied",
       value: fmt(ctx.suppliedAfter),
       symbol: ctx.loanSymbol,
@@ -453,17 +333,145 @@ export function MorphoEventDetail({ ctx, txHash, blockNumber, flows }: MorphoEve
       }),
     });
   }
+  return useChainTruthCells(stats);
+}
+
+/** The opened card: the market read at the event's block adds Health factor,
+ *  LTV and the market borrow rate (a cell holds its place while the read is in
+ *  flight; a failed read draws none), the oracle price in the loan token to
+ *  the price row, and a liquidation's forensics under the grid. */
+export function useMorphoOpened(
+  ctx: MorphoContext,
+  coords: MorphoCoords,
+  flows: AssetFlow[] | undefined,
+  cells: EventCellSpec[],
+  price: EventCardPrice | undefined,
+): EventCardOpened {
+  const read = useMorphoAtBlock(ctx.marketId, coords.blockNumber, coords.chainId ?? 1);
+  const lender = ctx.eventType === "supply" || ctx.eventType === "withdraw";
+  const debtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
+  const anyDebt = Number(ctx.debtBefore ?? 0) > 1e-6 || Number(ctx.debtAfter ?? ctx.borrowedAfter ?? 0) > 1e-6;
+  const risk = !lender && anyDebt && ctx.debtAfter != null;
+  const collSym = ctx.collateralSymbol;
+  const loanSym = ctx.loanSymbol;
+  const move = morphoHealthMove(ctx, read, coords.blockNumber);
+  const inputs = ["collateral", "debt"];
+
+  const riskCells: EventCellSpec[] = [];
+  if (risk && read.status === "loading") {
+    riskCells.push(pendingCell("health", "Health factor", inputs), pendingCell("ltv", "LTV", inputs));
+    if (debtSide) riskCells.push(pendingCell("rate", "Market borrow rate"));
+  } else if (risk && read.status === "ok" && move) {
+    const vals = (side: "before" | "after") => ({
+      collateral: String(side === "before" ? move.collBefore : move.collAfter),
+      debt: String(side === "before" ? move.debtBefore : move.debtAfter),
+      price: move.price,
+      priceBlock: move.priceBlock,
+      lltv: move.lltv,
+      liquidation: move.liquidationPrice,
+    });
+    const hfText = (hf: number | null) => (hf == null ? "no debt" : fmtMorphoHf(hf));
+    const ltvText = (l: number | null) =>
+      l == null ? "no debt" : l > 0 && l < 0.001 ? "<0.1%" : `${(l * 100).toFixed(1)}%`;
+    const pair = (
+      key: string,
+      label: string,
+      what: "health factor" | "LTV",
+      before: string,
+      after: string,
+      sub?: ReactNode,
+    ): EventCellSpec => ({
+      kind: "stat",
+      key,
+      label,
+      changed: before !== after,
+      inputs,
+      value: {
+        ...(before !== after
+          ? {
+              before: {
+                text: before,
+                info: morphoHealthAtEventProv(what, "before", collSym, loanSym, coords, vals("before")),
+              },
+            }
+          : {}),
+        after: { text: after, info: morphoHealthAtEventProv(what, "after", collSym, loanSym, coords, vals("after")) },
+      },
+      ...(sub ? { sub: [{ content: sub }] } : {}),
+    });
+    riskCells.push(
+      pair(
+        "health",
+        "Health factor",
+        "health factor",
+        hfText(move.hfBefore),
+        hfText(move.hfAfter),
+        <>
+          at the market oracle at {atBlockText(move.priceBlock, move.priceBlockTime)}
+          {move.liquidationPrice ? ": the price the liquidation ran at" : ""}
+        </>,
+      ),
+      pair(
+        "ltv",
+        `LTV (liquidation at ${(move.lltv * 100).toFixed(1)}%)`,
+        "LTV",
+        ltvText(move.ltvBefore),
+        ltvText(move.ltvAfter),
+      ),
+    );
+    const apr = read.at.borrowApr;
+    if (debtSide && apr != null)
+      riskCells.push({
+        kind: "stat",
+        key: "rate",
+        label: "Market borrow rate",
+        changed: false,
+        value: {
+          after: {
+            text: `${(apr * 100).toFixed(2)}% APR`,
+            info: morphoBorrowRateAtBlockProv(coords, read.at.block, apr),
+          },
+        },
+        sub: [
+          {
+            content: (
+              <>
+                at the end of {atBlockText(read.at.block, read.at.timestamp)}; it moves with the market&rsquo;s
+                utilization, the share of its supplied {loanSym} that is lent out
+              </>
+            ),
+          },
+        ],
+      });
+  }
+
+  // The collateral's price in the loan token (Morpho's unit; no USD), where
+  // the cells value collateral.
+  const figure: EventPriceFigure | null =
+    !lender && move
+      ? {
+          key: "oracle",
+          symbol: collSym,
+          address: soleFlowAddress(flows, collSym),
+          text: fmtMorphoPrice(move.price),
+          unit: `${loanSym} per ${collSym}`,
+          info: move.liquidationPrice
+            ? liqPriceUsedProv(collSym, loanSym, coords, move.price, move.priceBlock)
+            : atBlockOraclePriceProv(collSym, loanSym, coords, move.price),
+          value: String(move.price),
+          title: `The market oracle at ${atBlockText(move.priceBlock, move.priceBlockTime)}`,
+        }
+      : null;
 
   const forensics = ctx.eventType === "liquidation" ? buildMorphoLiqForensics(ctx, coords, flows, read) : undefined;
-  const move = morphoHealthMove(ctx, read, blockNumber);
-
-  return (
-    <>
-      <ChainTruthDetail stats={stats} />
-      {ctx.eventType !== "supply" && ctx.eventType !== "withdraw" && (
-        <MorphoRiskCards ctx={ctx} coords={coords} read={read} move={move} />
-      )}
-      {forensics && <LiquidationForensics {...forensics} />}
-    </>
-  );
+  return {
+    cells: [...cells, ...riskCells],
+    // The forensics' price pill gives way to the price row's figure.
+    notes: forensics ? (
+      <LiquidationForensics {...forensics} pricePills={figure ? [] : forensics.pricePills} />
+    ) : undefined,
+    price: figure
+      ? { gas: price?.gas, prices: price?.prices ?? [], figures: [...(price?.figures ?? []), figure] }
+      : price,
+  };
 }

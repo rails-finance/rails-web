@@ -9,7 +9,7 @@
 
 import type { AssetFlow, FxContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   collDeltaProv,
   debtDeltaProv,
@@ -42,7 +42,8 @@ export interface FxEventHeaderProps {
   eventId?: string;
 }
 
-export function FxEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useFxHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -52,7 +53,7 @@ export function FxEventHeader({
   externalBy,
   flows,
   eventId,
-}: FxEventHeaderProps) {
+}: FxEventHeaderProps): ChainTruthRowSpec {
   const socialized = useFxSocializedReads();
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
@@ -190,41 +191,35 @@ export function FxEventHeader({
   // holder is its first owner).
   const transferTo = ctx.eventType === "transfer" ? ctx.transferTo : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: ctx.reopens ? "Opened again" : isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
-        status: isOpen ? "open" : undefined,
-        critical: ctx.eventType === "liquidation",
-        // Rebalance rows follow the redemption grammar: the spine's caution
-        // pill carries the action name on desktop, the label becomes a
-        // mobile badge, and the tick-level amounts stay in the header (the
-        // warning spine shows no flanking numbers).
-        labelOnSpine: ctx.eventType === "tickRebalance" || poolLiq,
-        deltas,
-        note,
-        party: transferTo
-          ? {
-              prefix: "to",
-              address: transferTo,
-              prov: transferPartyProv("to", coords),
-            }
-          : undefined,
-        externalActor:
-          externalBy && ctx.ownerAt && ctx.txFrom
-            ? {
-                address: externalBy,
-                prov: fxExternalActorProv({ owner: ctx.ownerAt, txFrom: ctx.txFrom }, coords),
-                tip: (
-                  <>
-                    {externalBy} sent this transaction. The holder of the position at this block was {ctx.ownerAt}.
-                  </>
-                ),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: ctx.reopens ? "Opened again" : isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+    status: isOpen ? "open" : undefined,
+    critical: ctx.eventType === "liquidation",
+    // Rebalance rows follow the redemption grammar: the spine's caution
+    // pill carries the action name on desktop, the label becomes a
+    // mobile badge, and the tick-level amounts stay in the header (the
+    // warning spine shows no flanking numbers).
+    labelOnSpine: ctx.eventType === "tickRebalance" || poolLiq,
+    deltas,
+    note,
+    party: transferTo
+      ? {
+          prefix: "to",
+          address: transferTo,
+          prov: transferPartyProv("to", coords),
+        }
+      : undefined,
+    externalActor:
+      externalBy && ctx.ownerAt && ctx.txFrom
+        ? {
+            address: externalBy,
+            prov: fxExternalActorProv({ owner: ctx.ownerAt, txFrom: ctx.txFrom }, coords),
+            tip: (
+              <>
+                {externalBy} sent this transaction. The holder of the position at this block was {ctx.ownerAt}.
+              </>
+            ),
+          }
+        : undefined,
+  };
 }

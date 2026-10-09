@@ -7,7 +7,7 @@
 
 import type { AssetFlow, MakerDAOContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import {
   dinkProv,
@@ -46,7 +46,8 @@ export interface MakerDAOEventHeaderProps {
   txContext?: MakerTxContext;
 }
 
-export function MakerDAOEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useMakerHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -58,7 +59,7 @@ export function MakerDAOEventHeader({
   flows,
   ownership,
   txContext,
-}: MakerDAOEventHeaderProps) {
+}: MakerDAOEventHeaderProps): ChainTruthRowSpec {
   const coords: MakerCoords = { txHash, blockNumber, urn: ctx.urn, ilk: ctx.ilk };
   const dink = Number(ctx.dink) || 0;
   const dart = Number(ctx.dart) || 0;
@@ -112,35 +113,29 @@ export function MakerDAOEventHeader({
   const toChip = ownership ? ownerChipText(ownership.after, txContext) : null;
   const fromChip = ownership ? ownerChipText(ownership.before, txContext) : null;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
-        status: isOpen ? "open" : undefined,
-        critical: ctx.eventType === "grab" || ctx.eventType.startsWith("lse-"),
-        deltas,
-        fromParty:
-          fromChip && fromChip.address
-            ? { prefix: "from", address: fromChip.address, name: fromChip.name, prov: ownerBeforeProv(coords) }
-            : undefined,
-        party: giveTo
-          ? {
-              prefix: "to",
-              address: toChip?.address || giveTo,
-              ...(toChip?.name ? { name: toChip.name } : {}),
-              prov: ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords),
-            }
-          : undefined,
-        externalActor:
-          externalBy && ownerForReceipt && ctx.txFrom && ctx.txTo
-            ? {
-                address: externalBy,
-                prov: externalActorProv({ owner: ownerForReceipt, txFrom: ctx.txFrom, txTo: ctx.txTo }, coords),
-              }
-            : undefined,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : actionLabel,
+    status: isOpen ? "open" : undefined,
+    critical: ctx.eventType === "grab" || ctx.eventType.startsWith("lse-"),
+    deltas,
+    fromParty:
+      fromChip && fromChip.address
+        ? { prefix: "from", address: fromChip.address, name: fromChip.name, prov: ownerBeforeProv(coords) }
+        : undefined,
+    party: giveTo
+      ? {
+          prefix: "to",
+          address: toChip?.address || giveTo,
+          ...(toChip?.name ? { name: toChip.name } : {}),
+          prov: ctx.giveDstOwner ? giveOwnerProv(coords) : giveDstProv(coords),
+        }
+      : undefined,
+    externalActor:
+      externalBy && ownerForReceipt && ctx.txFrom && ctx.txTo
+        ? {
+            address: externalBy,
+            prov: externalActorProv({ owner: ownerForReceipt, txFrom: ctx.txFrom, txTo: ctx.txTo }, coords),
+          }
+        : undefined,
+  };
 }

@@ -1710,6 +1710,8 @@ export interface PwnContext {
   borrower?: string;
   /** Which side the VIEWED wallet is on — drives the card's framing. */
   viewerRole?: "lender" | "borrower";
+  /** The transaction's sender (lowercase): whose gas the transaction was. */
+  txFrom?: string;
   /** Collateral the borrower locked. `category` is the MultiToken standard. */
   collateralCategory?: PwnTokenCategory;
   collateralSymbol?: string;

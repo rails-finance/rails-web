@@ -1,7 +1,10 @@
 "use client";
 
-// Fluid event detail — adapter onto the shared ChainTruthDetail grid. The
-// lanes an event touches, with before→after transitions:
+// Fluid's T2 (ui-jobs 309 step 8): the card's `cells`, `notes` and `price`
+// slots. Collateral and Debt; a liquidation's outcome ("Partially
+// liquidated") stands in the price row with the vault oracle's price, its
+// forensics under the grid; an NFT move's holders are notes. The lanes an
+// event touches, with before→after transitions:
 //   operate      — each leg's balance after the event: the vault's settled
 //                  figure read at the block (interest included), with the
 //                  interest accrued since the previous event beneath it. A row
@@ -16,13 +19,18 @@
 //                  is captured (mig 114).
 //   mint/transfer— the ownership move (from → to), no token amounts.
 
+import type { ReactNode } from "react";
 import type { FluidContext } from "@/lib/shared/types/event-shape";
+import { reconstructTransition, type ChainTruthTransition } from "@/components/shared/chain-truth-event";
 import {
-  ChainTruthDetail,
-  reconstructTransition,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+  EventNotes,
+  NoteLine,
+  useChainTruthCells,
+  type ChainTruthCellStat,
+} from "@/components/shared/chain-truth-cells";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import type { EventCardPrice } from "@/components/shared/event-price-row";
+import { Prov } from "@/components/shared/provenance";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   colDeltaProv,
@@ -49,7 +57,7 @@ import { fmtHeaderMagnitude } from "@/lib/shared/header-values";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 import { useFluidLedgerCells } from "./fluid-ledger";
 
-export interface FluidEventDetailProps {
+export interface FluidCellsProps {
   ctx: FluidContext;
   txHash?: string;
   blockNumber?: number;
@@ -170,7 +178,20 @@ function buildFluidLiqForensics(ctx: FluidContext, coords: FluidCoords): Liquida
   };
 }
 
-export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, opening }: FluidEventDetailProps) {
+/** The cells, the notes and the price row of one Fluid event. */
+export function useFluidCells({
+  ctx,
+  txHash,
+  blockNumber,
+  wallet,
+  mintedTo,
+  opening,
+  price: price0,
+}: FluidCellsProps & { price?: EventCardPrice }): {
+  cells: EventCellSpec[];
+  notes?: ReactNode;
+  price?: EventCardPrice;
+} {
   const supplySym = ctx.supplySymbol ?? "DEX shares";
   const borrowSym = ctx.borrowSymbol ?? "DEX shares";
   const coords: FluidCoords = {
@@ -181,7 +202,8 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
     nftId: ctx.nftId,
     owner: ctx.ownerAt ?? wallet,
   };
-  const stats: ChainTruthStat[] = [];
+  const stats: ChainTruthCellStat[] = [];
+  const holders: { key: string; label: string; address: string }[] = [];
   const chain = ctx.balanceBasis === "chain";
   // The cells that open into the Lifetime flows ledgers, where the page has
   // them; while the model is on its way, the cells that will open stand as
@@ -192,7 +214,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
   const owes = (Number(ctx.debtAfter ?? "0") || 0) > 0 || (Number(ctx.debtBefore ?? "0") || 0) > 0;
   const collLedger = cells != null || flowsPending ? { ledger: "collateral" as const } : {};
   const debtLedger = cells?.debt || (flowsPending && owes) ? { ledger: "debt" as const } : {};
-  const interest = (side: "collateral" | "debt", sym: string): Pick<ChainTruthStat, "interestSincePrevious"> => {
+  const interest = (side: "collateral" | "debt", sym: string): Pick<ChainTruthCellStat, "interestSincePrevious"> => {
     const value = side === "collateral" ? ctx.colInterestSincePrevious : ctx.debtInterestSincePrevious;
     return value != null
       ? { interestSincePrevious: { value, prov: interestSincePreviousProv(side, sym, coords) } }
@@ -203,6 +225,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
     // The settled lane: both boundaries are the vault's own fetchLatestPosition
     // reads — exact, partial-liquidation math included.
     stats.push({
+      key: "collateral",
       label: "Collateral",
       value: fmt(ctx.liqSupplyAfter),
       symbol: supplySym,
@@ -212,6 +235,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
       ...collLedger,
     });
     stats.push({
+      key: "debt",
       label: "Debt",
       value: fmt(ctx.liqBorrowAfter),
       symbol: borrowSym,
@@ -220,30 +244,12 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
       ...interest("debt", borrowSym),
       ...debtLedger,
     });
-    stats.push({
-      label: "Outcome",
-      value: ctx.fullyLiquidated ? "Fully liquidated" : "Partially liquidated",
-      symbol: "",
-      prov: fullyLiquidatedProv(coords),
-    });
   } else if (ctx.eventType === "mint" || ctx.eventType === "transfer") {
     // Ownership move — the factory's ERC721 Transfer parties, no token amounts.
-    if (ctx.eventType === "transfer" && ctx.transferFrom) {
-      stats.push({
-        label: "From",
-        value: shortAddress(ctx.transferFrom),
-        symbol: "",
-        prov: ownerProv(coords, ctx.transferFrom),
-      });
-    }
-    if (ctx.transferTo) {
-      stats.push({
-        label: ctx.eventType === "mint" ? "Minted to" : "To",
-        value: shortAddress(ctx.transferTo),
-        symbol: "",
-        prov: ownerProv(coords, ctx.transferTo),
-      });
-    }
+    if (ctx.eventType === "transfer" && ctx.transferFrom)
+      holders.push({ key: "from", label: "From", address: ctx.transferFrom });
+    if (ctx.transferTo)
+      holders.push({ key: "to", label: ctx.eventType === "mint" ? "Minted to" : "To", address: ctx.transferTo });
   } else {
     // Operate: each leg's balance — a composite touches both. A leg this event
     // didn't move keeps its plain after-value, muted text marking it untouched.
@@ -251,6 +257,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
     const debtMoved = (Number(ctx.debtDelta ?? "0") || 0) !== 0;
     if (ctx.colAfter != null) {
       stats.push({
+        key: "collateral",
         label: "Collateral",
         value: fmt(ctx.colAfter),
         symbol: supplySym,
@@ -269,6 +276,7 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
     }
     if (ctx.debtAfter != null) {
       stats.push({
+        key: "debt",
         label: "Debt",
         value: fmt(ctx.debtAfter),
         symbol: borrowSym,
@@ -287,22 +295,68 @@ export function FluidEventDetail({ ctx, txHash, blockNumber, wallet, mintedTo, o
     }
   }
 
-  if (mintedTo) {
-    stats.push({
-      label: "Minted to",
-      value: shortAddress(mintedTo),
-      symbol: "",
-      prov: ownerProv(coords, mintedTo),
-    });
-  }
+  if (mintedTo) holders.push({ key: "minted", label: "Minted to", address: mintedTo });
 
   const forensics =
     ctx.eventType === "liquidated" || ctx.eventType === "absorbed" ? buildFluidLiqForensics(ctx, coords) : undefined;
+  const cellList = useChainTruthCells(stats);
 
-  return (
-    <>
-      <ChainTruthDetail stats={stats} />
-      {forensics && <LiquidationForensics {...forensics} />}
-    </>
-  );
+  // The price row: a liquidation's outcome, and the vault oracle's price in
+  // the debt token where the forensics priced the block.
+  const isLiq = ctx.eventType === "liquidated" || ctx.eventType === "absorbed";
+  const oracle = isLiq ? ctx.oraclePriceAtBlock : undefined;
+  const price: EventCardPrice | undefined = isLiq
+    ? {
+        gas: price0?.gas,
+        prices: price0?.prices ?? [],
+        figures: [
+          ...(price0?.figures ?? []),
+          ...(forensics && oracle && ctx.supplySymbol && ctx.borrowSymbol
+            ? [
+                {
+                  key: "oracle",
+                  symbol: ctx.supplySymbol,
+                  text: formatNumber(oracle.debtPerCol),
+                  unit: `${ctx.borrowSymbol} per ${ctx.supplySymbol}`,
+                  info: atBlockOraclePriceProv(
+                    ctx.supplySymbol,
+                    ctx.borrowSymbol,
+                    coords,
+                    oracle.debtPerCol,
+                    oracle.oracle,
+                    oracle.source,
+                  ),
+                  value: String(oracle.debtPerCol),
+                  title: "The vault oracle at this block",
+                },
+              ]
+            : []),
+        ],
+        outcome: {
+          word: {
+            text: ctx.fullyLiquidated ? "Fully liquidated" : "Partially liquidated",
+            info: fullyLiquidatedProv(coords),
+          },
+        },
+      }
+    : price0;
+
+  const notes =
+    holders.length > 0 || forensics ? (
+      <>
+        {holders.length > 0 && (
+          <EventNotes>
+            {holders.map((h) => (
+              <NoteLine key={h.key} label={h.label}>
+                <Prov info={ownerProv(coords, h.address)} value={shortAddress(h.address)}>
+                  {shortAddress(h.address)}
+                </Prov>
+              </NoteLine>
+            ))}
+          </EventNotes>
+        )}
+        {forensics && <LiquidationForensics {...forensics} pricePills={[]} />}
+      </>
+    ) : undefined;
+  return { cells: cellList, notes, price };
 }
