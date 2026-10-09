@@ -96,7 +96,6 @@ const WORD_SECTIONS = [
   "group_words",
   "L5_words",
   "trove_words",
-  "fragments",
 ];
 const isLine = (s) => typeof s === "string" && s.trim() !== "" && !s.includes("\n");
 const str = (where, s) => {
@@ -172,6 +171,21 @@ for (const [i, t] of d.templates.entries()) {
     }
     for (const id of [...(t.order ?? []), ...(t.list ?? [])])
       if (!seen.has(id)) fail(`${t.id}: "${id}" is in no group of groups`);
+  }
+  // Alternates: lists of its sentences, each in order, none in two lists.
+  if (t.alternates !== undefined) {
+    if (!Array.isArray(t.alternates) || !t.alternates.every(Array.isArray))
+      fail(`${t.id}.alternates is not a list of lists of sentence ids`);
+    else {
+      const seen = new Set();
+      for (const ids of t.alternates)
+        for (const id of ids) {
+          if (!t.order?.includes(id) && !t.list?.includes(id))
+            fail(`${t.id}.alternates: "${id}" is in neither order nor list`);
+          if (seen.has(id)) fail(`${t.id}.alternates: "${id}" is in two lists`);
+          seen.add(id);
+        }
+    }
   }
 }
 
@@ -319,8 +333,6 @@ for (const [file, src] of Object.entries(sources)) {
     if (!(m[2] in d[GROUP[m[1]]])) failIn(file, `reads ${m[1]}.${m[2]}, which ${DATA} lacks (${GROUP[m[1]]})`);
   for (const m of src.matchAll(/FILE\.L5_words\.([a-z_0-9]+)/g))
     if (!(m[1] in d.L5_words)) failIn(file, `reads L5_words.${m[1]}, which ${DATA} lacks`);
-  for (const m of src.matchAll(/"(debt_term\.[a-z_]+)"/g))
-    if (!(m[1] in d.fragments)) failIn(file, `reads fragment "${m[1]}", which ${DATA} lacks`);
 }
 for (const t of allTemplates)
   for (const g of t.L1 ?? [])
@@ -443,7 +455,7 @@ for (const src of Object.values(sources)) {
     addSupply(`${GROUP[m[1]]}.${m[2]}`, names);
   }
 }
-for (const sec of WORD_SECTIONS.filter((s) => s !== "fragments" && s !== "L5_words" && s !== "trove_words"))
+for (const sec of WORD_SECTIONS.filter((s) => s !== "L5_words" && s !== "trove_words"))
   for (const [k, v] of Object.entries(d[sec])) {
     if (!isLine(v) || !/\{/.test(v)) continue;
     const allowed = wordSupply.get(`${sec}.${k}`);
@@ -452,8 +464,6 @@ for (const sec of WORD_SECTIONS.filter((s) => s !== "fragments" && s !== "L5_wor
   }
 for (const [k, v] of Object.entries(d.trove_words))
   if (isLine(v) && troveSupply.has(k)) placeholders(`trove_words.${k}`, v, troveSupply.get(k), false);
-for (const [k, v] of Object.entries(d.fragments))
-  if (isLine(v)) placeholders(`fragments.${k}`, v, new Set(["x"]), false);
 
 // Modals: the values the loader's fillWords calls pass.
 const loader = sources[LOADER];

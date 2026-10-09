@@ -23,7 +23,6 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   CONTEXT_WORDS,
   FOOTER_WORDS,
-  FRAGMENTS,
   GROUP_WORDS,
   L1_WORDS,
   L2_WORDS,
@@ -622,11 +621,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     if (!safety?.priceMoveMaterial || safety.priceChange == null || safety.prevPrice == null) return;
     sp.say(safety.priceChange < 0 ? "market.fell" : "market.rose");
   };
-  const ratioMoved = () =>
-    safety?.crBefore != null &&
-    safety.crAfter != null &&
-    safety.price > 0 &&
-    fmtCr(safety.crBefore) !== fmtCr(safety.crAfter);
   const liqDistance = (id: string) => {
     if (v.liq_distance_after == null || v.liq_distance_before == null) return;
     if (!(num(v.liq_distance_after) > 0)) return;
@@ -638,12 +632,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     if (!accrual.batched) sp.say("accrual.interest", bold);
     else if (accrual.split && accrual.fee > 0.005) sp.say("accrual.batched_fee", bold);
     else sp.say("accrual.batched", bold);
-  };
-  const crPairNow = () => {
-    if (stateAfter.collateralRatio > 0) {
-      v.cr_after = stateAfter.collateralRatio;
-      sp.say("state.cr");
-    }
   };
   const ECHO_FEE = { upfront_fee: "upfront_fee" as const };
 
@@ -676,17 +664,14 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         repaid: "debt_change",
       } as const;
       const kind = t.id.split(".")[2];
-      if (kind === "combined") sp.say(`combined.what.${variant}`, echo);
+      // A borrow that charged the upfront fee says so in its first sentence.
+      const fee = upfront > 0 && debtOp > 0 ? "_fee" : "";
+      if (kind === "combined") sp.say(`combined.what.${variant}${fee}`, echo);
+      else if (kind === "borrow") sp.say(`borrow.what${fee}`, echo);
       else sp.say(`${kind === "add_coll" ? "add" : kind === "withdraw_coll" ? "withdraw" : kind}.what`, echo);
-      if (ratioMoved()) {
-        if (kind === "combined")
-          sp.say(num(v.cr_after) > num(v.cr_before_same_price) ? "combined.safety_rose" : "combined.safety_fell");
-        else sp.say(`${kind === "add_coll" ? "add" : kind === "withdraw_coll" ? "withdraw" : kind}.safety`);
-      }
       const base = kind === "add_coll" ? "add" : kind === "withdraw_coll" ? "withdraw" : kind;
       liqDistance(`${base}.liq_distance`);
       market();
-      if (upfront > 0 && (kind === "borrow" || kind === "combined")) sp.say("fee.borrow", ECHO_FEE);
       // A liquidated neighbour's redistribution this touch applied.
       const redist = liquityRedistOnAdjust(ctx);
       if (redist) {
@@ -696,33 +681,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         if (redist.debt >= 0.01 && redist.coll > 1e-9) sp.say("redist.both", e);
         else if (redist.debt >= 0.01) sp.say("redist.debt", e);
         else sp.say("redist.coll", e);
-        if (redist.debt >= 0.01) {
-          const terms: string[] = [];
-          const term = (k: string, x: string) => terms.push(fillText(FRAGMENTS[k], { x }));
-          if (Math.abs(debtOp) >= TROVE_DELTA_EPSILON)
-            term(debtOp < 0 ? "debt_term.repaid" : "debt_term.borrowed", fmtDebt(Math.abs(debtOp)));
-          if (upfront > 0) term("debt_term.fee", fmtDebt(upfront));
-          term("debt_term.redist", fmtDebt(redist.debt));
-          if (accrual && accrual.total > 0.01)
-            term(accrual.batched ? "debt_term.interest_and_fees" : "debt_term.interest", fmtAccrued(accrual.total));
-          v.debt_terms = terms.join(" ");
-          sp.say("redist.balance");
-        }
       }
-      const rateHeld = stateBefore.annualInterestRate === stateAfter.annualInterestRate;
-      const unchangedOk = rateHeld && !redist;
-      if (kind === "add_coll" && unchangedOk) sp.say("add.rest");
-      if (kind === "repay" && unchangedOk) sp.say("repay.rest");
-      if (kind === "combined" && rateHeld) sp.say("combined.rate");
-      if (
-        (kind === "withdraw_coll" || kind === "borrow") &&
-        unchangedOk &&
-        safety &&
-        safety.mcr > 0 &&
-        v.cr_after != null
-      )
-        sp.say(num(v.cr_after) >= 2 * safety.mcr * 100 ? `${base}.margin_far` : `${base}.margin`);
-      if (!rateHeld) sp.say("rate.moved", { rate_before: "bold", rate_after: "rate_after" });
       break;
     }
     case "liquity2.adjust.no_change": {
@@ -733,25 +692,19 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         v.run_count = run.count;
         v.run_first = run.firstTimestamp;
         v.run_last = run.lastTimestamp;
-        sp.say("nochange.run", { run_count: "bold" });
+        sp.say("nochange.run");
         if (dust < 0) sp.say("nochange.run_repaid");
       } else if (dust < 0) sp.say("nochange.dust");
       else sp.say("nochange.none");
-      if (Math.abs(stateAfter.debt - LIQUITY_MIN_DEBT) < TROVE_DELTA_EPSILON) {
-        sp.say("nochange.at_min");
+      if (Math.abs(stateAfter.debt - LIQUITY_MIN_DEBT) < TROVE_DELTA_EPSILON)
         sp.say(run ? "nochange.capped_run" : "nochange.capped");
-      }
       sp.say("nochange.bot");
-      sp.say("nochange.gas");
       break;
     }
     case "liquity2.adjust.rate": {
-      sp.say(variant === "raised" ? "rate.raised" : "rate.lowered", { rate_before: "bold", rate_after: "rate_after" });
+      sp.say(variant === "raised" ? "rate.raised" : "rate.lowered", { rate_after: "rate_after" });
       accrualSentence();
       if (upfront > 0) sp.say("rate.fee", ECHO_FEE);
-      if (stateAfter.debt > 0) sp.say("state.debt_now", { debt_after: "bold" });
-      if (stateAfter.coll > 0 && price > 0) sp.say("rate.coll", { coll_after: "bold", coll_after_usd: "bold" });
-      crPairNow();
       break;
     }
     // ── Redemption ──
@@ -778,16 +731,11 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         if (ctx.isInBatch && ctx.batchManager) sp.say("redeem.why_batch", rate);
         else sp.say("redeem.why_owner", rate);
       }
-      if (stateAfter.debt === 0) {
-        if (zombie) {
-          sp.say("redeem.zombie_zero");
-          sp.say("redeem.zombie_zero_rate", { rate_after: "bold" });
-          sp.say("redeem.zombie_zero_next");
-        } else sp.say("redeem.zero");
+      if (zombie && stateAfter.debt === 0) {
+        sp.say("redeem.zombie_zero");
+        sp.say("redeem.zombie_zero_next");
       } else if (zombie) {
-        sp.say("redeem.zombie_low", { debt_after: "bold" });
-        sp.say("redeem.zombie_low_queue");
-        sp.say("redeem.zombie_low_rate", rate);
+        sp.say("redeem.zombie_low");
         sp.say("redeem.zombie_low_next");
       }
       break;
@@ -800,25 +748,8 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         v.manager_name = getBatchManagerByAddress(mgr)?.name ?? null;
         sp.say("join.what");
       } else sp.say("join.what_plain");
-      if (upfront > 0) {
-        // The fee is charged on the debt with its accrual: that debt, then
-        // the fee that brought it to the debt after.
-        if (accrual && accrual.total > 0.01) {
-          v.debt_accrued_before = stateAfter.debt - upfront;
-          v.accrual_noun = accrualNoun(accrual);
-          sp.say("join.debt_fee", { debt_accrued_before: "bold" });
-        }
-        sp.say("join.fee", { ...ECHO_FEE, debt_after: "bold" });
-      } else if (stateAfter.debt > 0) {
-        const moved = Math.abs(stateAfter.debt - stateBefore.debt) >= 0.01;
-        const b = { debt_before: "bold", debt_after: "bold" } as const;
-        if (!moved) sp.say("join.debt_same", b);
-        else if (accrual && accrual.total > 0.01) sp.say("join.debt_accrued", b);
-        else sp.say("join.debt_moved", b);
-      }
-      if (stateAfter.coll > 0) sp.say("join.coll", { coll_after: "bold" });
+      if (upfront > 0) sp.say("join.fee", ECHO_FEE);
       if (stateAfter.annualInterestRate > 0) sp.say("join.rate", { rate_after: "rate_after" });
-      crPairNow();
       break;
     }
     case "liquity2.delegation.leave": {
@@ -829,11 +760,8 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       } else sp.say("leave.what_plain");
       if (accrual && accrual.split && accrual.fee > 0.01) sp.say("leave.fees");
       if (upfront > 0) sp.say("leave.fee", ECHO_FEE);
-      if (stateAfter.debt > 0) sp.say("state.debt_now", { debt_after: "bold" });
-      if (stateAfter.coll > 0 && price > 0) sp.say("leave.coll", { coll_after: "bold", coll_after_usd: "bold" });
       if (stateAfter.annualInterestRate !== stateBefore.annualInterestRate)
         sp.say("leave.rate", { rate_before: "bold", rate_after: "rate_after" });
-      crPairNow();
       break;
     }
     case "liquity2.delegation.rate_update": {
@@ -842,9 +770,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         sp.say(variant === "raised" ? "bru.raised" : "bru.lowered", { rate_before: "bold", rate_after: "rate_after" });
       const move = batchRateDebtMove(ctx, previousEvent, currentEvent);
       if (move && Math.abs(move.total) >= 0.01) {
-        v.debt_move = move.total;
-        v.prev_date = move.since;
-        sp.say("bru.move", { debt_move: "debt_change" });
         if (move.interest >= 0.005) {
           v.move_interest = move.interest;
           v.move_rate = move.rate;
@@ -861,16 +786,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
           sp.say("bru.upfront");
         }
       }
-      if (ctx.batchUpdate?.interestBatchManager) {
-        v.manager_address = ctx.batchUpdate.interestBatchManager;
-        sp.say("bru.setter");
-      }
-      if (stateAfter.debt > 0) sp.say("bru.debt");
-      if (stateAfter.coll > 0 && price > 0) sp.say("bru.coll");
-      if (stateAfter.collateralRatio > 0) {
-        v.cr_after = stateAfter.collateralRatio;
-        sp.say("bru.cr");
-      }
       if (debtCp && Math.abs(debtCp.change) >= 0.01) {
         v.debt_move_abs = Math.abs(debtCp.change);
         v.debt_move_abs_sign = debtCp.change;
@@ -881,14 +796,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     case "liquity2.open": {
       v.principal = stateAfter.debt - upfront;
       sp.say("open.what", { coll_after: "coll_change", principal: "bold" });
-      if (upfront > 0) {
-        sp.say("open.fee", ECHO_FEE);
-        sp.say("open.debt_fee", { debt_after: "debt_change" });
-      } else sp.say("open.debt", { debt_after: "debt_change" });
-      sp.say("open.reserve");
-      if (stateAfter.coll * price > 0) sp.say("open.value", { coll_after_usd: "bold", price_at_event: "bold" });
-      v.cr_after = stateAfter.collateralRatio;
-      sp.say("open.cr");
       if (safety?.liqPriceAfter != null && safety.price > 0 && 1 - safety.liqPriceAfter / safety.price > 0)
         sp.say("liq.after");
       sp.say("open.rate", { rate_after: "rate_after" });
@@ -900,7 +807,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
           v.manager_name = getBatchManagerByAddress(mgr)?.name ?? null;
           v.batch_rate = bu.annualInterestRate;
           v.batch_fee_rate = bu.annualManagementFee;
-          sp.say(bu.annualManagementFee > 0 ? "open.join" : "open.join_no_fee", { batch_rate: "bold" });
+          sp.say(bu.annualManagementFee > 0 ? "open.join" : "open.join_no_fee");
         } else sp.say("open.join_plain");
       }
       break;
@@ -908,17 +815,9 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
     case "liquity2.close": {
       v.debt_repaid = op ? Math.abs(op.debtChangeFromOperation) : stateBefore.debt;
       v.coll_retrieved = op ? Math.abs(op.collChangeFromOperation) : stateBefore.coll;
-      if (variant === "repaid") sp.say("close.repaid", { debt_repaid: "debt_change" });
-      else sp.say("close.zero");
-      sp.say("close.coll", { coll_retrieved: "coll_change" });
-      sp.say("close.reserve");
-      if (variant === "repaid" && stateBefore.annualInterestRate > 0) sp.say("close.rate", { rate_before: "bold" });
-      if (variant === "repaid" && stateBefore.collateralRatio > 0) {
-        v.cr_before = stateBefore.collateralRatio;
-        sp.say("close.cr");
-      }
-      sp.say("close.nft");
-      sp.say("close.nothing");
+      const echoColl = { coll_retrieved: "coll_change" } as const;
+      if (variant === "repaid") sp.say("close.repaid", { debt_repaid: "debt_change", ...echoColl });
+      else sp.say("close.zero", echoColl);
       break;
     }
     // ── Liquidation ──
@@ -937,16 +836,8 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         v.redist_debt = debtInherited;
         v.redist_coll_usd = usd;
         v.net_benefit = Math.abs(net);
-        sp.say("liq.gain.what");
-        sp.say(usd > 0 ? "liq.gain.received" : "liq.gain.received_unpriced", { redist_coll: "coll_change" });
-        sp.say("liq.gain.inherited", { redist_debt: "debt_change" });
-        sp.say(net >= 0 ? "liq.gain.net_pos" : "liq.gain.net_neg");
-        sp.say("liq.gain.why");
-        if (stateBefore.collateralRatio > 0 && stateAfter.collateralRatio > 0) {
-          v.cr_before = stateBefore.collateralRatio;
-          v.cr_after = stateAfter.collateralRatio;
-          sp.say("liq.gain.cr");
-        }
+        sp.say("liq.gain.received", { redist_coll: "coll_change", redist_debt: "debt_change" });
+        if (usd > 0) sp.say(net >= 0 ? "liq.gain.net_pos" : "liq.gain.net_neg");
         sp.say("liq.gain.open");
         break;
       }
@@ -960,8 +851,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.cr_at_liquidation =
         collUsd > 0 && debtCleared > 0 ? (collUsd / debtCleared) * 100 : stateBefore.collateralRatio;
       sp.say("liq.what");
-      sp.say("liq.debt", { debt_cleared: "bold" });
-      sp.say("liq.coll", { coll_liquidated: "bold", coll_liquidated_usd: "bold" });
       const claimable = liq.collSurplus > 0 && liq.debtRedistributed === 0;
       const surplusUsd = liq.collSurplus * liq.price;
       if (claimable) {
@@ -981,23 +870,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         sp.say("liq.loss");
       }
       if (liq.debtOffsetBySP > 0 && liq.debtRedistributed > 0) sp.say("liq.partial");
-      // The payout legs.
-      if (liq.collSentToSP > 0) {
-        v.coll_to_sp = liq.collSentToSP;
-        v.coll_to_sp_usd = liq.collSentToSP * liq.price;
-        sp.say("liq.leg.sp");
-      }
-      if (liq.collGasCompensation > 0) {
-        v.coll_gas_comp = liq.collGasCompensation;
-        sp.say("liq.leg.gas_comp");
-      }
-      sp.say("liq.leg.gas_weth");
-      if (debtCleared > 0 && liq.price > 0) {
-        v.incentive_coll = (debtCleared * 0.05) / liq.price;
-        v.incentive_usd = debtCleared * 0.05;
-        sp.say("liq.leg.incentive");
-      }
-      sp.say("liq.leg.nft");
       if (liq.collSurplus > 0) {
         v.surplus_l1 = `${liq.collSurplus.toFixed(4)} ${collSym} ${surplusClaimedAt !== undefined ? L1_WORDS.claimed : L1_WORDS.claimable}${
           surplusClaimedAt != null ? ` ${formatDate(surplusClaimedAt)}` : ""
@@ -1015,11 +887,6 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
         sp.say("apply.what_coll", { redist_debt: "debt_change", redist_coll: "coll_change" });
       } else sp.say("apply.what", { redist_debt: "debt_change" });
       if (ctx.batchUpdate) sp.say("apply.batch");
-      sp.say("state.debt_now", { debt_after: "bold" });
-      if (stateAfter.coll > 0)
-        sp.say(price > 0 ? "apply.coll" : "apply.coll_unpriced", { coll_after: "bold", coll_after_usd: "bold" });
-      sp.say("apply.rate", { rate_after: "rate_after" });
-      crPairNow();
       break;
     }
     case "liquity2.transfer": {
@@ -1034,12 +901,8 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       else if (tr.transferType === "burn") sp.say("transfer.burn");
       else {
         sp.say("transfer.move");
-        if (stateAfter.debt > 0 || stateAfter.coll > 0) {
-          v.cr_after = stateAfter.collateralRatio;
-          const b = { debt_after: "bold", coll_after: "bold", rate_after: "bold", price_at_event: "bold" } as const;
-          sp.say(price > 0 ? "transfer.state" : "transfer.state_unpriced", b);
-        }
-        sp.say("transfer.unchanged");
+        if (stateAfter.debt > 0 || stateAfter.coll > 0)
+          sp.say("transfer.state", { debt_after: "bold", coll_after: "bold" });
       }
       break;
     }

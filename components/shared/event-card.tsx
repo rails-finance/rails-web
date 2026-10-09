@@ -289,7 +289,13 @@ export function EventCard(props: EventCardProps) {
   const datePrefix = useContext(EventDateContext);
   const dayMark = useContext(EventDayMarkContext);
   const reactId = useId();
-  const cardId = persistKey ?? reactId;
+  // The card's ids name the event where the card has one (its share path's
+  // id, one card per event on a page), so they hold whatever the tree above
+  // the card looks like: a useId alone differed between server and client on
+  // the timeline and event pages when the page hydrated in pieces.
+  const shareEventId = eventIdFromShareHref(shareHref);
+  const domId = shareEventId ? `evt-${shareEventId.replace(/[^A-Za-z0-9_-]/g, "_")}` : reactId;
+  const cardId = persistKey ?? domId;
   const hasPanel = detail != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
@@ -457,8 +463,8 @@ export function EventCard(props: EventCardProps) {
   // The row's name, the same at both widths: the spoken caption, then the
   // legs the column states under `legsId` ("Repay, 6 June 2026: 7,500 BOLD
   // repaid"); a group passes its whole `label`.
-  const labelId = `${reactId}-label`;
-  const legsId = `${reactId}-legs`;
+  const labelId = `${domId}-label`;
+  const legsId = `${domId}-legs`;
   // The whole row is the card's click target (row-target.ts): from 640px
   // where the header is the control, below it where the segment's button
   // is. Hovering it lights the header (`.evt-row-target` in globals.css).
@@ -476,7 +482,7 @@ export function EventCard(props: EventCardProps) {
     [inTimeline, legsId, rowTarget, actedByOwner],
   );
   const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
-  const panelId = `${reactId}-card`;
+  const panelId = `${domId}-card`;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   // A timeline row's T1 surface is the desktop header's; under 640px it is the

@@ -21,6 +21,8 @@ export interface EventGas {
   usd: number;
   /** The run's transaction count, where the gas covers a no-change run. */
   run?: number | null;
+  /** The figure's receipt; drawn as a <Prov> where given. */
+  info?: Provenance;
 }
 
 /** A symbol's price at the event, as a then/today chip. */
@@ -116,7 +118,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{figure(unit)}</span>
+      <span>{gas.info ? <Prov info={gas.info}>{figure(unit)}</Prov> : figure(unit)}</span>
     </button>
   );
 }
