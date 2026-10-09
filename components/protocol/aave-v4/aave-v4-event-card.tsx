@@ -7,13 +7,15 @@
 // identical across protocols.
 
 import { EventCard } from "@/components/shared/event-card";
-import { gasPrice } from "@/components/shared/event-price-row";
+import { EventCellGrid } from "@/components/shared/event-cells";
+import { eventGas } from "@/components/shared/event-price-row";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
 import { SpineColumn } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { AaveV4EventHeader, type AaveV4TxGroup } from "./aave-v4-event-header";
 import { aaveV4Label } from "@/lib/aave-v4/event-label";
-import { AaveV4EventDetail } from "./aave-v4-event-detail";
+import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { aaveV4ExplainerTeaser, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
@@ -93,41 +95,51 @@ export function AaveV4EventCard({
     />
   );
 
+  // T2: the snapshot as cells (no flows panel: the cells stand as rows), the
+  // prices at this block and the gas in the price row (ui-jobs 309).
+  const { cells, prices } = useAaveV4Cells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    previousRate,
+  });
+
   return (
-    <EventCard
-      avatar={null}
-      by={extBy ?? undefined}
-      caption={aaveV4Label(ctx)}
-      iconColumn={iconSlot}
-      header={
-        <AaveV4EventHeader
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          txGroup={txGroup}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-        />
-      }
-      detail={
-        <AaveV4EventDetail ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} wallet={event.wallet} />
-      }
-      explainer={
-        <AaveV4EventExplainer
-          ctx={ctx}
-          event={event}
-          siblings={siblings ?? [event]}
-          previousRate={previousRate}
-          debtLifeInterest={debtLifeInterest}
-          skipLead
-        />
-      }
-      price={gasPrice(event.gas)}
-      explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={aaveV4LearnMoreContent(ctx)} />}
-      persistKey={`aave-v4:${event.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard
+        avatar={null}
+        by={extBy ?? undefined}
+        caption={aaveV4Label(ctx)}
+        iconColumn={iconSlot}
+        header={
+          <AaveV4EventHeader
+            ctx={ctx}
+            timestamp={event.timestamp}
+            txHash={event.txHash}
+            blockNumber={event.blockNumber}
+            txGroup={txGroup}
+            eventNumber={eventNumber}
+            externalBy={extBy ?? undefined}
+          />
+        }
+        detail={<EventCellGrid cells={cells} />}
+        explainer={
+          <AaveV4EventExplainer
+            ctx={ctx}
+            event={event}
+            siblings={siblings ?? [event]}
+            previousRate={previousRate}
+            debtLifeInterest={debtLifeInterest}
+            skipLead
+          />
+        }
+        price={{ gas: eventGas(event.gas), prices }}
+        explainerTeaser={aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event)}
+        txHash={event.txHash}
+        learnMore={<LearnMore inline content={aaveV4LearnMoreContent(ctx)} />}
+        persistKey={`aave-v4:${event.id}`}
+      />
+    </EventLedgerContext.Provider>
   );
 }

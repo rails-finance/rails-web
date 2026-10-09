@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
 import type { AaveV4Context, AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { AaveV4SnapshotItem } from "@/lib/shared/types/event-shape";
 import {
@@ -14,7 +15,7 @@ import {
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { usePreferences } from "@/lib/shared/preferences-context";
 import { formatRatio, ratioLabel, ratioColorClass } from "@/lib/shared/ratio-format";
-import { StatCard, StatSubline, StateTransition, TransitionArrow } from "@/components/shared/state-transition";
+import { StatSubline } from "@/components/shared/state-transition";
 import { hfLabelV4, fmtV4Amount, fmtUnitPrice } from "@/lib/aave-v4/format";
 import { PositionRow } from "@/components/shared/position-row";
 import { resolvePrice } from "@/lib/aave/prices";
@@ -51,25 +52,9 @@ const RATIO_PROV: Provenance = {
   formula: "Σ(collateral × price) ÷ Σ(debt × price)",
 };
 
-/** Per-unit asset-price pill shown in the event-detail footer — one per
- *  distinct asset in the snapshot (collateral + debt), each carrying the
- *  asset's historic USD price at the event's block. The ≈ prefix on
- *  stablecoin sources distinguishes pinned-$1 from market. */
-function PricePill({
-  symbol,
-  usd,
-  source,
-  block,
-  eventBlock,
-}: {
-  symbol: string;
-  usd: number;
-  source: AaveV4PriceSource;
-  /** The block of the feed row this price was read from (wire `price.block`);
-   *  absent on an older payload. */
-  block?: number;
-  eventBlock?: number;
-}) {
+/** A price chip's tip: the feed and the block its row was read at. The ≈
+ *  prefix on stablecoin sources distinguishes pinned-$1 from market. */
+function pricePillTitle(symbol: string, source: AaveV4PriceSource, block?: number, eventBlock?: number): string {
   const sourceLabel =
     source === "chainlink"
       ? "Chainlink feed"
@@ -82,21 +67,9 @@ function PricePill({
             : source === "stablecoin"
               ? "stablecoin, pinned to $1"
               : "approximation";
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs font-bold text-rb-500 bg-background px-2 py-1 rounded-md"
-      title={
-        block != null && eventBlock != null && block !== eventBlock
-          ? `${aaveV4DisplaySymbol(symbol)} price from the feed's row at block ${block.toLocaleString("en-US")}, ${(eventBlock - block).toLocaleString("en-US")} blocks before this event (${sourceLabel})`
-          : `${aaveV4DisplaySymbol(symbol)} price at this event's block${block != null ? ` ${block.toLocaleString("en-US")}` : ""} (${sourceLabel})`
-      }
-    >
-      <Prov info={pricePillProv(symbol, source, block, eventBlock)} icon={<TokenChipIcon symbol={symbol} size={14} />}>
-        {source === "stablecoin" ? "≈" : ""}
-        {fmtUnitPrice(usd)}
-      </Prov>
-    </span>
-  );
+  return block != null && eventBlock != null && block !== eventBlock
+    ? `${aaveV4DisplaySymbol(symbol)} price from the feed's row at block ${block.toLocaleString("en-US")}, ${(eventBlock - block).toLocaleString("en-US")} blocks before this event (${sourceLabel})`
+    : `${aaveV4DisplaySymbol(symbol)} price at this event's block${block != null ? ` ${block.toLocaleString("en-US")}` : ""} (${sourceLabel})`;
 }
 
 /** A single held-debt asset's borrow rate — `4.35% [icon] USDC`. Mirrors the
@@ -121,6 +94,9 @@ export interface AaveV4EventDetailProps {
   txHash: string;
   blockNumber?: number;
   wallet: string;
+  /** The borrow rate (decimal) the previous event on this spoke recorded for
+   *  this event's asset: the Borrow Rate cell is changed where it moved. */
+  previousRate?: number;
 }
 
 /** Render a single position row — with before→after if this asset changed,
@@ -224,7 +200,13 @@ function V4PositionRow({
   );
 }
 
-export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4EventDetailProps) {
+/** The card's cells and the price row's chips (ui-jobs 309): Collateral and
+ *  Debt with a line per reserve, the ratio, the health factor either side and
+ *  the borrow rate; one price per asset in the snapshot. */
+export function useAaveV4Cells({ ctx, txHash, blockNumber, wallet, previousRate }: AaveV4EventDetailProps): {
+  cells: EventCellSpec[];
+  prices: EventPriceChip[];
+} {
   const { prefs } = usePreferences();
   const ratioMode = prefs.ratioMode;
   const prices = usePrices();
@@ -352,130 +334,150 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
     }
   }
 
-  // Full-position snapshot, assembled as a flat list of equal-size cards.
-  // Collateral · Debt · LTV · Borrow Rate each become one StatCard; the grid
-  // below balances their widths and heights. Built here (rather than inline)
-  // so the trailing-card full-width span can key off the final count.
-  const snapshotCards: { key: string; label: string; body: ReactNode }[] = [];
+  const cells: EventCellSpec[] = [];
+  // A collateral toggle moves no balance: its one figure is whether the
+  // reserve counts as collateral.
+  if (isToggle)
+    cells.push({
+      kind: "stat",
+      key: "toggle",
+      label: "Used as collateral",
+      changed: true,
+      value: {
+        before: { text: ctx.enabled ? "No" : "Yes" },
+        after: { text: ctx.enabled ? "Yes" : "No", info: undefined },
+        afterClass: ctx.enabled ? "text-green-400" : undefined,
+      },
+    });
   if (hasSupplies) {
-    snapshotCards.push({
+    cells.push({
+      kind: "stat",
       key: "collateral",
       label: "Collateral",
-      body: (
-        <div className="flex flex-col gap-1">
-          {supplies.map((s) => {
-            // The changed asset is the supply side's primary asset for
-            // supply/withdraw, or the collateral asset for liquidations.
-            const isThisChanged = (isSupplySide || isLiq) && s.symbol === (isLiq ? ctx.collateralSymbol : token);
-            // Prefer the per-row price (server enriches every snapshot item with
-            // its historic USD price). Fall back to the event's primary price on
-            // the changed row so older clients / payloads without per-row prices
-            // still render.
-            const priceUsd =
-              s.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.collateralPrice?.usd : ctx.price?.usd);
-            return (
-              <V4PositionRow
-                key={s.symbol}
-                symbol={s.symbol}
-                amount={s.amount}
-                before={isThisChanged ? supplyBefore : undefined}
-                isChanged={isThisChanged}
-                priceUsd={priceUsd}
-                coord={coord}
-                side="supply"
-                rawBefore={isThisChanged ? ctx.raw?.supplyBefore : undefined}
-                rawAfter={isThisChanged ? ctx.raw?.supplyAfter : undefined}
-                chain={
-                  isThisChanged && ctx.balanceBasis === "chain"
-                    ? {
-                        sharesBefore: ctx.raw?.supplySharesBefore,
-                        sharesAfter: ctx.raw?.supplySharesAfter,
-                        a: ctx.raw?.hubAddedAssets,
-                        b: ctx.raw?.hubAddedShares,
-                      }
-                    : undefined
-                }
-                interest={isThisChanged ? ctx.supplyInterestSincePrevious : undefined}
-              />
-            );
-          })}
-        </div>
-      ),
+      changed: isSupplySide || isLiq,
+      value: {
+        lines: supplies.map((s) => {
+          // The changed asset is the supply side's primary asset for
+          // supply/withdraw, or the collateral asset for liquidations.
+          const isThisChanged = (isSupplySide || isLiq) && s.symbol === (isLiq ? ctx.collateralSymbol : token);
+          // Prefer the per-row price (server enriches every snapshot item with
+          // its historic USD price). Fall back to the event's primary price on
+          // the changed row so older clients / payloads without per-row prices
+          // still render.
+          const priceUsd =
+            s.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.collateralPrice?.usd : ctx.price?.usd);
+          return (
+            <V4PositionRow
+              key={s.symbol}
+              symbol={s.symbol}
+              amount={s.amount}
+              before={isThisChanged ? supplyBefore : undefined}
+              isChanged={isThisChanged}
+              priceUsd={priceUsd}
+              coord={coord}
+              side="supply"
+              rawBefore={isThisChanged ? ctx.raw?.supplyBefore : undefined}
+              rawAfter={isThisChanged ? ctx.raw?.supplyAfter : undefined}
+              chain={
+                isThisChanged && ctx.balanceBasis === "chain"
+                  ? {
+                      sharesBefore: ctx.raw?.supplySharesBefore,
+                      sharesAfter: ctx.raw?.supplySharesAfter,
+                      a: ctx.raw?.hubAddedAssets,
+                      b: ctx.raw?.hubAddedShares,
+                    }
+                  : undefined
+              }
+              interest={isThisChanged ? ctx.supplyInterestSincePrevious : undefined}
+            />
+          );
+        }),
+      },
     });
   }
   if (hasDebts) {
-    snapshotCards.push({
+    cells.push({
+      kind: "stat",
       key: "debt",
       label: "Debt",
-      body: (
-        <div className="flex flex-col gap-1">
-          {debts.map((d) => {
-            const isThisChanged = (isDebtSide || isLiq) && d.symbol === token;
-            const priceUsd = d.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.debtPrice?.usd : ctx.price?.usd);
-            return (
-              <V4PositionRow
-                key={d.symbol}
-                symbol={d.symbol}
-                amount={d.amount}
-                before={isThisChanged ? debtBefore : undefined}
-                isChanged={isThisChanged}
-                priceUsd={priceUsd}
-                coord={coord}
-                side="debt"
-                rawBefore={isThisChanged ? ctx.raw?.debtBefore : undefined}
-                rawAfter={isThisChanged ? ctx.raw?.debtAfter : undefined}
-                chain={
-                  isThisChanged && ctx.balanceBasis === "chain"
-                    ? {
-                        sharesBefore: ctx.raw?.drawnSharesBefore,
-                        sharesAfter: ctx.raw?.drawnSharesAfter,
-                        a: ctx.raw?.hubDrawnIndex,
-                        premiumBefore: premiumAt(hfAround, "before"),
-                        premiumAfter: premiumAt(hfAround, "after"),
-                      }
-                    : undefined
-                }
-                interest={isThisChanged ? ctx.debtInterestSincePrevious : undefined}
-              />
-            );
-          })}
-        </div>
-      ),
+      changed: isDebtSide || isLiq,
+      value: {
+        lines: debts.map((d) => {
+          const isThisChanged = (isDebtSide || isLiq) && d.symbol === token;
+          const priceUsd = d.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.debtPrice?.usd : ctx.price?.usd);
+          return (
+            <V4PositionRow
+              key={d.symbol}
+              symbol={d.symbol}
+              amount={d.amount}
+              before={isThisChanged ? debtBefore : undefined}
+              isChanged={isThisChanged}
+              priceUsd={priceUsd}
+              coord={coord}
+              side="debt"
+              rawBefore={isThisChanged ? ctx.raw?.debtBefore : undefined}
+              rawAfter={isThisChanged ? ctx.raw?.debtAfter : undefined}
+              chain={
+                isThisChanged && ctx.balanceBasis === "chain"
+                  ? {
+                      sharesBefore: ctx.raw?.drawnSharesBefore,
+                      sharesAfter: ctx.raw?.drawnSharesAfter,
+                      a: ctx.raw?.hubDrawnIndex,
+                      premiumBefore: premiumAt(hfAround, "before"),
+                      premiumAfter: premiumAt(hfAround, "after"),
+                    }
+                  : undefined
+              }
+              interest={isThisChanged ? ctx.debtInterestSincePrevious : undefined}
+            />
+          );
+        }),
+      },
     });
   }
   if (showRatio && ratioAbsent) {
     const label = ratioLabel(ratioMode);
     const side = collateralAbsent ? "collateral" : "debt";
     const names = collateralAbsent ? supplySum.excluded : debtSum.excluded;
-    snapshotCards.push({
+    cells.push({
+      kind: "stat",
       key: "ratio",
       label,
-      body: (
-        <div className="text-sm font-semibold text-rb-500" data-ratio="no-price">
-          <Prov info={noPriceRatioProv(label, side, names)}>{NO_PRICE_HINT}</Prov>
-        </div>
-      ),
+      changed: false,
+      inputs: ["collateral", "debt"],
+      value: {
+        after: {
+          text: <span data-ratio="no-price">{NO_PRICE_HINT}</span>,
+          info: noPriceRatioProv(label, side, names),
+        },
+      },
     });
   } else if (showRatio) {
     const label = ratioLabel(ratioMode);
-    snapshotCards.push({
+    const tone = ratioColorClass(collRatio * 100, {
+      danger: 120,
+      warn: 150,
+      warnClass: "text-foreground",
+      safeClass: "",
+    });
+    cells.push({
+      kind: "stat",
       key: "ratio",
       label: partialLabel(label, ratioExcluded),
-      body: (
-        <div
-          className={`text-sm font-semibold ${ratioColorClass(collRatio * 100, {
-            danger: 120,
-            warn: 150,
-            warnClass: "text-foreground",
-            safeClass: "",
-          })}`}
-          data-ratio={ratioExcluded.length > 0 ? "partial" : "whole"}
-        >
-          <Prov info={partialRatioProv(RATIO_PROV, label, ratioExcluded)}>
-            {formatRatio(collRatio * 100, ratioMode, 0)}
-          </Prov>
-        </div>
-      ),
+      // Derived from the collateral and the debt: its heading follows them.
+      changed: isSupplySide || isDebtSide || isLiq,
+      inputs: ["collateral", "debt"],
+      value: {
+        after: {
+          text: (
+            <span data-ratio={ratioExcluded.length > 0 ? "partial" : "whole"}>
+              {formatRatio(collRatio * 100, ratioMode, 0)}
+            </span>
+          ),
+          info: partialRatioProv(RATIO_PROV, label, ratioExcluded),
+        },
+        afterClass: tone || undefined,
+      },
     });
   }
   // Health factor before → after: read from the spoke at the end of the block
@@ -485,35 +487,36 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
   // either side has no finite factor to show, and a failed read draws nothing.
   const hfBothInfinite = hfAround.status === "ok" && hfAround.before.wad == null && hfAround.after.wad == null;
   if (hfAround.status === "loading" && hasDebts) {
-    snapshotCards.push({
+    cells.push({
+      kind: "stat",
       key: "health-factor",
       label: "Health factor",
-      body: (
-        <span
-          className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse align-middle"
-          aria-hidden="true"
-        />
-      ),
+      changed: false,
+      inputs: ["collateral", "debt"],
+      value: {
+        after: {
+          text: (
+            <span
+              className="inline-block h-[1em] w-24 rounded-md bg-skeleton animate-pulse align-middle"
+              aria-hidden="true"
+            />
+          ),
+        },
+      },
     });
   } else if (hfAround.status === "ok" && !hfBothInfinite) {
-    snapshotCards.push({
+    const before = hfLabelV4(hfOf(hfAround.before.wad));
+    const after = hfLabelV4(hfOf(hfAround.after.wad));
+    cells.push({
+      kind: "stat",
       key: "health-factor",
       label: "Health factor",
-      body: (
-        <StateTransition>
-          <span className="text-sm font-semibold tabular-nums text-rb-500">
-            <Prov info={healthFactorAtBlockProv("before", coord, hfAround.before)}>
-              {hfLabelV4(hfOf(hfAround.before.wad))}
-            </Prov>
-          </span>
-          <TransitionArrow size="sm" />
-          <span className="text-sm font-semibold tabular-nums">
-            <Prov info={healthFactorAtBlockProv("after", coord, hfAround.after)}>
-              {hfLabelV4(hfOf(hfAround.after.wad))}
-            </Prov>
-          </span>
-        </StateTransition>
-      ),
+      changed: before !== after,
+      inputs: ["collateral", "debt"],
+      value: {
+        before: { text: before, info: healthFactorAtBlockProv("before", coord, hfAround.before) },
+        after: { text: after, info: healthFactorAtBlockProv("after", coord, hfAround.after) },
+      },
     });
   }
   // Supply rate is intentionally not shown. Aave V4's hub emits no supply-side
@@ -528,67 +531,33 @@ export function AaveV4EventDetail({ ctx, txHash, blockNumber, wallet }: AaveV4Ev
   // silently switch between them event to event (see borrowRatesByDebt).
   const debtRates = borrowRatesByDebt(ctx);
   if (debtRates.length > 0) {
-    snapshotCards.push({
+    const thisRate = debtRates.find((r) => r.symbol === ctx.reserveSymbol);
+    const pctOf = (apr: number) => (apr * 100).toFixed(2);
+    cells.push({
+      kind: "stat",
       key: "borrow-rate",
       label: debtRates.length > 1 ? "Borrow Rates" : "Borrow Rate",
-      body: (
-        <div className="flex flex-col gap-1">
-          {debtRates.map((r) => (
-            <BorrowRateRow key={r.symbol} symbol={r.symbol} apr={r.apr} coord={coord} />
-          ))}
-        </div>
-      ),
+      // Moved where this asset's rate differs, at the two places shown, from
+      // the one the previous event on the spoke recorded.
+      changed: thisRate != null && previousRate != null && pctOf(parseFloat(thisRate.apr)) !== pctOf(previousRate),
+      value: {
+        lines: debtRates.map((r) => <BorrowRateRow key={r.symbol} symbol={r.symbol} apr={r.apr} coord={coord} />),
+      },
     });
   }
 
-  return (
-    <>
-      {/* Collateral toggle status */}
-      {isToggle && (
-        <div className="px-5 py-2 text-sm">
-          <span className={`font-bold ${ctx.enabled ? "text-green-400" : ""}`}>
-            {ctx.enabled ? "Enabled as collateral" : "Disabled as collateral"}
-          </span>
-        </div>
-      )}
+  // The price row's chips: one per distinct asset in the snapshot (collateral
+  // + debt), each its historic price at this block. The ≈ prefix on a
+  // stablecoin source tells a pinned $1 from a market price, so that figure
+  // stands as it is.
+  const chips: EventPriceChip[] = pricePills.map((p) => ({
+    symbol: p.symbol,
+    usd: p.usd,
+    format: fmtUnitPrice,
+    text: p.source === "stablecoin" ? `≈${fmtUnitPrice(p.usd)}` : undefined,
+    info: pricePillProv(p.symbol, p.source, p.block, blockNumber),
+    title: pricePillTitle(p.symbol, p.source, p.block, blockNumber),
+  }));
 
-      {/* Full position snapshot — one equal-size card per section (Collateral,
-          Debt, LTV, Borrow Rate). Rows size to their own content (no
-          `auto-rows-fr`) so the single-line LTV / Borrow-Rate cards don't
-          stretch to match the tall multi-asset Collateral / Debt cards; cards
-          within a row still align via `h-full`. Mirrors the Liquity V2 detail
-          grid that leads its card. */}
-      {snapshotCards.length > 0 && (
-        <div className="px-5 py-2">
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {snapshotCards.map((c) => (
-              <StatCard key={c.key} label={c.label}>
-                {c.body}
-              </StatCard>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Asset-price footer pills — one per-unit price per asset in the
-          snapshot (collateral + debt), mirroring Liquity V2's `$X,XXX ◊` chip.
-          Each pill is source-aware via its tooltip; the ≈ prefix on stablecoin
-          sources lets the user tell pinned-$1 apart from market. */}
-      {pricePills.length > 0 && (
-        <div className="flex items-center justify-end gap-2 px-5 py-2">
-          <span className="text-xs text-rb-500">Prices at this block</span>
-          {pricePills.map((p) => (
-            <PricePill
-              key={p.symbol}
-              symbol={p.symbol}
-              usd={p.usd}
-              source={p.source}
-              block={p.block}
-              eventBlock={blockNumber}
-            />
-          ))}
-        </div>
-      )}
-    </>
-  );
+  return { cells, prices: chips };
 }
