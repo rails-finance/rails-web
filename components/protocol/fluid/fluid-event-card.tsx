@@ -1,20 +1,23 @@
 "use client";
 
-// Composer: wires the Fluid header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// Fluid's event card on the shared shell's slots (ui-jobs 309 step 8): the
+// head from fluid-event-header.tsx, T2 from fluid-cells.tsx, the explanation
+// and the Learn More from fluid-event-explainer.tsx. Gas stands in the price
+// row where the owner in force signed the transaction (lib/shared/index-gas.ts).
 
 import type { FluidContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FluidLedgerProvider } from "./fluid-ledger";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type FluidCoords } from "@/lib/fluid/event-provenance";
 import { pairLabel } from "@/lib/fluid/asset-catalog";
 
 import { fluidExplainerTeaser, fundedSameTx, transferRoundTrip, type FluidEvent } from "@/lib/fluid/explainer-clauses";
-import { FluidEventHeader } from "./fluid-event-header";
-import { FluidEventDetail } from "./fluid-event-detail";
+import { useFluidHeadSpec } from "./fluid-event-header";
+import { useFluidCells } from "./fluid-cells";
 import { FluidEventExplainer, fluidLearnMoreContent } from "./fluid-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { fluidMintContent } from "@/lib/shared/learn-more-content";
@@ -103,17 +106,15 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
             ? [{ ...debtRow, direction: DIRECTION[ctx.eventType] }]
             : undefined;
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : ctx.eventType === "mint" ? (
-    <SpineColumn icon="mint" isLast={!!isLast} />
-  ) : ctx.eventType === "transfer" ? (
-    // An ownership handover is a people event with no token flow — the person
-    // glyph with the join badge marks the new owner taking over.
-    <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isLiq
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : ctx.eventType === "mint"
+      ? { icon: "mint", isLast: !!isLast }
+      : ctx.eventType === "transfer"
+        ? // An ownership handover is a people event with no token flow — the
+          // person glyph with the join badge marks the new owner taking over.
+          { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+        : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
   // T1's word, which the phone spine view's caption repeats. A hop of an NFT
   // round trip inside one transaction says so at T1; the explainer states the
@@ -124,55 +125,77 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
       ? "Ownership transfer · round trip in this transaction"
       : event.actionLabel;
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <FluidLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined}
-        caption={headLabel}
-        iconColumn={iconSlot}
-        header={
-          <FluidEventHeader
-            actionLabel={headLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            wallet={ctx.ownerAt ?? event.wallet}
-            flows={event.flows}
-          />
-        }
-        detail={
-          <FluidEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            mintedTo={openedBy?.context.data.transferTo}
-            opening={openedBy != null || fundedSameTx(sibs, event)}
-          />
-        }
-        explainer={
-          <FluidEventExplainer
-            ctx={ctx}
-            event={event}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            wallet={event.wallet}
-            siblings={sibs}
-            skipLead
-            openedBy={openedBy}
-          />
-        }
-        explainerTeaser={fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy })}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />}
-        persistKey={`fluid:${event.id}`}
-      />
-    </FluidLedgerProvider>
-  );
+  const head = useFluidHeadSpec({
+    actionLabel: headLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    externalBy: extBy ?? undefined,
+    wallet: ctx.ownerAt ?? event.wallet,
+    flows: event.flows,
+  });
+  // The owner's gas: the transaction's, stated on its first row, where the
+  // owner in force signed it. An Open row is the mint's transaction, whose
+  // first row is the mint. A liquidation is the liquidator's.
+  const owner = ctx.ownerAt ?? event.wallet;
+  const gasRow = openedBy?.gas ?? event.gas;
+  const gas = isLiq
+    ? undefined
+    : ownerPaidGas({ wallet: owner, gas: gasRow }, ctx.txFrom ?? openedBy?.context.data.txFrom);
+  const price = gas ? { gas, prices: [] } : undefined;
+  const body = useFluidCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    mintedTo: openedBy?.context.data.transferTo,
+    opening: openedBy != null || fundedSameTx(sibs, event),
+    price,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "fluid",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: headLabel,
+    actor: { by: extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined },
+    cells: body.cells,
+    // The Collateral and Debt cells open into their ledgers where the page
+    // ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <FluidLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </FluidLedgerProvider>
+      ),
+    },
+    notes: body.notes,
+    price: body.price,
+    explainer: {
+      body: (
+        <FluidEventExplainer
+          ctx={ctx}
+          event={event}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          wallet={event.wallet}
+          siblings={sibs}
+          skipLead
+          openedBy={openedBy}
+        />
+      ),
+      first: fluidExplainerTeaser(ctx, coords, sibs, event, { openedBy }),
+    },
+    learnMore: <LearnMore inline content={openedBy ? fluidMintContent() : fluidLearnMoreContent(ctx)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

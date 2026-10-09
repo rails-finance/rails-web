@@ -3,13 +3,14 @@
 // Alchemist transaction detail: the figures the logs carry, the ones they do
 // not, and where the position stood once they had all landed.
 //
-// TWO GRIDS, AND THE SEAM BETWEEN THEM IS THE POINT. The first is what the logs
+// TWO KINDS OF FIGURE, AND THE SEAM BETWEEN THEM IS THE POINT. The card's cells
+// are a `getCDP` READING at the block, served on the wire, with the reading at
+// the previous reading block beside it as the "before"
+// (lib/alchemix/readings-before). The notes under them are what the logs
 // state: amounts the transaction's legs emitted, plus the two a `Repay` does
-// not emit and the index resolved when it captured the log. The second is a
-// `getCDP` READING at the block, served on the wire, with the reading at the
-// previous reading block beside it as the "before" (lib/alchemix/readings-before).
-// Both are readings; neither is a balance replayed from the rows above it
-// (rails-ops decisions/0032).
+// not emit and the index resolved when it captured the log (ui-jobs 309).
+// Neither is a balance replayed from the rows above it (rails-ops
+// decisions/0032).
 //
 // ONE READING PER CARD, AND IT COMES FROM WHICHEVER LEG HAS ONE. Every leg of a
 // transaction carries the same reading of the same block, so drawing it per leg
@@ -24,12 +25,16 @@
 //
 // A row that names no position states the line's figure and says so.
 
+import type { ReactNode } from "react";
 import type { AlchemixV3Context } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import { compactAmount, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { EventCells } from "@/components/shared/event-cells";
+import { ExactTip } from "@/components/shared/amount-text";
+import { Prov } from "@/components/shared/provenance";
 import { formatExact, formatNumber } from "@/lib/utils/format";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
-import { AlchemixStateAtBlock } from "./alchemix-state-at-block";
+import { useAlchemixReadingCells } from "./alchemix-state-at-block";
 import {
   collateralTakenRaw,
   useAlchemixUnderlying,
@@ -283,7 +288,35 @@ function legStats(
   return stats;
 }
 
-export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEventDetailProps) {
+/** The logs' figures as lines under the grid: the label, the figure with its
+ *  receipt and its unit in words. */
+function LogNotes({ stats, heading }: { stats: ChainTruthStat[]; heading: string }) {
+  return (
+    <div className="px-5 pb-2" data-alchemix-log-notes="">
+      <h4 className={`${OVERLAY_HEADING} pt-1 text-rb-500`}>{heading}</h4>
+      <ul className="mt-1 flex flex-col gap-0.5 text-xs text-rb-500">
+        {stats.map((s, i) => (
+          <li key={i} className="flex flex-wrap items-baseline gap-x-1.5">
+            <span>{s.label}</span>
+            <span className={`font-semibold tabular-nums ${s.changed === false ? "" : "text-foreground"}`}>
+              <Prov info={s.prov} value={s.value}>
+                <ExactTip always text={s.display ?? compactAmount(s.value)} exact={s.value} symbol={s.symbol} />
+              </Prov>
+            </span>
+            {s.symbol ? <span>{s.symbol}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The card's T2: the reading as cells; the logs' figures, the line-scope
+ *  sentence and any word about the reading as notes. */
+export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventDetailProps): {
+  cells: EventCells;
+  notes: ReactNode;
+} {
   // The reading, taken once from whichever leg states one; with none stated,
   // the first leg's, whose own reason is what the sentence reports.
   const readingLeg = legs.find((l) => l.context.data.stateAtBlockFromReading?.status === "stated") ?? legs[0];
@@ -291,6 +324,15 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
   const before = useReadingBefore(readingCtx.stateAtBlockFromReading?.blockNumber);
   const unit = useAlchemixUnderlying();
   const stats = legs.flatMap((leg) => legStats(leg, mytSymbol, coordsFor(leg), before, unit, legs));
+  const reading = useAlchemixReadingCells({
+    state: readingCtx.stateAtBlockFromReading,
+    syntheticSymbol: readingCtx.syntheticSymbol,
+    mytSymbol,
+    eventBlock: readingLeg.blockNumber,
+    legCount: legs.length,
+    coords: coordsFor(readingLeg),
+    before,
+  });
 
   // A line-scope row is never a leg of anybody's transaction, so a card that
   // carries one carries it alone and this narrows to that row.
@@ -302,21 +344,20 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
       ? { fromBlock: span.fromBlock, atBlock: span.atBlock }
       : null;
 
-  return (
+  const notes = (
     <>
-      {/* Both grids are headed, and the first one is why: a lone heading
-          over the second grid would read as covering the pane. Naming this
-          one says which figures the transaction emitted and which were read. */}
       {stats.length > 0 ? (
-        <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>
-          {legs.some((l) => l.context.data.eventType === "self_liquidated")
-            ? "What the transaction moved"
-            : legs.length > 1
-              ? "What the logs state"
-              : "What the log states"}
-        </h4>
+        <LogNotes
+          stats={stats}
+          heading={
+            legs.some((l) => l.context.data.eventType === "self_liquidated")
+              ? "What the transaction moved"
+              : legs.length > 1
+                ? "What the logs state"
+                : "What the log states"
+          }
+        />
       ) : null}
-      <ChainTruthDetail stats={stats} symbolText />
       {lineCtx ? (
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
           This event belongs to the whole line. It is on this timeline because it fell inside this position&rsquo;s
@@ -337,15 +378,8 @@ export function AlchemixEventDetail({ legs, mytSymbol, coordsFor }: AlchemixEven
           ) : null}
         </p>
       ) : null}
-      <AlchemixStateAtBlock
-        state={readingCtx.stateAtBlockFromReading}
-        syntheticSymbol={readingCtx.syntheticSymbol}
-        mytSymbol={mytSymbol}
-        eventBlock={readingLeg.blockNumber}
-        legCount={legs.length}
-        coords={coordsFor(readingLeg)}
-        before={before}
-      />
+      {reading.note}
     </>
   );
+  return { cells: reading.cells, notes };
 }

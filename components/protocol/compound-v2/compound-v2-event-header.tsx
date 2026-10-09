@@ -10,7 +10,7 @@
 
 import type { AssetFlow, CompoundV2Context } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   movedDeltaProv,
   transferAmountProv,
@@ -25,10 +25,8 @@ import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 export interface CompoundV2EventHeaderProps {
   actionLabel: string;
   ctx: CompoundV2Context;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   /** Third-party actor (the card's externalActor() verdict) — renders the pink
    *  "by 0x…" chip with the traced receipt. */
   externalBy?: string;
@@ -44,17 +42,15 @@ export interface CompoundV2EventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function CompoundV2EventHeader({
+export function compoundV2HeadSpec({
   actionLabel,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   externalBy,
   wallet,
   flows,
-}: CompoundV2EventHeaderProps) {
+}: CompoundV2EventHeaderProps): ChainTruthRowSpec {
   const market = COMPOUND_V2_MARKET_BY_KEY[ctx.market];
   const cSym = market?.cSymbol ?? `c${ctx.marketSymbol}`;
   const coords: CompoundV2Coords = {
@@ -161,29 +157,23 @@ export function CompoundV2EventHeader({
                 }
               : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: actionLabel,
-        critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out" || ctx.eventType === "seize_burn",
-        // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
-        // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
-        custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
-        deltas,
-        externalActor:
-          externalBy && wallet && ctx.txFrom && ctx.caller
-            ? {
-                address: externalBy,
-                prov: externalActorProv(
-                  { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
-                  coords,
-                ),
-              }
-            : undefined,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: actionLabel,
+    critical: ctx.eventType === "liquidation" || ctx.eventType === "seize_out" || ctx.eventType === "seize_burn",
+    // A transfer is a custody row: `400 ◎ to 0x…` — the spine's paper
+    // plane and the chip's to/from are the verb (see ChainTruthRowSpec).
+    custody: ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out",
+    deltas,
+    externalActor:
+      externalBy && wallet && ctx.txFrom && ctx.caller
+        ? {
+            address: externalBy,
+            prov: externalActorProv(
+              { eventType: ctx.eventType, owner: wallet, txFrom: ctx.txFrom, caller: ctx.caller },
+              coords,
+            ),
+          }
+        : undefined,
+    party,
+  };
 }

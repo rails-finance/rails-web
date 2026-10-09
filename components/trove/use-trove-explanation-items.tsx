@@ -10,22 +10,15 @@ import { formatPrice, formatUsdValue, formatApproximate, formatExact } from "@/l
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
-import { trovePriceRunwayExplanation } from "@/components/protocol/liquity/trove-price-axis";
-import {
-  troveBranchDebtProv,
-  troveDebtInFrontProv,
-  troveQueueShareProv,
-  troveTrovesAheadProv,
-} from "@/lib/liquity/trove-queue-provenance";
+import { troveDebtInFrontProv, troveQueueShareProv } from "@/lib/liquity/trove-queue-provenance";
 import { trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { H } from "@/lib/shared/explainer-prose";
+import { H, type ExplainerItem } from "@/lib/shared/explainer-prose";
 import { stateOriginVia, stateOriginSummary } from "@/lib/shared/trove-state-origin";
-import { AmountText } from "@/components/shared/amount-text";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { troveNodes } from "@/lib/liquity/trove-nodes";
@@ -59,7 +52,28 @@ interface UseTroveExplanationItemsArgs {
  *  (charter §4) over the plain-English explanation bullets. */
 export interface TroveExplanation {
   lead: React.ReactNode | null;
-  items: React.ReactNode[];
+  items: ExplainerItem[];
+}
+
+/** The position card's four headings, in order (rails-ops
+ *  standards/prose-limits-and-zones.md 3.3). */
+const GROUPS = ["holdings", "risk", "rate", "history"] as const;
+type Group = (typeof GROUPS)[number];
+type Bullet = { group: Group; node: React.ReactNode };
+
+/** The bullets in heading order; under their headings when two or more
+ *  headings hold two or more bullets each, otherwise one list. */
+function arrange(bullets: Bullet[]): ExplainerItem[] {
+  const sorted = GROUPS.flatMap((g) => bullets.filter((b) => b.group === g));
+  const dense = GROUPS.filter((g) => sorted.filter((b) => b.group === g).length >= 2).length;
+  if (dense < 2) return sorted.map((b) => b.node);
+  const heading: Record<Group, string> = {
+    holdings: troveWords("heading_holdings"),
+    risk: troveWords("heading_risk"),
+    rate: troveWords("heading_rate"),
+    history: troveWords("heading_history"),
+  };
+  return sorted.map((b) => ({ group: heading[b.group], node: b.node }));
 }
 
 /**
@@ -83,12 +97,13 @@ export function useTroveExplanationItems({
     if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
     if (trove.status === "closed")
       return buildClosedItems(trove, debtAtClose === 0 && trove.activity.redemptionCount > 0);
-    return buildOpenItems({ trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal });
+    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal });
   }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus, debtAtClose]);
 }
 
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
-  const items: React.ReactNode[] = [];
+  const items: Bullet[] = [];
+  const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
   const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
   const truncatedTroveId = trove.id.length > 10 ? `${trove.id.slice(0, 6)}...${trove.id.slice(-4)}` : trove.id;
   const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
@@ -109,7 +124,8 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
     </span>
   );
 
-  items.push(
+  add(
+    "history",
     <span key="lifecycle" className="text-rb-500">
       {troveNodes("liq_lifecycle", {
         duration: (
@@ -129,7 +145,8 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
   const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
   if (nftUrl && trove.lastOwner) {
     const truncatedOwner = trove.ownerEns || `${trove.lastOwner.substring(0, 6)}...${trove.lastOwner.substring(38)}`;
-    items.push(
+    add(
+      "history",
       <span key="nft-info" className="text-rb-500">
         {troveNodes("liq_nft", {
           nft: (
@@ -160,16 +177,17 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
       </span>,
     );
   }
-  if (surplus) items.push(<SurplusBullet key="surplus" surplus={surplus} symbol={trove.collateralType} />);
+  if (surplus) add("holdings", <SurplusBullet key="surplus" surplus={surplus} symbol={trove.collateralType} />);
   // No owner-linked NFT bullet without a lastOwner — the generic "ownership is
   // an NFT" rule is Layer-2 material, covered by the "?" modal's Trove NFT
   // concept (the 2026-07-25 Layer-2-in-Layer-1 audit).
 
-  return { lead, items };
+  return { lead, items: arrange(items) };
 }
 
 function buildClosedItems(trove: TroveSummary, clearedByRedemption: boolean): TroveExplanation {
   const items: React.ReactNode[] = [];
+  // Every bullet of a closed trove is History: one list, no heading.
 
   // The status verdict — subject-first, one sentence, colon-terminated
   // (absorbs the old "closure" bullet).
@@ -246,10 +264,10 @@ function buildOpenItems({
   liveState,
   prices,
   debtInFront,
-  trovesAhead,
   queueDebtTotal,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
-  const items: React.ReactNode[] = [];
+  const items: Bullet[] = [];
+  const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
   const displayDebt = liveState?.debt.entire ?? trove.debt.current;
@@ -264,7 +282,6 @@ function buildOpenItems({
   // shows only the annual cost, so a per-day figure would be a non-mirrored
   // derived extra (charter §3's figure-density cap).
   const annualInterestCost = (displayRecordedDebt * displayInterestRate) / 100;
-  const annualManagementFee = (displayRecordedDebt * trove.batch.managementFee) / 100;
 
   // The status verdict — subject-first, one sentence, two figures, colon-
   // terminated (charter §4): the lead-in to the bullets. The two figures head
@@ -339,18 +356,6 @@ function buildOpenItems({
     note: stateNote,
   };
 
-  const debtProv: Provenance = {
-    kind: "chain",
-    summary: troveWords(isLive ? "prov_debt_live" : "prov_debt_indexed"),
-    contract: tmContract,
-    via: stateOriginVia(isLive, "entireDebt"),
-  };
-  const recordedProv: Provenance = {
-    kind: "chain",
-    summary: troveWords("prov_recorded"),
-    contract: tmContract,
-    via: stateOriginVia(isLive, "recordedDebt"),
-  };
   const accruedProv: Provenance = {
     kind: "chain",
     summary: troveWords("prov_accrued"),
@@ -388,35 +393,16 @@ function buildOpenItems({
     value: `${trove.batch.managementFee}%`,
     kind: "chain" as const,
   };
-  const annualMgmtProv: Provenance = {
-    kind: "derived",
-    summary: troveWords("prov_annual_mgmt"),
-    formula: troveWords("prov_annual_mgmt_formula"),
-    inputs: [recordedInput, mgmtRateInput],
-  };
   const mgmtFeeRateProv: Provenance = {
     kind: "chain",
     summary: troveWords("prov_mgmt_rate"),
     via: troveWords("prov_mgmt_rate_via"),
   };
   if (displayAccruedInterest !== undefined) {
-    items.push(
+    add(
+      "holdings",
       <span key="debt-breakdown" className="text-rb-500">
         {troveNodes("debt_breakdown", {
-          debt: (
-            <Prov info={debtProv}>
-              <HighlightableValue type="debt" state="after" value={displayDebt}>
-                {formatPrice(displayDebt)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
-          principal: (
-            <Prov info={recordedProv}>
-              <HighlightableValue type="principal" state="after" value={displayRecordedDebt}>
-                {formatPrice(displayRecordedDebt)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
           interest: (
             <Prov info={accruedProv}>
               <HighlightableValue type="interest" state="after" value={displayAccruedInterest}>
@@ -451,12 +437,12 @@ function buildOpenItems({
     </Prov>
   );
   if (hasLiveData && currentPrice && collateralUsd) {
-    // The USD worth and today's spot price split into separate bullets —
-    // three figures in one sentence is a list wearing a sentence (charter §3).
-    items.push(
+    // The lead states the collateral; this bullet its worth and the price
+    // that worth is at.
+    add(
+      "holdings",
       <span key="collateral-info" className="text-rb-500">
         {troveNodes("coll_worth", {
-          coll: collNode,
           usd: (
             <Prov info={collUsdProv}>
               <HighlightableValue type="collateralUsd" state="after" value={collateralUsd}>
@@ -464,12 +450,7 @@ function buildOpenItems({
               </HighlightableValue>
             </Prov>
           ),
-        })}
-      </span>,
-    );
-    items.push(
-      <span key="spot-price" className="text-rb-500">
-        {troveNodes("spot_price", {
+          coll_type,
           price: (
             <Prov info={priceProv}>
               <HighlightableValue type="currentPrice" state="after" value={currentPrice}>
@@ -477,12 +458,12 @@ function buildOpenItems({
               </HighlightableValue>
             </Prov>
           ),
-          coll_type,
         })}
       </span>,
     );
   } else {
-    items.push(
+    add(
+      "holdings",
       <span key="collateral-info" className="text-rb-500">
         {troveNodes("coll_secures", { coll: collNode })}
       </span>,
@@ -495,7 +476,8 @@ function buildOpenItems({
     // the debt itself). The 110% minimum states once, in the runway bullet.
     const currentCollateralRatio = collateralRatio.toFixed(1);
     const crMultiple = (collateralRatio / 100).toFixed(2);
-    items.push(
+    add(
+      "risk",
       <span key="collateral-ratio" className="text-rb-500">
         {troveNodes("coll_ratio", {
           ratio: (
@@ -535,24 +517,25 @@ function buildOpenItems({
     ],
   };
   if (currentPrice && liqPrice && liqPrice > 0) {
-    items.push(
+    // The runway: the fall to the liquidation price, both the twins of the
+    // card's "% from liquidation" and "Liquidates at" chrome, so both bold.
+    const headroomPct = ((currentPrice - liqPrice) / currentPrice) * 100;
+    add(
+      "risk",
       <span key="price-runway" className="text-rb-500">
-        {trovePriceRunwayExplanation({
-          collateralSymbol: trove.collateralType,
-          debtSymbol: "BOLD",
-          oraclePrice: currentPrice,
-          liquidationPrice: liqPrice,
-          mcr,
-          // The chrome twin is the "Liquidates at" caption — same formatter,
-          // same receipt shape, mirrored bold.
-          liquidationPriceNode: (
-            <Prov info={liqPriceProv}>
-              <HighlightableValue type="liquidationPrice" state="after" value={liqPrice}>
-                {formatLiquidationPrice(liqPrice)}
-              </HighlightableValue>
-            </Prov>
-          ),
-        })}
+        {currentPrice <= liqPrice
+          ? troveNodes("liq_runway_now", { coll_type })
+          : troveNodes("liq_runway", {
+              coll_type,
+              drop: <span className="font-semibold text-foreground">{headroomPct.toFixed(1)}%</span>,
+              price: (
+                <Prov info={liqPriceProv}>
+                  <HighlightableValue type="liquidationPrice" state="after" value={liqPrice}>
+                    {formatLiquidationPrice(liqPrice)}
+                  </HighlightableValue>
+                </Prov>
+              ),
+            })}
       </span>,
     );
   }
@@ -572,10 +555,10 @@ function buildOpenItems({
     </Prov>
   );
   if (trove.batch.isMember) {
-    // Rate + delegate + cost merged into one bullet: the interest rate, who
-    // manages it and at what fee, and what the base interest plus delegate fee
-    // actually cost — one continuous thought rather than two split bullets.
-    items.push(
+    // Who sets the rate and the fee they charge; the yearly costs are the
+    // card's costs line, and two figures fill the bullet.
+    add(
+      "rate",
       <span key="rate-cost" className="text-rb-500">
         {troveNodes("rate_cost_delegate", {
           rate: rateNode,
@@ -604,89 +587,51 @@ function buildOpenItems({
               </HighlightableValue>
             </Prov>
           ),
-          interest_year: annualInterestNode,
-          fee_year: (
-            <Prov info={annualMgmtProv}>
-              <HighlightableValue type="annualManagementFee" state="after" value={annualManagementFee}>
-                {formatPrice(annualManagementFee)} BOLD
-              </HighlightableValue>
-            </Prov>
-          ),
         })}
       </span>,
     );
   } else {
-    items.push(
+    add(
+      "rate",
       <span key="rate-cost" className="text-rb-500">
         {troveNodes("rate_cost_owner", { rate: rateNode, interest_year: annualInterestNode })}
       </span>,
     );
   }
 
+  // The redemption queue: the debt redeemed before or with this trove and,
+  // where the branch's whole queue is known, its share of it (the compact
+  // runway chip's twin, so it carries the same receipt). The general
+  // mechanics are Layer-2 material in the "?" modal (the 2026-07-25
+  // Layer-2-in-Layer-1 audit).
   if (debtInFront !== null && debtInFront !== undefined) {
-    items.push(
+    const debtNode = (
+      <Prov info={troveDebtInFrontProv(trove.collateralType)} value={formatExact(debtInFront)} symbol="BOLD">
+        <span className="font-bold text-foreground">{formatApproximate(debtInFront)} BOLD</span>
+      </Prov>
+    );
+    const queueShare =
+      queueDebtTotal !== null && queueDebtTotal !== undefined && queueDebtTotal > 0
+        ? Math.min(1, debtInFront / queueDebtTotal)
+        : null;
+    add(
+      "risk",
       <span key="debt-in-front" className="text-rb-500">
-        {troveNodes("debt_in_front", {
-          debt: (
-            <Prov info={troveDebtInFrontProv(trove.collateralType)} value={formatExact(debtInFront)} symbol="BOLD">
-              <span className="font-bold text-foreground">{formatApproximate(debtInFront)} BOLD</span>
-            </Prov>
-          ),
-        })}
-        {trovesAhead !== null && trovesAhead !== undefined && (
-          <span>
-            {" "}
-            {troveNodes(trovesAhead === 1 ? "troves_ahead_one" : "troves_ahead_many", {
-              count: (
-                <Prov info={troveTrovesAheadProv(trove.collateralType)}>
-                  <HighlightableValue type="trovesAhead" state="after" value={trovesAhead}>
-                    {trovesAhead}
+        {queueShare != null
+          ? troveNodes("queue_share", {
+              share: (
+                <Prov info={troveQueueShareProv(trove.collateralType)}>
+                  <HighlightableValue type="queueShare" state="after" value={queueShare}>
+                    {pct(queueShare)}
                   </HighlightableValue>
                 </Prov>
               ),
-            })}
-          </span>
-        )}
+              coll_type,
+              debt: debtNode,
+            })
+          : troveNodes("debt_in_front", { debt: debtNode })}
       </span>,
     );
-  }
-
-  // The redemption-queue bullets — the reduced form of the retired full-width
-  // redemption panel (detail-page-anatomy §2): the branch's whole queue and
-  // this trove's share of it (the compact runway chip's twin, so it carries
-  // the same receipt). The general redemption mechanics the retired panel's
-  // paragraph carried are Layer-2 material and live in the "?" modal
-  // (liquityPositionContent's Redemption exposure + Branch scoping concepts),
-  // not here — the 2026-07-25 Layer-2-in-Layer-1 audit.
-  if (debtInFront !== null && debtInFront !== undefined) {
-    if (queueDebtTotal !== null && queueDebtTotal !== undefined && queueDebtTotal > 0) {
-      const queueShare = Math.min(1, debtInFront / queueDebtTotal);
-      items.push(
-        <span key="branch-debt" className="text-rb-500">
-          {troveNodes("branch_debt", {
-            coll_type,
-            debt: (
-              <Prov info={troveBranchDebtProv(trove.collateralType)} value={formatExact(queueDebtTotal)} symbol="BOLD">
-                <AmountText value={queueDebtTotal} format="compact" /> BOLD
-              </Prov>
-            ),
-          })}
-        </span>,
-      );
-      items.push(
-        <span key="queue-share" className="text-rb-500">
-          {troveNodes("queue_share", {
-            share: (
-              <Prov info={troveQueueShareProv(trove.collateralType)}>
-                <HighlightableValue type="queueShare" state="after" value={queueShare}>
-                  {pct(queueShare)}
-                </HighlightableValue>
-              </Prov>
-            ),
-          })}
-        </span>,
-      );
-    }
   }
 
   // Liquidation reserve moved to the economics panel's footnote — it's a
@@ -695,7 +640,8 @@ function buildOpenItems({
   const nftUrl = getTroveNftUrl(trove.collateralType, trove.id);
   if (nftUrl && trove.owner) {
     const truncatedOwner = trove.ownerEns || `${trove.owner.substring(0, 6)}...${trove.owner.substring(38)}`;
-    items.push(
+    add(
+      "history",
       <span key="nft-info" className="text-rb-500">
         {troveNodes("nft_held", {
           nft: (
@@ -769,7 +715,8 @@ function buildOpenItems({
   const time_word = troveWords(redemptionCount !== 1 ? "time_many" : "time_one");
   const tx_word = troveWords(ownerTxCount !== 1 ? "owner_tx_many" : "owner_tx_one");
   if (redemptionCount > 0 && ownerTxCount > 0) {
-    items.push(
+    add(
+      "history",
       <span key="activity-counts" className="text-rb-500">
         {troveNodes("counts_both", {
           redemptions: redemptionCountNode,
@@ -780,18 +727,20 @@ function buildOpenItems({
       </span>,
     );
   } else if (ownerTxCount > 0) {
-    items.push(
+    add(
+      "history",
       <span key="activity-counts" className="text-rb-500">
         {troveNodes("counts_owner", { owner_txs: ownerTxCountNode, tx_word })}
       </span>,
     );
   } else if (redemptionCount > 0) {
-    items.push(
+    add(
+      "history",
       <span key="activity-counts" className="text-rb-500">
         {troveNodes("counts_redeemed", { redemptions: redemptionCountNode, time_word })}
       </span>,
     );
   }
 
-  return { lead, items };
+  return { lead, items: arrange(items) };
 }

@@ -4586,6 +4586,85 @@ export function aaveVaultFlowsContent(assetSymbol: string, shareSymbol: string):
   };
 }
 
+/** Where each vault family's documentation explains the vault. Yearn has
+ *  no host in content/official-docs.json yet, so its rows link nothing. */
+const VAULT_EVENT_LINKS: Record<VaultPositionFamily | "yearn", LearnMoreLink[]> = {
+  sgho: [{ label: "Savings GHO (sGHO)", url: "https://aave.com/docs/ecosystem/gho/sgho" }],
+  stata: [{ label: "Static aTokens", url: "https://aave.com/docs/aave-v3/smart-contracts/tokenization" }],
+  "umbrella-stake": [{ label: "Umbrella", url: "https://aave.com/docs/aave-v3/umbrella" }],
+  morpho: [{ label: "Morpho vaults", url: "https://docs.morpho.org/learn/concepts/vault/" }],
+  yearn: [],
+};
+
+/** The "?" on a vault timeline row (ui-jobs 309): what a row is and what its
+ *  figures are, true of any holder of any vault in the family. */
+export function vaultEventContent(family: VaultPositionFamily | "yearn"): LearnMoreContent {
+  return {
+    title: "How vault shares move",
+    intro:
+      "A vault takes deposits of one asset and issues shares for them. Each row is one log the vault emitted about this address: shares minted, burned or transferred.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Balance",
+        text: "the sum of this address's share transfers up to the row. The figure before the arrow is the same sum one log earlier.",
+      },
+      {
+        bold: "Share price at this block",
+        text: "what one share converts to in the asset at the row's block, read from the vault. It says nothing about other blocks.",
+      },
+      {
+        bold: "Shares moved",
+        text: "the value of the row's Transfer log. A deposit mints shares, a withdrawal burns them, and a transfer passes existing shares on.",
+      },
+      ...(family === "morpho"
+        ? [
+            {
+              bold: "Share of the vault",
+              text: "the balance after the row over every share in existence at its block.",
+            },
+          ]
+        : []),
+    ],
+    links: VAULT_EVENT_LINKS[family],
+  };
+}
+
+/** The "?" on an Aave V3-family account's e-mode switch row (ui-jobs 309). */
+export function emodeSwitchContent(protocol: "aave" | "spark" | "seamless"): LearnMoreContent {
+  const link: LearnMoreLink =
+    protocol === "spark"
+      ? { label: "E-mode on SparkLend", url: "https://docs.spark.fi/products/sparklend/guides/e-mode" }
+      : protocol === "seamless"
+        ? { label: "Seamless documentation", url: SEAMLESS_DOCS_URL }
+        : { label: "Aave V3 overview: Efficiency Mode", url: "https://aave.com/docs/aave-v3/overview" };
+  return {
+    title: "How e-mode works",
+    intro:
+      "E-mode is a setting on the whole account. Choosing a category lets collateral in that category count at the category's limits in place of each asset's own.",
+    detailsHeading: "Key concepts:",
+    details: [
+      {
+        bold: "Category",
+        text: "a group of assets whose prices move together, such as ETH and its staked forms. Its limits are set by governance.",
+      },
+      {
+        bold: "Limits",
+        text: "how much of the collateral's value can be borrowed against, and the level at which the account can be liquidated.",
+      },
+      {
+        bold: "Health factor",
+        text: "moves with the switch although nothing is supplied or borrowed, because the same collateral now counts at other limits.",
+      },
+      {
+        bold: "Borrowing in e-mode",
+        text: "an account in a category may borrow only assets in that category.",
+      },
+    ],
+    links: [link],
+  };
+}
+
 // ── Liquity family — claiming a collateral surplus ───────────────────────────
 
 /** The "?" on a Trove's "Claim collateral" row: what the CollSurplusPool holds

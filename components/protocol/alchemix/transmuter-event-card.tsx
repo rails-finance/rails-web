@@ -17,18 +17,20 @@
 // NO READING. These rows carry no `stateAtBlockFromReading`, and the card
 // states none: a Transmuter position has no getCDP.
 
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { LearnMore } from "@/components/shared/learn-more-modal";
+import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import {
-  ChainTruthDetail,
-  ChainTruthRow,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
   chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
+import { ALCHEMIX_TRANSMUTER } from "@/lib/alchemix/learn-more";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
 import type { AlchemixV3Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
@@ -306,6 +308,7 @@ function explainerLines(legs: TransmuterEvent[], mytSymbol: string, early: Trans
 export function TransmuterEventCard({
   legs,
   mytSymbol,
+  holders = [],
   isLast,
   eventNumber,
   early = null,
@@ -313,48 +316,61 @@ export function TransmuterEventCard({
   /** The legs of ONE transaction, in log order. */
   legs: TransmuterEvent[];
   mytSymbol: string;
+  /** The addresses that held the position (creator, owner, claimer), lower
+   *  case: a transaction one of them sent paid the gas. */
+  holders?: string[];
   /** The position's claim split into its parts, where it came before
    *  maturity; the claim's own log does not carry the stake or its term. */
   early?: TransmuterEarlyClaim | null;
   isLast?: boolean;
   eventNumber?: number;
 }) {
+  const toCells = useStatCells();
   const lead = legs[0];
   const custodyOnly = legs.every((l) => l.context.data.eventType === "transfer");
   const tokens = spineTokens(legs, mytSymbol);
-  const iconSlot = custodyOnly ? (
-    <SpineColumn tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]} isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = custodyOnly
+    ? { tokens: [{ symbol: lead.context.data.syntheticSymbol, badge: "send" }], isLast: !!isLast }
+    : { tokens, isLast: !!isLast };
   const claimLeg = find(legs, "transmuter_position_claimed");
   const earlyHere = claimLeg ? early : null;
   const stats = detailStats(legs, mytSymbol, earlyHere);
   const lines = explainerLines(legs, mytSymbol, earlyHere);
   const spec = rowSpec(legs, mytSymbol);
+  // The gas, where a holder sent every leg on Ethereum: the index's figure is
+  // the transaction's, and on Base it leaves out the L1 data fee.
+  const ownerPaid =
+    lead.context.data.chainId === 1 && legs.every((l) => holders.includes(l.wallet?.toLowerCase() ?? ""));
+  const gas = ownerPaid ? legs.find((l) => l.gas && l.gas.gasCostEth > 0)?.gas : undefined;
 
+  const slots: EventCardSlots = {
+    event: {
+      id: lead.id,
+      family: "alchemix-v3",
+      txHash: lead.txHash,
+      blockNumber: lead.blockNumber,
+      timestamp: lead.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: spec,
+    caption: chainTruthCaption(spec) ?? "",
+    // The logs' figures are the event's cells: a Transmuter position has no
+    // reading.
+    cells:
+      stats.length > 0
+        ? toCells(stats.map((s, i) => ({ ...s, key: `log-${i}` })))
+        : { none: "the logs state no amount" },
+    ledgers: { none: "no flows panel on the Transmuter" },
+    price: gasPrice(gas),
+    // The first sentence is the teaser, which the pane draws as its lead
+    // bullet; the pane lists the rest, so no sentence shows twice.
+    explainer: { body: lines.length > 0 ? <ProseExplainer items={lines.slice(1)} /> : null, first: lines[0] },
+    learnMore: <LearnMore inline content={ALCHEMIX_TRANSMUTER} />,
+  };
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      caption={chainTruthCaption(spec)}
-      header={<ChainTruthRow spec={spec} timestamp={lead.timestamp} eventNumber={eventNumber} />}
-      detail={
-        stats.length > 0 ? (
-          <>
-            <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>
-              {legs.length > 1 ? "What the logs state" : "What the log states"}
-            </h4>
-            <ChainTruthDetail stats={stats} />
-          </>
-        ) : undefined
-      }
-      // The first sentence is the teaser, which the pane draws as its lead
-      // bullet; the pane lists the rest, so no sentence shows twice.
-      explainer={lines.length > 0 ? <ProseExplainer items={lines.slice(1)} /> : undefined}
-      explainerTeaser={lines[0]}
-      txHash={lead.txHash}
-      persistKey={`alchemix-v3:${lead.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }

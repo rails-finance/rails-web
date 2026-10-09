@@ -11,7 +11,7 @@
 
 import type { AssetFlow, LlamalendContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   collateralDeltaProv,
   debtDeltaProv,
@@ -41,7 +41,8 @@ export interface LlamalendEventHeaderProps {
   loanMark?: LlamalendLoanMark | null;
 }
 
-export function LlamalendEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useLlamalendHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -51,7 +52,7 @@ export function LlamalendEventHeader({
   wallet,
   flows,
   loanMark,
-}: LlamalendEventHeaderProps) {
+}: LlamalendEventHeaderProps): ChainTruthRowSpec {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   const isLiq = ctx.eventType === "liquidation";
   const role = ctx.role ?? (isLiq ? "borrower" : undefined);
@@ -153,17 +154,11 @@ export function LlamalendEventHeader({
         }
       : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: isLiq ? actionLabel : opens ? "Open" : closes ? "Close" : "",
-        ...(opens ? { status: "open" as const } : closes ? { status: "close" as const } : {}),
-        critical: borrowerLoss,
-        deltas,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: isLiq ? actionLabel : opens ? "Open" : closes ? "Close" : "",
+    ...(opens ? { status: "open" as const } : closes ? { status: "close" as const } : {}),
+    critical: borrowerLoss,
+    deltas,
+    party,
+  };
 }

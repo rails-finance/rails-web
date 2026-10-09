@@ -11,7 +11,7 @@
 
 import type { AssetFlow, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import {
   changeProv,
   challengeFigureProv,
@@ -44,7 +44,8 @@ const num = (s?: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function FrankencoinEventHeader({
+/** T1's head row spec (the card's `head` slot). */
+export function useFrankencoinHeadSpec({
   actionLabel,
   ctx,
   timestamp,
@@ -52,7 +53,7 @@ export function FrankencoinEventHeader({
   blockNumber,
   eventNumber,
   flows,
-}: FrankencoinEventHeaderProps) {
+}: FrankencoinEventHeaderProps): ChainTruthRowSpec {
   const coords: FrankencoinCoords = { txHash, blockNumber, position: ctx.position, hub: ctx.hub };
   const sym = ctx.collateralSymbol;
   const collAddr = soleFlowAddress(flows, sym);
@@ -281,26 +282,20 @@ export function FrankencoinEventHeader({
       }
     : undefined;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        label: isOpen
-          ? "Open"
-          : ctx.eventType === "adjust_price" && priceLabel
-            ? priceLabel
-            : isAdjust && deltas.length > 0
-              ? ""
-              : actionLabel,
-        ratioChip: priceChip,
-        status: isOpen ? "open" : undefined,
-        // Terminal-adverse rows tint critical; the challenge's start and the
-        // forced sale carry the caution spine from the card composer instead.
-        critical: ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied",
-        deltas,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    label: isOpen
+      ? "Open"
+      : ctx.eventType === "adjust_price" && priceLabel
+        ? priceLabel
+        : isAdjust && deltas.length > 0
+          ? ""
+          : actionLabel,
+    ratioChip: priceChip,
+    status: isOpen ? "open" : undefined,
+    // Terminal-adverse rows tint critical; the challenge's start and the
+    // forced sale carry the caution spine from the card composer instead.
+    critical: ctx.eventType === "challenge_succeeded" || ctx.eventType === "denied",
+    deltas,
+    party,
+  };
 }

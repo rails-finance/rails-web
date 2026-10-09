@@ -1,7 +1,14 @@
 "use client";
 
-// Composer: wires the f(x) header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// f(x)'s event card on the shared shell's slots (ui-jobs 309 step 8): the head
+// from fx-event-header.tsx, T2 from fx-cells.tsx (read when the card opens),
+// the explanation and the Learn More from fx-event-explainer.tsx.
+//
+// Gas, the owner-paid rule: the price row states the transaction's gas only
+// on the owner's transactions — an operate or an ownership transfer the
+// owner in force at the block signed. A rebalance, a redemption or a
+// liquidation is a keeper's or a redeemer's transaction, and an operate a
+// third party sent is theirs: none states gas.
 //
 // Collateral on the spine chips and in the header is the TOKEN as transferred
 // (wstETH / WBTC); the detail grid adds the pool's stETH-equivalent.
@@ -15,16 +22,17 @@
 // by construction.
 
 import type { BaseActivityEvent, FxContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { fxExternalActor } from "@/lib/fx/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type FxCoords } from "@/lib/fx/event-provenance";
 import { fxExplainerTeaser } from "@/lib/fx/explainer-clauses";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
-import { FxEventHeader } from "./fx-event-header";
-import { FxEventDetail } from "./fx-event-detail";
+import { useFxHeadSpec } from "./fx-event-header";
+import { FX_HEADS, useFxOpened } from "./fx-cells";
 import { FxEventExplainer, fxLearnMoreContent } from "./fx-event-explainer";
 import { useFxPoolTerms } from "@/lib/fx/use-event-state";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -104,92 +112,107 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
           : []),
       ];
 
-  const iconSlot = isLiq ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="critical"
-      warningTip={
-        ctx.poolWide
+  const spine: SpineColumnProps = isLiq
+    ? {
+        icon: "warning",
+        warningTone: "critical",
+        warningTip: ctx.poolWide
           ? "A keeper liquidated the pool from its top tick down, reaching this position's tick. The owner did not act."
-          : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act."
+          : "A keeper liquidated this position: it repaid the debt and took the collateral plus the bonus. The owner did not act.",
+        isLast: !!isLast,
       }
-      isLast={!!isLast}
-    />
-  ) : ctx.eventType === "tickRebalance" && ctx.redemption ? (
-    <SpineColumn
-      icon="warning"
-      warningTone="caution"
-      warningTip="Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act."
-      isLast={!!isLast}
-    />
-  ) : ctx.eventType === "tickRebalance" ? (
-    // Derived socialized row — routine adverse (caution, not critical): the
-    // pool trimmed the position's whole tick; no action by the owner.
-    <SpineColumn
-      icon="warning"
-      warningTone="caution"
-      warningTip="A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act."
-      isLast={!!isLast}
-    />
-  ) : isTransfer ? (
-    // An ownership handover is a people event with no token flow — the person
-    // glyph with the join badge marks the new owner taking over; dotted spine
-    // (nothing moved). Identical to makerdao's `give` and fluid's `transfer`,
-    // which fx was the lone holdout against: it rendered a blank slot instead.
-    // The glyph is the event's own MEANING, so it wins over the third-party
-    // fallback the way a check/cross badge does — that fact is still carried by
-    // the dotted spine and the header's from → to chips.
-    <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
-  ) : (
-    // Third-party operate badges the flow pink (color-grammar §4) rather than
-    // replacing it — see spine-column's `externalParty`.
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+    : ctx.eventType === "tickRebalance" && ctx.redemption
+      ? {
+          icon: "warning",
+          warningTone: "caution",
+          warningTip:
+            "Someone redeemed fxUSD for collateral from the pool's highest-ratio ticks, including this position's. The position gave up collateral and debt of equal value and stays open; the owner did not act.",
+          isLast: !!isLast,
+        }
+      : ctx.eventType === "tickRebalance"
+        ? // Derived socialized row — routine adverse, so caution:
+          // the pool trimmed the position's whole tick; no action by the owner.
+          {
+            icon: "warning",
+            warningTone: "caution",
+            warningTip:
+              "A keeper rebalanced the tick this position sat in: it repaid part of the debt and took collateral plus the bonus. The position stays open; the owner did not act.",
+            isLast: !!isLast,
+          }
+        : isTransfer
+          ? // An ownership handover is a people event with no token flow — the
+            // person glyph with the join badge marks the new owner taking
+            // over; dotted spine (nothing moved). The glyph is the event's
+            // meaning, so it wins over the third-party fallback.
+            { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+          : // Third-party operate badges the flow pink (color-grammar §4)
+            // rather than replacing it — see spine-column's `externalParty`.
+            { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <FxLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        by={extBy ?? undefined}
-        iconColumn={iconSlot}
-        header={
-          <FxEventHeader
-            actionLabel={event.actionLabel}
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            externalBy={extBy ?? undefined}
-            flows={event.flows}
-            eventId={event.id}
-          />
-        }
-        detail={
-          <FxEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            normalizedSymbol={meta?.normalizedSymbol ?? ctx.poolSymbol}
-            blockPeers={blockPeers}
-          />
-        }
-        explainer={
-          <FxEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            blockPeers={blockPeers}
-            skipLead
-          />
-        }
-        explainerTeaser={fxExplainerTeaser(ctx, coords)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />}
-        persistKey={`fx:${event.id}`}
-      />
-    </FxLedgerProvider>
-  );
+  const head = useFxHeadSpec({
+    actionLabel: event.actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    externalBy: extBy ?? undefined,
+    flows: event.flows,
+    eventId: event.id,
+  });
+  // The owner-paid rule (above): an operate or a transfer the owner in force
+  // signed.
+  const ownTx = ctx.eventType === "operate" || isTransfer;
+  const gas = ownTx ? ownerPaidGas({ wallet: ctx.ownerAt ?? event.wallet, gas: event.gas }, ctx.txFrom) : undefined;
+  const price = gas ? { gas, prices: [] } : undefined;
+  const normalizedSymbol = meta?.normalizedSymbol ?? ctx.poolSymbol;
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "fx",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells: isTransfer ? { none: "An ownership transfer moves no balance" } : { pending: FX_HEADS },
+    // The Collateral and Debt cells open into their ledgers where the page
+    // ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <FxLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </FxLedgerProvider>
+      ),
+    },
+    price,
+    useOpened: () =>
+      useFxOpened({
+        ctx,
+        txHash: event.txHash,
+        blockNumber: event.blockNumber,
+        normalizedSymbol,
+        blockPeers,
+        price,
+      }),
+    explainer: {
+      body: (
+        <FxEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          blockPeers={blockPeers}
+          skipLead
+        />
+      ),
+      first: fxExplainerTeaser(ctx, coords),
+    },
+    learnMore: <LearnMore inline content={fxLearnMoreContent(ctx, terms?.expenseRatio)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }

@@ -67,7 +67,7 @@ import { useMemo } from "react";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { VaultAllocationBand, VaultAllocationDetail } from "@/components/protocol/morpho-base/vault-allocation-band";
 import { Prov } from "@/components/shared/provenance";
-import { StatCard, pctText, shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
+import { pctText, shareText } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@/components/vaults/vault-timeline-row";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
@@ -98,6 +98,8 @@ import {
   type VaultTimelineCoords,
 } from "@/lib/shared/vault-holder-timeline";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { vaultEventContent } from "@/lib/shared/learn-more-content";
+import type { EventCellSpec } from "@/components/shared/event-cells";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -353,7 +355,8 @@ export function MorphoBaseVaultTimeline({
                       first={i === 0}
                     />
                   }
-                  detailCards={(rowCoords) => <ShareOfVaultCard event={row} coords={rowCoords} shareUnit={shareUnit} />}
+                  extraCells={(rowCoords) => [shareOfVaultCell(row, rowCoords, shareUnit)]}
+                  learnMore={vaultEventContent("morpho")}
                   detailNotes={(rowCoords) => (
                     <VaultAllocationDetail
                       event={row}
@@ -450,36 +453,30 @@ function GateFailure({
 
 /** What proportion of the vault this address held after the row — the page's
  *  own central question, asked at a block the address chose by transacting. */
-function ShareOfVaultCard({
-  event,
-  coords,
-  shareUnit,
-}: {
-  event: VaultHolderEvent;
-  coords: VaultTimelineCoords;
-  shareUnit: string;
-}) {
+function shareOfVaultCell(event: VaultHolderEvent, coords: VaultTimelineCoords, shareUnit: string): EventCellSpec {
   const supply = supplyAt(event);
   const balance = BigInt(event.balanceAfter);
-  return (
-    <StatCard
-      label="Share of the vault after this"
-      figure="row-share-of-vault"
-      note={
-        supply
-          ? `This address's balance over the ${shareText(raw(supply, event.shareDecimals), event.shareDecimals)} ${shareUnit} in existence at block ${event.blockNumber.toLocaleString("en-US")}.`
-          : "The vault's supply at this block was not read, so no proportion is stated."
-      }
-    >
-      {supply && BigInt(supply) > BigInt(0) ? (
-        <Prov info={morphoVaultTimelineShareOfVaultProv(coords)}>
-          {pctText(Number(balance) / Number(BigInt(supply)))}
-        </Prov>
-      ) : (
-        <NotLoaded className="text-base font-normal text-rb-500" />
-      )}
-    </StatCard>
-  );
+  return {
+    kind: "stat",
+    key: "share-of-vault",
+    label: "Share of the vault after this",
+    figure: "row-share-of-vault",
+    tip: supply
+      ? `This address's balance over the ${shareText(raw(supply, event.shareDecimals), event.shareDecimals)} ${shareUnit} in existence at block ${event.blockNumber.toLocaleString("en-US")}.`
+      : "The vault's supply at this block was not read, so no proportion is stated.",
+    // Derived from the balance and the supply at the row's block.
+    changed: event.sharesDelta !== "0",
+    inputs: ["balance"],
+    value:
+      supply && BigInt(supply) > BigInt(0)
+        ? {
+            after: {
+              text: pctText(Number(balance) / Number(BigInt(supply))),
+              info: morphoVaultTimelineShareOfVaultProv(coords),
+            },
+          }
+        : { after: { text: <NotLoaded className="text-sm font-semibold text-rb-500" /> } },
+  };
 }
 
 /** Vault-wide terms that changed for every holder at once, as the house note

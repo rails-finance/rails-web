@@ -3,26 +3,24 @@
 // An Aave V3-family account's e-mode change as a timeline row of its own: the
 // Pool's UserEModeSet log, which the page reads beside its timeline
 // (lib/aave-v3/account-switches.ts; SparkLend, Seamless). The header names the
-// new category and its limits at the switch's block; the grid states the
-// account before and after the transaction, read at blocks N−1 and N like
-// every other row: the Aave V3 family's side cells and SparkLend's figures
-// under them, which read any Aave V3-family Pool's answer. The card passes
-// its parts to the shell; it moves onto the slots with 309's later steps.
+// new category and its limits at the switch's block; the cells state the
+// category before → after and the health factor either side, read at blocks
+// N−1 and N like every other row (ui-jobs 309).
 
 import type { BaseActivityEvent, EmodeSwitchFields, SparkContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { ChainTruthRow } from "@/components/shared/chain-truth-event";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { LearnMore } from "@/components/shared/learn-more-modal";
+import { emodeSwitchContent } from "@/lib/shared/learn-more-content";
+import { healthFactorProv } from "@/lib/aave-v3/event-provenance";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { bpsPct, type AaveV3PositionState } from "@/lib/aave-v3/position-state";
+import { bpsPct } from "@/lib/aave-v3/position-state";
 import { hfLabelV4 } from "@/lib/aave-v4/format";
 import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import type { V3PoolIdentity } from "@/lib/aave-v3/pool-context";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { sparkEventState } from "@/lib/spark/event-state";
-import { sparkRiskCells } from "@/components/protocol/spark/spark-account-state";
-import { EventCellGrid } from "@/components/shared/event-cells";
-import { AaveFamilyLedgers, accountSideCells } from "@/components/protocol/aave-v3/aave-family-cells";
 
 type Switch = EmodeSwitchFields;
 
@@ -105,40 +103,92 @@ export function AaveFamilyEmodeSwitchCard({
   const entering = s.toId !== 0;
   const state = read.status === "ready" ? read.state : undefined;
   const hfMoved = state && state.before.hf != null && state.after.hf != null ? state : undefined;
+  const acc = read.raw?.account;
 
-  return (
-    <EventCard
-      avatar={null}
-      iconColumn={<SpineColumn icon="rate-change" iconDirection={entering ? "up" : "down"} isLast={!!isLast} />}
-      header={
-        <ChainTruthRow
-          spec={{
-            label: "E-mode",
-            deltas: [],
-            note: (
-              <span data-emode-switch="">
-                <Prov info={switchProv(s, coords, pool)}>{headline(s)}</Prov>
-              </span>
-            ),
-          }}
-          timestamp={event.timestamp}
-          eventNumber={eventNumber}
-        />
-      }
-      detail={
-        read.status === "ready" && read.state && read.raw ? (
-          <AccountCells state={read.state} raw={read.raw} coords={v3Coords} hfFormat={hfFormat} />
-        ) : read.status === "loading" ? (
-          <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
-            Reading the account before and after this transaction…
-          </div>
-        ) : read.status === "unavailable" && !read.lasting ? (
-          <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
-            The account before and after this transaction was not read. Reload to try again.
-          </div>
-        ) : null
-      }
-      explainer={
+  // The switch's one figure, from the log: the category before → after.
+  const emodeCell: EventCellSpec = {
+    kind: "stat",
+    key: "emode",
+    label: "E-mode",
+    changed: true,
+    value: {
+      before: { text: s.fromId === 0 ? "None" : name(s.fromId, s.fromLabel), info: switchProv(s, coords, pool) },
+      after: { text: s.toId === 0 ? "None" : name(s.toId, s.toLabel), info: switchProv(s, coords, pool) },
+    },
+  };
+  // The health factor either side, from the account read at N−1 and N: the
+  // same collateral counted at the category's limits.
+  const hfCell: EventCellSpec | null =
+    state && acc && (state.before.hf != null || state.after.hf != null)
+      ? {
+          kind: "stat",
+          key: "health-factor",
+          label: "Health factor",
+          changed: state.before.hf !== state.after.hf,
+          inputs: ["emode"],
+          value: {
+            before:
+              state.before.hf !== state.after.hf
+                ? {
+                    text: hfFormat(state.before.hf),
+                    value: state.before.hf == null ? "∞" : hfFormat(state.before.hf),
+                    info: healthFactorProv("before", v3Coords, {
+                      wad: acc.before.healthFactor,
+                      collateralBase: acc.before.totalCollateralBase,
+                      debtBase: acc.before.totalDebtBase,
+                      thresholdBps: acc.before.liquidationThresholdBps,
+                    }),
+                  }
+                : undefined,
+            after: {
+              text: hfFormat(state.after.hf),
+              value: state.after.hf == null ? "∞" : hfFormat(state.after.hf),
+              info: healthFactorProv("after", v3Coords, {
+                wad: acc.after.healthFactor,
+                collateralBase: acc.after.totalCollateralBase,
+                debtBase: acc.after.totalDebtBase,
+                thresholdBps: acc.after.liquidationThresholdBps,
+              }),
+            },
+          },
+        }
+      : null;
+  const protocol = pool.protocol === "Seamless" ? "seamless" : /spark/i.test(pool.name) ? "spark" : "aave";
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: persistPrefix,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine: { icon: "rate-change", iconDirection: entering ? "up" : "down", isLast: !!isLast },
+    head: {
+      label: "E-mode",
+      deltas: [],
+      note: (
+        <span data-emode-switch="">
+          <Prov info={switchProv(s, coords, pool)}>{headline(s)}</Prov>
+        </span>
+      ),
+    },
+    caption: "E-mode",
+    cells: hfCell ? [emodeCell, hfCell] : [emodeCell],
+    ledgers: { none: "an e-mode switch moves no reserve" },
+    notes:
+      read.status === "loading" ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
+          Reading the account before and after this transaction…
+        </div>
+      ) : read.status === "unavailable" && !read.lasting ? (
+        <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="unread">
+          The account before and after this transaction was not read. Reload to try again.
+        </div>
+      ) : undefined,
+    explainer: {
+      body: (
         <p className="text-sm leading-relaxed">
           {entering ? (
             <>
@@ -163,34 +213,14 @@ export function AaveFamilyEmodeSwitchCard({
             </>
           ) : null}
         </p>
-      }
-      txHash={event.txHash}
-      persistKey={`${persistPrefix}:${event.id}`}
-      caption="E-mode"
-    />
-  );
-}
+      ),
+    },
+    learnMore: <LearnMore inline content={emodeSwitchContent(protocol)} />,
+  };
 
-/** The account around the switch: the side cells, then the figures under them. */
-function AccountCells({
-  state,
-  raw,
-  coords,
-  hfFormat,
-}: {
-  state: NonNullable<ReturnType<typeof sparkEventState>>;
-  raw: AaveV3PositionState;
-  coords: V3Coords;
-  hfFormat: (hf: number | null) => string;
-}) {
-  const risk = sparkRiskCells({ state, raw, coords, isLiquidation: false, hfFormat });
-  if (!raw.account) return null;
   return (
-    <AaveFamilyLedgers state={raw} coords={coords}>
-      <EventCellGrid
-        cells={[...accountSideCells({ state: raw, coords, touched: [], moved: new Set() }), ...risk.cells]}
-        data={{ "data-spark-account-state": "ready" }}
-      />
-    </AaveFamilyLedgers>
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }

@@ -305,6 +305,24 @@ export const liquidationLegProv = (
 // at the same block) renders beside it as the constant the engine sized the
 // seizure by, so the card audits itself.
 
+/** A market's price at an ordinary event: the core's stored LogOraclePrice
+ *  at or before the event's block, as the timeline route serves it. */
+export const dolomiteEventPriceProv = (sym: string, coords: DolomiteCoords, priceRaw?: string): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  verify: {
+    kind: "recompute",
+    text:
+      coords.blockNumber != null
+        ? `Re-run the core's getMarketPrice eth_call at block ${coords.blockNumber} against an archive node.`
+        : "Re-run the core's getMarketPrice eth_call at the event's block against an archive node.",
+  },
+  summary: `${sym}'s USD price at this event — the margin core's oracle price for the market as its LogOraclePrice recorded it at or before the event's block, per whole token (scale 1e(36 − decimals)). The Lifetime flows panel values this event's balances at the same price.`,
+  contract: MARGIN,
+  via: `LogOraclePrice at or before the event block${priceRaw ? ` · raw: ${priceRaw}` : ""}`,
+  inputs: eventInputs(coords),
+});
+
 /** The core's own oracle price for one market, read back AT the event's
  *  block — an archive eth_call, not a captured series. */
 export const dolomiteLiqAtBlockPriceProv = (sym: string, coords: DolomiteCoords, priceRaw?: string): Provenance => ({

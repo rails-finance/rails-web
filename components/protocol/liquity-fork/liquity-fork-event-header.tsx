@@ -1,7 +1,8 @@
 "use client";
 
-// Shared Liquity-V2-fork event header (chain-state tier) — one adapter onto the
-// shared ChainTruthRow grammar for BOTH forks (Ebisu, Asymmetry). A Trove event
+// Shared Liquity-V2-fork event head (chain-state tier) — the card's `head` slot
+// (ui-jobs 309), drawn by the shared ChainTruthRow, for the three forks (Ebisu,
+// Asymmetry, Basedollar). A Trove event
 // moves two axes at once (branch collateral + the fork's stablecoin debt), so
 // the row carries two signed deltas; each is after − before over two emitted
 // absolutes (chain-derived), traced via <Prov>. The two forks differ only in
@@ -24,9 +25,15 @@
 // adjusts — chipping them all would bury the 82 rows where a delegate was
 // actually handed control.
 
-import type { AssetFlow, EbisuContext, AsymmetryContext, OriginEnvelope } from "@/lib/shared/types/event-shape";
+import type {
+  AssetFlow,
+  EbisuContext,
+  AsymmetryContext,
+  BasedollarContext,
+  OriginEnvelope,
+} from "@/lib/shared/types/event-shape";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LiquityForkCoords, DeltaOps } from "@/lib/shared/liquity-fork-provenance";
 import {
@@ -41,8 +48,8 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import { getForkBatchManagerName } from "@/lib/shared/fork-batch-managers";
 
-/** The two fork contexts are structural twins; either drives the header. */
-export type LiquityForkEventContext = EbisuContext | AsymmetryContext;
+/** The fork contexts are structural twins; any of them drives the head. */
+export type LiquityForkEventContext = EbisuContext | AsymmetryContext | BasedollarContext;
 
 /** The per-deployment blanks: the debt symbol and the provenance builders (the
  *  fork vocabulary's own collDeltaProv / debtDeltaProv / rateAtEventProv). */
@@ -65,16 +72,14 @@ export interface LiquityForkHeaderBuilders {
   ) => Provenance;
 }
 
-export interface LiquityForkEventHeaderProps {
+export interface LiquityForkHeadArgs {
   actionLabel: string;
   /** Zero-delta adjust — the sub-epsilon dust chip would contradict the
    *  "No change" label, so the row renders label-only. */
   noChange?: boolean;
   ctx: LiquityForkEventContext;
-  timestamp: number;
   txHash?: string;
   blockNumber?: number;
-  eventNumber?: number;
   builders: LiquityForkHeaderBuilders;
   /** The event's own movements, read for the two contracts this row names. A
    *  fork adds branches over time and each branch is a different collateral, so
@@ -84,17 +89,17 @@ export interface LiquityForkEventHeaderProps {
   flows?: AssetFlow[];
 }
 
-export function LiquityForkEventHeader({
+/** The row's spec: the per-axis verbs, the redemption's legs, the rate pill
+ *  and the delegate chip where the rate is the event's point. */
+export function liquityForkHeadSpec({
   actionLabel,
   noChange,
   ctx,
-  timestamp,
   txHash,
   blockNumber,
-  eventNumber,
   builders,
   flows,
-}: LiquityForkEventHeaderProps) {
+}: LiquityForkHeadArgs): ChainTruthRowSpec {
   const coords: LiquityForkCoords = {
     txHash,
     blockNumber,
@@ -261,23 +266,17 @@ export function LiquityForkEventHeader({
     debtAfterN - debt >= builders.minDebt &&
     debtAfterN < builders.minDebt;
 
-  return (
-    <ChainTruthRow
-      spec={{
-        ...(becameZombie ? { note: "Now a zombie: out of the rate queue" } : {}),
-        // Open → the short pill word + green status; a combined/single owner
-        // adjust drops the row verb (the per-axis delta labels carry it) but
-        // keeps its label when nothing moved (a "No change" row has no deltas).
-        label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : isBatchChange ? "Adjusted" : actionLabel,
-        status: isOpen ? "open" : undefined,
-        critical: ctx.eventType === "liquidate",
-        labelOnSpine: isRedemption,
-        deltas,
-        ratePill,
-        party,
-      }}
-      timestamp={timestamp}
-      eventNumber={eventNumber}
-    />
-  );
+  return {
+    ...(becameZombie ? { note: "Now a zombie: out of the rate queue" } : {}),
+    // Open → the short pill word + green status; a combined/single owner
+    // adjust drops the row verb (the per-axis delta labels carry it) but
+    // keeps its label when nothing moved (a "No change" row has no deltas).
+    label: isOpen ? "Open" : isAdjust && deltas.length > 0 ? "" : isBatchChange ? "Adjusted" : actionLabel,
+    status: isOpen ? "open" : undefined,
+    critical: ctx.eventType === "liquidate",
+    labelOnSpine: isRedemption,
+    deltas,
+    ratePill,
+    party,
+  };
 }

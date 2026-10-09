@@ -65,6 +65,9 @@ export interface EventCardEvent {
   blockNumber?: number;
   timestamp: number;
   number?: number;
+  /** The last of the card's event numbers, where it draws several logs (one
+   *  transaction's): the number reads "7–8". */
+  numberLast?: number;
 }
 
 /** Who acted, where the owner did not. */
@@ -99,7 +102,8 @@ export interface EventCardSlots {
   spine: SpineColumnProps;
   /** T1's head row, drawn by the shared `ChainTruthRow`. */
   head: ChainTruthRowSpec;
-  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"). */
+  /** The phone caption's kind ("Repay", "Rate 4.12% → 3.60%"); empty, the
+   *  timeline's word for the event. */
   caption: string;
   actor?: EventCardActor;
   /** T2's grid: the ordered cells, the cells to come while their figures are
@@ -125,6 +129,28 @@ export interface EventCardSlots {
   /** Run while the body is open: a family whose cells need a read starts it
    *  here, so a closed card asks for nothing. */
   onOpen?: () => void;
+  /** A hook the shell runs while the body is open, for a family whose cells,
+   *  notes or price wait on a read a closed row must not make (Liquity V1's
+   *  receipt read): what it returns stands in for those slots, which hold
+   *  the closed card's values (the cells `pending`). */
+  useOpened?: () => EventCardOpened;
+}
+
+/** The slots `useOpened` returns once the body opens. */
+export type EventCardOpened = Partial<Pick<EventCardSlots, "cells" | "notes" | "price">>;
+
+/** The body of a card whose slots wait on `useOpened`: mounted with the open
+ *  panel, so its read starts when the card opens. */
+function OpenedBody({ slots, useOpened }: { slots: EventCardSlots; useOpened: () => EventCardOpened }) {
+  const opened = useOpened();
+  const price = opened.price ?? slots.price;
+  return (
+    <>
+      <EventCellGrid cells={opened.cells ?? slots.cells} />
+      {opened.notes ?? slots.notes}
+      {hasPriceRow(price) && <EventPriceRow price={price} />}
+    </>
+  );
 }
 
 /** What the shell takes beside a family's parts: the timeline's and the
@@ -206,23 +232,28 @@ function partsOf(slots: EventCardSlots, pageMode: boolean): Omit<EventCardParts,
         spec={slots.head}
         timestamp={event.timestamp}
         eventNumber={event.number}
+        eventNumberLast={event.numberLast}
         variant={pageMode ? "page" : "row"}
       />
     ),
     band: slots.band,
-    detail: (
+    detail: slots.useOpened ? (
+      <OpenedBody slots={slots} useOpened={slots.useOpened} />
+    ) : (
       <>
         <EventCellGrid cells={slots.cells} data={slots.cellsData} />
         {slots.notes}
       </>
     ),
-    price: slots.price,
+    // A card read on open draws its price row inside `OpenedBody`.
+    price: slots.useOpened ? undefined : slots.price,
     explainer: explainer.body,
     explainerTeaser: explainer.grouped ? undefined : explainer.first,
     txHash: event.txHash,
     learnMore: slots.learnMore,
     persistKey: `${event.family}:${event.id}`,
-    caption: slots.caption,
+    // An empty kind leaves the timeline's word for the event.
+    caption: slots.caption || undefined,
     by: actor?.by,
     byOwner: actor?.byOwner,
     custody: actor?.custody,
@@ -296,7 +327,13 @@ export function EventCard(props: EventCardProps) {
   const datePrefix = useContext(EventDateContext);
   const dayMark = useContext(EventDayMarkContext);
   const reactId = useId();
-  const cardId = persistKey ?? reactId;
+  // The card's ids name the event where the card has one (its share path's
+  // id, one card per event on a page), so they hold whatever the tree above
+  // the card looks like: a useId alone differed between server and client on
+  // the timeline and event pages when the page hydrated in pieces.
+  const shareEventId = eventIdFromShareHref(shareHref);
+  const domId = shareEventId ? `evt-${shareEventId.replace(/[^A-Za-z0-9_-]/g, "_")}` : reactId;
+  const cardId = persistKey ?? domId;
   const hasPanel = detail != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
   // as the spine segment, the T1 row as the caption under the node, and the
@@ -467,8 +504,8 @@ export function EventCard(props: EventCardProps) {
   // The row's name, the same at both widths: the spoken caption, then the
   // legs the column states under `legsId` ("Repay, 6 June 2026: 7,500 BOLD
   // repaid"); a group passes its whole `label`.
-  const labelId = `${reactId}-label`;
-  const legsId = `${reactId}-legs`;
+  const labelId = `${domId}-label`;
+  const legsId = `${domId}-legs`;
   // The whole row is the card's click target (row-target.ts): from 640px
   // where the header is the control, below it where the segment's button
   // is. Hovering it lights the header (`.evt-row-target` in globals.css).
@@ -486,7 +523,7 @@ export function EventCard(props: EventCardProps) {
     [inTimeline, legsId, rowTarget, actedByOwner],
   );
   const nameProps = label ? { "aria-label": label } : { "aria-labelledby": `${labelId} ${legsId}` };
-  const panelId = `${reactId}-card`;
+  const panelId = `${domId}-card`;
 
   /* ── Content tiers ──────────────────────────────────────────────── */
   // A timeline row's T1 surface is the desktop header's; under 640px it is the

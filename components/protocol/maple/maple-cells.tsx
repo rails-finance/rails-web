@@ -1,7 +1,12 @@
 "use client";
 
-// Maple event detail — adapter onto the shared ChainTruthDetail grid. Every
-// row leads with the position's claim in the pool's asset, before → after
+// Maple's T2 (ui-jobs 309 step 8): the card's `cells` and `notes` slots. One
+// ledger cell, the wallet's pool claim, and the rate at this event. There is
+// no Debt cell: a Maple position lends to the pool and owes nothing. The
+// claim's ledger carries Held and "Interest since {date}" rows as the
+// day-close card does, and the closed cell "incl. X interest"; the share and
+// queue lanes and what was paid to the wallet stand as notes. Every row leads
+// with the position's claim in the pool's asset, before → after
 // ((shares + escrowed) × the pool's rate in the row's block, the chain's
 // convertToAssets there; decision 0033) and the interest it earned since the
 // previous row in the pool. Then the lanes an event touches:
@@ -14,12 +19,15 @@
 //   transfers — the share lane (a position can arrive or leave by transfer).
 
 import type { MapleContext } from "@/lib/shared/types/event-shape";
+import type { ReactNode } from "react";
 import {
-  ChainTruthDetail,
   reconstructTransition,
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
+import { StatNotes, useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import { Prov } from "@/components/shared/provenance";
 import {
   sharesDeltaProv,
   requestSharesProv,
@@ -37,10 +45,10 @@ import {
   type MapleCoords,
 } from "@/lib/maple/event-provenance";
 import { formatNumber } from "@/lib/utils/format";
-import { formatDayMonth, formatDuration } from "@/lib/date";
-import { useMapleLedgerCell } from "./maple-ledger";
+import { dayStamp } from "@/components/shared/event-ledger";
+import type { MapleHeld } from "./maple-ledger";
 
-export interface MapleEventDetailProps {
+export interface MapleCellsProps {
   ctx: MapleContext;
   txHash?: string;
   blockNumber?: number;
@@ -74,19 +82,14 @@ const ACT: Partial<Record<MapleContext["eventType"], string>> = {
   request_fill: "fill",
 };
 
-export function MapleEventDetail({
-  ctx,
-  txHash,
-  blockNumber,
-  wallet,
-  timestamp,
-  prevAt,
-  eventId,
-}: MapleEventDetailProps) {
-  // The claim opens into the pool's Lifetime flows ledger, where the page has it.
-  const ledger = useMapleLedgerCell(eventId ?? "", ctx.pool);
+export function useMapleCells({ ctx, txHash, blockNumber, wallet, timestamp, prevAt }: MapleCellsProps): {
+  cells: EventCellSpec[];
+  notes: ReactNode;
+  held: MapleHeld | null;
+} {
   const coords: MapleCoords = { txHash, blockNumber, pool: ctx.pool, account: wallet };
   const stats: ChainTruthStat[] = [];
+  let held: MapleHeld | null = null;
 
   // The claim at the block rate, where the index holds one for this block.
   if (ctx.valueAfter != null && ctx.valueBefore != null) {
@@ -98,13 +101,26 @@ export function MapleEventDetail({
       beforeProv: claimBeforeProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords),
     });
     const interest = Number(ctx.interestSincePrev ?? "0");
-    // A wallet's two pools interleave, so the period runs from the previous
-    // row in this pool, which need not be the row below.
-    const since =
-      prevAt != null && timestamp != null && timestamp >= prevAt
-        ? `Interest since the pool's previous row (${formatDayMonth(prevAt)}, ${formatDuration(prevAt, timestamp)})`
-        : "Interest since the pool's previous row";
     const act = ACT[ctx.eventType];
+    const interestProv = interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev);
+    const interestText = interest < 0 ? `−${fmt(String(-interest))}` : fmt(ctx.interestSincePrev);
+    const claimProv = claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter);
+    if (ctx.valueAfter != null)
+      held = {
+        symbol: ctx.assetSymbol,
+        claim: Number(ctx.valueAfter),
+        interest: ctx.interestSincePrev != null ? interest : 0,
+        since: prevAt != null ? dayStamp(prevAt) : "the pool's previous row",
+        claimProv,
+        interestProv,
+        heldProv: {
+          kind: "derived",
+          summary:
+            "The claim before the interest since the pool's previous row: the claim after this event less that interest.",
+          via: "claim after − interest since the previous row",
+          formula: "claim after − interest since previous row",
+        },
+      };
     stats.push({
       // The wallet's own claim: a − on a fill is the claim shrinking as the
       // assets leave for the wallet.
@@ -119,20 +135,25 @@ export function MapleEventDetail({
             : "Wallet's pool claim",
       value: fmt(ctx.valueAfter),
       symbol: ctx.assetSymbol,
-      prov: claimAfterProv(ctx.assetSymbol, ctx.poolSymbol, ctx.rateSource, coords, ctx.raw?.valueAfter),
+      prov: claimProv,
       transition,
-      changed: transition != null,
-      ...(ledger ? { ledger: "collateral" as const } : {}),
-      interestSincePrevious:
-        ctx.interestSincePrev != null && interest !== 0
-          ? {
-              value: ctx.interestSincePrev,
-              prov: interestSincePrevProv(ctx.assetSymbol, ctx.poolSymbol, coords, ctx.raw?.interestSincePrev),
-              label: since,
-              display: interest < 0 ? `−${fmt(String(-interest))}` : fmt(ctx.interestSincePrev),
-              after: ", the rise in the claim's value from the exit rate; nothing is paid out",
-            }
-          : undefined,
+      changed: transition != null || (ctx.interestSincePrev != null && interest !== 0),
+      // The claim opens into its ledger on every card: the pool's flows where
+      // the page's panel shows this pool, else its Held and Interest rows.
+      ledger: "collateral" as const,
+      // The interest since the pool's previous row is inside the claim, as
+      // Liquity's Debt cell states its accrual.
+      sub:
+        ctx.interestSincePrev != null && interest !== 0 ? (
+          <>
+            incl.{" "}
+            <Prov info={interestProv} value={ctx.interestSincePrev}>
+              {interest > 0 ? "+" : ""}
+              {interestText}
+            </Prov>{" "}
+            interest
+          </>
+        ) : undefined,
     });
   }
 
@@ -263,9 +284,15 @@ export function MapleEventDetail({
     });
   }
 
-  return (
-    <ChainTruthDetail
-      stats={stats.map((st) => ({ ...st, display: st.display ?? st.value, transition: full(st.transition) }))}
-    />
-  );
+  // One ledger cell and the rate; no Debt cell, since a lender owes nothing.
+  const shown = stats.map((st) => ({ ...st, display: st.display ?? st.value, transition: full(st.transition) }));
+  const cellStats: ChainTruthCellStat[] = [];
+  const notes: ChainTruthStat[] = [];
+  for (const st of shown) {
+    if (st.ledger) cellStats.push({ ...st, key: "claim" });
+    else if (st.label === "Rate at this event") cellStats.push({ ...st, key: "rate" });
+    else notes.push(st);
+  }
+  const cells = useChainTruthCells(cellStats);
+  return { cells, notes: notes.length > 0 ? <StatNotes stats={notes} /> : undefined, held };
 }

@@ -1,6 +1,12 @@
 "use client";
 
-// f(x) event detail — adapter onto the shared ChainTruthDetail grid.
+// f(x)'s T2 (ui-jobs 309 step 8): the card's `cells`, `notes` and `price`
+// slots, read when the card opens. Collateral, Debt and the debt ratio; the
+// oracle price and the fee in the price row. A rebalance's or a pool-wide
+// liquidation's tick and pool totals are not the position's: the explanation
+// states them, and the position's part is its ledger's "This rebalance" or
+// "This liquidation" row. A liquidation's split (what reached the liquidator,
+// what the protocol kept, the debt repaid) stands as notes.
 //
 // Every row that moves the position states it before → after: getPosition and
 // getPositionDebtRatio at block − 1 and at the block (/api/chain/fx/event-state,
@@ -8,24 +14,28 @@
 // rebalance has, and the only debt ratio an operate has. Until the read lands
 // an operate keeps the stored after-figures the timeline carries.
 //
-//   operate      — fee, collateral, debt, debt ratio, oracle price. The fee is
-//                  the event's protocolFees where the old manager emitted one,
-//                  else the caller's schedule at the block times the amounts.
-//   liquidation  — what reached the liquidator (token units) and its stETH
-//                  worth, what the protocol kept, the debt repaid and any debt
-//                  left unpaid, and the position before → after.
-//   rebalance    — the whole tick's (or pool's) figures, then this position's
-//                  own change.
+//   operate      — collateral, debt, debt ratio; the fee (the event's
+//                  protocolFees where the old manager emitted one, else the
+//                  caller's schedule at the block times the amounts) and the
+//                  oracle price in the price row.
+//   liquidation  — the position before → after; notes for what reached the
+//                  liquidator (token units) and its stETH worth, what the
+//                  protocol kept, the debt repaid and any debt left unpaid.
+//   rebalance    — the position's change.
 
 import type { FxContext } from "@/lib/shared/types/event-shape";
+import type { ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import {
-  ChainTruthDetail,
   reconstructTransition,
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
+import { EventNotes, NoteLine, useStatCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import type { EventCardOpened } from "@/components/shared/event-card";
+import type { EventCellHead } from "@/components/shared/event-cells";
+import type { EventCardPrice, EventPriceFigure } from "@/components/shared/event-price-row";
 import {
   debtDeltaProv,
   protocolFeesProv,
@@ -39,8 +49,6 @@ import {
   debtSincePreviousProv,
   snapOraclePriceProv,
   transferPartyProv,
-  tickRebalanceHitProv,
-  tickRebAmountProv,
   rowStateProv,
   rowChangeProv,
   wstethRateProv,
@@ -53,15 +61,14 @@ import {
 } from "@/lib/fx/event-provenance";
 import { FX_POOLS, isFxPoolKey } from "@/lib/fx/asset-catalog";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
-import { fxBeforeAfter, useFxEventStateRead, type FxEventState, type FxSide } from "@/lib/fx/use-event-state";
+import { fxBeforeAfter, useFxEventStateRead, type FxSide } from "@/lib/fx/use-event-state";
 import { fxRowFees, fxFeePct } from "@/lib/fx/row-figures";
 import { fxCollMoved, fxFundingText, fxRowFunding } from "@/lib/fx/in-tx-funding";
 import { formatDate } from "@/lib/date";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
-import { T2Skeleton } from "@/components/shared/event-ledger";
 import { useFxLedgerCells } from "./fx-ledger";
 
-export interface FxEventDetailProps {
+export interface FxCellsProps {
   ctx: FxContext;
   txHash?: string;
   blockNumber?: number;
@@ -84,10 +91,6 @@ const impliedDebtBeforeProv = (coords: FxCoords): Provenance => ({
     "Event-implied fxUSD debt before this event — the implied debt after it minus this event's debt delta. Funding and rebalances move the real debt between events with no per-position log, so this is the replay lane.",
   formula: "implied debt after − debt change",
 });
-
-/** A liquidation's figures run to dust (a wei of collateral, 2,477 wei of
- *  fxUSD): their accessible names use the site's number format. */
-const readable = (st: ChainTruthStat): ChainTruthStat => ({ ...st, readableLabel: true });
 
 /** A before → after pair from the row read, as a grid stat. */
 /** Collateral worth less than this at the row's price is dust: what a
@@ -159,30 +162,24 @@ function readStat(
   };
 }
 
-export function FxEventDetail({ ctx, txHash, blockNumber, normalizedSymbol, blockPeers }: FxEventDetailProps) {
-  const { value: state, settled } = useFxEventStateRead(ctx, blockNumber, txHash);
-  return (
-    <FxEventDetailBody
-      ctx={ctx}
-      txHash={txHash}
-      blockNumber={blockNumber}
-      normalizedSymbol={normalizedSymbol}
-      blockPeers={blockPeers}
-      state={state}
-      stateSettled={settled}
-    />
-  );
-}
+/** The cells to come while the position is read at the block. */
+export const FX_HEADS: EventCellHead[] = [
+  { kind: "ledger", side: "collateral", label: "Collateral" },
+  { kind: "ledger", side: "debt", label: "Debt" },
+  { kind: "stat", label: "Debt ratio" },
+];
 
-function FxEventDetailBody({
+/** The opened card: getPosition and getPositionDebtRatio at block − 1 and at
+ *  the block (/api/chain/fx/event-state). */
+export function useFxOpened({
   ctx,
   txHash,
   blockNumber,
   normalizedSymbol,
   blockPeers,
-  state,
-  stateSettled = true,
-}: FxEventDetailProps & { state: FxEventState | null; stateSettled?: boolean }) {
+  price: price0,
+}: FxCellsProps & { price?: EventCardPrice }): EventCardOpened {
+  const { value: state, settled } = useFxEventStateRead(ctx, blockNumber, txHash);
   const meta = isFxPoolKey(ctx.pool) ? FX_POOLS[ctx.pool] : undefined;
   const tokenSym = meta?.tokenSymbol ?? ctx.poolSymbol;
   const coords: FxCoords = {
@@ -197,16 +194,20 @@ function FxEventDetailBody({
   // The cells that open into the Lifetime flows ledgers, where the page has
   // them; while the model is on its way, the cells that will open stand as
   // placeholder rows.
-  const cells = useFxLedgerCells();
+  const ledgerCells = useFxLedgerCells();
   const focus = useFlowFocus();
   const flowsPending = !!focus && !focus.model;
-  const ledgers = cells != null || flowsPending;
+  const ledgers = ledgerCells != null || flowsPending;
+  const toCells = useStatCells();
   const collLedger = ledgers ? { ledger: "collateral" as const } : {};
   const debtLedger = ledgers ? { ledger: "debt" as const } : {};
-  const stats: ChainTruthStat[] = [];
-  const feeStats: ChainTruthStat[] = [];
+  const stats: ChainTruthCellStat[] = [];
+  const figures: EventPriceFigure[] = [];
+  const notes: ReactNode[] = [];
+  const keyed = (key: string, s: ChainTruthStat | null, inputs?: string[]): ChainTruthCellStat | null =>
+    s ? { ...s, key, ...(inputs ? { inputs } : {}) } : null;
 
-  // "= 1.748 stETH at 1.192 stETH per wstETH" under a wstETH amount.
+  // "= 1.748 stETH at 1.192 stETH per wstETH" beside a wstETH amount.
   const stethSub = (tokenAmount: number, what: string) =>
     rate != null && tokenSym !== normalizedSymbol ? (
       <>
@@ -222,164 +223,141 @@ function FxEventDetailBody({
       </>
     ) : undefined;
 
-  // Ownership rows are zero-delta: the grid is the Transfer log's holders.
+  // Ownership rows are zero-delta: the Transfer log's holders, as notes.
   if (ctx.eventType === "transfer") {
     const short = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "—");
     const isMint = ctx.transferFrom === "0x0000000000000000000000000000000000000000";
-    return (
-      <ChainTruthDetail
-        stats={[
-          {
-            label: isMint ? "From · mint" : "From",
-            value: isMint ? "0x0" : short(ctx.transferFrom),
-            symbol: "",
-            prov: transferPartyProv("from", coords),
-            sub:
-              !isMint && ctx.transferFromSince != null && ctx.transferAt != null ? (
-                <>
-                  held it from {formatDate(ctx.transferFromSince)} to {formatDate(ctx.transferAt)}
-                </>
-              ) : undefined,
-          },
-          {
-            label: "To · new holder",
-            value: short(ctx.transferTo),
-            symbol: "",
-            prov: transferPartyProv("to", coords),
-          },
-        ]}
-      />
-    );
+    return {
+      cells: { none: "An ownership transfer moves no balance" },
+      notes: (
+        <EventNotes>
+          <NoteLine label={isMint ? "From · mint" : "From"}>
+            <Prov info={transferPartyProv("from", coords)} value={isMint ? "0x0" : short(ctx.transferFrom)}>
+              {isMint ? "0x0" : short(ctx.transferFrom)}
+            </Prov>
+            {!isMint && ctx.transferFromSince != null && ctx.transferAt != null ? (
+              <span className="font-normal text-rb-500">
+                {" "}
+                held it from {formatDate(ctx.transferFromSince)} to {formatDate(ctx.transferAt)}
+              </span>
+            ) : null}
+          </NoteLine>
+          <NoteLine label="To · new holder">
+            <Prov info={transferPartyProv("to", coords)} value={short(ctx.transferTo)}>
+              {short(ctx.transferTo)}
+            </Prov>
+          </NoteLine>
+        </EventNotes>
+      ),
+      price: price0,
+    };
   }
 
   const poolLiq = ctx.eventType === "liquidation" && ctx.poolWide === true;
   if (ctx.eventType === "tickRebalance" || poolLiq) {
-    const scope = ctx.poolWide ? "whole pool" : "whole tick";
-    const tickStats: ChainTruthStat[] = [
-      {
-        label: poolLiq
-          ? "Pool-wide liquidation · liquidated this position's tick"
-          : ctx.redemption
-            ? "Redemption · took from this position's tick"
-            : ctx.poolWide
-              ? "Pool-wide rebalance · moved this position's tick"
-              : "Rebalanced tick",
-        // `#`-prefixed so the grid's numeric compaction leaves the tick id alone.
-        value: `#${ctx.rebalancedTick ?? "—"}`,
-        symbol: "",
-        prov: tickRebalanceHitProv(ctx.rebalancedTick, coords, ctx.poolWide),
-      },
-      {
-        label: `${ctx.redemption ? "Collateral to the redeemer" : "Collateral to the keeper"} · ${scope}`,
-        value: fmt(ctx.tickRebColls),
-        symbol: tokenSym,
-        prov: tickRebAmountProv("colls", tokenSym, coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
-      },
-      {
-        label: `${ctx.redemption ? "fxUSD redeemed" : "fxUSD repaid"} · ${scope}`,
-        value: fmt(ctx.tickRebFxusdDebts),
-        symbol: "fxUSD",
-        prov: tickRebAmountProv("fxusd", "fxUSD", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
-      },
-    ];
-    if (ctx.tickRebStableDebts != null && Number(ctx.tickRebStableDebts) !== 0) {
-      tickStats.push({
-        label: `USDC repaid · ${scope}`,
-        value: fmt(ctx.tickRebStableDebts),
-        symbol: "USDC",
-        prov: tickRebAmountProv("stable", "stable-side debt", coords, undefined, ctx.poolWide, poolLiq, ctx.redemption),
-      });
-    }
+    // The position's change at the block; the tick's or the pool's totals
+    // are the explanation's.
     const tag = blockPeers && blockPeers > 1 ? ` · this block (${blockPeers} rebalances)` : "";
     const px = poolLiq ? (before?.minPrice ?? null) : null;
-    const coll = readStat(`This position · collateral${tag}`, "coll", normalizedSymbol, before, after, coords);
-    const debt = readStat(`This position · debt${tag}`, "debt", "fxUSD", before, after, coords);
+    const coll = readStat(`Collateral${tag}`, "coll", normalizedSymbol, before, after, coords);
+    const debt = readStat(`Debt${tag}`, "debt", "fxUSD", before, after, coords);
     for (const s of [
-      coll ? { ...coll, ...collLedger } : null,
-      debt ? { ...debt, ...debtLedger } : null,
-      readStat(`This position · debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords, px),
+      keyed("collateral", coll ? { ...coll, ...collLedger } : null),
+      keyed("debt", debt ? { ...debt, ...debtLedger } : null),
+      keyed("ratio", readStat(`Debt ratio${tag}`, "ratio", normalizedSymbol, before, after, coords, px), [
+        "collateral",
+        "debt",
+      ]),
     ])
-      if (s) tickStats.push(s);
-    return (
-      <>
-        <ChainTruthDetail stats={poolLiq ? tickStats.map(readable) : tickStats} />
-        {/* The position's read at the block is out: its Collateral and Debt
-            stand as placeholder rows until it lands. */}
-        {ledgers && !stateSettled && (!coll || !debt) && <T2Skeleton data={{ "data-position-state": "loading" }} />}
-      </>
-    );
+      if (s) stats.push(poolLiq ? { ...s, readableLabel: true } : s);
+    const cells = toCells(stats);
+    return {
+      // The position's read at the block is out: its cells stand as
+      // placeholder rows until it lands.
+      cells: !settled && (!coll || !debt) ? { pending: FX_HEADS } : cells,
+      price: price0,
+    };
   }
 
   if (ctx.eventType === "liquidation") {
     const sent = Number(ctx.liqColls ?? "0") || 0;
-    stats.push({
-      label: "Collateral to the liquidator",
-      value: fmt(ctx.liqColls),
-      symbol: tokenSym,
-      prov: liqCollsProv(tokenSym, coords),
-      sub: stethSub(sent, "Collateral to the liquidator"),
-    });
+    const steth = stethSub(sent, "Collateral to the liquidator");
+    notes.push(
+      <NoteLine key="sent" label="Collateral to the liquidator">
+        <Prov info={liqCollsProv(tokenSym, coords)} value={fmt(ctx.liqColls)}>
+          {fmt(ctx.liqColls)} {tokenSym}
+        </Prov>
+        {steth && <span className="font-normal text-rb-500"> {steth}</span>}
+      </NoteLine>,
+    );
     const sentNorm = tokenSym === normalizedSymbol ? sent : rate != null ? sent * rate : null;
     if (before?.colls != null && after?.colls != null && sentNorm != null) {
       const kept = before.colls - after.colls - sentNorm;
       if (kept > DUST)
-        stats.push({
-          label: "Kept by the protocol",
-          value: String(kept),
-          display: formatTinyNonZero(kept),
-          symbol: normalizedSymbol,
-          prov: protocolShareProv(normalizedSymbol, coords),
-          sub:
-            state?.expenseRatio != null ? (
-              <>{Math.round(state.expenseRatio * 100)}% of the liquidation bonus</>
-            ) : undefined,
-        });
+        notes.push(
+          <NoteLine key="kept" label="Kept by the protocol">
+            <Prov info={protocolShareProv(normalizedSymbol, coords)} value={String(kept)}>
+              {formatTinyNonZero(kept)} {normalizedSymbol}
+            </Prov>
+            {state?.expenseRatio != null && (
+              <span className="font-normal text-rb-500">
+                {" "}
+                {Math.round(state.expenseRatio * 100)}% of the liquidation bonus
+              </span>
+            )}
+          </NoteLine>,
+        );
     }
-    stats.push({
-      label: "fxUSD debt repaid",
-      value: fmt(ctx.liqFxusdDebts),
-      symbol: "fxUSD",
-      prov: liqDebtRepaidProv("fxusd", coords),
-    });
+    notes.push(
+      <NoteLine key="fxusd" label="fxUSD debt repaid">
+        <Prov info={liqDebtRepaidProv("fxusd", coords)} value={fmt(ctx.liqFxusdDebts)}>
+          {fmt(ctx.liqFxusdDebts)} fxUSD
+        </Prov>
+      </NoteLine>,
+    );
     const stable = Number(ctx.liqStableDebts ?? "0") || 0;
-    if (stable !== 0) {
-      stats.push({
-        label: "Stable debt repaid",
-        value: fmt(ctx.liqStableDebts),
-        symbol: "USDC",
-        prov: liqDebtRepaidProv("stable", coords),
-      });
-    }
+    if (stable !== 0)
+      notes.push(
+        <NoteLine key="stable" label="Stable debt repaid">
+          <Prov info={liqDebtRepaidProv("stable", coords)} value={fmt(ctx.liqStableDebts)}>
+            {fmt(ctx.liqStableDebts)} USDC
+          </Prov>
+        </NoteLine>,
+      );
     const debtBefore = before?.debts ?? (ctx.debtBefore != null ? Number(ctx.debtBefore) : null);
     const repaid = (Number(ctx.liqFxusdDebts ?? "0") || 0) + stable;
-    if (ctx.emptiesPosition && debtBefore != null && debtBefore - repaid > 1e-9) {
-      stats.push({
-        label: "Debt left unpaid · spread over other positions",
-        value: String(debtBefore - repaid),
-        symbol: "fxUSD",
-        prov: unpaidDebtProv(coords),
-      });
-    }
+    if (ctx.emptiesPosition && debtBefore != null && debtBefore - repaid > 1e-9)
+      notes.push(
+        <NoteLine key="unpaid" label="Debt left unpaid · spread over other positions">
+          <Prov info={unpaidDebtProv(coords)} value={String(debtBefore - repaid)}>
+            {formatNumber(debtBefore - repaid)} fxUSD
+          </Prov>
+        </NoteLine>,
+      );
   } else {
-    // Operate: the fee is drawn last, after the position's figures and the
-    // price — the event's field where the old manager emitted one, else the
-    // caller's schedule at the block.
+    // Operate: the fee in the price row — the event's field where the old
+    // manager emitted one, else the caller's schedule at the block.
     if (ctx.protocolFees != null && Number(ctx.protocolFees) !== 0) {
-      feeStats.push({
+      figures.push({
+        key: "fee",
         label: "Protocol fee",
-        value: fmt(ctx.protocolFees),
         symbol: tokenSym,
-        prov: protocolFeesProv(tokenSym, coords),
+        text: fmt(ctx.protocolFees),
+        info: protocolFeesProv(tokenSym, coords),
+        value: fmt(ctx.protocolFees),
       });
     } else if (state?.fees) {
       for (const f of fxRowFees(ctx, state.fees)) {
         if (f.amount <= 0) continue;
-        feeStats.push({
+        const sym = f.symbol === "token" ? tokenSym : "fxUSD";
+        figures.push({
+          key: `fee-${f.leg}`,
           label: `Fee · ${fxFeePct(f.ratio)} ${f.leg}`,
+          symbol: sym,
+          text: formatNumber(f.amount),
+          info: feeScheduleProv(state.fees.caller, coords),
           value: String(f.amount),
-          symbol: f.symbol === "token" ? tokenSym : "fxUSD",
-          prov: feeScheduleProv(state.fees.caller, coords),
-          sub: state.fees.custom ? "schedule set for the caller" : "pool default schedule",
+          title: state.fees.custom ? "Schedule set for the caller" : "Pool default schedule",
         });
       }
     }
@@ -420,12 +398,14 @@ function FxEventDetailBody({
         moved
       );
     stats.push({
+      key: "collateral",
       label: "Collateral",
       value: String(collAfter),
       symbol: normalizedSymbol,
       prov: after
         ? rowStateProv("coll", "after", normalizedSymbol, coords)
         : chainAfterProv("coll", normalizedSymbol, coords),
+      changed: collBefore == null || Math.abs(collAfter - collBefore) > 0,
       transition:
         collBefore != null
           ? reconstructTransition({
@@ -444,12 +424,14 @@ function FxEventDetailBody({
     });
     const debtBefore = before?.debts ?? (ctx.debtBefore != null ? Number(ctx.debtBefore) : null);
     stats.push({
+      key: "debt",
       label: "Debt",
       value: String(debtAfter),
       symbol: "fxUSD",
       prov: after
         ? rowStateProv("debt", "after", normalizedSymbol, coords)
         : chainAfterProv("debt", normalizedSymbol, coords),
+      changed: debtBefore == null || Math.abs(debtAfter - debtBefore) > 0 || Boolean(ctx.debtSincePrevious),
       transition:
         debtBefore != null
           ? reconstructTransition({
@@ -476,54 +458,67 @@ function FxEventDetailBody({
         : {}),
       ...debtLedger,
     });
-    const ratio = readStat(
-      "Debt ratio",
+    const ratio = keyed(
       "ratio",
-      normalizedSymbol,
-      before,
-      after,
-      coords,
-      // Dust is what a liquidation leaves: only its rows test for it.
-      ctx.eventType === "liquidation" && ctx.oraclePrice != null ? Number(ctx.oraclePrice) : null,
+      readStat(
+        "Debt ratio",
+        "ratio",
+        normalizedSymbol,
+        before,
+        after,
+        coords,
+        // Dust is what a liquidation leaves: only its rows test for it.
+        ctx.eventType === "liquidation" && ctx.oraclePrice != null ? Number(ctx.oraclePrice) : null,
+      ),
+      ["collateral", "debt"],
     );
     if (ratio) stats.push(ratio);
-    return (
-      <ChainTruthDetail
-        stats={[...withPrice(ctx.eventType === "liquidation" ? stats.map(readable) : stats), ...feeStats]}
-      />
-    );
+  } else {
+    // The replay lane — labeled event-implied so it is never read as the
+    // position's current debt.
+    stats.push({
+      key: "debt",
+      label: "Debt after · event-implied",
+      value: fmt(ctx.impliedDebtAfter),
+      symbol: "fxUSD",
+      prov: impliedDebtAfterProv(coords),
+      transition: reconstructTransition({
+        after: ctx.impliedDebtAfter,
+        change: ctx.debtDelta,
+        changeProv: ctx.eventType === "liquidation" ? liqDebtTotalProv(coords) : debtDeltaProv(coords),
+        beforeProv: impliedDebtBeforeProv(coords),
+      }),
+    });
   }
+  const cells = toCells(ctx.eventType === "liquidation" ? stats.map((s) => ({ ...s, readableLabel: true })) : stats);
 
-  // The replay lane — labeled event-implied so it is never read as the
-  // position's current debt.
-  stats.push({
-    label: "Debt after · event-implied",
-    value: fmt(ctx.impliedDebtAfter),
-    symbol: "fxUSD",
-    prov: impliedDebtAfterProv(coords),
-    transition: reconstructTransition({
-      after: ctx.impliedDebtAfter,
-      change: ctx.debtDelta,
-      changeProv: ctx.eventType === "liquidation" ? liqDebtTotalProv(coords) : debtDeltaProv(coords),
-      beforeProv: impliedDebtBeforeProv(coords),
-    }),
-  });
-
-  return <ChainTruthDetail stats={[...withPrice(stats), ...feeStats]} />;
-
-  // The same-tx PositionSnapshot's oracle price — USD per NORMALIZED unit at
-  // this event's block.
-  function withPrice(list: ChainTruthStat[]): ChainTruthStat[] {
-    if (ctx.oraclePrice == null) return list;
-    return [
-      ...list,
-      {
-        label: `Oracle price · USD per ${normalizedSymbol}`,
-        value: fmt(ctx.oraclePrice),
-        display: `$${fmt(ctx.oraclePrice)}`,
-        symbol: "",
-        prov: snapOraclePriceProv(normalizedSymbol, coords),
-      },
-    ];
-  }
+  // The same-tx PositionSnapshot's oracle price — USD per normalized unit at
+  // this event's block — in the price row.
+  const oracle = ctx.oraclePrice != null ? Number(ctx.oraclePrice) : null;
+  const price: EventCardPrice | undefined =
+    (oracle != null && oracle > 0) || figures.length > 0
+      ? {
+          gas: price0?.gas,
+          prices: [
+            ...(price0?.prices ?? []),
+            ...(oracle != null && oracle > 0
+              ? [
+                  {
+                    symbol: normalizedSymbol,
+                    usd: oracle,
+                    info: snapOraclePriceProv(normalizedSymbol, coords),
+                    value: fmt(ctx.oraclePrice),
+                    title: `Oracle price, USD per ${normalizedSymbol}, at this event's block`,
+                  },
+                ]
+              : []),
+          ],
+          figures: [...(price0?.figures ?? []), ...figures],
+        }
+      : price0;
+  return {
+    cells,
+    notes: notes.length ? <EventNotes>{notes}</EventNotes> : undefined,
+    price,
+  };
 }

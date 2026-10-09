@@ -1,8 +1,7 @@
 "use client";
 
 // Where the position stood at one transaction's block: the served `getCDP`
-// reading, drawn in the same StatCard grid Morpho's chain-state cards draw
-// their after-balances in.
+// reading, as the event card's cells (ui-jobs 309).
 //
 // THREE RULES, each one a way this figure can be read as saying something it
 // does not.
@@ -16,10 +15,10 @@
 // 2. IT BELONGS TO THE BLOCK, NOT TO THE EVENT. One reading covers every event
 //    in its block, and 3,248 of production's 8,680 position-blocks hold more
 //    than one. `positionEventsInBlock` is what tells the two apart, and the
-//    heading is where it shows: at or below the card's own leg count the
-//    reading covers what the card draws and nothing else, so the heading names
+//    cells' tip is where it shows: at or below the card's leg count the
+//    reading covers what the card draws and nothing else, so the tip names
 //    the transaction (or the lone event); above it the block holds events this
-//    card does not draw, and the heading counts the block's instead.
+//    card does not draw, and the tip counts the block's instead.
 //
 // 3. AN ABSENT READING IS NOT A ZERO. A custody Transfer moves neither axis, so
 //    it is not a block the sweep stops at: 1,867 of production's 4,988 position
@@ -36,10 +35,10 @@
 // and the two unit caveats, on every card and once per leg of a transaction.
 // The rules did not go: they are bullets behind the info toggle
 // (`alchemixReadingClauses`) and notes on each figure's own receipt, which is
-// where a reader asks "where did this number come from". The heading names the
-// block and stops.
+// where a reader asks "where did this number come from". Each cell's tip names
+// the block and stops.
 //
-// EARMARKED IS SHOWN, AND ONLY BECAUSE THE HEADING NAMES THE BLOCK. Decision
+// EARMARKED IS SHOWN, AND ONLY BECAUSE THE TIP NAMES THE BLOCK. Decision
 // 0032 point 6 permits stating it as of the block it was read at and forbids
 // carrying it anywhere else. All three figures here come from one call at one
 // block, and nothing on this card puts it beside a figure from another block. A
@@ -47,14 +46,12 @@
 // and by rule 3 an absent cell already means "not stated", so dropping a
 // measured zero would make the two look alike.
 
+import type { ReactNode } from "react";
 import type { AlchemixStateAtBlockFromReading } from "@/lib/shared/types/event-shape";
-import {
-  ChainTruthDetail,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+import { type ChainTruthStat, type ChainTruthTransition } from "@/components/shared/chain-truth-event";
+import type { EventCellSpec, EventCells } from "@/components/shared/event-cells";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatTinyNonZero, formatUnitsExact } from "@/lib/utils/format";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import {
   carriedReadingProv,
   lineRatioProv,
@@ -74,6 +71,9 @@ import { Prov } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 
 const block = (n: number) => n.toLocaleString("en-US");
+
+/** A line under the card's grid. */
+const NOTE = "px-5 pb-2 text-[11px] leading-relaxed text-rb-500";
 
 /** Both alAssets and the MYT share count carry 18 decimals, the same scale the
  *  rest of this card reads its emitted amounts at. */
@@ -121,7 +121,7 @@ export interface AlchemixStateAtBlockProps {
    *  mean nothing without it. */
   eventBlock: number | undefined;
   /** How many of this position's logs the card draws. One is a lone event;
-   *  above one the card is a whole transaction, and rule 2's heading reads
+   *  above one the card is a whole transaction, and rule 2's tip reads
    *  against this number. */
   legCount: number;
   coords: AlchemixCoords;
@@ -148,7 +148,14 @@ function ratioPct(raw: string): string {
     : `${Math.round(pct).toLocaleString("en-US")}%`;
 }
 
-export function AlchemixStateAtBlock({
+/** The reading as the card's cells, and the line that stands under them where
+ *  the block has no reading of its own. */
+export interface AlchemixReadingCells {
+  cells: EventCells;
+  note: ReactNode;
+}
+
+export function useAlchemixReadingCells({
   state,
   syntheticSymbol,
   mytSymbol,
@@ -156,24 +163,24 @@ export function AlchemixStateAtBlock({
   legCount,
   coords,
   before = null,
-}: AlchemixStateAtBlockProps) {
+}: AlchemixStateAtBlockProps): AlchemixReadingCells {
   const unit = useAlchemixUnderlying();
   const ratios = useAlchemixLineRatios();
+  const toCells = useStatCells(true);
   // Rule 3's exception, for a block with no reading of its own: the reading in
   // force there, carried on debt and collateral only (lib/alchemix/readings-before).
   const inForce = useReadingInForce(state && state.status !== "stated" ? eventBlock : null);
 
   // Absent on Transmuter rows, which have neither axis.
-  if (!state) return null;
+  if (!state) return { cells: { none: "no reading on this row" }, note: null };
 
   if (state.status !== "stated" || state.blockNumber == null) {
     if (state.reason === "reading-stale") {
       const at = eventBlock != null ? ` at block ${block(eventBlock)}` : "";
-      return (
-        <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
-          The reading{at} did not complete, so what this position held here is not stated.
-        </p>
-      );
+      return {
+        cells: { none: "the reading did not complete" },
+        note: <p className={NOTE}>The reading{at} did not complete, so what this position held here is not stated.</p>,
+      };
     }
     // A custody move: neither axis moved. The figures in force are shown
     // muted, the way an untouched axis is, and set-aside is left out because
@@ -187,31 +194,26 @@ export function AlchemixStateAtBlock({
         changed: false,
         prov: carriedReadingProv(label, symbol, raw, inForce.blockNumber, eventBlock, coords),
       });
-      return (
-        <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
-          <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
-            Unchanged by {legCount > 1 ? "this transaction" : "this event"}
-          </h4>
-          <ChainTruthDetail
-            stats={[
-              carried("Debt", inForce.debtRaw, syntheticSymbol),
-              carried("Collateral", inForce.collateralRaw, mytSymbol),
-            ]}
-            symbolText
-          />
-        </div>
-      );
+      const tip = `Unchanged by ${legCount > 1 ? "this transaction" : "this event"}: the reading at block ${block(inForce.blockNumber)}, the last before it`;
+      return {
+        cells: [
+          ...toCells([
+            { ...carried("Debt", inForce.debtRaw, syntheticSymbol), key: "debt" },
+            { ...carried("Collateral", inForce.collateralRaw, mytSymbol), key: "collateral" },
+          ]).map((c) => ({ ...c, tip })),
+        ],
+        note: null,
+      };
     }
-    return (
-      <p className="mt-1 border-t border-rb-200 px-5 pb-3 pt-2 text-[11px] leading-relaxed text-rb-500 dark:border-rb-800">
-        Debt and collateral did not change.
-      </p>
-    );
+    return {
+      cells: { none: "no reading at this block" },
+      note: <p className={NOTE}>Debt and collateral did not change.</p>,
+    };
   }
 
   const atBlock = state.blockNumber;
   // Rule 2. Above the card's own leg count the reading covers events this card
-  // does not draw, and the heading has to count the block's instead.
+  // does not draw, and the tip has to count the block's instead.
   const beyondCard = state.positionEventsInBlock > legCount;
 
   /** Before → after on one axis, from the reading before this block. None
@@ -313,41 +315,41 @@ export function AlchemixStateAtBlock({
         }
       : null;
 
-  const stats = [
-    axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw),
-    axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw),
-    axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw),
-    ratioStat,
-  ].filter((s): s is ChainTruthStat => s != null);
-
-  if (stats.length === 0) return null;
-
   const subjectWord = beyondCard
     ? `this block’s ${state.positionEventsInBlock} events`
     : legCount > 1
       ? "this transaction"
       : "this event";
-  const heading = before ? `Before and after ${subjectWord}` : `After ${subjectWord}`;
+  // Rule 2, in each cell's tip: the reading belongs to the block.
+  const tip = `${before ? `Before and after ${subjectWord}` : `After ${subjectWord}`}: getCDP read at block ${block(atBlock)}${before ? ` and at block ${block(before.blockNumber)}` : ""}`;
+  const cell = (s: ChainTruthStat | null, key: string, inputs?: string[]): EventCellSpec | null =>
+    s ? { ...toCells([{ ...s, key, inputs }])[0], tip } : null;
+  const ratioCell = cell(ratioStat, "ratio", ["debt", "collateral"]);
+  if (ratioCell && ratios)
+    ratioCell.sub = [
+      ...(ratioCell.sub ?? []),
+      {
+        content: (
+          <>
+            minimum{" "}
+            <Prov info={lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords)}>
+              {ratioPct(ratios.minimumRaw)}
+            </Prov>
+            {" · "}liquidation at{" "}
+            <Prov info={lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords)}>
+              {ratioPct(ratios.lowerBoundRaw)}
+            </Prov>
+            , read at <BlockRef block={ratios.asOfBlock} />
+          </>
+        ),
+      },
+    ];
+  const cells = [
+    cell(axis("Debt", state.debtRaw, syntheticSymbol, before?.debtRaw), "debt"),
+    cell(axis("Collateral", state.collateralRaw, mytSymbol, before?.collateralRaw), "collateral"),
+    cell(axis("Set aside for repayment", state.earmarkedRaw, syntheticSymbol, before?.earmarkedRaw), "set-aside"),
+    ratioCell,
+  ].filter((c): c is EventCellSpec => c != null);
 
-  return (
-    <div className="mt-1 border-t border-rb-200 pt-2 pb-3 dark:border-rb-800">
-      <h4 className={`${OVERLAY_HEADING} px-5 text-rb-500`}>
-        {heading} · <BlockRef block={atBlock} />
-      </h4>
-      <ChainTruthDetail stats={stats} symbolText />
-      {ratioStat && ratios ? (
-        <p className="px-5 text-[11px] leading-relaxed tabular-nums text-rb-500">
-          Collateralisation minimum{" "}
-          <Prov info={lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords)}>
-            {ratioPct(ratios.minimumRaw)}
-          </Prov>
-          {" · "}liquidation at{" "}
-          <Prov info={lineRatioProv("collateralizationLowerBound", ratios.lowerBoundRaw, ratios.asOfBlock, coords)}>
-            {ratioPct(ratios.lowerBoundRaw)}
-          </Prov>
-          , read at <BlockRef block={ratios.asOfBlock} />
-        </p>
-      ) : null}
-    </div>
-  );
+  return { cells: cells.length > 0 ? cells : { none: "the reading states no figure" }, note: null };
 }

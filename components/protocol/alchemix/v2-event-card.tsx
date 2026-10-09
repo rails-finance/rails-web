@@ -21,19 +21,20 @@
 // V3 position showing its holder's V2 account), and not on the V2 page, where
 // every row is V2 and the page name already says so.
 
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { gasPrice } from "@/components/shared/event-price-row";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import {
-  ChainTruthDetail,
-  ChainTruthRow,
   type ChainTruthDelta,
   type ChainTruthRowSpec,
   type ChainTruthStat,
   chainTruthCaption,
 } from "@/components/shared/chain-truth-event";
+import { useStatCells } from "@/components/shared/chain-truth-cells";
 import { formatExact, formatUnitsExact } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-event";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import type { GasCost } from "@/lib/shared/types/event-shape";
 import type { AlchemixV2Context, BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { ChainId } from "@/lib/shared/chains";
 import { v2EmittedProv, type AlchemixV2Coords } from "@/lib/alchemix/v2-provenance";
@@ -207,6 +208,13 @@ function detailStats(e: AlchemixV2Event, a: Amount | null): ChainTruthStat[] {
   return stats;
 }
 
+/** The gas, where the account acted on Ethereum: the index's figure is
+ *  the transaction's, and on an L2 it leaves out the L1 data fee. */
+function ownerGas(e: AlchemixV2Event): GasCost | undefined {
+  const d = e.context.data;
+  return d.chainId === 1 && e.wallet?.toLowerCase() === d.account.toLowerCase() ? e.gas : undefined;
+}
+
 function explainer(e: AlchemixV2Event, a: Amount | null): string | null {
   const d = e.context.data;
   const amt = a ? `${formatUnitsExact(a.raw, a.decimals)} ${a.symbol}` : null;
@@ -255,43 +263,49 @@ export function AlchemixV2EventCard({
 }) {
   const d = event.context.data;
   const a = movedAmount(d);
-  const iconSlot =
+  const toCells = useStatCells();
+  const spineProps: SpineColumnProps =
     // Repayment styling, no warning: the holder's own action closes with the
     // dead-end arrow on a solid (agency) spine, the same register as V3's
     // self-liquidation `close` mark.
-    d.eventType === "liquidate" ? (
-      <SpineColumn icon="dead-end" isLast={!!isLast} />
-    ) : (
-      <SpineColumn tokens={spine(d, a)} isLast={!!isLast} />
-    );
+    d.eventType === "liquidate" ? { icon: "dead-end", isLast: !!isLast } : { tokens: spine(d, a), isLast: !!isLast };
   const stats = detailStats(event, a);
   const line = explainer(event, a);
   const spec = rowSpec(event, a, showVersion);
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "alchemix-v2",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine: spineProps,
+    head: spec,
+    caption: chainTruthCaption(spec) ?? "",
+    // The log's figures are the event's cells: V2 took no reading.
+    cells:
+      stats.length > 0
+        ? toCells(stats.map((s, i) => ({ ...s, key: `log-${i}` })))
+        : { none: "the log states no amount" },
+    ledgers: { none: "no flows panel on the V2 Alchemist" },
+    notes:
+      stats.length > 0 ? (
+        <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
+          V2 records what each event moved{credit(d) ? " and the debt it cleared" : ""}. It took no reading of the
+          account&rsquo;s debt or collateral here, so no before and after is shown.
+        </p>
+      ) : undefined,
+    price: gasPrice(ownerGas(event)),
+    // The one sentence is the teaser, which the pane draws as its lead; the
+    // body adds nothing, so the sentence shows once.
+    explainer: { body: line ? <ProseExplainer items={[]} /> : null, first: line ?? undefined },
+    learnMore: <LearnMore inline content={ALCHEMIX_V2} />,
+  };
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      caption={chainTruthCaption(spec)}
-      header={<ChainTruthRow spec={spec} timestamp={event.timestamp} eventNumber={eventNumber} />}
-      detail={
-        stats.length > 0 ? (
-          <>
-            <h4 className={`${OVERLAY_HEADING} px-5 pt-2 text-rb-500`}>What the log states</h4>
-            <ChainTruthDetail stats={stats} />
-            <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
-              V2 records what each event moved{credit(d) ? " and the debt it cleared" : ""}. It took no reading of the
-              account&rsquo;s debt or collateral here, so no before and after is shown.
-            </p>
-          </>
-        ) : undefined
-      }
-      // The one sentence is the teaser, which the pane draws as its lead; the
-      // body adds nothing, so the sentence shows once.
-      explainer={line ? <ProseExplainer items={[]} /> : undefined}
-      explainerTeaser={line ?? undefined}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={ALCHEMIX_V2} />}
-      persistKey={`alchemix-v2:${event.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }

@@ -25,6 +25,7 @@ import type { BaseActivityEvent, AssetFlow, FluidContext, FluidEventType } from 
 
 import type { TimelineRowCeiling } from "@/lib/shared/timeline-row-ceiling";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { firstLogOfTx, gasOnFirstRow } from "@/lib/shared/index-gas";
 
 export interface FluidTimelineResult {
   nftId: string;
@@ -202,6 +203,8 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
   // The previous balance-bearing row (an ownership move states no balance, so
   // the interest across it lands on the next row that does).
   let prev: FluidMvRow | null = null;
+  // The transaction's gas on its first row (lib/shared/index-gas.ts).
+  const firstLog = firstLogOfTx(rows);
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash ? (r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`) : "";
     const kind = r.action as FluidEventType;
@@ -228,6 +231,7 @@ export function buildFluidTimeline(rows: FluidMvRow[], nftId: string): FluidTime
       blockNumber: Number(r.block_number),
       timestamp: r.block_timestamp != null ? Number(r.block_timestamp) : 0,
       wallet: r.owner_at ?? "",
+      ...gasOnFirstRow(r, firstLog),
       etherscanUrl: tx ? explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx) : "",
     };
 

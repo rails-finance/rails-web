@@ -1,8 +1,10 @@
 "use client";
 
-// Composer: wires the Frankencoin header / detail / explainer into the
-// universal EventCard shell (the plain-English explainer rides its own
-// second-tier slot).
+// Frankencoin's event card on the shared shell's slots (ui-jobs 309 step 8):
+// the head from frankencoin-event-header.tsx, T2 from frankencoin-cells.tsx,
+// the explanation and the Learn More from frankencoin-event-explainer.tsx.
+// Gas stands in the price row where the owner signed the transaction
+// (lib/shared/index-gas.ts).
 //
 // Spine grammar: the challenge lifecycle carries the warning spine —
 // caution-toned at its start (an open bet against the declared price),
@@ -13,15 +15,16 @@
 // carries NO token-flow chip: not a send the owner made.
 
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { FrankencoinLedgerProvider } from "./frankencoin-ledger";
-import { SpineColumn } from "@/components/shared/spine-column";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
 import { frankencoinExplainerTeaser } from "@/lib/frankencoin/explainer-clauses";
-import { FrankencoinEventHeader } from "./frankencoin-event-header";
-import { FrankencoinEventDetail } from "./frankencoin-event-detail";
+import { useFrankencoinHeadSpec } from "./frankencoin-event-header";
+import { useFrankencoinCells } from "./frankencoin-cells";
 import { FrankencoinEventExplainer, frankencoinLearnMoreContent } from "./frankencoin-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { useFrankencoinPageFacts } from "@/lib/frankencoin/page-facts";
@@ -126,66 +129,73 @@ export function FrankencoinEventCard({ event, isLast, eventNumber }: Frankencoin
         ]
       : undefined;
 
-  const iconSlot =
-    critical || caution ? (
-      <SpineColumn icon="warning" warningTone={critical ? "critical" : "caution"} isLast={!!isLast} />
-    ) : ctx.eventType === "ownership_transferred" ? (
-      // An ownership handover is a people event with no token flow — the person
-      // glyph with the join badge marks the new owner taking over; dotted spine
-      // (nothing moved). Same treatment as makerdao's `give`, fluid's and fx's
-      // `transfer`. Covers the mint-time factory→owner handover too ("Owner Set
-      // at Mint"), which is the same shape: a party changed, no collateral did.
-      <SpineColumn icon="delegate" iconDirection="up" isLast={!!isLast} />
-    ) : (
-      <SpineColumn tokens={tokens} isLast={!!isLast} />
-    );
+  const spine: SpineColumnProps =
+    critical || caution
+      ? { icon: "warning", warningTone: critical ? "critical" : "caution", isLast: !!isLast }
+      : ctx.eventType === "ownership_transferred"
+        ? { icon: "delegate", iconDirection: "up", isLast: !!isLast }
+        : { tokens, isLast: !!isLast };
 
-  // The Collateral and Debt cells open into their ledgers where the page ties
-  // its timeline to the Lifetime flows panel.
-  return (
-    <FrankencoinLedgerProvider eventId={event.id} eventTs={event.timestamp}>
-      <EventCard
-        avatar={null}
-        iconColumn={iconSlot}
-        header={
-          <FrankencoinEventHeader
-            actionLabel={
-              ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel
-            }
-            ctx={ctx}
-            timestamp={event.timestamp}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventNumber={eventNumber}
-            flows={event.flows}
-          />
-        }
-        detail={
-          <FrankencoinEventDetail
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            eventId={event.id}
-            timestamp={event.timestamp}
-          />
-        }
-        explainer={
-          <FrankencoinEventExplainer
-            ctx={ctx}
-            txHash={event.txHash}
-            blockNumber={event.blockNumber}
-            timestamp={event.timestamp}
-            eventId={event.id}
-            skipLead
-          />
-        }
-        explainerTeaser={frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read)}
-        txHash={event.txHash}
-        learnMore={<LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />}
-        persistKey={`frankencoin:${event.id}`}
-      />
-    </FrankencoinLedgerProvider>
-  );
+  const actionLabel = ctx.eventType === "auction_settlement" && forcedTx ? "Forced Sale Settlement" : event.actionLabel;
+  const head = useFrankencoinHeadSpec({
+    actionLabel,
+    ctx,
+    timestamp: event.timestamp,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventNumber,
+    flows: event.flows,
+  });
+  const body = useFrankencoinCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    eventId: event.id,
+    timestamp: event.timestamp,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "frankencoin",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head,
+    caption: actionLabel,
+    cells: body.cells,
+    // A ledger row's Collateral and Debt open into their ledgers where the
+    // page ties its timeline to the Lifetime flows panel.
+    ledgers: {
+      provider: (children) => (
+        <FrankencoinLedgerProvider eventId={event.id} eventTs={event.timestamp}>
+          {children}
+        </FrankencoinLedgerProvider>
+      ),
+    },
+    notes: body.notes,
+    // The owner's gas; a challenger's, a bidder's or a buyer's transaction is
+    // theirs.
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices: [] },
+    explainer: {
+      body: (
+        <FrankencoinEventExplainer
+          ctx={ctx}
+          txHash={event.txHash}
+          blockNumber={event.blockNumber}
+          timestamp={event.timestamp}
+          eventId={event.id}
+          skipLead
+        />
+      ),
+      first: frankencoinExplainerTeaser(ctx, coords, event.timestamp, facts, event.txHash, read),
+    },
+    learnMore: <LearnMore inline content={frankencoinLearnMoreContent(ctx, facts, event.txHash, forcedExample)} />,
+  };
+  return <EventCard slots={slots} avatar={null} />;
 }
 
 /** The forced-sale modal's worked example, from the sale's receipt read. */

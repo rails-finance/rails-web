@@ -600,6 +600,7 @@ export function interestSubs(
 export function priceChips(pills: AtBlockPricePill[]): EventPriceChip[] {
   return pills.map((p) => ({
     symbol: p.symbol,
+    address: p.address,
     usd: p.priceUsd,
     info: p.priceProv,
     value: p.display ?? undefined,

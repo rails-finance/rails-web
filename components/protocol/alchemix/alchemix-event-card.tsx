@@ -32,15 +32,16 @@
 // for any of them would attribute a movement the event does not state.
 
 import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
 import { gasPrice } from "@/components/shared/event-price-row";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AlchemixCoords } from "@/lib/alchemix/event-provenance";
-import { AlchemixEventHeader, ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
+import { ALCHEMIX_CAUTION, alchemixHeaderSpec } from "./alchemix-event-header";
 import { chainTruthCaption } from "@/components/shared/chain-truth-event";
-import { AlchemixEventDetail } from "./alchemix-event-detail";
+import { useAlchemixDetail } from "./alchemix-event-detail";
 import {
   AlchemixEventExplainer,
   alchemixOwnerGas,
@@ -172,46 +173,47 @@ export function AlchemixEventCard({
   const header = alchemixHeaderSpec(legs, sibs, mytSymbol, coordsFor, before);
   const tokens = adverse || cautioned || closed ? [] : legs.flatMap((leg) => legTokens(leg, mytSymbol));
 
-  const iconSlot = custodyOnly ? (
-    <SpineColumn tokens={[{ symbol: lead.context.data.syntheticSymbol, badge: "send" }]} isLast={!!isLast} />
-  ) : closed ? (
-    <SpineColumn icon="close" isLast={!!isLast} />
-  ) : adverse || cautioned ? (
-    <SpineColumn
-      icon="warning"
-      // A redemption, force repay, batch liquidation or fee shortfall changes
-      // the position without the owner acting: caution (color-grammar.md §5),
-      // told apart by the pill's word. A liquidation stays critical.
-      warningTone={adverse ? "critical" : "caution"}
-      isLast={!!isLast}
-    />
-  ) : (
-    <SpineColumn tokens={tokens} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = custodyOnly
+    ? { tokens: [{ symbol: lead.context.data.syntheticSymbol, badge: "send" }], isLast: !!isLast }
+    : closed
+      ? { icon: "close", isLast: !!isLast }
+      : adverse || cautioned
+        ? // A redemption, force repay, batch liquidation or fee shortfall
+          // changes the position without the owner acting: caution
+          // (color-grammar.md §5), told apart by the pill's word. A
+          // liquidation stays critical.
+          { icon: "warning", warningTone: adverse ? "critical" : "caution", isLast: !!isLast }
+        : { tokens, isLast: !!isLast };
 
+  const detail = useAlchemixDetail({ legs, mytSymbol, coordsFor });
+  const slots: EventCardSlots = {
+    event: {
+      id: lead.id,
+      family: "alchemix-v3",
+      txHash: lead.txHash,
+      blockNumber: lead.blockNumber,
+      timestamp: lead.timestamp,
+      number: eventNumber,
+      numberLast: eventNumberLast,
+    },
+    spine,
+    head: header,
+    caption: chainTruthCaption(header) ?? "",
+    cells: detail.cells,
+    ledgers: { none: "no flows panel on the Alchemist yet" },
+    notes: detail.notes,
+    price: gasPrice(alchemixOwnerGas(legs)),
+    explainer: {
+      body: <AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />,
+      first: alchemixExplainerTeaser(legs, sibs, prose),
+    },
+    learnMore: <LearnMore inline content={alchemixLearnMoreFor(legs)} />,
+  };
+
+  // No ledgers: the cells stand as rows, as a ledger card's do.
   return (
-    <EventCard
-      avatar={null}
-      iconColumn={iconSlot}
-      caption={chainTruthCaption(header)}
-      header={
-        <AlchemixEventHeader
-          legs={legs}
-          siblings={sibs}
-          mytSymbol={mytSymbol}
-          timestamp={lead.timestamp}
-          eventNumber={eventNumber}
-          eventNumberLast={eventNumberLast}
-          coordsFor={coordsFor}
-        />
-      }
-      detail={<AlchemixEventDetail legs={legs} mytSymbol={mytSymbol} coordsFor={coordsFor} />}
-      explainer={<AlchemixEventExplainer legs={legs} siblings={sibs} skipLead prose={prose} />}
-      price={gasPrice(alchemixOwnerGas(legs))}
-      explainerTeaser={alchemixExplainerTeaser(legs, sibs, prose)}
-      txHash={lead.txHash}
-      learnMore={<LearnMore inline content={alchemixLearnMoreFor(legs)} />}
-      persistKey={`alchemix-v3:${lead.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }

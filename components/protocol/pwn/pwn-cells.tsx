@@ -1,15 +1,20 @@
 "use client";
 
-// PWN event detail (chain-state tier) — adapter onto the shared ChainTruthDetail
-// grid. A PWN loan's economics are FIXED at creation and don't accrue, so unlike
+// PWN's T2 (ui-jobs 309 step 8): the card's `cells` and `notes` slots.
+// Collateral (and on a flow row Debt, each opening into its ledger), the
+// credit principal, the repay total and the deadline before → after; the
+// fixed or accruing interest stands as a note. A PWN loan's economics are FIXED at creation and don't accrue, so unlike
 // Spark/Comet there is no before→after replay: every event shows the loan's fixed
 // terms — the collateral and where it stands after this event, the credit
 // principal, the repay total — each traced via <Prov>. The creation adds the
 // fixed interest and its rate; an extension shows the deadline it moved.
 // Current-debt-with-interest, USD, HF are absent by construction.
 
+import type { ReactNode } from "react";
 import type { PwnContext } from "@/lib/shared/types/event-shape";
-import { ChainTruthDetail, type ChainTruthStat } from "@/components/shared/chain-truth-event";
+import type { ChainTruthStat } from "@/components/shared/chain-truth-event";
+import { StatNotes, useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
+import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 import { usePwnLedgerPending, usePwnLedgerSides } from "./pwn-ledger";
 import {
@@ -32,7 +37,7 @@ import { formatDate } from "@/lib/date";
 import { shortTokenId } from "@/lib/pwn/asset-catalog";
 import type { PwnEvent } from "@/lib/pwn/explainer-clauses";
 
-export interface PwnEventDetailProps {
+export interface PwnCellsProps {
   ctx: PwnContext;
   txHash?: string;
   blockNumber?: number;
@@ -83,7 +88,10 @@ const STATE_LABEL: Record<CollateralState, string> = {
   closed: "Collateral · none (loan closed)",
 };
 
-export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId }: PwnEventDetailProps) {
+export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId }: PwnCellsProps): {
+  cells: EventCellSpec[];
+  notes: ReactNode;
+} {
   const coords: PwnCoords = { txHash, blockNumber, loanId: ctx.loanId, version: ctx.version };
   const isNft = ctx.collateralCategory === "ERC721" || ctx.collateralCategory === "ERC1155";
   const seized = ctx.eventType === "claimed" && ctx.defaulted === true;
@@ -265,25 +273,53 @@ export function PwnEventDetail({ ctx, txHash, blockNumber, timestamp, siblings =
       });
   }
 
-  // An extension: the deadline before and after.
+  // An extension: the deadline before → after, in one cell.
   if (ctx.eventType === "extended" && ctx.extendedDefaultTimestamp != null) {
-    if (ctx.originalDefaultTimestamp != null)
-      stats.push({
-        label: "Deadline · before",
-        value: utcMinute(ctx.originalDefaultTimestamp),
-        display: formatDate(Number(ctx.originalDefaultTimestamp)),
-        symbol: "",
-        prov: extendedDeadlineProv(coords),
-        changed: false,
-      });
+    const was = ctx.originalDefaultTimestamp;
+    const added = was != null ? Number(ctx.extendedDefaultTimestamp) - Number(was) : null;
     stats.push({
-      label: "Deadline · after",
+      label: "Deadline",
       value: utcMinute(ctx.extendedDefaultTimestamp),
       display: formatDate(Number(ctx.extendedDefaultTimestamp)),
       symbol: "",
       prov: extendedDeadlineProv(coords),
+      ...(was != null && added != null && added !== 0
+        ? {
+            transition: {
+              before: formatDate(Number(was)),
+              beforeExact: utcMinute(was),
+              beforeProv: extendedDeadlineProv(coords),
+              change: `${added > 0 ? "+" : "−"}${minutesText(Math.abs(added) / 60)}`,
+              changeExact: `${added > 0 ? "+" : "−"}${Math.abs(added)} s`,
+              changeProv: extendedDeadlineProv(coords),
+              shownAsIs: true,
+            },
+          }
+        : {}),
     });
   }
 
-  return <ChainTruthDetail stats={stats} />;
+  // The cells: Collateral (and Debt), the credit principal, the repay total,
+  // the deadline; the interest lines are notes.
+  const keyOf = (label: string): string | null =>
+    label.startsWith("Collateral")
+      ? "collateral"
+      : label === "Debt"
+        ? "debt"
+        : label === "Credit · principal"
+          ? "credit"
+          : label.startsWith("Repa") || label.startsWith("Owed")
+            ? "repay"
+            : label.startsWith("Deadline")
+              ? "deadline"
+              : null;
+  const cellStats: ChainTruthCellStat[] = [];
+  const notes: ChainTruthStat[] = [];
+  for (const st of stats) {
+    const key = keyOf(st.label);
+    if (key && !cellStats.some((c) => c.key === key)) cellStats.push({ ...st, key });
+    else notes.push(st);
+  }
+  const cells = useChainTruthCells(cellStats);
+  return { cells, notes: notes.length > 0 ? <StatNotes stats={notes} /> : undefined };
 }

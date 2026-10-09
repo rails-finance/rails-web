@@ -29,6 +29,7 @@ import type {
   FrankencoinEventType,
 } from "@/lib/shared/types/event-shape";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { firstLogOfTx, gasOnFirstRow } from "@/lib/shared/index-gas";
 
 export interface FrankencoinTimelineResult {
   /** Lowercased Position contract address. */
@@ -246,6 +247,8 @@ export function buildFrankencoinTimeline(
   }
   for (const list of handovers.values()) list.sort((a, b) => a.log_index - b.log_index);
 
+  // The transaction's gas on its first row (lib/shared/index-gas.ts).
+  const firstLog = firstLogOfTx(rows);
   const events: BaseActivityEvent[] = rows.map((r, idx) => {
     const tx = r.tx_hash.startsWith("0x") ? r.tx_hash : `0x${r.tx_hash}`;
     // The wire spells it "V1"/"V2" (and `hub` is the hub ADDRESS — a
@@ -436,6 +439,7 @@ export function buildFrankencoinTimeline(
       blockNumber: Number(r.block_number),
       timestamp: Number(r.block_timestamp),
       wallet: r.owner ? r.owner.toLowerCase() : position,
+      ...gasOnFirstRow(r, firstLog),
       etherscanUrl: explorerUrl(MAINNET_CHAIN_ID, "tx-logs", tx),
       actionType: kind,
       actionLabel: initialization ? "Owner Set at Mint" : (compositeAdjustLabel ?? LABELS[kind] ?? kind),
