@@ -241,6 +241,36 @@ const FAMILIES = {
       "components/protocol/spark/spark-event-card.tsx",
     ],
   },
+  moonwell: {
+    generator: "lib/moonwell/event-prose.ts",
+    loader: "lib/moonwell/event-templates.ts",
+    entry: "export function moonwellEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "moonwell",
+    fallback: "moonwell.fallback",
+    builtVariants: () => [],
+    wordConsts: { MOONWELL_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/moonwell/event-prose.ts",
+      "lib/moonwell/event-templates.ts",
+      "components/protocol/moonwell/moonwell-event-explainer.tsx",
+      "components/protocol/moonwell/moonwell-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/moonwell/moonwell-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/moonwell/event-prose.ts",
+      "lib/moonwell/event-templates.ts",
+      "lib/moonwell/position-nodes.tsx",
+      "components/protocol/moonwell/moonwell-event-explainer.tsx",
+      "components/protocol/moonwell/moonwell-event-card.tsx",
+    ],
+  },
 };
 
 /** The engine every family runs on: no prose either. */

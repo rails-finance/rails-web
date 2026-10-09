@@ -27,7 +27,7 @@ import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
-import { moonwellPositionContent, type MoonwellPositionDeployment } from "@/lib/moonwell/position-content";
+import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
 import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
@@ -337,10 +337,6 @@ export function MoonwellPositionCard({
   // headline's receipts.
   const dep = useMoonwellDeployment();
   const session = dep.session;
-  // The "?" cell every state panel owns — the same content function serves
-  // Moonwell on Ethereum and on Base; only the deployment named by the
-  // card's own session changes the prose (roster size, separate-deployment note).
-  const positionDeployment: MoonwellPositionDeployment = session === "moonwell-base" ? "base" : "ethereum";
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
   const vc: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => isEntered(v, r.address)) };
@@ -386,12 +382,7 @@ export function MoonwellPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={moonwellPositionContent({
-          status: v.status,
-          deployment: positionDeployment,
-          liquidations: v.liquidations,
-          liquidationCount: v.liquidationCount,
-        })}
+        learnMore={moonwellPositionModal(v.status)}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -470,11 +461,7 @@ export function MoonwellPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={moonwellPositionContent({
-        status: v.status,
-        deployment: positionDeployment,
-        hasDebt: v.borrows.length > 0,
-      })}
+      learnMore={moonwellPositionModal(v.status, v.borrows.length > 0)}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

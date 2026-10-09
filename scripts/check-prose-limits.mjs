@@ -125,6 +125,7 @@ const Z1_STRINGS = {
   compound: { section: "position_words", ids: null, figures: "placeholders" },
   "compound-v2": { section: "position_words", ids: null, figures: "placeholders" },
   spark: { section: "position_words", ids: null, figures: "placeholders" },
+  moonwell: { section: "position_words", ids: null, figures: "placeholders" },
 };
 const z1Ids = (family, d) => {
   const z = Z1_STRINGS[family];

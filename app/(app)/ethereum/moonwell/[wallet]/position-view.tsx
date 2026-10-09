@@ -542,7 +542,6 @@ export default function MoonwellPositionView({
                       <MoonwellPositionExplanation
                         chain={chain}
                         captions={captions}
-                        txCount={liveView.txCount}
                         liquidationCount={liveView.liquidationCount}
                         externalActivity={externalActivity}
                       />

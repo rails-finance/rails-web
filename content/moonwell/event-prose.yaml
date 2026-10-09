@@ -1,0 +1,896 @@
+# Moonwell prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a Moonwell account, on Ethereum and on
+# Base. The page reads this file and nothing else; the code chooses which
+# strings to say and fills their figures (lib/moonwell/event-prose.ts for an
+# event, components/protocol/moonwell/moonwell-position-explanation.tsx for the
+# position card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  number: |-
+    a token amount as the site prints it (113.438, 44,912.562)
+  usd: |-
+    whole dollars ($4,490)
+  pct_plain: |-
+    a fraction as a percent, up to two places (0.078 → 7.8%)
+  hf: |-
+    a health factor as the card prints it (1.0848, 2.60, >100)
+  count: |-
+    a whole number, grouped (1,204)
+  date: |-
+    a UTC day (1 Sep 2025)
+  address: |-
+    an address, shortened and linked to the explorer
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  amount:
+    rounding: number
+    means: |-
+      the underlying tokens the event moved, as the header prints it
+  symbol:
+    rounding: text
+    means: |-
+      the market's underlying symbol
+  mtokens:
+    rounding: number
+    means: |-
+      the mTokens the event minted, burned or moved
+  msymbol:
+    rounding: text
+    means: |-
+      the market's mToken label
+  repaid:
+    rounding: number
+    means: |-
+      the debt the liquidator repaid
+  seized:
+    rounding: number
+    means: |-
+      the collateral mTokens the liquidator seized
+  coll_msymbol:
+    rounding: text
+    means: |-
+      the seized market's mToken label
+  sender:
+    rounding: address
+    means: |-
+      the wallet that sent a liquidation's transaction
+  liquidator:
+    rounding: address
+    means: |-
+      the account that called the liquidation
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  hf:
+    rounding: hf
+    means: |-
+      the account's health factor now
+  supplied_usd:
+    rounding: usd
+    means: |-
+      the supplied markets at the Comptroller's oracle prices now
+  borrowed_usd:
+    rounding: usd
+    means: |-
+      the borrowed markets at the Comptroller's oracle prices now
+  syms:
+    rounding: text
+    means: |-
+      the markets, named
+  count:
+    rounding: count
+    means: |-
+      how many markets there are
+  shortfall_usd:
+    rounding: usd
+    means: |-
+      the debt the collateral no longer covers
+  liquidity_usd:
+    rounding: usd
+    means: |-
+      the borrowing power the account has not used
+  drop:
+    rounding: pct_plain
+    means: |-
+      how far the collateral basket can fall before liquidation
+  rate:
+    rounding: pct_plain
+    means: |-
+      the variable borrow rate a year
+  liq_count:
+    rounding: count
+    means: |-
+      the liquidations over the account's life
+  time_word:
+    rounding: text
+    means: |-
+      time or times
+  lead:
+    rounding: text
+    means: |-
+      the words that open the operator bullet, naming the events it counts
+  external:
+    rounding: count
+    means: |-
+      the events another address executed
+  were:
+    rounding: text
+    means: |-
+      was or were
+  peak_supply:
+    rounding: number
+    means: |-
+      the most each market supplied over the account's life, as the card prints it
+  peak_debt:
+    rounding: number
+    means: |-
+      the most each market owed over the account's life, as the card prints it
+  closed_on:
+    rounding: date
+    means: |-
+      the day the account's record closed
+  tx_count:
+    rounding: count
+    means: |-
+      the account's transactions
+  tx_word:
+    rounding: text
+    means: |-
+      transaction or transactions
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  the_asset: |-
+    the asset
+  and: |-
+    and
+  was: |-
+    was
+  were: |-
+    were
+  tx_one: |-
+    transaction
+  tx_many: |-
+    transactions
+  time_one: |-
+    time
+  time_many: |-
+    times
+  more_one: |-
+    more market
+  more_many: |-
+    more markets
+  operator_where: |-
+    on this account's timeline
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk, Rate and History when two of them hold two or more
+# bullets. Risk holds at most four: the shortfall or the unused borrowing power,
+# and the fall to liquidation. The health factor stands in the lead. A closed
+# account carries the lead and History.
+# Read by positionWords / positionNodes (lib/moonwell/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── An open account ──
+  lead_shortfall: |-
+    The Comptroller reports a shortfall, so the account can be liquidated now:
+  lead_debt: |-
+    The account borrows against its supplied collateral, held at a {hf} health factor:
+  lead_debt_unread: |-
+    The account borrows against its supplied collateral:
+  lead_supply: |-
+    The account supplies collateral to Moonwell and owes nothing:
+  lead_earn: |-
+    The account supplies to Moonwell to earn, with nothing entered as collateral:
+  totals_both: |-
+    The supplied markets are worth {supplied_usd} and the borrowed markets {borrowed_usd}.
+  totals_supplied: |-
+    The supplied markets are worth {supplied_usd}.
+  totals_borrowed: |-
+    The borrowed markets are worth {borrowed_usd}.
+  unentered: |-
+    The {syms} supply is not entered as collateral, so it backs no borrowing.
+  unentered_many: |-
+    The supply in {count} markets is not entered as collateral, so it backs no borrowing.
+  shortfall: |-
+    The shortfall is {shortfall_usd}, the debt the collateral no longer covers.
+  capacity: |-
+    {liquidity_usd} of borrowing power is still unused.
+  drop: |-
+    The collateral basket can fall about {drop} before the account is liquidatable.
+  rate: |-
+    The debt accrues at a {rate} borrow rate.
+  rate_avg: |-
+    The debts accrue at a {rate} average borrow rate.
+  liquidated: |-
+    It has been liquidated {liq_count} {time_word} and remains open.
+  operators: |-
+    {lead}{external} {were} executed by an address other than the owner's.
+  # ── A closed account ──
+  closed_lead: |-
+    This account ran its course and closed, with nothing left supplied or borrowed:
+  peaks_both: |-
+    At its height it held {peak_supply} supplied and owed {peak_debt}.
+  peaks_supply: |-
+    At its height it held {peak_supply} supplied.
+  peaks_debt: |-
+    At its height it owed {peak_debt} and held no lasting supply.
+  liquidated_closed: |-
+    It was liquidated {liq_count} {time_word}.
+  closure: |-
+    Its record closed on {closed_on}, after {tx_count} {tx_word}.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  stake.empty:
+    when: |-
+      the event left no mTokens in the market
+    text: |-
+      That empties the position's stake in this market.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: moonwell.mint
+    title: |-
+      Supply
+    when: |-
+      mint
+    L5: supply
+    variants:
+      default: |-
+        always
+    sentences:
+      mint.what:
+        when: |-
+          always
+        text: |-
+          Supplied {amount} {symbol} to Moonwell's {symbol} market, minting {mtokens} {msymbol} in return.
+      mint.router:
+        when: |-
+          the deposit went through the WETH Router
+        text: |-
+          The deposit came in as native ETH through Moonwell's WETH Router, which wraps it to WETH.
+    order:
+      - mint.what
+      - mint.router
+    groups:
+      happened: [mint.what, mint.router]
+
+  - id: moonwell.redeem
+    title: |-
+      Withdraw
+    when: |-
+      redeem
+    L5: withdraw
+    variants:
+      partial: |-
+        the position still holds mTokens in the market
+      empty: |-
+        the withdrawal emptied the market
+    sentences:
+      redeem.what:
+        when: |-
+          always
+        text: |-
+          Withdrew {amount} {symbol} from the {symbol} market, burning {mtokens} {msymbol}.
+    order:
+      - redeem.what
+      - stake.empty
+    groups:
+      happened: [redeem.what]
+      leaves: [stake.empty]
+
+  - id: moonwell.borrow
+    title: |-
+      Borrow
+    when: |-
+      borrow
+    L5: borrow
+    variants:
+      first: |-
+        the position's first debt in this market
+      more: |-
+        the market already held debt
+    sentences:
+      borrow.what_first:
+        when: |-
+          first
+        text: |-
+          Borrowed {amount} {symbol} against the account's supplied collateral, the position's first debt in this market.
+      borrow.what:
+        when: |-
+          more
+        text: |-
+          Borrowed {amount} {symbol} against the account's supplied collateral.
+    order:
+      - borrow.what_first
+      - borrow.what
+    groups:
+      happened: [borrow.what_first, borrow.what]
+    alternates:
+      - [borrow.what_first, borrow.what]
+
+  - id: moonwell.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: repay
+    variants:
+      partial: |-
+        some of the market's debt remains
+      full: |-
+        the repayment cleared the market's debt
+    sentences:
+      repay.what:
+        when: |-
+          always
+        text: |-
+          Repaid {amount} {symbol} of the {symbol} debt.
+      repay.external:
+        when: |-
+          another address paid
+        text: |-
+          Another address paid this repayment for the owner.
+      repay.cleared:
+        when: |-
+          full
+        text: |-
+          That clears the {symbol} debt in full.
+    order:
+      - repay.what
+      - repay.external
+      - repay.cleared
+    groups:
+      happened: [repay.what, repay.external]
+      leaves: [repay.cleared]
+
+  - id: moonwell.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation
+    L5: liquidation
+    variants:
+      default: |-
+        always
+    sentences:
+      liq.what:
+        when: |-
+          the row carries the seized mTokens
+        text: |-
+          A liquidator repaid {repaid} {symbol} of the account's debt and seized {seized} {coll_msymbol} of collateral.
+      liq.what_debt:
+        when: |-
+          the row does not carry the seized mTokens
+        text: |-
+          A liquidator repaid {repaid} {symbol} of the account's debt.
+      liq.why:
+        when: |-
+          always
+        text: |-
+          The account's debt had outgrown what its collateral covers, so anyone could liquidate it.
+      liq.sender:
+        when: |-
+          the wallet that sent the transaction is not the liquidator
+        text: |-
+          The wallet {sender} sent the transaction through the contract {liquidator}, which is the liquidator.
+      liq.bot:
+        when: |-
+          the liquidator signed the transaction
+        text: |-
+          The liquidator {liquidator} is a third party, typically an automated bot.
+    order:
+      - liq.what
+      - liq.what_debt
+      - liq.why
+      - liq.sender
+      - liq.bot
+    groups:
+      happened: [liq.what, liq.what_debt, liq.why, liq.sender, liq.bot]
+    alternates:
+      - [liq.what, liq.what_debt]
+      - [liq.sender, liq.bot]
+
+  - id: moonwell.transfer_in
+    title: |-
+      Transfer in
+    when: |-
+      transfer_in
+    L5: transfer_in
+    variants:
+      default: |-
+        always
+    sentences:
+      transfer_in.what:
+        when: |-
+          always
+        text: |-
+          Received {mtokens} {msymbol}, the market's receipt token, from another wallet.
+    order:
+      - transfer_in.what
+    groups:
+      happened: [transfer_in.what]
+
+  - id: moonwell.transfer_out
+    title: |-
+      Transfer out
+    when: |-
+      transfer_out to another wallet
+    L5: transfer_out
+    variants:
+      partial: |-
+        the position still holds mTokens in the market
+      empty: |-
+        the transfer emptied the market
+    sentences:
+      transfer_out.what:
+        when: |-
+          always
+        text: |-
+          Sent {mtokens} {msymbol}, the market's receipt token, to another wallet.
+    order:
+      - transfer_out.what
+      - stake.empty
+    groups:
+      happened: [transfer_out.what]
+      leaves: [stake.empty]
+
+  - id: moonwell.protocol_share
+    title: |-
+      Liquidation share
+    when: |-
+      transfer_out to the market's contract
+    L5: liquidation
+    variants:
+      default: |-
+        always
+    sentences:
+      share.what:
+        when: |-
+          always
+        text: |-
+          The market took {mtokens} {msymbol}, the protocol's share of a liquidation's seized collateral.
+    order:
+      - share.what
+      - stake.empty
+    groups:
+      happened: [share.what]
+      leaves: [stake.empty]
+
+  - id: moonwell.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The account recorded a {event_type} event.
+    order:
+      - fallback.what
+    groups:
+      happened: [fallback.what]
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  CORE: |-
+    https://docs.moonwell.fi/moonwell/developers/protocol
+  SUPPLY: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/lend/supply
+  WITHDRAW_LIQUIDITY: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/lend/withdraw#checking-available-liquidity
+  BORROW_HOW: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/how-to-borrow
+  BORROW_RATES: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/borrow-faq#are-interest-rates-stable
+  REPAY_STRUCTURE: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/loan-repayment#loan-structure
+  REPAY_INTEREST: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/loan-repayment#accrued-interest-impact
+  CREDIT_LIMIT: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/credit-and-liquidations#understanding-credit-limit
+  CREDIT_REMAINING: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/credit-and-liquidations#understanding-credit-remaining
+  AVOID_LIQUIDATION: |-
+    https://docs.moonwell.fi/moonwell/moonwell-overview/borrow/credit-and-liquidations#avoiding-liquidation
+  CLOSE_FACTOR: |-
+    https://docs.moonwell.fi/moonwell/protocol-information/protocol-information#close-factor
+  LIQUIDATION_INCENTIVE: |-
+    https://docs.moonwell.fi/moonwell/protocol-information/protocol-information#liquidation-incentive
+  COLLATERAL_FACTOR: |-
+    https://docs.moonwell.fi/moonwell/protocol-information/protocol-information#collateral-factor
+  MTOKENS: |-
+    https://docs.moonwell.fi/moonwell/developers/protocol/mtokens
+  COMPTROLLER: |-
+    https://docs.moonwell.fi/moonwell/developers/protocol/comptroller#responsibilities
+
+# ── The "?" modals (zone Z4): the event modals and the position card's. Each
+# stops at the mechanism and hands it to a Quick Link; no figure of one account
+# appears here. ──
+L5:
+  supply:
+    title: |-
+      How Supplying Works
+    intro: |-
+      Supplying deposits an asset into a Moonwell market and mints mTokens, a transferable receipt, in exchange. The deposit earns the market's supply rate.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          mTokens
+        text: |-
+          each market's mToken is a receipt whose exchange rate with the underlying grows as interest accrues, so the same balance redeems for more.
+      - bold: |-
+          Entering a market
+        text: |-
+          a supply backs borrowing only once its market is entered as collateral; the owner can enter or leave a market.
+      - bold: |-
+          Transferable positions
+        text: |-
+          mTokens are ERC-20s, so sending them moves the deposit and its collateral role with no mint or redeem.
+    links:
+      - label: |-
+          Supply
+        doc: SUPPLY
+      - label: |-
+          mTokens
+        doc: MTOKENS
+      - label: |-
+          Market membership
+        doc: COMPTROLLER
+
+  withdraw:
+    title: |-
+      How Withdrawing Works
+    intro: |-
+      Withdrawing burns mTokens and returns the underlying asset to the wallet, as far as the market has liquidity and the remaining collateral covers any debt.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidity
+        text: |-
+          a withdrawal needs that much of the asset unborrowed in the market; when utilisation is high it waits for repayments or new supply.
+      - bold: |-
+          Effect on credit
+        text: |-
+          withdrawing collateral lowers the credit limit, and the Comptroller blocks a withdrawal that would leave debt uncovered.
+    links:
+      - label: |-
+          Checking available liquidity
+        doc: WITHDRAW_LIQUIDITY
+      - label: |-
+          Credit limit
+        doc: CREDIT_LIMIT
+
+  borrow:
+    title: |-
+      How Borrowing Works
+    intro: |-
+      Borrowing draws an asset against the account's supplied collateral. The debt accrues interest continuously, so it grows between events.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Credit limit
+        text: |-
+          the sum of each entered market's supply in dollars times its collateral factor; the account can borrow up to it.
+      - bold: |-
+          Credit remaining
+        text: |-
+          the credit limit less the debt; at zero the account becomes liquidatable.
+      - bold: |-
+          Interest rates
+        text: |-
+          borrow rates follow market demand along a curve that governance sets, so they change in real time.
+      - bold: |-
+          The emitted debt figure
+        text: |-
+          each borrow and repay event carries the borrower's total debt after it, interest included to that moment.
+    links:
+      - label: |-
+          How to borrow
+        doc: BORROW_HOW
+      - label: |-
+          Credit remaining
+        doc: CREDIT_REMAINING
+      - label: |-
+          Are interest rates stable?
+        doc: BORROW_RATES
+
+  repay:
+    title: |-
+      How Repaying Works
+    intro: |-
+      Repaying returns the borrowed asset to the market, clearing debt and restoring the account's borrowing headroom.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          No fixed term
+        text: |-
+          a loan has no maturity date; it stays open while the credit remaining stays above zero.
+      - bold: |-
+          Accrued interest
+        text: |-
+          interest keeps accruing between events, so a gap between the debt after one event and before the next is accrued interest.
+      - bold: |-
+          Anyone may repay
+        text: |-
+          any address can repay an account's debt, the one thing a third party can do for an account unasked.
+    links:
+      - label: |-
+          Loan structure
+        doc: REPAY_STRUCTURE
+      - label: |-
+          Accrued interest
+        doc: REPAY_INTEREST
+
+  liquidation:
+    title: |-
+      How Liquidations Work
+    intro: |-
+      A Moonwell account becomes liquidatable when its credit remaining reaches zero: the debt is no longer covered by the collateral-factor-weighted supply. Anyone, in practice automated bots, can then liquidate it.
+    extraParagraphs:
+      - |-
+        A liquidator repays part of one debt, at most the close factor of 50%, and seizes mTokens worth the repaid debt plus a 10% incentive. The incentive is 7% for the liquidator and 3% for the market's reserves.
+      - |-
+        A liquidation is partial and repeatable: each one repays at most half of one debt, nudging the account back toward solvency.
+    links:
+      - label: |-
+          Avoiding liquidation
+        doc: AVOID_LIQUIDATION
+      - label: |-
+          Close factor
+        doc: CLOSE_FACTOR
+      - label: |-
+          Liquidation incentive
+        doc: LIQUIDATION_INCENTIVE
+
+  transfer_in:
+    title: |-
+      How Receiving mTokens Works
+    intro: |-
+      mTokens are ordinary ERC-20 tokens, so a Moonwell deposit can change hands without touching the market. Receiving them hands the underlying claim, and its collateral role, to the recipient.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The claim moves with the token
+        text: |-
+          the recipient's mToken balance times the exchange rate becomes their underlying claim; no mint or redeem event fires.
+      - bold: |-
+          Positions can start here
+        text: |-
+          a wallet that never supplied can still hold a position, because received mTokens are a deposit like any other.
+    links:
+      - label: |-
+          mTokens
+        doc: MTOKENS
+
+  transfer_out:
+    title: |-
+      How Sending mTokens Works
+    intro: |-
+      mTokens are ordinary ERC-20 tokens, so a Moonwell deposit can change hands without touching the market. Sending them hands the underlying claim, and its collateral role, to the recipient.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The claim moves with the token
+        text: |-
+          the sender gives up the underlying claim its mToken balance represents; no mint or redeem event fires.
+      - bold: |-
+          Debt stays covered
+        text: |-
+          the Comptroller blocks a transfer that would leave the sender's debt uncovered, so collateral cannot walk away from a borrow.
+    links:
+      - label: |-
+          mTokens
+        doc: MTOKENS
+      - label: |-
+          Market membership
+        doc: COMPTROLLER
+
+  fallback:
+    title: |-
+      How Moonwell Positions Work
+    intro: |-
+      Moonwell is a Compound-V2-compatible lending protocol: a wallet supplies assets into mToken markets and borrows against them, and the Comptroller pools everything into one account.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          mTokens
+        text: |-
+          each market's receipt token, whose exchange rate with the underlying grows as interest accrues.
+      - bold: |-
+          Borrowing and credit
+        text: |-
+          borrowing draws against the collateral-factor-weighted supply; credit remaining measures the headroom, and zero means liquidatable.
+    links:
+      - label: |-
+          Moonwell Core
+        doc: CORE
+      - label: |-
+          Credit limit
+        doc: CREDIT_LIMIT
+
+  position_open:
+    title: |-
+      About This Position
+    intro: |-
+      A Moonwell position is one wallet's account under a Comptroller: what it supplied, what it borrowed against that, and how safely the debt is covered.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One account per wallet
+        text: |-
+          the Comptroller pools every entered market, so supply in one market backs borrowing in another.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the credit limit, each entered market's supply times its collateral factor, less the debt; a negative figure is a shortfall, and anyone can liquidate.
+      - bold: |-
+          Health factor
+        text: |-
+          the credit limit divided by the debt; at 1 the shortfall begins.
+      - bold: |-
+          Entering a market
+        text: |-
+          a supply backs borrowing only once its market is entered; a supply that is not entered still earns.
+      - bold: |-
+          Other addresses
+        text: |-
+          a third party can repay an account's debt or send it mTokens unasked; supplying, borrowing and redeeming act only for the caller.
+    links:
+      - label: |-
+          Credit and liquidations
+        doc: AVOID_LIQUIDATION
+      - label: |-
+          Collateral factor
+        doc: COLLATERAL_FACTOR
+      - label: |-
+          Comptroller
+        doc: COMPTROLLER
+
+  position_supply:
+    title: |-
+      About This Position
+    intro: |-
+      A Moonwell position is one wallet's account under a Comptroller. This one supplies assets and owes nothing, so there is nothing to liquidate.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Entering a market
+        text: |-
+          a supply backs borrowing only once its market is entered; a supply that is not entered still earns.
+      - bold: |-
+          mTokens
+        text: |-
+          each market's receipt token, whose exchange rate with the underlying grows as interest accrues.
+      - bold: |-
+          Credit limit
+        text: |-
+          the sum of each entered market's supply times its collateral factor, the most the account could borrow.
+    links:
+      - label: |-
+          Supply
+        doc: SUPPLY
+      - label: |-
+          Credit limit
+        doc: CREDIT_LIMIT
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      This account has repaid all its debt and withdrawn its supply. The panel above shows the highest supply and debt each market reached.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each market's peak is the maximum of its running balance, replayed from the account's events.
+      - bold: |-
+          mTokens
+        text: |-
+          each market's receipt token, whose exchange rate with the underlying grows as interest accrues.
+    links:
+      - label: |-
+          Moonwell Core
+        doc: CORE
+      - label: |-
+          mTokens
+        doc: MTOKENS
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above shows the highest supply and debt each market reached.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each market's peak is the maximum of its running balance, replayed from the account's events.
+      - bold: |-
+          Partial and repeatable
+        text: |-
+          each liquidation repays at most half of one debt, so an account often survives one and closes later.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the credit limit less the debt; a negative figure is a shortfall and anyone can liquidate the account.
+    links:
+      - label: |-
+          Avoiding liquidation
+        doc: AVOID_LIQUIDATION
+      - label: |-
+          Close factor
+        doc: CLOSE_FACTOR

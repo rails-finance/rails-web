@@ -646,7 +646,6 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                           <MoonwellPositionExplanation
                             chain={data}
                             captions={captions}
-                            txCount={view.txCount}
                             liquidationCount={view.liquidationCount}
                             externalActivity={externalActivity}
                           />
