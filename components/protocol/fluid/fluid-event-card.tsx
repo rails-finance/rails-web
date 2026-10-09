@@ -167,7 +167,12 @@ export function FluidEventCard({ event, isLast, eventNumber, siblings, openedBy 
     spine,
     head,
     caption: headLabel,
-    actor: { by: extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined },
+    actor: {
+      by: extBy ?? (ctx.eventType === "liquidated" ? ctx.liquidator : undefined) ?? undefined,
+      // The transaction-sender test, the NFT's mint and transfer among the
+      // kinds (ui-jobs 304).
+      sent: { txFrom: ctx.txFrom ?? openedBy?.context.data.txFrom, caller: ctx.initiator, owner },
+    },
     cells: body.cells,
     // The Collateral and Debt cells open into their ledgers where the page
     // ties its timeline to the Lifetime flows panel.

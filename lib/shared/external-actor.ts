@@ -21,6 +21,26 @@ export function externalActor(ctx: { txFrom?: string; poolCaller?: string }, wal
   return ctx.txFrom;
 }
 
+/** The facts the transaction-sender test reads. */
+export interface SentFacts {
+  txFrom?: string | null;
+  /** The event's party param, where its log names one. */
+  caller?: string | null;
+  owner?: string | null;
+}
+
+/** The transaction-sender test the event card's spine runs (rails-ops
+ *  ui-jobs 304): another account sent the transaction, and the event's
+ *  caller, where its log names one, is not the owner either. With a caller
+ *  it is `externalActor`'s verdict; without one the sender decides. Absent
+ *  facts judge nothing. */
+export function sentByOther(f: SentFacts | undefined): boolean {
+  if (!f?.txFrom || !f.owner) return false;
+  const owner = f.owner.toLowerCase();
+  if (f.txFrom.toLowerCase() === owner) return false;
+  return !f.caller || f.caller.toLowerCase() !== owner;
+}
+
 /** Who has been acting on a position, across its whole history. */
 export interface ExternalActorSummary {
   /** Rows considered — the position's loaded event history. */

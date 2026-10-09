@@ -166,7 +166,8 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
       feeOf,
     }),
     caption: event.actionLabel,
-    actor: { by: extBy ?? undefined },
+    // A transfer received: the sender acted (ui-jobs 304).
+    actor: { by: extBy ?? undefined, byOwner: isTransfer && kind === "transfer_in" ? false : undefined },
     cells: body.cells,
     cellsData: body.cellsData,
     ledgers: stateMarket

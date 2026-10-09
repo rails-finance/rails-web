@@ -34,6 +34,7 @@ import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
+import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -81,8 +82,13 @@ export interface EventCardActor {
    *  a queue fill). */
   byOwner?: boolean;
   /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
-   *  "Received from 0x…". */
+   *  "Received from 0x…". A receipt draws the spine dotted: the sender
+   *  acted. */
   custody?: { dir: "to" | "from"; address: string };
+  /** The transaction's sender, the event's caller where its log names one,
+   *  and the owner it is judged against: the spine runs dotted where
+   *  another account sent it (`sentByOther`, rails-ops ui-jobs 304). */
+  sent?: SentFacts;
 }
 
 /** The family's ledgers (T2.1): the provider the opened cells read, or the
@@ -232,6 +238,7 @@ interface EventCardDrawn {
   by?: string;
   byOwner?: boolean;
   custody?: EventCardActor["custody"];
+  sent?: SentFacts;
 }
 
 export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
@@ -276,6 +283,7 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
     by: actor?.by,
     byOwner: actor?.byOwner,
     custody: actor?.custody,
+    sent: actor?.sent,
   };
 }
 
@@ -320,6 +328,7 @@ export function EventCard(props: EventCardProps) {
     by,
     byOwner,
     custody,
+    sent,
   } = drawn;
   const { ledgers, onIntent, onOpen } = props.slots;
   const scale = useTimelineScale();
@@ -532,9 +541,10 @@ export function EventCard(props: EventCardProps) {
       ? () => ((isPhoneViewport() && inTimeline ? phoneToggles : showChevron) ? toggleDetail() : undefined)
       : null,
   );
-  // Not actioned by the owner (another actor named, or the card says so):
-  // the spine runs dotted below the node (mobile decision 18).
-  const actedByOwner = byOwner ?? !by;
+  // Not actioned by the owner (another actor named, a receipt from another
+  // account, a transaction another account sent, or the card says so): the
+  // spine runs dotted below the node (mobile decision 18; ui-jobs 304).
+  const actedByOwner = byOwner ?? !(by || custody?.dir === "from" || sentByOther(sent));
   const rowSlot = useMemo(
     () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget, byOwner: actedByOwner }),
     [inTimeline, legsId, rowTarget, actedByOwner],

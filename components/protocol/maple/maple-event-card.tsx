@@ -150,7 +150,8 @@ export function MapleEventCard({ event, isLast, eventNumber, times }: MapleEvent
     caption: isTransfer ? TRANSFER_LABEL[kind as keyof typeof TRANSFER_LABEL] : event.actionLabel,
     actor: {
       by: extBy ?? undefined,
-      byOwner: ctx.eventType === "request_fill" ? false : undefined,
+      // A queue fill, and a transfer received: the sender acted (ui-jobs 304).
+      byOwner: ctx.eventType === "request_fill" || kind === "transfer_in" ? false : undefined,
       custody:
         ctx.counterparty && (kind === "transfer_in" || kind === "transfer_out")
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }

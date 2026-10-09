@@ -103,6 +103,8 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
     spine,
     head,
     caption: event.actionLabel,
+    // A transfer: the holder it reached only received it (ui-jobs 304).
+    actor: ctx.eventType === "transfer" ? { byOwner: false } : undefined,
     cells: body.cells,
     ledgers: {
       provider: (children) => (

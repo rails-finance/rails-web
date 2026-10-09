@@ -152,6 +152,10 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
     caption: event.actionLabel,
     actor: {
       by: extBy ?? (isLiq ? ctx.liquidator : undefined) ?? undefined,
+      // A transfer received: the sender acted; any other kind follows the
+      // transaction-sender test (ui-jobs 304).
+      byOwner: ctx.eventType === "transfer_in" ? false : undefined,
+      sent: { txFrom: ctx.txFrom, caller: ctx.caller, owner: event.wallet },
       custody:
         ctx.counterparty && isTransfer
           ? { dir: ctx.eventType === "transfer_out" ? "to" : "from", address: ctx.counterparty }

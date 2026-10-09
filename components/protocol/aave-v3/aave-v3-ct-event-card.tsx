@@ -244,6 +244,8 @@ export function AaveV3CtEventCard({ event, isLast, eventNumber, market, siblings
     caption: aaveV3CtLabel(ctx, !!feeOf, chainId),
     actor: {
       by: extBy ?? undefined,
+      // A transfer received: the sender acted (ui-jobs 304).
+      byOwner: kind === "transfer_in" ? false : undefined,
       custody:
         ctx.counterparty && isTransfer
           ? { dir: kind === "transfer_out" ? "to" : "from", address: ctx.counterparty }

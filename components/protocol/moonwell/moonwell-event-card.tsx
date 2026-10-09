@@ -130,7 +130,8 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
     spine,
     head,
     caption: event.actionLabel,
-    actor: { by: extBy ?? undefined },
+    // A transfer received: the sender acted (ui-jobs 304).
+    actor: { by: extBy ?? undefined, byOwner: kind === "transfer_in" ? false : undefined },
     cells,
     ledgers,
     notes,
