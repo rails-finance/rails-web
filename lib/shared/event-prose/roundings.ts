@@ -4,6 +4,7 @@
 
 import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhole } from "@/lib/liquity/figure-format";
 import { ledgerFigure } from "@/lib/shared/coll-figure";
+import { fmtMorphoAmount } from "@/lib/morpho/figure-format";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
 import type { ProseValue, Rounding } from "./types";
@@ -103,4 +104,9 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   units2: (v) => num(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   ratio_frac: (v) =>
     `${(num(v) * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+  morpho_amount: (v) => fmtMorphoAmount(num(v)),
+  fall_pct: (v) => {
+    const pct = num(v) * 100;
+    return `${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`;
+  },
 };

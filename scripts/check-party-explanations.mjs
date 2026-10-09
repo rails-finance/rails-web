@@ -225,6 +225,18 @@ function proseOf(src) {
   return runs.join(" ").replace(/\s+/g, " ");
 }
 
+/** The lines of a strings file's top-level sections, by name. */
+function yamlSections(text, names) {
+  const out = [];
+  let inside = false;
+  for (const line of text.split("\n")) {
+    const top = /^([A-Za-z_0-9]+):/.exec(line);
+    if (top) inside = names.includes(top[1]);
+    else if (inside && !/^\s*#/.test(line)) out.push(line);
+  }
+  return out.join("\n");
+}
+
 const protocols = listDir(COMPONENTS)
   .filter((d) => existsSync(join(COMPONENTS, d)) && listDir(join(COMPONENTS, d)).length > 0)
   .sort();
@@ -289,13 +301,28 @@ for (const proto of protocols) {
   }
   const positionPanes = compFiles.filter((f) => f.endsWith("-position-explanation.tsx")).map((f) => join(compDir, f));
 
+  // A family whose words moved into content/<proto>/event-prose.yaml: the event
+  // pane is the generator (which reads the actor signal) with the file's
+  // sentences, the position pane its component with the file's position words.
+  const strings = read(join("content", proto, "event-prose.yaml"));
+  const generator = join(LIB, proto, "event-prose.ts");
+  const stringsEvent =
+    strings && existsSync(generator)
+      ? `${stripComments(read(generator))}\n${yamlSections(strings, ["shared_sentences", "templates"])}`
+      : null;
+  const stringsPosition = strings ? yamlSections(strings, ["position_words"]) : "";
+
   const paneProse = {
-    event: existsSync(eventPane) ? stripComments(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => stripComments(read(f))).join("\n") : null,
+    event: existsSync(eventPane) ? stripComments(read(eventPane)) : stringsEvent,
+    position:
+      positionPanes.length > 0
+        ? positionPanes.map((f) => stripComments(read(f))).join("\n") + "\n" + stringsPosition
+        : null,
   };
   const paneText = {
-    event: existsSync(eventPane) ? proseOf(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") : null,
+    event: existsSync(eventPane) ? proseOf(read(eventPane)) : stringsEvent,
+    position:
+      positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") + " " + stringsPosition : null,
   };
 
   const checks = [];

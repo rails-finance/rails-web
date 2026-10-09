@@ -151,6 +151,36 @@ const FAMILIES = {
       "components/protocol/liquity-v1/liquity-v1-event-card.tsx",
     ],
   },
+  morpho: {
+    generator: "lib/morpho/event-prose.ts",
+    loader: "lib/morpho/event-templates.ts",
+    entry: "export function morphoEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "morpho",
+    fallback: "morpho.fallback",
+    builtVariants: () => [],
+    wordConsts: { MORPHO_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/morpho/event-prose.ts",
+      "lib/morpho/event-templates.ts",
+      "components/protocol/morpho/morpho-event-explainer.tsx",
+      "components/protocol/morpho/morpho-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/morpho/morpho-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/morpho/event-prose.ts",
+      "lib/morpho/event-templates.ts",
+      "lib/morpho/position-nodes.tsx",
+      "components/protocol/morpho/morpho-event-explainer.tsx",
+      "components/protocol/morpho/morpho-event-card.tsx",
+    ],
+  },
 };
 
 /** The engine every family runs on: no prose either. */

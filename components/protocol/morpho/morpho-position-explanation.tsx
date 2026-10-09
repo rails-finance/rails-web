@@ -1,25 +1,75 @@
 "use client";
 
-// Plain-language explanation of a Morpho position NOW — a SHORT status lead (one
-// or two subject-first sentences) over a bullet list of the independent facts
-// (the market it sits in, the LLTV line, the health factor, the drop to
-// liquidation, the remaining borrowing power, the liquidation model). The
-// position pane is a genuine enumeration, not a causal story — prose is reserved
-// for the status verdict; the mechanics stay as bullets (charter §4).
+// The Morpho position card's explanation (zone Z1): a colon-terminated lead,
+// then bullets under Holdings, Risk, Rate and History when two of them hold
+// two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3). The
+// words are content/morpho/event-prose.yaml's `position_words`; this file
+// chooses which to say and draws each figure as the card does (its receipt, or
+// the card's amount format). The open position's figures are the chain read at
+// head; an ended position's are its replayed record. The mechanisms behind
+// them are the card's "?" (position_* in the same file).
 //
-// Every figure here is the same chain-state values shown on the cards around it — this
-// panel narrates it. All values quote in loan-token units (the market oracle's
-// own numeraire); Morpho has no USD.
+// Every figure is a value shown on the cards around the pane, in the loan
+// token (the market oracle's numeraire); Morpho has no USD.
 
+import type { ReactNode } from "react";
 import type { MorphoChainPositionResponse } from "@/lib/api/fetch-morpho-position";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
-import { oracleAge } from "@/lib/morpho/oracle-age";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
-import { parsePendlePt, pendlePtSentence } from "@/lib/morpho/pendle-pt";
+import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
+import { MORPHO_WORDS, positionWords } from "@/lib/morpho/event-templates";
+import { positionNodes } from "@/lib/morpho/position-nodes";
+import { isMorphoEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
+import type { MorphoPositionView } from "./morpho-position-card";
+import type { ServedFolder } from "@/lib/shared/timeline-folder";
+import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
 
-const MORPHO_LIQUIDATION_DOC = "https://docs.morpho.org/learn/concepts/liquidation/";
+const GROUPS = ["holdings", "risk", "rate", "history"] as const;
+type Group = (typeof GROUPS)[number];
+type Bullet = { group: Group; node: ReactNode };
+
+const arrange = (bullets: Bullet[]) => {
+  const heading: Record<Group, string> = {
+    holdings: positionWords("heading_holdings"),
+    risk: positionWords("heading_risk"),
+    rate: positionWords("heading_rate"),
+    history: positionWords("heading_history"),
+  };
+  return arrangeByHeading(bullets, GROUPS, (g) => heading[g]);
+};
+
+const bulletOf = (group: Group, key: string, node: ReactNode): Bullet => ({
+  group,
+  node: <span key={key}>{node}</span>,
+});
+
+/** "3 times", "once", or "at least once" where the count is not known. */
+const timesText = (n: number | null): string =>
+  n == null || n <= 0
+    ? MORPHO_WORDS.seizures_some
+    : n === 1
+      ? MORPHO_WORDS.seizures_once
+      : `${n.toLocaleString("en-US")} ${MORPHO_WORDS.seizures_times}`;
+
+const txWord = (n: number) => (n === 1 ? MORPHO_WORDS.tx_one : MORPHO_WORDS.tx_many);
+const eventWord = (n: number) => (n === 1 ? MORPHO_WORDS.event_one : MORPHO_WORDS.event_many);
+
+/** The owner's transactions and the events the timeline lists from them. */
+function countsBullet(txCount: number, eventsFromThem: number | null): ReactNode {
+  return eventsFromThem != null && eventsFromThem >= txCount
+    ? positionNodes("counts", {
+        tx_count: <H>{txCount.toLocaleString("en-US")}</H>,
+        tx_word: txWord(txCount),
+        event_count: eventsFromThem.toLocaleString("en-US"),
+        event_word: eventWord(eventsFromThem),
+      })
+    : positionNodes("counts_tx", {
+        tx_count: <H>{txCount.toLocaleString("en-US")}</H>,
+        tx_word: txWord(txCount),
+      });
+}
 
 export function MorphoPositionExplanation({
   chain,
@@ -34,323 +84,161 @@ export function MorphoPositionExplanation({
    *  Omit where the page cannot count the whole history. */
   eventCount?: number;
   liquidationCount?: number;
-  /** The card's own-transaction count (the activity chip's figure — DISTINCT
+  /** The card's owner-transaction count (the activity chip's figure: DISTINCT
    *  txs excluding liquidation rows). Omit to skip. */
   txCount?: number;
   /** Whether the record carries liquidation seizures (the chip's flag). */
   everLiquidated?: boolean;
-  /** Who executed the position's events — the timeline's own externalActor()
+  /** Who executed the position's events: the timeline's externalActor()
    *  verdict, reduced over the whole history. Omit to skip the operator fact. */
   externalActivity?: ExternalActorSummary;
 }) {
-  // The two leading actors, reverse-resolved. A FIXED pair of calls (rules of
-  // hooks), which is also all the prose can name without becoming a list —
-  // where more addresses act, they are counted rather than named.
+  // The two leading actors, reverse-resolved. A fixed pair of calls (rules of
+  // hooks), which is also all the prose can name without becoming a list.
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
-  const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   if (chain.chainStale) return null;
 
   const hasDebt = chain.currentDebt > 0;
   const hasColl = chain.collateral > 0;
   const hf = chain.healthFactor;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
-  const penaltyPct = ((chain.lif - 1) * 100).toFixed(2);
+  const loan = chain.loanSymbol;
+  const coll = chain.collateralSymbol;
 
-  // ── the status lead — subject-first, one sentence, ≤2 figures, colon-
-  // terminated: the lead-in to the bullets (charter §4) ─────────────────────
-  let lead: React.ReactNode = null;
+  // The status lead: subject-first, one sentence, colon-terminated.
+  let lead: ReactNode = null;
   if (hasDebt) {
-    lead = (
-      <>
-        This position owes{" "}
+    lead = positionNodes("lead_debt", {
+      debt: (
         <H>
-          <AmountText value={chain.currentDebt} /> {chain.loanSymbol}
-        </H>{" "}
-        against{" "}
+          <AmountText value={chain.currentDebt} />
+        </H>
+      ),
+      loan_symbol: loan,
+      coll: (
         <H>
-          <AmountText value={chain.collateral} /> {chain.collateralSymbol}
-        </H>{" "}
-        of collateral:
-      </>
-    );
+          <AmountText value={chain.collateral} />
+        </H>
+      ),
+      coll_symbol: coll,
+    });
   } else if (hasColl) {
-    lead = (
-      <>
-        This position holds{" "}
+    lead = positionNodes("lead_collateral", {
+      coll: (
         <H>
-          <AmountText value={chain.collateral} /> {chain.collateralSymbol}
-        </H>{" "}
-        as collateral with nothing borrowed against it:
-      </>
-    );
+          <AmountText value={chain.collateral} />
+        </H>
+      ),
+      coll_symbol: coll,
+    });
   }
 
-  // ── the facts, as bullets ─────────────────────────────────────────────────
-  const bullets: React.ReactNode[] = [];
+  const bullets: Bullet[] = [];
 
-  if (hasDebt) {
-    // The oracle value is a prose-only figure (no chrome twin), so it stays
-    // muted; the health verdict is the market's own read.
+  if (hasDebt)
     bullets.push(
-      <span key="oracle-value">
-        At the market&rsquo;s own oracle that collateral is worth about <AmountText value={chain.collateralValue} />{" "}
-        {chain.loanSymbol}
-        {chain.healthy != null && (
-          <>
-            ; by the market&rsquo;s own health test the position is currently{" "}
-            <H>{chain.healthy ? "healthy" : "liquidatable"}</H>
-          </>
-        )}
-        .
-      </span>,
+      bulletOf(
+        "holdings",
+        "worth",
+        positionNodes("coll_worth", { coll_value: <AmountText value={chain.collateralValue} />, loan_symbol: loan }),
+      ),
     );
-  } else if (hasColl) {
-    bullets.push(<span key="idle">None of that collateral can be seized, and it earns nothing.</span>);
+
+  if (hasColl && !hasDebt) bullets.push(bulletOf("risk", "no-debt", positionNodes("no_debt")));
+
+  if (hasDebt && hf != null) {
+    const health =
+      hf < 1
+        ? positionNodes("health_below", { hf: hf.toFixed(2) })
+        : dropPct != null && dropPct > 0
+          ? positionNodes("health_drop", { hf: hf.toFixed(2), coll_symbol: coll, drop: <H>{dropPct}%</H> })
+          : null;
+    if (health) bullets.push(bulletOf("risk", "health", health));
   }
 
-  // When the price every figure here rests on was published — the oldest of
-  // the oracle's feeds. Said only where the feeds were read; an oracle of
-  // another kind gets no sentence at all (lib/morpho/oracle-age.ts).
-  const age = hasColl ? oracleAge(chain) : null;
-  if (age) {
+  if (hasDebt && chain.maxBorrow > chain.currentDebt)
     bullets.push(
-      <span key="oracle-age">
-        The market&rsquo;s oracle price, <AmountText value={chain.oraclePrice} /> {chain.loanSymbol} per{" "}
-        {chain.collateralSymbol},{" "}
-        {age.feedCount > 1 ? (
-          <>
-            is built from {age.feedCount} feeds; the {age.feedCount === 2 ? "older" : "oldest"} was published{" "}
-          </>
-        ) : (
-          <>was published </>
-        )}
-        {age.published}, {age.age} before this page&rsquo;s chain read at block{" "}
-        {chain.blockNumber.toLocaleString("en-US")} ({age.readAt}).
-      </span>,
+      bulletOf(
+        "risk",
+        "capacity",
+        positionNodes("capacity", {
+          capacity: <AmountText value={chain.maxBorrow - chain.currentDebt} />,
+          loan_symbol: loan,
+        }),
+      ),
     );
-  }
-
-  bullets.push(
-    <span key="isolated">
-      It sits in one <H>isolated market</H>: {chain.loanSymbol} lent against {chain.collateralSymbol} at an LLTV of{" "}
-      {(chain.lltv * 100).toFixed(1)}%, with its own oracle and rate model. Nothing outside this market backs or
-      threatens the position.
-    </span>,
-  );
-
-  const pt = parsePendlePt(chain.collateralSymbol);
-  if (pt && chain.collateralSymbol) {
-    bullets.push(<span key="pendle-pt">{pendlePtSentence(pt, chain.collateralSymbol)}</span>);
-  }
-
-  if (hasColl && !hasDebt && chain.maxBorrow > 0) {
+  else if (hasColl && !hasDebt && chain.maxBorrow > 0)
     bullets.push(
-      <span key="idle-capacity">
-        At the market&rsquo;s own oracle price this collateral could back up to <AmountText value={chain.maxBorrow} />{" "}
-        {chain.loanSymbol} of borrowing.
-      </span>,
+      bulletOf(
+        "risk",
+        "capacity",
+        positionNodes("capacity_idle", { capacity: <AmountText value={chain.maxBorrow} />, loan_symbol: loan }),
+      ),
     );
-  }
 
-  if (hasDebt) {
-    if (hf != null) {
-      // One distance, three readings: the capacity bar's share of the line
-      // used is LTV ÷ LLTV = 1 ÷ HF, and the price fall to the line is 1 − 1 ÷ HF.
-      const usedPct = (100 / hf).toFixed(1);
-      const lltvPct = (chain.lltv * 100).toFixed(1);
-      bullets.push(
-        <span key="hf">
-          Its health factor is {hf.toFixed(2)}: the collateral&rsquo;s value × the LLTV is {hf.toFixed(2)} times the
-          debt, and at 1 the position can be liquidated.
-          {chain.ltv != null && chain.ltv > 0 ? (
-            <>
-              {" "}
-              Its LTV (debt ÷ collateral value) is {(chain.ltv * 100).toFixed(1)}%, and {(chain.ltv * 100).toFixed(1)}%
-              ÷ {lltvPct}% is the {usedPct}% of borrow capacity used.
-            </>
-          ) : null}{" "}
-          That {usedPct}%
-          {dropPct != null && dropPct > 0 ? (
-            <>
-              , the <H>{dropPct}%</H> fall in the {chain.collateralSymbol} price (in {chain.loanSymbol}) that would
-              reach the line
-            </>
-          ) : null}{" "}
-          and the health factor are three views of one distance.
-        </span>,
-      );
-    }
-    if (chain.borrowApr > 0) {
-      bullets.push(
-        <span key="rate">
-          The market&rsquo;s borrow rate is {(chain.borrowApr * 100).toFixed(2)}% APR, about{" "}
-          <AmountText value={chain.currentDebt * chain.borrowApr} /> {chain.loanSymbol} a year on this debt at this
-          rate; the market&rsquo;s rate model moves it with utilization, the share of the market&rsquo;s supplied{" "}
-          {chain.loanSymbol} that is lent out.
-        </span>,
-      );
-    }
-    if (chain.maxBorrow > chain.currentDebt) {
-      bullets.push(
-        <span key="power">
-          About <AmountText value={chain.maxBorrow - chain.currentDebt} /> {chain.loanSymbol} more could be borrowed at
-          the current price; Morpho allows borrowing right up to the LLTV line.
-        </span>,
-      );
-    }
+  if (hasDebt)
     bullets.push(
-      <span key="liq-model">
-        Past the line, a liquidator can repay debt and seize collateral worth {penaltyPct}% more than it repays: this
-        market&rsquo;s liquidation incentive, set by its LLTV as min(1.15, 1 ÷ (0.3 × LLTV + 0.7)) − 1 (
-        <a href={MORPHO_LIQUIDATION_DOC} target="_blank" rel="noopener noreferrer" className="link-external underline">
-          docs.morpho.org — Liquidation
-        </a>
-        ). If the collateral runs out, the shortfall is written off against this market&rsquo;s lenders as bad debt.
-      </span>,
+      bulletOf("risk", "penalty", positionNodes("penalty", { penalty: `${((chain.lif - 1) * 100).toFixed(2)}%` })),
     );
-  }
 
-  // The counts, said plainly: the timeline's events, the owner's transactions
-  // behind them (one transaction can carry several events), and the
-  // liquidations, which are done TO the position.
-  const countedTxs = txCount != null && txCount > 0;
-  if (countedTxs) {
-    const liq = liquidationCount ?? 0;
-    const ownEvents = eventCount != null ? eventCount - liq : null;
+  if (hasDebt && chain.borrowApr > 0)
     bullets.push(
-      <span key="tx-count">
-        {eventCount != null && ownEvents != null && ownEvents >= txCount ? (
-          <>
-            Its timeline lists {eventCount.toLocaleString("en-US")} events: {ownEvents.toLocaleString("en-US")} from{" "}
-            <H>{txCount.toLocaleString("en-US")}</H> transaction{txCount === 1 ? "" : "s"} by the owner
-            {ownEvents > txCount
-              ? " (one transaction can carry several events, such as adding collateral and borrowing)"
-              : ""}
-            {liq > 0 ? (
-              <>
-                , and {liq.toLocaleString("en-US")} liquidation{liq === 1 ? "" : "s"}
-              </>
-            ) : null}
-            .
-          </>
-        ) : (
-          <>
-            The owner has made <H>{txCount.toLocaleString("en-US")}</H> transaction{txCount === 1 ? "" : "s"} on this
-            position{everLiquidated ? ", and it has been liquidated at least once" : ""}.
-          </>
-        )}
-      </span>,
+      bulletOf(
+        "rate",
+        "rate",
+        positionNodes("rate", {
+          apr: `${(chain.borrowApr * 100).toFixed(2)}%`,
+          cost: <AmountText value={chain.currentDebt * chain.borrowApr} />,
+          loan_symbol: loan,
+        }),
+      ),
     );
-  }
 
-  // Who has been operating the position. It sits beside the count bullet —
-  // a position run by an authorised operator reads as alarming until the
-  // reader is told the owner granted it.
-  //
-  // The denominator is deliberately null (self-anchored lead): the count
-  // bullet above speaks TRANSACTIONS while `ext.total` counts EVENTS — equal
-  // numbers would be a coincidence of different quantities, so the operator
-  // bullet states its own events base instead of chaining onto the bullet's.
-  //
-  // The identity is deliberately NOT bolded: an operator name has no chrome twin
-  // on this card, and bolding it would break the pane's reverse-completeness
-  // (charter §3) — the same reason the oracle value and health factor above stay
-  // muted. Nor is an address ever interpolated as a stand-in for a name: the
-  // fact (how many events, authorised by the owner) is stated whatever resolves,
-  // and only a real name is ever spoken.
+  // The counts, said plainly: the owner's transactions behind the timeline's
+  // events (one transaction can carry several), and the liquidations, which
+  // are done to the position.
+  if (txCount != null && txCount > 0) {
+    const ownEvents = eventCount != null ? eventCount - (liquidationCount ?? 0) : null;
+    bullets.push(bulletOf("history", "tx-count", countsBullet(txCount, ownEvents)));
+  }
+  if ((liquidationCount ?? 0) > 0 || everLiquidated)
+    bullets.push(
+      bulletOf(
+        "history",
+        "liquidated",
+        positionNodes("liquidated_count", { seizures: timesText(liquidationCount ?? null) }),
+      ),
+    );
+
+  // Who has been operating the position. It sits beside the counts: a position
+  // run by an authorised account reads as alarming until the reader is told
+  // the owner granted it (the card's "?" says how). The denominator comes
+  // from operatorLead, which compares events with the transactions beside it.
   const ext = externalActivity;
   if (ext && ext.external > 0) {
-    const others = ext.external - (ext.actors[0]?.count ?? 0);
+    const lead = operatorLead(ext, null, MORPHO_WORDS.operators_where);
+    const external = ext.external.toLocaleString("en-US");
+    const external_word = ext.external === 1 ? MORPHO_WORDS.external_one : MORPHO_WORDS.external_many;
     bullets.push(
-      <span key="operators">
-        {operatorLead(ext, null, "recorded on this position")}
-        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        the owner&rsquo;s. Morpho lets anyone add to a position, but requires the owner&rsquo;s own on-chain
-        authorisation before another account can borrow or withdraw from it — so this is delegated operation, not
-        interference.
-        {ext.actors.length === 1
-          ? leadName
-            ? ` All of it ran through ${leadName}.`
-            : " A single address accounts for all of it."
+      bulletOf(
+        "history",
+        "operators",
+        leadName && ext.actors.length === 1
+          ? positionNodes("operators_all", { lead, external, external_word, name: leadName })
           : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
-            : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
-      </span>,
+            ? positionNodes("operators_most", { lead, external, external_word, name: leadName })
+            : positionNodes("operators", { lead, external, external_word }),
+      ),
     );
   }
 
   if (lead == null && bullets.length === 0) return null;
 
-  return <ProseExplainer paragraph={lead} items={bullets} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
 
-// ── the terminal pane — a closed or liquidated position narrated from the
-// replay + the timeline already on the page (no chain overlay needed) ─────────
-
-import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-import { isMorphoEvent } from "@/lib/shared/types/event-shape";
-import type { MorphoPositionView } from "./morpho-position-card";
-import { formatDate } from "@/lib/date";
-import type { ServedFolder } from "@/lib/shared/timeline-folder";
-import { newestActivityFolder } from "@/lib/shared/timeline-folder-reductions";
-import { useChainId } from "@/lib/shared/chain-context";
-import { fmtMorphoPrice, useMorphoAtBlock } from "@/lib/morpho/use-market-at-block";
-
-function closureDate(unix: number): string {
-  return formatDate(unix);
-}
-
-type Activity = { block: number; at: number } | null;
-
-/** The position's first and last activity, a served folder's edge where one
- *  is older (or newer) than every loaded row. */
-function firstActivity(rows: BaseActivityEvent[], folders?: readonly ServedFolder[] | null): Activity {
-  let a: Activity = rows[0] ? { block: rows[0].blockNumber, at: rows[0].timestamp } : null;
-  for (const f of folders ?? []) if (!a || f.firstBlock < a.block) a = { block: f.firstBlock, at: f.firstAt };
-  return a;
-}
-function lastActivity(rows: BaseActivityEvent[], folders?: readonly ServedFolder[] | null): Activity {
-  const r = rows[rows.length - 1];
-  let a: Activity = r ? { block: r.blockNumber, at: r.timestamp } : null;
-  for (const f of folders ?? []) if (!a || f.lastBlock > a.block) a = { block: f.lastBlock, at: f.lastAt };
-  return a;
-}
-
-/** The PT collateral's oracle price at the position's first and last
- *  activity (the price going into each block), and — where it fell — why a
- *  PT's price can fall before maturity. Nothing while either read is out. */
-function PtPriceRun({
-  marketId,
-  first,
-  last,
-  collSym,
-  loanSym,
-}: {
-  marketId: string;
-  first: Activity;
-  last: Activity;
-  collSym: string;
-  loanSym: string;
-}) {
-  const chainId = useChainId();
-  const a = useMorphoAtBlock(marketId, first?.block, chainId);
-  const b = useMorphoAtBlock(marketId, last && first && last.block !== first.block ? last.block : undefined, chainId);
-  if (!first || !last || a.status !== "ok" || b.status !== "ok") return null;
-  const p0 = a.prev.price;
-  const p1 = b.prev.price;
-  if (!(p0 > 0) || !(p1 > 0)) return null;
-  return (
-    <>
-      {" "}
-      Its oracle price was {fmtMorphoPrice(p0)} {loanSym} per {collSym} at the position&rsquo;s first event (
-      {formatDate(first.at)}) and {fmtMorphoPrice(p1)} {loanSym} at its last ({formatDate(last.at)})
-      {p1 < p0
-        ? "; a PT's price also follows the price of its underlying token and market yields, so it can fall before maturity"
-        : ""}
-      .
-    </>
-  );
-}
+// ── the terminal pane: a closed or liquidated position narrated from the
+// replay and the timeline already on the page (no chain overlay needed) ──────
 
 export function MorphoClosedPositionExplanation({
   v,
@@ -362,14 +250,14 @@ export function MorphoClosedPositionExplanation({
   v: MorphoPositionView;
   /** The timeline's whole event count; omit where the page cannot count it. */
   eventCount?: number;
-  /** The liquidations in the whole history — the loaded rows plus the members
+  /** The liquidations in the whole history: the loaded rows plus the members
    *  of every served liquidation folder. Omit where the page cannot count the
    *  whole history; the pane then states no number. */
   liquidationCount?: number;
-  /** The position's timeline (morpho events, ascending) — the pane reads how
+  /** The position's timeline (morpho events, ascending): the pane reads how
    *  the record ended from the rows already fetched. */
   events: BaseActivityEvent[];
-  /** Every folder the index served, whole and unfiltered — the position's
+  /** Every folder the index served, whole and unfiltered: the position's
    *  newest activity can sit inside one, so the closure attribution below
    *  reads it before falling back to the last loaded row. */
   folders?: readonly ServedFolder[] | null;
@@ -378,17 +266,16 @@ export function MorphoClosedPositionExplanation({
 
   const morpho = events.filter(isMorphoEvent);
   const liqCount = liquidationCount;
-  // The newest activity overall — a served folder's last member when it is
+  // The newest activity overall: a served folder's last member when it is
   // newer than every loaded row, the loaded row otherwise. Morpho's two
   // folder kinds are `liquidation` (pure seizures) and `owner_run` (the
-  // position's own supply/withdraw/borrow/repay), so `kind` alone says which
+  // position's supply, withdraw, borrow and repay), so `kind` alone says which
   // one ended it.
   const newestFolder = newestActivityFolder(morpho, folders);
   const lastType = newestFolder ? null : morpho.length > 0 ? morpho[morpho.length - 1].context.data.eventType : null;
-  // How the record actually ended — the truthful closure attribution. The
-  // liquidated STATUS only says seizures exist somewhere in the record; the
-  // ending is a separate fact (709 of 1,535 liquidated-status positions ended
-  // with the seizure; the rest closed by their own hand afterwards).
+  // How the record ended: the liquidated status only says seizures exist
+  // somewhere in the record (709 of 1,535 liquidated-status positions ended
+  // with the seizure; the rest were closed by the owner afterwards).
   const endedBySeizure = newestFolder ? newestFolder.kind === "liquidation" : lastType === "liquidation";
   // What the owner did after the last seizure, where that seizure is a loaded
   // row (a seizure inside a folder leaves the rows after it unread here).
@@ -407,157 +294,90 @@ export function MorphoClosedPositionExplanation({
   // loaded the whole history; the principal peak otherwise.
   const owedPeak = v.peakDebtOwed != null && v.peakDebtOwed > 0;
   const peakDebt = owedPeak ? v.peakDebtOwed! : v.peakBorrowed;
+  const coll = v.collateralSymbol ?? v.loanSymbol;
 
-  const lead = endedBySeizure ? (
-    <>This position was emptied by liquidation — the final seizure took the last of its collateral to cover its debt:</>
-  ) : v.everLiquidated ? (
-    <>This position closed with liquidations in its record — its debt cleared and the collateral left withdrawn:</>
-  ) : v.peakBorrowed > 0 ? (
-    <>This position ran its course and closed — the collateral withdrawn and the debt repaid:</>
-  ) : (
-    <>This position ran its course and closed — its collateral withdrawn, with nothing ever borrowed against it:</>
+  const lead = positionNodes(
+    endedBySeizure
+      ? "closed_lead_emptied"
+      : v.everLiquidated
+        ? "closed_lead_liquidated"
+        : v.peakBorrowed > 0
+          ? "closed_lead_repaid"
+          : "closed_lead_no_debt",
   );
 
-  const bullets: React.ReactNode[] = [];
+  const bullets: Bullet[] = [];
 
-  if (hasPeakColl || hasPeakBorr) {
-    bullets.push(
-      <span key="peaks">
-        At its height it held as much as{" "}
-        {hasPeakColl ? (
-          <H>
-            <AmountText value={v.peakCollateral} /> {v.collateralSymbol}
-          </H>
-        ) : null}
-        {hasPeakColl && hasPeakBorr ? <> of collateral and owed as much as </> : null}
-        {hasPeakBorr ? (
-          <H>
-            <AmountText value={peakDebt} /> {v.loanSymbol}
-          </H>
-        ) : null}
-        {hasPeakColl && hasPeakBorr ? (
-          owedPeak ? (
-            <>
-              {" "}
-              — each figure is its highest point over the position&rsquo;s events, so the two need not have stood
-              together. The debt figure includes the interest accrued to that event.
-            </>
-          ) : (
-            <>
-              {" "}
-              of principal — each figure is its own highest point over the position&rsquo;s recorded events, so the two
-              need not have stood together; interest accrued on top of the principal between events.
-            </>
-          )
-        ) : hasPeakColl ? (
-          <> of collateral — its highest point over the position&rsquo;s recorded events; it never drew debt.</>
-        ) : owedPeak ? (
-          <> of debt, interest included — its highest over the position&rsquo;s events.</>
-        ) : (
-          <> of principal — its highest recorded draw over the position&rsquo;s life.</>
-        )}
-      </span>,
-    );
-  }
-
-  bullets.push(
-    <span key="isolated">
-      It sat in one isolated market — {v.loanSymbol} lent against {v.collateralSymbol ?? v.loanSymbol} at an LLTV of{" "}
-      {(v.lltv * 100).toFixed(1)}% — so nothing outside that market backed or threatened it.
-    </span>,
+  const peakColl = (
+    <H>
+      <AmountText value={v.peakCollateral} />
+    </H>
   );
-
-  const pt = parsePendlePt(v.collateralSymbol);
-  if (pt && v.collateralSymbol) {
+  const peakDebtNode = (
+    <H>
+      <AmountText value={peakDebt} />
+    </H>
+  );
+  if (hasPeakColl && hasPeakBorr)
     bullets.push(
-      <span key="pendle-pt">
-        {pendlePtSentence(pt, v.collateralSymbol, v.lastTs)}
-        <PtPriceRun
-          marketId={v.marketId}
-          first={firstActivity(morpho, folders)}
-          last={lastActivity(morpho, folders)}
-          collSym={v.collateralSymbol}
-          loanSym={v.loanSymbol}
-        />
-      </span>,
+      bulletOf(
+        "history",
+        "peaks",
+        positionNodes(owedPeak ? "peaks_both" : "peaks_both_principal", {
+          peak_coll: peakColl,
+          coll_symbol: coll,
+          peak_debt: peakDebtNode,
+          loan_symbol: v.loanSymbol,
+        }),
+      ),
     );
-  }
+  else if (hasPeakColl)
+    bullets.push(bulletOf("history", "peaks", positionNodes("peaks_coll", { peak_coll: peakColl, coll_symbol: coll })));
+  else if (hasPeakBorr)
+    bullets.push(
+      bulletOf(
+        "history",
+        "peaks",
+        positionNodes(owedPeak ? "peaks_debt" : "peaks_debt_principal", {
+          peak_debt: peakDebtNode,
+          loan_symbol: v.loanSymbol,
+        }),
+      ),
+    );
 
   if (v.everLiquidated) {
+    const seizures = timesText(liqCount ?? null);
     bullets.push(
-      <span key="seizures">
-        {liqCount != null && liqCount > 0 ? (
-          <>
-            Liquidators seized its collateral {liqCount} time{liqCount === 1 ? "" : "s"}.{" "}
-          </>
-        ) : (
-          <>Liquidators seized its collateral. </>
-        )}
-        A Morpho liquidation can take part of a position: a liquidator repays some of the debt and takes collateral
-        worth that amount plus the market&rsquo;s incentive, so one seizure need not empty it.{" "}
-        {endedBySeizure
-          ? "Here the final seizure emptied it."
+      bulletOf(
+        "history",
+        "seizures",
+        endedBySeizure
+          ? positionNodes("seizures_emptied", { seizures })
           : withdrawnAfter
             ? repaidAfter
-              ? "After the last seizure the owner repaid the debt left and withdrew the collateral left."
-              : "After the last seizure the owner withdrew the collateral left."
-            : "After the seizures the owner closed the position with transactions of its own."}{" "}
-        Seizures in the record are what mark the outcome Liquidated.
-      </span>,
+              ? positionNodes("seizures_repaid", { seizures })
+              : positionNodes("seizures_withdrew", { seizures })
+            : positionNodes("seizures_closed", { seizures }),
+      ),
     );
     // The split the timeline cannot show: the Liquidate log's cleared figure
-    // merges repaid + badDebt, so the written-off share rides its own backend
-    // sum (morpho_liquidation.bad_debt_assets). Stated only when it exists —
+    // merges repaid + badDebt, so the written-off share rides a separate
+    // backend sum (morpho_liquidation.bad_debt_assets). Stated only when it exists:
     // most liquidated records cleared fully against their collateral.
-    if (v.badDebt > 0 && !v.loanDecimalsUnread) {
+    if (v.badDebt > 0 && !v.loanDecimalsUnread)
       bullets.push(
-        <span key="bad-debt">
-          The seizures did not cover everything: <AmountText value={v.badDebt} /> {v.loanSymbol} of the debt had no
-          collateral left to claim and was written off — socialized to this market&rsquo;s lenders, not repaid.
-        </span>,
+        bulletOf(
+          "history",
+          "bad-debt",
+          positionNodes("bad_debt", { bad_debt: <AmountText value={v.badDebt} />, loan_symbol: v.loanSymbol }),
+        ),
       );
-    }
   }
 
-  // The counts: the timeline's events, the owner's transactions behind them
-  // (one transaction can carry several events), and the liquidations.
-  const own = eventCount != null && liqCount != null ? eventCount - liqCount : null;
-  bullets.push(
-    <span key="closure">
-      Its record closed
-      {v.lastTs != null ? (
-        <>
-          {" "}
-          on <H>{closureDate(v.lastTs)}</H>
-        </>
-      ) : null}
-      {own != null && own >= v.txCount ? (
-        <>
-          . Its timeline lists {eventCount} events{liqCount ? <>: {own}</> : null} from <H>{v.txCount}</H> transaction
-          {v.txCount === 1 ? "" : "s"} of its own
-          {own > v.txCount ? " (one transaction can carry several, such as adding collateral and borrowing)" : ""}
-          {liqCount ? (
-            <>
-              {" "}
-              and {liqCount} liquidation{liqCount === 1 ? "" : "s"}
-            </>
-          ) : null}
-        </>
-      ) : (
-        <>
-          , after <H>{v.txCount}</H> transaction{v.txCount === 1 ? "" : "s"} of its own
-        </>
-      )}
-      .
-    </span>,
-  );
+  // The counts: the owner's transactions behind the timeline's events (one
+  // transaction can carry several), and the liquidations.
+  const ownerEvents = eventCount != null && liqCount != null ? eventCount - liqCount : null;
+  bullets.push(bulletOf("history", "closure", countsBullet(v.txCount, ownerEvents)));
 
-  bullets.push(
-    <span key="door">
-      The market-and-wallet pair is the position&rsquo;s permanent key — a new deposit or draw by the same wallet in
-      this market reopens this very timeline.
-    </span>,
-  );
-
-  return <ProseExplainer paragraph={lead} items={bullets} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
