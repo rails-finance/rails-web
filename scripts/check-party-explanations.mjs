@@ -176,6 +176,14 @@ const PARTY_ROLES = [
   { role: "router", prefixes: ["via", "as ETH via"], phrases: [/\brouter\b/i, /\bsettle(d|ment)\b/i] },
 ];
 
+/** A strings file's words: its lines without comments, joined. */
+function yamlProse(src) {
+  return src
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+}
+
 function read(p) {
   try {
     return readFileSync(p, "utf8");
@@ -289,13 +297,26 @@ for (const proto of protocols) {
   }
   const positionPanes = compFiles.filter((f) => f.endsWith("-position-explanation.tsx")).map((f) => join(compDir, f));
 
+  // A family on the shared generator (content/<proto>/event-prose.yaml) keeps
+  // its words in the strings file: both panes read it, and the event pane's
+  // actor signal is the generator's (lib/<proto>/event-prose.ts).
+  const stringsFile = join("content", proto, "event-prose.yaml");
+  const strings = existsSync(stringsFile) ? yamlProse(read(stringsFile)) : null;
+  const generator = join(LIB, proto, "event-prose.ts");
+  const eventSrc = existsSync(eventPane)
+    ? read(eventPane)
+    : strings !== null && existsSync(generator)
+      ? read(generator)
+      : null;
   const paneProse = {
-    event: existsSync(eventPane) ? stripComments(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => stripComments(read(f))).join("\n") : null,
+    event: eventSrc === null ? null : [stripComments(eventSrc), strings ?? ""].join("\n"),
+    position:
+      positionPanes.length > 0 ? [...positionPanes.map((f) => stripComments(read(f))), strings ?? ""].join("\n") : null,
   };
   const paneText = {
-    event: existsSync(eventPane) ? proseOf(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") : null,
+    event: eventSrc === null ? null : [existsSync(eventPane) ? proseOf(eventSrc) : "", strings ?? ""].join(" "),
+    position:
+      positionPanes.length > 0 ? [...positionPanes.map((f) => proseOf(read(f))), strings ?? ""].join(" ") : null,
   };
 
   const checks = [];
@@ -381,7 +402,9 @@ for (const proto of protocols) {
     const src = stripComments(read(join(compDir, file)));
     if (!/ExternalActorSummary/.test(src)) continue;
     const handRolled = /"Of those/.test(src);
-    const routed = /\boperatorLead\(/.test(src);
+    // A strings-file bullet states its event count ("{external} of the
+    // {events} events …"), so it needs no lead.
+    const routed = /\boperatorLead\(/.test(src) || /\bpositionNodes\("operators/.test(src);
     if (handRolled || !routed) {
       gaps++;
       const why = handRolled

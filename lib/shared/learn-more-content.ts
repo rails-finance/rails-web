@@ -4,7 +4,7 @@ import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
 import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
 import { getSpokeMeta, ARCHETYPE_GLOSS, SPOKE_DOC_LINKS } from "@/lib/aave-v4/spoke-meta";
 import { HUB_TIER_LABEL, type HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
-import { SEAMLESS_DOCS_URL, v3Brand, v3Possessive, type V3Protocol } from "@/lib/aave-v3/protocol-name";
+import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/components/transaction-timeline/explanation/shared/faqUrls";
 import { ALCHEMIX_DOCS } from "@/lib/alchemix/learn-more";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
@@ -646,25 +646,18 @@ export function aaveV4BaseHubContent(): LearnMoreContent {
   };
 }
 
-// Page-level explainer for the V3-family market-overview surfaces
-// (/aave-v3/market, /spark/market) — the single-market counterpart of
-// aaveV4HubsContent. Layer-2 mechanics only, no snapshot numbers, so it reads
-// identically on any block. Concepts mirror what the band and the reserve list
-// show: reserves, rates and the kink, LTV, LT, bonus, caps, closed states, price.
-export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "seamless" | "spark"): LearnMoreContent {
-  const spark = market === "spark";
-  const onBase = market === "aave-v3-base";
-  const seamless = market === "seamless";
-  const name = spark ? "SparkLend" : seamless ? "Seamless" : "Aave V3";
+// Page-level explainer for SparkLend's market overview (/spark/market). The
+// Aave V3 and Seamless market overviews read content/aave-v3/event-prose.yaml.
+// Layer-2 mechanics only, no snapshot numbers, so it reads identically on any
+// block. Concepts mirror what the band and the reserve list show: reserves,
+// rates and the kink, LTV, LT, bonus, caps, closed states, price.
+export function aaveMarketOverviewContent(market: "spark"): LearnMoreContent {
+  void market;
+  const name = "SparkLend";
   return {
     title: "How the market overview works",
-    intro: seamless
-      ? "Seamless is a single Aave-V3-architecture market on Base: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a fork rather than an Aave deployment, with its own contracts, its own risk parameters and its own oracle. Every one of its reserves has been frozen since April 2025, which closes the market to new supplies and new borrows while leaving interest, repayment, withdrawal and liquidation working exactly as before. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
-      : spark
-        ? "SparkLend is a single Aave-V3-architecture market: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with SparkLend's own oracle."
-        : onBase
-          ? "Aave V3 on Base is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. It is a separate deployment from Aave V3 on Ethereum — its own reserves, its own risk parameters, its own oracle — so a wallet's position on one says nothing about its position on the other. This page reads each reserve's size, rates and risk parameters from that Pool and prices them with the oracle it liquidates with."
-          : "Aave V3 Core is one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with Aave's own oracle.",
+    intro:
+      "SparkLend is a single Aave-V3-architecture market: one Pool holding every reserve, with all of a wallet's supplied assets cross-collateralised under one health factor. This page reads each reserve's size, rates and risk parameters live from that Pool and prices them with SparkLend's own oracle.",
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -673,9 +666,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Utilisation & rates",
-        text: spark
-          ? "utilisation is borrowed ÷ supplied per reserve, and every SparkLend borrow rate follows it along a curve. DAI's and USDS's curve rises to a target that follows a rate Sky governance sets, so a governance change moves them too."
-          : "utilisation is borrowed ÷ supplied per reserve; the interest-rate curve prices borrowing from it, and suppliers earn the borrow interest net of the reserve factor.",
+        text: "utilisation is borrowed ÷ supplied per reserve, and every SparkLend borrow rate follows it along a curve. DAI's and USDS's curve rises to a target that follows a rate Sky governance sets, so a governance change moves them too.",
       },
       {
         bold: "Utilisation bar",
@@ -695,9 +686,7 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
       },
       {
         bold: "Caps used",
-        text: spark
-          ? "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. SparkLend's CapAutomator keeps each live cap a short step above use and raises it automatically up to a governance-set maximum, so use is measured against that maximum; where the automator holds no setting for a reserve, against the live cap. A cap of one token closes that side, and the largest value the field can hold means no cap."
-          : "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. Governance closes a side by setting its cap to one whole token, which reads as closed; a cap of 0 means no cap.",
+        text: "how much of each side's cap is in use: supply (the aToken supply plus interest owed to the treasury, which the Pool counts) and borrow. SparkLend's CapAutomator keeps each live cap a short step above use and raises it automatically up to a governance-set maximum, so use is measured against that maximum; where the automator holds no setting for a reserve, against the live cap. A cap of one token closes that side, and the largest value the field can hold means no cap.",
       },
       {
         bold: "Closed to new business",
@@ -707,460 +696,11 @@ export function aaveMarketOverviewContent(market: "aave-v3" | "aave-v3-base" | "
         bold: "Oracle price",
         text: `USD comes from ${name}'s own IAaveOracle — the same prices the Pool liquidates with, not an off-chain feed.`,
       },
-      ...(seamless
-        ? [
-            {
-              bold: "Frozen",
-              text: "a bit in the reserve's own configuration word. A frozen reserve accepts no new supply and no new borrow, but keeps accruing interest and stays liquidatable — so a frozen market's rates and thresholds are live and enforced rather than historical. All eighteen here were frozen in one block.",
-            },
-          ]
-        : []),
-    ],
-    links: seamless
-      ? [
-          { label: "Seamless docs", url: SEAMLESS_DOCS_URL },
-          { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-          { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
-        ]
-      : spark
-        ? [
-            { label: "SparkLend docs", url: "https://docs.spark.fi/products/sparklend" },
-            { label: "Spark FAQ", url: "https://docs.spark.fi/faq" },
-          ]
-        : onBase
-          ? [
-              { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-              { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
-              { label: "Aave on Base", url: "https://app.aave.com/markets/?marketName=proto_base_v3" },
-            ]
-          : [
-              { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-              { label: "Borrowing", url: AAVE_FAQ_URLS.BORROWING },
-              { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-            ],
-  };
-}
-
-// ── Aave V3 — Event-card modals ──────────────────────────────────────────────
-//
-// Mirrors the V4 event modals, but for V3's single-Pool model: one cross-
-// collateralised account per wallet (no spokes / isolation), so the mechanics
-// talk about the whole account sharing one health factor rather than per-spoke
-// isolation. Mapped from event types by the V3 event explainer's resolver.
-//
-// Shared with Seamless (an Aave V3 fork on Base): the same machine, so the
-// same mechanics prose — only the protocol's name and the docs it points at
-// change. `protocol` defaults to Aave V3 so every existing caller reads
-// byte-for-byte what it read before.
-
-/** The modal's links for this protocol. Aave's help pages explain the
- *  mechanics a fork inherits, so a fork keeps the mechanic links and swaps
- *  the general "Aave FAQ" for its own docs, first — the market overview's
- *  precedent (aaveMarketOverviewContent). */
-function v3ModalLinks(protocol: V3Protocol, links: { label: string; url: string }[]): { label: string; url: string }[] {
-  if (protocol === "Aave V3") return links;
-  return [{ label: `${protocol} docs`, url: SEAMLESS_DOCS_URL }, ...links.filter((l) => l.label !== "Aave FAQ")];
-}
-
-export function aaveV3SupplyWithdrawContent(
-  eventType: "supply" | "withdraw",
-  protocol: V3Protocol = "Aave V3",
-): LearnMoreContent {
-  const pool = `${v3Possessive(protocol, "'")} Pool`;
-  if (eventType === "withdraw")
-    return {
-      title: "How Withdrawing Works",
-      intro: `Withdrawing returns supplied assets from ${pool} to a wallet, burning the matching aTokens. It can go only as far as the collateral left keeps any debt covered.`,
-      detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Interest comes with it",
-          text: "the supplied balance includes the supply interest earned so far, so more can come out than went in.",
-        },
-        {
-          bold: "Health factor",
-          text: "withdrawing collateral lowers the account's health factor. The Pool refuses a withdrawal that would leave it below 1.0; one that leaves it just above is allowed, and a later price fall can then make the account liquidatable.",
-        },
-        {
-          bold: "Only the owner",
-          text: "a withdrawal takes the sender's own aTokens, so no other account can withdraw from this position. The tokens can be sent to any address.",
-        },
-        {
-          bold: "Available liquidity",
-          text: "the asset has to be in the Pool to leave it: when most of a reserve is borrowed, a withdrawal can wait until borrowers repay or new supply arrives.",
-        },
-      ],
-      links: v3ModalLinks(protocol, [
-        { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-        { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-        { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-      ]),
-    };
-  return {
-    title: "How Supplying Works",
-    intro: `Supplying deposits an asset into ${pool}, which mints aTokens for it. The deposit earns the variable supply rate and, while it is on as collateral, backs borrowing.`,
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Supplied balance",
-        text: "the aToken balance grows with the supply rate, so the deposit accrues interest without a transaction.",
-      },
-      {
-        bold: "Collateral on or off",
-        text: "each supplied asset is on or off as collateral for the account. On a first supply of an asset that can back borrowing, the Pool switches it on in the same transaction; the owner can switch it off while the debt stays covered.",
-      },
-      {
-        bold: "One account",
-        text: `${protocol} pools every asset on as collateral into one account per wallet and market: all of it backs all of the account's borrowing, under one health factor.`,
-      },
-      {
-        bold: "Supplying for someone else",
-        text: "anyone can supply on behalf of any account; the deposit belongs to that account and needs nothing from its owner.",
-      },
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
-  };
-}
-
-export function aaveV3BorrowRepayContent(
-  eventType: "borrow" | "repay",
-  protocol: V3Protocol = "Aave V3",
-): LearnMoreContent {
-  if (eventType === "repay")
-    return {
-      title: "How Repaying Works",
-      intro:
-        "Repaying returns borrowed tokens to the Pool, burning the matching debt tokens. The debt falls, the health factor rises, and collateral is freed to withdraw or borrow against.",
-      detailsHeading: "Key concepts:",
-      details: [
-        {
-          bold: "Partial or full",
-          text: "any amount can be repaid at any time; repaying the whole balance clears that asset's debt, interest included.",
-        },
-        {
-          bold: "Interest",
-          text: "debt grows with the variable borrow rate every block, so the amount owed at repayment is more than was borrowed. What is left after a partial repay keeps accruing.",
-        },
-        {
-          bold: "Repaying with aTokens",
-          text: "a debt can be repaid with supplied tokens of the same asset, burning those aTokens instead of taking tokens from the wallet.",
-        },
-        {
-          bold: "Repaying for someone else",
-          text: "anyone can repay any account's debt; it needs nothing from the owner.",
-        },
-      ],
-      links: v3ModalLinks(protocol, [
-        { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
-        { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-        { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-      ]),
-    };
-  return {
-    title: "How Borrowing Works",
-    intro:
-      "Borrowing draws an asset from the Pool against the account's collateral, minting debt tokens that accrue variable borrow interest until repaid.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Borrowing power",
-        text: "the account can borrow up to its collateral's value times each asset's loan-to-value (LTV). The liquidation threshold, a little higher, is where it becomes liquidatable.",
-      },
-      {
-        bold: "One shared health factor",
-        text: "the account has one health factor across all its collateral and debt; borrowing lowers it, and below 1.0 the account can be liquidated.",
-      },
-      {
-        bold: "Variable borrow interest",
-        text: "the rate moves with how much of the reserve is borrowed, and applies to the whole debt while it lasts.",
-      },
-      {
-        bold: "Borrowing for someone else",
-        text: "credit delegation: the owner approves another account on the asset's debt token for an amount they set, and that account can then borrow against the owner's collateral. The debt is the owner's.",
-      },
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
-  };
-}
-
-export function aaveV3LiquidationContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  const aave = protocol === "Aave V3";
-  const account = aave ? "An Aave V3 account" : `A ${protocol} account`;
-  return {
-    title: "How Liquidations Work",
-    intro: `${account} can be liquidated when its health factor falls below 1.0: its collateral, each asset counted up to its liquidation threshold, no longer covers its debt. Anyone can then liquidate it; in practice automated bots do.`,
-    extraParagraphs: [
-      protocol === "Seamless"
-        ? "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. Seamless can keep a share of the bonus, the liquidation protocol fee, also set per asset: it is 0 on most reserves, WETH and USDC among them, so the liquidator keeps the whole bonus. Each liquidation's card states the bonus and the fee at its block."
-        : "A liquidator repays some of one debt asset and takes one collateral asset in return, worth the debt repaid plus the collateral asset's liquidation bonus, which governance sets per asset. The bonus is the liquidator's reward and the borrower's cost. A share of it, the liquidation protocol fee, goes to the treasury as aTokens in the same transaction.",
-      aave
-        ? "One liquidation may repay up to half of the account's total debt. It may repay all of the debt asset when the health factor is at or below 0.95, or when the account's position in the debt or the collateral asset is worth under $2,000. The account stays open, and it can be liquidated again while its health factor is below 1.0."
-        : `One liquidation may repay up to half of the debt asset it repays, or all of it when the health factor is at or below 0.95. The account stays open, and it can be liquidated again while its health factor is below 1.0.`,
-      "Health factor = (collateral value × each asset's liquidation threshold) ÷ total debt. More collateral or less debt keeps it above 1.0.",
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
-  };
-}
-
-export function aaveV3BadDebtContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  const brand = v3Brand(protocol);
-  const isAave = protocol === "Aave V3";
-  return {
-    title: "How Bad Debt Is Written Off",
-    intro: `A liquidation can seize the last of an account's collateral while some of its debt is still outstanding. Nothing is left for a liquidator to take in return for repaying that remainder, so no one will. ${brand} does not leave it on the account: in the same transaction it burns the remaining debt tokens and records the amount as a deficit on the reserve.`,
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Not a repayment",
-        text: "no one paid the written-off amount. The borrower's debt on that reserve is cleared and the reserve carries the shortfall.",
-      },
-      {
-        bold: "Who absorbs it",
-        text: isAave
-          ? "the reserve's deficit is covered by Aave's Umbrella safety module and the DAO treasury, not by charging other borrowers."
-          : `the reserve's deficit is covered from ${brand}'s own reserves, not by charging other borrowers.`,
-      },
-      {
-        bold: "Why it happens",
-        text: "a fast price move, or a thin and volatile collateral, can carry a position past the point where the seized collateral still covers the debt before liquidators reach it.",
-      },
-      {
-        bold: "Recorded on chain",
-        text: "the Pool emits one DeficitCreated event per reserve written off. This row is that event, and it sits beside the liquidation that triggered it.",
-      },
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
-  };
-}
-
-export function aaveV3TransferContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  return {
-    title: "How Position Transfers Work",
-    intro: `Supplied balances on ${protocol} live as aTokens — ERC-20s that can move between accounts like any token. Transferring aTokens hands a supplied position (or part of one) to another account without withdrawing to a wallet and re-supplying. Custody changes hands; the tokens never leave the Pool.`,
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Not a deposit or withdrawal",
-        text: "a transfer is a change of custody, so the lifetime flows give it a separate row from supplied and withdrawn. Two transfers count as something else: one to the WETH gateway is a withdrawal to ETH (the gateway withdraws it in the same transaction), and a liquidation's protocol fee to the treasury counts with the collateral the liquidation took.",
-      },
-      {
-        bold: "Two accounts, one move",
-        text: "the same on-chain transfer shows as an out-leg on the sender and an in-leg on the recipient; each account's running balance stays exact because both legs are replayed.",
-      },
-      {
-        bold: "Health still enforced",
-        text: "the Pool blocks any transfer that would leave the sender's remaining collateral unable to cover its debt — the sender's health factor must stay above 1.0 after the move.",
-      },
-      {
-        bold: "Interest rides along",
-        text: "aTokens are interest-bearing: the amount shown is the underlying the transferred aTokens were worth at that moment, and it keeps earning the supply rate in the new account.",
-      },
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
-  };
-}
-
-/** Official sources for the swap modals: Aave's help page on withdrawing
- *  (the app's withdraw-and-switch), and the adapters' source in Aave's own
- *  periphery repository. */
-const AAVE_V3_SWAP_SOURCES = {
-  WITHDRAW_HELP: "https://aave.com/help/supplying/withdraw-tokens",
-  REPAY_ADAPTER:
-    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapRepayAdapter.sol",
-  WITHDRAW_SWAP_ADAPTER:
-    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapWithdrawSwapAdapter.sol",
-  LIQUIDITY_SWAP_ADAPTER:
-    "https://github.com/aave/aave-v3-periphery/blob/master/contracts/adapters/paraswap/ParaSwapLiquiditySwapAdapter.sol",
-  DEBT_SWAP_ADAPTER: "https://github.com/bgd-labs/aave-debt-swap",
-} as const;
-
-export function aaveV3RepayWithCollateralContent(): LearnMoreContent {
-  return {
-    title: "How Repaying with Collateral Works",
-    intro:
-      "Repaying with collateral pays a debt with the account's own supplied collateral instead of tokens from the wallet: in one transaction, part of the collateral is withdrawn, swapped for the debt asset, and used to repay.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "One transaction",
-        text: "Aave's repay adapter takes the owner's supplied collateral (the owner approves it first), withdraws it, swaps it through ParaSwap for the debt asset and repays. Where taking the collateral first would leave the account unhealthy, it repays first with a flash loan, a loan taken and returned inside the same transaction, and pays that back from the swap.",
-      },
-      {
-        bold: "Leftover supplied back",
-        text: "the swap is sized with room for price movement. Collateral the swap did not use is supplied back to the account in the same transaction, so what left the position is the amount taken less that return.",
-      },
-      {
-        bold: "Health factor",
-        text: "the debt and the collateral both fall. When the debt falls by more, relative to each asset's liquidation threshold, the health factor rises, which is why it is used to pull an account back from the liquidation line without new funds.",
-      },
-      {
-        bold: "Cost",
-        text: "the swap's price and slippage, and a flash-loan fee where one is used, are paid out of the collateral sold.",
-      },
     ],
     links: [
-      { label: "ParaSwap repay adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.REPAY_ADAPTER },
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
+      { label: "SparkLend docs", url: "https://docs.spark.fi/products/sparklend" },
+      { label: "Spark FAQ", url: "https://docs.spark.fi/faq" },
     ],
-  };
-}
-
-/** How a swap reached the market: an Aave ParaSwap adapter, or a CoW Protocol
- *  order (the Aave app's one-order contract). */
-export type AaveV3SwapVenue = "paraswap" | "cow";
-
-export function aaveV3CollateralSwapContent(venue: AaveV3SwapVenue = "paraswap"): LearnMoreContent {
-  const para = venue === "paraswap";
-  return {
-    title: "How a Collateral Swap Works",
-    intro:
-      "A collateral swap trades one supplied asset for another without either leaving the position: in one transaction, part of a supplied balance is withdrawn, swapped, and the asset bought is supplied back to the same account.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "One transaction",
-        text: para
-          ? "Aave's liquidity swap adapter takes the owner's aTokens (the owner approves it or signs a permit), withdraws the underlying, sells it through ParaSwap and supplies what it bought on the owner's behalf. Where the account needs that collateral to stay healthy while it moves, the adapter can use a flash loan, a loan taken and returned inside the same transaction, repaid from the owner's aTokens."
-          : "The owner signs a CoW Protocol order. CoW Protocol's settlement takes the owner's aTokens (directly, or through a one-order contract the Aave app creates), sells them, and the asset bought is supplied back to the account.",
-      },
-      {
-        bold: "Slippage",
-        text: para
-          ? "the owner sets how much of the new asset must arrive at least (minAmountToReceive); the swap reverts if the trade would deliver less. The price and slippage of the trade are paid out of the asset sold."
-          : "the order names the least the owner accepts for the asset sold; it settles at that or better, or not at all.",
-      },
-      {
-        bold: "Health factor",
-        text: "the debt does not move, and the collateral's value changes only by the trade's cost, so the health factor moves little. It moves more where the two assets have different liquidation thresholds: the new asset's threshold replaces the old one's for the amount swapped.",
-      },
-      {
-        bold: "Why do it",
-        text: "to change which asset backs the debt without repaying it: to move into an asset with a higher supply rate or loan-to-value, to change exposure (out of BTC into a stablecoin, or back), or to leave an asset whose settings governance is changing.",
-      },
-    ],
-    links: [
-      ...(para
-        ? [{ label: "ParaSwap liquidity swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.LIQUIDITY_SWAP_ADAPTER }]
-        : []),
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ],
-  };
-}
-
-export function aaveV3DebtSwapContent(venue: AaveV3SwapVenue = "paraswap"): LearnMoreContent {
-  const para = venue === "paraswap";
-  return {
-    title: "How a Debt Swap Works",
-    intro:
-      "A debt swap changes which asset the position owes: in one transaction a new debt is opened in another asset, swapped for the old debt's asset, and used to repay the old debt. The collateral does not move.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "One transaction",
-        text: para
-          ? "Aave's debt swap adapter opens the new debt in the owner's name with a flash loan that stays open as variable debt (the owner gives it credit delegation for that asset, usually by a signed permit), buys exactly the old debt's asset through ParaSwap, and repays the old debt with it."
-          : "The owner signs a CoW Protocol order; a one-order contract the Aave app creates borrows the new asset on the owner's behalf, sells it in CoW Protocol's settlement for the old debt's asset and repays the old debt.",
-      },
-      {
-        bold: "Borrowed to fund it, returned unused",
-        text: para
-          ? "the trade buys an exact amount, so the adapter borrows a little more of the new asset than the trade is expected to need (the owner's slippage allowance, capped by maxNewDebtAmount). What the trade did not use repays part of the new debt at once, so the new debt that stays is what was borrowed less that return."
-          : "the order names the most of the new asset the owner will sell; what the settlement did not use is not borrowed.",
-      },
-      {
-        bold: "Health factor",
-        text: para
-          ? "the new debt is worth about what the old debt was, plus the trade's cost, so the health factor moves little at the time. Where the account is close to its borrowing limit, the adapter can also flash-borrow collateral for the length of the transaction so the Pool accepts the new debt."
-          : "the new debt is worth about what the old debt was, plus the trade's cost, so the health factor moves little at the time.",
-      },
-      {
-        bold: "What it changes",
-        text: "the position now owes the new asset. Its dollar value follows that asset's price from here: owing BTC in place of a stablecoin means the debt, and with it the health factor, moves with BTC, and the variable rate is the new asset's.",
-      },
-      {
-        bold: "Why do it",
-        text: "to move to a lower borrow rate, to take a view on prices (owing an asset the owner expects to fall), or to hedge collateral held in the same asset.",
-      },
-    ],
-    links: [
-      ...(para
-        ? [{ label: "ParaSwap debt swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.DEBT_SWAP_ADAPTER }]
-        : []),
-      { label: "Health factor & liquidations", url: AAVE_FAQ_URLS.LIQUIDATIONS },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ],
-  };
-}
-
-export function aaveV3WithdrawAndSwapContent(): LearnMoreContent {
-  return {
-    title: "How Withdraw and Swap Works",
-    intro:
-      "Withdraw and swap takes supplied tokens out of the Pool and swaps them for another token in one transaction; the Aave app calls it withdrawing and switching. The swapped tokens go to the wallet, outside the position.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "One transaction",
-        text: "Aave's withdraw swap adapter takes the owner's supplied tokens (the owner approves it to), withdraws them from the Pool, swaps them through ParaSwap and sends the result to the owner.",
-      },
-      {
-        bold: "A withdrawal first",
-        text: "for the position it is a withdrawal: the supplied balance falls, and the Pool refuses it if the health factor would end below 1.0.",
-      },
-      {
-        bold: "Cost",
-        text: "the swap's price and slippage decide how much of the new token arrives.",
-      },
-    ],
-    links: [
-      { label: "Withdrawing (Aave help)", url: AAVE_V3_SWAP_SOURCES.WITHDRAW_HELP },
-      { label: "ParaSwap withdraw swap adapter (Aave source)", url: AAVE_V3_SWAP_SOURCES.WITHDRAW_SWAP_ADAPTER },
-    ],
-  };
-}
-
-export function aaveV3EventFallbackContent(protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  return {
-    title: `How ${protocol} Positions Work`,
-    intro: `${protocol} lets a wallet supply assets as collateral and borrow against them inside one cross-collateralised account, where a single shared health factor governs the whole position.`,
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Supply & collateral",
-        text: "supplied assets earn interest and, unless disabled, back the account's borrowing as collateral.",
-      },
-      {
-        bold: "Borrowing & health factor",
-        text: "borrowing draws against the pooled collateral; the health factor measures how safely the combined debt is covered.",
-      },
-      {
-        bold: "One pooled account",
-        text: "all of a wallet's supply and debt in one market share one account and one health factor.",
-      },
-    ],
-    links: v3ModalLinks(protocol, [
-      { label: "Supplying assets", url: AAVE_FAQ_URLS.SUPPLYING },
-      { label: "Borrowing assets", url: AAVE_FAQ_URLS.BORROWING },
-      { label: "Aave FAQ", url: AAVE_FAQ_URLS.FAQ },
-    ]),
   };
 }
 

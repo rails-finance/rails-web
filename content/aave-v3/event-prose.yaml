@@ -1,0 +1,1644 @@
+# Aave V3 event prose: every string the Aave V3 family prints in an event's
+# explanation (Z2), the position card's explanation (Z1) and the "?" modals
+# (Z4), on Aave V3 Ethereum (Core, Prime, EtherFi), Aave V3 Base and Seamless
+# (an Aave V3 fork on Base, the same Pool code). Seamless reads this file: the
+# protocol and brand are values, and a modal's Seamless wording is its
+# `intro_seamless` / `text_seamless` form. Read by lib/aave-v3/event-templates.ts
+# (the loader) and lib/aave-v3/event-prose.ts (the generator). Every string is
+# one line; `{name}` is a value the code supplies, `{name|rounding}` the same
+# value at another rounding. Limits: rails-ops standards/prose-limits-and-zones.md.
+
+roundings:
+  token: |-
+    A token amount as the event header prints it, three places, never a false zero.
+  token_leg: |-
+    A liquidation leg at two places, significant places below 1.
+  token_pos: |-
+    A token amount as the card's rows print it: whole from 1,000, four places from 1.
+  hf: |-
+    A health factor as the card prints it: four places below 1.1, two above.
+  pct_whole: |-
+    A fraction as a whole percentage.
+  pct_plain: |-
+    A fraction as a percentage to two places, trailing zeros dropped.
+  ratio_frac: |-
+    A fraction as a percentage with two places.
+  usd_cents: |-
+    Dollars and cents.
+  date: |-
+    A day, month and year.
+  count: |-
+    A whole number with thousands separators.
+  text: |-
+    A name or a word, printed as given.
+  address: |-
+    An address, shortened and linked to the explorer.
+
+placeholders:
+  # ── Z2: the event ──
+  amount:
+    rounding: token
+    means: |-
+      The amount the event moved, as its header prints it.
+  symbol:
+    rounding: text
+    means: |-
+      The event's reserve symbol.
+  protocol:
+    rounding: text
+    means: |-
+      The protocol the Pool belongs to, Aave V3 or Seamless.
+  brand:
+    rounding: text
+    means: |-
+      The protocol without its version, Aave or Seamless.
+  actor:
+    rounding: address
+    means: |-
+      The account that sent the transaction when it was not the owner.
+  sender:
+    rounding: text
+    means: |-
+      A transfer's sender: a named contract, or another account.
+  recipient:
+    rounding: text
+    means: |-
+      A transfer's recipient: a named contract, or another account.
+  role:
+    rounding: text
+    means: |-
+      What a named contract is.
+  sent_on:
+    rounding: date
+    means: |-
+      The day the position sent the transfer that came back.
+  swap_received:
+    rounding: token_pos
+    means: |-
+      What the withdraw and swap just before sent to the wallet.
+  hf_after:
+    rounding: hf
+    means: |-
+      The health factor once the transaction ran.
+  hf_before:
+    rounding: hf
+    means: |-
+      The health factor before the transaction.
+  hf_prev:
+    rounding: hf
+    means: |-
+      The health factor after the previous event.
+  hf_call:
+    rounding: hf
+    means: |-
+      The health factor at the prices the liquidation ran at.
+  drop_pct:
+    rounding: pct_whole
+    means: |-
+      The fall in the collateral's value that takes the health factor to 1.
+  coll_symbol:
+    rounding: text
+    means: |-
+      The one collateral asset, or the collateral a liquidation took.
+  price_symbol:
+    rounding: text
+    means: |-
+      The collateral whose price moved most since the previous event.
+  side_word:
+    rounding: text
+    means: |-
+      The rate's side, supply or borrow.
+  rate_avg:
+    rounding: ratio_frac
+    means: |-
+      The rate averaged since the previous event, a year.
+  rate_then:
+    rounding: ratio_frac
+    means: |-
+      The rate after the previous event, a year.
+  rate_now:
+    rounding: ratio_frac
+    means: |-
+      The rate at this block, a year.
+  cleared:
+    rounding: token_leg
+    means: |-
+      The debt a liquidator repaid.
+  seized:
+    rounding: token_leg
+    means: |-
+      The collateral a liquidator took.
+  debt_symbol:
+    rounding: text
+    means: |-
+      The debt asset a liquidation repaid.
+  bonus:
+    rounding: pct_plain
+    means: |-
+      The liquidation bonus on the collateral at the block.
+  fee:
+    rounding: token_leg
+    means: |-
+      The protocol's fee taken from the collateral in the liquidation.
+  fee_share:
+    rounding: pct_plain
+    means: |-
+      The share of the liquidation bonus the protocol keeps.
+  cleared_usd:
+    rounding: usd_cents
+    means: |-
+      The debt cleared, at the block's oracle price.
+  debt_usd:
+    rounding: usd_cents
+    means: |-
+      The account's whole debt before the liquidation, in dollars.
+  debt_before:
+    rounding: token_leg
+    means: |-
+      The debt asset's balance before the liquidation.
+  other_debt:
+    rounding: text
+    means: |-
+      The debt assets a liquidation left as they were.
+  given:
+    rounding: token_pos
+    means: |-
+      What a swap gave up.
+  received:
+    rounding: token_pos
+    means: |-
+      What a swap received.
+  r_symbol:
+    rounding: text
+    means: |-
+      The symbol of what a swap received.
+  venue:
+    rounding: text
+    means: |-
+      How a swap was made: a ParaSwap adapter or a CoW Protocol settlement.
+  funded:
+    rounding: token_pos
+    means: |-
+      What a debt swap's adapter borrowed to fund the trade.
+  back:
+    rounding: token_pos
+    means: |-
+      What a swap's adapter returned unused.
+  sent:
+    rounding: token_pos
+    means: |-
+      The collateral a repay-with-collateral adapter took before its return.
+  event_type:
+    rounding: text
+    means: |-
+      The event's type as the index names it.
+  # ── Z1: the position card ──
+  hf:
+    rounding: hf
+    means: |-
+      The account's health factor now.
+  coll_usd:
+    rounding: usd_cents
+    means: |-
+      The collateral at the Pool's oracle prices now.
+  ltv:
+    rounding: ratio_frac
+    means: |-
+      The debt divided by the collateral.
+  max_ltv:
+    rounding: ratio_frac
+    means: |-
+      The account's maximum loan-to-value.
+  liq_price:
+    rounding: usd_cents
+    means: |-
+      The single collateral's price at which the account becomes liquidatable.
+  drop:
+    rounding: pct_whole
+    means: |-
+      The fall in the collateral that takes the health factor to 1.
+  capacity:
+    rounding: usd_cents
+    means: |-
+      What could still be borrowed at today's prices.
+  emode_lt:
+    rounding: ratio_frac
+    means: |-
+      The e-mode category's liquidation threshold.
+  rate:
+    rounding: ratio_frac
+    means: |-
+      The debt's borrow rate now.
+  external:
+    rounding: count
+    means: |-
+      The events another account sent.
+  events:
+    rounding: count
+    means: |-
+      The events on the account's timeline.
+  closed:
+    rounding: date
+    means: |-
+      The day the account's record closed.
+  peak_supply:
+    rounding: token_pos
+    means: |-
+      The highest recorded supply of up to three reserves.
+  peak_borrow:
+    rounding: token_pos
+    means: |-
+      The highest recorded debt of up to three reserves.
+  liq_count:
+    rounding: count
+    means: |-
+      The liquidations in the account's record.
+  tx_count:
+    rounding: count
+    means: |-
+      The owner's transactions.
+
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# Words the generator and the position explanation put into a sentence.
+words:
+  another_account: |-
+    another account
+  side_supply: |-
+    supply
+  side_borrow: |-
+    borrow
+  venue_paraswap: |-
+    a ParaSwap adapter
+  venue_cow: |-
+    a CoW Protocol settlement
+  and: |-
+    and
+  assets: |-
+    {n} assets
+  more_reserves: |-
+    {n} more reserves
+  more_reserve: |-
+    one more reserve
+
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── An open account ──
+  lead_hf: |-
+    This account borrows against its collateral at a {hf} health factor:
+  lead_debt: |-
+    This account borrows against its collateral:
+  lead_no_debt: |-
+    This account supplies collateral and borrows nothing, so none of it can be liquidated:
+  lead_unread: |-
+    This account borrows {debt_assets} against {coll_assets}:
+  unread: |-
+    The health factor waits for the Pool's read at the current block, which has not answered.
+  worth: |-
+    The collateral is worth {coll_usd} and the debt {debt_usd} at the Pool's oracle prices.
+  worth_no_debt: |-
+    The collateral is worth {coll_usd} at the Pool's oracle prices.
+  inert: |-
+    The supplied {inert_assets} backs nothing: its liquidation threshold is zero, so it supports no borrowing.
+  inert_many: |-
+    The supplied {inert_assets} back nothing: their liquidation threshold is zero, so they support no borrowing.
+  ltv_cap: |-
+    Borrowing stands at {ltv} of the collateral, against a {max_ltv} cap.
+  liq_single: |-
+    If {liq_symbol} falls about {drop} to {liq_price}, the account can be liquidated.
+  liq_basket: |-
+    The collateral can fall about {drop} in value before liquidation.
+  capacity: |-
+    About {capacity} more could be borrowed at current prices.
+  emode: |-
+    The {emode} e-mode category sets a {emode_lt} liquidation threshold for {emode_assets}.
+  rate: |-
+    The debt accrues at a {rate} borrow rate.
+  rate_avg: |-
+    The debt accrues at a {rate} average borrow rate.
+  rate_move: |-
+    The {rate_symbol} borrow rate is {rate_now}, against {rate_then} at the last borrow.
+  operators: |-
+    {external} of the {events} events were sent by other accounts on the owner's behalf.
+  operators_one: |-
+    {external} of the {events} events were sent by {actor} on the owner's behalf.
+  # ── A closed or liquidated account ──
+  closed_lead_transfers: |-
+    This account's balances arrived and left as aToken transfers, with no Pool transaction by the owner:
+  closed_lead_transfer_out: |-
+    This account ended on {closed} when its supply moved to another account:
+  closed_lead_seized: |-
+    Liquidation emptied this account on {closed}:
+  closed_lead_after_liq: |-
+    The owner closed this account on {closed}, after liquidation:
+  closed_lead_repaid: |-
+    The owner closed this account on {closed}, with its debt repaid:
+  closed_lead_supply: |-
+    The owner closed this account on {closed}, with nothing ever borrowed:
+  peaks_both: |-
+    At its height it held {peak_supply} supplied and owed {peak_borrow}.
+  peaks_supply: |-
+    At its height it held {peak_supply} supplied.
+  peaks_borrow: |-
+    It held no lasting supply and owed as much as {peak_borrow}.
+  seizures: |-
+    Liquidators seized its collateral {liq_count} times.
+  seizure_one: |-
+    Liquidators seized its collateral once.
+  tx: |-
+    Its record holds {tx_count} transactions by the owner.
+  tx_one: |-
+    Its record holds one transaction by the owner.
+  tx_none: |-
+    The liquidations are its only recorded events.
+
+# Sentences more than one template says.
+shared_sentences:
+  off.switched:
+    when: |-
+      the event took the last of a supply that was on as collateral
+    text: |-
+      With none of it left, {symbol} no longer counts as collateral.
+  hf.under:
+    when: |-
+      the health factor after is 1 or below
+    text: |-
+      At {hf_after} the account can be liquidated.
+  hf.close:
+    when: |-
+      the health factor after is under 1.1, one collateral asset
+    text: |-
+      At {hf_after} the account is close to liquidation: a {drop_pct} fall in {coll_symbol}'s price would liquidate it.
+  hf.close_basket:
+    when: |-
+      the health factor after is under 1.1, several collateral assets
+    text: |-
+      At {hf_after} the account is close to liquidation: a {drop_pct} fall in the collateral's value would liquidate it.
+  hf.close_same:
+    when: |-
+      the health factor after is under 1.1, the one collateral is also the one debt
+    text: |-
+      At {hf_after} the account is close to liquidation, and with {coll_symbol} on both sides only interest moves it.
+  hf.near:
+    when: |-
+      the health factor after is from 1.1 to 1.2, one collateral asset
+    text: |-
+      A {drop_pct} fall in {coll_symbol}'s price would make the account liquidatable.
+  hf.near_basket:
+    when: |-
+      the health factor after is from 1.1 to 1.2, several collateral assets
+    text: |-
+      A {drop_pct} fall in the collateral's value would make the account liquidatable.
+  hf.near_same:
+    when: |-
+      the health factor after is from 1.1 to 1.2, the one collateral is also the one debt
+    text: |-
+      With {coll_symbol} on both sides, its price leaves the health factor where it is.
+  hf.started_close:
+    when: |-
+      the account started the transaction under 1.1 and ended at 1.2 or above
+    text: |-
+      The account started this transaction close to liquidation, at {hf_before}.
+  hf.cleared:
+    when: |-
+      the transaction left no debt where there was some
+    text: |-
+      With no debt left, the account cannot be liquidated.
+  hf.closed:
+    when: |-
+      the account holds nothing and owes nothing after the transaction
+    text: |-
+      This closed the position: the account holds nothing and owes nothing.
+  prior.price:
+    when: |-
+      the health factor moved since the previous event, a collateral price the largest cause
+    text: |-
+      {price_symbol}'s price change took the health factor from {hf_prev} to {hf_before} since the previous event.
+  prior.prices:
+    when: |-
+      the health factor moved since the previous event, several prices the largest cause
+    text: |-
+      Oracle price moves took the health factor from {hf_prev} to {hf_before} since the previous event.
+  prior.interest:
+    when: |-
+      the health factor moved since the previous event, interest the largest cause
+    text: |-
+      Interest took the health factor from {hf_prev} to {hf_before} since the previous event.
+  prior.threshold:
+    when: |-
+      the health factor moved since the previous event, a threshold change the largest cause
+    text: |-
+      A governance change to a liquidation threshold took the health factor from {hf_prev} to {hf_before} since then.
+  prior.emode:
+    when: |-
+      the health factor moved since the previous event, an e-mode switch the largest cause
+    text: |-
+      The e-mode switch took the health factor from {hf_prev} to {hf_before} since the previous event.
+  prior.plain:
+    when: |-
+      the health factor moved since the previous event, cause unread
+    text: |-
+      The health factor moved from {hf_prev} to {hf_before} since the previous event, with no transaction.
+  rate.avg:
+    when: |-
+      both reads are at their blocks a day or more apart
+    text: |-
+      The {symbol} {side_word} rate averaged {rate_avg} a year since the previous event.
+  rate.moved:
+    when: |-
+      both reads are at their blocks under a day apart
+    text: |-
+      The {symbol} {side_word} rate was {rate_then} after the previous event and {rate_now} at this block.
+  rate.held:
+    when: |-
+      both reads are at their blocks under a day apart, and the rate did not move
+    text: |-
+      The {symbol} {side_word} rate held at {rate_now} a year since the previous event.
+  rate.at:
+    when: |-
+      a borrow with no reads: the rate the row logged
+    text: |-
+      The {symbol} variable borrow rate was {rate_now} a year at this block.
+
+templates:
+  - id: aave3.supply
+    title: |-
+      Supply
+    when: |-
+      supply
+    L5: supply
+    variants:
+      default: |-
+        a supply to the Pool
+    sentences:
+      supply.what:
+        when: |-
+          the owner sent it
+        text: |-
+          Supplied {amount} {symbol} to {protocol}.
+      supply.by:
+        when: |-
+          another account sent it
+        text: |-
+          {actor} supplied {amount} {symbol} to {protocol} on the owner's behalf.
+      coll.on:
+        when: |-
+          the Pool switched the asset on as collateral in this transaction
+        text: |-
+          The Pool switched {symbol} on as collateral, so it backs the debt and can be seized in a liquidation.
+      coll.was_on:
+        when: |-
+          the asset was on as collateral before
+        text: |-
+          {symbol} was on as collateral, so the new {symbol} backs the debt at once.
+      coll.zero_ltv:
+        when: |-
+          the asset is off as collateral and its loan-to-value is 0%
+        text: |-
+          {symbol} cannot back borrowing here: its loan-to-value at this block is 0%, so it stays off as collateral.
+      coll.stays_off:
+        when: |-
+          the asset is off as collateral and could be switched on
+        text: |-
+          {symbol} stayed off as collateral, so this supply earns interest and backs no debt.
+    order: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    groups:
+      happened: [supply.what, supply.by, coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
+      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    alternates:
+      - [supply.what, supply.by]
+      - [coll.on, coll.was_on, coll.zero_ltv, coll.stays_off]
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      - [rate.avg, rate.moved, rate.held]
+
+  - id: aave3.withdraw
+    title: |-
+      Withdraw
+    when: |-
+      withdraw, or a transfer of supply to the WETH gateway
+    L5: withdraw
+    variants:
+      default: |-
+        a withdrawal from the Pool
+      gateway: |-
+        a withdrawal as ETH through the WETH gateway
+    sentences:
+      withdraw.what:
+        when: |-
+          default
+        text: |-
+          Withdrew {amount} {symbol} from {protocol} to the wallet.
+      withdraw.gateway:
+        when: |-
+          gateway
+        text: |-
+          Withdrew {amount} {symbol} as ETH through the WETH gateway.
+    order: [withdraw.what, withdraw.gateway, off.switched, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    groups:
+      happened: [withdraw.what, withdraw.gateway, off.switched]
+      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    alternates:
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      - [rate.avg, rate.moved, rate.held]
+
+  - id: aave3.borrow
+    title: |-
+      Borrow
+    when: |-
+      borrow
+    L5: borrow
+    variants:
+      default: |-
+        a borrow from the Pool
+    sentences:
+      borrow.what:
+        when: |-
+          the owner sent it
+        text: |-
+          Borrowed {amount} {symbol} against the account's collateral.
+      borrow.by:
+        when: |-
+          another account sent it, with credit the owner delegated
+        text: |-
+          {actor} borrowed {amount} {symbol} on the owner's behalf, with credit the owner delegated.
+    order: [borrow.what, borrow.by, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held, rate.at]
+    groups:
+      happened: [borrow.what, borrow.by]
+      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held, rate.at]
+    alternates:
+      - [borrow.what, borrow.by]
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      - [rate.avg, rate.moved, rate.held, rate.at]
+
+  - id: aave3.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: repay
+    variants:
+      default: |-
+        a repayment to the Pool
+    sentences:
+      repay.what:
+        when: |-
+          the owner repaid from the wallet and debt remains
+        text: |-
+          Repaid {amount} {symbol} of the account's debt.
+      repay.cleared:
+        when: |-
+          the owner repaid from the wallet and the reserve's debt is gone
+        text: |-
+          Repaid {amount} {symbol}, clearing the account's {symbol} debt.
+      repay.atokens:
+        when: |-
+          repaid with supplied tokens of the same asset, debt remains
+        text: |-
+          Repaid {amount} {symbol} of debt with supplied {symbol}.
+      repay.atokens_cleared:
+        when: |-
+          repaid with supplied tokens of the same asset, the reserve's debt is gone
+        text: |-
+          Repaid {amount} {symbol} with supplied {symbol}, clearing the {symbol} debt.
+      repay.by:
+        when: |-
+          another account repaid, debt remains
+        text: |-
+          {actor} repaid {amount} {symbol} of the account's debt on the owner's behalf.
+      repay.by_cleared:
+        when: |-
+          another account repaid, the reserve's debt is gone
+        text: |-
+          {actor} repaid {amount} {symbol} on the owner's behalf, clearing the {symbol} debt.
+      repay.funded:
+        when: |-
+          a withdraw and swap within the hour before sent this token to the wallet
+        text: |-
+          The {symbol} came from the withdraw and swap just before, which sent {swap_received} {symbol} to the wallet.
+    order: [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    groups:
+      happened: [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared, repay.funded]
+      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain, rate.avg, rate.moved, rate.held]
+    alternates:
+      - [repay.what, repay.cleared, repay.atokens, repay.atokens_cleared, repay.by, repay.by_cleared]
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+      - [rate.avg, rate.moved, rate.held]
+
+  - id: aave3.swap
+    title: |-
+      Swap
+    when: |-
+      a swap through a ParaSwap adapter or a CoW Protocol settlement
+    L5: fallback
+    variants:
+      debt_swap: |-
+        a debt swap
+      repay_with_collateral: |-
+        a repay with collateral
+      supply_from_swap: |-
+        a supply from a swap
+      withdraw_and_swap: |-
+        a withdraw and swap
+      collateral_swap: |-
+        a collateral swap
+    sentences:
+      swap.debt:
+        when: |-
+          debt_swap
+        text: |-
+          Repaid {given} {symbol} of debt and took on {received} {r_symbol} of debt in its place, through {venue}.
+      swap.repay:
+        when: |-
+          repay_with_collateral
+        text: |-
+          Repaid {received} {r_symbol} of debt with {given} {symbol} of supplied collateral, through {venue}.
+      swap.supply_from:
+        when: |-
+          supply_from_swap
+        text: |-
+          Sold {received} {r_symbol} from the wallet for {given} {symbol}, supplied to this position through {venue}.
+      swap.withdraw:
+        when: |-
+          withdraw_and_swap
+        text: |-
+          Withdrew {given} {symbol} of supply and swapped it for {received} {r_symbol}, through {venue}.
+      swap.withdraw_wallet:
+        when: |-
+          withdraw_and_swap through a ParaSwap adapter
+        text: |-
+          The {r_symbol} went to the wallet, outside the position.
+      swap.withdraw_receiver:
+        when: |-
+          withdraw_and_swap through a CoW Protocol settlement
+        text: |-
+          The {r_symbol} went to the order's receiver, outside the position.
+      swap.collateral:
+        when: |-
+          collateral_swap
+        text: |-
+          Swapped {given} {symbol} of supply for {received} {r_symbol} of supply, through {venue}.
+      swap.off:
+        when: |-
+          withdraw_and_swap, repay_with_collateral or collateral_swap that took the last of a collateral supply
+        text: |-
+          With none of it left, {symbol} no longer counts as collateral.
+      swap.debt_funded:
+        when: |-
+          debt_swap through a ParaSwap adapter that returned part of what it borrowed
+        text: |-
+          The adapter borrowed {funded} {r_symbol} and returned {back} {r_symbol} it did not use.
+      swap.repay_net:
+        when: |-
+          repay_with_collateral through a ParaSwap adapter that supplied part back
+        text: |-
+          The adapter took {sent} {symbol} and supplied {back} {symbol} back unused.
+      swap.debt_owes:
+        when: |-
+          debt_swap
+        text: |-
+          The position now owes {r_symbol}, so its debt in dollars moves with {r_symbol}'s price.
+      swap.supply_wallet:
+        when: |-
+          supply_from_swap
+        text: |-
+          The {r_symbol} left the wallet, and the {symbol} entered the position as supply.
+    order: [swap.debt, swap.repay, swap.supply_from, swap.withdraw, swap.withdraw_wallet, swap.withdraw_receiver, swap.collateral, swap.off, swap.debt_funded, swap.repay_net, swap.debt_owes, swap.supply_wallet, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    groups:
+      happened: [swap.debt, swap.repay, swap.supply_from, swap.withdraw, swap.withdraw_wallet, swap.withdraw_receiver, swap.collateral, swap.off]
+      adds_up: [swap.debt_funded, swap.repay_net]
+      leaves: [swap.debt_owes, swap.supply_wallet, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    alternates:
+      - [swap.withdraw_wallet, swap.withdraw_receiver]
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+
+  - id: aave3.transfer_in
+    title: |-
+      Transfer in
+    when: |-
+      transfer_in
+    L5: transfer
+    variants:
+      default: |-
+        supply received as an aToken transfer
+    sentences:
+      tin.what:
+        when: |-
+          always
+        text: |-
+          Received {amount} {symbol} of supply from {sender} as an aToken transfer.
+      tin.named:
+        when: |-
+          the sender is a known contract
+        text: |-
+          The sender is {role}.
+      tin.returned:
+        when: |-
+          the previous row sent the same reserve to the same account, and the supply index accounts for the difference
+        text: |-
+          It returns what this position sent the same account on {sent_on}, with the interest earned since.
+    order: [tin.what, tin.named, tin.returned]
+    groups:
+      happened: [tin.what, tin.named]
+      leaves: [tin.returned]
+
+  - id: aave3.transfer_out
+    title: |-
+      Transfer out
+    when: |-
+      transfer_out to an account other than the WETH gateway or, in a liquidation, the treasury
+    L5: transfer
+    variants:
+      default: |-
+        supply sent as an aToken transfer
+    sentences:
+      tout.what:
+        when: |-
+          always
+        text: |-
+          Sent {amount} {symbol} of supply to {recipient} as an aToken transfer.
+      tout.named:
+        when: |-
+          the recipient is a known contract
+        text: |-
+          The recipient is {role}.
+    order: [tout.what, tout.named, off.switched, hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    groups:
+      happened: [tout.what, tout.named, off.switched]
+      leaves: [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed, prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+    alternates:
+      - [hf.under, hf.close, hf.close_basket, hf.close_same, hf.near, hf.near_basket, hf.near_same, hf.started_close, hf.cleared, hf.closed]
+      - [prior.price, prior.prices, prior.interest, prior.threshold, prior.emode, prior.plain]
+
+  - id: aave3.liq_fee
+    title: |-
+      Liquidation fee
+    when: |-
+      transfer_out to the treasury in a liquidation's transaction
+    L5: liquidation
+    variants:
+      default: |-
+        the protocol's fee on a liquidation
+    sentences:
+      fee.what:
+        when: |-
+          always
+        text: |-
+          Sent {amount|token_leg} {symbol} of supply to the {brand} treasury as the liquidation's protocol fee.
+      fee.split:
+        when: |-
+          always
+        text: |-
+          The liquidator took {seized} {symbol} of the collateral and the treasury {amount|token_leg} {symbol}.
+      fee.share:
+        when: |-
+          the bonus and its fee share are read
+        text: |-
+          {brand} keeps {fee_share} of the liquidation bonus on {symbol}.
+    order: [fee.what, fee.split, fee.share]
+    groups:
+      happened: [fee.what]
+      adds_up: [fee.split]
+      leaves: [fee.share]
+
+  - id: aave3.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation
+    L5: liquidation
+    variants:
+      default: |-
+        a liquidation
+    sentences:
+      liq.what:
+        when: |-
+          always
+        text: |-
+          A liquidator repaid {cleared} {debt_symbol} of the debt and took {seized} {coll_symbol} of collateral.
+      liq.why:
+        when: |-
+          the health factor at the call is read
+        text: |-
+          The health factor had fallen to {hf_call} at the prices the liquidation ran at.
+      liq.why_unread:
+        when: |-
+          the health factor at the call is not read
+        text: |-
+          The health factor had fallen below 1.
+      liq.bonus_fee:
+        when: |-
+          the bonus and the fee are known
+        text: |-
+          {brand} paid a {bonus} bonus on {coll_symbol}, and {fee} {coll_symbol} of it went to the treasury.
+      liq.bonus_all:
+        when: |-
+          the bonus is known and the fee was 0 at the block
+        text: |-
+          {brand} paid a {bonus} liquidation bonus on {coll_symbol}, all of it to the liquidator.
+      liq.bonus:
+        when: |-
+          the bonus is known and the fee is not
+        text: |-
+          {brand} paid a {bonus} liquidation bonus on {coll_symbol}.
+      liq.fee:
+        when: |-
+          the fee is known and the bonus is not
+        text: |-
+          {fee} {coll_symbol} of the collateral went to the treasury as the protocol's fee.
+      liq.half_usd:
+        when: |-
+          Aave V3: the debt cleared is half the account's whole debt
+        text: |-
+          The {cleared_usd} cleared is half of the {debt_usd} owed, the most one liquidation may take.
+      liq.half_asset:
+        when: |-
+          Seamless: the debt cleared is half the debt asset's balance
+        text: |-
+          The {cleared} {debt_symbol} repaid is half of the {debt_before} {debt_symbol} owed, the most one call may take.
+      liq.again:
+        when: |-
+          the health factor after is above 1 or unread, no other debt left
+        text: |-
+          The account stays open and can be liquidated again if the health factor falls below 1.
+      liq.again_now:
+        when: |-
+          the health factor after is 1 or below
+        text: |-
+          At {hf_after} the account can be liquidated again.
+      liq.left:
+        when: |-
+          other debt assets were left as they were
+        text: |-
+          The {other_debt} debt was left as it was, and the account stays open.
+    order: [liq.what, liq.why, liq.why_unread, liq.bonus_fee, liq.bonus_all, liq.bonus, liq.fee, liq.half_usd, liq.half_asset, liq.again, liq.again_now, liq.left]
+    groups:
+      happened: [liq.what, liq.why, liq.why_unread]
+      adds_up: [liq.bonus_fee, liq.bonus_all, liq.bonus, liq.fee, liq.half_usd, liq.half_asset]
+      leaves: [liq.again, liq.again_now, liq.left]
+    alternates:
+      - [liq.why, liq.why_unread]
+      - [liq.bonus_fee, liq.bonus_all, liq.bonus, liq.fee]
+      - [liq.half_usd, liq.half_asset]
+      - [liq.again, liq.again_now, liq.left]
+
+  - id: aave3.bad_debt
+    title: |-
+      Bad debt written off
+    when: |-
+      bad_debt_written_off
+    L5: bad_debt
+    variants:
+      default: |-
+        debt written off after a liquidation
+    sentences:
+      bad.what:
+        when: |-
+          always
+        text: |-
+          A liquidation left no collateral to cover {amount} {symbol} of debt, so {brand} wrote it off.
+      bad.deficit:
+        when: |-
+          always
+        text: |-
+          Nothing was repaid: the Pool records the amount as a deficit on the reserve.
+    order: [bad.what, bad.deficit]
+    groups:
+      happened: [bad.what]
+      leaves: [bad.deficit]
+
+  - id: aave3.fallback
+    title: |-
+      Event
+    when: |-
+      any other row
+    L5: fallback
+    variants:
+      default: |-
+        an event the templates above do not cover
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The Pool recorded this {event_type} event for the account.
+    order: [fallback.what]
+    groups:
+      happened: [fallback.what]
+
+# Every Quick Link's page, with its anchor. A row in rails-ops
+# reference/official-docs/aave-v3.md backs each.
+doc_urls:
+  HF: https://aave.com/help/borrowing/liquidations#health-factor
+  LIQ_PROCESS: https://aave.com/help/borrowing/liquidations#liquidation-process
+  SUPPLY_HELP: https://aave.com/help/supplying/supply-tokens#introduction
+  WITHDRAW_HELP: https://aave.com/help/supplying/withdraw-tokens#introduction
+  WITHDRAW_COLLATERAL: https://aave.com/help/supplying/withdraw-tokens#step-5-handling-collateralised-tokens
+  WITHDRAW_SWITCH: https://aave.com/help/supplying/withdraw-tokens#step-6-withdrawing-and-switching-tokens
+  TOGGLE_COLLATERAL: https://aave.com/help/supplying/toggle-collateral-status#step-4-monitor-your-health-factor
+  ISOLATION: https://aave.com/help/supplying/isolation-mode#supplying-an-isolated-asset
+  BORROW_HELP: https://aave.com/help/borrowing/borrow-tokens#introduction
+  REPAY_HELP: https://aave.com/help/borrowing/repay-tokens#introduction
+  EMODE_HELP: https://aave.com/help/borrowing/e-mode#introduction
+  RESERVE: https://aave.com/docs/aave-v3/concepts/reserve#key-reserve-parameters
+  RESERVE_GOVERNANCE: https://aave.com/docs/aave-v3/concepts/reserve#dynamic-parameters-and-governance
+  POOL_REPAY: https://aave.com/docs/aave-v3/concepts/liquidity-pool#repay
+  OVERVIEW_SUPPLY: https://aave.com/docs/aave-v3/overview#supply
+  OVERVIEW_BORROW: https://aave.com/docs/aave-v3/overview#borrow
+  INTEREST_RATES: https://aave.com/docs/aave-v3/overview#interest-rates
+  CREDIT_DELEGATION: https://aave.com/docs/aave-v3/guides/credit-delegation#approving-the-delegation
+  ATOKEN: https://aave.com/docs/aave-v3/smart-contracts/tokenization#atoken
+  GATEWAY: https://aave.com/docs/aave-v3/smart-contracts/wrapped-token-gateway#write-methods-withdraweth
+  SWAP_TOKENS: https://aave.com/docs/aave-v3/smart-contracts/swap-features#swap-tokens
+  SWAP_REPAY: https://aave.com/docs/aave-v3/smart-contracts/swap-features#repay-with-collateral
+  SWAP_COLLATERAL: https://aave.com/docs/aave-v3/smart-contracts/swap-features#collateral-swap
+  SWAP_DEBT: https://aave.com/docs/aave-v3/smart-contracts/swap-features#borrow-position-swap
+  SWAP_WITHDRAW: https://aave.com/docs/aave-v3/smart-contracts/swap-features#withdraw-swap
+  FAQ_FLASH_LOAN: https://aave.com/faq#other-features-what-is-a-flash-loan
+  FAQ_LIQ_PRICE: https://aave.com/faq#liquidations-what-is-my-liquidation-price
+  FAQ_PENALTY: https://aave.com/faq#liquidations-how-much-is-the-liquidation-penalty
+  FAQ_SUPPLY_LIMITS: https://aave.com/faq#supplying-earning-are-there-limitations-to-supply
+  UMBRELLA: https://aave.com/help/umbrella/umbrella#what-is-umbrella
+  UMBRELLA_DEFICIT: https://aave.com/docs/aave-v3/umbrella#slashing-risk-and-deficit-protection
+
+L5:
+  supply:
+    title: |-
+      How Supplying Works
+    intro: |-
+      Supplying deposits an asset into the Pool, which mints aTokens for it. The deposit earns the variable supply rate and, while on as collateral, backs borrowing.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Supplied balance
+        text: |-
+          the aToken balance grows at the supply rate, which follows how much of the reserve is on loan.
+      - bold: |-
+          Collateral on or off
+        text: |-
+          on a first supply of an asset that can back borrowing, the Pool switches it on; the owner can switch it off.
+      - bold: |-
+          Collateral off
+        text: |-
+          an asset off as collateral earns interest but backs no debt and cannot be seized in a liquidation.
+      - bold: |-
+          Assets that stay off
+        text: |-
+          an asset with a 0% loan-to-value cannot be switched on, and an isolated asset stays off while other collateral is on.
+      - bold: |-
+          Supplying for someone else
+        text: |-
+          anyone can supply on behalf of any account; the deposit belongs to that account.
+    links:
+      - label: |-
+          Supplying tokens
+        doc: SUPPLY_HELP
+      - label: |-
+          Collateral status
+        doc: TOGGLE_COLLATERAL
+      - label: |-
+          Isolation mode
+        doc: ISOLATION
+      - label: |-
+          Reserve parameters
+        doc: RESERVE
+
+  withdraw:
+    title: |-
+      How Withdrawing Works
+    intro: |-
+      Withdrawing returns supplied assets from the Pool to a wallet, burning the matching aTokens. It can go only as far as the collateral left keeps any debt covered.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Interest comes with it
+        text: |-
+          the supplied balance includes the supply interest earned, so more can come out than went in.
+      - bold: |-
+          Health factor
+        text: |-
+          the Pool allows a withdrawal only while the health factor stays at or above 1.
+      - bold: |-
+          Available liquidity
+        text: |-
+          the asset has to be in the Pool to leave it, so a withdrawal can wait while most of a reserve is on loan.
+      - bold: |-
+          WETH gateway
+        text: |-
+          the route for ETH: it takes the supplied WETH, withdraws it from the Pool, unwraps it and sends ETH on.
+      - bold: |-
+          Only the owner
+        text: |-
+          a withdrawal takes the sender's supply, so no other account can withdraw from this position.
+    links:
+      - label: |-
+          Withdrawing tokens
+        doc: WITHDRAW_HELP
+      - label: |-
+          Withdrawing collateral
+        doc: WITHDRAW_COLLATERAL
+      - label: |-
+          The WETH gateway
+        doc: GATEWAY
+
+  borrow:
+    title: |-
+      How Borrowing Works
+    intro: |-
+      Borrowing draws an asset from the Pool against the account's collateral, minting debt tokens that accrue variable interest until repaid.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrowing power
+        text: |-
+          the collateral's value times its maximum LTV, each asset's setting averaged by value; the liquidation threshold sits a little higher.
+      - bold: |-
+          One shared health factor
+        text: |-
+          one health factor covers all the account's collateral and debt; borrowing lowers it, and below 1 the account can be liquidated.
+      - bold: |-
+          Variable borrow interest
+        text: |-
+          the rate follows how much of the reserve is on loan, so it moves with every supply, borrow and repayment.
+      - bold: |-
+          Borrowing for someone else
+        text: |-
+          credit delegation: the owner approves another account for an amount, and that account borrows against the owner's collateral.
+    links:
+      - label: |-
+          Borrowing tokens
+        doc: BORROW_HELP
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Interest rates
+        doc: INTEREST_RATES
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+
+  repay:
+    title: |-
+      How Repaying Works
+    intro: |-
+      Repaying returns borrowed tokens to the Pool, burning the matching debt tokens. The debt falls, the health factor rises, and collateral is freed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Partial or full
+        text: |-
+          any amount can be repaid at any time; repaying the whole balance clears that asset's debt, interest included.
+      - bold: |-
+          Interest
+        text: |-
+          debt grows at the variable borrow rate, so more is owed at repayment than was borrowed.
+      - bold: |-
+          Repaying with aTokens
+        text: |-
+          a debt can be repaid with supplied tokens of the same asset, burning those aTokens.
+      - bold: |-
+          Repaying for someone else
+        text: |-
+          anyone can repay any account's debt without the owner's approval.
+    links:
+      - label: |-
+          Repaying tokens
+        doc: REPAY_HELP
+      - label: |-
+          Ways to repay
+        doc: POOL_REPAY
+
+  liquidation:
+    title: |-
+      How Liquidations Work
+    intro: |-
+      An account can be liquidated once its health factor falls below 1, when its collateral, counted up to each threshold, no longer covers its debt. Automated bots usually do it.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidation bonus
+        text: |-
+          the liquidator repays part of one debt asset and takes collateral worth that plus the asset's bonus, set by governance.
+      - bold: |-
+          Protocol fee
+        text: |-
+          a share of the bonus goes to the treasury as aTokens in the same transaction, on a separate row.
+        text_seamless: |-
+          Seamless can keep a share of the bonus; it is 0 on most reserves, so the liquidator keeps all of it.
+      - bold: |-
+          How much one call takes
+        text: |-
+          up to half the debt, or all of the debt asset at a health factor of 0.95 or below or under $2,000.
+        text_seamless: |-
+          up to half of the debt asset repaid, or all of it at a health factor of 0.95 or below.
+      - bold: |-
+          After it
+        text: |-
+          collateral counts only up to its threshold, so taking it lowers the cover less than clearing the debt raises it.
+      - bold: |-
+          Still open
+        text: |-
+          the account stays open, and it can be liquidated again while its health factor is below 1.
+    links:
+      - label: |-
+          Health factor and liquidations
+        doc: LIQ_PROCESS
+      - label: |-
+          Liquidation penalty
+        doc: FAQ_PENALTY
+
+  bad_debt:
+    title: |-
+      How Bad Debt Is Written Off
+    intro: |-
+      A liquidation can take the last of an account's collateral while some debt remains. The Pool then burns that debt and records it as a deficit on the reserve.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Not a repayment
+        text: |-
+          no one paid the written-off amount; the borrower's debt is cleared and the reserve carries the shortfall.
+      - bold: |-
+          Who absorbs it
+        text: |-
+          Aave's Umbrella stakers and the DAO cover the deficit, with no charge to other borrowers.
+      - bold: |-
+          Why it happens
+        text: |-
+          a fast price move or a thin collateral can carry a position past full cover before liquidators reach it.
+      - bold: |-
+          A separate row
+        text: |-
+          the write-off is a separate row on the timeline, beside the liquidation that caused it.
+    links:
+      - label: |-
+          Umbrella
+        doc: UMBRELLA
+      - label: |-
+          Deficit cover
+        doc: UMBRELLA_DEFICIT
+
+  transfer:
+    title: |-
+      How Position Transfers Work
+    intro: |-
+      Supplied balances are aTokens, which move between accounts like any token. A transfer hands supply to another account without leaving the Pool.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Not a deposit or withdrawal
+        text: |-
+          custody changes hands and no new value enters the Pool, so the lifetime flows give it a separate row.
+      - bold: |-
+          Two accounts, one move
+        text: |-
+          one transfer is an out-leg on the sender and an in-leg on the recipient.
+      - bold: |-
+          Health still enforced
+        text: |-
+          the Pool refuses a transfer that would leave the sender's health factor below 1.
+      - bold: |-
+          Interest rides along
+        text: |-
+          the transferred supply keeps earning the supply rate in the new account, and backs its borrowing once on as collateral.
+      - bold: |-
+          Who receives it
+        text: |-
+          the chain does not say whether the receiving account has the same owner.
+    links:
+      - label: |-
+          aTokens
+        doc: ATOKEN
+      - label: |-
+          Supplying
+        doc: OVERVIEW_SUPPLY
+
+  repay_with_collateral:
+    title: |-
+      How Repaying with Collateral Works
+    intro: |-
+      Repaying with collateral pays a debt with the account's supply instead of tokens from the wallet. In one transaction, collateral is withdrawn, swapped for the debt asset and repaid.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One transaction
+        text: |-
+          Aave's repay adapter takes the approved supply, swaps it through ParaSwap and repays, using a flash loan where needed.
+      - bold: |-
+          Flash loan
+        text: |-
+          a loan taken and returned inside one transaction, which lets the debt be repaid before the collateral moves.
+      - bold: |-
+          Leftover supplied back
+        text: |-
+          the swap is sized with room for price movement, and what it did not use is supplied back.
+      - bold: |-
+          Health factor
+        text: |-
+          debt and collateral both fall; when the debt falls more against the thresholds, the health factor rises.
+      - bold: |-
+          Cost
+        text: |-
+          the swap's price and slippage, and any flash-loan fee, come out of the collateral sold.
+    links:
+      - label: |-
+          Repay with collateral
+        doc: SWAP_REPAY
+      - label: |-
+          Flash loans
+        doc: FAQ_FLASH_LOAN
+      - label: |-
+          Health factor
+        doc: HF
+
+  collateral_swap:
+    title: |-
+      How a Collateral Swap Works
+    intro: |-
+      A collateral swap trades one supplied asset for another without either leaving the position. Part of a supply is withdrawn, swapped, and supplied back in one transaction.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One transaction
+        text: |-
+          Aave's liquidity swap adapter takes the approved supply, sells it through ParaSwap and supplies what it bought.
+      - bold: |-
+          Slippage
+        text: |-
+          the owner sets the least the swap must deliver, and it reverts below that.
+      - bold: |-
+          Health factor
+        text: |-
+          the debt does not move, so the health factor moves little, unless the two assets have different thresholds.
+      - bold: |-
+          Why do it
+        text: |-
+          to change which asset backs the debt without repaying it, for a better rate, a higher LTV or other exposure.
+    links:
+      - label: |-
+          Collateral swap
+        doc: SWAP_COLLATERAL
+      - label: |-
+          Flash loans
+        doc: FAQ_FLASH_LOAN
+
+  collateral_swap_cow:
+    title: |-
+      How a Collateral Swap Works
+    intro: |-
+      A collateral swap trades one supplied asset for another without either leaving the position. The owner signs a CoW Protocol order, and the settlement makes the trade.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The order
+        text: |-
+          the settlement takes the owner's aTokens, sells them, and the asset bought is supplied back to the account.
+      - bold: |-
+          Slippage
+        text: |-
+          the order names the least the owner accepts, and it settles at that or better, or not at all.
+      - bold: |-
+          Health factor
+        text: |-
+          the debt does not move, so the health factor moves little, unless the two assets have different thresholds.
+      - bold: |-
+          Why do it
+        text: |-
+          to change which asset backs the debt without repaying it, for a better rate, a higher LTV or other exposure.
+    links:
+      - label: |-
+          Swap features
+        doc: SWAP_TOKENS
+
+  debt_swap:
+    title: |-
+      How a Debt Swap Works
+    intro: |-
+      A debt swap changes which asset the position owes. In one transaction a new debt is opened, swapped for the old debt's asset and used to repay it.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One transaction
+        text: |-
+          Aave's debt swap adapter borrows the new asset under the owner's delegation, buys the old asset through ParaSwap and repays.
+      - bold: |-
+          Borrowed to fund it, returned unused
+        text: |-
+          the adapter borrows a little more than the trade needs, and what it did not use repays part of the new debt.
+      - bold: |-
+          Health factor
+        text: |-
+          the new debt is worth about the old plus the trade's cost, so the health factor moves little at the time.
+      - bold: |-
+          What it changes
+        text: |-
+          the debt's dollar value and its rate now follow the new asset.
+      - bold: |-
+          Why do it
+        text: |-
+          to move to a lower rate, to owe an asset the owner expects to fall, or to match the collateral.
+    links:
+      - label: |-
+          Debt swap
+        doc: SWAP_DEBT
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+
+  debt_swap_cow:
+    title: |-
+      How a Debt Swap Works
+    intro: |-
+      A debt swap changes which asset the position owes. The owner signs a CoW Protocol order, and one transaction borrows the new asset, sells it and repays the old debt.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The order
+        text: |-
+          a one-order contract the Aave app creates borrows the new asset for the owner and sells it in the settlement.
+      - bold: |-
+          Slippage
+        text: |-
+          the order names the most of the new asset the owner will sell, and no more is borrowed.
+      - bold: |-
+          Health factor
+        text: |-
+          the new debt is worth about the old plus the trade's cost, so the health factor moves little at the time.
+      - bold: |-
+          What it changes
+        text: |-
+          the debt's dollar value and its rate now follow the new asset.
+    links:
+      - label: |-
+          Swap features
+        doc: SWAP_TOKENS
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+
+  withdraw_and_swap:
+    title: |-
+      How Withdraw and Swap Works
+    intro: |-
+      Withdraw and swap takes supplied tokens out of the Pool and swaps them for another token in one transaction. The swapped tokens go to the wallet, outside the position.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One transaction
+        text: |-
+          Aave's withdraw swap adapter takes the approved supply, withdraws it, swaps it through ParaSwap and sends the result on.
+      - bold: |-
+          A withdrawal first
+        text: |-
+          the supply falls, and the Pool refuses it if the health factor would end below 1.
+      - bold: |-
+          Cost
+        text: |-
+          the swap's price and slippage decide how much of the new token arrives.
+    links:
+      - label: |-
+          Withdraw and swap
+        doc: SWAP_WITHDRAW
+      - label: |-
+          Withdrawing and switching
+        doc: WITHDRAW_SWITCH
+
+  fallback:
+    title: |-
+      How Positions Work
+    intro: |-
+      Aave V3 lets a wallet borrow against supplied collateral in one account, under a single health factor.
+    intro_seamless: |-
+      Seamless, an Aave V3 fork, lets a wallet borrow against supplied collateral in one account, under a single health factor.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Supply and collateral
+        text: |-
+          supplied assets earn interest and, while on as collateral, back the account's borrowing.
+      - bold: |-
+          Borrowing and health factor
+        text: |-
+          borrowing draws against the pooled collateral, and the health factor measures how well the debt is covered.
+      - bold: |-
+          One pooled account
+        text: |-
+          a wallet's supply and debt in one market share one account and one health factor.
+    links:
+      - label: |-
+          Supplying
+        doc: OVERVIEW_SUPPLY
+      - label: |-
+          Borrowing
+        doc: OVERVIEW_BORROW
+      - label: |-
+          Health factor
+        doc: HF
+
+  position_open:
+    title: |-
+      About This Position
+    intro: |-
+      This panel reads the account from the Pool at the current block: what it supplies, what it borrows and how well its debt is covered.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Health factor
+        text: |-
+          the collateral, each asset counted up to its liquidation threshold, divided by the debt; below 1 the account can be liquidated.
+      - bold: |-
+          Maximum LTV and threshold
+        text: |-
+          each collateral asset's governance settings averaged by value, so they move with the mix of collateral and with votes.
+      - bold: |-
+          Liquidation price
+        text: |-
+          with one collateral asset, the price at which the health factor reaches 1; with several, the fall in their combined value.
+        text_no_debt: |-
+          with no debt, the collateral could carry debt up to its value at the liquidation threshold before becoming liquidatable.
+      - bold: |-
+          One asset on both sides
+        text: |-
+          when the collateral and the debt are one asset, its price moves both sides alike, so only interest moves the health factor.
+      - bold: |-
+          The market
+        text: |-
+          Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
+        text_base: |-
+          Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_seamless: |-
+          every Seamless reserve has been frozen since April 2025: repayment, withdrawal and liquidation work, and nothing new can be supplied or borrowed.
+    links:
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Reserve parameters
+        doc: RESERVE_GOVERNANCE
+      - label: |-
+          Liquidation price
+        doc: FAQ_LIQ_PRICE
+      - label: |-
+          Credit delegation
+        doc: CREDIT_DELEGATION
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      This account repaid its debt and withdrew its collateral. The panel shows each reserve's highest recorded balance over its life.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each reserve's highest balance at the event that reached it, interest included; the peaks need not have stood together.
+      - bold: |-
+          One account
+        text: |-
+          every reserve on as collateral backed all of the account's borrowing, under one health factor.
+      - bold: |-
+          Reopening
+        text: |-
+          a new supply or borrow by the same wallet in the same market reopens this account and its timeline.
+        text_seamless: |-
+          a new supply or borrow by the same wallet would reopen this account, and the freeze rules both out.
+      - bold: |-
+          The market
+        text: |-
+          Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
+        text_base: |-
+          Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_seamless: |-
+          every Seamless reserve has been frozen since April 2025; repayment, withdrawal and liquidation still work.
+    links:
+      - label: |-
+          Supplying
+        doc: OVERVIEW_SUPPLY
+      - label: |-
+          Health factor
+        doc: HF
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      Liquidation took collateral from this account after its health factor fell below 1. The panel shows each reserve's highest recorded balance over its life.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Health factor
+        text: |-
+          the account's one safety number across every reserve; below 1 a liquidator can step in.
+      - bold: |-
+          Liquidation by parts
+        text: |-
+          a liquidator repays part of one debt asset and takes one collateral asset plus its bonus, so one call need not empty the account.
+      - bold: |-
+          Liquidated
+        text: |-
+          the outcome marks an account whose record holds a seizure, even where the owner closed it afterwards.
+      - bold: |-
+          Reopening
+        text: |-
+          a new supply or borrow by the same wallet in the same market reopens this account and its timeline.
+        text_seamless: |-
+          a new supply or borrow by the same wallet would reopen this account, and the freeze rules both out.
+      - bold: |-
+          The market
+        text: |-
+          Core, Prime and EtherFi are separate Pools on Ethereum, each a separate account with a separate health factor.
+        text_base: |-
+          Aave V3 on Base keeps reserves, settings and an oracle apart from Aave V3 on Ethereum.
+        text_seamless: |-
+          every Seamless reserve has been frozen since April 2025; repayment, withdrawal and liquidation still work.
+    links:
+      - label: |-
+          Health factor and liquidations
+        doc: LIQ_PROCESS
+      - label: |-
+          Liquidation penalty
+        doc: FAQ_PENALTY
+
+  market:
+    title: |-
+      How the market overview works
+    intro: |-
+      Aave V3 Core is one Pool holding every reserve, where a wallet's supply backs its borrowing under one health factor. This page reads each reserve's size, rates and settings from that Pool.
+    intro_base: |-
+      Aave V3 on Base is one Pool holding every reserve, apart from Aave V3 on Ethereum. This page reads each reserve's size, rates and settings from that Pool.
+    intro_seamless: |-
+      Seamless is an Aave V3 fork on Base: one Pool holding every reserve, all frozen since April 2025. This page reads each reserve's size, rates and settings from that Pool.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Utilisation and rates
+        text: |-
+          borrowed divided by supplied; the rate climbs steeply past the kink, the tick on the blue utilisation bar.
+      - bold: |-
+          Loan-to-value (LTV)
+        text: |-
+          the most a wallet can borrow against a reserve, as a share of its value; at 0 the reserve backs no new borrowing.
+      - bold: |-
+          Liquidation threshold (LT)
+        text: |-
+          the share of a reserve's value that counts toward covering debt; a reserve with none cannot be collateral.
+      - bold: |-
+          Liquidation bonus
+        text: |-
+          the extra collateral a liquidator receives, as a share of the debt repaid.
+      - bold: |-
+          Caps and closed reserves
+        text: |-
+          a cap of one token closes that side, and a frozen or paused reserve takes no new supply or borrowing.
+        text_seamless: |-
+          a frozen reserve takes no new supply or borrowing, and still accrues interest and can be liquidated.
+    links:
+      - label: |-
+          Reserve parameters
+        doc: RESERVE
+      - label: |-
+          Interest rates
+        doc: INTEREST_RATES
+      - label: |-
+          E-mode
+        doc: EMODE_HELP
+      - label: |-
+          Supply limits
+        doc: FAQ_SUPPLY_LIMITS

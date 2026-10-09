@@ -35,3 +35,6 @@ export function v3Possessive(name: string, apostrophe: "’" | "'" = "’"): str
 }
 
 export const SEAMLESS_DOCS_URL = "https://docs.seamlessprotocol.com/";
+
+/** Whether a Pool's protocol is the Seamless fork. */
+export const isSeamless = (protocol: V3Protocol): boolean => protocol === "Seamless";

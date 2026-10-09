@@ -80,9 +80,6 @@ export function liquidationBonus(
   return { bonus: total / base - 1, feeShare: feeAmount > 0 ? feeAmount / bonusPart : null, feeAmount };
 }
 
-/** A bonus or share as Aave states it: "7.5%", "10%" (two decimals at most). */
-export const pctPlain = (f: number): string => `${Number((f * 100).toFixed(2))}%`;
-
 /** A liquidation leg's amount at two decimals ("3,938.39"), four below 1. */
 export const fmt2 = (human?: string): string => {
   const n = Math.abs(Number(human ?? "0"));

@@ -37,7 +37,7 @@ import {
   useAaveV3CardDeployment,
   type AaveV3CardDeployment,
 } from "@/lib/aave-v3/card-deployment";
-import { aaveV3PositionContent, type AaveV3PositionDeployment } from "@/lib/aave-v3/position-content";
+import { aaveV3PositionModal, type AaveV3Deployment } from "@/lib/aave-v3/event-templates";
 import { formatUsd } from "@/lib/shared/format-event";
 import { fmtLiqPrice } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel, notRecordedNote } from "@/lib/shared/card-vocab";
@@ -554,7 +554,7 @@ function AaveV3PositionCardBody({
   // Aave V3 on Ethereum, Aave V3 on Base, and Seamless; only the deployment
   // named by the card's own session (set via AaveV3CardDeploymentProvider)
   // changes the prose.
-  const positionDeployment: AaveV3PositionDeployment =
+  const positionDeployment: AaveV3Deployment =
     dep.session === "aave-v3-base" || dep.session === "seamless" ? dep.session : "aave-v3";
 
   // Closed / liquidated: the account holds no open reserves, so the headline is
@@ -569,7 +569,7 @@ function AaveV3PositionCardBody({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={aaveV3PositionContent({ status: v.status, deployment: positionDeployment })}
+        learnMore={aaveV3PositionModal(v.status, positionDeployment)}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -651,11 +651,7 @@ function AaveV3PositionCardBody({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={aaveV3PositionContent({
-        status: v.status,
-        deployment: positionDeployment,
-        hasDebt: v.borrows.length > 0,
-      })}
+      learnMore={aaveV3PositionModal(v.status, positionDeployment, v.borrows.length > 0)}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats

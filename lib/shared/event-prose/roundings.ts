@@ -6,6 +6,7 @@ import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhol
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
+import { formatNumber, formatTinyNonZero } from "@/lib/utils/format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -48,6 +49,26 @@ function fmtSpan(seconds: number): string {
     return `${h} hour${h === 1 ? "" : "s"}`;
   }
   return `${(hours / 24).toFixed(1)} days`;
+}
+
+/** A token amount as the Aave family's rows print it: whole from 1,000, four
+ *  places from 1, significant places below, never a false zero. */
+function fmtTokenPos(n: number): string {
+  if (!isFinite(n) || n === 0) return "0";
+  const abs = Math.abs(n);
+  if (abs >= 1_000) return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (abs >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  const decimals = Math.min(8, Math.ceil(-Math.log10(abs)) + 2);
+  const s = n.toLocaleString("en-US", { maximumFractionDigits: decimals });
+  return parseFloat(s) === 0 ? formatTinyNonZero(n) : s;
+}
+
+/** A health factor: four places below 1.1 (rounded down under 1, so a
+ *  liquidatable account never reads 1.0000), two above, ">100" past the cap. */
+function fmtHf(hf: number): string {
+  if (hf >= 100) return ">100";
+  if (hf < 1) return (Math.floor(hf * 1e4 + 1e-9) / 1e4).toFixed(4);
+  return hf < 1.1 ? hf.toFixed(4) : hf.toFixed(2);
 }
 
 /** A collateral figure at the ledger's decimals. */
@@ -103,4 +124,12 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   units2: (v) => num(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   ratio_frac: (v) =>
     `${(num(v) * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+  token: (v) => formatNumber(Math.abs(num(v))),
+  token_leg: (v) => {
+    const n = Math.abs(num(v));
+    return n < 1 ? fmtTokenPos(n) : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  token_pos: (v) => fmtTokenPos(Math.abs(num(v))),
+  hf: (v) => fmtHf(num(v)),
+  pct_plain: (v) => `${Number((num(v) * 100).toFixed(2))}%`,
 };

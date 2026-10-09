@@ -36,7 +36,12 @@ export type Rounding =
   | "text"
   | "units4"
   | "units2"
-  | "ratio_frac";
+  | "ratio_frac"
+  | "token"
+  | "token_leg"
+  | "token_pos"
+  | "hf"
+  | "pct_plain";
 
 export type ProseValue = number | string | null;
 

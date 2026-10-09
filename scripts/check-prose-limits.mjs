@@ -122,6 +122,7 @@ const Z1_NAME_PLACEHOLDERS = new Set(["id", "owner", "nft", "coll_type", "delega
 const Z1_STRINGS = {
   "liquity-v2": { section: "trove_words", ids: Z1_IDS, figures: "names" },
   "liquity-v1": { section: "position_words", ids: null, figures: "placeholders" },
+  "aave-v3": { section: "position_words", ids: null, figures: "placeholders" },
 };
 const z1Ids = (family, d) => {
   const z = Z1_STRINGS[family];
