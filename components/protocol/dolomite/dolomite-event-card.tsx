@@ -1,7 +1,10 @@
 "use client";
 
-// Composer: wires the Dolomite header / detail / explainer into the universal
-// EventCard shell (the plain-English explainer rides its own second-tier slot).
+// Composer: fills the shared event card's slots (components/shared/
+// event-card.tsx; ui-jobs 309) from a Dolomite balance leg: the head, the
+// account's Collateral and Debt ledger cells with the market's balance cell
+// after them, the other account, forensics and spread lines as notes, the
+// price row and the explanation.
 //
 // The rows arrive at the BALANCE grain — one row per BalanceUpdate leg, so a
 // liquidation is FOUR rows across two accounts and this account's timeline
@@ -11,15 +14,16 @@
 // liquidator-side legs (`seize_in`, `liquidation_payout`) are that account's
 // own acts and flow normally.
 
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type DolomiteCoords } from "@/lib/dolomite/event-provenance";
 import { dolomiteExplainerTeaser, type DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
-import { DolomiteEventHeader } from "./dolomite-event-header";
-import { DolomiteEventDetail } from "./dolomite-event-detail";
+import { dolomiteHeadSpec } from "./dolomite-event-header";
+import { useDolomiteCells } from "./dolomite-event-detail";
 import { DolomiteEventExplainer, dolomiteLearnMoreContent } from "./dolomite-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
@@ -75,42 +79,47 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
           },
         ];
 
-  const iconSlot = isBorrowerLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps = isBorrowerLoss
+    ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+    : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  return (
-    <EventCard
-      avatar={null}
-      by={extBy ?? undefined}
-      iconColumn={iconSlot}
-      header={
-        <DolomiteEventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <DolomiteEventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          event={event}
-          siblings={sibs}
-          accountNumber={accountNumber}
-        />
-      }
-      explainer={
+  const { cells, ledgers, notes, prices } = useDolomiteCells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    event,
+    siblings: sibs,
+    accountNumber,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "dolomite",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: dolomiteHeadSpec({
+      actionLabel: event.actionLabel,
+      ctx,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      externalBy: extBy ?? undefined,
+      wallet: event.wallet,
+      flows: event.flows,
+    }),
+    caption: event.actionLabel,
+    actor: { by: extBy ?? undefined },
+    cells,
+    ledgers,
+    notes,
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
+    explainer: {
+      body: (
         <DolomiteEventExplainer
           ctx={ctx}
           event={event}
@@ -120,11 +129,11 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
           siblings={sibs}
           skipLead
         />
-      }
-      explainerTeaser={dolomiteExplainerTeaser(ctx, coords, sibs, event)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={dolomiteLearnMoreContent(ctx)} />}
-      persistKey={`dolomite:${event.id}`}
-    />
-  );
+      ),
+      first: dolomiteExplainerTeaser(ctx, coords, sibs, event) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={dolomiteLearnMoreContent(ctx)} />,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }

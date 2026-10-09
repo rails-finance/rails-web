@@ -241,6 +241,33 @@ export function eventPriceProv(ctx: LiquityContext, coords?: EventCoords): Figur
   };
 }
 
+/** The receipt for the gas the owner paid (the price row's gas figure): the
+ *  transaction's gas used times its effective gas price, in ETH, and in USD
+ *  at ETH's price at the block. A no-change run's figure sums its
+ *  transactions. */
+export function eventGasProv(
+  gas: { eth: number; usd: number; gasUsed?: number; run?: number | null },
+  coords?: EventCoords,
+): Provenance {
+  const run = gas.run != null && gas.run > 1;
+  return {
+    kind: "chain-derived",
+    pclass: "emitted",
+    summary: run
+      ? `Gas across the ${gas.run} transactions this row stands for — each one's gas used times its effective gas price, summed, in ETH and in USD at ETH's price at each block.`
+      : "Gas for this transaction — the gas used times the effective gas price, in ETH, and in USD at ETH's price at the block.",
+    formula: "gasUsed × effectiveGasPrice",
+    via: `${streamVia()} · transaction receipt`,
+    inputs: eventInputs(run ? undefined : coords, [
+      ...(gas.gasUsed != null && !run
+        ? [{ label: "gas used", value: gas.gasUsed.toLocaleString("en-US"), kind: "chain" as const }]
+        : []),
+      { label: "gas cost", value: `${gas.eth} ETH`, kind: "chain" as const },
+      ...(gas.usd > 0 ? [{ label: "USD", value: `$${gas.usd.toFixed(2)}`, kind: "chain-derived" as const }] : []),
+    ]),
+  };
+}
+
 /** A liquidated neighbour's redistribution that an adjust applied: the
  *  TroveOperation's `_debtIncreaseFromRedist` / `_collIncreaseFromRedist`.
  *  Null on every other operation and where neither leg is above dust. */

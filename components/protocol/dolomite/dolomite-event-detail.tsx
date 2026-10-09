@@ -1,6 +1,6 @@
 "use client";
 
-// Dolomite event detail — adapter onto the shared ChainTruthDetail grid.
+// Dolomite event cells (ui-jobs 309): the card's `cells` slot.
 // One lane per row (the row IS one balance leg): the token balance
 // before→after, par × the market's index at the block, which getAccountWei
 // reads there. The transition is built from the row's two emitted absolutes
@@ -15,23 +15,25 @@
 // the reference constant. The engine sizes the seizure from that constant,
 // so a liquidation with collateral to spare lands on it exactly and the card
 // audits itself. The archive read is lazy (this panel mounts on expand) and
-// cached immutable; a miss keeps the card token-only — the safe state.
+// cached immutable; a miss keeps the card token-only — the safe state. The
+// two legs' prices stand in the price row; an ordinary row's market price at
+// the event (the stored LogOraclePrice) stands there where the route serves it.
 //
 // Where the page ties its timeline to the Lifetime flows panel, the grid opens
 // with the account's Collateral and Debt cells (components/shared/
 // ctoken-event-ledger.tsx, over lib/dolomite/flows.ts); the market's own
 // balance cell stays, since it carries the interest since the previous row.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { formatDolomitePrice, otherAccountName } from "@/lib/dolomite/asset-catalog";
 import { DolomiteAccountLabel } from "@/components/protocol/dolomite/dolomite-position-card";
 import type { DolomiteContext } from "@/lib/shared/types/event-shape";
-import {
-  ChainTruthDetail,
-  type ChainTruthStat,
-  type ChainTruthTransition,
-} from "@/components/shared/chain-truth-event";
+import type { ChainTruthStat, ChainTruthTransition } from "@/components/shared/chain-truth-event";
+import { useStatCells } from "@/components/shared/chain-truth-stat-cell";
+import type { EventCardLedgers } from "@/components/shared/event-card";
+import type { EventCells } from "@/components/shared/event-cells";
+import type { EventPriceChip } from "@/components/shared/event-price-row";
 import { LiquidationForensics, type LiquidationForensicsProps } from "@/components/shared/liquidation-forensics";
 import {
   parAfterProv,
@@ -45,11 +47,12 @@ import {
   dolomiteLiqLegValueProv,
   dolomiteLiqPremiumProv,
   dolomiteLiqSpreadRefProv,
+  dolomiteEventPriceProv,
   type DolomiteCoords,
 } from "@/lib/dolomite/event-provenance";
 import type { DolomiteEvent } from "@/lib/dolomite/explainer-clauses";
 import { dolomiteBalanceAction } from "@/lib/dolomite/balance-action";
-import { CTokenLedgerCells } from "@/components/shared/ctoken-event-ledger";
+import { pillPriceChips, useCTokenLedgerCells } from "@/components/shared/ctoken-event-ledger";
 import {
   decimalSub,
   formatNumber,
@@ -60,7 +63,7 @@ import {
   formatUsdValue,
 } from "@/lib/utils/format";
 
-export interface DolomiteEventDetailProps {
+export interface DolomiteCellsInput {
   ctx: DolomiteContext;
   txHash?: string;
   blockNumber?: number;
@@ -233,7 +236,7 @@ function buildDolomiteLiqForensics(
         display: heldPriceText,
         address: held.marketToken,
         priceProv: dolomiteLiqAtBlockPriceProv(held.marketSymbol, coords, atBlock.heldPriceRaw),
-        note: "oracle at block",
+        note: coords.blockNumber != null ? `oracle at block ${coords.blockNumber.toLocaleString("en-US")}` : "oracle",
       },
       {
         symbol: owed.marketSymbol,
@@ -241,7 +244,7 @@ function buildDolomiteLiqForensics(
         display: owedPriceText,
         address: owed.marketToken,
         priceProv: dolomiteLiqAtBlockPriceProv(owed.marketSymbol, coords, atBlock.owedPriceRaw),
-        note: "oracle at block",
+        note: coords.blockNumber != null ? `oracle at block ${coords.blockNumber.toLocaleString("en-US")}` : "oracle",
       },
     ],
     format: { value: formatUsdValue, price: formatDolomitePrice },
@@ -310,7 +313,8 @@ function liquidationNotes(
   return out;
 }
 
-export function DolomiteEventDetail({
+/** The card's cells, ledgers, notes and prices. */
+export function useDolomiteCells({
   ctx,
   txHash,
   blockNumber,
@@ -318,7 +322,7 @@ export function DolomiteEventDetail({
   event,
   siblings,
   accountNumber,
-}: DolomiteEventDetailProps) {
+}: DolomiteCellsInput): { cells: EventCells; ledgers: EventCardLedgers; notes: ReactNode; prices: EventPriceChip[] } {
   const coords: DolomiteCoords = {
     txHash,
     blockNumber,
@@ -371,11 +375,9 @@ export function DolomiteEventDetail({
       ? Math.abs(Number(ctx.weiDelta)) / Math.abs(Number(ctx.balanceBefore)) || null
       : null;
   // A protocol call moves no balance and has no account cells.
-  const ledgerLead =
-    event != null && ctx.eventType !== "call" ? (
-      <CTokenLedgerCells eventId={event.id} eventTs={event.timestamp} />
-    ) : null;
-  const notes =
+  const account = useCTokenLedgerCells(event?.id ?? "", event?.timestamp ?? 0);
+  const ledgerCells = event != null && ctx.eventType !== "call" ? account.cells : [];
+  const liqNotes =
     forensics && bothLegs && atBlock ? liquidationNotes(bothLegs.held, bothLegs.owed, atBlock, repaidShare) : [];
 
   // The lane states the token balance the core held: par × the market's index
@@ -420,7 +422,7 @@ export function DolomiteEventDetail({
     }
   }
 
-  const stats: ChainTruthStat[] = [
+  const statCells = useStatCells([
     {
       label,
       value: fmt(onChain ? ctx.balanceAfter : ctx.parAfter),
@@ -442,7 +444,7 @@ export function DolomiteEventDetail({
           }
         : {}),
     },
-  ];
+  ] satisfies ChainTruthStat[]);
 
   // A transfer's other side: the account number it came from or went to,
   // linked to that account's own page.
@@ -465,9 +467,25 @@ export function DolomiteEventDetail({
           ? "Came from"
           : "Went to";
 
-  return (
+  // The price row: the liquidation's two legs at the block, else the
+  // market's price at this event.
+  const prices: EventPriceChip[] = forensics
+    ? pillPriceChips(forensics.pricePills, "Dolomite", (n) => `$${formatDolomitePrice(n)}`)
+    : ctx.oraclePrice && ctx.oraclePrice.usd > 0
+      ? [
+          {
+            symbol: sym,
+            usd: ctx.oraclePrice.usd,
+            address: ctx.marketToken,
+            display: `$${formatDolomitePrice(ctx.oraclePrice.usd)}`,
+            info: dolomiteEventPriceProv(sym, coords, ctx.oraclePrice.raw),
+            title: `${sym} price at this event: Dolomite's oracle`,
+          },
+        ]
+      : [];
+
+  const notes = (
     <>
-      <ChainTruthDetail stats={stats} lead={ledgerLead} />
       {other && (
         <p className="mt-2 px-5 text-xs text-rb-500" data-dolomite-other-account="">
           {lead}{" "}
@@ -478,14 +496,20 @@ export function DolomiteEventDetail({
           no tokens left the protocol.
         </p>
       )}
-      {forensics && <LiquidationForensics {...forensics} />}
-      {notes.length > 0 && (
+      {forensics && <LiquidationForensics {...forensics} pricePills={[]} />}
+      {liqNotes.length > 0 && (
         <div className="mt-2 space-y-1 px-5 text-xs text-rb-500" data-dolomite-liq-notes="">
-          {notes.map((n) => (
+          {liqNotes.map((n) => (
             <p key={n}>{n}</p>
           ))}
         </div>
       )}
     </>
   );
+  return {
+    cells: [...ledgerCells, ...statCells],
+    ledgers: ledgerCells.length > 0 ? account.ledgers : { none: "A protocol call moves no balance." },
+    notes,
+    prices,
+  };
 }

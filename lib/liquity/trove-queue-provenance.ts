@@ -40,16 +40,6 @@ export function troveTrovesAheadProv(collateralType: string): Provenance {
   };
 }
 
-/** Receipt for the branch's entire BOLD debt — the whole redemption queue. */
-export function troveBranchDebtProv(collateralType: string): Provenance {
-  return {
-    kind: "chain",
-    summary: `The ${collateralType} branch's entire BOLD debt — everything the branch's troves owe now, interest included, as the ${collateralType} TroveManager contract reports it. Every trove in the branch is in the redemption queue, so this is the queue's full size.`,
-    contract: { name: `${collateralType} TroveManager` },
-    via: "TroveManager.getEntireBranchDebt() at the latest block",
-  };
-}
-
 /** Receipt for the queue-share fraction (debt in front ÷ entire branch debt) —
  *  the compact RedemptionRunway and the Explanation pane's queue bullet trace
  *  the same figure identically. */

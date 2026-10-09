@@ -21,6 +21,8 @@ export interface EventGas {
   usd: number;
   /** The run's transaction count, where the gas covers a no-change run. */
   run?: number | null;
+  /** The figure's receipt; drawn as a <Prov> where given. */
+  info?: Provenance;
 }
 
 /** A symbol's price at the event, as a then/today chip. */
@@ -32,6 +34,9 @@ export interface EventPriceChip {
   value?: string;
   /** The chip's tip. */
   title?: string;
+  /** The figure as the family prints it, where its precision is not whole
+   *  dollars (a stablecoin's four places). */
+  display?: string;
   /** The token's contract, for the icon where the house table does not know
    *  the symbol. */
   address?: string;
@@ -72,6 +77,15 @@ export function eventGas(gas: GasCost | null | undefined): EventGas | undefined 
 export function gasPrice(gas: GasCost | null | undefined): EventCardPrice | undefined {
   const g = eventGas(gas);
   return g ? { gas: g, prices: [] } : undefined;
+}
+
+/** The event's gas where the owner sent its transaction; none where a third
+ *  party paid or the index sends no gas. */
+export function ownerPaidGas(
+  event: { wallet: string; gas?: GasCost | null },
+  txFrom: string | null | undefined,
+): EventGas | undefined {
+  return txFrom != null && txFrom.toLowerCase() === event.wallet.toLowerCase() ? eventGas(event.gas) : undefined;
 }
 
 /** Whether the row has anything to draw. */
@@ -115,7 +129,7 @@ export function EventGasButton({ gas }: { gas: EventGas }) {
       onKeyDown={(e) => e.stopPropagation()}
     >
       <Fuel size={14} aria-hidden className="shrink-0" />
-      <span>{figure(unit)}</span>
+      <span>{gas.info ? <Prov info={gas.info}>{figure(unit)}</Prov> : figure(unit)}</span>
     </button>
   );
 }
@@ -152,7 +166,7 @@ export function EventPriceRow({ price }: { price: EventCardPrice }) {
         {prices.map((p) => {
           const icon = <TokenChipIcon symbol={p.symbol} address={p.address} size={14} />;
           const format = p.unit?.format ?? p.format ?? usdWhole;
-          const text = format(p.usd);
+          const text = p.display ?? format(p.usd);
           const chip = (
             <ThenTodayChip
               symbol={p.symbol}

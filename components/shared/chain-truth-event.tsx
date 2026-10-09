@@ -73,7 +73,7 @@ import type { EventCellSpec } from "@/components/shared/event-cells";
 /** Compact a full grouped number string ("10,967,283.723" → "10.97M") for the
  *  snapshot grid; the full string rides the tooltip + provenance trace. Passes
  *  non-numeric placeholders ("—") and sub-1000 values through unchanged. */
-function compactAmount(full: string): string {
+export function compactAmount(full: string): string {
   const n = Number(full.replace(/,/g, ""));
   return Number.isFinite(n) && full.trim() !== "" ? formatCompact(n) : full;
 }
@@ -84,7 +84,7 @@ function compactAmount(full: string): string {
  *  the face in exponent notation. A change keeps its sign, with a space before
  *  a "<" ("+ <0.000001"); a before carries none. The exact figure stays in the
  *  tooltip and the receipt. */
-function transitionFigure(shown: string, exact: string, signed = true): string {
+export function transitionFigure(shown: string, exact: string, signed = true): string {
   const m = /^([+\u2212-]?)(.*)$/.exec(exact.trim());
   if (!m) return shown;
   const n = Number(m[2].replace(/,/g, ""));

@@ -108,6 +108,8 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
   focus: FlowFocusValue;
   facts: CompoundV2FlowsFacts | null;
   states: Map<string, CTokenEventState> | null;
+  /** Each (block, market) price read, keyed "block:market", in USD. */
+  prices: ReadonlyMap<string, number> | null;
 } {
   const [fetched, setFetched] = useState<{ events: BaseActivityEvent[] | null; read: FlowsRead }>({
     events: null,
@@ -258,5 +260,5 @@ export function useCompoundV2Flows(p: CompoundV2FlowsInput): {
       : now == null || (source != null && prices == null) || (rows != null && rows.length > 0 && !dailySettled)
         ? "reading"
         : "done";
-  return { timeline, read: state, focus, facts, states };
+  return { timeline, read: state, focus, facts, states, prices };
 }

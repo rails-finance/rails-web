@@ -1,8 +1,10 @@
 "use client";
 
-// Composer: wires the Compound V2 header / detail / explainer into the
-// universal EventCard shell (the plain-English explainer rides its own
-// second-tier slot).
+// Composer: fills the shared event card's slots (components/shared/
+// event-card.tsx; ui-jobs 309) from a Compound V2 event: the head, the
+// account's Collateral and Debt ledger cells with the market's cells after
+// them, the forensics and the Comptroller's lines as notes, the price row and
+// the explanation.
 //
 // Two shapes Moonwell's composer never met:
 //   • liquidation — ONE card per liquidation (the index merged its repay leg),
@@ -12,18 +14,19 @@
 //     like a send); seize_in is the liquidator's receipt (a real inflow).
 
 import type { CompoundV2Context } from "@/lib/shared/types/event-shape";
-import { EventCard } from "@/components/shared/event-card";
-import { SpineColumn } from "@/components/shared/spine-column";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { SpineColumnProps } from "@/components/shared/spine-column";
 
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { type CompoundV2Coords } from "@/lib/compound-v2/event-provenance";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2ExplainerTeaser, type CompoundV2Event } from "@/lib/compound-v2/explainer-clauses";
-import { CompoundV2EventHeader } from "./compound-v2-event-header";
-import { CompoundV2EventDetail } from "./compound-v2-event-detail";
+import { compoundV2HeadSpec } from "./compound-v2-event-header";
+import { useCompoundV2Cells } from "./compound-v2-event-detail";
 import { CompoundV2EventExplainer, compoundV2LearnMoreContent } from "./compound-v2-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
+import { ownerPaidGas } from "@/components/shared/event-price-row";
 
 export interface CompoundV2EventCardProps {
   event: CompoundV2Event;
@@ -113,54 +116,59 @@ export function CompoundV2EventCard({ event, isLast, eventNumber, siblings }: Co
               },
             ];
 
-  const iconSlot = isLiq ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : isSeizeLoss ? (
-    <SpineColumn icon="warning" warningTone="critical" isLast={!!isLast} />
-  ) : (
-    <SpineColumn tokens={tokens} externalParty={!!extBy} isLast={!!isLast} />
-  );
+  const spine: SpineColumnProps =
+    isLiq || isSeizeLoss
+      ? { icon: "warning", warningTone: "critical", isLast: !!isLast }
+      : { tokens, externalParty: !!extBy, isLast: !!isLast };
 
-  return (
-    <EventCard
-      avatar={null}
-      custody={
-        ctx.counterparty && (ctx.eventType === "transfer_in" || ctx.eventType === "transfer_out")
+  const { cells, ledgers, notes, prices } = useCompoundV2Cells({
+    ctx,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    wallet: event.wallet,
+    eventId: event.id,
+    eventTs: event.timestamp,
+  });
+
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: "compound-v2",
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine,
+    head: compoundV2HeadSpec({
+      actionLabel: event.actionLabel,
+      ctx,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      externalBy: extBy ?? undefined,
+      wallet: event.wallet,
+      flows: event.flows,
+    }),
+    caption: event.actionLabel,
+    actor: {
+      by: extBy ?? (isLiq ? ctx.liquidator : undefined) ?? undefined,
+      custody:
+        ctx.counterparty && isTransfer
           ? { dir: ctx.eventType === "transfer_out" ? "to" : "from", address: ctx.counterparty }
-          : undefined
-      }
-      by={extBy ?? (isLiq ? ctx.liquidator : undefined) ?? undefined}
-      iconColumn={iconSlot}
-      header={
-        <CompoundV2EventHeader
-          actionLabel={event.actionLabel}
-          ctx={ctx}
-          timestamp={event.timestamp}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          eventNumber={eventNumber}
-          externalBy={extBy ?? undefined}
-          wallet={event.wallet}
-          flows={event.flows}
-        />
-      }
-      detail={
-        <CompoundV2EventDetail
-          ctx={ctx}
-          txHash={event.txHash}
-          blockNumber={event.blockNumber}
-          wallet={event.wallet}
-          eventId={event.id}
-          eventTs={event.timestamp}
-        />
-      }
-      explainer={
+          : undefined,
+    },
+    cells,
+    ledgers,
+    notes,
+    price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
+    explainer: {
+      body: (
         <CompoundV2EventExplainer ctx={ctx} event={event} externalBy={extBy ?? undefined} siblings={sibs} skipLead />
-      }
-      explainerTeaser={compoundV2ExplainerTeaser(ctx, coords, sibs, event, extBy ?? undefined)}
-      txHash={event.txHash}
-      learnMore={<LearnMore inline content={compoundV2LearnMoreContent(ctx)} />}
-      persistKey={`compound-v2:${event.id}`}
-    />
-  );
+      ),
+      first: compoundV2ExplainerTeaser(ctx, coords, sibs, event, extBy ?? undefined) ?? undefined,
+    },
+    learnMore: <LearnMore inline content={compoundV2LearnMoreContent(ctx)} />,
+  };
+
+  return <EventCard slots={slots} avatar={null} />;
 }
