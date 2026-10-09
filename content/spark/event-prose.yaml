@@ -357,7 +357,7 @@ position_words:
   history_flows: |-
     Most of its {tx_count} transactions were supplying and withdrawing.
   operators: |-
-    {lead}{external} {were} executed by another account for the owner.
+    {lead}{external} {were} executed by an address other than the owner's.
   # ── A closed or liquidated account ──
   closed_lead_transfers: |-
     This account's record has no Pool transaction: its balances arrived and left as spToken transfers:
