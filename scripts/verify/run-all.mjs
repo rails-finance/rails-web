@@ -63,6 +63,13 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 // budget any script is expected to spend.
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MS ?? 900_000);
 
+// A verifier that walks every family is longer than the cap by design, so it
+// carries its own. Measured, as the cap above is: verify-anatomy-codes.mjs
+// (ui-jobs 309 step 11) opens one position per family at two widths, about 60
+// pages, and took about 70 min on 9 Oct 2026 with the box at load 15 to 20.
+const TIMEOUT_FOR = { "verify-anatomy-codes.mjs": 7_200_000 };
+const timeoutOf = (file) => Math.max(TIMEOUT_FOR[file] ?? 0, TIMEOUT_MS);
+
 // Not runnable against a plain dev server on this checkout. A reason, not a
 // shrug — anything listed here is evidence nobody is collecting.
 //
@@ -276,7 +283,7 @@ function runOne(file) {
       } catch {
         /* already gone */
       }
-    }, TIMEOUT_MS);
+    }, timeoutOf(file));
 
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -296,7 +303,7 @@ function runOne(file) {
       let outcome, detail;
       if (timedOut) {
         outcome = "CRASH";
-        detail = `timed out after ${TIMEOUT_MS / 1000}s — no verdict reached`;
+        detail = `timed out after ${timeoutOf(file) / 1000}s — no verdict reached`;
       } else if (signal) {
         outcome = "CRASH";
         detail = `killed by ${signal} — no verdict reached`;
@@ -407,10 +414,7 @@ const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 // configuration each entry below was written to avoid, with no warning at the
 // point of use — the run just starts moving around. Reach for it to re-test an
 // entry, read the entry first, and write down what came back.
-const RUN_ALONE = process.env.MEASURE
-  ? {}
-  : {
-    };
+const RUN_ALONE = process.env.MEASURE ? {} : {};
 
 const results = [];
 const queue = scripts.filter((f) => !RUN_ALONE[f]);

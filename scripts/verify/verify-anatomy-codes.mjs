@@ -181,7 +181,8 @@ async function firstCardId(page) {
 /** Open the first card from its control at this width (the header from
  *  640px, the spine's segment below it), then its first ledger cell and its
  *  Explanation. A press before hydration is lost, so each is pressed until
- *  it reads open. */
+ *  it reads open. Returns the codes read with the ledger open and with the
+ *  Explanation open, merged; null when the card never opened. */
 async function openCard(page, id, expectLedger) {
   const card = page.locator(cardSelector(id)).first();
   const control = card
@@ -205,7 +206,7 @@ async function openCard(page, id, expectLedger) {
       .catch(() => {});
   }
   const opened = (await control.getAttribute("aria-expanded").catch(() => null)) === "true";
-  if (!opened) return false;
+  if (!opened) return null;
   await card
     .locator('[data-anatomy~="T2"]')
     .first()
@@ -226,6 +227,8 @@ async function openCard(page, id, expectLedger) {
       .waitFor({ timeout: 15_000 })
       .catch(() => {});
   }
+  // Read once with the ledger open, before the Explanation's press.
+  const withLedger = await readCodes(page, id);
   const t3 = card.locator("[data-t3-toggle]").locator("visible=true").first();
   for (let i = 0; i < 4 && (await t3.count()); i++) {
     if ((await t3.getAttribute("aria-expanded").catch(() => null)) === "true") break;
@@ -233,7 +236,11 @@ async function openCard(page, id, expectLedger) {
     await page.waitForTimeout(600);
   }
   await page.waitForTimeout(1000);
-  return true;
+  const withExplanation = await readCodes(page, id);
+  return {
+    page: [...new Set([...withLedger.page, ...withExplanation.page])],
+    card: [...new Set([...withLedger.card, ...withExplanation.card])],
+  };
 }
 
 /** The family's position path: pinned, or the first row its listing links to. */
@@ -279,7 +286,7 @@ async function walk(path, width, expectLedger) {
     if (!firstId) return { error: "no event card drew" };
     await page.waitForTimeout(2000);
     const closed = await readCodes(page, firstId);
-    const opened = (await openCard(page, firstId, expectLedger)) ? await readCodes(page, firstId) : null;
+    const opened = await openCard(page, firstId, expectLedger);
     if (!opened) return { error: `the first card (${firstId}) never opened`, closed };
     return { firstId, closed, opened };
   } catch (e) {
