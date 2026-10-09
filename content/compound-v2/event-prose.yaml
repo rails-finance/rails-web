@@ -1,0 +1,1161 @@
+# Compound V2 prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a Compound V2 page. The page reads
+# this file and nothing else; the code chooses which strings to say and fills
+# their figures (lib/compound-v2/event-prose.ts for an event,
+# components/protocol/compound-v2/compound-v2-position-explanation.tsx for the
+# position card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  number: |-
+    three places, grouped (6,500.123)
+  ratio_frac: |-
+    a ratio given as a fraction, as a percent at two places (0.0953 → 9.53%)
+  pct_whole: |-
+    whole percent of a fraction (0.32 → 32%), unsigned
+  usd: |-
+    whole dollars ($4,490)
+  count: |-
+    a whole number, grouped (1,204)
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  delta:
+    rounding: number
+    means: |-
+      the amount of the underlying asset the event moved, as the header prints it
+  ctokens:
+    rounding: number
+    means: |-
+      the cTokens the event moved
+  market_symbol:
+    rounding: text
+    means: |-
+      the symbol of the market's underlying asset
+  c_symbol:
+    rounding: text
+    means: |-
+      the symbol of the market's cToken
+  repaid:
+    rounding: number
+    means: |-
+      the debt a liquidator repaid
+  seized:
+    rounding: number
+    means: |-
+      the collateral cTokens the liquidation seized
+  collateral_csymbol:
+    rounding: text
+    means: |-
+      the symbol of the seized collateral's cToken
+  debt_symbol:
+    rounding: text
+    means: |-
+      the symbol of the debt the same transaction's liquidation repaid
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  supplied_usd:
+    rounding: usd
+    means: |-
+      the supplied markets at Compound's oracle prices
+  borrowed_usd:
+    rounding: usd
+    means: |-
+      the borrowed markets at Compound's oracle prices
+  entered_syms:
+    rounding: text
+    means: |-
+      the supplied markets the wallet entered as collateral, listed
+  unentered_syms:
+    rounding: text
+    means: |-
+      the supplied markets the wallet did not enter, listed
+  disabled_syms:
+    rounding: text
+    means: |-
+      the entered markets whose collateral factor is zero, listed
+  deprecated_syms:
+    rounding: text
+    means: |-
+      the borrowed markets that are deprecated, listed
+  liquidity:
+    rounding: usd
+    means: |-
+      the borrowing room the Comptroller still leaves
+  shortfall:
+    rounding: usd
+    means: |-
+      how far the debt is past the borrow limit
+  share:
+    rounding: ratio_frac
+    means: |-
+      the debt as a share of the liquidation line (61.2%), or over 1,000×
+  line:
+    rounding: usd
+    means: |-
+      the debt the liquidation line covers
+  drop:
+    rounding: pct_whole
+    means: |-
+      how far the collateral can fall before the account can be liquidated
+  supply_apr:
+    rounding: ratio_frac
+    means: |-
+      the highest supply rate among the supplied markets, per year
+  rate:
+    rounding: ratio_frac
+    means: |-
+      the borrow rate the debt accrues at, per year
+  count:
+    rounding: count
+    means: |-
+      how many times the account was liquidated
+  time_word:
+    rounding: text
+    means: |-
+      time or times
+  peak_supplies:
+    rounding: number
+    means: |-
+      the most each market's supply reached, listed
+  peak_borrows:
+    rounding: number
+    means: |-
+      the most each market's debt reached, listed
+  external:
+    rounding: count
+    means: |-
+      the events another address executed
+  total:
+    rounding: count
+    means: |-
+      the events recorded on the account
+  actors:
+    rounding: count
+    means: |-
+      the other addresses that executed events
+  top_count:
+    rounding: count
+    means: |-
+      the events the most active other address executed
+  lead_name:
+    rounding: text
+    means: |-
+      the name of the most active other address
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence or between a list's items ──
+words:
+  and: |-
+    and
+  time_one: |-
+    time
+  time_many: |-
+    times
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk, Rate and History when two of them hold two or more
+# bullets. Risk holds at most four: the borrowing room or shortfall, the debt
+# against the liquidation line, the fall to liquidation, and a deprecated
+# borrow. Read by positionWords / positionNodes
+# (lib/compound-v2/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── An open account ──
+  lead_liquidatable: |-
+    This position is liquidatable now: its borrowing has outgrown what its collateral covers:
+  lead_borrowing: |-
+    This position borrows against its Compound V2 collateral and is currently healthy:
+  lead_debt_free: |-
+    This position supplies collateral and is debt-free, so its collateral is safe from liquidation:
+  lead_supply_only: |-
+    This position only supplies; nothing is entered as collateral, so it backs no borrowing:
+  worth_both: |-
+    At Compound's oracle prices, the supplied markets are worth {supplied_usd} and the borrowed markets {borrowed_usd}.
+  worth_supplied: |-
+    At Compound's oracle prices, the supplied markets are worth {supplied_usd}.
+  worth_borrowed: |-
+    At Compound's oracle prices, the borrowed markets are worth {borrowed_usd}.
+  entered: |-
+    The {entered_syms} supply is entered as collateral and counts toward the borrow limit.
+  unentered: |-
+    The {unentered_syms} supply is not entered as collateral, so it backs no borrowing.
+  disabled: |-
+    The {disabled_syms} market is entered, but its collateral factor is zero, so it backs nothing.
+  liquidity: |-
+    Compound's risk check shows {liquidity} of borrowing room still unused.
+  shortfall: |-
+    Compound's risk check shows a {shortfall} shortfall: the account is liquidatable now.
+  idle_room: |-
+    At current prices, the entered collateral could back up to {liquidity} of borrowing.
+  liq_line: |-
+    The debt stands at {share} of the liquidation line, which sits at {line} of debt.
+  liq_line_beyond: |-
+    The debt is {share} the liquidation line, which sits at {line} of debt.
+  drop: |-
+    The collateral basket can fall about {drop} before the account is liquidatable.
+  deprecated_one: |-
+    The {deprecated_syms} borrow is in a deprecated market, so it can be liquidated in full at any time.
+  deprecated_many: |-
+    The {deprecated_syms} borrows are in deprecated markets, so they can be liquidated in full at any time.
+  earns_nothing: |-
+    The supply earns nothing now.
+  earns_rate: |-
+    The supplied markets earn their supply rates, up to {supply_apr} APR.
+  borrow_rate: |-
+    The debt accrues at a {rate} borrow rate.
+  borrow_rate_avg: |-
+    The debt accrues at an average {rate} borrow rate.
+  liquidated_open: |-
+    The account has been liquidated {count} {time_word} and is still open.
+  operators: |-
+    Of the {total} events here, {external} were executed by an address other than the owner's.
+  operators_one: |-
+    Of the {total} events here, {external} was executed by an address other than the owner's.
+  operators_one_named: |-
+    That one ran through {lead_name}.
+  operators_all_named: |-
+    All of them ran through {lead_name}.
+  operators_most_named: |-
+    Most of them ran through {lead_name}.
+  operators_single: |-
+    A single address ran all of them.
+  operators_spread: |-
+    The work is spread across {actors} addresses, the most active running {top_count} of them.
+  # ── A closed or liquidated account ──
+  closed_lead: |-
+    This account ran its course and closed; nothing remains supplied or borrowed:
+  closed_lead_liquidated: |-
+    This account closed with a liquidation in its record; nothing remains supplied or borrowed:
+  peak_supplied: |-
+    At its height it supplied as much as {peak_supplies}.
+  peak_owed: |-
+    It owed as much as {peak_borrows}.
+  liquidated_n: |-
+    The account was liquidated {count} {time_word}.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  seize.same_tx_symbol:
+    when: |-
+      the same transaction's liquidation row is on the page
+    text: |-
+      The debt they paid down is the {debt_symbol} liquidation in the same transaction.
+  seize.same_tx:
+    when: |-
+      the same transaction's liquidation row is not on the page
+    text: |-
+      The debt they paid down is the liquidation in the same transaction.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: compound2.mint
+    title: |-
+      Supply
+    when: |-
+      mint
+    L5: supply
+    variants:
+      default: |-
+        always
+    sentences:
+      mint.what:
+        when: |-
+          always
+        text: |-
+          The account supplied {delta} {market_symbol} and received {ctokens} {c_symbol}.
+    order:
+      - mint.what
+    groups:
+      happened:
+        - mint.what
+
+  - id: compound2.redeem
+    title: |-
+      Withdraw
+    when: |-
+      redeem
+    L5: withdraw
+    variants:
+      default: |-
+        the account keeps some supply here
+      emptied: |-
+        the withdrawal emptied the account's supply in this market
+    sentences:
+      redeem.what:
+        when: |-
+          always
+        text: |-
+          The account withdrew {delta} {market_symbol}, burning {ctokens} {c_symbol}.
+      redeem.emptied:
+        when: |-
+          emptied
+        text: |-
+          That emptied the account's {market_symbol} supply.
+    order:
+      - redeem.what
+      - redeem.emptied
+    groups:
+      happened:
+        - redeem.what
+      leaves:
+        - redeem.emptied
+
+  - id: compound2.borrow
+    title: |-
+      Borrow
+    when: |-
+      borrow
+    L5: borrow
+    variants:
+      first: |-
+        the account had no debt in this market before
+      more: |-
+        the account already owed in this market
+    sentences:
+      borrow.what:
+        when: |-
+          always
+        text: |-
+          The account borrowed {delta} {market_symbol} against its supplied collateral.
+      borrow.first:
+        when: |-
+          first
+        text: |-
+          This is the account's first {market_symbol} debt.
+    order:
+      - borrow.what
+      - borrow.first
+    groups:
+      happened:
+        - borrow.what
+      leaves:
+        - borrow.first
+
+  - id: compound2.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: repay
+    variants:
+      cleared: |-
+        the repayment cleared the debt in this market
+      left: |-
+        some debt remains
+      unknown: |-
+        the row does not say what remains
+    sentences:
+      repay.what:
+        when: |-
+          always
+        text: |-
+          The account repaid {delta} {market_symbol} of its debt.
+      repay.by_other:
+        when: |-
+          another address paid the repayment
+        text: |-
+          Another address paid this repayment.
+      repay.cleared:
+        when: |-
+          cleared
+        text: |-
+          That cleared the {market_symbol} debt in full.
+      repay.left:
+        when: |-
+          left
+        text: |-
+          Some {market_symbol} debt remains.
+    order:
+      - repay.what
+      - repay.by_other
+      - repay.cleared
+      - repay.left
+    groups:
+      happened:
+        - repay.what
+        - repay.by_other
+      leaves:
+        - repay.cleared
+        - repay.left
+    alternates:
+      - [repay.cleared, repay.left]
+
+  - id: compound2.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation: a liquidator repaid part of the account's debt
+    L5: liquidation
+    variants:
+      account: |-
+        the account's borrowed value outgrew its collateral
+      deprecated: |-
+        the borrowed market is deprecated, so the whole borrow could be liquidated
+    sentences:
+      liq.what:
+        when: |-
+          the row names the seized collateral
+        text: |-
+          A liquidator repaid {repaid} {market_symbol} of the account's debt and seized {seized} {collateral_csymbol} of collateral.
+      liq.what_no_seize:
+        when: |-
+          the row does not name the seized collateral
+        text: |-
+          A liquidator repaid {repaid} {market_symbol} of the account's debt.
+      liq.why_account:
+        when: |-
+          account
+        text: |-
+          The account's borrowed value had outgrown what its collateral covers.
+      liq.why_deprecated:
+        when: |-
+          deprecated
+        text: |-
+          The {market_symbol} market is deprecated, so any borrow in it can be liquidated in full.
+      liq.survived:
+        when: |-
+          some debt remains after the liquidation
+        text: |-
+          The account survived: some {market_symbol} debt remains.
+      liq.cleared:
+        when: |-
+          the liquidation cleared the debt
+        text: |-
+          The liquidation cleared the account's {market_symbol} debt in full.
+    order:
+      - liq.what
+      - liq.what_no_seize
+      - liq.why_account
+      - liq.why_deprecated
+      - liq.survived
+      - liq.cleared
+    groups:
+      happened:
+        - liq.what
+        - liq.what_no_seize
+        - liq.why_account
+        - liq.why_deprecated
+      leaves:
+        - liq.survived
+        - liq.cleared
+    alternates:
+      - [liq.what, liq.what_no_seize]
+      - [liq.survived, liq.cleared]
+
+  - id: compound2.transfer
+    title: |-
+      Transfer
+    when: |-
+      transfer_in or transfer_out of cTokens
+    L5: transfer_in
+    variants:
+      in: |-
+        the account received cTokens
+      out: |-
+        the account sent cTokens
+    sentences:
+      xfer.in:
+        when: |-
+          in
+        text: |-
+          The account received {ctokens} {c_symbol} from another wallet.
+      xfer.out:
+        when: |-
+          out
+        text: |-
+          The account sent {ctokens} {c_symbol} to another wallet.
+      xfer.claim_in:
+        when: |-
+          in
+        text: |-
+          The {market_symbol} claim, and its collateral role, moved into the position with the tokens.
+      xfer.claim_out:
+        when: |-
+          out
+        text: |-
+          The {market_symbol} claim, and its collateral role, moved out of the position with the tokens.
+    order:
+      - xfer.in
+      - xfer.out
+      - xfer.claim_in
+      - xfer.claim_out
+    groups:
+      happened:
+        - xfer.in
+        - xfer.out
+      leaves:
+        - xfer.claim_in
+        - xfer.claim_out
+    alternates:
+      - [xfer.in, xfer.out]
+      - [xfer.claim_in, xfer.claim_out]
+
+  - id: compound2.seize_out
+    title: |-
+      Seized
+    when: |-
+      seize_out: a liquidation took cTokens from the account
+    L5: seize_out
+    variants:
+      default: |-
+        always
+    sentences:
+      seize_out.what:
+        when: |-
+          always
+        text: |-
+          A liquidator seized {ctokens} {c_symbol} of the account's collateral.
+    order:
+      - seize_out.what
+      - seize.same_tx_symbol
+      - seize.same_tx
+    groups:
+      happened:
+        - seize_out.what
+      adds_up:
+        - seize.same_tx_symbol
+        - seize.same_tx
+    alternates:
+      - [seize.same_tx_symbol, seize.same_tx]
+
+  - id: compound2.seize_in
+    title: |-
+      Seizure received
+    when: |-
+      seize_in: the account, as liquidator, received cTokens
+    L5: seize_in
+    variants:
+      default: |-
+        always
+    sentences:
+      seize_in.what:
+        when: |-
+          always
+        text: |-
+          The account received {ctokens} {c_symbol} of a borrower's collateral as the liquidator.
+    order:
+      - seize_in.what
+      - seize.same_tx_symbol
+      - seize.same_tx
+    groups:
+      happened:
+        - seize_in.what
+      adds_up:
+        - seize.same_tx_symbol
+        - seize.same_tx
+    alternates:
+      - [seize.same_tx_symbol, seize.same_tx]
+
+  - id: compound2.seize_burn
+    title: |-
+      Protocol share
+    when: |-
+      seize_burn: the protocol's cut of a seizure, burned
+    L5: seize_burn
+    variants:
+      default: |-
+        always
+    sentences:
+      seize_burn.what:
+        when: |-
+          always
+        text: |-
+          The protocol kept {ctokens} {c_symbol} of this seizure as its share; the tokens were burned.
+    order:
+      - seize_burn.what
+    groups:
+      happened:
+        - seize_burn.what
+
+  - id: compound2.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The account recorded a {event_type} event on the {market_symbol} market.
+    order:
+      - fallback.what
+    groups:
+      happened:
+        - fallback.what
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  OVERVIEW: |-
+    https://docs.compound.finance/v2/#introduction-to-compound-v2
+  CTOKENS: |-
+    https://docs.compound.finance/v2/ctokens/#introduction
+  MINT: |-
+    https://docs.compound.finance/v2/ctokens/#mint
+  REDEEM: |-
+    https://docs.compound.finance/v2/ctokens/#redeem
+  BORROW: |-
+    https://docs.compound.finance/v2/ctokens/#borrow
+  REPAY_BORROW: |-
+    https://docs.compound.finance/v2/ctokens/#repay-borrow
+  REPAY_BEHALF: |-
+    https://docs.compound.finance/v2/ctokens/#repay-borrow-behalf
+  TRANSFER: |-
+    https://docs.compound.finance/v2/ctokens/#transfer
+  LIQUIDATE_BORROW: |-
+    https://docs.compound.finance/v2/ctokens/#liquidate-borrow
+  EXCHANGE_RATE: |-
+    https://docs.compound.finance/v2/ctokens/#exchange-rate
+  RESERVE_FACTOR: |-
+    https://docs.compound.finance/v2/ctokens/#reserve-factor
+  PRICES: |-
+    https://docs.compound.finance/v2/prices/#introduction
+  COMPTROLLER: |-
+    https://docs.compound.finance/v2/comptroller/#introduction
+  ENTER_MARKETS: |-
+    https://docs.compound.finance/v2/comptroller/#enter-markets
+  COLLATERAL_FACTOR: |-
+    https://docs.compound.finance/v2/comptroller/#collateral-factor
+  ACCOUNT_LIQUIDITY: |-
+    https://docs.compound.finance/v2/comptroller/#account-liquidity
+  CLOSE_FACTOR: |-
+    https://docs.compound.finance/v2/comptroller/#close-factor
+  LIQUIDATION_INCENTIVE: |-
+    https://docs.compound.finance/v2/comptroller/#liquidation-incentive
+
+# ── The "?" modals (zone Z4): the event modals and the position card's. Each
+# stops at the mechanism and hands it to a Quick Link; no figure of one
+# account appears here. ──
+L5:
+  supply:
+    title: |-
+      How Supplying Works
+    intro: |-
+      Supplying deposits an asset into a Compound V2 market and mints cTokens, a transferable receipt, in exchange. The deposit earns the supply rate and, once the market is entered, backs borrowing.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          cTokens and the exchange rate
+        text: |-
+          a cToken balance times the market's exchange rate is the underlying claim, and interest raises the rate.
+      - bold: |-
+          Entering a market
+        text: |-
+          supplying alone does not make a deposit collateral; the wallet enters the market in a separate call.
+      - bold: |-
+          Cross-collateralisation
+        text: |-
+          the Comptroller, Compound's risk contract, pools every entered market into one account, each weighted by its collateral factor.
+      - bold: |-
+          Transferable positions
+        text: |-
+          cTokens are ordinary ERC-20s, so transferring them moves the deposit and its collateral role without a mint or redeem.
+    links:
+      - label: |-
+          Mint
+        doc: MINT
+      - label: |-
+          Exchange rate
+        doc: EXCHANGE_RATE
+      - label: |-
+          Enter markets
+        doc: ENTER_MARKETS
+
+  withdraw:
+    title: |-
+      How Withdrawing Works
+    intro: |-
+      Withdrawing burns cTokens and returns the underlying asset to the wallet. It goes only as far as the account's liquidity and the market's cash allow.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          cTokens and the exchange rate
+        text: |-
+          the cTokens burned times the market's exchange rate is the underlying asset returned.
+      - bold: |-
+          Effect on liquidity
+        text: |-
+          withdrawing removes collateral, so the account's borrowing room falls; the market blocks a withdrawal that would leave debt uncovered.
+      - bold: |-
+          Entered markets only
+        text: |-
+          only entered markets count toward the borrow limit, so withdrawing from one that is not entered changes no limit.
+    links:
+      - label: |-
+          Redeem
+        doc: REDEEM
+      - label: |-
+          Account liquidity
+        doc: ACCOUNT_LIQUIDITY
+
+  borrow:
+    title: |-
+      How Borrowing Works
+    intro: |-
+      Borrowing draws an asset against the account's supplied collateral and accrues interest at the market's borrow rate. The amount must stay within the account's liquidity and the market's cash.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrowing power
+        text: |-
+          the supplied value in entered markets, weighted by each market's collateral factor, sets how much can be borrowed.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the borrow limit minus the debt; below zero it is a shortfall, and the account can be liquidated.
+      - bold: |-
+          The emitted debt figure
+        text: |-
+          each borrow and repay carries the debt after it, with interest to that moment, so the gap to the next event is interest.
+    links:
+      - label: |-
+          Borrow
+        doc: BORROW
+      - label: |-
+          Collateral factor
+        doc: COLLATERAL_FACTOR
+      - label: |-
+          Account liquidity
+        doc: ACCOUNT_LIQUIDITY
+
+  repay:
+    title: |-
+      How Repaying Works
+    intro: |-
+      Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing room.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Repaying for others
+        text: |-
+          any address can repay another account's borrow, in full or in part.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the borrow limit minus the debt; repaying lowers the debt, so the room to borrow grows.
+      - bold: |-
+          The emitted debt figure
+        text: |-
+          each borrow and repay carries the debt after it, with interest to that moment, so the gap to the next event is interest.
+    links:
+      - label: |-
+          Repay borrow
+        doc: REPAY_BORROW
+      - label: |-
+          Repay borrow behalf
+        doc: REPAY_BEHALF
+      - label: |-
+          Account liquidity
+        doc: ACCOUNT_LIQUIDITY
+
+  transfer_in:
+    title: |-
+      How Receiving cTokens Works
+    intro: |-
+      cTokens are ordinary ERC-20 tokens, so a Compound V2 deposit can change hands without touching the market. Transferring cTokens transfers the underlying claim and its collateral role.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The claim moves with the token
+        text: |-
+          the recipient's cToken balance times the exchange rate becomes their claim; the sender gives it up and no mint or redeem fires.
+      - bold: |-
+          Collateral implications
+        text: |-
+          the market blocks a transfer that would leave the sender's debt uncovered.
+      - bold: |-
+          Positions can start here
+        text: |-
+          a wallet that never supplied can still hold a position; received cTokens are a deposit like any other.
+    links:
+      - label: |-
+          Transfer
+        doc: TRANSFER
+      - label: |-
+          Exchange rate
+        doc: EXCHANGE_RATE
+
+  transfer_out:
+    title: |-
+      How Sending cTokens Works
+    intro: |-
+      cTokens are ordinary ERC-20 tokens, so a Compound V2 deposit can change hands without touching the market. Transferring cTokens transfers the underlying claim and its collateral role.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          The claim moves with the token
+        text: |-
+          the recipient's cToken balance times the exchange rate becomes their claim; the sender gives it up and no mint or redeem fires.
+      - bold: |-
+          Collateral implications
+        text: |-
+          the market blocks a transfer that would leave the sender's debt uncovered.
+      - bold: |-
+          Positions can end here
+        text: |-
+          a wallet can exit by sending its cTokens, and the position continues under the new owner.
+    links:
+      - label: |-
+          Transfer
+        doc: TRANSFER
+      - label: |-
+          Exchange rate
+        doc: EXCHANGE_RATE
+
+  liquidation:
+    title: |-
+      How Liquidations Work
+    intro: |-
+      A Compound V2 account can be liquidated when its liquidity turns into a shortfall: its debt is worth more than its collateral counts for. Anyone may then repay part of the debt for collateral.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Close factor
+        text: |-
+          a liquidator repays at most the close factor, 50%, of one borrowed market per call.
+      - bold: |-
+          Liquidation incentive
+        text: |-
+          the liquidator seizes cTokens worth the repaid debt plus the 8% incentive, in a collateral market it chooses.
+      - bold: |-
+          The protocol's share
+        text: |-
+          most markets keep 2.8% of the seized cTokens for the protocol, and a few take none.
+      - bold: |-
+          Deprecated markets
+        text: |-
+          a market with collateral factor 0, borrowing paused and reserve factor 100% is deprecated: any borrow in it can be liquidated in full.
+      - bold: |-
+          Partial and repeatable
+        text: |-
+          otherwise a liquidation is partial and repeatable, so borrowers often survive one.
+    links:
+      - label: |-
+          Liquidate borrow
+        doc: LIQUIDATE_BORROW
+      - label: |-
+          Close factor
+        doc: CLOSE_FACTOR
+      - label: |-
+          Liquidation incentive
+        doc: LIQUIDATION_INCENTIVE
+
+  seize_out:
+    title: |-
+      How Collateral Seizure Works
+    intro: |-
+      When a liquidator repays part of an account's debt, the protocol moves cTokens in a collateral market out of the borrower's balance. The borrower did not send them.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One seizure, two parts
+        text: |-
+          the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
+        text_no_share: |-
+          this market takes no protocol share, so the liquidator receives every seized cToken.
+      - bold: |-
+          Receipt tokens move
+        text: |-
+          a seizure moves the receipt tokens, and their value follows the collateral market's exchange rate.
+      - bold: |-
+          Partial, outside deprecated markets
+        text: |-
+          the close factor caps a liquidation at half of one borrowed market, so accounts often survive; a deprecated one can go whole.
+    links:
+      - label: |-
+          Liquidate borrow
+        doc: LIQUIDATE_BORROW
+      - label: |-
+          Liquidation incentive
+        doc: LIQUIDATION_INCENTIVE
+
+  seize_in:
+    title: |-
+      How Seized Collateral Arrives
+    intro: |-
+      A liquidator receives these cTokens for repaying part of a liquidatable account's debt. They are its side of a seizure, worth the repaid debt plus the liquidation incentive.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One seizure, two parts
+        text: |-
+          the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
+        text_no_share: |-
+          this market takes no protocol share, so the liquidator receives every seized cToken.
+      - bold: |-
+          Receipt tokens move
+        text: |-
+          a seizure moves the receipt tokens, and their value follows the collateral market's exchange rate.
+      - bold: |-
+          Partial, outside deprecated markets
+        text: |-
+          the close factor caps a liquidation at half of one borrowed market, so accounts often survive; a deprecated one can go whole.
+    links:
+      - label: |-
+          Liquidate borrow
+        doc: LIQUIDATE_BORROW
+      - label: |-
+          Liquidation incentive
+        doc: LIQUIDATION_INCENTIVE
+
+  seize_burn:
+    title: |-
+      The Protocol's Seize Share
+    intro: |-
+      The protocol's share of a seizure: 2.8% of the seized cTokens are taken from the borrower and burned, and their underlying joins the market's reserves. No wallet receives them.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One seizure, two parts
+        text: |-
+          the seized total is the liquidator's part plus the protocol's 2.8% share, so the liquidator's part alone understates the loss.
+      - bold: |-
+          Receipt tokens move
+        text: |-
+          a seizure moves the receipt tokens, and their value follows the collateral market's exchange rate.
+    links:
+      - label: |-
+          Liquidation incentive
+        doc: LIQUIDATION_INCENTIVE
+      - label: |-
+          Liquidate borrow
+        doc: LIQUIDATE_BORROW
+
+  fallback:
+    title: |-
+      How Compound V2 Positions Work
+    intro: |-
+      Compound V2 is the original pooled-lending protocol. A wallet supplies assets into cToken markets, receiving transferable receipts, and borrows against them through one Comptroller.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          cTokens
+        text: |-
+          each market's receipt token: balance times exchange rate is the underlying claim, and the rate's growth is the supply interest.
+      - bold: |-
+          Borrowing and account liquidity
+        text: |-
+          borrowing draws against the supplied value in entered markets, weighted by collateral factors; a shortfall means liquidatable.
+      - bold: |-
+          Liquidation
+        text: |-
+          a liquidator repays part of a debt and seizes collateral worth the repayment plus an incentive.
+    links:
+      - label: |-
+          Compound v2 documentation
+        doc: OVERVIEW
+      - label: |-
+          cTokens
+        doc: CTOKENS
+      - label: |-
+          Comptroller
+        doc: COMPTROLLER
+
+  # ── The position card's "?" (an open account with debt, an open account
+  # without, a closed one, a liquidated one) ──
+  position_borrowing:
+    title: |-
+      About This Position
+    intro: |-
+      This panel explains the account in plain words. It covers what is supplied in each Compound V2 market, what is borrowed against it, and the borrowing room the Comptroller leaves.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          cTokens and the exchange rate
+        text: |-
+          a cToken balance times the market's exchange rate is the underlying claim, and the rate rises with interest.
+      - bold: |-
+          Entering a market
+        text: |-
+          supplying alone does not enter a market; only entered markets count toward the borrow limit.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the Comptroller adds each entered market's value times its collateral factor, then subtracts the debt; a shortfall can be liquidated.
+      - bold: |-
+          Reserve factor 100%
+        text: |-
+          governance has set every market to keep all borrower interest as reserves, so supplying earns nothing now.
+      - bold: |-
+          Constant prices
+        text: |-
+          a few markets are priced by a constant stored in the oracle, which nothing updates.
+    links:
+      - label: |-
+          Comptroller
+        doc: COMPTROLLER
+      - label: |-
+          Account liquidity
+        doc: ACCOUNT_LIQUIDITY
+      - label: |-
+          Reserve factor
+        doc: RESERVE_FACTOR
+      - label: |-
+          Price feed
+        doc: PRICES
+
+  position_supply:
+    title: |-
+      About This Position
+    intro: |-
+      This panel explains the account in plain words: what is supplied in each Compound V2 market, and whether any of it backs borrowing.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          cTokens and the exchange rate
+        text: |-
+          a cToken balance times the market's exchange rate is the underlying claim, and the rate rises with interest.
+      - bold: |-
+          Entering a market
+        text: |-
+          a supply is not collateral until its market is entered; with no debt there is nothing to liquidate.
+      - bold: |-
+          Reserve factor 100%
+        text: |-
+          governance has set every market to keep all borrower interest as reserves, so supplying earns nothing now.
+      - bold: |-
+          Constant prices
+        text: |-
+          a few markets are priced by a constant stored in the oracle, which nothing updates.
+    links:
+      - label: |-
+          Comptroller
+        doc: COMPTROLLER
+      - label: |-
+          Enter markets
+        doc: ENTER_MARKETS
+      - label: |-
+          Reserve factor
+        doc: RESERVE_FACTOR
+      - label: |-
+          Price feed
+        doc: PRICES
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      This account has repaid all its debt and withdrawn its supply. The panel above shows its lifetime peaks.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each market's peak is the highest of its running balance, replayed from the account's events.
+      - bold: |-
+          cTokens and the exchange rate
+        text: |-
+          a cToken balance times the market's exchange rate is the underlying claim, and the rate rises with interest.
+      - bold: |-
+          Coming back
+        text: |-
+          a new supply or borrow reopens this same account's timeline.
+    links:
+      - label: |-
+          Compound v2 documentation
+        doc: OVERVIEW
+      - label: |-
+          cTokens
+        doc: CTOKENS
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      This account was liquidated and has since closed: nothing remains supplied or borrowed. The panel above shows the highest supply and debt each market reached.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Partial by design
+        text: |-
+          each liquidation repays at most half the debt in one borrowed market, so a liquidated account often survives it.
+      - bold: |-
+          Account liquidity
+        text: |-
+          the Comptroller adds each entered market's value times its collateral factor, then subtracts the debt; a shortfall can be liquidated.
+      - bold: |-
+          Highest recorded
+        text: |-
+          each market's peak is the highest of its running balance, replayed from the account's events.
+      - bold: |-
+          Coming back
+        text: |-
+          a new supply or borrow reopens this same account's timeline.
+    links:
+      - label: |-
+          Liquidate borrow
+        doc: LIQUIDATE_BORROW
+      - label: |-
+          Comptroller
+        doc: COMPTROLLER

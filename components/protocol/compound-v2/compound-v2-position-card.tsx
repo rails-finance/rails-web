@@ -57,7 +57,7 @@ import {
 import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
-import { compoundV2PositionContent } from "@/lib/compound-v2/position-content";
+import { compoundV2PositionModal } from "@/lib/compound-v2/event-templates";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
 import {
@@ -396,11 +396,7 @@ export function CompoundV2PositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={compoundV2PositionContent({
-          status: v.status,
-          liquidations: v.liquidations,
-          liquidationCount: v.liquidationCount,
-        })}
+        learnMore={compoundV2PositionModal({ status: v.status })}
         disclosureKey={disclosureKey}
       >
         <ClosedPositionStats
@@ -450,7 +446,7 @@ export function CompoundV2PositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={compoundV2PositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
+      learnMore={compoundV2PositionModal({ status: v.status, hasDebt: v.borrows.length > 0 })}
       disclosureKey={disclosureKey}
     >
       <OpenPositionStats
