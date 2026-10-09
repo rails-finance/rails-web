@@ -96,6 +96,7 @@ import {
   type VaultNote,
   type VaultTimelineCoords,
 } from "@/lib/shared/vault-holder-timeline";
+import { vaultEventContent } from "@/lib/shared/learn-more-content";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -311,6 +312,7 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
                   vaultAddress={timeline.vault}
                   eventNumber={meta.eventNumber}
                   isLast={meta.isLast}
+                  family={family}
                 />
               );
             }}
@@ -463,9 +465,11 @@ function AaveTimelineRow({
   vaultAddress,
   eventNumber,
   isLast,
+  family,
 }: {
   event: VaultHolderEvent;
   coords: VaultTimelineCoords;
+  family: AaveVaultFamily;
   shareUnit: string;
   assetSymbol: string;
   vaultAddress: string;
@@ -488,6 +492,7 @@ function AaveTimelineRow({
       isLast={isLast}
       prov={PROV}
       persistPrefix="aave-vault"
+      learnMore={vaultEventContent(family)}
       // A cooldown moves nothing, so there is no flow to draw; the clock says
       // what the row is instead of leaving the spine slot empty.
       icon={event.kind === "cooldown" ? "extend" : event.kind === "transfer-self" ? "no-change" : undefined}

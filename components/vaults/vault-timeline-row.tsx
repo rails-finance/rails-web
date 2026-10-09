@@ -46,12 +46,15 @@
 
 import type { ReactNode } from "react";
 
-import { ChainTruthRow, type ChainTruthDelta } from "@/components/shared/chain-truth-event";
-import { EventCard } from "@/components/shared/event-card";
+import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
+import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import type { EventCellSpec } from "@/components/shared/event-cells";
+import { EventLedgerContext, ROW_CELLS } from "@/components/shared/event-ledger-context";
+import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { SpineColumn, type SpineTokenRow } from "@/components/shared/spine-column";
-import { DeltaToggle, StateTransition } from "@/components/shared/state-transition";
-import { StatCard, assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
+import type { SpineTokenRow } from "@/components/shared/spine-column";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { assetText, shareText, shortAddress } from "@/components/protocol/morpho-base/vault-exposure-parts";
 import { sharePriceText } from "@/components/vaults/aave-vault-format";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { KIND_LABEL, type VaultHolderEvent, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
@@ -94,8 +97,8 @@ export interface VaultTimelineRowProps {
    *  panel — the `EventCard` slot whose grid lines up with the detail grid.
    *  Ethereum's families have none; MetaMorpho draws its allocation band here. */
   band?: ReactNode;
-  /** Where a family's own figure joins the row's stat grid. */
-  detailCards?: (rowCoords: VaultTimelineCoords) => ReactNode;
+  /** Where a family's figure joins the row's cells. */
+  extraCells?: (rowCoords: VaultTimelineCoords) => EventCellSpec[];
   /** Where a family's own sentence joins the row's detail panel, under the
    *  standard paragraphs. */
   detailNotes?: (rowCoords: VaultTimelineCoords) => ReactNode;
@@ -105,6 +108,8 @@ export interface VaultTimelineRowProps {
   /** Namespaces the open/closed memory of a card so two chains' rows cannot
    *  collide on one reader's machine. */
   persistPrefix: string;
+  /** The family's "?" (`vaultEventContent`). */
+  learnMore: LearnMoreContent;
 }
 
 export function VaultTimelineRow({
@@ -118,10 +123,11 @@ export function VaultTimelineRow({
   eventNumber,
   prov,
   band,
-  detailCards,
+  extraCells,
   detailNotes,
   icon,
   persistPrefix,
+  learnMore,
 }: VaultTimelineRowProps) {
   // Each row's receipts name THAT row's block and transaction, not the page's.
   const rowCoords: VaultTimelineCoords = { ...coords, blockNumber: event.blockNumber, txHash: event.txHash };
@@ -181,66 +187,142 @@ export function VaultTimelineRow({
         }
       : undefined;
 
+  const spec: ChainTruthRowSpec = { label: KIND_LABEL[event.kind], custody: isTransfer, deltas, party };
+  const lines = explainerLines(event, shareUnit, assetSymbol);
+  const slots: EventCardSlots = {
+    event: {
+      id: event.id,
+      family: `${persistPrefix}:${vaultAddress}`,
+      txHash: event.txHash,
+      blockNumber: event.blockNumber,
+      timestamp: event.timestamp,
+      number: eventNumber,
+    },
+    spine: { tokens: tokens.length ? tokens : undefined, icon, isLast },
+    head: spec,
+    caption: KIND_LABEL[event.kind],
+    cells: rowCells(event, rowCoords, shareUnit, assetSymbol, prov, extraCells),
+    ledgers: { none: "a vault row states one share token, with no flows panel" },
+    notes: (
+      <RowNotes
+        event={event}
+        coords={rowCoords}
+        chainId={chainId}
+        assetSymbol={assetSymbol}
+        prov={prov}
+        detailNotes={detailNotes}
+      />
+    ),
+    explainer: { body: <ProseExplainer items={lines.slice(1)} />, first: lines[0] },
+    learnMore: <LearnMore inline content={learnMore} />,
+    band,
+  };
   return (
-    <EventCard
-      avatar={null}
-      caption={KIND_LABEL[event.kind]}
-      iconColumn={<SpineColumn tokens={tokens.length ? tokens : undefined} icon={icon} isLast={isLast} />}
-      header={
-        <ChainTruthRow
-          spec={{ label: KIND_LABEL[event.kind], custody: isTransfer, deltas, party }}
-          timestamp={event.timestamp}
-          eventNumber={eventNumber}
-        />
-      }
-      band={band}
-      detail={
-        <RowDetail
-          event={event}
-          coords={rowCoords}
-          chainId={chainId}
-          shareUnit={shareUnit}
-          assetSymbol={assetSymbol}
-          prov={prov}
-          detailCards={detailCards}
-          detailNotes={detailNotes}
-        />
-      }
-      explainer={<RowExplainer event={event} shareUnit={shareUnit} assetSymbol={assetSymbol} />}
-      txHash={event.txHash}
-      persistKey={`${persistPrefix}:${vaultAddress}:${event.id}`}
-    />
+    <EventLedgerContext.Provider value={ROW_CELLS}>
+      <EventCard slots={slots} avatar={null} />
+    </EventLedgerContext.Provider>
   );
 }
 
-function RowDetail({
+/** The row's cells: the balance before → after, the share price at the row's
+ *  block, the shares the row moved, and any the family adds. Each cell's tip
+ *  says what kind of reading it is. */
+function rowCells(
+  event: VaultHolderEvent,
+  coords: VaultTimelineCoords,
+  shareUnit: string,
+  assetSymbol: string,
+  prov: VaultTimelineProvKit,
+  extraCells?: (rowCoords: VaultTimelineCoords) => EventCellSpec[],
+): EventCellSpec[] {
+  const sd = event.shareDecimals;
+  const ad = event.assetDecimals;
+  const moved = event.sharesDelta !== "0";
+  // The before side: the replay position after this log less the
+  // log's signed value. Integer arithmetic on two figures the row already
+  // carries — no second read, and nothing inferred.
+  const balanceBeforeRaw = (BigInt(event.balanceAfter) - BigInt(event.sharesDelta)).toString();
+  const shares = (r: string) => shareText(rawAmount(r, sd), sd);
+  return [
+    {
+      kind: "stat",
+      key: "balance",
+      label: `Balance · ${shareUnit}`,
+      figure: "row-balance-after",
+      tip: "Replayed from this address's transfers up to and including this log, with no call at this block. The figure before the arrow is the same replay one log earlier.",
+      changed: moved,
+      value: {
+        // No delta: the arrow stays a plain glyph. The change this row made is
+        // the "Shares moved" cell beside this one, with its receipt.
+        before: prov.balanceBefore ? { text: shares(balanceBeforeRaw), info: prov.balanceBefore(coords) } : undefined,
+        after: { text: shares(event.balanceAfter), info: prov.balanceAfter(coords) },
+      },
+    },
+    {
+      kind: "stat",
+      key: "share-price",
+      label: `Share price at this block · ${assetSymbol}`,
+      figure: "row-share-price",
+      tip: event.sharePriceReverted
+        ? `convertToAssets(10^${sd}) reverted at block ${event.blockNumber.toLocaleString("en-US")}, so the vault states no share price there. Asking again at that block returns the same revert.`
+        : `convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")}, the block this address's transaction landed in.`,
+      // A reading at the row's block: the row did not move it.
+      changed: false,
+      value: event.sharePriceAtBlock
+        ? {
+            after: {
+              text: sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad),
+              info: prov.sharePrice(coords, sd),
+            },
+          }
+        : event.sharePriceReverted
+          ? { none: "Reverted" }
+          : { after: { text: <NotLoaded className="text-sm font-semibold text-rb-500" /> } },
+    },
+    {
+      kind: "stat",
+      key: "shares-moved",
+      label: `Shares moved · ${shareUnit}`,
+      figure: "row-shares-delta",
+      tip:
+        event.kind === "cooldown"
+          ? "This transaction carried no transfer of this address's shares: starting a cooldown moves none. The balance beside it is unchanged by it."
+          : event.kind === "transfer-self"
+            ? "Both ends of the transfer are this same address, so the balance did not move. The action still happened."
+            : "The value word of this row's Transfer log, in the share token's units.",
+      changed: moved,
+      value:
+        event.kind === "cooldown"
+          ? { none: "none" }
+          : { after: { text: shares(event.sharesDelta), info: prov.shares(coords, event.kind) } },
+    },
+    ...(extraCells?.(coords) ?? []),
+  ];
+}
+
+/** Under the cells: the asset leg the vault stated, the transfer's other
+ *  address, and the family's notes. The raw figures ride the wrapper's
+ *  attributes, so a verifier reads the row wei-exact. */
+function RowNotes({
   event,
   coords,
   chainId,
-  shareUnit,
   assetSymbol,
   prov,
-  detailCards,
   detailNotes,
 }: {
   event: VaultHolderEvent;
   coords: VaultTimelineCoords;
   chainId: ChainId;
-  shareUnit: string;
   assetSymbol: string;
   prov: VaultTimelineProvKit;
-  detailCards?: (rowCoords: VaultTimelineCoords) => ReactNode;
   detailNotes?: (rowCoords: VaultTimelineCoords) => ReactNode;
 }) {
-  const sd = event.shareDecimals;
   const ad = event.assetDecimals;
-  // The before side, exactly: the replay position after this log less the log's
-  // own signed value. Integer arithmetic on two figures the row already
-  // carries — no second read, and nothing inferred.
   const balanceBeforeRaw = (BigInt(event.balanceAfter) - BigInt(event.sharesDelta)).toString();
   return (
     <div
-      className="px-5 pb-4"
+      className="px-5 pb-2 empty:hidden"
       data-row-kind={event.kind}
       data-row-block={event.blockNumber}
       data-row-balance-before={balanceBeforeRaw}
@@ -250,75 +332,15 @@ function RowDetail({
       // formatted figure — the rule every vault verifier holds to. The empty
       // string is the UNREAD marker and is distinct from "0": an archive call
       // that did not answer and a price of nothing are different facts, and the
-      // panel above says so in words too.
+      // cell says so in words too.
       data-row-share-price={event.sharePriceAtBlock ?? ""}
       // Set only where `convertToAssets` reverted at this block: the empty
       // price beside it is then the chain's answer at that block.
       data-row-share-price-reverted={event.sharePriceReverted ? "true" : undefined}
       data-row-assets={event.assets ?? ""}
     >
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label={`Balance · ${shareUnit}`}
-          figure="row-balance-after"
-          note="Replayed from this address's own transfers up to and including this log — not a call at this block. The figure on the left is the same replay one log earlier."
-        >
-          {prov.balanceBefore ? (
-            <StateTransition>
-              {/* `delta={null}`: the arrow stays a plain glyph rather than a
-                  toggle. The change this row made is the "Shares moved" card
-                  beside this one, with its own receipt, and a second statement
-                  of it here would be the same figure twice in one panel. */}
-              <DeltaToggle
-                size="sm"
-                delta={null}
-                before={<Prov info={prov.balanceBefore(coords)}>{shareText(rawAmount(balanceBeforeRaw, sd), sd)}</Prov>}
-              />
-              <Prov info={prov.balanceAfter(coords)}>{shareText(rawAmount(event.balanceAfter, sd), sd)}</Prov>
-            </StateTransition>
-          ) : (
-            <Prov info={prov.balanceAfter(coords)}>{shareText(rawAmount(event.balanceAfter, sd), sd)}</Prov>
-          )}
-        </StatCard>
-        <StatCard
-          label={`Share price at this block · ${assetSymbol}`}
-          figure="row-share-price"
-          note={
-            event.sharePriceReverted
-              ? `convertToAssets(10^${sd}) reverted at block ${event.blockNumber.toLocaleString("en-US")}, so the vault states no share price there. Asking again at that block returns the same revert.`
-              : `convertToAssets(10^${sd}) at block ${event.blockNumber.toLocaleString("en-US")} — the block this address's own transaction landed in.`
-          }
-        >
-          {event.sharePriceAtBlock ? (
-            <Prov info={prov.sharePrice(coords, sd)}>{sharePriceText(rawAmount(event.sharePriceAtBlock, ad), ad)}</Prov>
-          ) : event.sharePriceReverted ? (
-            <span className="text-base font-normal text-rb-500">Reverted</span>
-          ) : (
-            <NotLoaded className="text-base font-normal text-rb-500" />
-          )}
-        </StatCard>
-        <StatCard
-          label={`Shares moved · ${shareUnit}`}
-          figure="row-shares-delta"
-          note={
-            event.kind === "cooldown"
-              ? "This transaction carried no transfer of this address's shares — starting a cooldown moves none. The balance beside it is unchanged by it."
-              : event.kind === "transfer-self"
-                ? "Both ends of the transfer are this same address, so the balance did not move. The action still happened."
-                : "The value word of this row's own Transfer log, in the share token's own units."
-          }
-        >
-          {event.kind === "cooldown" ? (
-            <span className="text-base font-normal text-rb-500">none</span>
-          ) : (
-            <Prov info={prov.shares(coords, event.kind)}>{shareText(rawAmount(event.sharesDelta, sd), sd)}</Prov>
-          )}
-        </StatCard>
-        {detailCards?.(coords)}
-      </div>
-
       {(event.kind === "deposit" || event.kind === "withdrawal") && (
-        <p className="mt-3 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-asset-leg">
+        <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-asset-leg">
           {event.assets ? (
             <>
               The vault stated the other leg itself:{" "}
@@ -340,7 +362,7 @@ function RowDetail({
       )}
 
       {event.counterparty && (
-        <p className="mt-3 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-counterparty">
+        <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-counterparty">
           The other end of the transfer was{" "}
           <a
             href={explorerUrl(chainId, "address", event.counterparty)}
@@ -359,17 +381,10 @@ function RowDetail({
   );
 }
 
-/** The house explainer, and it is chain-neutral on purpose: what a mint IS on a
- *  share token does not change with the chain it happened on. */
-function RowExplainer({
-  event,
-  shareUnit,
-  assetSymbol,
-}: {
-  event: VaultHolderEvent;
-  shareUnit: string;
-  assetSymbol: string;
-}) {
+/** The house explanation, and it is chain-neutral on purpose: what a mint IS
+ *  on a share token does not change with the chain it happened on. Two
+ *  bullets: what the row is, then the rule its share price keeps. */
+function explainerLines(event: VaultHolderEvent, shareUnit: string, assetSymbol: string): string[] {
   const line = (() => {
     switch (event.kind) {
       case "deposit":
@@ -386,14 +401,8 @@ function RowExplainer({
         return `This address started a cooldown on the stake token, in a transaction that moved no shares. A stake token keeps one cooldown record per address at a time: starting a new one replaces the old, and an outgoing transfer decays it.`;
     }
   })();
-  return (
-    <div className="px-5 pb-4">
-      <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">{line}</p>
-      <p className="mt-2 max-w-3xl text-[12px] leading-relaxed text-rb-500">
-        The share price on this row was read at block {event.blockNumber.toLocaleString("en-US")} — the block this
-        transaction landed in. It says nothing about the blocks before or after it, and this page draws no line between
-        one row&rsquo;s price and the next.
-      </p>
-    </div>
-  );
+  return [
+    line,
+    `The share price on this row was read at block ${event.blockNumber.toLocaleString("en-US")} — the block this transaction landed in. It says nothing about the blocks before or after it, and this page draws no line between one row's price and the next.`,
+  ];
 }

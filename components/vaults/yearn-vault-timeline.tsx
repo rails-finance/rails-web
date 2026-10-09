@@ -62,6 +62,7 @@ import {
   yearnVaultTimelineSharesProv,
 } from "@/lib/yearn/vault-timeline-provenance";
 import type { VaultHolderTimeline, VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
+import { vaultEventContent } from "@/lib/shared/learn-more-content";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -240,6 +241,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
                   isLast={meta.isLast}
                   prov={PROV}
                   persistPrefix="yearn-vault"
+                  learnMore={vaultEventContent("yearn")}
                   // A transfer whose two ends are this address moves nothing,
                   // so there is no flow to draw; the glyph says what the row
                   // is instead of leaving the spine slot empty.
