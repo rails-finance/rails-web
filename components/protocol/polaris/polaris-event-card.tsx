@@ -17,13 +17,18 @@ import { eventGas } from "@/components/shared/event-price-row";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { useFlowFocus } from "@/components/shared/flow-focus-context";
 
-import { type PolarisCoords } from "@/lib/polaris/event-provenance";
-import { polarisExplainerTeaser } from "@/lib/polaris/explainer-clauses";
+import { polarisEventProse } from "@/lib/polaris/event-prose";
 import { PETH, POLARIS_MARKET_CONFIG } from "@/lib/polaris/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { usePolarisHeadSpec } from "./polaris-event-header";
 import { polarisEventBody } from "./polaris-event-detail";
-import { PolarisEventExplainer, polarisLearnMoreContent } from "./polaris-event-explainer";
+import {
+  PolarisEventExplainer,
+  PolarisExplainerTeaser,
+  isGroupedExplanation,
+  polarisEchoCoords,
+  polarisEchoFor,
+} from "./polaris-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { PolarisLedgerProvider } from "./polaris-ledger";
 
@@ -40,12 +45,8 @@ const num = (s?: string): number => {
 
 export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCardProps) {
   const ctx = event.context.data;
-  const coords: PolarisCoords = {
-    txHash: event.txHash,
-    blockNumber: event.blockNumber,
-    market: ctx.market,
-    cdpId: ctx.cdpId,
-  };
+  const coords = polarisEchoCoords(ctx, event.txHash, event.blockNumber);
+  const prose = polarisEventProse({ ctx });
   const stable = ctx.stableSymbol;
   const stableAddr = POLARIS_MARKET_CONFIG[ctx.market].stable.address;
 
@@ -120,10 +121,14 @@ export function PolarisEventCard({ event, isLast, eventNumber }: PolarisEventCar
       prices: body.price ? [body.price] : [],
     },
     explainer: {
-      body: <PolarisEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} skipLead />,
-      first: polarisExplainerTeaser(ctx, coords) ?? undefined,
+      body: <PolarisEventExplainer ctx={ctx} txHash={event.txHash} blockNumber={event.blockNumber} />,
+      first:
+        prose.L4.length > 0 ? (
+          <PolarisExplainerTeaser prose={prose} echo={(key) => polarisEchoFor(key, ctx, coords)} />
+        ) : undefined,
+      grouped: isGroupedExplanation(prose),
     },
-    learnMore: <LearnMore inline content={polarisLearnMoreContent(ctx)} />,
+    learnMore: <LearnMore inline content={prose.L5.content} />,
   };
   return <EventCard slots={slots} avatar={null} />;
 }

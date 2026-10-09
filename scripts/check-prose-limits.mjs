@@ -126,6 +126,7 @@ const Z1_STRINGS = {
   "aave-v3": { section: "position_words", ids: null, figures: "placeholders" },
   compound: { section: "position_words", ids: null, figures: "placeholders" },
   "compound-v2": { section: "position_words", ids: null, figures: "placeholders" },
+  polaris: { section: "position_words", ids: null, figures: "placeholders" },
   spark: { section: "position_words", ids: null, figures: "placeholders" },
   moonwell: { section: "position_words", ids: null, figures: "placeholders" },
 };

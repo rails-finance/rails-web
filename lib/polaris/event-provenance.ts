@@ -581,6 +581,18 @@ export type PolarisLifetimeLeg =
   | "debt cleared by PSM redemptions"
   | "minted to settle";
 
+/** The lifetime legs the position explanation names, by the word the code
+ *  uses for each (the receipts' labels are the values). */
+export const LIFETIME_LEGS = {
+  interest: "interest charged",
+  seized: "collateral liquidated",
+  cleared: "debt liquidated",
+  psmCollIn: "pETH from PSM mints",
+  psmDebtIn: "debt from PSM mints",
+  psmCollOut: "pETH to PSM redemptions",
+  psmDebtOut: "debt cleared by PSM redemptions",
+} as const satisfies Record<string, PolarisLifetimeLeg>;
+
 const LEG_VIA: Record<PolarisLifetimeLeg, string> = {
   deposited: "Σ max(_collChange, 0)",
   withdrawn: "Σ max(−_collChange, 0) on open/adjust/close rows",

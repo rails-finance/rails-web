@@ -1,5 +1,4 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
-import { POLARIS_APP_LINK, POLARIS_DOC_LINKS } from "@/lib/polaris/docs-links";
 import type { CurveEventType } from "@/lib/shared/types/protocols/curve";
 import type { UniswapEventType } from "@/lib/shared/types/protocols/uniswap";
 import { getSpokeMeta, ARCHETYPE_GLOSS, SPOKE_DOC_LINKS } from "@/lib/aave-v4/spoke-meta";
@@ -2292,7 +2291,6 @@ function marketNoteLead(noun: string): string {
 export type PriceGapProtocol =
   | "liquity-v2"
   | "liquity-fork"
-  | "polaris"
   | "aave-v4"
   | "aave-v3"
   | "spark"
@@ -2300,39 +2298,6 @@ export type PriceGapProtocol =
 
 export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMoreContent {
   switch (protocol) {
-    case "polaris":
-      return {
-        title: "How a price move reaches a CDP",
-        intro: `${marketNoteLead("CDP")} This kind states how the market's own price feed moved between two of the CDP's own touches, and what that move alone did to its collateral ratio.`,
-        detailsHeading: "Key concepts:",
-        details: [
-          {
-            bold: "Oracle price",
-            text: "every priced touch carries the market's own price feed at that block, in the market's own unit (USDp or GOLDp) rather than in dollars. The two ends of a note are two such touches; no price is read for the note itself, and none is drawn between them.",
-          },
-          {
-            bold: "Collateral ratio",
-            text: "the pETH collateral's value at that price divided by the debt. The same collateral at a lower price covers less of the debt, so a fall lowers the ratio with nothing else moving.",
-          },
-          {
-            bold: "The liquidation line",
-            text: "the market's normal-mode MCR(). A CDP below it can be liquidated. A defensive-mode minimum can be in force at a past block, but it is not indexed here, so the note always names the normal-mode one.",
-          },
-          {
-            bold: "Runway",
-            text: "how far the price could fall from the earlier touch before the collateral ratio reached that line, at the debt and collateral the CDP's own log recorded there.",
-          },
-          {
-            bold: "Which stretches are stated",
-            text: "a stretch is shown when the price move used at least a quarter of that runway, in either direction, and always when it ends in a liquidation. Polaris has no redemption row of its own, so a stretch ends only in a liquidation or an adjustment.",
-          },
-          {
-            bold: "A live note",
-            text: "the same idea, but the later end is the chain head: this CDP's newest priced touch against the market's price feed read right now. Shown on any open CDP, whatever the move.",
-          },
-        ],
-        links: [POLARIS_DOC_LINKS.oracles, POLARIS_DOC_LINKS.liquidations, POLARIS_DOC_LINKS.defensiveMode],
-      };
     case "aave-v4":
       return {
         title: "How a price move reaches an Aave V4 position",
@@ -2509,10 +2474,7 @@ export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMore
   }
 }
 
-// ── Polaris (Sepolia testnet) ───────────────────────────────────────────────
-// Layer-2 content: the protocol's rules, true of every CDP. Instance figures
-// belong in the Layer-1 panes (lib/polaris/explainer-clauses.tsx and the
-// position explanation), never here.
+// ── Vault-terms and rate-step notes ──────────────────────────────────────────
 
 /** The vault surfaces' own note: a change to the VAULT's terms, which happened
  *  to every holder at once and so is not one holder's event. */
@@ -2540,7 +2502,7 @@ export function marketNoteVaultTermsContent(): LearnMoreContent {
 }
 
 /** The protocols a rate-step note is built for. */
-export type RateStepProtocol = "polaris" | "makerdao" | "aave-v3" | "spark";
+export type RateStepProtocol = "makerdao" | "aave-v3" | "spark";
 
 export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMoreContent {
   switch (protocol) {
@@ -2616,155 +2578,7 @@ export function marketNoteRateStepContent(protocol: RateStepProtocol): LearnMore
             ],
       };
     }
-    case "polaris":
-      return {
-        title: "How the primary rate moves a CDP",
-        intro: `${marketNoteLead("CDP")} This kind states a step in the market's primary rate between two of the CDP's own touches; both ends are this CDP's own events.`,
-        detailsHeading: "Key concepts:",
-        details: [
-          {
-            bold: "Primary rate",
-            text: "the market's Peg Stability Rate, set algorithmically on the market's own PSM mints and redemptions. It is on every touch as the rate in force at that block.",
-          },
-          {
-            bold: "Rate in force at a touch",
-            text: "the market's last PrimaryRateSet at or before the touch's block. Nothing is read for the note itself: the rate is the figure the touch's own row states.",
-          },
-          {
-            bold: "Which stretches are stated",
-            text: "a stretch is shown when the rate moved by at least one percentage point between the CDP's two touches, in either direction. Consecutive moves in the same direction are stated as one note, from the first touch to the last; the receipt lists each step it took in, and a move too small to be stated on its own never breaks a run. A move the other way ends the run and begins the next note. A stretch ending in a liquidation has no exception, because the primary rate does not cause one.",
-          },
-          {
-            bold: "The figure in the header",
-            text: "the rate at the later end: what the market charged by the end of the stretch, or charges now on a live note. The panel sets the two rates side by side.",
-          },
-          {
-            bold: "The interest figure",
-            text: "the yearly interest the CDP's debt at the earlier touch would cost at each end's rate, holding that debt fixed and moving only the rate. The secondary rate, which rises with the market's debt-to-reserve ratio, is added on top by the protocol and is not on this log.",
-          },
-          {
-            bold: "A live note",
-            text: "the same idea, but the later end is the chain head: this CDP's last touch against the cdpManager's primary rate read right now. Shown on any open CDP, whatever the move.",
-          },
-        ],
-        links: [POLARIS_DOC_LINKS.interestRates, POLARIS_APP_LINK],
-      };
   }
-}
-
-export function polarisCdpContent(): LearnMoreContent {
-  return {
-    title: "How Polaris CDPs Work",
-    intro:
-      "Polaris is a Liquity-lineage CDP protocol on the Sepolia testnet. A borrower posts pETH into a CDP in one of two markets and mints that market's stablecoin against it: USDp tracks the dollar, GOLDp tracks gold. pETH is the protocol's own collateral token: ETH paid into its bonding curve mints pETH, and pETH returned to the curve is burned for ETH. The curve's price per pETH rises as ETH enters it, which is why one pETH costs more than one ETH. The CDP is an NFT, so the position can change hands without being closed.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Touch",
-        text: "any transaction on the CDP: an open, a deposit, a borrow, a repayment, a close or a liquidation. Every touch writes the pending legs below into the CDP's stated collateral and debt.",
-      },
-      {
-        bold: "Two rates, set by the market",
-        text: "the primary rate (the docs' Peg Stability Rate) rises as traders redeem through the PSM and falls as they mint. The secondary rate (the Protocol Safety Rate) rises with the market's debt-to-reserve ratio. A CDP pays both on its debt; nobody chooses a rate.",
-      },
-      {
-        bold: "The PSM",
-        text: "the protocol's peg module, called Adaptive Peg Defense in the docs. A trader mints USDp or GOLDp directly against pETH there, or redeems it for pETH. Nobody picks a CDP: every open CDP in the market takes a pro-rata share. A mint adds debt and collateral to each CDP; a redemption takes both away. A row states the net share of every mint and redemption since the CDP's previous touch, so its two sides can move in opposite directions, and the trades' fees, which go to the CDPs, make their sizes differ. It is not a Liquity redemption, and no one chose this CDP.",
-      },
-      {
-        bold: "Settled to zero",
-        text: "when a net PSM share clears more debt than a CDP owes, the protocol adds the difference back to the debt at that touch, so the debt lands on zero rather than below.",
-      },
-      {
-        bold: "Stability gain",
-        text: "the CDP's share of the secondary-rate interest the market's CDPs pay, credited against its debt in proportion to the collateral it holds. A CDP with little debt for its collateral receives more than it pays.",
-      },
-      {
-        bold: "Reward pETH",
-        text: "pETH the protocol pays out of its fees (bonding-curve swap fees, reserve-loan fees and pETH-to-POLAR conversions, per the docs), shared between CDPs in proportion to the debt each holds and added to the collateral.",
-      },
-      {
-        bold: "Minimum collateral ratio",
-        text: "a CDP must hold collateral worth at least 115% of its debt at the protocol's price. When the market's reserve-to-debt ratio falls below 1.10 it enters defensive mode and the minimum rises to 150%; above that it is in normal mode.",
-      },
-      {
-        bold: "The feed",
-        text: "the protocol's price for pETH: the bonding curve's price in ETH times an ETH/USD price. That price comes from the protocol's medianiser, which reads up to three oracles and takes their median. GOLDp divides by a gold price read the same way.",
-      },
-      {
-        bold: "Equity at the feed",
-        text: "an open CDP's collateral at the feed's price, minus its debt: a valuation at the block the figures were read at. A profit or loss would need a price for each of the holder's deposits (a basis), which the chain does not state.",
-      },
-    ],
-    links: [
-      POLARIS_DOC_LINKS.pegDefence,
-      POLARIS_DOC_LINKS.interestRates,
-      POLARIS_DOC_LINKS.bondingCurve,
-      POLARIS_DOC_LINKS.defensiveMode,
-      POLARIS_APP_LINK,
-    ],
-  };
-}
-
-export function polarisLiquidationContent(): LearnMoreContent {
-  return {
-    title: "How Polaris Liquidations Work",
-    intro:
-      "A CDP whose collateral ratio falls below the market's minimum can be liquidated by anyone. The market's stability pool absorbs the debt where it can, taking the collateral in exchange; what the pool cannot cover is redistributed across the other CDPs in the market.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Pool absorption",
-        text: "the stability pool's deposits repay the liquidated debt and the pool receives the collateral — the common case on this deployment.",
-      },
-      {
-        bold: "Redistribution",
-        text: "debt and collateral the pool cannot absorb are spread pro rata across every other CDP in the market, arriving at each one's next touch.",
-      },
-      {
-        bold: "What the pool takes",
-        text: "collateral worth the debt plus the protocol's 5% liquidation penalty, at the feed's price at that block.",
-      },
-      {
-        bold: "Gas compensation",
-        text: "the fixed 0.0375 pETH the CDP set aside at opening, paid to the liquidator. It sits outside the seized collateral.",
-      },
-      {
-        bold: "Collateral compensation",
-        text: "0.5% of the seized collateral, also paid to the liquidator.",
-      },
-      {
-        bold: "Collateral surplus",
-        text: "the seized collateral left after the pool's take and the liquidator's share, set aside for the CDP's owner to claim from the protocol's surplus pool. This page does not show claims.",
-      },
-    ],
-    links: [
-      POLARIS_DOC_LINKS.liquidations,
-      POLARIS_DOC_LINKS.recoveryMode,
-      POLARIS_DOC_LINKS.oracles,
-      POLARIS_APP_LINK,
-    ],
-  };
-}
-
-export function polarisTransferContent(): LearnMoreContent {
-  return {
-    title: "Transferring a Polaris CDP",
-    intro:
-      "A Polaris CDP is an NFT. Transferring it hands the whole position — its collateral, its debt and every pending adjustment — to a new owner, without opening or closing anything. The explorer names the current holder from the last such transfer.",
-    detailsHeading: "Key concepts:",
-    details: [
-      {
-        bold: "Custody, not an action on the position",
-        text: "nothing about the CDP's balances moves in a transfer; only who may act on it changes.",
-      },
-      {
-        bold: "The mint and the burn",
-        text: "the NFT is minted when the CDP opens and burned when it closes or is liquidated — those two transfers are the open and the close themselves, not custody events.",
-      },
-    ],
-    links: [POLARIS_DOC_LINKS.passetMarkets, POLARIS_DOC_LINKS.polaris101, POLARIS_APP_LINK],
-  };
 }
 
 // ── Aave's vault layer on Ethereum ───────────────────────────────────────────

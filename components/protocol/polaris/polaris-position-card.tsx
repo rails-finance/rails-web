@@ -58,7 +58,7 @@ import {
   liveUsdValueProv,
 } from "@/lib/polaris/live-provenance";
 import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/asset-catalog";
-import { polarisPositionContent } from "@/lib/polaris/position-content";
+import { polarisPositionModal } from "@/lib/polaris/event-templates";
 import { polarisCdpNftUrl } from "@/lib/polaris/routes";
 import type { Provenance } from "@/components/shared/provenance";
 import type { PolarisPositionSummary, PolarisPositionStatus } from "@/lib/sources/api/polaris-positions";
@@ -373,7 +373,7 @@ export function PolarisPositionCard({
         explanationDefaultOpen={explanationDefaultOpen}
         onExplanationToggle={onExplanationToggle}
         viewHref={viewHref}
-        learnMore={polarisPositionContent({ status: v.status })}
+        learnMore={polarisPositionModal(v.status)}
       >
         <ClosedPositionStats
           outcome={v.status}
@@ -450,7 +450,7 @@ export function PolarisPositionCard({
       explanationDefaultOpen={explanationDefaultOpen}
       onExplanationToggle={onExplanationToggle}
       viewHref={viewHref}
-      learnMore={polarisPositionContent({ status: "open" })}
+      learnMore={polarisPositionModal("open")}
     >
       <OpenPositionStats
         statusPill={

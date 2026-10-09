@@ -1,0 +1,1061 @@
+# Polaris prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a Polaris page. The page reads this
+# file and nothing else; the code chooses which strings to say and fills their
+# figures (lib/polaris/event-prose.ts for an event,
+# components/protocol/polaris/polaris-position-explanation.tsx for the position
+# card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  token: |-
+    three places, grouped, never a false zero (6,500.123, <0.000001)
+  units4: |-
+    up to four places (0.0375)
+  number: |-
+    three places, grouped, signed (6,500.123)
+  pct_whole: |-
+    whole percent of a fraction (0.32 → 32%), unsigned
+  ratio_frac: |-
+    a ratio given as a fraction, as a percent at two places (0.0258 → 2.58%)
+  count: |-
+    a whole number, grouped (1,204)
+  address: |-
+    a shortened address linked to the explorer
+  text: |-
+    a word or name as given
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  coll_change:
+    rounding: token
+    means: |-
+      the pETH the event moved, as the header prints it
+  debt_change:
+    rounding: token
+    means: |-
+      the debt the event moved, as the header prints it
+  stable:
+    rounding: text
+    means: |-
+      the market's stablecoin (USDp or GOLDp)
+  zero_mint:
+    rounding: token
+    means: |-
+      the debt the protocol added so the debt settled at zero
+  escrow:
+    rounding: units4
+    means: |-
+      the fixed gas compensation a CDP escrows at its open
+  legs:
+    rounding: text
+    means: |-
+      the legs written in at this touch, named (interest, stability gains, reward pETH)
+  mcr:
+    rounding: pct_whole
+    means: |-
+      the market's normal-mode minimum collateral ratio
+  penalty:
+    rounding: pct_whole
+    means: |-
+      the liquidation penalty the protocol applied on this path
+  from_addr:
+    rounding: address
+    means: |-
+      the address that held the CDP before a transfer
+  to_addr:
+    rounding: address
+    means: |-
+      the address that holds it after
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  # The position card's figures, drawn by the card with their receipts.
+  coll:
+    rounding: token
+    means: |-
+      the pETH the CDP holds now
+  debt:
+    rounding: token
+    means: |-
+      the debt the CDP owes now
+  price:
+    rounding: token
+    means: |-
+      the feed's price of one pETH, in the market's stablecoin
+  worth:
+    rounding: token
+    means: |-
+      the collateral at that price
+  equity:
+    rounding: number
+    means: |-
+      the collateral at the feed's price less the debt
+  drop:
+    rounding: pct_whole
+    means: |-
+      how far pETH's price can fall before the CDP reaches the minimum
+  defensive:
+    rounding: pct_whole
+    means: |-
+      the minimum collateral ratio in defensive mode
+  primary:
+    rounding: ratio_frac
+    means: |-
+      the market's primary rate now, a yearly figure
+  secondary:
+    rounding: ratio_frac
+    means: |-
+      the market's secondary rate now, a yearly figure
+  transfers:
+    rounding: count
+    means: |-
+      the transfers of the CDP's NFT since it opened
+  deposited:
+    rounding: token
+    means: |-
+      the pETH the holder deposited over the CDP's life
+  withdrawn:
+    rounding: token
+    means: |-
+      the pETH the holder withdrew over its life
+  borrowed:
+    rounding: token
+    means: |-
+      the stablecoin the holder borrowed over its life
+  repaid:
+    rounding: token
+    means: |-
+      the stablecoin the holder repaid over its life
+  interest:
+    rounding: token
+    means: |-
+      the interest charged over its life
+  seized:
+    rounding: token
+    means: |-
+      the pETH the liquidation seized
+  cleared:
+    rounding: token
+    means: |-
+      the debt the liquidation cleared
+  psm_coll_in:
+    rounding: token
+    means: |-
+      the pETH the CDP's PSM shares added to its collateral over its life
+  psm_debt_in:
+    rounding: token
+    means: |-
+      the stablecoin the CDP's PSM shares added to its debt over its life
+  psm_coll_out:
+    rounding: token
+    means: |-
+      the pETH the CDP's PSM shares removed from its collateral over its life
+  psm_debt_out:
+    rounding: token
+    means: |-
+      the stablecoin the CDP's PSM shares removed from its debt over its life
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence or between a list's items ──
+words:
+  and: |-
+    and
+  leg_interest: |-
+    interest
+  leg_gain: |-
+    stability gains
+  leg_reward: |-
+    reward pETH
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk, Rate and History when two of them hold two or more
+# bullets. An open CDP reads: Holdings (what the collateral is worth, the
+# equity), Risk (the fall to the minimum, the market's mode), Rate, History
+# (the NFT's holder). A closed or liquidated CDP reads History only, from the
+# index. Read by positionWords / positionNodes (lib/polaris/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── Leads ──
+  lead_holds: |-
+    This CDP holds {coll} pETH of collateral and owes {debt} {stable}:
+  lead_settles: |-
+    This CDP holds {coll} pETH of collateral and owes nothing at this block; its next touch settles the debt to zero:
+  lead_no_debt: |-
+    This CDP holds {coll} pETH of collateral and has no debt:
+  lead_closed: |-
+    This CDP is closed and holds nothing now.
+  lead_liquidated: |-
+    This CDP was liquidated and holds nothing now.
+  # ── An open CDP ──
+  worth: |-
+    At the feed's price of {price} {stable} per pETH, the collateral is worth {worth} {stable}.
+  equity: |-
+    Less the debt, equity is {equity} {stable}: a valuation at this block that says nothing of profit.
+  drop: |-
+    pETH's price can fall {drop} before this CDP reaches the {mcr} minimum.
+  drop_far: |-
+    pETH's price would have to fall over 99% before this CDP reaches the {mcr} minimum.
+  below: |-
+    It is below the {mcr} minimum, so anyone may liquidate it.
+  mode_normal: |-
+    The market is in normal mode; in defensive mode the minimum would rise to {defensive}.
+  mode_defensive: |-
+    The market is in defensive mode, which has raised the minimum to {defensive}.
+  rate: |-
+    Interest is a primary rate of {primary} plus a secondary rate of {secondary}, both set by the market.
+  holder: |-
+    The CDP is an NFT held by the address on the card.
+  holder_one: |-
+    The CDP is an NFT held by the address on the card, after one transfer.
+  holder_many: |-
+    The CDP is an NFT held by the address on the card, after {transfers} transfers.
+  # ── A closed or liquidated CDP: its life, from the index ──
+  life_coll: |-
+    Over its life the holder deposited {deposited} pETH and withdrew {withdrawn} pETH.
+  life_coll_in: |-
+    Over its life the holder deposited {deposited} pETH.
+  life_coll_out: |-
+    Over its life the holder withdrew {withdrawn} pETH.
+  life_debt: |-
+    The holder borrowed {borrowed} {stable} and repaid {repaid} {stable}.
+  life_debt_in: |-
+    The holder borrowed {borrowed} {stable}.
+  life_debt_out: |-
+    The holder repaid {repaid} {stable}.
+  life_interest: |-
+    {interest} {stable} of interest was charged on the debt.
+  life_psm_in: |-
+    Its PSM shares added {psm_coll_in} pETH to the collateral and {psm_debt_in} {stable} to the debt.
+  life_psm_out: |-
+    Its PSM shares removed {psm_coll_out} pETH from the collateral and {psm_debt_out} {stable} from the debt.
+  life_liq: |-
+    The liquidation seized {seized} pETH and cleared {cleared} {stable} of debt.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  legs.written:
+    when: |-
+      interest, stability gains or reward pETH were written in at this touch
+    text: |-
+      The touch also wrote in the {legs} built up since the previous one.
+  psm.share:
+    when: |-
+      a net PSM share was written in at this touch
+    text: |-
+      Traders' PSM mints and redemptions since the previous touch gave this CDP a net share.
+  zero.settled:
+    when: |-
+      the protocol added debt so it settled at zero
+    text: |-
+      The protocol added {zero_mint} {stable} to the debt so it settled at zero.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: polaris.open
+    title: |-
+      Open
+    when: |-
+      the CDP's first touch
+    L5: open
+    variants:
+      with_debt: |-
+        the holder deposited collateral and borrowed
+      no_debt: |-
+        the holder deposited collateral and borrowed nothing
+      bare: |-
+        the open moved neither
+    sentences:
+      open.what_debt:
+        when: |-
+          with_debt
+        text: |-
+          The holder opened this CDP with {coll_change} pETH of collateral and borrowed {debt_change} {stable}.
+      open.what_no_debt:
+        when: |-
+          no_debt
+        text: |-
+          The holder opened this CDP with {coll_change} pETH of collateral and no debt.
+      open.what_bare:
+        when: |-
+          bare
+        text: |-
+          This CDP opened.
+      open.escrow:
+        when: |-
+          with_debt, no_debt
+        text: |-
+          The {escrow} pETH escrow, held as gas compensation, comes back when the CDP closes.
+    order:
+      - open.what_debt
+      - open.what_no_debt
+      - open.what_bare
+      - open.escrow
+    groups:
+      happened:
+        - open.what_debt
+        - open.what_no_debt
+        - open.what_bare
+      adds_up:
+        - open.escrow
+    alternates:
+      - [open.what_debt, open.what_no_debt, open.what_bare]
+
+  - id: polaris.adjust
+    title: |-
+      Adjust
+    when: |-
+      a touch that is not the open, the close or a liquidation
+    L5: adjust
+    variants:
+      moved: |-
+        the holder moved collateral or debt
+      unmoved: |-
+        the touch moved neither
+    sentences:
+      adj.deposit:
+        when: |-
+          moved, where collateral went in
+        text: |-
+          The holder deposited {coll_change} pETH.
+      adj.withdraw:
+        when: |-
+          moved, where collateral came out
+        text: |-
+          The holder withdrew {coll_change} pETH.
+      adj.borrow:
+        when: |-
+          moved, where debt went up
+        text: |-
+          The holder borrowed {debt_change} {stable}.
+      adj.repay:
+        when: |-
+          moved, where debt went down
+        text: |-
+          The holder repaid {debt_change} {stable}.
+      adj.none:
+        when: |-
+          unmoved
+        text: |-
+          The holder touched this CDP without moving collateral or debt.
+    order:
+      - adj.deposit
+      - adj.withdraw
+      - adj.borrow
+      - adj.repay
+      - adj.none
+      - legs.written
+      - psm.share
+      - zero.settled
+    groups:
+      happened:
+        - adj.deposit
+        - adj.withdraw
+        - adj.borrow
+        - adj.repay
+        - adj.none
+      adds_up:
+        - legs.written
+        - psm.share
+        - zero.settled
+    alternates:
+      - [adj.deposit, adj.withdraw]
+      - [adj.borrow, adj.repay]
+
+  - id: polaris.close
+    title: |-
+      Close
+    when: |-
+      the touch that closed the CDP
+    L5: close
+    variants:
+      both: |-
+        the holder repaid debt and withdrew collateral
+      repay_only: |-
+        the holder repaid debt
+      withdraw_only: |-
+        the holder withdrew collateral
+      bare: |-
+        the close moved neither
+    sentences:
+      close.both:
+        when: |-
+          both
+        text: |-
+          The holder closed this CDP, repaying {debt_change} {stable} and withdrawing {coll_change} pETH.
+      close.repay:
+        when: |-
+          repay_only
+        text: |-
+          The holder closed this CDP, repaying {debt_change} {stable}.
+      close.withdraw:
+        when: |-
+          withdraw_only
+        text: |-
+          The holder closed this CDP, withdrawing {coll_change} pETH.
+      close.bare:
+        when: |-
+          bare
+        text: |-
+          The holder closed this CDP.
+      close.ended:
+        when: |-
+          always
+        text: |-
+          Its NFT was burned and the escrowed gas compensation returned to the holder.
+    order:
+      - close.both
+      - close.repay
+      - close.withdraw
+      - close.bare
+      - legs.written
+      - psm.share
+      - zero.settled
+      - close.ended
+    groups:
+      happened:
+        - close.both
+        - close.repay
+        - close.withdraw
+        - close.bare
+      adds_up:
+        - legs.written
+        - psm.share
+        - zero.settled
+      leaves:
+        - close.ended
+    alternates:
+      - [close.both, close.repay, close.withdraw, close.bare]
+
+  - id: polaris.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      the touch that liquidated the CDP
+    L5: liquidation
+    variants:
+      pool: |-
+        the stability pool absorbed the whole debt
+      pool_priced: |-
+        the same, with the block's price read
+      redistributed: |-
+        the pool covered part and the rest was redistributed
+      redistributed_priced: |-
+        the same, with the block's price read
+    sentences:
+      liq.what:
+        when: |-
+          pool, redistributed
+        text: |-
+          This CDP was liquidated because its collateral ratio fell below the market's minimum.
+      liq.what_priced:
+        when: |-
+          pool_priced, redistributed_priced
+        text: |-
+          This CDP was liquidated: its collateral ratio at the feed's price was below the normal-mode minimum of {mcr}.
+      liq.pool:
+        when: |-
+          pool, pool_priced
+        text: |-
+          The stability pool repaid the debt and received the collateral.
+      liq.redistributed:
+        when: |-
+          redistributed, redistributed_priced
+        text: |-
+          The pool covered part of the debt; the market's other CDPs took the rest of the debt and collateral.
+      liq.penalty_pool:
+        when: |-
+          pool_priced
+        text: |-
+          The pool's premium is the {penalty} liquidation penalty, which comes out of what the owner could have kept.
+      liq.penalty_redist:
+        when: |-
+          redistributed_priced
+        text: |-
+          The other CDPs' premium is the {penalty} liquidation penalty, which comes out of what the owner could have kept.
+      liq.surplus:
+        when: |-
+          the liquidation left a surplus for the owner
+        text: |-
+          The surplus is set aside for the owner to claim.
+    order:
+      - liq.what
+      - liq.what_priced
+      - liq.pool
+      - liq.redistributed
+      - liq.penalty_pool
+      - liq.penalty_redist
+      - legs.written
+      - liq.surplus
+    groups:
+      happened:
+        - liq.what
+        - liq.what_priced
+        - liq.pool
+        - liq.redistributed
+      adds_up:
+        - liq.penalty_pool
+        - liq.penalty_redist
+        - legs.written
+      leaves:
+        - liq.surplus
+    alternates:
+      - [liq.what, liq.what_priced]
+      - [liq.pool, liq.redistributed]
+      - [liq.penalty_pool, liq.penalty_redist]
+
+  - id: polaris.transfer
+    title: |-
+      Transfer
+    when: |-
+      the CDP's NFT moved between two holders
+    L5: transfer
+    variants:
+      both: |-
+        the transfer names both addresses
+      none: |-
+        it names neither
+    sentences:
+      xfer.what:
+        when: |-
+          both
+        text: |-
+          This CDP changed hands, from {from_addr} to {to_addr}.
+      xfer.what_none:
+        when: |-
+          none
+        text: |-
+          This CDP changed hands.
+      xfer.holder:
+        when: |-
+          always
+        text: |-
+          The new holder can now act on the CDP and the previous holder cannot.
+    order:
+      - xfer.what
+      - xfer.what_none
+      - xfer.holder
+    groups:
+      happened:
+        - xfer.what
+        - xfer.what_none
+      leaves:
+        - xfer.holder
+    alternates:
+      - [xfer.what, xfer.what_none]
+
+  - id: polaris.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The CDP recorded a {event_type} event.
+    order:
+      - fallback.what
+    groups:
+      happened:
+        - fallback.what
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  OPEN_POSITION: |-
+    https://docs.polaris.finance/architecture/passet-minting#opening-a-mint-position
+  WHY_MINT: |-
+    https://docs.polaris.finance/architecture/passet-minting#why-mint-passets
+  PEG_EFFECTS: |-
+    https://docs.polaris.finance/architecture/passet-minting#adaptive-peg-defense-and-position-effects
+  PEG_RATE: |-
+    https://docs.polaris.finance/design/interest-rates#peg-stability-rate
+  SAFETY_RATE: |-
+    https://docs.polaris.finance/design/interest-rates#protocol-safety-rate
+  DEFENSIVE_RESTRICTIONS: |-
+    https://docs.polaris.finance/design/defensive-mode#restrictions
+  LIQUIDATION_PROCESS: |-
+    https://docs.polaris.finance/design/liquidations#liquidation-process
+  REDISTRIBUTION: |-
+    https://docs.polaris.finance/design/liquidations#fallback-redistribution
+  RECOVERY_LIQUIDATIONS: |-
+    https://docs.polaris.finance/design/recovery-mode#liquidations
+  MEDIANIZER: |-
+    https://docs.polaris.finance/design/oracles#the-medianizer
+  PETH_NATIVE: |-
+    https://docs.polaris.finance/core-assets/peth#a-native-market
+  USDP_USING: |-
+    https://docs.polaris.finance/core-assets/usdp#using-usdp
+  GOLDP_USING: |-
+    https://docs.polaris.finance/core-assets/goldp#using-goldp
+
+# ── The "?" modals ──
+L5:
+  open:
+    title: |-
+      How Opening a CDP Works
+    intro: |-
+      Opening a CDP deposits pETH as collateral and can borrow the market's stablecoin against it. The CDP is an NFT, so it can change hands without being closed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          pETH
+        text: |-
+          the protocol's collateral token, minted when ETH enters its bonding curve and burned when pETH goes back.
+      - bold: |-
+          Gas compensation
+        text: |-
+          a fixed 0.0375 pETH the CDP escrows beside its collateral; it returns on close and goes to a liquidator on liquidation.
+      - bold: |-
+          Minimum ratio
+        text: |-
+          collateral must be worth 115% of the debt; in defensive mode, borrowing more or withdrawing needs 150%.
+      - bold: |-
+          Two rates
+        text: |-
+          a primary rate that moves with the market's PSM mints and redemptions, and a secondary rate that makes leverage dearer; nobody chooses either.
+    links:
+      - label: |-
+          Opening a mint position
+        doc: OPEN_POSITION
+      - label: |-
+          pETH, a native market
+        doc: PETH_NATIVE
+      - label: |-
+          The Peg Stability Rate
+        doc: PEG_RATE
+      - label: |-
+          The Protocol Safety Rate
+        doc: SAFETY_RATE
+
+  adjust:
+    title: |-
+      How Adjusting a CDP Works
+    intro: |-
+      An adjustment adds or removes collateral, or borrows or repays debt, on an open CDP. Each one is a touch, which also writes in what built up since the previous touch.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Touch
+        text: |-
+          any transaction on the CDP, which writes the interest, stability gains, reward pETH and PSM share that built up into its figures.
+      - bold: |-
+          Stability gain
+        text: |-
+          a share of the secondary-rate payments, credited against the debt; CDPs with less leverage receive more than they pay.
+      - bold: |-
+          Reward pETH
+        text: |-
+          pETH the protocol distributes to borrowers in proportion to their debt, added to the collateral.
+      - bold: |-
+          The PSM
+        text: |-
+          the peg module, Adaptive Peg Defense in the docs: buys and redemptions at peg change every open CDP's collateral and debt pro rata.
+      - bold: |-
+          Settled to zero
+        text: |-
+          when a net PSM share clears more debt than a CDP owes, the protocol adds the difference so the debt lands on zero.
+    links:
+      - label: |-
+          Adaptive Peg Defense and position effects
+        doc: PEG_EFFECTS
+      - label: |-
+          The Protocol Safety Rate
+        doc: SAFETY_RATE
+      - label: |-
+          Why mint pAssets
+        doc: WHY_MINT
+
+  close:
+    title: |-
+      How Closing a CDP Works
+    intro: |-
+      Closing repays the whole debt and takes back the collateral. The CDP's NFT is burned and its escrowed gas compensation returns to the holder.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Interest at the close
+        text: |-
+          interest accrued since the last touch is written into the debt at the close, so the amount repaid includes it.
+      - bold: |-
+          Settled to zero
+        text: |-
+          when a net PSM share clears more debt than the CDP owes, the protocol adds the difference so the debt lands on zero.
+      - bold: |-
+          Defensive mode
+        text: |-
+          while a market is in defensive mode, closing a CDP is restricted because it would lower the market's backing.
+      - bold: |-
+          The NFT
+        text: |-
+          burned at the close, so the CDP's number is never reused.
+    links:
+      - label: |-
+          Defensive mode restrictions
+        doc: DEFENSIVE_RESTRICTIONS
+      - label: |-
+          The Peg Stability Rate
+        doc: PEG_RATE
+      - label: |-
+          Adaptive Peg Defense and position effects
+        doc: PEG_EFFECTS
+
+  liquidation:
+    title: |-
+      How Liquidations Work
+    intro: |-
+      A CDP whose collateral ratio falls below the market's minimum can be liquidated by anyone. The stability pool, called the Earn Pool in the docs, repays the debt first.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Stability pool
+        text: |-
+          its deposits repay the liquidated debt and the pool receives the collateral, worth the debt plus a 5% penalty at the feed's price.
+      - bold: |-
+          Redistribution
+        text: |-
+          if the pool cannot cover it all, the rest of the debt and collateral is shared across the market's other open CDPs.
+      - bold: |-
+          Liquidator's pay
+        text: |-
+          a fixed 0.0375 pETH gas compensation from the CDP's escrow, plus 0.5% of the seized collateral.
+      - bold: |-
+          Surplus
+        text: |-
+          collateral left after the pool's take and the liquidator's share is set aside for the owner to claim.
+      - bold: |-
+          Recovery mode
+        text: |-
+          below full backing, a market disables liquidation by redistribution.
+    links:
+      - label: |-
+          The liquidation process
+        doc: LIQUIDATION_PROCESS
+      - label: |-
+          Fallback redistribution
+        doc: REDISTRIBUTION
+      - label: |-
+          Liquidations in recovery mode
+        doc: RECOVERY_LIQUIDATIONS
+
+  transfer:
+    title: |-
+      Transferring a CDP
+    intro: |-
+      A Polaris CDP is an NFT, so transferring it hands the whole position to a new holder without opening or closing anything.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Control
+        text: |-
+          whoever holds the NFT can act on the CDP, and its collateral, debt and pending legs go with it.
+      - bold: |-
+          Mint and burn
+        text: |-
+          the NFT is minted when the CDP opens and burned when it closes or is liquidated; those two moves are the open and the close.
+    links:
+      - label: |-
+          Opening a mint position
+        doc: OPEN_POSITION
+
+  fallback:
+    title: |-
+      How a CDP Changes
+    intro: |-
+      A Polaris CDP changes through a touch: an open, an adjustment, a close or a liquidation. Moving its NFT to another holder changes only who can act on it.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Touch
+        text: |-
+          any transaction on the CDP; it writes in the interest, stability gains, reward pETH and PSM share that built up before it.
+      - bold: |-
+          The NFT
+        text: |-
+          whoever holds the token holds the position, which closing or liquidation burns.
+    links:
+      - label: |-
+          Opening a mint position
+        doc: OPEN_POSITION
+      - label: |-
+          Adaptive Peg Defense and position effects
+        doc: PEG_EFFECTS
+
+  position_open:
+    title: |-
+      About This CDP
+    intro: |-
+      The lead says what the CDP holds and owes now. The bullets say what the figures mean for it.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral ratio
+        text: |-
+          collateral at the feed's price divided by the debt; below the market's minimum, 115% or 150% in defensive mode, a CDP can be liquidated.
+      - bold: |-
+          The feed
+        text: |-
+          the protocol's price for pETH: the bonding curve's price in ETH times an ETH/USD price from the Medianizer, which aggregates up to three oracles.
+      - bold: |-
+          Equity
+        text: |-
+          the collateral at the feed's price less the debt; a profit would need a price for each deposit, which the chain does not state.
+      - bold: |-
+          Pending legs
+        text: |-
+          interest, stability gains, reward pETH and PSM share built up since the last touch, all written in at the next one.
+      - bold: |-
+          Two rates
+        text: |-
+          a primary rate that moves with the PSM's mints and redemptions plus a secondary rate on leverage; the holder chooses neither.
+    links:
+      - label: |-
+          Defensive mode restrictions
+        doc: DEFENSIVE_RESTRICTIONS
+      - label: |-
+          The Medianizer
+        doc: MEDIANIZER
+      - label: |-
+          The Peg Stability Rate
+        doc: PEG_RATE
+      - label: |-
+          The Protocol Safety Rate
+        doc: SAFETY_RATE
+
+  position_closed:
+    title: |-
+      About This CDP
+    intro: |-
+      This CDP is closed and its debt repaid. The card shows the most it ever held, and its NFT is burned.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          the most pETH and debt the CDP held after any touch, once the legs that had built up were written in.
+      - bold: |-
+          Interest at each touch
+        text: |-
+          interest accrued at the market's rate is written into the debt at every touch, the close included.
+      - bold: |-
+          The PSM share
+        text: |-
+          traders' mints and redemptions at the PSM add or remove collateral and debt from every open CDP at a touch.
+      - bold: |-
+          Settled to zero
+        text: |-
+          when a net PSM share clears more debt than the CDP owes, the protocol adds the difference so the close lands on zero.
+    links:
+      - label: |-
+          The Peg Stability Rate
+        doc: PEG_RATE
+      - label: |-
+          Adaptive Peg Defense and position effects
+        doc: PEG_EFFECTS
+
+  position_liquidated:
+    title: |-
+      About This CDP
+    intro: |-
+      This CDP was liquidated: its collateral ratio fell below the market's minimum and a liquidator closed it. Its NFT is burned.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Stability pool
+        text: |-
+          it repaid the debt and received the collateral; any debt it could not cover was redistributed across other CDPs.
+      - bold: |-
+          Liquidator's pay
+        text: |-
+          a fixed 0.0375 pETH gas compensation from the CDP's escrow, plus 0.5% of the seized collateral.
+      - bold: |-
+          Surplus
+        text: |-
+          collateral left after the pool's take and the liquidator's share is set aside for the owner to claim.
+      - bold: |-
+          Highest recorded
+        text: |-
+          the most pETH and debt the CDP held after any touch, the liquidation's included.
+    links:
+      - label: |-
+          The liquidation process
+        doc: LIQUIDATION_PROCESS
+      - label: |-
+          Fallback redistribution
+        doc: REDISTRIBUTION
+      - label: |-
+          Liquidations in recovery mode
+        doc: RECOVERY_LIQUIDATIONS
+
+  market:
+    title: |-
+      How a Polaris Market Works
+    intro: |-
+      Polaris has one market per pAsset, each minted against pETH: USDp tracks the dollar and GOLDp tracks gold. Each market keeps separate accounting, an oracle feed and a stability pool.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          pETH
+        text: |-
+          the shared collateral: ETH paid into the bonding curve mints it, and returning it to the curve burns it for ETH.
+      - bold: |-
+          The PSM
+        text: |-
+          anyone can buy a pAsset with pETH or redeem it at its target value; each trade changes every open CDP pro rata.
+      - bold: |-
+          Two rates
+        text: |-
+          the primary rate moves with the PSM's mints and redemptions; the secondary rate charges leverage, more so as collateral health weakens.
+      - bold: |-
+          Market modes
+        text: |-
+          below a reserve-to-debt ratio of 1.10 a market enters defensive mode, which restricts actions that would weaken it.
+    links:
+      - label: |-
+          USDp, the Polaris dollar
+        doc: USDP_USING
+      - label: |-
+          GOLDp, Polaris gold
+        doc: GOLDP_USING
+      - label: |-
+          Adaptive Peg Defense and position effects
+        doc: PEG_EFFECTS
+      - label: |-
+          Defensive mode restrictions
+        doc: DEFENSIVE_RESTRICTIONS
+
+  price_gap:
+    title: |-
+      How a Price Move Reaches a CDP
+    intro: |-
+      A market note states something the market did while this CDP transacted nothing, and no count moves because of it. This kind states how the price feed moved between two touches.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Oracle price
+        text: |-
+          the market's price feed at each touch's block, in the market's unit (USDp or GOLDp).
+      - bold: |-
+          Collateral ratio
+        text: |-
+          the collateral's value at that price divided by the debt; a lower price lowers the ratio with nothing else moving.
+      - bold: |-
+          The liquidation line
+        text: |-
+          the normal-mode minimum of 115%; a defensive-mode minimum at a past block is not indexed.
+      - bold: |-
+          Runway
+        text: |-
+          how far the price could fall from the earlier touch before the ratio reached that line.
+      - bold: |-
+          Which stretches are stated
+        text: |-
+          one where the move used a quarter of the runway or ended in a liquidation; a live note runs to now.
+    links:
+      - label: |-
+          The Medianizer
+        doc: MEDIANIZER
+      - label: |-
+          The liquidation process
+        doc: LIQUIDATION_PROCESS
+      - label: |-
+          Defensive mode restrictions
+        doc: DEFENSIVE_RESTRICTIONS
+
+  rate_step:
+    title: |-
+      How the Primary Rate Moves a CDP
+    intro: |-
+      A market note states something the market did while this CDP transacted nothing, and no count moves because of it. This kind states a step in the primary rate between two touches.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Primary rate
+        text: |-
+          the Peg Stability Rate, set by the market's mints and redemptions; every touch carries the rate in force at its block.
+      - bold: |-
+          Which stretches are stated
+        text: |-
+          one where the rate moved a percentage point or more; consecutive moves the same way are one note, and a live note runs to now.
+      - bold: |-
+          The header figure
+        text: |-
+          the rate at the later end: what the market charged by the end of the stretch, or charges now.
+      - bold: |-
+          The interest figure
+        text: |-
+          the yearly interest on the debt at the earlier touch at each end's rate, with the debt held fixed.
+      - bold: |-
+          Secondary rate
+        text: |-
+          added on top by the protocol and not on the log the note reads.
+    links:
+      - label: |-
+          The Peg Stability Rate
+        doc: PEG_RATE
+      - label: |-
+          The Protocol Safety Rate
+        doc: SAFETY_RATE

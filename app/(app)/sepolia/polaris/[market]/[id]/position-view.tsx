@@ -544,7 +544,6 @@ export default function PolarisPositionView({
                     stableSymbol={stable}
                     terminal={summary && summary.status !== "open" ? summary.status : null}
                     lifetime={lifetime}
-                    eventCount={summary?.eventCount}
                     transferCount={summary?.transferCount}
                   />
                 ) : undefined
