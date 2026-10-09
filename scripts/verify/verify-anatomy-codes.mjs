@@ -100,6 +100,16 @@ const FAMILIES = [
 const NO_FLOWS_CHART = "the page is not tied to a Lifetime flows chart (`dates` stays on in its view), so no day mark";
 const NO_LEDGER = "the family's cells carry no ledger (`ledgers: { none }`, no flows panel), so no cell opens into one";
 const NA = {
+  // The pinned positions' first (newest) cards are rows that move no position
+  // flow; the family draws ledgers on its flow rows.
+  pwn: {
+    "T2.1":
+      "the first card is loan #60's Claimed row (to the note holder), which moves no position flow; PwnLedgerProvider gives ledgers to created, repaid and seized rows only",
+  },
+  frankencoin: {
+    "T2.1":
+      "the first card is a Challenge Started row, whose cells are stat cells (collateral challenged); the ledgers stand on mint, deposit, withdraw and sale rows",
+  },
   "aave-v4": { "T2.1": NO_LEDGER },
   "alchemix-v3": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },
   "alchemix-v2": { "T2.1": NO_LEDGER, T7: NO_FLOWS_CHART },
@@ -123,37 +133,42 @@ function check(name, cond, detail = "") {
 
 const browser = await chromium.launch();
 
-/** Every `data-anatomy` code on the page and on the marked card, with T4's
+/** The card's row by its event id: a page can re-mount its timeline once its
+ *  reads land, so the row is found again each time rather than marked. */
+const cardSelector = (id) => `[data-event-id="${id.replace(/"/g, '\\"')}"]`;
+
+/** Every `data-anatomy` code on the page and on the first card, with T4's
  *  selector applied to both. */
-async function readCodes(page) {
-  return page.evaluate((t4) => {
-    const codesIn = (root) => {
-      const out = new Set();
-      if (!root) return out;
-      for (const el of root.querySelectorAll("[data-anatomy]"))
-        for (const c of (el.getAttribute("data-anatomy") ?? "").split(/\s+/)) if (c) out.add(c);
-      if (root.matches?.("[data-anatomy]"))
-        for (const c of root.getAttribute("data-anatomy").split(/\s+/)) if (c) out.add(c);
-      if (root.querySelector(t4)) out.add("T4");
-      return out;
-    };
-    const card = document.querySelector("[data-verify-anatomy-card]");
-    return { page: [...codesIn(document.body)], card: [...codesIn(card)] };
-  }, T4_SELECTOR);
+async function readCodes(page, id) {
+  return page.evaluate(
+    ([t4, sel]) => {
+      const codesIn = (root) => {
+        const out = new Set();
+        if (!root) return out;
+        for (const el of root.querySelectorAll("[data-anatomy]"))
+          for (const c of (el.getAttribute("data-anatomy") ?? "").split(/\s+/)) if (c) out.add(c);
+        if (root.matches?.("[data-anatomy]"))
+          for (const c of root.getAttribute("data-anatomy").split(/\s+/)) if (c) out.add(c);
+        if (root.querySelector(t4)) out.add("T4");
+        return out;
+      };
+      const card = document.querySelector(sel);
+      return { page: [...codesIn(document.body)], card: [...codesIn(card)] };
+    },
+    [T4_SELECTOR, cardSelector(id)],
+  );
 }
 
-/** Mark the first event card of the timeline: a `data-event-id` row that holds
- *  a T1, outside any group. Waits for the timeline to draw one. */
-async function markFirstCard(page) {
+/** The first event card of the timeline: a `data-event-id` row that holds a
+ *  T1, outside any group. Waits for the timeline to draw one. */
+async function firstCardId(page) {
   const found = await page
     .waitForFunction(
       () => {
         const row = [...document.querySelectorAll("[data-event-id]")].find(
           (el) => el.querySelector('[data-anatomy~="T1"]') && !el.closest("[data-group-frame]"),
         );
-        if (!row) return false;
-        row.setAttribute("data-verify-anatomy-card", "");
-        return row.getAttribute("data-event-id");
+        return row ? row.getAttribute("data-event-id") : false;
       },
       null,
       { timeout: 240_000, polling: 1000 },
@@ -163,12 +178,12 @@ async function markFirstCard(page) {
   return found;
 }
 
-/** Open the marked card from its control at this width (the header from
+/** Open the first card from its control at this width (the header from
  *  640px, the spine's segment below it), then its first ledger cell and its
  *  Explanation. A press before hydration is lost, so each is pressed until
  *  it reads open. */
-async function openCard(page, expectLedger) {
-  const card = page.locator("[data-verify-anatomy-card]");
+async function openCard(page, id, expectLedger) {
+  const card = page.locator(cardSelector(id)).first();
   const control = card
     .locator('[data-spine-toggle], [data-anatomy~="T1"] [data-row-control][role="button"]')
     .locator("visible=true")
@@ -184,7 +199,7 @@ async function openCard(page, expectLedger) {
         (el) => el?.getAttribute("aria-expanded") === "true",
         await control.elementHandle().catch(() => null),
         {
-          timeout: 4000,
+          timeout: 15_000,
         },
       )
       .catch(() => {});
@@ -255,16 +270,16 @@ async function walk(path, width, expectLedger) {
   const page = await ctx.newPage();
   try {
     await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded", timeout: 300_000 });
-    let firstId = await markFirstCard(page);
+    let firstId = await firstCardId(page);
     if (!firstId) {
       // A timeline that never draws a row is a backend 429: reload once.
       await page.reload({ waitUntil: "domcontentloaded", timeout: 300_000 }).catch(() => {});
-      firstId = await markFirstCard(page);
+      firstId = await firstCardId(page);
     }
     if (!firstId) return { error: "no event card drew" };
     await page.waitForTimeout(2000);
-    const closed = await readCodes(page);
-    const opened = (await openCard(page, expectLedger)) ? await readCodes(page) : null;
+    const closed = await readCodes(page, firstId);
+    const opened = (await openCard(page, firstId, expectLedger)) ? await readCodes(page, firstId) : null;
     if (!opened) return { error: `the first card (${firstId}) never opened`, closed };
     return { firstId, closed, opened };
   } catch (e) {
