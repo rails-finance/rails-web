@@ -289,13 +289,21 @@ for (const proto of protocols) {
   }
   const positionPanes = compFiles.filter((f) => f.endsWith("-position-explanation.tsx")).map((f) => join(compDir, f));
 
+  // A family on the shared generator (ui-jobs 314) keeps its words in
+  // content/<proto>/event-prose.yaml: the generator carries the actor signal,
+  // the file the sentences, so both stand for the event pane, and the file's
+  // position words stand beside the position component.
+  const stringsFile = join("content", proto, "event-prose.yaml");
+  const generator = join(LIB, proto, "event-prose.ts");
+  const words = existsSync(stringsFile) && existsSync(generator) ? read(stringsFile) : null;
   const paneProse = {
-    event: existsSync(eventPane) ? stripComments(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => stripComments(read(f))).join("\n") : null,
+    event: words !== null ? stripComments(read(generator)) + "\n" + words : existsSync(eventPane) ? stripComments(read(eventPane)) : null,
+    position:
+      positionPanes.length > 0 ? positionPanes.map((f) => stripComments(read(f))).join("\n") + "\n" + (words ?? "") : null,
   };
   const paneText = {
-    event: existsSync(eventPane) ? proseOf(read(eventPane)) : null,
-    position: positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") : null,
+    event: words !== null ? proseOf(read(generator)) + " " + words : existsSync(eventPane) ? proseOf(read(eventPane)) : null,
+    position: positionPanes.length > 0 ? positionPanes.map((f) => proseOf(read(f))).join(" ") + " " + (words ?? "") : null,
   };
 
   const checks = [];

@@ -151,6 +151,36 @@ const FAMILIES = {
       "components/protocol/liquity-v1/liquity-v1-event-card.tsx",
     ],
   },
+  spark: {
+    generator: "lib/spark/event-prose.ts",
+    loader: "lib/spark/event-templates.ts",
+    entry: "export function sparkEventProse(",
+    switchEnd: "// ── The run's sentences",
+    prefix: "spark",
+    fallback: "spark.fallback",
+    builtVariants: () => [],
+    wordConsts: { SPARK_WORDS: "words" },
+    modalWords: null,
+    readers: [
+      "lib/spark/event-prose.ts",
+      "lib/spark/event-templates.ts",
+      "components/protocol/spark/spark-event-explainer.tsx",
+      "components/protocol/spark/spark-position-explanation.tsx",
+    ],
+    nodes: {
+      section: "position_words",
+      calls: ["positionWords", "positionNodes"],
+      readers: ["components/protocol/spark/spark-position-explanation.tsx"],
+    },
+    faq: null,
+    noProse: [
+      "lib/spark/event-prose.ts",
+      "lib/spark/event-templates.ts",
+      "lib/spark/position-nodes.tsx",
+      "components/protocol/spark/spark-event-explainer.tsx",
+      "components/protocol/spark/spark-event-card.tsx",
+    ],
+  },
 };
 
 /** The engine every family runs on: no prose either. */
