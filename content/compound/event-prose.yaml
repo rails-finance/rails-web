@@ -1,0 +1,1288 @@
+# Compound V3 prose: every string an event's explanation, the position card's
+# explanation and the "?" modals print on a Compound V3 (Comet) page, on
+# Ethereum and on Base. The page reads this file and nothing else; the code
+# chooses which strings to say and fills their figures
+# (lib/compound/event-prose.ts for an event,
+# components/protocol/compound/compound-position-explanation.tsx for the
+# position card).
+#
+# How to edit
+#   Each string sits on the line below its `|-`, indented. Write it as it should
+#   read: colons, apostrophes, quotes, percent signs and dashes need no escaping.
+#   Keep each string on one line, keep its indentation, and leave the ids (the
+#   words before a colon) as they are.
+#
+# Placeholders
+#   {name} is a figure the code fills in, printed at the rounding the
+#   `placeholders` section gives it; {name|rounding} prints it at another
+#   rounding for that string alone. Keep the braces and the name; move a
+#   placeholder anywhere in its string.
+#
+# Limits
+#   Every string here is held to rails-ops standards/prose-limits-and-zones.md:
+#   `pnpm check:prose-limits` fails a bullet over 20 words or 2 figures, a modal
+#   over 200 words, and the rest of the standard's section 2. `pnpm check:prose`
+#   confirms the file parses, every id the code reads is here, and every
+#   placeholder is one the code supplies.
+
+# ── Roundings: how a placeholder's figure is printed ──
+roundings:
+  compound_amount: |-
+    the card's amount: four places below one, three above, grouped (0.0743, 14,550.916)
+  number: |-
+    three places, grouped (6,500.123)
+  usd_value: |-
+    dollars and cents ($2.20)
+  ratio_frac: |-
+    a ratio given as a fraction, as a percent at two places (0.0512 → 5.12%)
+  pct_whole: |-
+    whole percent of a fraction (0.32 → 32%), unsigned
+  usd: |-
+    whole dollars ($4,490)
+  count: |-
+    a whole number, grouped (1,204)
+  text: |-
+    a word or name as given
+  address: |-
+    an address, shortened and linked to the block explorer
+
+# ── Placeholders: each name, its default rounding and what it stands for ──
+placeholders:
+  delta:
+    rounding: compound_amount
+    means: |-
+      the amount of the token the event moved, as the header prints it
+  asset_symbol:
+    rounding: text
+    means: |-
+      the symbol of the token the event moved
+  market:
+    rounding: text
+    means: |-
+      the market's label (cUSDCv3)
+  base_symbol:
+    rounding: text
+    means: |-
+      the market's base asset
+  repaid:
+    rounding: compound_amount
+    means: |-
+      the part of a supply that cleared base debt
+  lent:
+    rounding: compound_amount
+    means: |-
+      the part of a supply that was lent out, or the base balance a position lends
+  from_savings:
+    rounding: compound_amount
+    means: |-
+      the part of a withdrawal that came from the account's lent balance
+  borrowed:
+    rounding: compound_amount
+    means: |-
+      the part of a withdrawal that was borrowed, or the base debt a position owes
+  base_debt:
+    rounding: number
+    means: |-
+      the base debt the account owes after the event, as the detail grid prints it
+  cleared:
+    rounding: compound_amount
+    means: |-
+      the base debt an absorb cleared
+  credit:
+    rounding: compound_amount
+    means: |-
+      the credit an absorb left past the debt, kept as a lent balance
+  kept:
+    rounding: usd_value
+    means: |-
+      the value the protocol kept from the seized collateral, over the credit the account received
+  short:
+    rounding: usd_value
+    means: |-
+      how far the seized collateral fell short of the credit
+  seized_usd:
+    rounding: usd_value
+    means: |-
+      the seized collateral at the absorb's prices
+  sibling_cleared:
+    rounding: compound_amount
+    means: |-
+      the debt the same transaction's absorb cleared
+  event_type:
+    rounding: text
+    means: |-
+      the event's type as the index names it
+  actor:
+    rounding: address
+    means: |-
+      the account that sent the transaction
+  funder:
+    rounding: address
+    means: |-
+      the account that provided the tokens
+  # The position card's figures, drawn by the card with their receipts.
+  collateral_syms:
+    rounding: text
+    means: |-
+      the collateral assets the account holds, listed
+  deprecated_syms:
+    rounding: text
+    means: |-
+      the held collateral assets that add no borrowing capacity, listed
+  collateral_usd:
+    rounding: usd
+    means: |-
+      the collateral at the market's oracle prices
+  debt_usd:
+    rounding: usd
+    means: |-
+      the base debt at the market's oracle prices
+  collateral_base:
+    rounding: compound_amount
+    means: |-
+      the collateral at the market's oracle prices, in the base asset
+  supply_apr:
+    rounding: ratio_frac
+    means: |-
+      the supply rate the market pays now, per year
+  share:
+    rounding: ratio_frac
+    means: |-
+      the debt as a share of the liquidation line (61.2%), or over 1,000×
+  line:
+    rounding: compound_amount
+    means: |-
+      the debt the liquidation line covers, in the base asset
+  drop:
+    rounding: pct_whole
+    means: |-
+      how far the collateral can fall before the account can be absorbed
+  room:
+    rounding: compound_amount
+    means: |-
+      the base the account could still borrow, or the collateral could back
+  peak_coll:
+    rounding: compound_amount
+    means: |-
+      the most of each collateral asset the position held, listed
+  peak_lent:
+    rounding: compound_amount
+    means: |-
+      the most base the position lent
+  peak_debt:
+    rounding: compound_amount
+    means: |-
+      the most base the position owed
+  dust:
+    rounding: compound_amount
+    means: |-
+      the dust left in each asset, listed
+  count:
+    rounding: count
+    means: |-
+      how many times the protocol absorbed the position
+  time_word:
+    rounding: text
+    means: |-
+      time or times
+  external:
+    rounding: count
+    means: |-
+      the events another address executed
+  total:
+    rounding: count
+    means: |-
+      the events recorded on the position
+  actors:
+    rounding: count
+    means: |-
+      the other addresses that executed events
+  top_count:
+    rounding: count
+    means: |-
+      the events the most active other address executed
+  lead_name:
+    rounding: text
+    means: |-
+      the name of the most active other address
+
+# ── The event explanation's group headings, in the order the pane shows them ──
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# ── Words the code puts into a sentence ──
+words:
+  and: |-
+    and
+  time_one: |-
+    time
+  time_many: |-
+    times
+
+# ── The position card's explanation (zone Z1): an unheaded lead, then bullets
+# under Holdings, Risk and History when two of them hold two or more bullets
+# (Compound V3 has no rate group: the supply rate sits in the lead). Risk holds
+# at most four: the debt against the liquidation line, the fall to absorption,
+# the room to borrow, and the verdict when the account is absorbable or over
+# its limit. Read by positionWords / positionNodes
+# (lib/compound/event-templates.ts). ──
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_history: |-
+    History
+  # ── An open position ──
+  lead_borrow: |-
+    This position borrows {borrowed} against collateral in {collateral_syms}:
+  lead_lend: |-
+    This position lends {lent} to the {base_symbol} market, earning the supply rate ({supply_apr} APR):
+  lead_collateral: |-
+    This position holds collateral in {collateral_syms} with nothing borrowed against it:
+  worth_both: |-
+    At the market's oracle prices, the collateral is worth {collateral_usd} and the debt {debt_usd}.
+  worth_collateral: |-
+    At the market's oracle prices, the collateral is worth {collateral_usd}.
+  worth_debt: |-
+    At the market's oracle prices, the debt is {debt_usd}.
+  worth_base: |-
+    At the market's oracle prices, the collateral is worth about {collateral_base}.
+  also_collateral: |-
+    It also holds collateral in {collateral_syms}, backing no borrowing.
+  deprecated_one: |-
+    {deprecated_syms} is deprecated and adds no borrowing capacity.
+  deprecated_many: |-
+    {deprecated_syms} are deprecated and add no borrowing capacity.
+  liq_line: |-
+    Debt sits at {share} of the liquidation line, which covers {line} of debt.
+  liq_line_beyond: |-
+    Debt is {share} the liquidation line, which covers {line} of debt.
+  drop: |-
+    The collateral can fall about {drop} before the account can be absorbed.
+  absorbable: |-
+    The account can be absorbed now: anyone may trigger it.
+  over_limit: |-
+    The account is over its borrow limit, so it cannot borrow more.
+  capacity: |-
+    The account could borrow about {room} more at current prices.
+  idle_safe: |-
+    Nothing is borrowed, so none of the collateral can be absorbed.
+  idle_capacity: |-
+    At current prices the collateral could back up to {room} of borrowing.
+  operators: |-
+    {external} of {total} events here were executed by someone other than the owner.
+  operators_one: |-
+    One of {total} events here was executed by someone other than the owner.
+  operators_one_named: |-
+    That one ran through {lead_name}.
+  operators_all_named: |-
+    All of them ran through {lead_name}.
+  operators_most_named: |-
+    Most of them ran through {lead_name}.
+  operators_single: |-
+    A single address ran all of them.
+  operators_spread: |-
+    The work is spread across {actors} addresses, the most active running {top_count} of them.
+  # ── A closed or absorbed position ──
+  closed_lead: |-
+    This {market} position is closed; nothing is lent, borrowed or posted now:
+  closed_lead_dust: |-
+    This {market} position is closed; nothing is borrowed now:
+  closed_lead_absorbed: |-
+    This {market} position is closed, with an absorb in its record; nothing is lent, borrowed or posted now:
+  closed_lead_absorbed_dust: |-
+    This {market} position is closed, with an absorb in its record; nothing is borrowed now:
+  dust_left: |-
+    All that is left is dust worth under a cent: {dust}.
+  peak_held: |-
+    At its height it held up to {peak_coll} of collateral.
+  peak_lent: |-
+    It lent as much as {peak_lent}.
+  peak_owed: |-
+    It owed as much as {peak_debt}.
+  peak_owed_principal: |-
+    It owed as much as {peak_debt} in principal.
+  absorbed: |-
+    The protocol absorbed the position {count} {time_word}.
+
+# ── Sentences more than one template says ──
+shared_sentences:
+  base.lends:
+    when: |-
+      the account's base balance is positive after the event
+    text: |-
+      The account now lends in this market and earns the supply rate.
+  base.owes:
+    when: |-
+      the account's base balance is negative after the event
+    text: |-
+      The account now owes on its base balance and pays the borrow rate.
+  base.flat:
+    when: |-
+      the account's base balance is zero after the event
+    text: |-
+      The account's base balance is now flat.
+  base.unsettled:
+    when: |-
+      the row has no balance before it, so the balance after is still being read
+    text: |-
+      The balance after it, with interest, is still being read.
+  coll.backs_debt:
+    when: |-
+      collateral was added or received, and the account owes base afterwards
+    text: |-
+      The collateral now stands behind {base_debt} {base_symbol} of base debt.
+  coll.no_debt_in:
+    when: |-
+      collateral was added or received, and the account owes nothing afterwards
+    text: |-
+      No base is borrowed, so this collateral backs nothing yet.
+  coll.still_backs:
+    when: |-
+      collateral was withdrawn or sent, and the account owes base afterwards
+    text: |-
+      The remaining collateral still stands behind {base_debt} {base_symbol} of base debt.
+  coll.no_debt_out:
+    when: |-
+      collateral was withdrawn or sent, and the account owes nothing afterwards
+    text: |-
+      Nothing is borrowed, so no debt is left uncovered.
+  actor.sent_funded:
+    when: |-
+      another account sent the transaction and provided the tokens
+    text: |-
+      Another account, {actor}, sent this transaction and provided the tokens.
+  actor.sent:
+    when: |-
+      another account sent the transaction and the tokens came from somewhere else
+    text: |-
+      Another account, {actor}, sent this transaction.
+  actor.bundler:
+    when: |-
+      the wallet is a smart account and a bundler sent its signed operation
+    text: |-
+      The owner's smart account signed this; the bundler {actor} sent it.
+  actor.tokens_from:
+    when: |-
+      the tokens came from an account that did not send the transaction
+    text: |-
+      The tokens came from {funder}.
+  actor.tokens_bulker:
+    when: |-
+      the tokens came through Compound's Bulker
+    text: |-
+      The tokens came through Compound's Bulker, {funder}.
+
+# ── Templates: one per kind of event ──
+#   id          the template's id
+#   title       the event's label in the template list
+#   when        the event and state that select it
+#   L5          the modal it opens (see L5 below)
+#   variants    each variant's id and when it applies
+#   sentences   its sentences, each with `when` and `text`
+#   order       the order the explanation says them in, shared sentences included
+#   groups      which group (group_words) each sentence of order sits in
+#   alternates  lists of sentences the code says at most one of
+# A figure the card's cells, notes or price row show stays out of a sentence
+# unless the sentence says what it means (rails-ops
+# standards/prose-limits-and-zones.md).
+templates:
+  - id: compound3.supply
+    title: |-
+      Supply
+    when: |-
+      supply of the base asset: lends, repays debt, or both
+    L5: supply
+    variants:
+      lend: |-
+        the account had no debt, so all of it is lent
+      repay: |-
+        the supply only paid down debt
+      split: |-
+        the supply cleared the debt and lent the rest
+      unsettled: |-
+        the row has no balance before it, so the split is not known
+      zero: |-
+        the call moved nothing
+    sentences:
+      supply.zero:
+        when: |-
+          zero
+        text: |-
+          A supply call for 0 {asset_symbol} on the {market} market moved nothing.
+      supply.what_lend:
+        when: |-
+          lend
+        text: |-
+          The account supplied {delta} {asset_symbol} to the {market} market, where it is lent out to earn the supply rate.
+      supply.what_repay:
+        when: |-
+          repay
+        text: |-
+          The account supplied {delta} {asset_symbol} to the {market} market, paying down its base debt.
+      supply.what:
+        when: |-
+          split, unsettled
+        text: |-
+          The account supplied {delta} {asset_symbol} to the {market} market.
+      supply.split:
+        when: |-
+          split
+        text: |-
+          {repaid} {asset_symbol} cleared the base debt and {lent} {asset_symbol} was lent out.
+    order:
+      - supply.zero
+      - supply.what_lend
+      - supply.what_repay
+      - supply.what
+      - actor.sent_funded
+      - actor.sent
+      - actor.bundler
+      - actor.tokens_from
+      - actor.tokens_bulker
+      - supply.split
+      - base.lends
+      - base.owes
+      - base.flat
+      - base.unsettled
+    groups:
+      happened:
+        - supply.zero
+        - supply.what_lend
+        - supply.what_repay
+        - supply.what
+        - actor.sent_funded
+        - actor.sent
+        - actor.bundler
+        - actor.tokens_from
+        - actor.tokens_bulker
+      adds_up:
+        - supply.split
+      leaves:
+        - base.lends
+        - base.owes
+        - base.flat
+        - base.unsettled
+    alternates:
+      - [supply.zero, supply.what_lend, supply.what_repay, supply.what]
+      - [actor.sent_funded, actor.sent, actor.bundler]
+      - [actor.tokens_from, actor.tokens_bulker]
+      - [base.lends, base.owes, base.flat, base.unsettled]
+
+  - id: compound3.withdraw
+    title: |-
+      Withdraw or borrow
+    when: |-
+      withdraw of the base asset: spends the lent balance, borrows, or both
+    L5: withdraw
+    variants:
+      savings: |-
+        the withdrawal came from the account's lent balance
+      borrow: |-
+        the account had no lent balance, so all of it is borrowed
+      split: |-
+        the withdrawal spent the lent balance and borrowed the rest
+      unsettled: |-
+        the row has no balance before it, so the split is not known
+      zero: |-
+        the call moved nothing
+    sentences:
+      withdraw.zero:
+        when: |-
+          zero
+        text: |-
+          A withdraw call for 0 {asset_symbol} on the {market} market moved nothing.
+      withdraw.what_savings:
+        when: |-
+          savings
+        text: |-
+          The account withdrew {delta} {asset_symbol} of its lent balance back to the wallet.
+      withdraw.what_borrow:
+        when: |-
+          borrow
+        text: |-
+          The account borrowed {delta} {asset_symbol} from the {market} market against its collateral.
+      withdraw.what:
+        when: |-
+          split, unsettled
+        text: |-
+          The account withdrew {delta} {asset_symbol} from the {market} market.
+      withdraw.split:
+        when: |-
+          split
+        text: |-
+          {from_savings} {asset_symbol} came from its lent balance and {borrowed} {asset_symbol} was borrowed.
+    order:
+      - withdraw.zero
+      - withdraw.what_savings
+      - withdraw.what_borrow
+      - withdraw.what
+      - withdraw.split
+      - base.lends
+      - base.flat
+      - base.unsettled
+    groups:
+      happened:
+        - withdraw.zero
+        - withdraw.what_savings
+        - withdraw.what_borrow
+        - withdraw.what
+      adds_up:
+        - withdraw.split
+      leaves:
+        - base.lends
+        - base.flat
+        - base.unsettled
+    alternates:
+      - [withdraw.zero, withdraw.what_savings, withdraw.what_borrow, withdraw.what]
+      - [base.lends, base.flat, base.unsettled]
+
+  - id: compound3.supply_collateral
+    title: |-
+      Add collateral
+    when: |-
+      supply_collateral
+    L5: collateral_in
+    variants:
+      default: |-
+        always
+    sentences:
+      coll.what_in:
+        when: |-
+          always
+        text: |-
+          The account added {delta} {asset_symbol} to the {market} collateral stack.
+    order:
+      - coll.what_in
+      - actor.sent_funded
+      - actor.sent
+      - actor.bundler
+      - actor.tokens_from
+      - actor.tokens_bulker
+      - coll.backs_debt
+      - coll.no_debt_in
+    groups:
+      happened:
+        - coll.what_in
+        - actor.sent_funded
+        - actor.sent
+        - actor.bundler
+        - actor.tokens_from
+        - actor.tokens_bulker
+      leaves:
+        - coll.backs_debt
+        - coll.no_debt_in
+    alternates:
+      - [actor.sent_funded, actor.sent, actor.bundler]
+      - [actor.tokens_from, actor.tokens_bulker]
+      - [coll.backs_debt, coll.no_debt_in]
+
+  - id: compound3.withdraw_collateral
+    title: |-
+      Withdraw collateral
+    when: |-
+      withdraw_collateral
+    L5: collateral_out
+    variants:
+      default: |-
+        always
+    sentences:
+      coll.what_out:
+        when: |-
+          always
+        text: |-
+          The account withdrew {delta} {asset_symbol} from the {market} collateral stack.
+    order:
+      - coll.what_out
+      - coll.still_backs
+      - coll.no_debt_out
+    groups:
+      happened:
+        - coll.what_out
+      leaves:
+        - coll.still_backs
+        - coll.no_debt_out
+    alternates:
+      - [coll.still_backs, coll.no_debt_out]
+
+  - id: compound3.absorb_debt
+    title: |-
+      Absorb
+    when: |-
+      absorb_debt: the protocol took over the account's debt
+    L5: absorb
+    variants:
+      plain: |-
+        the absorb cleared the debt and left no credit
+      credit: |-
+        the credit passed the debt, and the rest stays as a lent balance
+    sentences:
+      absorb.what:
+        when: |-
+          always
+        text: |-
+          The account's debt passed its liquidation line, so the protocol absorbed it.
+      absorb.cleared:
+        when: |-
+          plain
+        text: |-
+          The absorb cleared {cleared} {asset_symbol} of debt.
+      absorb.cleared_credit:
+        when: |-
+          credit
+        text: |-
+          The absorb cleared {cleared} {asset_symbol} of debt, leaving {credit} {asset_symbol} as a lent balance.
+      absorb.kept:
+        when: |-
+          the seized collateral was worth more than the credit
+        text: |-
+          The protocol kept {kept} of the collateral's value, which is what the absorb cost the account.
+      absorb.short:
+        when: |-
+          the seized collateral was worth less than the credit
+        text: |-
+          The credit was {short} more than the collateral was worth; the protocol's reserves covered it.
+    order:
+      - absorb.what
+      - absorb.cleared
+      - absorb.cleared_credit
+      - absorb.kept
+      - absorb.short
+    groups:
+      happened:
+        - absorb.what
+      adds_up:
+        - absorb.cleared
+        - absorb.cleared_credit
+      leaves:
+        - absorb.kept
+        - absorb.short
+    alternates:
+      - [absorb.cleared, absorb.cleared_credit]
+      - [absorb.kept, absorb.short]
+
+  - id: compound3.absorb_collateral
+    title: |-
+      Absorbed collateral
+    when: |-
+      absorb_collateral: one asset the protocol took from the account
+    L5: absorb
+    variants:
+      priced: |-
+        the row carries the asset's value at the absorb's prices
+      unpriced: |-
+        the row carries no value
+    sentences:
+      seize.what_usd:
+        when: |-
+          priced
+        text: |-
+          In this absorb the protocol seized {delta} {asset_symbol} of collateral, worth {seized_usd} at the absorb's prices.
+      seize.what:
+        when: |-
+          unpriced
+        text: |-
+          In this absorb the protocol seized {delta} {asset_symbol} of collateral.
+      seize.same_tx_amount:
+        when: |-
+          the same transaction's absorb row is on the page
+        text: |-
+          In the same transaction the protocol cleared the account's whole debt, {sibling_cleared} {base_symbol}.
+      seize.same_tx:
+        when: |-
+          the same transaction's absorb row is not on the page
+        text: |-
+          In the same transaction the protocol cleared the account's whole debt.
+    order:
+      - seize.what_usd
+      - seize.what
+      - seize.same_tx_amount
+      - seize.same_tx
+    groups:
+      happened:
+        - seize.what_usd
+        - seize.what
+      adds_up:
+        - seize.same_tx_amount
+        - seize.same_tx
+    alternates:
+      - [seize.what_usd, seize.what]
+      - [seize.same_tx_amount, seize.same_tx]
+
+  - id: compound3.transfer
+    title: |-
+      Transfer
+    when: |-
+      transfer_in or transfer_out of the base balance
+    L5: transfer_base
+    variants:
+      in: |-
+        the account received base
+      out: |-
+        the account sent base
+    sentences:
+      xfer.in:
+        when: |-
+          in
+        text: |-
+          The account received {delta} {asset_symbol} of base from another Comet account.
+      xfer.out:
+        when: |-
+          out
+        text: |-
+          The account sent {delta} {asset_symbol} of base to another Comet account.
+    order:
+      - xfer.in
+      - xfer.out
+      - base.lends
+      - base.owes
+      - base.flat
+      - base.unsettled
+    groups:
+      happened:
+        - xfer.in
+        - xfer.out
+      leaves:
+        - base.lends
+        - base.owes
+        - base.flat
+        - base.unsettled
+    alternates:
+      - [xfer.in, xfer.out]
+      - [base.lends, base.owes, base.flat, base.unsettled]
+
+  - id: compound3.transfer_collateral
+    title: |-
+      Collateral transfer
+    when: |-
+      transfer_collateral_in or transfer_collateral_out
+    L5: transfer_collateral
+    variants:
+      in: |-
+        the account received collateral
+      out: |-
+        the account sent collateral
+    sentences:
+      xfer_coll.in:
+        when: |-
+          in
+        text: |-
+          The account received {delta} {asset_symbol} of collateral from another Comet account.
+      xfer_coll.out:
+        when: |-
+          out
+        text: |-
+          The account sent {delta} {asset_symbol} of collateral to another Comet account.
+    order:
+      - xfer_coll.in
+      - xfer_coll.out
+      - coll.backs_debt
+      - coll.no_debt_in
+      - coll.still_backs
+      - coll.no_debt_out
+    groups:
+      happened:
+        - xfer_coll.in
+        - xfer_coll.out
+      leaves:
+        - coll.backs_debt
+        - coll.no_debt_in
+        - coll.still_backs
+        - coll.no_debt_out
+    alternates:
+      - [xfer_coll.in, xfer_coll.out]
+      - [coll.backs_debt, coll.no_debt_in, coll.still_backs, coll.no_debt_out]
+
+  - id: compound3.fallback
+    title: |-
+      Event
+    when: |-
+      an event type the generator does not know
+    L5: fallback
+    variants:
+      default: |-
+        always
+    sentences:
+      fallback.what:
+        when: |-
+          always
+        text: |-
+          The account recorded a {event_type} event on the {market} market.
+    order:
+      - fallback.what
+    groups:
+      happened:
+        - fallback.what
+
+# ── The documentation pages the modals link, by id ──
+doc_urls:
+  OVERVIEW: |-
+    https://docs.compound.finance/#introduction
+  COLLATERAL_BORROWING: |-
+    https://docs.compound.finance/collateral-and-borrowing/
+  SUPPLY: |-
+    https://docs.compound.finance/collateral-and-borrowing/#supply
+  BORROW: |-
+    https://docs.compound.finance/collateral-and-borrowing/#withdraw-or-borrow
+  BORROW_COLLATERALIZATION: |-
+    https://docs.compound.finance/collateral-and-borrowing/#borrow-collateralization
+  LIQUIDATION: |-
+    https://docs.compound.finance/liquidation/
+  LIQUIDATABLE: |-
+    https://docs.compound.finance/liquidation/#liquidatable-accounts
+  ABSORB: |-
+    https://docs.compound.finance/liquidation/#absorb
+  BUY_COLLATERAL: |-
+    https://docs.compound.finance/liquidation/#buy-collateral
+  RESERVES: |-
+    https://docs.compound.finance/liquidation/#reserves
+  INTEREST_RATES: |-
+    https://docs.compound.finance/interest-rates/
+  ACCOUNT_MANAGEMENT: |-
+    https://docs.compound.finance/account-management/
+  ALLOW: |-
+    https://docs.compound.finance/account-management/#allow
+  TRANSFER: |-
+    https://docs.compound.finance/account-management/#transfer
+  LIQUIDATION_FACTOR: |-
+    https://docs.compound.finance/governance/#update-liquidation-factor
+
+# ── The "?" modals (zone Z4): the event modals and the position card's. Each
+# stops at the mechanism and hands it to a Quick Link; no figure of one
+# position appears here. ──
+L5:
+  supply:
+    title: |-
+      How Supplying the Base Asset Works
+    intro: |-
+      Each Compound V3 market lends and borrows one base asset. Supplying base repays any debt first, then lends the rest to earn the supply rate.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One signed balance
+        text: |-
+          positive base is lending and negative base is borrowing, so supply and repay are one operation, as are withdraw and borrow.
+      - bold: |-
+          Interest accrues in place
+        text: |-
+          the balance grows or deepens every second at the market's rate, which moves with how much of the pool is borrowed.
+      - bold: |-
+          Earning vs collateral
+        text: |-
+          lent base earns interest but does not back borrowing; only the separate collateral stack does.
+      - bold: |-
+          Who may act
+        text: |-
+          anyone may supply to any account, but taking value out needs the owner to name a manager, with no amount limit.
+    links:
+      - label: |-
+          Supply
+        doc: SUPPLY
+      - label: |-
+          Interest rates
+        doc: INTEREST_RATES
+      - label: |-
+          Account management
+        doc: ALLOW
+
+  withdraw:
+    title: |-
+      How Withdrawing and Borrowing Work
+    intro: |-
+      Withdrawing base spends the account's lent balance first, and anything past zero is a borrow. Compound V3 has no separate borrow call.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One signed balance
+        text: |-
+          positive base is lending and negative base is borrowing, so withdraw and borrow are one operation, as are supply and repay.
+      - bold: |-
+          Backed by collateral
+        text: |-
+          a borrow must stay under the account's borrow capacity, where each collateral asset counts up to its borrow factor.
+      - bold: |-
+          Interest accrues in place
+        text: |-
+          the debt deepens every second at the market's borrow rate, which moves with how much of the pool is borrowed.
+      - bold: |-
+          Who may act
+        text: |-
+          only the owner or a named manager can withdraw or borrow; a manager can act on every asset with no amount limit.
+    links:
+      - label: |-
+          Withdraw or borrow
+        doc: BORROW
+      - label: |-
+          Borrow collateralization
+        doc: BORROW_COLLATERALIZATION
+      - label: |-
+          Interest rates
+        doc: INTEREST_RATES
+
+  collateral_in:
+    title: |-
+      How Collateral Works
+    intro: |-
+      Compound V3 collateral is a separate stack from the base balance. It earns nothing and backs the account's base borrowing.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrow factor
+        text: |-
+          the share of a collateral asset's value that can be borrowed against.
+      - bold: |-
+          Liquidate factor
+        text: |-
+          a higher share that counts toward the liquidation line; the gap to the borrow factor is the safety margin.
+      - bold: |-
+          Liquidation factor
+        text: |-
+          the share of its value the account is credited at if it is absorbed; the protocol keeps the rest.
+      - bold: |-
+          Non-earning
+        text: |-
+          collateral earns no interest, so its amount changes only when the account moves it or an absorb takes it.
+      - bold: |-
+          Who may act
+        text: |-
+          anyone may add collateral to any account, but withdrawing it needs the owner or a named manager.
+    links:
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+      - label: |-
+          Liquidation
+        doc: LIQUIDATION
+      - label: |-
+          Liquidation factor
+        doc: LIQUIDATION_FACTOR
+
+  collateral_out:
+    title: |-
+      How Withdrawing Collateral Works
+    intro: |-
+      Withdrawing collateral shrinks the stack backing the account's borrowing. The market blocks a withdrawal that would leave debt over the account's borrow capacity.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Borrow factor
+        text: |-
+          the share of a collateral asset's value that can be borrowed against.
+      - bold: |-
+          Liquidate factor
+        text: |-
+          a higher share that counts toward the liquidation line; the gap to the borrow factor is the safety margin.
+      - bold: |-
+          Deprecated assets
+        text: |-
+          governance retires an asset by setting its borrow factor to 0: it still counts toward the liquidation line but backs no new borrowing.
+      - bold: |-
+          Who may act
+        text: |-
+          only the owner or a named manager can withdraw collateral; a manager can act on every asset with no amount limit.
+    links:
+      - label: |-
+          Withdraw or borrow
+        doc: BORROW
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+      - label: |-
+          Account management
+        doc: ALLOW
+
+  absorb:
+    title: |-
+      How Absorb (Liquidation) Works
+    intro: |-
+      Compound V3 calls its liquidation an absorb. Once an account's debt passes its liquidation line, anyone may trigger it and the protocol takes over the whole account.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidation line
+        text: |-
+          each collateral asset's value times its liquidate factor, added up; debt above it makes the account absorbable.
+      - bold: |-
+          One step
+        text: |-
+          the protocol takes all the account's collateral and clears its whole debt; nobody repays part of it.
+      - bold: |-
+          Credit
+        text: |-
+          each asset is credited at its liquidation factor, a share of its value; the credit clears the debt and any excess stays lent.
+      - bold: |-
+          The protocol's share
+        text: |-
+          the uncredited value stays with the protocol, which sells the seized collateral at a discount while its reserves are below target.
+      - bold: |-
+          Factors at the block
+        text: |-
+          the factors shown are those in force just before the absorb; governance can change them later.
+    links:
+      - label: |-
+          Absorb
+        doc: ABSORB
+      - label: |-
+          Liquidatable accounts
+        doc: LIQUIDATABLE
+      - label: |-
+          Buy collateral
+        doc: BUY_COLLATERAL
+      - label: |-
+          Reserves
+        doc: RESERVES
+
+  transfer_base:
+    title: |-
+      How Position Transfers Work
+    intro: |-
+      A Compound V3 base position is an ERC-20 balance, so it can move to another account directly. The signed balance changes hands without a supply or a withdraw.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Not a deposit or withdrawal
+        text: |-
+          a transfer changes custody, so this explorer counts it apart from deposited and withdrawn.
+      - bold: |-
+          Two accounts, one move
+        text: |-
+          the same transfer shows as an out-leg on the sender and an in-leg on the recipient.
+      - bold: |-
+          Base is fungible
+        text: |-
+          positive base is a lending position; transferring it hands the lent balance, and the interest it earns, to the recipient.
+    links:
+      - label: |-
+          Transfer
+        doc: TRANSFER
+      - label: |-
+          Account management
+        doc: ACCOUNT_MANAGEMENT
+
+  transfer_collateral:
+    title: |-
+      How Collateral Transfers Work
+    intro: |-
+      Compound V3 lets an account move collateral to another account in the same market, without withdrawing to a wallet and supplying it again.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Not a deposit or withdrawal
+        text: |-
+          a transfer changes custody, so this explorer counts it apart from deposited and withdrawn.
+      - bold: |-
+          Two accounts, one move
+        text: |-
+          the same transfer shows as an out-leg on the sender and an in-leg on the recipient.
+      - bold: |-
+          Health still enforced
+        text: |-
+          the transfer fails if it would make the sender's account liquidatable.
+    links:
+      - label: |-
+          Transfer
+        doc: TRANSFER
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+
+  fallback:
+    title: |-
+      How Compound V3 Positions Work
+    intro: |-
+      Compound V3 runs one market per base asset, each a contract Compound calls a Comet. A position is a signed base balance plus a separate stack of non-earning collateral.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Signed base
+        text: |-
+          supply and repay are one operation, pushing the balance up; withdraw and borrow are one, pulling it down past zero.
+      - bold: |-
+          Collateral factors
+        text: |-
+          each asset backs borrowing up to its borrow factor and counts toward the liquidation line up to its higher liquidate factor.
+      - bold: |-
+          Absorb liquidation
+        text: |-
+          past the liquidation line the protocol takes the collateral, clears the whole debt and credits each asset at its liquidation factor.
+    links:
+      - label: |-
+          Compound III documentation
+        doc: OVERVIEW
+      - label: |-
+          Liquidation
+        doc: LIQUIDATION
+
+  # ── The position card's "?" (an open position, by what it does now; a
+  # closed one; an absorbed one). On Base the text_base forms apply. ──
+  position_borrowing:
+    title: |-
+      About This Position
+    intro: |-
+      This panel explains the position in plain words: the base balance, the collateral behind its borrowing, and what would trigger an absorb.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One signed base balance
+        text: |-
+          positive base is lending and negative base is borrowing, so supply and repay are one operation, as are withdraw and borrow.
+      - bold: |-
+          Borrowing capacity
+        text: |-
+          each collateral asset adds capacity up to its borrow factor, while the liquidation line uses its higher liquidate factor.
+      - bold: |-
+          Absorb
+        text: |-
+          past the liquidation line the protocol takes the collateral, clears the whole debt and credits each asset at its liquidation factor.
+      - bold: |-
+          Who may act
+        text: |-
+          anyone may supply or repay for the account; taking value out or borrowing needs the owner or a named manager.
+      - bold: |-
+          One market per base asset
+        text: |-
+          each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
+        text_base: |-
+          Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+    links:
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+      - label: |-
+          Liquidation
+        doc: LIQUIDATION
+      - label: |-
+          Account management
+        doc: ACCOUNT_MANAGEMENT
+
+  position_lending:
+    title: |-
+      About This Position
+    intro: |-
+      This panel explains the position in plain words: the base balance it holds, any collateral posted beside it, and what would trigger an absorb.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          One signed base balance
+        text: |-
+          positive base is lending and earns the supply rate, negative base is borrowing, and supply and repay are one operation.
+      - bold: |-
+          Collateral stays separate
+        text: |-
+          collateral is a non-earning stack backing only this market's borrowing, with each asset counted up to its borrow factor.
+      - bold: |-
+          No debt, no absorb
+        text: |-
+          an account with a positive base and no debt has no liquidation line to cross.
+      - bold: |-
+          Who may act
+        text: |-
+          anyone may supply or repay for the account; taking value out or borrowing needs the owner or a named manager.
+      - bold: |-
+          One market per base asset
+        text: |-
+          each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
+        text_base: |-
+          Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+    links:
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+      - label: |-
+          Interest rates
+        doc: INTEREST_RATES
+      - label: |-
+          Account management
+        doc: ACCOUNT_MANAGEMENT
+
+  position_closed:
+    title: |-
+      About This Position
+    intro: |-
+      This position has unwound: its debt is repaid and its collateral withdrawn, with at most dust under a cent left.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Highest recorded
+        text: |-
+          each peak is the highest balance the position held just before or after any event, as the chain read it with interest.
+        text_base: |-
+          each peak is the highest balance the position held just before or after any event, replayed from the logged amounts without interest.
+      - bold: |-
+          One signed base balance
+        text: |-
+          positive base is lending and negative base is borrowing, so supply and repay are one operation, as are withdraw and borrow.
+      - bold: |-
+          Coming back
+        text: |-
+          a new supply or borrow in this market reopens the same position's timeline.
+      - bold: |-
+          One market per base asset
+        text: |-
+          each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
+        text_base: |-
+          Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+    links:
+      - label: |-
+          Collateral and borrowing
+        doc: COLLATERAL_BORROWING
+      - label: |-
+          Liquidation
+        doc: LIQUIDATION
+
+  position_liquidated:
+    title: |-
+      About This Position
+    intro: |-
+      This position was absorbed when its debt outgrew its liquidation line, and nothing is borrowed or posted now.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Absorb
+        text: |-
+          Compound V3 liquidates the whole account: the protocol takes the collateral and clears all the debt in one step.
+      - bold: |-
+          Outcome
+        text: |-
+          a position that closes with an absorb in its record reads as liquidated.
+      - bold: |-
+          Highest recorded
+        text: |-
+          each peak is the highest balance the position held just before or after any event, as the chain read it with interest.
+        text_base: |-
+          each peak is the highest balance the position held just before or after any event, replayed from the logged amounts without interest.
+      - bold: |-
+          Coming back
+        text: |-
+          a new supply or borrow in this market reopens the same position's timeline.
+      - bold: |-
+          One market per base asset
+        text: |-
+          each market, a contract Compound calls a Comet, lends and borrows one base asset; this card's is one of several, and they share nothing.
+        text_base: |-
+          Compound V3 on Base runs separate markets from Ethereum's; a position on one says nothing about the other.
+    links:
+      - label: |-
+          Absorb
+        doc: ABSORB
+      - label: |-
+          Liquidation
+        doc: LIQUIDATION

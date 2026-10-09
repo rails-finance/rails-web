@@ -233,7 +233,7 @@ placeholders:
     rounding: count
     means: |-
       The events another account sent.
-  events:
+  total:
     rounding: count
     means: |-
       The events on the account's timeline.
@@ -332,9 +332,9 @@ position_words:
   rate_move: |-
     The {rate_symbol} borrow rate is {rate_now}, against {rate_then} at the last borrow.
   operators: |-
-    {external} of the {events} events were sent by other accounts on the owner's behalf.
+    {external} of the {total} events were sent by other accounts on the owner's behalf.
   operators_one: |-
-    {external} of the {events} events were sent by {actor} on the owner's behalf.
+    {external} of the {total} events were sent by {actor} on the owner's behalf.
   # ── A closed or liquidated account ──
   closed_lead_transfers: |-
     This account's balances arrived and left as aToken transfers, with no Pool transaction by the owner:

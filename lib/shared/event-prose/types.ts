@@ -41,7 +41,10 @@ export type Rounding =
   | "token_leg"
   | "token_pos"
   | "hf"
-  | "pct_plain";
+  | "pct_plain"
+  | "compound_amount"
+  | "number"
+  | "usd_value";
 
 export type ProseValue = number | string | null;
 

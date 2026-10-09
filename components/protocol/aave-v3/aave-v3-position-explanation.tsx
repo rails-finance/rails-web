@@ -200,14 +200,14 @@ export function AaveV3PositionExplanation({
   const ext = externalActivity;
   if (ext && ext.external > 0) {
     const external = ext.external.toLocaleString("en-US");
-    const events = ext.total.toLocaleString("en-US");
+    const total = ext.total.toLocaleString("en-US");
     const one = ext.actors.length === 1 ? ext.actors[0] : null;
     add(
       "history",
       "operators",
       one
-        ? positionNodes("operators_one", { external, events, actor: leadName ?? short(one.address) })
-        : positionNodes("operators", { external, events }),
+        ? positionNodes("operators_one", { external, total, actor: leadName ?? short(one.address) })
+        : positionNodes("operators", { external, total }),
     );
   }
 

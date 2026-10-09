@@ -176,20 +176,19 @@ const PARTY_ROLES = [
   { role: "router", prefixes: ["via", "as ETH via"], phrases: [/\brouter\b/i, /\bsettle(d|ment)\b/i] },
 ];
 
-/** A strings file's words: its lines without comments, joined. */
-function yamlProse(src) {
-  return src
-    .split("\n")
-    .filter((l) => !/^\s*#/.test(l))
-    .join("\n");
-}
-
 function read(p) {
   try {
     return readFileSync(p, "utf8");
   } catch {
     return "";
   }
+}
+
+/** The text of a family's strings file with its comment lines dropped, or
+ *  null where the family has none. */
+function stringsFileProse(proto) {
+  const text = read(join("content", proto, "event-prose.yaml"));
+  return text ? text.replace(/^[ \t]*#.*$/gm, " ") : null;
 }
 
 function listDir(p) {
@@ -297,26 +296,28 @@ for (const proto of protocols) {
   }
   const positionPanes = compFiles.filter((f) => f.endsWith("-position-explanation.tsx")).map((f) => join(compDir, f));
 
-  // A family on the shared generator (content/<proto>/event-prose.yaml) keeps
-  // its words in the strings file: both panes read it, and the event pane's
-  // actor signal is the generator's (lib/<proto>/event-prose.ts).
-  const stringsFile = join("content", proto, "event-prose.yaml");
-  const strings = existsSync(stringsFile) ? yamlProse(read(stringsFile)) : null;
-  const generator = join(LIB, proto, "event-prose.ts");
-  const eventSrc = existsSync(eventPane)
-    ? read(eventPane)
-    : strings !== null && existsSync(generator)
-      ? read(generator)
-      : null;
+  // A family whose words moved into a strings file (content/<proto>/event-prose.yaml,
+  // ui-jobs 314) says them there: the generator that picks the sentences is its
+  // event pane, and the file's text is what both panes print.
+  const strings = stringsFileProse(proto);
+  if (strings) {
+    const generator = join(LIB, proto, "event-prose.ts");
+    if (existsSync(generator)) eventPane = generator;
+  }
+
   const paneProse = {
-    event: eventSrc === null ? null : [stripComments(eventSrc), strings ?? ""].join("\n"),
+    event: existsSync(eventPane) ? stripComments(read(eventPane)) + (strings ? `\n${strings}` : "") : null,
     position:
-      positionPanes.length > 0 ? [...positionPanes.map((f) => stripComments(read(f))), strings ?? ""].join("\n") : null,
+      positionPanes.length > 0
+        ? positionPanes.map((f) => stripComments(read(f))).join("\n") + (strings ? `\n${strings}` : "")
+        : null,
   };
   const paneText = {
-    event: eventSrc === null ? null : [existsSync(eventPane) ? proseOf(eventSrc) : "", strings ?? ""].join(" "),
+    event: existsSync(eventPane) ? proseOf(read(eventPane)) + (strings ? ` ${strings}` : "") : null,
     position:
-      positionPanes.length > 0 ? [...positionPanes.map((f) => proseOf(read(f))), strings ?? ""].join(" ") : null,
+      positionPanes.length > 0
+        ? positionPanes.map((f) => proseOf(read(f))).join(" ") + (strings ? ` ${strings}` : "")
+        : null,
   };
 
   const checks = [];
@@ -402,9 +403,11 @@ for (const proto of protocols) {
     const src = stripComments(read(join(compDir, file)));
     if (!/ExternalActorSummary/.test(src)) continue;
     const handRolled = /"Of those/.test(src);
-    // A strings-file bullet states its event count ("{external} of the
-    // {events} events …"), so it needs no lead.
-    const routed = /\boperatorLead\(/.test(src) || /\bpositionNodes\("operators/.test(src);
+    // A strings file states a denominator: the count of the others' events
+    // beside the position's total, in one sentence.
+    const strings = stringsFileProse(proto);
+    const routed =
+      /\boperatorLead\(/.test(src) || (strings != null && /\{external\}[^\n]*\{total\}/.test(strings));
     if (handRolled || !routed) {
       gaps++;
       const why = handRolled
