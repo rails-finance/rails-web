@@ -6,6 +6,8 @@ import { fmtAccrued, fmtColl, fmtCr, fmtDebt, fmtRate, fmtRateChange, fmtUsdWhol
 import { ledgerFigure } from "@/lib/shared/coll-figure";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
+import { compoundAmount } from "@/lib/compound/row-facts";
+import { formatNumber, formatUsdValue } from "@/lib/utils/format";
 import type { ProseValue, Rounding } from "./types";
 
 /** The values one sentence is filled from, and the collateral ledger's decimals. */
@@ -103,4 +105,7 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   units2: (v) => num(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   ratio_frac: (v) =>
     `${(num(v) * 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`,
+  compound_amount: (v) => compoundAmount(num(v)),
+  number: (v) => formatNumber(num(v)),
+  usd_value: (v) => formatUsdValue(num(v)),
 };

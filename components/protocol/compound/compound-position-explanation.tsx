@@ -1,44 +1,59 @@
 "use client";
 
-// Plain-language explanation of a Compound V3 position — the Comet analogue of
-// the Aave-family position explanations, built straight from the live chain
-// response (the base balance, the enumerated collateral with its factors and
-// oracle prices, and the contract's own account verdicts). The charter form for
-// a position pane is a short subject-first status lead plus bullets, one per
-// independent derived fact: composition in the lead; the verdict, the
-// liquidation line, the drop to absorption, and remaining borrowing power as
-// bullets — the absorb mechanic riding whichever of those carries its figures.
-//
-// Every figure here is the same chain-state values shown on the cards around it — this
-// panel only narrates it. Values quote in the market's own unit (USD, or ETH in
-// the WETH market), so magnitudes are stated in base tokens, which is unit-safe
-// everywhere.
+// The Compound V3 position card's explanation (zone Z1): a colon-terminated
+// lead, then bullets under Holdings, Risk and History when two of them hold
+// two or more bullets (rails-ops standards/prose-limits-and-zones.md 3.3;
+// Compound V3 has no rate group, the supply rate sits in the lead). The words
+// are content/compound/event-prose.yaml's `position_words`; this file chooses
+// which to say and draws each figure as the card does (its receipt, or the
+// card's amount format). An open position's figures are the live chain read;
+// a closed one narrates from the index alone, since its live read answers
+// zeros. Values quote in the market's unit (USD, or ETH in the WETH
+// market), so magnitudes are stated in base tokens. The mechanisms behind them
+// are the card's "?" (position_* in the same file).
 
+import type { ReactNode } from "react";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
 import { formatUsd } from "@/lib/shared/format-event";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { useEnsName } from "@/lib/ens/use-ens-names";
-import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
+import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import type { CompoundPositionView } from "@/components/protocol/compound/compound-position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
-import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
+import { COMPOUND_WORDS, positionWords } from "@/lib/compound/event-templates";
+import { positionNodes } from "@/lib/compound/position-nodes";
+import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 
-/** Oxford-join asset symbols ("wstETH, WBTC and cbBTC"). */
-function joinSymbols(syms: string[]): string {
-  if (syms.length === 0) return "";
-  if (syms.length === 1) return syms[0];
-  if (syms.length === 2) return `${syms[0]} and ${syms[1]}`;
-  return `${syms.slice(0, -1).join(", ")} and ${syms[syms.length - 1]}`;
+const GROUPS = ["holdings", "risk", "history"] as const;
+type Group = (typeof GROUPS)[number];
+type Bullet = { group: Group; node: ReactNode };
+
+const arrange = (bullets: Bullet[]) => {
+  const heading: Record<Group, string> = {
+    holdings: positionWords("heading_holdings"),
+    risk: positionWords("heading_risk"),
+    history: positionWords("heading_history"),
+  };
+  return arrangeByHeading(bullets, GROUPS, (g) => heading[g]);
+};
+
+/** Join items with commas and the file's "and" ("wstETH, WBTC and cbBTC"). */
+function joinItems<T>(items: T[], draw: (item: T, i: number) => ReactNode): ReactNode[] {
+  return items.map((item, i) => (
+    <span key={i}>
+      {i > 0 ? (i === items.length - 1 ? ` ${COMPOUND_WORDS.and} ` : ", ") : ""}
+      {draw(item, i)}
+    </span>
+  ));
 }
 
-/** Terminal (closed / liquidated) pane — narrated from the index view alone,
- *  never waiting on the chain lane: a terminal account's live read answers
- *  zeros, so everything worth saying (the heights it reached, the absorption
- *  record, when it wound down, the way back in) is in the replayed history the
- *  card itself renders. The bullets restate the card's own peak figures
- *  (charter §3 reverse-completeness). */
+const joinSymbols = (syms: string[]): string =>
+  syms.length <= 1 ? (syms[0] ?? "") : `${syms.slice(0, -1).join(", ")} ${COMPOUND_WORDS.and} ${syms[syms.length - 1]}`;
+
+/** Terminal (closed / liquidated) pane: narrated from the index view alone,
+ *  never waiting on the chain lane. */
 export function CompoundClosedPositionExplanation({
   v,
   principalOnly = false,
@@ -49,107 +64,81 @@ export function CompoundClosedPositionExplanation({
   principalOnly?: boolean;
 }) {
   const liquidated = v.status === "liquidated";
-  const peakText = (rs: { amount: number; symbol: string }[]) =>
-    rs.map((r, i) => (
-      <span key={r.symbol + i}>
-        {i > 0 ? (i === rs.length - 1 ? " and " : ", ") : ""}
-        <H>
-          <AmountText value={r.amount} /> {r.symbol}
-        </H>
-      </span>
-    ));
-  const closedDate = v.lastActivityAt != null ? formatDate(v.lastActivityAt) : null;
-
   const dust = v.dustLeft ?? [];
-  const nothingLeft =
-    dust.length > 0 ? (
-      <>
-        nothing is borrowed, and all that is left is dust worth under a cent:{" "}
-        {dust.map((d, i) => (
-          <span key={d.symbol + i}>
-            {i > 0 ? (i === dust.length - 1 ? " and " : ", ") : ""}
+  const market = v.marketLabel;
+  const lead =
+    dust.length > 0
+      ? positionNodes(liquidated ? "closed_lead_absorbed_dust" : "closed_lead_dust", { market })
+      : positionNodes(liquidated ? "closed_lead_absorbed" : "closed_lead", { market });
+
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
+
+  if (dust.length > 0)
+    add(
+      "holdings",
+      "dust",
+      positionNodes("dust_left", {
+        dust: joinItems(dust, (d) => (
+          <>
             <AmountText value={d.amount} /> {d.symbol}
-          </span>
-        ))}
-        .
-      </>
-    ) : (
-      <>nothing is lent, borrowed or posted now.</>
-    );
-  const lead = liquidated ? (
-    <>
-      This {v.marketLabel} position is closed, with an absorption in its record; {nothingLeft}
-    </>
-  ) : (
-    <>
-      This {v.marketLabel} position is closed; {nothingLeft}
-    </>
-  );
-
-  // The card's own peak lines, joined: supply side (lent base and/or collateral
-  // assets), then the borrowed base.
-  // Collateral and the lent base are named apart: the lent base earns
-  // interest and backs nothing.
-  const supplyPeaks = v.peak.collateral.map((c) => ({ amount: c.amount, symbol: c.symbol }));
-  const lentPeak = v.peak.lentBase > 0 ? [{ amount: v.peak.lentBase, symbol: v.base.symbol }] : [];
-  const list: React.ReactNode[] = [];
-  const peakFigures = supplyPeaks.length + lentPeak.length + (v.peak.borrowedBase > 0 ? 1 : 0);
-  if (peakFigures > 0) {
-    list.push(
-      <>
-        At its height the position
-        {supplyPeaks.length > 0 && <> held up to {peakText(supplyPeaks)} of collateral</>}
-        {supplyPeaks.length > 0 && lentPeak.length > 0 && <>,</>}
-        {lentPeak.length > 0 && <> lent up to {peakText(lentPeak)}</>}
-        {(supplyPeaks.length > 0 || lentPeak.length > 0) && v.peak.borrowedBase > 0 && <> and</>}
-        {v.peak.borrowedBase > 0 && (
-          <>
-            {" "}
-            owed up to{" "}
-            <H>
-              <AmountText value={v.peak.borrowedBase} /> {v.base.symbol}
-            </H>
-            {principalOnly && <> in principal</>}
           </>
-        )}
-        {peakFigures > 1 ? (
-          <>
-            {" "}
-            — each the most that amount reached, counted before and after every event, so the figures need not have
-            stood together.
-          </>
-        ) : (
-          <> — the most it reached, counted before and after every event.</>
-        )}
-      </>,
+        )),
+      }),
     );
-  }
-  if (v.liquidationCount > 0) {
-    list.push(
-      <>
-        The protocol absorbed the position <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"}, taking
-        its collateral, clearing the whole debt and crediting each asset at its liquidation factor, a share of its
-        value; the protocol keeps the rest.
-        {liquidated && <> Closing with that in its record is what marks the outcome Liquidated.</>}
-      </>,
-    );
-  }
-  if (closedDate != null) {
-    list.push(
-      <>
-        Its last activity was on <H>{closedDate}</H>, after <H>{v.txCount}</H> transaction
-        {v.txCount === 1 ? "" : "s"}.
-      </>,
-    );
-  }
-  list.push(
-    <>
-      The wallet can come back at any time — a new supply or borrow in this market reopens this same position&rsquo;s
-      timeline.
-    </>,
-  );
 
-  return <ProseExplainer paragraph={lead} items={list} />;
+  // The card's peak lines: collateral assets, the lent base, the borrowed base.
+  const held = v.peak.collateral.map((c) => ({ amount: c.amount, symbol: c.symbol }));
+  if (held.length > 0)
+    add(
+      "history",
+      "held",
+      positionNodes("peak_held", {
+        peak_coll: joinItems(held, (r) => (
+          <H>
+            <AmountText value={r.amount} /> {r.symbol}
+          </H>
+        )),
+      }),
+    );
+  if (v.peak.lentBase > 0)
+    add(
+      "history",
+      "lent",
+      positionNodes("peak_lent", {
+        peak_lent: (
+          <H>
+            <AmountText value={v.peak.lentBase} /> {v.base.symbol}
+          </H>
+        ),
+      }),
+    );
+  if (v.peak.borrowedBase > 0) {
+    const owed = (
+      <H>
+        <AmountText value={v.peak.borrowedBase} /> {v.base.symbol}
+      </H>
+    );
+    add(
+      "history",
+      "owed",
+      principalOnly
+        ? positionNodes("peak_owed_principal", { peak_debt: owed })
+        : positionNodes("peak_owed", { peak_debt: owed }),
+    );
+  }
+  if (v.liquidationCount > 0)
+    add(
+      "history",
+      "absorbed",
+      positionNodes("absorbed", {
+        count: <H>{v.liquidationCount}</H>,
+        time_word: v.liquidationCount === 1 ? COMPOUND_WORDS.time_one : COMPOUND_WORDS.time_many,
+      }),
+    );
+
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
 
 export function CompoundPositionExplanation({
@@ -159,215 +148,176 @@ export function CompoundPositionExplanation({
   externalActivity,
 }: {
   chain: CompoundMarketChainResponse;
-  /** The card's oracle-USD side headlines (cardSideUsd on the card view) — the
-   *  exact chrome figures, so the pane's bold twins byte-match (charter §3
-   *  reverse-completeness). Omit (or null) when the card shows no USD headline. */
+  /** The card's oracle-USD side headlines (cardSideUsd on the card view): the
+   *  exact chrome figures, so the pane's bold twins byte-match. Omit (or null)
+   *  when the card shows no USD headline. */
   collateralUsd?: number | null;
   debtUsd?: number | null;
   /** Who executed the position's events, reduced over its whole timeline. The
    *  page derives it from the events already on the page; omit to skip the
-   *  operator bullet. */
+   *  operator bullets. */
   externalActivity?: ExternalActorSummary;
 }) {
   const leadName = useEnsName(externalActivity?.actors[0]?.address ?? null);
-  const secondName = useEnsName(externalActivity?.actors[1]?.address ?? null);
   const supplyBase = scaleCompoundChainBalance(chain.supplyBalanceRaw, chain.baseDecimals);
   const borrowBase = scaleCompoundChainBalance(chain.borrowBalanceRaw, chain.baseDecimals);
   const hasDebt = borrowBase > 0;
   const collateralSyms = chain.collateral.map((c) => c.symbol);
-  const toBase = (v: number) => (chain.basePrice > 0 ? v / chain.basePrice : v);
+  const toBase = (n: number) => (chain.basePrice > 0 ? n / chain.basePrice : n);
   const hf = chain.healthFactor;
   const dropPct = hf != null && hf > 1 ? Math.round((1 - 1 / hf) * 100) : null;
   const deprecated = chain.collateral.filter((c) => c.borrowCollateralFactor === 0);
+  const base = (n: number) => (
+    <H>
+      <AmountText value={n} /> {chain.baseSymbol}
+    </H>
+  );
 
-  let lead: React.ReactNode = null;
-  const bullets: React.ReactNode[] = [];
+  let lead: ReactNode = null;
+  const bullets: Bullet[] = [];
+  const add = (group: Group, key: string, node: ReactNode) =>
+    bullets.push({ group, node: <span key={key}>{node}</span> });
 
   if (hasDebt) {
-    const collateralValue = chain.collateral.reduce(
-      (s, c) => s + scaleCompoundChainBalance(c.balanceRaw, c.decimals) * c.price,
-      0,
-    );
-    // Subject-first, one sentence, two figures, colon-terminated (charter §4).
-    lead = (
-      <>
-        This position borrows{" "}
-        <H>
-          <AmountText value={borrowBase} /> {chain.baseSymbol}
-        </H>{" "}
-        against collateral in {joinSymbols(collateralSyms)}, worth about <AmountText value={toBase(collateralValue)} />{" "}
-        {chain.baseSymbol} at the market&rsquo;s oracle prices:
-      </>
-    );
+    lead = positionNodes("lead_borrow", { borrowed: base(borrowBase), collateral_syms: joinSymbols(collateralSyms) });
 
-    // The card's own USD headlines (Comet's own oracle) — stated bold so the
-    // dollar figures on the stat row resolve to a pane mention.
-    if (collateralUsd != null || debtUsd != null) {
-      bullets.push(
-        <span key="usd">
-          In dollars at those same oracle prices,{" "}
-          {collateralUsd != null && (
+    // The card's USD headlines (Comet's oracle), else the collateral in base.
+    if (collateralUsd != null && debtUsd != null)
+      add(
+        "holdings",
+        "worth",
+        positionNodes("worth_both", {
+          collateral_usd: <H>{formatUsd(collateralUsd)}</H>,
+          debt_usd: <H>{formatUsd(debtUsd)}</H>,
+        }),
+      );
+    else if (collateralUsd != null)
+      add(
+        "holdings",
+        "worth",
+        positionNodes("worth_collateral", { collateral_usd: <H>{formatUsd(collateralUsd)}</H> }),
+      );
+    else if (debtUsd != null)
+      add("holdings", "worth", positionNodes("worth_debt", { debt_usd: <H>{formatUsd(debtUsd)}</H> }));
+    else {
+      const collateralValue = chain.collateral.reduce(
+        (s, c) => s + scaleCompoundChainBalance(c.balanceRaw, c.decimals) * c.price,
+        0,
+      );
+      add(
+        "holdings",
+        "worth",
+        positionNodes("worth_base", {
+          collateral_base: (
             <>
-              the collateral comes to <H>{formatUsd(collateralUsd)}</H>
+              <AmountText value={toBase(collateralValue)} /> {chain.baseSymbol}
             </>
-          )}
-          {collateralUsd != null && debtUsd != null && <> and </>}
-          {debtUsd != null && (
-            <>
-              the debt to <H>{formatUsd(debtUsd)}</H>
-            </>
-          )}
-          .
-        </span>,
+          ),
+        }),
       );
     }
-    // The absorb mechanic rides figure-bearing bullets (never a figure-free
-    // rule sentence of its own): on the drop bullet for a healthy account, or
-    // on the verdict itself once the account is absorbable.
-    const lf = chain.collateral.map((c) => c.liquidationFactor);
-    const oneLf = lf.length > 0 && lf.every((f) => f === lf[0]) ? lf[0] : null;
-    const pctOf = (f: number) => `${Math.round(f * 1000) / 10}%`;
-    const absorbTail =
-      oneLf != null ? (
-        <>
-          the protocol takes the collateral and clears the whole debt, crediting it at {pctOf(oneLf)} of value
-          (liquidation factor); the protocol keeps {pctOf(1 - oneLf)}
-        </>
-      ) : (
-        <>
-          the protocol takes the collateral and clears the whole debt, crediting each asset at its share of value
-          (liquidation factor) and keeping the rest
-        </>
-      );
-    bullets.push(
-      <span key="verdict">
-        The market&rsquo;s check (isLiquidatable) says it{" "}
-        <H>{chain.isLiquidatable ? "can be absorbed now" : "cannot be absorbed now"}</H>
-        {!chain.isLiquidatable && !chain.isBorrowCollateralized
-          ? ", though it is over its borrow limit, so it cannot borrow more"
-          : ""}
-        {chain.isLiquidatable ? <> — anyone may now trigger an absorb, where {absorbTail}</> : null}.
-      </span>,
-    );
+
+    if (chain.isLiquidatable) add("risk", "verdict", positionNodes("absorbable"));
+    else if (!chain.isBorrowCollateralized) add("risk", "verdict", positionNodes("over_limit"));
     if (chain.liquidationCapacity > 0) {
       const share = capacityShare(chain.debtValue, chain.liquidationCapacity);
-      bullets.push(
-        <span key="liq-line">
-          Debt sits at <H>{share.text}</H> {share.ofThe} liquidation line — collateral weighted by each asset&rsquo;s
-          liquidate factor covers up to{" "}
-          <H>
-            <AmountText value={toBase(chain.liquidationCapacity)} /> {chain.baseSymbol}
-          </H>{" "}
-          of debt, and Comet absorbs the account the moment debt reaches that line.
-        </span>,
+      add(
+        "risk",
+        "liq-line",
+        share.beyond
+          ? positionNodes("liq_line_beyond", {
+              share: <H>{share.text}</H>,
+              line: base(toBase(chain.liquidationCapacity)),
+            })
+          : positionNodes("liq_line", { share: <H>{share.text}</H>, line: base(toBase(chain.liquidationCapacity)) }),
       );
     }
-    if (dropPct != null && dropPct > 0) {
-      bullets.push(
-        <span key="drop">
-          The collateral basket can fall about <H>{dropPct}%</H> before absorption
-          {!chain.isLiquidatable ? <> — {absorbTail}</> : null}.
-        </span>,
-      );
-    }
-    if (chain.borrowCapacity > chain.debtValue) {
-      bullets.push(
-        <span key="power">
-          The account could borrow about{" "}
-          <H>
-            <AmountText value={toBase(chain.borrowCapacity - chain.debtValue)} /> {chain.baseSymbol}
-          </H>{" "}
-          more at current prices.
-        </span>,
-      );
-    }
+    if (dropPct != null && dropPct > 0) add("risk", "drop", positionNodes("drop", { drop: <H>{dropPct}%</H> }));
+    if (chain.borrowCapacity > chain.debtValue)
+      add("risk", "power", positionNodes("capacity", { room: base(toBase(chain.borrowCapacity - chain.debtValue)) }));
   } else if (supplyBase > 0) {
-    lead = (
-      <>
-        This position lends{" "}
-        <H>
-          <AmountText value={supplyBase} /> {chain.baseSymbol}
-        </H>{" "}
-        to the {chain.baseSymbol} market, earning the supply rate ({(chain.supplyApr * 100).toFixed(2)}% APR):
-      </>
-    );
-    bullets.push(<span key="accrue">Interest accrues into the lent balance itself.</span>);
+    lead = positionNodes("lead_lend", {
+      lent: base(supplyBase),
+      base_symbol: chain.baseSymbol,
+      supply_apr: `${(chain.supplyApr * 100).toFixed(2)}%`,
+    });
   } else if (collateralSyms.length > 0) {
-    lead = <>This position holds collateral in {joinSymbols(collateralSyms)} with nothing borrowed against it:</>;
+    lead = positionNodes("lead_collateral", { collateral_syms: joinSymbols(collateralSyms) });
   }
 
-  // Idle collateral (a lending or bare-collateral position with no debt): the
-  // collateral backs nothing, so none of it is at risk and it earns nothing.
+  // Idle collateral (a lending or bare-collateral position with no debt): it
+  // backs nothing, so none of it is at risk.
   if (collateralSyms.length > 0 && !hasDebt) {
-    if (supplyBase > 0) {
-      bullets.push(
-        <span key="also-coll">It also holds collateral in {joinSymbols(collateralSyms)}, backing no borrowing.</span>,
+    if (supplyBase > 0)
+      add("holdings", "also-coll", positionNodes("also_collateral", { collateral_syms: joinSymbols(collateralSyms) }));
+    add("risk", "idle-risk", positionNodes("idle_safe"));
+    // No debt, so the risk row (the figure's bold twin) does not render and
+    // the capacity stays plain.
+    if (chain.borrowCapacity > 0)
+      add(
+        "risk",
+        "idle-capacity",
+        positionNodes("idle_capacity", {
+          room: (
+            <>
+              <AmountText value={toBase(chain.borrowCapacity)} /> {chain.baseSymbol}
+            </>
+          ),
+        }),
       );
-    }
-    bullets.push(
-      <span key="idle-risk">
-        None of that collateral can be absorbed while nothing is borrowed against it, and it earns nothing (Comet
-        collateral is non-earning).
-      </span>,
-    );
-    if (chain.borrowCapacity > 0) {
-      // No debt → the risk row (the figure's bold twin) doesn't render, so
-      // the capacity stays muted here.
-      bullets.push(
-        <span key="idle-capacity">
-          At current oracle prices it could back up to <AmountText value={toBase(chain.borrowCapacity)} />{" "}
-          {chain.baseSymbol} of borrowing (each asset counts up to its borrow factor).
-        </span>,
-      );
-    }
   }
 
   if (deprecated.length > 0) {
-    bullets.push(
-      <span key="deprecated">
-        {joinSymbols(deprecated.map((c) => c.symbol))} {deprecated.length === 1 ? "is" : "are"} deprecated for new
-        borrowing (borrow factor 0) — still protecting against liquidation, but adding no borrow capacity.
-      </span>,
+    const syms = joinSymbols(deprecated.map((c) => c.symbol));
+    add(
+      "holdings",
+      "deprecated",
+      deprecated.length === 1
+        ? positionNodes("deprecated_one", { deprecated_syms: syms })
+        : positionNodes("deprecated_many", { deprecated_syms: syms }),
     );
   }
 
-  // Who has been operating the position, across its whole timeline — the same
+  // Who has been operating the position across its whole timeline: the same
   // externalActor() verdict each event card renders on its spine, reduced once
-  // so the pane can state the PATTERN. The event clause explains a single row;
-  // only this can tell a reader the position is run by someone other than its
-  // owner (charter §5 item 7).
-  //
-  // Count-first and plurality-safe: an "operated by <name>" template is false
-  // wherever several actors share the work, and an address is never spoken in
-  // place of a name — the fact holds whether or not anything resolves. The
-  // identity stays unbolded: it has no chrome twin on the card, so bolding it
-  // would break the pane's reverse-completeness (charter §3).
-  //
-  // The seam is supply-side by construction (Comet's withdraw rows name no
-  // funder), so the mechanic sentence speaks to what a non-owner can add, and
-  // to the authorisation the other direction needs.
+  // so the pane states the pattern. The count is plural-safe and an address is
+  // never spoken in place of a name; the identity stays unbolded since the
+  // card shows no twin of it.
   const ext = externalActivity;
   if (ext && ext.external > 0) {
-    const others = ext.external - (ext.actors[0]?.count ?? 0);
-    bullets.push(
-      <span key="operators">
-        {operatorLead(ext, null, "recorded here")}
-        {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by an address other than
-        the owner&rsquo;s. Anyone may put value into a Comet account unasked — and on the base asset that is also the
-        way a debt gets repaid — but taking value out, or borrowing against the collateral, needs the owner to have
-        authorised that address as a manager first, in one switch that covers every asset and sets no amount cap.
-        {ext.actors.length === 1
-          ? leadName
-            ? ` All of it ran through ${leadName}.`
-            : " A single address accounts for all of it."
-          : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
-            : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
-      </span>,
-    );
+    if (ext.external === 1) {
+      add("history", "operators", positionNodes("operators_one", { total: ext.total.toLocaleString("en-US") }));
+      if (leadName) add("history", "operators-who", positionNodes("operators_one_named", { lead_name: leadName }));
+    } else {
+      add(
+        "history",
+        "operators",
+        positionNodes("operators", {
+          external: ext.external.toLocaleString("en-US"),
+          total: ext.total.toLocaleString("en-US"),
+        }),
+      );
+      if (ext.actors.length === 1)
+        add(
+          "history",
+          "operators-who",
+          leadName ? positionNodes("operators_all_named", { lead_name: leadName }) : positionNodes("operators_single"),
+        );
+      else if (leadName)
+        add("history", "operators-who", positionNodes("operators_most_named", { lead_name: leadName }));
+      else
+        add(
+          "history",
+          "operators-who",
+          positionNodes("operators_spread", {
+            actors: ext.actors.length.toLocaleString("en-US"),
+            top_count: ext.actors[0].count.toLocaleString("en-US"),
+          }),
+        );
+    }
   }
 
   if (lead == null && bullets.length === 0) return null;
 
-  return <ProseExplainer paragraph={lead} items={bullets} />;
+  return <ProseExplainer paragraph={lead} items={arrange(bullets)} />;
 }
