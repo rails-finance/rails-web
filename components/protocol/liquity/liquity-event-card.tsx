@@ -16,7 +16,7 @@ import { EventMarkdownContext, EventPageContext } from "@/components/shared/even
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { isNoChangeAdjust } from "@/lib/liquity/trove-ops";
 import { soleFlowAddress } from "@/lib/shared/format-event";
-import { collChangeProv, debtChangeProv, eventPriceProv } from "@/lib/liquity/event-provenance";
+import { collChangeProv, debtChangeProv, eventGasProv, eventPriceProv } from "@/lib/liquity/event-provenance";
 import { eventPriceTitle } from "@/lib/liquity/trove-page-words";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { LiquityLedgerProvider } from "@/components/protocol/liquity-family/liquity-ledger";
@@ -245,7 +245,16 @@ export function LiquityEventCard({
   const priceP = l2 ? eventPriceProv(ctx, coords) : undefined;
   const redemption = l2?.redemption;
   const price: EventCardPrice = {
-    gas: prose.footer.gasCost ? { ...prose.footer.gasCost, run: prose.footer.gasRun } : null,
+    gas: prose.footer.gasCost
+      ? {
+          ...prose.footer.gasCost,
+          run: prose.footer.gasRun,
+          info: eventGasProv(
+            { ...prose.footer.gasCost, gasUsed: event.gas?.gasUsed, run: prose.footer.gasRun },
+            coords,
+          ),
+        }
+      : null,
     prices: l2
       ? [
           {
