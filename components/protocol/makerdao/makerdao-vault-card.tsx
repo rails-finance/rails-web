@@ -144,7 +144,7 @@ export function MakerVaultCard({
   rowExtra,
   explanation,
   viewHref,
-  disclosureKey,
+  positionSummary,
   riskDetail,
 }: {
   v: MakerVaultView;
@@ -152,7 +152,7 @@ export function MakerVaultCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per vault —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Opened-layer lines under Collateral ratio from the page's live overlay
    *  (the price bar, the room to the minimum). Only drawn on a disclosing card. */
   riskDetail?: React.ReactNode;
@@ -175,7 +175,7 @@ export function MakerVaultCard({
   const capBinds = v.priceCap != null && v.priceCap.oracleUsd != null && v.priceCap.oracleUsd > v.priceCap.capUsd;
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   const Detail = disclosing ? PositionCardDetail : Fragment;
 
   // Closed / liquidated: ink and art have settled to 0, so the headline is what
@@ -208,7 +208,7 @@ export function MakerVaultCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -274,7 +274,7 @@ export function MakerVaultCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={makerdaoPositionContent({ status: v.status, ilk: v.ilk, debtSymbol: debtSym, lse: v.lse })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

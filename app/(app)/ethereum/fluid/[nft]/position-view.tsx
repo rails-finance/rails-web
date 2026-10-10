@@ -444,7 +444,7 @@ export default function FluidPositionView({
                 // 209). The borrow rate and the room to the borrow limit from
                 // the live read sit in the opened layer under Debt, inside the
                 // card's receipts scope.
-                disclosureKey={`fluid:${nftId}`}
+                positionSummary
                 debtDetail={liveRisk ? <FluidDebtDetail chain={chain} pair={fluidPairText(view, chain)} /> : undefined}
                 // The Explanation is layman prose about the face figures.
                 // Rendered whenever there's a view or a chain read — a closed

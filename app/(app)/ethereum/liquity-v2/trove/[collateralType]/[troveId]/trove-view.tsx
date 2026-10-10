@@ -625,9 +625,7 @@ export default function TroveView({
           trovesAhead={trovesAhead}
           queueDebtTotal={queueDebtTotal}
           debtInFrontLoading={debtInFrontLoading}
-          // Closed by default, remembered per viewer and Trove with its
-          // Explanation (ui-jobs 209).
-          disclosureKey={`liquity-v2:${troveKey.toLowerCase()}`}
+          positionSummary
           viewHref={tl.viewHref}
           surplus={surplus}
           cardMenu={

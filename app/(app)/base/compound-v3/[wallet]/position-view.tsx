@@ -319,7 +319,7 @@ function MarketSection({
             session="compound-base"
             // Closed by default, remembered per viewer and position (ui-jobs
             // 209); the risk headline and the room to borrow from the Comet read.
-            disclosureKey={`compound-base:${market.key}:${view.account.toLowerCase()}`}
+            positionSummary
             risk={
               // A stale read states no figure, so it draws no risk column.
               view.status === "open" && !(chain && !live) ? compoundRiskColumn(live, compoundBorrowing(view)) : null

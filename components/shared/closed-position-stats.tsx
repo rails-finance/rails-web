@@ -33,6 +33,8 @@ const OUTCOME: Record<PositionOutcome, { label: string; color: string; badge: st
 };
 
 export interface ClosedPositionStatsProps {
+  /** The card's ⋮ menu, pinned to the top right of the header. */
+  menu?: ReactNode;
   outcome: PositionOutcome;
   collateral: ReactNode;
   /** Omit for supply-only positions that never carried debt — Debt column is dropped entirely. */
@@ -59,8 +61,8 @@ export interface ClosedPositionStatsProps {
   debtAssetIcons?: ReactNode;
   collateralFootnote?: ReactNode;
   debtFootnote?: ReactNode;
-  /** A line under Outcome that stays in view on a disclosing card's closed
-   *  layer: what the owner can still claim (a liquidated Trove's surplus). */
+  /** A line under Outcome: what the owner can still claim (a liquidated
+   *  Trove's surplus). */
   outcomeFootnote?: ReactNode;
   /** The Outcome column's word when the protocol names how the position
    *  ended more finely than `outcome` (Liquity V1's "Fully redeemed"). The
@@ -86,9 +88,8 @@ export interface ClosedPositionStatsProps {
    *  used by surfaces (e.g. Aave spokes) that prefer the spoke name as a
    *  status-line companion rather than a top-right tag. */
   leadingIdentity?: ReactNode;
-  /** A card with progressive disclosure (ui-jobs 209) passes its detail gate
-   *  (`PositionCardDetail`). Since the rows open one by one (ui-jobs 295) the
-   *  gate outside a row draws its cells. */
+  /** A wrapper around the Collateral and Debt cells (`PositionCardDetail`
+   *  from the families that pass it; it draws its children). */
   detailGate?: ComponentType<{ children: ReactNode }>;
   /** Drawn in place of the CLOSED badge: a card that names its ending in its
    *  own tag (ui-jobs 270's "Closed" / "Liquidated"). */
@@ -125,6 +126,7 @@ export function ClosedPositionStats({
   badgeTip,
   detailGate,
   tag,
+  menu,
 }: ClosedPositionStatsProps) {
   const Gate = detailGate ?? Fragment;
   const base = OUTCOME[outcome];
@@ -145,28 +147,32 @@ export function ClosedPositionStats({
     : "grid grid-cols-2 sm:grid-cols-4 gap-4";
   return (
     <div data-anatomy="C11">
-      <PositionCardHeader className="flex items-center justify-between gap-2 flex-wrap" spacing="mb-3" anatomy="C5">
-        {/* Wraps between pieces: at 390px the owner address used to break in
+      <PositionCardHeader className="flex items-start gap-2" spacing="mb-3" anatomy="C5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+          {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          <PositionSummaryHeading />
-          {tag !== undefined ? (
-            tag
-          ) : badgeTip ? (
-            <RevealTip
-              tip={badgeTip}
-              label={`${redeemed ? "Redeemed" : "Closed"}: ${badgeTip}`}
-              focusable
-              className="focus-ring rounded-xs"
-            >
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+            <PositionSummaryHeading />
+            {tag !== undefined ? (
+              tag
+            ) : badgeTip ? (
+              <RevealTip
+                tip={badgeTip}
+                label={`${redeemed ? "Redeemed" : "Closed"}: ${badgeTip}`}
+                focusable
+                className="focus-ring rounded-xs"
+              >
+                <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>{badgeWord}</span>
+              </RevealTip>
+            ) : (
               <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>{badgeWord}</span>
-            </RevealTip>
-          ) : (
-            <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${badge}`}>{badgeWord}</span>
-          )}
-          {leadingIdentity}
-        </span>
-        {identity}
+            )}
+            {leadingIdentity}
+          </span>
+          {identity}
+        </div>
+        {/* The card's ⋮ at the top right of the header, whatever wraps beside it. */}
+        {menu && <span className="-my-1 flex shrink-0 items-center">{menu}</span>}
       </PositionCardHeader>
       <PositionCardRegion className={gridClass} anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}

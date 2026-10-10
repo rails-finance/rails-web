@@ -650,7 +650,7 @@ export default function AaveV3BasePositionView({
                     // 209), as on Ethereum. The room left to borrow and the
                     // distance bar from the Pool read sit in the opened layer
                     // under Debt and Health factor, inside the card's receipts scope.
-                    disclosureKey={`aave-v3:base:${wallet.toLowerCase()}`}
+                    positionSummary
                     debtDetail={<AaveV3BorrowRoom chain={data} />}
                     riskDetail={<AaveV3RiskDetail chain={data} />}
                     // The Explanation is layman prose about the face figures,

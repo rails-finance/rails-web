@@ -189,7 +189,7 @@ export function FluidPositionCard({
   explanation,
   viewHref,
   chain,
-  disclosureKey,
+  positionSummary,
   debtDetail,
 }: {
   v: FluidPositionView;
@@ -197,7 +197,7 @@ export function FluidPositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Opened-layer lines under Debt from the live read (the borrow rate, the
    *  room to the borrow limit). Only drawn on a disclosing card. */
   debtDetail?: React.ReactNode;
@@ -216,7 +216,7 @@ export function FluidPositionCard({
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>). The events-plus-interest
   // footnotes leave it: the flows panel counts the interest.
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // The position type and the share pair are labels the figures do not
   // carry; on the detail card they sit at the header's right end (ui-jobs
   // 270 item 6), leaving the left end to the status.
@@ -275,7 +275,7 @@ export function FluidPositionCard({
           wasLiquidated: v.wasLiquidated,
           peakBasis: v.peakBasis,
         })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -377,7 +377,7 @@ export function FluidPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={fluidPositionContent({ status: "open", hasDebt })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

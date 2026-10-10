@@ -633,7 +633,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                       // Closed by default, remembered per viewer and position
                       // (ui-jobs 209). The health factor, the room left to borrow
                       // and the distance bar come from the Comptroller read.
-                      disclosureKey={`moonwell:base:${wallet.toLowerCase()}`}
+                      positionSummary
                       risk={view.status === "open" ? moonwellRiskColumn(data, view.borrows.length > 0) : null}
                       debtDetail={<MoonwellBorrowRoom chain={data} />}
                       // The Explanation is layman prose about those same face

@@ -403,7 +403,7 @@ export function AaveV3PositionCard({
   deployment,
   peaks = true,
   pricesPending = false,
-  disclosureKey,
+  positionSummary,
   debtDetail,
   riskDetail,
 }: {
@@ -412,7 +412,7 @@ export function AaveV3PositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail and the Explanation. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Opened-layer lines under Debt from the page's Pool read (the room left
    *  to borrow). Only drawn on a disclosing card. */
   debtDetail?: React.ReactNode;
@@ -457,7 +457,7 @@ export function AaveV3PositionCard({
           captions={captions}
           peaks={peaks}
           pricesPending={pricesPending}
-          disclosureKey={disclosureKey}
+          positionSummary={positionSummary}
           debtDetail={debtDetail}
           riskDetail={riskDetail}
         />
@@ -474,7 +474,7 @@ export function AaveV3PositionCard({
       captions={captions}
       peaks={peaks}
       pricesPending={pricesPending}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
       debtDetail={debtDetail}
       riskDetail={riskDetail}
     />
@@ -490,14 +490,14 @@ function AaveV3PositionCardBody({
   captions,
   peaks = true,
   pricesPending = false,
-  disclosureKey,
+  positionSummary,
   debtDetail,
   riskDetail,
 }: {
   v: AaveV3PositionView;
   receipts?: boolean;
   pricesPending?: boolean;
-  disclosureKey?: string;
+  positionSummary?: boolean;
   debtDetail?: React.ReactNode;
   riskDetail?: React.ReactNode;
   rowExtra?: React.ReactNode;
@@ -533,7 +533,7 @@ function AaveV3PositionCardBody({
   // The closed/opened card (ui-jobs 209): the per-side reserve chevrons give
   // way to the card's one header chevron, and every line under a headline
   // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // Value order for the cluster and the leg lines — the three visible icons
   // are the three largest by oracle USD, and the detail legs match. Dust
   // reserves (under a cent) leave the icon stack, its "+N" and the list
@@ -570,7 +570,7 @@ function AaveV3PositionCardBody({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={aaveV3PositionModal(v.status, positionDeployment)}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -652,7 +652,7 @@ function AaveV3PositionCardBody({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={aaveV3PositionModal(v.status, positionDeployment, v.borrows.length > 0)}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

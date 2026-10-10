@@ -37,11 +37,7 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { PositionCardDetail } from "@/components/shared/position-card-disclosure";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import {
-  latestAbsoluteProv,
-  peakAbsoluteProv,
-  lifetimeFlowProv,
-} from "@/lib/frankencoin/event-provenance";
+import { latestAbsoluteProv, peakAbsoluteProv, lifetimeFlowProv } from "@/lib/frankencoin/event-provenance";
 import type { FrankencoinLifetimeDebt } from "@/lib/frankencoin/flows";
 import { fmtZchf } from "@/lib/frankencoin/figures";
 import {
@@ -293,7 +289,7 @@ export function FrankencoinPositionCard({
   cloneParent,
   ending,
   lifetimeDebt,
-  disclosureKey,
+  positionSummary,
   challengeAlert,
   collateralDetail,
   debtDetail,
@@ -301,7 +297,7 @@ export function FrankencoinPositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and its
    *  headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** A running challenge, from the live read: drawn under Collateral (Outcome
    *  on a terminal card) in both states. Only on a disclosing card. */
   challengeAlert?: React.ReactNode;
@@ -337,7 +333,7 @@ export function FrankencoinPositionCard({
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>); a running challenge stays
   // in view.
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   const Detail = disclosing ? PositionCardDetail : Fragment;
 
   // Terminal states — closed, DENIED (the challenge that never became a
@@ -380,7 +376,7 @@ export function FrankencoinPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={frankencoinPositionContent({ status: v.status, forcedSale: forcedAt != null })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome
@@ -440,7 +436,7 @@ export function FrankencoinPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={frankencoinPositionContent({ status: "open" })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

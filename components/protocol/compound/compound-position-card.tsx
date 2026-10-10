@@ -424,14 +424,14 @@ export function CompoundPositionCard({
   session = "compound",
   lane = {},
   peaks = true,
-  disclosureKey,
+  positionSummary,
   risk,
   debtDetail,
 }: {
   v: CompoundPositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The risk headline from the page's Comet read, with its opened layer
    *  (compoundRiskColumn). */
   risk?: CardRiskColumn | null;
@@ -467,7 +467,7 @@ export function CompoundPositionCard({
   const eff = effectiveBase(v);
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // The "?" cell every state panel owns — the same content function serves
   // Compound V3 on Ethereum and on Base; only the deployment named by the
   // card's own session changes the prose.
@@ -530,7 +530,7 @@ export function CompoundPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -621,7 +621,7 @@ export function CompoundPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment, side: eff.side })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

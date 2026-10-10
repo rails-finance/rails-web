@@ -147,14 +147,14 @@ export function MorphoPositionCard({
   viewHref,
   session = "morpho",
   listedReceipts,
-  disclosureKey,
+  positionSummary,
   risk,
   debtDetail,
 }: {
   v: MorphoPositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The LTV headline from the page's live market read, with its opened
    *  layer (morphoRiskColumn). */
   risk?: CardRiskColumn | null;
@@ -184,7 +184,7 @@ export function MorphoPositionCard({
   const coords: MorphoCoords = { marketId: v.marketId, chainId: useChainId(), source: useCaptureSource() };
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   const Detail = disclosing ? PositionCardDetail : Fragment;
   const hasColl = v.collateral > 0;
   const collSym = v.collateralSymbol ?? "—";
@@ -243,7 +243,7 @@ export function MorphoPositionCard({
           explanation={explanation}
           viewHref={viewHref}
           learnMore={positionModal({ status: v.status, peakDebt: "unrecorded" })}
-          disclosureKey={disclosureKey}
+          positionSummary={positionSummary}
         >
           <ClosedPositionStats
             detailGate={disclosing ? PositionCardDetail : undefined}
@@ -286,7 +286,7 @@ export function MorphoPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={positionModal({ status: v.status, hasDebt })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <OpenPositionStats
           stackOnPhone={disclosing}
@@ -385,7 +385,7 @@ export function MorphoPositionCard({
           status: v.status,
           peakDebt: v.peaksPartial ? "unrecorded" : v.peakDebtOwed != null && v.peakDebtOwed > 0 ? "owed" : "principal",
         })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -467,7 +467,7 @@ export function MorphoPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={positionModal({ status: v.status, hasDebt: morphoHasDebt(v.borrowSharesRaw) })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

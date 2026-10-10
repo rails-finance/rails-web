@@ -68,14 +68,14 @@ export function LiquityV1PositionCard({
   surplus,
   priceUsd,
   endedBy,
-  disclosureKey,
+  positionSummary,
   risk,
 }: {
   v: LiquityV1PositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The third headline from the page's live read: the collateral ratio and
    *  its opened-layer lines. Omitted until the read lands, and on a listing. */
   risk?: { value: React.ReactNode; detail?: React.ReactNode };
@@ -107,7 +107,7 @@ export function LiquityV1PositionCard({
 }) {
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
   // it lives safely inside the listing card's <Link>). The detail page draws
@@ -159,7 +159,7 @@ export function LiquityV1PositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={liquityV1PositionModal(v.status, endedBy)}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header, the outcome and any
@@ -234,7 +234,7 @@ export function LiquityV1PositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={liquityV1PositionModal(v.status)}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

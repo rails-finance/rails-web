@@ -655,7 +655,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                     // 209), as on Ethereum. The room left to borrow and the
                     // distance bar from the Pool read sit in the opened layer
                     // under Debt and Health factor, inside the card's receipts scope.
-                    disclosureKey={`seamless:${wallet.toLowerCase()}`}
+                    positionSummary
                     debtDetail={<AaveV3BorrowRoom chain={data} />}
                     riskDetail={<AaveV3RiskDetail chain={data} />}
                     // The Explanation: the L1 prose about the face figures, then

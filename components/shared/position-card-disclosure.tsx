@@ -1,120 +1,33 @@
 "use client";
 
-// Progressive disclosure on a position card (rails-ops ui-jobs 209, 295).
-// Opt-in: a card whose shell is given a `disclosureKey` draws a "Position
-// summary" heading over its headline rows, and each row (Collateral, Debt,
-// the ratio) opens on a chevron after its heading into the lines under
-// it: per-asset lines, captions, the risk strip. The rows that state the
-// position's assets (the first two) open by default; the others start
-// closed. A card without the key draws every line, as before.
+// The position card's summary face (rails-ops TO-DO-position-card 270, 322).
+// A card whose shell is given `positionSummary` draws a "Position summary"
+// heading over its headline rows. The card has no open or closed state: every
+// line under a headline is drawn, and a card that moves its additive lines into
+// the right-hand panel (322) does so in its layout. The (i) Explanation row
+// stays a toggle, since it opens an explanation and not a card state.
 //
-// Remembered per viewer and per position, in the store the timeline's event
-// cards use (lib/shared/card-open-store.ts): each row that a viewer moved off
-// its default (`position:<key>:row<i>` for a row opened, `:closed` added for
-// a default-open row closed), and whether the card's Explanation is open.
-// The card-wide key of 209 (`position:<key>`) is dropped on read. Rows are
-// read through useSyncExternalStore with their default as the server
-// snapshot, so the server render and the hydrating render agree. Arming the
-// provenance inspector opens every row, so an armed click can reach a figure
-// in the detail layer, the rule `useReserveDisclosure` follows.
+// `PositionCardRow`, `PositionCardDetail` and `riskColumns` keep their names
+// for the families that still draw their lines under the headlines (323).
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
-import { DiscChevron } from "@/components/shared/expand-chevron";
+import { createContext, useContext, type ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
-import { POSITION_CARD_SCOPE, useProvArmedFor } from "@/components/shared/provenance";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import { isCardOpen, setCardOpen, subscribeCardOpen } from "@/lib/shared/card-open-store";
 
-export interface PositionCardDisclosure {
-  /** The position's store key. */
-  key: string;
-  /** The provenance inspector is armed on the page or on this card: every row
-   *  stands open. */
-  armed: boolean;
-  /** The Explanation row's remembered state, for the shell to restore. */
-  explanationOpen: boolean;
-  setExplanationOpen: (open: boolean) => void;
+const SummaryContext = createContext(false);
+
+/** Whether the card draws the summary face. */
+export function usePositionSummary(): boolean {
+  return useContext(SummaryContext);
 }
 
-const DisclosureContext = createContext<PositionCardDisclosure | null>(null);
-
-/** The card's disclosure, or null on a card that has not opted in. */
-export function usePositionCardDisclosure(): PositionCardDisclosure | null {
-  return useContext(DisclosureContext);
+export function PositionSummaryProvider({ value, children }: { value: boolean; children: ReactNode }) {
+  return <SummaryContext.Provider value={value}>{children}</SummaryContext.Provider>;
 }
 
-/** The store keys for one position: prefixed so they never meet an event id. */
-const cardKey = (key: string) => `position:${key}`;
-const explanationKey = (key: string) => `position:${key}:explanation`;
-const rowKey = (key: string, row: number) => `position:${key}:row${row}`;
-
-const closedOnServer = () => false;
-
-/** One remembered flag, read from the store on every client render. */
-function useStoredOpen(storeId: string | null): boolean {
-  return useSyncExternalStore(subscribeCardOpen, () => (storeId ? isCardOpen(storeId) : false), closedOnServer);
-}
-
-/** The state for a card that opts in with `key`; null without one. Hooks run
- *  either way, so a card can switch the key on and off. */
-export function usePositionCardDisclosureState(key: string | undefined): PositionCardDisclosure | null {
-  const explanationOpen = useStoredOpen(key ? explanationKey(key) : null);
-  // Armed page-wide or on this card (ui-jobs 284); armed on another section
-  // leaves the rows as the reader set them.
-  const armed = useProvArmedFor(POSITION_CARD_SCOPE);
-  // The card-wide open flag of ui-jobs 209 has no reader since the rows took
-  // their own: drop it.
-  useEffect(() => {
-    if (key && isCardOpen(cardKey(key))) setCardOpen(cardKey(key), false);
-  }, [key]);
-  const setExplanationOpen = useCallback(
-    (open: boolean) => {
-      if (key) setCardOpen(explanationKey(key), open);
-    },
-    [key],
-  );
-  return useMemo(
-    () => (key ? { key, armed, explanationOpen, setExplanationOpen } : null),
-    [key, armed, explanationOpen, setExplanationOpen],
-  );
-}
-
-export function PositionCardDisclosureProvider({
-  value,
-  children,
-}: {
-  value: PositionCardDisclosure | null;
-  children: ReactNode;
-}) {
-  return <DisclosureContext.Provider value={value}>{children}</DisclosureContext.Provider>;
-}
-
-/** One headline row's state, read by the `PositionCardDetail`s inside it:
- *  whether it stands open, and the count of detail blocks it holds (a row
- *  with none draws no chevron). */
-interface RowState {
-  open: boolean;
-  register: () => () => void;
-}
-const RowContext = createContext<RowState | null>(null);
-
-/** One headline row of a disclosing card: the column under its heading. The
- *  heading is the row's toggle, its chevron directly after the words; the
- *  figures and the lines under them follow. `index` keys the row's
- *  remembered state; `defaultOpen` is its state before a viewer moves it.
- *  On a card that does not disclose the heading is plain text. */
+/** One headline: its heading, then the figures and the lines under them. */
 export function PositionCardRow({
   index,
-  defaultOpen,
   label,
   labelTip,
   headerIcon,
@@ -122,80 +35,27 @@ export function PositionCardRow({
   children,
 }: {
   index: number;
-  defaultOpen: boolean;
+  /** Retired with the open and closed card; ignored. */
+  defaultOpen?: boolean;
   label: string;
   labelTip?: string;
   headerIcon?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
-  const d = usePositionCardDisclosure();
-  const id = d ? rowKey(d.key, index) : null;
-  // A default-open row stores its closing, a default-closed row its opening.
-  const flag = id ? (defaultOpen ? `${id}:closed` : id) : null;
-  const flagged = useSyncExternalStore(subscribeCardOpen, () => (flag ? isCardOpen(flag) : false), closedOnServer);
-  const open = !!d && (d.armed || (defaultOpen ? !flagged : flagged));
-  const [details, setDetails] = useState(0);
-  const register = useCallback(() => {
-    setDetails((n) => n + 1);
-    return () => setDetails((n) => n - 1);
-  }, []);
-  const row = useMemo(() => ({ open, register }), [open, register]);
-  const toggles = !!d && details > 0;
-  const toggle = () => {
-    if (flag) setCardOpen(flag, !flagged);
-  };
-  const toggleData = { "data-card-row-toggle": String(index), "aria-expanded": open };
-  const heading = !toggles ? (
-    <>
-      <TipLabel text={label} tip={labelTip} />
-      {headerIcon}
-    </>
-  ) : labelTip ? (
-    // The heading carries a tip on hover or tap, so the chevron is a second
-    // press area after it.
-    <>
-      <TipLabel text={label} tip={labelTip} />
-      <button
-        type="button"
-        onClick={toggle}
-        aria-label={label}
-        className="-m-1 inline-flex cursor-pointer items-center rounded-sm p-1 focus-ring"
-        {...toggleData}
-      >
-        <DiscChevron isOpen={open} />
-      </button>
-      {headerIcon}
-    </>
-  ) : (
-    <>
-      <button
-        type="button"
-        onClick={toggle}
-        className="-my-1 inline-flex cursor-pointer items-center gap-1 rounded-sm py-1 focus-ring"
-        {...toggleData}
-      >
-        {label}
-        <DiscChevron isOpen={open} />
-      </button>
-      {headerIcon}
-    </>
-  );
   return (
-    <div
-      className={`${toggles ? "disc-row" : ""} ${className ?? ""}`}
-      data-card-row={index}
-      {...(toggles && open ? { "data-card-row-open": "" } : {})}
-    >
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">{heading}</div>
-      <RowContext.Provider value={row}>{children}</RowContext.Provider>
+    <div className={className} data-card-row={index}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-rb-500">
+        <TipLabel text={label} tip={labelTip} />
+        {headerIcon}
+      </div>
+      {children}
     </div>
   );
 }
 
-/** The card's top row. On a disclosing card (ui-jobs 295) it is the heading
- *  over the rows: "Position summary" (`PositionSummaryHeading`) on the left,
- *  the card's ⋮ or the activity meta at the right end. */
+/** The card's top row: the "Position summary" heading (`PositionSummaryHeading`)
+ *  on the left, the card's ⋮ or the activity meta at the right end. */
 export function PositionCardHeader({
   className,
   spacing,
@@ -209,19 +69,21 @@ export function PositionCardHeader({
   anatomy?: string;
   children: ReactNode;
 }) {
-  const d = usePositionCardDisclosure();
+  const summary = usePositionSummary();
   return (
-    <div className={`${className} ${spacing ?? ""}`} data-anatomy={anatomy} {...(d ? { "data-card-header": "" } : {})}>
+    <div
+      className={`${className} ${spacing ?? ""}`}
+      data-anatomy={anatomy}
+      {...(summary ? { "data-card-header": "" } : {})}
+    >
       {children}
     </div>
   );
 }
 
-/** The words "Position summary", the heading of a disclosing card; nothing
- *  on a card that does not disclose. */
+/** The words "Position summary"; nothing on a card without the summary face. */
 export function PositionSummaryHeading() {
-  const d = usePositionCardDisclosure();
-  if (!d) return null;
+  if (!usePositionSummary()) return null;
   return (
     <h2 className={`${OVERLAY_HEADING} text-rb-500`} data-position-summary="">
       Position summary
@@ -247,8 +109,7 @@ export function PositionCardRegion({
 }
 
 /** A card's risk headline drawn from the page's live read (Compound V2,
- *  Moonwell, Compound V3): the label, the figure, and the opened layer
- *  beneath it. */
+ *  Moonwell, Compound V3): the label, the figure, and the lines beneath it. */
 export interface CardRiskColumn {
   label: string;
   labelTip?: string;
@@ -256,27 +117,22 @@ export interface CardRiskColumn {
   detail?: ReactNode;
 }
 
-/** The risk headline as an `OpenPositionStats` column, its detail in the
- *  opened layer; none where the card does not disclose or has no risk. */
-export function riskColumns(risk: CardRiskColumn | null | undefined, disclosing: boolean) {
-  if (!disclosing || !risk) return [];
+/** The risk headline as an `OpenPositionStats` column; none where the card
+ *  does not draw the summary face or has no risk. */
+export function riskColumns(risk: CardRiskColumn | null | undefined, summary: boolean) {
+  if (!summary || !risk) return [];
   return [
     {
       label: risk.label,
       labelTip: risk.labelTip,
       value: risk.value,
-      footnote: risk.detail ? <PositionCardDetail>{risk.detail}</PositionCardDetail> : undefined,
+      footnote: risk.detail,
     },
   ];
 }
 
-/** The opened layer beneath a headline: drawn while its row is open, and
- *  always on a card that has not opted in or outside a row. */
+/** The lines beneath a headline. Always drawn; kept as a seam for the
+ *  families that pass it as their `detailGate`. */
 export function PositionCardDetail({ children }: { children: ReactNode }) {
-  const d = usePositionCardDisclosure();
-  const row = useContext(RowContext);
-  const register = row?.register;
-  useEffect(() => (d && register ? register() : undefined), [d, register]);
-  if (d && row && !row.open) return null;
   return <>{children}</>;
 }

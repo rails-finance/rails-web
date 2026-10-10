@@ -301,14 +301,14 @@ export function MoonwellPositionCard({
   viewHref,
   captions,
   peaks = true,
-  disclosureKey,
+  positionSummary,
   risk,
   debtDetail,
 }: {
   v: MoonwellPositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The risk headline from the page's Comptroller read, with its opened
    *  layer (moonwellRiskColumn). */
   risk?: CardRiskColumn | null;
@@ -360,7 +360,7 @@ export function MoonwellPositionCard({
   // The closed/opened card (ui-jobs 209): the per-side market chevrons give
   // way to the card's one header chevron, and every line under a headline
   // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // Dust lines (under a cent) leave the icon stack, its "+N" and the list
   // count; the lines put them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
@@ -383,7 +383,7 @@ export function MoonwellPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={moonwellPositionModal(v.status)}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -462,7 +462,7 @@ export function MoonwellPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={moonwellPositionModal(v.status, v.borrows.length > 0)}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

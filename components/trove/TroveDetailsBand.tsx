@@ -14,12 +14,14 @@ interface TroveDetailsBandProps {
   debtInFront?: number | null;
   trovesAhead?: number | null;
   debtInFrontLoading?: boolean;
-  /** One item alone, for the position card's opened layer (ui-jobs 209):
-   *  the costs under Debt, then the debt in front below them. Both by
-   *  default, as the right-aligned strip draws them. */
+  /** One item alone: the costs, or the debt in front. Both by default, as
+   *  the right-aligned strip draws them. */
   part?: "costs" | "queue";
   /** Left-aligned, under a headline. Right-aligned (the strip) by default. */
   alignStart?: boolean;
+  /** The figure alone, for a value cell of the card's panel (TO-DO-position-card
+   *  322): no label, no alignment, the panel's type. Needs `part`. */
+  bare?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function TroveDetailsBand({
   debtInFrontLoading,
   part,
   alignStart = false,
+  bare = false,
 }: TroveDetailsBandProps) {
   if (trove.status !== "open") return null;
 
@@ -85,6 +88,50 @@ export function TroveDetailsBand({
   // provenance) so the Explanation pane's bullets trace identically.
   const debtInFrontProv = troveDebtInFrontProv(trove.collateralType);
   const trovesAheadProv = troveTrovesAheadProv(trove.collateralType);
+
+  if (bare && part === "costs") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2" data-anatomy="C15·liquity">
+        <span>
+          <Prov info={costsProv} value={formatExact(annualInterestCost)}>
+            ~<FadeNumber value={annualInterestCost} formatFn={formatPrice} animateOnMount={true} />
+          </Prov>{" "}
+          BOLD
+        </span>
+        {trove.batch.isMember && (
+          <span className="inline-flex items-center gap-1 text-rb-500">
+            <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
+              +{trove.batch.managementFee}%
+            </Prov>
+            <Users className="w-3 h-3 shrink-0 text-pink-500" aria-hidden="true" />
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (bare && part === "queue") {
+    if (debtInFrontLoading)
+      return <span className="inline-block h-3 w-24 rounded-md bg-rb-200 dark:bg-rb-700 animate-pulse" />;
+    if (debtInFront == null) return <span className="font-normal text-rb-500/70">Unavailable</span>;
+    return (
+      <span data-anatomy="C16·liquity">
+        <Prov info={debtInFrontProv} value={formatExact(debtInFront)} symbol="BOLD">
+          {formatApproximate(debtInFront)}
+        </Prov>{" "}
+        BOLD
+        {trovesAhead != null && (
+          <span
+            className="ml-1.5 inline-flex items-center rounded-full bg-rb-200 dark:bg-rb-700 px-1.5 py-px text-[0.7rem] font-semibold text-rb-500 align-middle"
+            title={`${trovesAhead} Troves ahead in the queue`}
+          >
+            <Prov info={trovesAheadProv} value={String(trovesAhead)}>
+              {trovesAhead}
+            </Prov>
+          </span>
+        )}
+      </span>
+    );
+  }
 
   const showCosts = part !== "queue";
   const showQueue = part !== "costs";

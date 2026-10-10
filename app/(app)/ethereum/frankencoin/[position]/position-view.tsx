@@ -467,7 +467,7 @@ export default function FrankencoinPositionView({
                     // 209). A running challenge stays in view; the challenge tally,
                     // the phase length and the minting cooldown, from the
                     // position's slots at head, sit in the opened layer.
-                    disclosureKey={`frankencoin:${view.position.toLowerCase()}`}
+                    positionSummary
                     challengeAlert={
                       chain && view.status !== "closed" && (chain.challengedAmount ?? 0) > 0 ? (
                         <RiskFigure alignStart caution>

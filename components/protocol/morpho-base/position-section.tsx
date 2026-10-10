@@ -250,20 +250,9 @@ export function MorphoBasePositionSection({
         {sweptClean &&
           !borrowerSide &&
           (live ? (
-            <MorphoLenderOpenCard
-              p={live}
-              receipts
-              vault={vaultOwner}
-              disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
-            />
+            <MorphoLenderOpenCard p={live} receipts vault={vaultOwner} positionSummary />
           ) : (
-            <LenderClosedCard
-              pos={pos}
-              wallet={wallet}
-              receipts
-              vault={vaultOwner}
-              disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
-            />
+            <LenderClosedCard pos={pos} wallet={wallet} receipts vault={vaultOwner} positionSummary />
           ))}
         {sweptClean && borrowerSide && (
           <MorphoPositionCard
@@ -273,7 +262,7 @@ export function MorphoBasePositionSection({
             session="morpho-base"
             // Closed by default, remembered per viewer and position (ui-jobs
             // 209); the LTV and the room to borrow from the live market read.
-            disclosureKey={`morpho-base:${pos.marketId.toLowerCase()}:${wallet.toLowerCase()}`}
+            positionSummary
             risk={view.status === "open" ? morphoRiskColumn(live, morphoHasDebt(view.borrowSharesRaw)) : null}
             debtDetail={live ? <MorphoBorrowRoom chain={live} /> : undefined}
             explanation={
@@ -388,21 +377,21 @@ export function MorphoLenderOpenCard({
   p,
   receipts = false,
   vault = null,
-  disclosureKey,
+  positionSummary,
 }: {
   p: MorphoChainPositionResponse;
   receipts?: boolean;
   /** Opt in to the closed/opened card (ui-jobs 209): the supply rate is the
    *  opened layer. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Set when `p.user` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
 }) {
   return (
-    <PositionCardShell receipts={receipts} disclosureKey={disclosureKey}>
+    <PositionCardShell receipts={receipts} positionSummary={positionSummary}>
       <OpenPositionStats
-        stackOnPhone={receipts && !!disclosureKey}
+        stackOnPhone={receipts && !!positionSummary}
         statusPill={
           receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
@@ -464,22 +453,22 @@ export function LenderClosedCard({
   wallet,
   receipts = false,
   vault = null,
-  disclosureKey,
+  positionSummary,
 }: {
   pos: MorphoSweptPosition;
   wallet: string;
   receipts?: boolean;
   /** Opt in to the closed/opened card (ui-jobs 209). */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Set when `wallet` is a catalogued MetaMorpho vault — see
    *  MorphoBasePositionSection. */
   vault?: { name: string; href: string } | null;
 }) {
   const note = <div className="text-xs mt-0.5 text-rb-500">{notRecordedNote("wallet")}</div>;
   return (
-    <PositionCardShell receipts={receipts} disclosureKey={disclosureKey}>
+    <PositionCardShell receipts={receipts} positionSummary={positionSummary}>
       <ClosedPositionStats
-        detailGate={receipts && disclosureKey ? PositionCardDetail : undefined}
+        detailGate={receipts && positionSummary ? PositionCardDetail : undefined}
         outcome="closed"
         leadingIdentity={
           <span className="flex items-center gap-2 text-xs font-semibold text-rb-500">

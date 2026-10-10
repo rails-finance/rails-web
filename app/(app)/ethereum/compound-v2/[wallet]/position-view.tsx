@@ -496,7 +496,7 @@ export default function CompoundV2PositionView({
                   // 209). The risk headline, the room left to borrow and the
                   // distance bar come from the live Comptroller read, inside the
                   // card's receipts scope.
-                  disclosureKey={`compound-v2:${wallet.toLowerCase()}`}
+                  positionSummary
                   risk={
                     liveView.status === "open" ? compoundV2RiskColumn(chain ?? null, cardView.borrows.length > 0) : null
                   }

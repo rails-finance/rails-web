@@ -238,7 +238,8 @@ function Cell({ cell, heading }: { cell: EventCellSpec; heading: boolean }) {
     </StatSubline>
   ));
   const label = cell.tip ? <span title={cell.tip}>{cell.label}</span> : cell.label;
-  const data = cell.figure || cell.data ? { ...cell.data, ...(cell.figure ? { "data-figure": cell.figure } : {}) } : undefined;
+  const data =
+    cell.figure || cell.data ? { ...cell.data, ...(cell.figure ? { "data-figure": cell.figure } : {}) } : undefined;
   const value = (node: ReactNode) => (cell.figure ? <div data-figure-value="">{node}</div> : node);
   if (cell.kind === "ledger")
     return (

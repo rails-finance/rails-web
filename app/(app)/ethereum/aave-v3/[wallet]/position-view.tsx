@@ -778,7 +778,7 @@ export default function AaveV3PositionDetail({
                   // 209). The room left to borrow and the distance bar from the
                   // Pool read sit in the opened layer under Debt and Health
                   // factor, inside the card's receipts scope.
-                  disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
+                  positionSummary
                   debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
                   riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
                   // The Explanation is now pure layman prose about those same face

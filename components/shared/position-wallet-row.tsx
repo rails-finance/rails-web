@@ -160,9 +160,7 @@ export function PositionWalletRow({
           {strip}
         </span>
       )}
-      {tools !== false && (
-        <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>
-      )}
+      {tools !== false && <span className="ml-auto flex min-h-7 shrink-0 items-center">{tools || <ToolsMenu />}</span>}
     </div>
   );
 }

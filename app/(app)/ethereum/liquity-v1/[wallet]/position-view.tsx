@@ -554,7 +554,7 @@ export default function LiquityV1TroveView({
                 // the room to borrow and the system ratio sit in the opened
                 // layer, inside the card's receipts scope. Only for the open
                 // life with the read landed: they describe the CURRENT Trove.
-                disclosureKey={`liquity-v1:${wallet.toLowerCase()}`}
+                positionSummary
                 risk={
                   chain && view.status === "open" && liquityV1HasRisk(chain)
                     ? { value: <LiquityV1RiskHeadline chain={chain} />, detail: <LiquityV1RiskDetail chain={chain} /> }

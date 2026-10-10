@@ -682,7 +682,7 @@ export default function MakerVaultDetailView({
                 // 209). The price bar and the room to the ilk's minimum sit in
                 // the opened layer under Collateral ratio, inside the card's
                 // receipts scope, once the live overlay landed.
-                disclosureKey={`makerdao:${cardView.urn.toLowerCase()}`}
+                positionSummary
                 riskDetail={
                   cardView.source === "chain" && cardView.status === "open" ? (
                     <MakerdaoRiskDetail v={cardView} />
