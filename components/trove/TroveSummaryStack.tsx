@@ -126,31 +126,23 @@ export function TroveSummaryStack({
   const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
 
   // The right-hand panel (TO-DO-position-card 322), after the card's
-  // Liquidates at and Interest rate rows: the yearly cost, then the debt in
-  // front with the queue bar, since the rate sets the Trove's place in it. The
-  // price bar sits under Liquidates at.
+  // Liquidates at and Interest rate rows: label and value rows only.
   const panelRows: PositionPanelRow[] | undefined =
     positionSummary && showBand
       ? [
           { id: "costs", label: "Costs per year", value: <TroveDetailsBand {...bandProps} part="costs" bare /> },
-          {
-            id: "debt-in-front",
-            label: "Debt in front",
-            value: <TroveDetailsBand {...bandProps} part="queue" bare />,
-            below: queueRunway,
-          },
+          { id: "debt-in-front", label: "Debt in front", value: <TroveDetailsBand {...bandProps} part="queue" bare /> },
+          ...(trovesAhead != null
+            ? [
+                {
+                  id: "troves-in-front",
+                  label: "Troves in front",
+                  value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
+                },
+              ]
+            : []),
         ]
       : undefined;
-  const liquidationBar =
-    positionSummary && showRunway && liqPrice && collPrice ? (
-      <PriceRunway
-        compact
-        currentPrice={collPrice}
-        liqPrice={liqPrice}
-        // The row above names the price, so the bar's words say only the fall.
-        label={`${trove.collateralType} can fall ${Math.round(((collPrice - liqPrice) / collPrice) * 100)}%`}
-      />
-    ) : undefined;
 
   const rowExtra =
     !positionSummary && (showBand || (showRunway && liqPrice && collPrice)) ? (
@@ -184,7 +176,6 @@ export function TroveSummaryStack({
       headerSet={!!positionSummary}
       cardMenu={cardMenu}
       panelRows={panelRows}
-      liquidationBar={liquidationBar}
       footer={
         loadingStatus?.message ? (
           <div className="flex justify-end mt-3">

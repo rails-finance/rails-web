@@ -16,7 +16,7 @@ interface TroveDetailsBandProps {
   debtInFrontLoading?: boolean;
   /** One item alone: the costs, or the debt in front. Both by default, as
    *  the right-aligned strip draws them. */
-  part?: "costs" | "queue";
+  part?: "costs" | "queue" | "ahead";
   /** Left-aligned, under a headline. Right-aligned (the strip) by default. */
   alignStart?: boolean;
   /** The figure alone, for a value cell of the card's panel (TO-DO-position-card
@@ -99,7 +99,7 @@ export function TroveDetailsBand({
           BOLD
         </span>
         {trove.batch.isMember && (
-          <span className="inline-flex items-center gap-1 text-rb-500">
+          <span className="inline-flex items-center gap-1">
             <Prov info={feeProv} value={formatExact(trove.batch.managementFee)}>
               +{trove.batch.managementFee}%
             </Prov>
@@ -107,6 +107,14 @@ export function TroveDetailsBand({
           </span>
         )}
       </span>
+    );
+  }
+  if (bare && part === "ahead") {
+    if (trovesAhead == null) return null;
+    return (
+      <Prov info={trovesAheadProv} value={String(trovesAhead)}>
+        {trovesAhead}
+      </Prov>
     );
   }
   if (bare && part === "queue") {
@@ -119,16 +127,6 @@ export function TroveDetailsBand({
           {formatApproximate(debtInFront)}
         </Prov>{" "}
         BOLD
-        {trovesAhead != null && (
-          <span
-            className="ml-1.5 inline-flex items-center rounded-full bg-rb-200 dark:bg-rb-700 px-1.5 py-px text-[0.7rem] font-semibold text-rb-500 align-middle"
-            title={`${trovesAhead} Troves ahead in the queue`}
-          >
-            <Prov info={trovesAheadProv} value={String(trovesAhead)}>
-              {trovesAhead}
-            </Prov>
-          </span>
-        )}
       </span>
     );
   }

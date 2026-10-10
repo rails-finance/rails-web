@@ -12,8 +12,6 @@ export interface PositionPanelRow {
   id: string;
   label: string;
   value: ReactNode;
-  /** A line under the row across the panel's width (a runway bar). */
-  below?: ReactNode;
 }
 
 export function PositionCardPanel({ rows, columns = 1 }: { rows: PositionPanelRow[]; columns?: 1 | 2 }) {
@@ -27,12 +25,11 @@ export function PositionCardPanel({ rows, columns = 1 }: { rows: PositionPanelRo
       data-anatomy="C18"
     >
       {groups.map((group, g) => (
-        <dl key={g} className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-1.5">
+        <dl key={g} className="grid text-sm grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-1.5">
           {group.map((r) => (
             <div key={r.id} className="contents" data-panel-row={r.id}>
-              <dt className="text-xs font-semibold text-rb-500">{r.label}</dt>
-              <dd className="min-w-0 text-sm font-semibold tabular-nums text-foreground/80">{r.value}</dd>
-              {r.below && <dd className="col-span-2 -mt-0.5 mb-0.5">{r.below}</dd>}
+              <dt className="text-rb-500">{r.label}</dt>
+              <dd className="min-w-0 tabular-nums text-foreground">{r.value}</dd>
             </div>
           ))}
         </dl>
@@ -46,12 +43,12 @@ export function PositionPanelSummary({ rows }: { rows: { id: string; label: stri
   if (rows.length === 0) return null;
   return (
     <div
-      className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-rb-500"
+      className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-rb-500"
       data-position-panel-summary=""
     >
       {rows.map((r) => (
         <span key={r.id} className="tabular-nums" data-panel-row={r.id}>
-          {r.label} <span className="font-semibold text-foreground/80">{r.value}</span>
+          {r.label} <span className="text-foreground">{r.value}</span>
         </span>
       ))}
     </div>

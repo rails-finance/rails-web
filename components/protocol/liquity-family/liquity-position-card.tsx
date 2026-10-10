@@ -454,7 +454,6 @@ export function LiquityPositionCard({
   surplus,
   positionSummary,
   panelRows,
-  liquidationBar,
   debtDetail,
   riskDetail,
   headerSet = false,
@@ -491,8 +490,6 @@ export function LiquityPositionCard({
   /** Panel rows from the page's live read, after Liquidates at and Interest
    *  rate (TO-DO-position-card 322): the yearly cost, the debt in front. */
   panelRows?: PositionPanelRow[];
-  /** The price bar under the panel's Liquidates at row. */
-  liquidationBar?: ReactNode;
   /** Off the `headerSet` face (the forks, until 323): lines under Debt from
    *  the page's live read (the yearly cost, the redemption queue). */
   debtDetail?: ReactNode;
@@ -764,13 +761,13 @@ export function LiquityPositionCard({
     ) : null;
   const rateValue = (
     <Prov info={fp.rate}>
-      <HighlightableValue type="interestRate" state="after" value={rate} className="text-foreground/80">
+      <HighlightableValue type="interestRate" state="after" value={rate} asBlock>
         <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
       </HighlightableValue>
     </Prov>
   );
   const panelBase: PositionPanelRow[] = [
-    ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue, below: liquidationBar }] : []),
+    ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
     { id: "interest-rate", label: "Interest rate", value: rateValue },
   ];
   const panel = set ? <PositionCardPanel rows={[...panelBase, ...(panelRows ?? [])]} /> : undefined;
