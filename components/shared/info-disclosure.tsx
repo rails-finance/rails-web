@@ -152,8 +152,8 @@ export interface InfoDisclosureProps {
    *  while the panel opens below. Listing headers use it for the recency
    *  stamp. */
   rowExtra?: React.ReactNode;
-  /** The event card's register (rails-ops TO-DO-ui-jobs 236): a hairline
-   *  above, no fill and no rounded box on the pill or the open panel. */
+  /** The event card's register (rails-ops TO-DO-ui-jobs 236): no fill and
+   *  no rounded box on the pill or the open panel. */
   bare?: boolean;
 }
 
@@ -171,7 +171,6 @@ export function InfoDisclosure({
   bare,
 }: InfoDisclosureProps) {
   const surfaceBg = surface === "raised" ? "bg-raised" : "bg-background";
-  const hairline = bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : "";
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = openProp !== undefined;
   const open = isControlled ? openProp : internalOpen;
@@ -214,7 +213,7 @@ export function InfoDisclosure({
 
   if (!open) {
     return (
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${hairline} ${className ?? ""}`}>
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${className ?? ""}`}>
         {trigger}
         {rowExtra}
       </div>
@@ -225,7 +224,7 @@ export function InfoDisclosure({
     // The info panel is editorial — narrated figures and footer chrome, never a
     // stat surface — so it's exempt from the dev provenance-coverage tripwire
     // (a <Prov> inside still registers; the exemption only silences the scan).
-    <div className={`${bare ? hairline : `rounded-xl ${surfaceBg}`} ${className ?? ""}`} data-prov-exempt="">
+    <div className={`${bare ? "" : `rounded-xl ${surfaceBg}`} ${className ?? ""}`} data-prov-exempt="">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {trigger}
         {rowExtra}
@@ -276,18 +275,14 @@ export interface InfoTabsDisclosureProps {
    *  set on its heading-button and its pane: "T3" on an event card, "C3" on a
    *  position card. */
   anatomy?: string;
-  /** The event card's register (rails-ops TO-DO-ui-jobs 236): a hairline above
-   *  the row, the (i) button and the open pane drawn with no fill and no
-   *  rounded box. Unset, the panel register. */
+  /** The event card's register (rails-ops TO-DO-ui-jobs 236): the (i)
+   *  button and the open pane drawn with no fill and no rounded box. Unset,
+   *  the panel register. */
   bare?: boolean;
-  /** With `bare`, draw the hairline above the row. Default true; the
-   *  position card and the Lifetime Flows panels have none (TO-DO-position-card 270). */
-  hairline?: boolean;
-  /** Words after the (i) ("Event explanation" on an event card). Set, the
-   *  first tab draws as the event card's row (ui-jobs 281, 295): the toggle
-   *  spans the (i), the words, the chevron after them and the free space
-   *  after it, and `rowExtra` stands at the row's right end. */
-  heading?: string;
+  /** The event card's row (ui-jobs 281, 295): the first tab's toggle spans
+   *  the (i), the chevron after it and the free space after that, and
+   *  `rowExtra` stands at the row's right end. */
+  rowToggle?: boolean;
 }
 
 /** The row's tones: muted at rest, foreground while either half of the
@@ -318,8 +313,7 @@ export function InfoTabsDisclosure({
   className,
   anatomy,
   bare,
-  hairline = true,
-  heading,
+  rowToggle,
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
   const openIndex = open ? tabs.indexOf(open) : -1;
@@ -343,9 +337,9 @@ export function InfoTabsDisclosure({
   };
 
   return (
-    <div className={`${bare && hairline ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
-      {heading && first ? (
-        // The event card's row. The chevron follows the words inside the
+    <div className={className}>
+      {rowToggle && first ? (
+        // The event card's row. The chevron follows the (i) inside the
         // toggle (ui-jobs 295), and the toggle spans the free space after
         // them; `rowExtra` (the card's action) stands at the right end as a
         // sibling, so no control nests in another. Tab reaches the toggle,
@@ -361,7 +355,7 @@ export function InfoTabsDisclosure({
             data-t3-toggle=""
             onClick={toggleFirst}
             aria-expanded={open?.key === first.key}
-            aria-label={`${open?.key === first.key ? "Hide" : "Show"} ${heading.toLowerCase()}`}
+            aria-label={`${open?.key === first.key ? "Hide" : "Show"} ${first.label}`}
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 self-stretch rounded-md py-1 text-left"
           >
             <svg
@@ -372,9 +366,6 @@ export function InfoTabsDisclosure({
             >
               <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
             </svg>
-            <span className={`truncate text-sm font-semibold transition-colors ${tone}`} data-t3-heading="">
-              {heading}
-            </span>
             <span className="inline-flex items-center" data-t3-chevron="">
               <DiscChevron isOpen={open?.key === first.key} />
             </span>

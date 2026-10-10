@@ -93,7 +93,6 @@ export function PositionCardShell({
       {receipts && (
         <ProvenanceInfoTabs
           className="mt-3"
-          hairline={false}
           rowExtra={
             footerEnd ? (
               <>

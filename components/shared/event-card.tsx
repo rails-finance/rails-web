@@ -10,12 +10,7 @@ import { EventPageAside, EventPageContext } from "@/components/shared/event-page
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
-import {
-  INFO_PATH,
-  InfoDisclosure,
-  InfoTabsDisclosure,
-  type InfoDisclosureTab,
-} from "@/components/shared/info-disclosure";
+import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
@@ -278,9 +273,6 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
     custody: actor?.custody,
   };
 }
-
-/** The (i) row's words, on every card. */
-const EXPLANATION_HEADING = "Event explanation";
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
 
@@ -644,27 +636,19 @@ export function EventCard(props: EventCardProps) {
       {detail}
       {hasPriceRow(price) && <EventPriceRow price={price} />}
 
-      {/* ── Info sections: under a hairline, the (i) Explanation button
+      {/* ── Info sections: the (i) Explanation button
                at the bottom-left opens the pane beneath, drawn with no
                panel, with the footer metadata pinned below. A card
                without an explainer keeps the plain (i) for its footer. ── */}
       {(hasExplainer || txHash) && (
         <div className="px-4 pb-3 pt-1">
-          {/* The event page: the explanation stands open with no panel,
-              under a hairline and the (i) with its heading words, in the
-              foreground as the timeline's row is while open (ui-jobs 289). */}
+          {/* The event page: the explanation stands open with no panel and
+              no heading, in the foreground as the timeline's row is while
+              open (ui-jobs 289). */}
           {pageMode && infoTabs.length > 0 ? (
-            <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
-              <div className="flex items-center gap-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
-                  <svg className="h-5 w-5 text-foreground" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
-                  </svg>
-                  {EXPLANATION_HEADING}
-                </h3>
-              </div>
+            <div data-anatomy="T3" data-prov-exempt="">
               {infoTabs.map((t) => (
-                <div key={t.key} className="pb-3 pt-5 text-sm">
+                <div key={t.key} className="pb-3 pt-2 text-sm">
                   {t.content}
                 </div>
               ))}
@@ -674,7 +658,7 @@ export function EventCard(props: EventCardProps) {
             <InfoTabsDisclosure
               bare
               anatomy="T3"
-              heading={EXPLANATION_HEADING}
+              rowToggle
               tabs={infoTabs}
               openTab={openInfoTab}
               onOpenTabChange={setOpenInfoTab}

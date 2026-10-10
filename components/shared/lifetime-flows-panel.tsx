@@ -212,7 +212,6 @@ export function LifetimeFlowsPanel({
           )}
           <ProvenanceInfoTabs
             className="mt-3"
-            hairline={false}
             explanation={
               explanation == null && !outcome && !flowsKey ? undefined : (
                 <>

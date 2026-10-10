@@ -1191,7 +1191,6 @@ function AaveV4SpokeTowerBlock({
               for the breakdown figures. */}
           <ProvenanceInfoTabs
             label="Lifetime flows explanation"
-            hairline={false}
             rowExtra={flowTimeline != null && flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
             explanation={
               <div className="space-y-2 text-sm text-rb-500">
