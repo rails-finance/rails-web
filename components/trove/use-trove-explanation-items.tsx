@@ -11,6 +11,9 @@ import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { troveDebtInFrontProv, troveQueueShareProv } from "@/lib/liquity/trove-queue-provenance";
+import { liquityTroveFaceProv, troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
+import { liveFromTroveState, viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
+import { collateralPriceInfo } from "@/lib/liquity/trove-page-words";
 import { trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-provenance";
 import { pct } from "@/components/shared/ratio-bar";
 import { getTroveNftUrl } from "@/lib/utils/nft-utils";
@@ -18,7 +21,7 @@ import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H, type ExplainerItem } from "@/lib/shared/explainer-prose";
-import { stateOriginVia, stateOriginSummary } from "@/lib/shared/trove-state-origin";
+import { stateOriginVia } from "@/lib/shared/trove-state-origin";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { troveWords } from "@/lib/liquity/event-templates";
 import { troveNodes } from "@/lib/liquity/trove-nodes";
@@ -317,44 +320,22 @@ function buildOpenItems({
   const isLive = !!liveState;
   const stateNote = troveWords(isLive ? "state_live" : "state_indexed");
   const coll_type = trove.collateralType;
-  const chainState = (field: string, what: string): Provenance => ({
-    kind: "chain",
-    summary: stateOriginSummary(isLive, what),
-    contract: tmContract,
-    via: stateOriginVia(isLive, field),
+  // The figures the card states come with the card's receipts (one builder
+  // for both surfaces): collateral, rate, USD, ratio, liquidation price, the
+  // yearly cost and the price.
+  const fp = liquityTroveFaceProv({
+    v: viewFromTroveSummary(trove, prices),
+    live: liveFromTroveState(trove, liveState, prices),
+    coll: displayCollateral,
+    debt: displayDebt,
+    rate: displayInterestRate,
+    priceUsd: currentPrice ?? null,
+    collUsd: collateralUsd,
+    crPct: collateralRatio,
+    liqPrice: null,
+    mcrPct: mcr,
   });
-  const priceProv: Provenance = {
-    kind: "chain-derived",
-    summary: troveWords("prov_price_summary", { coll_type }),
-    via: troveWords("prov_price_via"),
-  };
-  const collInput = {
-    label: troveWords("input_collateral"),
-    value: `${displayCollateral} ${trove.collateralType}`,
-    kind: "chain" as const,
-    note: stateNote,
-  };
-  const priceInput = currentPrice
-    ? { label: troveWords("input_price"), value: formatUsdValue(currentPrice), kind: "chain-derived" as const }
-    : null;
-  const debtInput = {
-    label: troveWords("input_debt"),
-    value: `${formatPrice(displayDebt)} BOLD`,
-    kind: "chain" as const,
-    note: stateNote,
-  };
-  const rateInput = {
-    label: troveWords("input_rate"),
-    value: `${displayInterestRate}%`,
-    kind: "chain" as const,
-    note: stateNote,
-  };
-  const recordedInput = {
-    label: troveWords("input_principal"),
-    value: `${formatPrice(displayRecordedDebt)} BOLD`,
-    kind: "chain" as const,
-    note: stateNote,
-  };
+  const priceProv = collateralPriceInfo(coll_type);
 
   const accruedProv: Provenance = {
     kind: "chain",
@@ -368,26 +349,11 @@ function buildOpenItems({
     contract: tmContract,
     via: stateOriginVia(isLive, "accruedBatchManagementFee"),
   };
-  const collProv = chainState("entireColl", troveWords("prov_coll_what"));
-  const rateProv = chainState("annualInterestRate", troveWords("prov_rate_what"));
-  const collUsdProv: Provenance = {
-    kind: "chain-derived",
-    summary: troveWords("prov_coll_usd", { coll_type }),
-    formula: troveWords("prov_coll_usd_formula"),
-    inputs: [collInput, ...(priceInput ? [priceInput] : [])],
-  };
-  const crProv: Provenance = {
-    kind: "chain-derived",
-    summary: troveWords("prov_cr", { coll_type }),
-    formula: troveWords("prov_cr_formula"),
-    inputs: [collInput, ...(priceInput ? [priceInput] : []), debtInput],
-  };
-  const annualInterestProv: Provenance = {
-    kind: "derived",
-    summary: troveWords("prov_annual_interest"),
-    formula: troveWords("prov_annual_interest_formula"),
-    inputs: [recordedInput, rateInput],
-  };
+  const collProv = fp.coll;
+  const rateProv = fp.rate;
+  const collUsdProv = fp.collUsd;
+  const crProv = fp.cr;
+  const annualInterestProv = troveAnnualCostProv(displayRecordedDebt, displayInterestRate, isLive);
   const mgmtRateInput = {
     label: troveWords("input_mgmt_rate"),
     value: `${trove.batch.managementFee}%`,
@@ -506,16 +472,7 @@ function buildOpenItems({
           collateralType: trove.collateralType,
         })
       : null;
-  const liqPriceProv: Provenance = {
-    kind: "derived",
-    summary: troveWords("prov_liq_price", { coll_type, mcr }),
-    formula: troveWords("prov_liq_price_formula"),
-    inputs: [
-      debtInput,
-      { label: troveWords("input_mcr"), value: `${mcr}%`, kind: "chain", note: troveWords("input_mcr_note") },
-      collInput,
-    ],
-  };
+  const liqPriceProv = fp.liq;
   if (currentPrice && liqPrice && liqPrice > 0) {
     // The runway: the fall to the liquidation price, both the twins of the
     // card's "% from liquidation" and "Liquidates at" chrome, so both bold.

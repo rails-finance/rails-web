@@ -768,54 +768,16 @@ trove_words:
     live on-chain read
   state_indexed: |-
     indexed
-  prov_price_summary: |-
-    Liquity’s current price for {coll_type} — from Chainlink’s on-chain price feeds (and, for staked ETH, the token’s exchange rate) at the latest block, combined by the rules in Liquity’s PriceFeed contract.
-  prov_price_via: |-
-    Chainlink feeds at the latest block, combined by Liquity PriceFeed rules
-  input_collateral: |-
-    collateral
-  input_price: |-
-    price
-  input_debt: |-
-    debt
-  input_rate: |-
-    rate
-  input_principal: |-
-    principal
   input_mgmt_rate: |-
     mgmt rate
-  input_mcr: |-
-    MCR
-  input_mcr_note: |-
-    branch constant
   prov_accrued: |-
     Accrued interest — the interest built up on the trove’s debt since its last change.
   prov_mgmt_fee: |-
     Accrued delegate fee — the delegate’s management fee built up on the trove’s debt since its last change. It is charged on top of the interest.
-  prov_coll_what: |-
-    Collateral held by the trove
-  prov_rate_what: |-
-    Annual interest rate the trove pays
-  prov_coll_usd: |-
-    Collateral value in USD — the collateral multiplied by Liquity’s current price for {coll_type}.
-  prov_coll_usd_formula: |-
-    collateral × price
-  prov_cr: |-
-    Collateral ratio — the collateral’s dollar value divided by the debt, at Liquity’s current price for {coll_type}.
-  prov_cr_formula: |-
-    collateral × price ÷ debt × 100
-  prov_annual_interest: |-
-    Annual interest cost — the debt at the trove’s last change multiplied by the interest rate. It is a year’s interest at today’s rate, before any delegate fee.
-  prov_annual_interest_formula: |-
-    principal × rate
   prov_mgmt_rate: |-
     Delegate management rate — the delegate’s annual fee, charged on top of the interest rate. The delegate sets one rate for every trove in the batch.
   prov_mgmt_rate_via: |-
     the batch’s most recent BatchUpdated log: _annualManagementFee
-  prov_liq_price: |-
-    Liquidation price — the {coll_type} price at which the trove’s collateral ratio would equal the branch’s minimum of {mcr}%. Below that price the trove can be liquidated.
-  prov_liq_price_formula: |-
-    debt × MCR ÷ collateral
   prov_redemption_count: |-
     Redemption count — the number of redemptions that have taken collateral from this trove.
   prov_redemption_count_via: |-

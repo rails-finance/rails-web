@@ -7,6 +7,7 @@ import { formatPrice, formatApproximate, formatExact } from "@/lib/utils/format"
 import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { troveDebtInFrontProv, troveTrovesAheadProv } from "@/lib/liquity/trove-queue-provenance";
+import { troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
 
 interface TroveDetailsBandProps {
   trove: TroveSummary;
@@ -64,17 +65,7 @@ export function TroveDetailsBand({
   // The two figure legs come from different deliveries: with the second-wave
   // chain read in, debt + rate are live TroveManager.getLatestTroveData state;
   // until it lands they're the indexed summary (as of the trove's last event).
-  const legNote = liveState ? "TroveManager.getLatestTroveData()" : "as of the trove's last change";
-  const costsProv: Provenance = {
-    kind: "derived",
-    summary:
-      "Estimated interest cost per year — the debt at the trove's last change multiplied by its annual interest rate. It is a year's interest at today's rate; the rate can change.",
-    formula: "recorded debt × rate ÷ 100",
-    inputs: [
-      { label: "recorded debt", value: `${formatExact(displayRecordedDebt)} BOLD`, kind: "chain", note: legNote },
-      { label: "rate", value: `${formatExact(displayInterestRate)}%`, kind: "chain", note: legNote },
-    ],
-  };
+  const costsProv = troveAnnualCostProv(displayRecordedDebt, displayInterestRate, !!liveState);
   const feeProv: Provenance = {
     kind: "chain",
     summary:
