@@ -83,6 +83,8 @@ export interface ProvenanceInfoTabsProps {
   /** The (i) button's noun: "Show {label}" / "Hide {label}". Names the surface so
    *  a page with several (i) buttons gives each its own name. */
   label?: string;
+  /** The hairline above the row (`InfoTabsDisclosure`). Default true. */
+  hairline?: boolean;
 }
 
 export function ProvenanceInfoTabs({
@@ -95,6 +97,7 @@ export function ProvenanceInfoTabs({
   className,
   anatomy,
   label = "position explanation",
+  hairline = true,
 }: ProvenanceInfoTabsProps) {
   const [openTab, setOpenTab] = useState<string | null>(
     explanation != null && explanationDefaultOpen ? "explanation" : null,
@@ -146,6 +149,7 @@ export function ProvenanceInfoTabs({
   return (
     <InfoTabsDisclosure
       bare
+      hairline={hairline}
       tabs={tabs}
       openTab={openTab}
       rowExtra={rowExtra}

@@ -280,6 +280,9 @@ export interface InfoTabsDisclosureProps {
    *  the row, the (i) button and the open pane drawn with no fill and no
    *  rounded box. Unset, the panel register. */
   bare?: boolean;
+  /** With `bare`, draw the hairline above the row. Default true; the
+   *  position card has none (TO-DO-position-card 270). */
+  hairline?: boolean;
   /** Words after the (i) ("Event explanation" on an event card). Set, the
    *  first tab draws as the event card's row (ui-jobs 281, 295): the toggle
    *  spans the (i), the words, the chevron after them and the free space
@@ -315,6 +318,7 @@ export function InfoTabsDisclosure({
   className,
   anatomy,
   bare,
+  hairline = true,
   heading,
 }: InfoTabsDisclosureProps) {
   const open = tabs.find((t) => t.key === openTab) ?? null;
@@ -339,7 +343,7 @@ export function InfoTabsDisclosure({
   };
 
   return (
-    <div className={`${bare ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
+    <div className={`${bare && hairline ? "border-t border-rb-300 pt-3 dark:border-rb-700" : ""} ${className ?? ""}`}>
       {heading && first ? (
         // The event card's row. The chevron follows the words inside the
         // toggle (ui-jobs 295), and the toggle spans the free space after
