@@ -19,7 +19,7 @@ import { usePathname } from "next/navigation";
 import { CircleHelp } from "lucide-react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
-import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
+import { FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
@@ -224,9 +224,10 @@ export function LifetimeFlowsPanel({
                   )}
                   {scrubber != null && flowsKey && (
                     <>
-                      {flowsKey.chart && flowsKey.chart.length > 0 && (
+                      {(flowsKey.basis || (flowsKey.chart && flowsKey.chart.length > 0)) && (
                         <ExplainGroup title="Chart" data-flow-chart-words="">
-                          {flowsKey.chart.map((t) => (
+                          {flowsKey.basis && <ExplainBullet data-flow-basis="">{flowsKey.basis}</ExplainBullet>}
+                          {flowsKey.chart?.map((t) => (
                             <ExplainBullet key={t}>{t}</ExplainBullet>
                           ))}
                         </ExplainGroup>
@@ -241,7 +242,6 @@ export function LifetimeFlowsPanel({
             anatomy={FLOWS_ANATOMY}
             label={`${title} explanation`}
             onExplanationToggle={setInfoOpen}
-            rowExtra={flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
           />
         </div>
       </section>

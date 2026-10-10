@@ -137,8 +137,9 @@ export type FlowsKeyItems = {
   shade?: string | null;
   /** The Explanation's Chart bullets: what the bars and the line cover. */
   chart?: string[];
-  /** How the line values a point ("USD at each day's close"), beside the
-   *  panel's (i). */
+  /** How the line values a point, the first of the Explanation's Chart
+   *  bullets: "The line is in USD, each day valued at that day's closing
+   *  price." */
   basis?: string;
   /** The Explanation's Totals: what came in over the bars' stops. */
   totals?: FlowsTotalsData;
@@ -529,15 +530,6 @@ export function FlowsKey({ items, outline, lines, shade }: FlowsKeyItems) {
   );
 }
 
-/** The line's basis beside the panel's (i): how a point is valued. */
-export function FlowsBasis({ text }: { text: string }) {
-  return (
-    <span className="self-center text-[11px] text-rb-500" data-flow-basis="" data-anatomy="F7">
-      {text}
-    </span>
-  );
-}
-
 /** Where a pip under the pointer sits from the strip's left edge, and what
  *  its tip says. */
 type PipOpen = { x: number; text: string };
@@ -659,7 +651,11 @@ export function LifetimeFlowsScrubber({
       lines: lined ? words.lines : undefined,
       shade: lined && from > 0 ? "The bars' window" : null,
       chart: words.chart,
-      basis: lined ? `${basisUnit} at each ${bin}’s close` : undefined,
+      basis: lined
+        ? basisUnit === "USD"
+          ? `The line is in USD, each ${bin} valued at that ${bin}’s closing price.`
+          : `The line is in ${basisUnit}, each point the amount at the ${bin}’s close.`
+        : undefined,
       totals: totals ?? undefined,
     });
   }, [reportKey, busy, hatches, words, from, lined, bin, basisUnit, totals]);

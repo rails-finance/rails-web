@@ -30,7 +30,7 @@ export function lifetimeFlowsReadingContent(): LearnMoreContent {
       },
       {
         bold: "The line",
-        text: "Collateral and debt at the close of each day, week or month since the position opened, in the unit named under the chart. A dotted stretch rests on an old or missing price. The marks under it are days with events: a red triangle for a liquidation, an orange one for a redemption or a change the owner did not make, a pink dot for a delegate's rate change, a ring for the owner's, otherwise a dot in the side's colour.",
+        text: "Collateral and debt at the close of each day, week or month since the position opened. The line is in USD, each point valued at that close's price; where the two sides share no price it is in their tokens, as the (i) says. A dotted stretch rests on an old or missing price. The marks under it are days with events: a red triangle for a liquidation, an orange one for a redemption or a change the owner did not make, a pink dot for a delegate's rate change, a ring for the owner's, otherwise a dot in the side's colour.",
       },
       {
         bold: "The cursor",
@@ -2288,13 +2288,7 @@ function marketNoteLead(noun: string): string {
 
 /** The protocols a price-gap note is built for; the modal is that protocol's
  *  price move, with that protocol's own docs. */
-export type PriceGapProtocol =
-  | "liquity-v2"
-  | "liquity-fork"
-  | "aave-v4"
-  | "aave-v3"
-  | "spark"
-  | "alchemix-v3";
+export type PriceGapProtocol = "liquity-v2" | "liquity-fork" | "aave-v4" | "aave-v3" | "spark" | "alchemix-v3";
 
 export function marketNotePriceGapContent(protocol: PriceGapProtocol): LearnMoreContent {
   switch (protocol) {

@@ -94,7 +94,6 @@ import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-
 import { SECTION_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
 import {
-  FlowsBasis,
   FlowsKey,
   FlowsKeyContext,
   FlowsLedgerNoteContext,
@@ -1191,7 +1190,6 @@ function AaveV4SpokeTowerBlock({
               for the breakdown figures. */}
           <ProvenanceInfoTabs
             label="Lifetime flows explanation"
-            rowExtra={flowTimeline != null && flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
             explanation={
               <div className="space-y-2 text-sm text-rb-500">
                 {/* Value-bearing narration of the tower legend — a one-line lead
@@ -1268,6 +1266,12 @@ function AaveV4SpokeTowerBlock({
                       A total of {gasEth.toFixed(4)} ETH (${gasUsd.toFixed(2)}) has been spent on gas fees across these
                       transactions — each event&apos;s own gas is in its footnote below.
                     </span>
+                  </div>
+                )}
+                {flowTimeline != null && flowsKey?.basis && (
+                  <div className="flex items-start gap-2 leading-relaxed" data-flow-basis="">
+                    <span className="select-none text-rb-500">•</span>
+                    <span>{flowsKey.basis}</span>
                   </div>
                 )}
                 {flowTimeline != null && flowsKey?.lines?.length ? (
