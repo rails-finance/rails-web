@@ -774,6 +774,10 @@ trove_words:
     Accrued interest — the interest built up on the trove’s debt since its last change.
   prov_mgmt_fee: |-
     Accrued delegate fee — the delegate’s management fee built up on the trove’s debt since its last change. It is charged on top of the interest.
+  field_accrued_interest: |-
+    accrued interest
+  field_accrued_fee: |-
+    accrued batch management fee
   prov_mgmt_rate: |-
     Delegate management rate — the delegate’s annual fee, charged on top of the interest rate. The delegate sets one rate for every trove in the batch.
   prov_mgmt_rate_via: |-

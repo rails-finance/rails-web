@@ -341,13 +341,13 @@ function buildOpenItems({
     kind: "chain",
     summary: troveWords("prov_accrued"),
     contract: tmContract,
-    via: stateOriginVia(isLive, "accrued interest"),
+    via: stateOriginVia(isLive, troveWords("field_accrued_interest")),
   };
   const mgmtFeeProv: Provenance = {
     kind: "chain",
     summary: troveWords("prov_mgmt_fee"),
     contract: tmContract,
-    via: stateOriginVia(isLive, "accrued batch management fee"),
+    via: stateOriginVia(isLive, troveWords("field_accrued_fee")),
   };
   const collProv = fp.coll;
   const rateProv = fp.rate;
