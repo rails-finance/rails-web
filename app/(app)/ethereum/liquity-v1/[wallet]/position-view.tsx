@@ -73,7 +73,6 @@ import {
   useLiquityV1FlowReads,
   useLiquityV1Surplus,
 } from "@/lib/liquity-v1/use-event-read";
-import { LiquityV1LivesLine, liquityV1Lives } from "@/components/protocol/liquity-v1/liquity-v1-lives-line";
 import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
@@ -392,8 +391,6 @@ export default function LiquityV1TroveView({
           ? (surplus?.surplus ?? redemptionSplit(lastRow.context.data)?.ethSurplus ?? null)
           : null;
 
-  // The wallet's other Trove lives, for the card's line linking them.
-  const lives = useMemo(() => (summaries.length > 1 ? liquityV1Lives(summaries, events) : []), [summaries, events]);
   // How the timeline's events divide: the owner's own rows, the redemptions,
   // the liquidation and the surplus claim. Only a page holding the whole
   // history can count them.
@@ -551,11 +548,6 @@ export default function LiquityV1TroveView({
                 surplus={surplus}
                 priceUsd={priceNow}
                 endedBy={lastRow ? endedBy : null}
-                lives={
-                  selectedEpoch != null ? (
-                    <LiquityV1LivesLine wallet={wallet} lives={lives} epoch={selectedEpoch} />
-                  ) : undefined
-                }
                 // Closed by default, remembered per viewer and Trove (ui-jobs
                 // 209). The collateral ratio from the live read is the third
                 // headline; the liquidation price, its bar, the redemption queue,

@@ -68,7 +68,6 @@ export function LiquityV1PositionCard({
   surplus,
   priceUsd,
   endedBy,
-  lives,
   disclosureKey,
   risk,
 }: {
@@ -80,8 +79,6 @@ export function LiquityV1PositionCard({
   /** The third headline from the page's live read: the collateral ratio and
    *  its opened-layer lines. Omitted until the read lands, and on a listing. */
   risk?: { value: React.ReactNode; detail?: React.ReactNode };
-  /** The line naming the wallet's other Trove lives, under the stats. */
-  lives?: React.ReactNode;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row (the detail page
    *  passes the compact liquidation runway). */
@@ -226,7 +223,6 @@ export function LiquityV1PositionCard({
             )
           }
         />
-        {lives}
       </PositionCardShell>
     );
   }
@@ -310,7 +306,6 @@ export function LiquityV1PositionCard({
             : []),
         ]}
       />
-      {lives}
     </PositionCardShell>
   );
 }
