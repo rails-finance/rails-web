@@ -47,8 +47,8 @@ export interface OpenPositionStatsProps {
    *  Opt-in: the summary face (TO-DO-position-card 270), whose nine-digit headlines
    *  collide two to a row at 390px. */
   stackOnPhone?: boolean;
-  /** The right-hand panel (TO-DO-position-card 322, `PositionCardPanel`):
-   *  beside the key values from lg, under them below it. */
+  /** The inset panel (TO-DO-position-card 322, `PositionCardPanel`), beneath
+   *  the headline row and across its width. */
   panel?: ReactNode;
 }
 
@@ -62,7 +62,9 @@ const GRID_WITHOUT_ICONS: Record<number, string> = {
   1: "grid grid-cols-1 gap-4",
   2: "grid grid-cols-2 sm:grid-cols-2 gap-4",
   3: "grid grid-cols-2 sm:grid-cols-3 gap-4",
-  4: "grid grid-cols-2 sm:grid-cols-4 gap-4",
+  // Four headlines go two by two until lg: four large figures do not fit a
+  // row narrower than that.
+  4: "grid grid-cols-2 lg:grid-cols-4 gap-4",
 };
 
 export function OpenPositionStats({
@@ -101,47 +103,37 @@ export function OpenPositionStats({
         {/* The card's ⋮ at the top right of the header, whatever wraps beside it. */}
         {menu && <span className="-my-1 flex shrink-0 items-center">{menu}</span>}
       </PositionCardHeader>
-      {/* With a panel: the key values take the left, the panel the right — half
-          each beside two keys, a narrower column beside three. */}
-      <div
-        className={
-          panel
-            ? `grid gap-4 lg:items-center ${visibleCount <= 2 ? "lg:grid-cols-2" : "lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.4fr)]"}`
-            : "contents"
-        }
-      >
-        <PositionCardRegion className={gridClass} anatomy="C10">
-          {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
-          {columns.map((col, i) => {
-            if (!col) return <div key={`empty-${i}`} className="hidden sm:block" />;
-            // Single-visible-column 3-col layouts span both mobile cells so the
-            // value isn't stranded next to a phantom slot; multi-column layouts
-            // keep the original 3-cols-spanning-last behaviour.
-            const spanLast = !stackOnPhone && visibleCount === 3 && i === columns.length - 1;
-            return (
-              <PositionCardRow
-                key={col.label || `col-${i}`}
-                index={i}
-                label={col.label}
-                labelTip={col.labelTip}
-                headerIcon={col.headerIcon}
-                className={spanLast ? "col-span-2 sm:col-span-1" : undefined}
-              >
-                {col.assetIcons ? (
-                  <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
-                    {col.value}
-                    {col.assetIcons}
-                  </div>
-                ) : (
-                  col.value
-                )}
-                {col.footnote}
-              </PositionCardRow>
-            );
-          })}
-        </PositionCardRegion>
-        {panel}
-      </div>
+      <PositionCardRegion className={gridClass} anatomy="C10">
+        {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
+        {columns.map((col, i) => {
+          if (!col) return <div key={`empty-${i}`} className="hidden sm:block" />;
+          // Single-visible-column 3-col layouts span both mobile cells so the
+          // value isn't stranded next to a phantom slot; multi-column layouts
+          // keep the original 3-cols-spanning-last behaviour.
+          const spanLast = !stackOnPhone && visibleCount === 3 && i === columns.length - 1;
+          return (
+            <PositionCardRow
+              key={col.label || `col-${i}`}
+              index={i}
+              label={col.label}
+              labelTip={col.labelTip}
+              headerIcon={col.headerIcon}
+              className={spanLast ? "col-span-2 sm:col-span-1" : undefined}
+            >
+              {col.assetIcons ? (
+                <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
+                  {col.value}
+                  {col.assetIcons}
+                </div>
+              ) : (
+                col.value
+              )}
+              {col.footnote}
+            </PositionCardRow>
+          );
+        })}
+      </PositionCardRegion>
+      {panel}
     </div>
   );
 }

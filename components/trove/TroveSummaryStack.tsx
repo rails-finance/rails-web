@@ -125,22 +125,28 @@ export function TroveSummaryStack({
   ) : null;
   const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
 
-  // The right-hand panel (TO-DO-position-card 322), after the card's
-  // Liquidates at and Interest rate rows: label and value rows only.
-  const panelRows: PositionPanelRow[] | undefined =
+  // The inset panel (TO-DO-position-card 322): the queue on the left, the
+  // yearly cost on the right, where the card adds Liquidates at.
+  const panelColumns: [PositionPanelRow[], PositionPanelRow[]] | undefined =
     positionSummary && showBand
       ? [
-          { id: "costs", label: "Costs per year", value: <TroveDetailsBand {...bandProps} part="costs" bare /> },
-          { id: "debt-in-front", label: "Debt in front", value: <TroveDetailsBand {...bandProps} part="queue" bare /> },
-          ...(trovesAhead != null
-            ? [
-                {
-                  id: "troves-in-front",
-                  label: "Troves in front",
-                  value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
-                },
-              ]
-            : []),
+          [
+            {
+              id: "debt-in-front",
+              label: "Debt in front",
+              value: <TroveDetailsBand {...bandProps} part="queue" bare />,
+            },
+            ...(trovesAhead != null
+              ? [
+                  {
+                    id: "troves-in-front",
+                    label: "Troves in front",
+                    value: <TroveDetailsBand {...bandProps} part="ahead" bare />,
+                  },
+                ]
+              : []),
+          ],
+          [{ id: "costs", label: "Costs per year", value: <TroveDetailsBand {...bandProps} part="costs" bare /> }],
         ]
       : undefined;
 
@@ -175,7 +181,7 @@ export function TroveSummaryStack({
       positionSummary={positionSummary}
       headerSet={!!positionSummary}
       cardMenu={cardMenu}
-      panelRows={panelRows}
+      panelColumns={panelColumns}
       footer={
         loadingStatus?.message ? (
           <div className="flex justify-end mt-3">

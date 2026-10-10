@@ -1,9 +1,8 @@
-// The position card's right-hand panel (rails-ops TO-DO-position-card 322):
-// the additive values as label and value rows in a bordered panel beside the
-// key values. Always shown. Beside two key values it takes two columns of rows,
-// beside three it narrows to one; below lg it stacks under the key values at
-// full width. The listing card (324) shows the top rows as one line instead
-// (`PositionPanelSummary`).
+// The position card's inset panel (rails-ops TO-DO-position-card 322): the
+// additive values as label and value rows, in two columns beneath the
+// headline row and across its width. Below sm the columns stack, the left
+// column first. One size and weight for every row: labels muted, values in
+// the foreground, no charts. The listing card has no panel (324).
 
 import type { ReactNode } from "react";
 
@@ -14,18 +13,17 @@ export interface PositionPanelRow {
   value: ReactNode;
 }
 
-export function PositionCardPanel({ rows, columns = 1 }: { rows: PositionPanelRow[]; columns?: 1 | 2 }) {
-  if (rows.length === 0) return null;
-  const half = Math.ceil(rows.length / 2);
-  const groups = columns === 2 ? [rows.slice(0, half), rows.slice(half)] : [rows];
+export function PositionCardPanel({ columns }: { columns: [PositionPanelRow[], PositionPanelRow[]] }) {
+  const filled = columns.filter((c) => c.length > 0);
+  if (filled.length === 0) return null;
   return (
     <div
-      className={`rounded-xl bg-rb-200/50 px-4 py-3 dark:bg-white/[0.04] ${columns === 2 ? "grid gap-x-8 gap-y-1.5 sm:grid-cols-2" : ""}`}
+      className="mt-4 grid gap-x-10 gap-y-1.5 rounded-xl bg-rb-200/50 px-4 py-3 text-sm dark:bg-white/[0.04] sm:grid-cols-2"
       data-position-panel=""
       data-anatomy="C18"
     >
-      {groups.map((group, g) => (
-        <dl key={g} className="grid text-sm grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-1.5">
+      {filled.map((group, g) => (
+        <dl key={g} className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-1.5">
           {group.map((r) => (
             <div key={r.id} className="contents" data-panel-row={r.id}>
               <dt className="text-rb-500">{r.label}</dt>
@@ -33,23 +31,6 @@ export function PositionCardPanel({ rows, columns = 1 }: { rows: PositionPanelRo
             </div>
           ))}
         </dl>
-      ))}
-    </div>
-  );
-}
-
-/** The listing card's panel (324): its top rows on one line. */
-export function PositionPanelSummary({ rows }: { rows: { id: string; label: string; value: ReactNode }[] }) {
-  if (rows.length === 0) return null;
-  return (
-    <div
-      className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-rb-500"
-      data-position-panel-summary=""
-    >
-      {rows.map((r) => (
-        <span key={r.id} className="tabular-nums" data-panel-row={r.id}>
-          {r.label} <span className="text-foreground">{r.value}</span>
-        </span>
       ))}
     </div>
   );

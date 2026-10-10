@@ -30,11 +30,7 @@ import { OpenPositionStats } from "@/components/shared/open-position-stats";
 import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
 import { PositionCardMeta } from "@/components/shared/position-card-meta";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
-import {
-  PositionCardPanel,
-  PositionPanelSummary,
-  type PositionPanelRow,
-} from "@/components/shared/position-card-panel";
+import { PositionCardPanel, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -453,7 +449,7 @@ export function LiquityPositionCard({
   onExplanationToggle,
   surplus,
   positionSummary,
-  panelRows,
+  panelColumns,
   debtDetail,
   riskDetail,
   headerSet = false,
@@ -487,9 +483,9 @@ export function LiquityPositionCard({
   /** The "Position summary" heading (TO-DO-position-card 270), forwarded to
    *  `PositionCardShell`. */
   positionSummary?: boolean;
-  /** Panel rows from the page's live read, after Liquidates at and Interest
-   *  rate (TO-DO-position-card 322): the yearly cost, the debt in front. */
-  panelRows?: PositionPanelRow[];
+  /** The inset panel's two columns from the page's live read
+   *  (TO-DO-position-card 322); the card adds Liquidates at to the right one. */
+  panelColumns?: [PositionPanelRow[], PositionPanelRow[]];
   /** Off the `headerSet` face (the forks, until 323): lines under Debt from
    *  the page's live read (the yearly cost, the redemption queue). */
   debtDetail?: ReactNode;
@@ -498,9 +494,9 @@ export function LiquityPositionCard({
   /** The card face of TO-DO-position-card 270 and 322, on Liquity V2 first:
    *  a status tag only for an ended Trove and the delegate flag, no asset
    *  names or IDs in the header, `cardMenu` at its right end, USD under each
-   *  asset figure, three key values, and the additive values in the
-   *  right-hand panel. On the listing (no `receipts`, 324) the panel is one
-   *  summary line. */
+   *  asset figure, four headlines (Collateral, Debt, Collateral ratio,
+   *  Interest rate) and the inset panel beneath them. The listing (no
+   *  `receipts`, 324) has no panel. */
   headerSet?: boolean;
   /** The card's ⋮ menu (ToolsMenu `card` variant), at the top right of the
    *  header with `headerSet`. */
@@ -737,8 +733,8 @@ export function LiquityPositionCard({
     );
   }
 
-  // The face of TO-DO-position-card 270 and 322: three key values with USD
-  // under each asset, the additive values in the panel beside them.
+  // The face of TO-DO-position-card 270 and 322: four headlines with USD
+  // under each asset, the additive values in the panel beneath them.
   const face = set || listSet;
   const collUsdLine =
     collUsd !== null && collUsd > 0 ? (
@@ -766,32 +762,16 @@ export function LiquityPositionCard({
       </HighlightableValue>
     </Prov>
   );
-  const panelBase: PositionPanelRow[] = [
-    ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
-    { id: "interest-rate", label: "Interest rate", value: rateValue },
-  ];
-  const panel = set ? <PositionCardPanel rows={[...panelBase, ...(panelRows ?? [])]} /> : undefined;
-  // The listing's panel (324): its top values on one line. The yearly cost is
-  // the Trove's debt at its rate, as the page's panel states it.
-  const yearlyCost = (debt * rate) / 100;
-  const panelSummary = listSet ? (
-    <PositionPanelSummary
-      rows={[
-        ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
-        { id: "interest-rate", label: "Interest rate", value: rateValue },
-        ...(debt > 0
-          ? [
-              {
-                id: "costs",
-                label: "Costs per year",
-                value: (
-                  <>
-                    ~{formatApproximate(yearlyCost)} {cfg.debtSymbol}
-                  </>
-                ),
-              },
-            ]
-          : []),
+  // The inset panel beneath the headlines (Trove page only): the page's
+  // left column, and its right with Liquidates at last.
+  const panel = set ? (
+    <PositionCardPanel
+      columns={[
+        panelColumns?.[0] ?? [],
+        [
+          ...(panelColumns?.[1] ?? []),
+          ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
+        ],
       ]}
     />
   ) : undefined;
@@ -810,7 +790,8 @@ export function LiquityPositionCard({
     >
       {deprecationBanner}
       <OpenPositionStats
-        stackOnPhone={summaryFace}
+        // The face goes two by two on a phone; the old face one per row.
+        stackOnPhone={summaryFace && !face}
         panel={panel}
         // Detail render (receipts): the house grammar's neutral mode-word
         // pill — "Borrowing", or "Zombie" once redeemed below the floor. The
@@ -978,9 +959,29 @@ export function LiquityPositionCard({
               </>
             ),
           },
+          ...(face
+            ? [
+                {
+                  label: "Interest rate",
+                  value: (
+                    <StatValue>
+                      <Prov info={fp.rate}>
+                        <HighlightableValue
+                          type="interestRate"
+                          state="after"
+                          value={rate}
+                          className="text-foreground/80"
+                        >
+                          <FadeNumber value={rate} decimals={2} animateOnMount={animate} />%
+                        </HighlightableValue>
+                      </Prov>
+                    </StatValue>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
-      {panelSummary}
       {footer}
     </PositionCardShell>
   );
