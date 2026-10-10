@@ -281,7 +281,7 @@ export interface InfoTabsDisclosureProps {
    *  rounded box. Unset, the panel register. */
   bare?: boolean;
   /** With `bare`, draw the hairline above the row. Default true; the
-   *  position card has none (TO-DO-position-card 270). */
+   *  position card and the Lifetime Flows panels have none (TO-DO-position-card 270). */
   hairline?: boolean;
   /** Words after the (i) ("Event explanation" on an event card). Set, the
    *  first tab draws as the event card's row (ui-jobs 281, 295): the toggle

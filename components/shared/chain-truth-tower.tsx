@@ -289,6 +289,7 @@ export function ChainTruthTower({
           </div>
           <ProvenanceInfoTabs
             className="mt-3"
+            hairline={false}
             label={`${title} explanation`}
             explanation={explanation}
             learnMore={learnMore}
