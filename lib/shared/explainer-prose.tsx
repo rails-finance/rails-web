@@ -26,7 +26,7 @@
 //     does not exist (it would open the paragraph) is dropped — a continuation
 //     attaches to the previous clause or dies with it.
 
-import { Fragment, isValidElement, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, type ReactNode } from "react";
 import { EXPLAIN_GROUP_RULE, ExplainHeading } from "@/components/shared/explain-groups";
 
 /** The one emphasis helper for explainer copy — the charter §3 highlight rule's
@@ -199,17 +199,22 @@ export function ProseExplainer({
   const hasItems = items != null && items.length > 0;
   const hasList = list != null && list.length > 0;
   if (paragraph == null && !hasItems && !hasList) return null;
+  // Over headed groups the lead is the first group's first bullet, its
+  // closing colon dropped, so nothing sits above the first heading.
+  const runs = hasItems && items.some(isGrouped) ? runsOf(items) : null;
+  const leadInGroup = paragraph != null && runs != null && runs[0].group !== "";
+  if (leadInGroup) runs[0].nodes.unshift(dropTrailingColon(paragraph));
   return (
     <div>
       {/* The lead spaces itself off the bullets (mb-2, matching their space-y-2)
           only when items follow — an items-only event pane keeps the flush top
           described above. */}
-      {paragraph != null && (
+      {paragraph != null && !leadInGroup && (
         <p className={`text-sm leading-relaxed text-rb-500${hasItems ? " mb-2" : ""}`}>{paragraph}</p>
       )}
       {hasItems &&
-        (items.some(isGrouped) ? (
-          runsOf(items).map((run, i) => (
+        (runs ? (
+          runs.map((run, i) => (
             <section
               key={i}
               className={`mt-3 first:mt-0 ${run.group ? EXPLAIN_GROUP_RULE : ""}`}
@@ -239,6 +244,19 @@ export function ProseExplainer({
       )}
     </div>
   );
+}
+
+/** The node with a colon at the end of its last text removed. */
+function dropTrailingColon(node: ReactNode): ReactNode {
+  if (typeof node === "string") return node.replace(/:\s*$/, "");
+  if (Array.isArray(node)) {
+    if (node.length === 0) return node;
+    return [...node.slice(0, -1), dropTrailingColon(node[node.length - 1])];
+  }
+  if (isValidElement<{ children?: ReactNode }>(node) && node.props.children != null) {
+    return cloneElement(node, undefined, dropTrailingColon(node.props.children));
+  }
+  return node;
 }
 
 /** Consecutive items of the same group, each run under its heading. */
