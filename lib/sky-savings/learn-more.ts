@@ -178,7 +178,7 @@ export function skyRateContent(): LearnMoreContent {
 
 export function skyFlowsContent(): LearnMoreContent {
   return {
-    title: "Reading Lifetime Flows for Sky Savings",
+    title: "Reading lifetime flows for Sky Savings",
     intro:
       "Lifetime flows show everything that came into the position and everything that left, with what is still held. A savings position has one side, so it draws one bar.",
     detailsHeading: "Key concepts",

@@ -1058,7 +1058,7 @@ L5:
 
   flows:
     title: |-
-      About the Lifetime Flows
+      About lifetime flows
     intro: |-
       This panel adds up what moved in and out of the Trove over its life, from each of its events.
     stepsHeading: |-

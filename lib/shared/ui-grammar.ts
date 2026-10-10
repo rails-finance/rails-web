@@ -150,8 +150,8 @@ export const PAGE_LINK = "text-xs font-semibold text-blue-500 hover:underline cu
  */
 export const OVERLAY_HEADING = "text-xs uppercase tracking-wider font-bold";
 
-/** A position page's section heading in title case: "Position Summary",
- *  "Lifetime Flows". */
+/** A position page's section heading in sentence case: "Position summary",
+ *  "Lifetime flows". */
 export const SECTION_HEADING = "text-xs font-bold";
 
 /**

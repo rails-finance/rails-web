@@ -103,7 +103,7 @@ export function LifetimeFlowsPanel({
   read,
   explanation,
   learnMore,
-  title = "Lifetime Flows",
+  title = "Lifetime flows",
   collapseKey: collapseKeyProp,
   outcome,
 }: LifetimeFlowsPanelProps) {

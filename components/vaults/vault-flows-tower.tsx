@@ -107,7 +107,7 @@ export function VaultFlowsTower(props: VaultFlowsTowerProps) {
     >
       <ChainTruthTower
         data={data}
-        title="Lifetime Flows"
+        title="Lifetime flows"
         explanation={vaultPositionEconomicsExplanation(data, flows, props, total)}
         learnMore={aaveVaultFlowsContent(props.assetSymbol, props.shareSymbol)}
       />

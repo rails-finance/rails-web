@@ -26,7 +26,7 @@ export function ExplainGroup({
 /** A group's heading: the Lifetime flows pane's, and an event explanation's
  *  where its bullets are grouped (lib/shared/explainer-prose.tsx). */
 export function ExplainHeading({ children }: { children: ReactNode }) {
-  return <h4 className="text-xs font-semibold text-foreground">{children}</h4>;
+  return <h4 className="text-sm font-semibold text-rb-500">{children}</h4>;
 }
 
 export function ExplainBullet({ children, ...rest }: { children: ReactNode } & Record<`data-${string}`, string>) {

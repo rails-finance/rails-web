@@ -1126,7 +1126,7 @@ function AaveV4SpokeTowerBlock({
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
   const title = (
-    <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime Flows</span>
+    <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>
   );
 
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of

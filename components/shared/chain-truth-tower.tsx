@@ -107,7 +107,7 @@ export interface ChainTruthTowerProps {
 
 export function ChainTruthTower({
   data,
-  title = "Lifetime Flows",
+  title = "Lifetime flows",
   explanation,
   learnMore,
   rowExtra,

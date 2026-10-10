@@ -488,7 +488,7 @@ export function aaveV4EconomicsContent(
     });
   }
   return {
-    title: "About Lifetime Flows",
+    title: "About lifetime flows",
     intro:
       "This panel totals every token that has moved into and out of a position over its life, as two towers: collateral on one side, debt on the other.",
     detailsHeading: "Key concepts:",
