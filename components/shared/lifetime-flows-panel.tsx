@@ -19,7 +19,6 @@ import { usePathname } from "next/navigation";
 import { CircleHelp } from "lucide-react";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
-import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { FlowsBasis, FlowsKey, FlowsKeyContext, type FlowsKeyItems } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -30,7 +29,7 @@ import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { useFlowFocusState } from "@/components/shared/flow-focus-context";
 import { LearnMoreModal, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { lifetimeFlowsReadingContent } from "@/lib/shared/learn-more-content";
-import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { CARD_PAD_X, CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
   COLLAPSED_ATTR,
@@ -104,7 +103,7 @@ export function LifetimeFlowsPanel({
   read,
   explanation,
   learnMore,
-  title = "Lifetime flows",
+  title = "Lifetime Flows",
   collapseKey: collapseKeyProp,
   outcome,
 }: LifetimeFlowsPanelProps) {
@@ -178,15 +177,14 @@ export function LifetimeFlowsPanel({
               data-flows-toggle=""
             >
               <span className="flex min-w-0 items-center gap-1.5">
-                <LifetimeFlowsIcon size={14} />
-                <span className={`${OVERLAY_HEADING} truncate`} data-flows-title="">
+                <span className={`${SECTION_HEADING} truncate`} data-flows-title="">
                   {title}
                 </span>
                 <DiscChevron isOpen={!collapsed} />
               </span>
             </button>
           ) : (
-            <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+            <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
           <div className="pointer-events-auto -mr-1 shrink-0">
             <FlowsMenu title={title} />

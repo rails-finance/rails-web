@@ -231,7 +231,7 @@ export function AlchemixV2PositionView({
 
         {/* ── Lifetime flows ─────────────────────────────────────────────── */}
         {economics ? (
-          <ChainTruthTower data={economics} title="Lifetime flows" />
+          <ChainTruthTower data={economics} title="Lifetime Flows" />
         ) : (
           <p className="rounded-md border border-dashed border-rb-300/50 px-4 py-6 text-center text-[11px] leading-relaxed text-rb-400 dark:border-rb-700/50">
             This position has more events than the page draws, so no lifetime totals are given.

@@ -92,7 +92,7 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
             <>
               <ChainTruthTower
                 data={result.data}
-                title="Lifetime flows"
+                title="Lifetime Flows"
                 explanation={liquityEconomicsExplanation(result.economics, result.economics._meta, now)}
                 learnMore={liquityLifetimeFlowsContent({ isBatched: result.economics._meta.isInBatch })}
                 // Stated, not left to default (ui-jobs 61): the hero belongs to

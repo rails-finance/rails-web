@@ -91,9 +91,8 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
-import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import {
   FlowsBasis,
   FlowsKey,
@@ -1128,10 +1127,7 @@ function AaveV4SpokeTowerBlock({
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
   const title = (
-    <span className={`${OVERLAY_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>
-      <LifetimeFlowsIcon size={14} />
-      Lifetime flows
-    </span>
+    <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime Flows</span>
   );
 
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of

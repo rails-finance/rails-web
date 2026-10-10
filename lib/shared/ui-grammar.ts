@@ -150,6 +150,10 @@ export const PAGE_LINK = "text-xs font-semibold text-blue-500 hover:underline cu
  */
 export const OVERLAY_HEADING = "text-xs uppercase tracking-wider font-bold";
 
+/** A position page's section heading in title case: "Position Summary",
+ *  "Lifetime Flows". */
+export const SECTION_HEADING = "text-xs font-bold";
+
 /**
  * Subordinate section label inside a multi-section overlay panel (e.g. the
  * per-dimension headers in a grouped filter-section dropdown). Smaller + muted

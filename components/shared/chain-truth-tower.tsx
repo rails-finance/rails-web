@@ -41,11 +41,10 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import { CTRL_GHOST, CTRL_OFF, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { CTRL_GHOST, CTRL_OFF, SECTION_HEADING } from "@/lib/shared/ui-grammar";
 import {
   COLLAPSE_KEY_ATTR,
   COLLAPSED_ATTR,
@@ -108,7 +107,7 @@ export interface ChainTruthTowerProps {
 
 export function ChainTruthTower({
   data,
-  title = "Lifetime flows",
+  title = "Lifetime Flows",
   explanation,
   learnMore,
   rowExtra,
@@ -227,15 +226,14 @@ export function ChainTruthTower({
             >
               <span className="flex w-full min-w-0 items-center justify-between gap-2">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <LifetimeFlowsIcon size={14} />
-                  <span className={`${OVERLAY_HEADING} truncate`}>{title}</span>
+                  <span className={`${SECTION_HEADING} truncate`}>{title}</span>
                 </span>
                 <ChevronDown size={16} className={collapsed ? "" : "rotate-180"} aria-hidden />
               </span>
             </button>
           ) : (
             <>
-              <span className={`${OVERLAY_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
+              <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
               {/* No corner color key — the flank-table swatches are the one legend
                   (design-grammar rule; neither reference tower carries one). */}
               <div className="pointer-events-auto flex items-center gap-3">

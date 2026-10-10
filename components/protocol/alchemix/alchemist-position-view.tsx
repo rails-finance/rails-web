@@ -884,7 +884,7 @@ export function AlchemistPositionView({
         {economics ? (
           <ChainTruthTower
             data={economics.data}
-            title="Lifetime flows"
+            title="Lifetime Flows"
             explanation={alchemixFlowsExplanation({
               figures: economics.figures,
               syntheticSymbol: sym,

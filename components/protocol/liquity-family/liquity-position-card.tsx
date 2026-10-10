@@ -799,11 +799,12 @@ export function LiquityPositionCard({
         // LISTING render keeps the lifecycle pill, with ZOMBIE standing in
         // for OPEN on a redeemed-down Trove.
         statusPill={
+          // The Trove page names a batch manager under the Interest rate
+          // headline, so its header carries no delegate flag.
           set ? (
-            <>
-              {zombie && tag("Zombie", MUTED_TAG)}
-              {delegateFlag}
-            </>
+            zombie ? (
+              tag("Zombie", MUTED_TAG)
+            ) : undefined
           ) : receipts ? (
             <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
               {zombie ? "Zombie" : "Borrowing"}

@@ -1,7 +1,7 @@
 "use client";
 
 // The position card's summary face (rails-ops TO-DO-position-card 270, 322).
-// A card whose shell is given `positionSummary` draws a "Position summary"
+// A card whose shell is given `positionSummary` draws a "Position Summary"
 // heading over its headline rows. The card has no open or closed state: every
 // line under a headline is drawn, and a card that moves its additive lines into
 // the right-hand panel (322) does so in its layout. The (i) Explanation row
@@ -12,7 +12,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { TipLabel } from "@/components/shared/tip-label";
-import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING } from "@/lib/shared/ui-grammar";
 
 const SummaryContext = createContext(false);
 
@@ -54,7 +54,7 @@ export function PositionCardRow({
   );
 }
 
-/** The card's top row: the "Position summary" heading (`PositionSummaryHeading`)
+/** The card's top row: the "Position Summary" heading (`PositionSummaryHeading`)
  *  on the left, the card's ⋮ or the activity meta at the right end. */
 export function PositionCardHeader({
   className,
@@ -81,12 +81,12 @@ export function PositionCardHeader({
   );
 }
 
-/** The words "Position summary"; nothing on a card without the summary face. */
+/** The words "Position Summary"; nothing on a card without the summary face. */
 export function PositionSummaryHeading() {
   if (!usePositionSummary()) return null;
   return (
-    <h2 className={`${OVERLAY_HEADING} text-rb-500`} data-position-summary="">
-      Position summary
+    <h2 className={`${SECTION_HEADING} text-rb-500`} data-position-summary="">
+      Position Summary
     </h2>
   );
 }
