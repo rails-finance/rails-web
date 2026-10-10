@@ -54,7 +54,7 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
       ? `Collateral held by the trove — the trove's full ${sym} balance as the TroveManager contract reports it now, including any share of liquidated troves' collateral that is waiting to be added to the trove.`
       : `Collateral held by the trove — the ${sym} balance the contract logged at the trove's most recent change.`,
     contract: tmContract,
-    via: stateOriginVia(isLive, "entireColl"),
+    via: stateOriginVia(isLive, "entire collateral"),
     scaling: collScaling,
   };
   const debtProv: Provenance = {
@@ -66,7 +66,7 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
         ? "The trove's debt — the trove's share of its delegate batch's total debt, as the contract logged it at the trove's most recent change. Interest has built up since then."
         : "The trove's debt — the debt the contract logged at the trove's most recent change. Interest has built up since then.",
     contract: tmContract,
-    via: stateOriginVia(isLive, "entireDebt"),
+    via: stateOriginVia(isLive, "entire debt"),
     scaling: debtScaling,
   };
   const rateProv: Provenance = {
@@ -75,7 +75,7 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
     summary:
       "Annual interest rate — the yearly rate the trove pays on its debt. The owner sets it, or the delegate sets it when the trove is in a delegate's batch.",
     contract: tmContract,
-    via: stateOriginVia(isLive, "annualInterestRate"),
+    via: stateOriginVia(isLive, "annual interest rate"),
     scaling: rateScaling,
   };
   // Shared atomic leaves so the collateral-USD and collateral-ratio flows expand
