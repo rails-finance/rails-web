@@ -18,7 +18,7 @@ export function PositionCardPanel({ columns }: { columns: [PositionPanelRow[], P
   if (filled.length === 0) return null;
   return (
     <div
-      className="mt-4 grid gap-x-10 gap-y-1.5 rounded-xl bg-rb-200/50 px-4 py-3 text-sm dark:bg-white/[0.04] sm:grid-cols-2"
+      className="mt-4 grid gap-x-10 gap-y-1.5 rounded-xl bg-background px-4 py-3 text-sm sm:grid-cols-2"
       data-position-panel=""
       data-anatomy="C18"
     >
