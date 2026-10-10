@@ -5,13 +5,18 @@
 
 import type { ReactNode } from "react";
 
+/** A headed group after another in the same pane draws a hairline above its
+ *  heading, 12px either side: the first group has none. */
+export const EXPLAIN_GROUP_RULE =
+  "explain-group [.explain-group~&]:border-t [.explain-group~&]:border-rb-300 [.explain-group~&]:pt-3 dark:[.explain-group~&]:border-rb-700";
+
 export function ExplainGroup({
   title,
   children,
   ...rest
 }: { title: string; children: ReactNode } & Record<`data-${string}`, string | undefined>) {
   return (
-    <section className="mt-3 first:mt-0" {...rest}>
+    <section className={`mt-3 first:mt-0 ${EXPLAIN_GROUP_RULE}`} {...rest}>
       <ExplainHeading>{title}</ExplainHeading>
       <ul className="mt-1 space-y-1 text-sm leading-snug text-rb-500">{children}</ul>
     </section>

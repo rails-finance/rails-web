@@ -27,7 +27,7 @@
 //     attaches to the previous clause or dies with it.
 
 import { Fragment, isValidElement, type ReactNode } from "react";
-import { ExplainHeading } from "@/components/shared/explain-groups";
+import { EXPLAIN_GROUP_RULE, ExplainHeading } from "@/components/shared/explain-groups";
 
 /** The one emphasis helper for explainer copy — the charter §3 highlight rule's
  *  render form (semibold + foreground tone against the muted body). Wrap a
@@ -210,7 +210,11 @@ export function ProseExplainer({
       {hasItems &&
         (items.some(isGrouped) ? (
           runsOf(items).map((run, i) => (
-            <section key={i} className="mt-3 first:mt-0" data-explain-group={run.group}>
+            <section
+              key={i}
+              className={`mt-3 first:mt-0 ${run.group ? EXPLAIN_GROUP_RULE : ""}`}
+              data-explain-group={run.group}
+            >
               {run.group && <ExplainHeading>{run.group}</ExplainHeading>}
               <div className={run.group ? "mt-1" : undefined}>
                 <Bullets items={run.nodes} />
