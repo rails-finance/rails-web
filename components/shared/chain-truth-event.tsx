@@ -27,6 +27,7 @@
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { Fragment, useContext, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
@@ -338,9 +339,9 @@ function PageMeta({ timestamp, counter }: { timestamp: number; counter: ReactNod
       <span className="text-xs">
         {shortDate(timestamp)} {shortDateYear(timestamp)}
       </span>
-      <span className="text-xs text-rb-500" title={`${formatDate(timestamp)} ${time} UTC`}>
+      <RevealTip tip={`${formatDate(timestamp)} ${time} UTC`} className="text-xs text-rb-500">
         {time}
-      </span>
+      </RevealTip>
       {counter}
     </span>
   );

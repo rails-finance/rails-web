@@ -6,6 +6,8 @@
 // asks again. A figure the chain can never give is a coverage `{ why }`, and says
 // why in its own words.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
+
 /** A figure the chain did not answer for. `title` is the hover line; the
  *  default fits any figure, and a caller names the figure where it can.
  *  `inline` lowercases the words for use inside a sentence. */
@@ -19,8 +21,14 @@ export function NotLoaded({
   inline?: boolean;
 }) {
   return (
-    <span className={className || undefined} title={title}>
-      {inline ? "not loaded" : "Not loaded"}
+    <span className={className || undefined}>
+      {title ? (
+        <RevealTip tip={title}>{inline ? "not loaded" : "Not loaded"}</RevealTip>
+      ) : inline ? (
+        "not loaded"
+      ) : (
+        "Not loaded"
+      )}
     </span>
   );
 }
@@ -31,12 +39,14 @@ export function NotLoaded({
  *  amount. The full address, where the row carries one, rides the hover line. */
 export function TokenAmountNotLoaded({ address, label }: { address?: string; label: string }) {
   return (
-    <span
+    <RevealTip
+      tip={`${address || label}: the chain didn't answer for this token's decimals. The amount shows once it does.`}
       className="text-rb-500"
-      title={`${address || label}: the chain didn't answer for this token's decimals. The amount shows once it does.`}
     >
-      Not loaded <span className="font-mono text-sm font-normal">{label}</span>
-    </span>
+      <span>
+        Not loaded <span className="font-mono text-sm font-normal">{label}</span>
+      </span>
+    </RevealTip>
   );
 }
 

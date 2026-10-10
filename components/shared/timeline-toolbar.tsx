@@ -14,6 +14,7 @@
 // in the position card's Explanation pane now, not here — see `CopyViewLink`
 // in `provenance-info-tabs.tsx`.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
 import { CalendarRange, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
@@ -854,9 +855,13 @@ export function TimelineToolbar({
             data-anatomy="L1.2"
             className="inline-flex items-center gap-2 basis-full sm:basis-auto whitespace-nowrap"
           >
-            <span className="text-xs text-rb-500 tabular-nums" title={countTooltip}>
-              {countLine}
-            </span>
+            {countTooltip ? (
+              <RevealTip tip={countTooltip} className="text-xs text-rb-500 tabular-nums">
+                {countLine}
+              </RevealTip>
+            ) : (
+              <span className="text-xs text-rb-500 tabular-nums">{countLine}</span>
+            )}
           </span>
           {tl.eventOptions.length > 1 && (
             <FilterDropdown

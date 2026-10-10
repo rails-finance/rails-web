@@ -1,5 +1,6 @@
 "use client";
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { createContext, useContext, type ReactNode } from "react";
 import { formatDate } from "@/lib/date";
 import { formatTimestamp } from "@/lib/shared/format-event";
@@ -38,9 +39,9 @@ export function EventTime({ ts }: { ts: number }) {
   return (
     <>
       {mark ? <>{mark} </> : datePrefix && <span className="text-xs">{datePrefix} </span>}
-      <span className="text-xs text-rb-500" title={`${formatDate(ts)} ${time} UTC`}>
+      <RevealTip tip={`${formatDate(ts)} ${time} UTC`} className="text-xs text-rb-500">
         {time}
-      </span>
+      </RevealTip>
     </>
   );
 }

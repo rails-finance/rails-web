@@ -27,6 +27,7 @@
 //
 // No colour of Rails's own choosing: the paper/dark tokens the rows use.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { useState } from "react";
 import { EventCard } from "@/components/shared/event-card";
 import { SpineColumn } from "@/components/shared/spine-column";
@@ -271,10 +272,12 @@ export function TimelineBoundaryCard({ boundary: b, protocolKey, csvExport, isLa
               return (
                 <div key={`${i}:${l.label}`} className="contents">
                   <dt className="text-rb-500">{l.label}</dt>
-                  <dd className="text-foreground" title={f.title}>
-                    {v < 0 ? "−" : ""}
-                    {f.display}
-                    {l.unit ? ` ${l.unit}` : ""}
+                  <dd className="text-foreground">
+                    <RevealTip tip={f.title}>
+                      {v < 0 ? "−" : ""}
+                      {f.display}
+                      {l.unit ? ` ${l.unit}` : ""}
+                    </RevealTip>
                   </dd>
                 </div>
               );

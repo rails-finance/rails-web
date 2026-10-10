@@ -1,3 +1,4 @@
+import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 
 interface StatValueProps {
@@ -28,10 +29,9 @@ export function StatValue({
   return (
     <div
       className={`text-2xl lg:text-3xl font-bold tabular-nums mt-2 ${color}${className ? ` ${className}` : ""}`}
-      title={title}
       data-figure={figure}
     >
-      {children}
+      {title ? <RevealTip tip={title}>{children}</RevealTip> : children}
     </div>
   );
 }
@@ -45,8 +45,8 @@ interface StatFootnoteProps {
 
 export function StatFootnote({ children, color = "text-rb-500", bold, title }: StatFootnoteProps) {
   return (
-    <div className={`text-xs mt-0.5 ${color}${bold ? " font-medium" : ""}`} title={title}>
-      {children}
+    <div className={`text-xs mt-0.5 ${color}${bold ? " font-medium" : ""}`}>
+      {title ? <RevealTip tip={title}>{children}</RevealTip> : children}
     </div>
   );
 }

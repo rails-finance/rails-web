@@ -9,6 +9,7 @@
 // where it restates the standing value, and a derived cell's heading following
 // its inputs (ui-jobs 243).
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { useContext, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
@@ -173,9 +174,9 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
       {v.icons.map((a) => {
         const mark = (
-          <span title={a.title}>
+          <RevealTip tip={a.title} label={a.title}>
             <TokenChipIcon symbol={a.symbol} address={a.address} size={16} filterable={false} />
-          </span>
+          </RevealTip>
         );
         return a.info ? (
           <Prov key={a.address ?? a.symbol} info={a.info} value={a.value}>
@@ -237,7 +238,7 @@ function Cell({ cell, heading }: { cell: EventCellSpec; heading: boolean }) {
       {s.content}
     </StatSubline>
   ));
-  const label = cell.tip ? <span title={cell.tip}>{cell.label}</span> : cell.label;
+  const label = cell.tip ? <RevealTip tip={cell.tip}>{cell.label}</RevealTip> : cell.label;
   const data =
     cell.figure || cell.data ? { ...cell.data, ...(cell.figure ? { "data-figure": cell.figure } : {}) } : undefined;
   const value = (node: ReactNode) => (cell.figure ? <div data-figure-value="">{node}</div> : node);

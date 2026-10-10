@@ -24,6 +24,7 @@
 // of that table on purpose: the `protocol` prop selects both the config row
 // and the OPS lookup below.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import { AlertTriangle, Users } from "lucide-react";
 import { OpenPositionStats } from "@/components/shared/open-position-stats";
@@ -591,12 +592,13 @@ export function LiquityPositionCard({
   ) : undefined;
   const delegateFlag = v.isBatched && v.status === "open" && (
     // Delegate marker: the name is in the Explanation; pink marks an outside party.
-    <span
-      className="inline-flex items-center text-pink-500/90"
-      title={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+    <RevealTip
+      tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+      label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+      className="text-pink-500/90"
     >
       <Users className="w-3.5 h-3.5" aria-hidden="true" />
-    </span>
+    </RevealTip>
   );
   const tag = (word: string, cls: string) => (
     <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${cls}`} data-anatomy="C6">
@@ -846,12 +848,14 @@ export function LiquityPositionCard({
               {/* Delegate marker — name lives in the row below the card, the
                 pink icon here is just a status flag (pink = external party). */}
               {v.isBatched && (
-                <span
-                  className="inline-flex items-center text-pink-500/90"
-                  title={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+                <RevealTip
+                  tip={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+                  label={v.batch?.managerName ? `Delegate: ${v.batch.managerName}` : "Delegate-managed"}
+                  focusable
+                  className="text-pink-500/90 focus-ring rounded-sm"
                 >
                   <Users className="w-3.5 h-3.5" aria-hidden="true" />
-                </span>
+                </RevealTip>
               )}
             </>
           )
@@ -982,16 +986,32 @@ export function LiquityPositionCard({
                   // A rate a batch manager sets: who sets it, in the slot the
                   // USD line takes under the asset figures.
                   footnote: v.isBatched ? (
-                    <div
-                      className="text-xs mt-0.5 min-h-[1rem] flex items-center gap-1 text-rb-500"
-                      data-rate-manager=""
-                      title={v.batch?.managerAddress ? `Batch manager ${v.batch.managerAddress}` : undefined}
-                    >
-                      <span className="text-pink-500/90" aria-hidden="true">
-                        <UsersGlyph />
-                      </span>
-                      {v.batch?.managerName ??
-                        (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager")}
+                    <div className="text-xs mt-0.5 min-h-[1rem] text-rb-500" data-rate-manager="">
+                      {(() => {
+                        const name =
+                          v.batch?.managerName ??
+                          (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager");
+                        const inner = (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-pink-500/90" aria-hidden="true">
+                              <UsersGlyph />
+                            </span>
+                            {name}
+                          </span>
+                        );
+                        return v.batch?.managerAddress ? (
+                          <RevealTip
+                            tip={`Batch manager ${v.batch.managerAddress}`}
+                            label={`${name}, batch manager ${v.batch.managerAddress}`}
+                            focusable={!!receipts}
+                            className="focus-ring rounded-sm"
+                          >
+                            {inner}
+                          </RevealTip>
+                        ) : (
+                          inner
+                        );
+                      })()}
                     </div>
                   ) : undefined,
                 },

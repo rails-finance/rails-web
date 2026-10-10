@@ -11,6 +11,7 @@
 // view that never resolves; the wallet joins it when the page knows it (an
 // id-keyed page learns its owner from the position read).
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { useEffect, useState, type ReactNode } from "react";
 import { WalletPill } from "@/components/shared/wallet-pill";
@@ -61,9 +62,16 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
   const w = addressKindWords(kind);
   return (
     // Gives way before the address does (shrink-[100]).
-    <span className="min-w-0 shrink-[100] truncate" data-address-kind={kind.kind} title={w.tip}>
-      {w.label}
-    </span>
+    <RevealTip
+      tip={<span className="block w-72 whitespace-normal">{w.tip}</span>}
+      label={`${w.label}. ${w.tip}`}
+      focusable
+      className="min-w-0 shrink-[100] focus-ring rounded-sm"
+    >
+      <span className="truncate" data-address-kind={kind.kind}>
+        {w.label}
+      </span>
+    </RevealTip>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import { useState } from "react";
 import { Image as ImageIcon, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
@@ -82,12 +83,11 @@ export function TroveIdentityRow({
           <>
             {isLastOwner && <span className="text-rb-400">last owner</span>}
             <Facehash address={ownerAddress} size={16} />
-            <span
-              className={name ? "max-w-[15ch] truncate" : "font-mono"}
-              title={name ? `${name} · ${ownerAddress}` : ownerAddress}
-            >
-              {name ?? `${ownerAddress.slice(0, 6)}…${ownerAddress.slice(-4)}`}
-            </span>
+            <RevealTip tip={name ? `${name} · ${ownerAddress}` : ownerAddress} className="min-w-0">
+              <span className={name ? "max-w-[15ch] truncate" : "font-mono"}>
+                {name ?? `${ownerAddress.slice(0, 6)}…${ownerAddress.slice(-4)}`}
+              </span>
+            </RevealTip>
           </>
         ) : (
           troveLabel && (
@@ -116,9 +116,9 @@ export function TroveIdentityRow({
         // owner-filtered listing is its `filterProtocol` link.
         <span className={`inline-flex items-center gap-1 ${isLastOwner ? "opacity-70" : ""}`}>
           {isLastOwner && (
-            <span className="text-rb-400" title="Last owner (trove closed)">
+            <RevealTip tip="Last owner (trove closed)" focusable className="text-rb-400 focus-ring rounded-sm">
               last owner
-            </span>
+            </RevealTip>
           )}
           <WalletPill
             wallet={ownerAddress}
