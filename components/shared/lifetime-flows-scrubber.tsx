@@ -5,7 +5,7 @@
 // reference/lifetime-flows-scrubber.md). The two headline figures share one
 // row over the bars; the axis's labels sit once, under the last bar, and its
 // gridlines run behind both. Solid is what is still there, each kind of exit
-// its own hatch, named in the Key inside the panel's Explanation
+// its own hatch, named in the Key in the "How to read these charts" modal
 // (`FlowsKeyContext`). Every figure is `stateAt(model, stop)` and
 // `assetsAt(model, stop)` (lib/shared/flows-timeline.ts); this file only draws
 // them. On a page that ties the panel to its timeline (flow-focus-context.tsx:
@@ -491,7 +491,7 @@ function SideBlock({
   );
 }
 
-/** The Key, drawn inside the panel's Explanation: the hatches the bars
+/** The Key, drawn in the "How to read these charts" modal: the hatches the bars
  *  draw, by name, for each kind of exit the position has had over its life.
  *  The segments' tips carry the figures. Where the position has other stops,
  *  the dashed outline too: where each bar ends at the last stop. */

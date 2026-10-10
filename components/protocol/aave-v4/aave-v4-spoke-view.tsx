@@ -1274,10 +1274,12 @@ function AaveV4SpokeTowerBlock({
                     <span>{flowsKey.basis}</span>
                   </div>
                 )}
-                {flowTimeline != null && flowsKey?.lines?.length ? (
-                  <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
-                ) : null}
                 <LearnMore
+                  extra={
+                    flowTimeline != null && flowsKey?.lines?.length ? (
+                      <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
+                    ) : undefined
+                  }
                   content={aaveV4EconomicsContent({
                     supplyInterest: totals.supplyInterestUsd > 0.01,
                     liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,

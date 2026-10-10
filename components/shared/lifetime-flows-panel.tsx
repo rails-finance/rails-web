@@ -70,7 +70,7 @@ const READING = lifetimeFlowsReadingContent();
 /** The ⋮ at the header's right end (ui-jobs 295): How to read these charts,
  *  one text on every explorer (§264), in the modal the "?" opened; then "Show
  *  provenance", which arms the inspector on this panel alone (ui-jobs 284). */
-function FlowsMenu({ title }: { title: string }) {
+function FlowsMenu({ title, flowsKey }: { title: string; flowsKey: FlowsKeyItems | null }) {
   const [reading, setReading] = useState(false);
   return (
     <>
@@ -93,7 +93,15 @@ function FlowsMenu({ title }: { title: string }) {
           />
         )}
       </ToolsMenu>
-      {reading && <LearnMoreModal content={READING} onClose={() => setReading(false)} anatomy="F16" />}
+      {reading && (
+        <LearnMoreModal
+          content={READING}
+          onClose={() => setReading(false)}
+          anatomy="F16"
+          // This position's key under the shared text; none while the chart has not drawn.
+          extra={flowsKey ? <FlowsKey {...flowsKey} /> : undefined}
+        />
+      )}
     </>
   );
 }
@@ -187,7 +195,7 @@ export function LifetimeFlowsPanel({
             <span className={`${SECTION_HEADING} pointer-events-auto min-w-0 text-rb-500`}>{title}</span>
           )}
           <div className="pointer-events-auto -mr-1 shrink-0">
-            <FlowsMenu title={title} />
+            <FlowsMenu title={title} flowsKey={flowsKey} />
           </div>
         </div>
         <div id={bodyId} {...(collapseKey ? { "data-flows-body": "" } : {})}>
@@ -232,7 +240,6 @@ export function LifetimeFlowsPanel({
                           ))}
                         </ExplainGroup>
                       )}
-                      <FlowsKey {...flowsKey} />
                     </>
                   )}
                 </>
