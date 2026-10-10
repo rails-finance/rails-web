@@ -34,6 +34,7 @@ import { PositionCardPanel, type PositionPanelRow } from "@/components/shared/po
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { UsersGlyph } from "@/components/shared/rate-pill";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { FadeNumber } from "@/components/ui/FadeNumber";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -977,6 +978,21 @@ export function LiquityPositionCard({
                       </Prov>
                     </StatValue>
                   ),
+                  // A rate a batch manager sets: who sets it, in the slot the
+                  // USD line takes under the asset figures.
+                  footnote: v.isBatched ? (
+                    <div
+                      className="text-xs mt-0.5 min-h-[1rem] flex items-center gap-1 text-rb-500"
+                      data-rate-manager=""
+                      title={v.batch?.managerAddress ? `Batch manager ${v.batch.managerAddress}` : undefined}
+                    >
+                      <span className="text-pink-500/90" aria-hidden="true">
+                        <UsersGlyph />
+                      </span>
+                      {v.batch?.managerName ??
+                        (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager")}
+                    </div>
+                  ) : undefined,
                 },
               ]
             : []),
