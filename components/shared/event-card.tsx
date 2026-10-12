@@ -30,6 +30,8 @@ import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
 import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
+import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -284,6 +286,34 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
 
 /* ── EventCard ───────────────────────────────────────────────────────── */
 
+/** Whether the owner the sender test judges against is a key-controlled
+ *  account, read from its code (one cached request per address) only where
+ *  the sender alone decides: no caller, and another address sent the
+ *  transaction. Undefined until known, which judges nothing. */
+function useOwnerIsAccount(sent: SentFacts | undefined): boolean | undefined {
+  const owner = sent?.owner?.toLowerCase();
+  const asks =
+    sent?.ownerIsAccount === undefined &&
+    !sent?.caller &&
+    !!owner &&
+    !!sent?.txFrom &&
+    sent.txFrom.toLowerCase() !== owner;
+  const chainId = sent?.chainId ?? MAINNET_CHAIN_ID;
+  const [kind, setKind] = useState<{ owner: string; account: boolean } | null>(null);
+  useEffect(() => {
+    if (!asks || !owner) return;
+    let live = true;
+    fetchAddressKind(owner, chainId).then((k) => {
+      if (live && k) setKind({ owner, account: k.kind === "account" || k.kind === "delegated" });
+    });
+    return () => {
+      live = false;
+    };
+  }, [asks, owner, chainId]);
+  if (sent?.ownerIsAccount !== undefined) return sent.ownerIsAccount;
+  return kind && kind.owner === owner ? kind.account : undefined;
+}
+
 export function EventCard(props: EventCardProps) {
   const {
     avatar,
@@ -536,7 +566,8 @@ export function EventCard(props: EventCardProps) {
   // Not actioned by the owner (another actor named, a receipt from another
   // account, a transaction another account sent, or the card says so): the
   // spine runs dotted below the node (mobile decision 18; ui-jobs 304).
-  const actedByOwner = byOwner ?? !(by || custody?.dir === "from" || sentByOther(sent));
+  const ownerIsAccount = useOwnerIsAccount(sent);
+  const actedByOwner = byOwner ?? !(by || custody?.dir === "from" || sentByOther(sent && { ...sent, ownerIsAccount }));
   const rowSlot = useMemo(
     () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget, byOwner: actedByOwner }),
     [inTimeline, legsId, rowTarget, actedByOwner],

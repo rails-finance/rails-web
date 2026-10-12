@@ -183,7 +183,8 @@ export function FxEventCard({ event, isLast, eventNumber, blockPeers }: FxEventC
     // force is a known EOA, as f(x)'s verdict is.
     actor: {
       by: extBy ?? undefined,
-      sent: ctx.ownerAtIsContract === false ? { txFrom: ctx.txFrom, owner: ctx.ownerAt } : undefined,
+      sent:
+        ctx.ownerAtIsContract === false ? { txFrom: ctx.txFrom, owner: ctx.ownerAt, ownerIsAccount: true } : undefined,
     },
     cells: isTransfer ? { none: "An ownership transfer moves no balance" } : { pending: FX_HEADS },
     // The Collateral and Debt cells open into their ledgers where the page
