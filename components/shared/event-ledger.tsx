@@ -830,7 +830,8 @@ const WIDE_SIDE = 3;
  *  asset with a row for this event), with a line "Show all N reserves" in the
  *  manner of the dust line, which shows every asset; a wide side the event
  *  did not touch opens on its total and the line alone (Miles, 9 Oct 2026).
- *  The timeline's asset filter narrows the rows to the assets it shows. The
+ *  The state card of a day with no event (`moment`) lists every asset. The
+ *  timeline's asset filter narrows the rows to the assets it shows. The
  *  side's total stands over every asset either way. The choice is not kept
  *  per card. */
 export function AssetLedgers({
@@ -843,6 +844,7 @@ export function AssetLedgers({
   usdShownFor,
   provsFor,
   assetWord = "reserves",
+  moment = false,
 }: {
   side: FlowSide;
   assets: Ledger[];
@@ -857,13 +859,16 @@ export function AssetLedgers({
   provsFor?: (l: Ledger) => LedgerProvs | undefined;
   /** What the side's assets are called in the "Show all" line. */
   assetWord?: string;
+  /** The state card of a day with no event: no asset was touched, and the
+   *  side lists every asset. */
+  moment?: boolean;
 }) {
   const filter = useContext(LedgerAssetFilterContext);
   const [all, setAll] = useState(false);
   const touched = assets.filter((a) => a.rows.some((r) => r.role === "event"));
   const narrowed = filter
     ? assets.filter((a) => a.symbol != null && filter.has(a.symbol))
-    : assets.length >= WIDE_SIDE
+    : assets.length >= WIDE_SIDE && !moment
       ? touched
       : assets;
   // A wide side the event did not touch opens on its total and the line.
