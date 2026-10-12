@@ -50,7 +50,7 @@ import { liquityTroveFaceProv, trovePeakCollProv, trovePeakDebtProv } from "@/li
 import { liquityPositionContent } from "@/lib/shared/learn-more-content";
 import { liquityForkPositionContent } from "@/lib/shared/liquity-fork-position-content";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
-import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiveScaling, forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
 import { forkCollAmount } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkCoords } from "@/lib/shared/liquity-fork-provenance";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
@@ -234,10 +234,11 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
       const { v, live, mcrPct } = ctx;
       const ct = v.collateralType;
       if (live) {
+        const sc = forkLiveScaling(live, ct, cfg.debtSymbol);
         return {
-          coll: vocab.troveStateProv("Collateral", "entireColl", ct),
-          debt: vocab.troveStateProv("Debt", "entireDebt", ct),
-          rate: vocab.liveRateProv(ct, v.isBatched),
+          coll: vocab.troveStateProv("Collateral", "entire collateral", ct, sc.coll),
+          debt: vocab.troveStateProv("Debt", "entire debt", ct, sc.debt),
+          rate: vocab.liveRateProv(ct, v.isBatched, sc.rate),
           collUsd: vocab.forkUsdProv("Collateral", ct),
           cr: vocab.contractIcrProv(ct),
           liq: vocab.liqPriceProv(ct),
@@ -430,6 +431,10 @@ export function liveFromForkChain(c: LiquityForkTroveChainResponse): LiquityTrov
     entireColl: c.entireColl,
     entireDebt: c.entireDebt,
     annualInterestRatePct: c.annualInterestRatePct,
+    entireCollRaw: c.entireCollRaw,
+    entireDebtRaw: c.entireDebtRaw,
+    annualInterestRateRaw: c.annualInterestRateRaw,
+    collDecimals: c.collDecimals,
     priceUsd: c.priceUsd,
     icrPct: c.icr != null ? c.icr * 100 : null,
     status: c.status,

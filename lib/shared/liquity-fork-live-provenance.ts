@@ -29,7 +29,8 @@
 //     one head block, behind the protocol view: the same contracts, read for
 //     the whole roster and its queues rather than a single trove.
 
-import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
+import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
+import { scalingOf } from "@/lib/liquity/event-provenance";
 import { EBISU_BRANCHES, DEBT_SYMBOL as EBISU_DEBT } from "@/lib/ebisu/asset-catalog";
 import { ASYMMETRY_BRANCHES, DEBT_SYMBOL as ASYMMETRY_DEBT } from "@/lib/asymmetry/asset-catalog";
 import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL as BASEDOLLAR_DEBT } from "@/lib/basedollar/asset-catalog";
@@ -158,11 +159,11 @@ function gradeSentence(g: LiquityForkPriceGrade, withFailure = false): string {
 }
 
 export interface LiquityForkLiveVocab {
-  troveStateProv: (what: string, field: string, branchSymbol: string) => Provenance;
+  troveStateProv: (what: string, field: string, branchSymbol: string, scaling?: ProvScaling) => Provenance;
   /** The live rate, with its author named — the generic troveStateProv's
    *  entire-figure sentence (redistribution gains, accrued interest) reads as
    *  nonsense on a RATE, and a batch member's rate is the manager's choice. */
-  liveRateProv: (branchSymbol: string, isBatched: boolean) => Provenance;
+  liveRateProv: (branchSymbol: string, isBatched: boolean, scaling?: ProvScaling) => Provenance;
   contractIcrProv: (branchSymbol: string) => Provenance;
   forkPriceProv: (branchSymbol: string, stale: boolean) => Provenance;
   constantProv: (what: string, name: string, branchSymbol: string) => Provenance;
@@ -227,23 +228,25 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
   });
 
   return {
-    troveStateProv: (what, field, sym) => ({
+    troveStateProv: (what, field, sym, scaling) => ({
       kind: "chain",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
-      summary: `${what} — read live from the ${sym} branch's own TroveManager (getLatestTroveData · ${field}) at the latest block. The ENTIRE figure: pending redistribution gains from liquidations and interest accrued to this moment are included — the branch's own live reckoning, which redemptions shrink without the captured events necessarily showing it.`,
+      summary: `${what} — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): ${field}) at the latest block. The ENTIRE figure: pending redistribution gains from liquidations and interest accrued to this moment are included — the branch's own live reckoning, which redemptions shrink without the captured events necessarily showing it.`,
       contract: tmContract(sym),
-      via: `${LANE_VIA} · TroveManager.getLatestTroveData @ head · ${field}`,
+      via: `${LANE_VIA} · TroveManager.getLatestTroveData(): ${field}`,
+      scaling,
     }),
-    liveRateProv: (sym, isBatched) => ({
+    liveRateProv: (sym, isBatched, scaling) => ({
       kind: "chain",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
       summary: isBatched
-        ? `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData · annualInterestRate) at the latest block. This Trove is a batch member, so the contract serves its batch's CURRENT rate — the rate its interest-batch manager sets for every member, which can differ from the rate on the Trove's own last recorded event.`
-        : `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData · annualInterestRate) at the latest block. The rate the owner set with the Trove's own latest adjustment; it accrues continuously on the recorded debt.`,
+        ? `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): annual interest rate) at the latest block. This Trove is a batch member, so the contract serves its batch's CURRENT rate — the rate its interest-batch manager sets for every member, which can differ from the rate on the Trove's own last recorded event.`
+        : `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): annual interest rate) at the latest block. The rate the owner set with the Trove's own latest adjustment; it accrues continuously on the recorded debt.`,
       contract: tmContract(sym),
-      via: `${LANE_VIA} · TroveManager.getLatestTroveData @ head · annualInterestRate`,
+      via: `${LANE_VIA} · TroveManager.getLatestTroveData(): annual interest rate`,
+      scaling,
     }),
     contractIcrProv: (sym) => ({
       kind: "chain",
@@ -289,8 +292,13 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       via: `${LANE_VIA} · derived ratio`,
       formula: "entire debt × MCR ÷ entire collateral",
       inputs: [
-        { label: "entire debt", kind: "chain", pclass: "state", note: "getLatestTroveData @ head" },
-        { label: "entire collateral", kind: "chain", pclass: "state", note: "getLatestTroveData @ head" },
+        { label: "entire debt", kind: "chain", pclass: "state", note: "getLatestTroveData() at the latest block" },
+        {
+          label: "entire collateral",
+          kind: "chain",
+          pclass: "state",
+          note: "getLatestTroveData() at the latest block",
+        },
         { label: "MCR", kind: "chain", pclass: "state", note: cfg.constantsSource },
       ],
     }),
@@ -544,3 +552,22 @@ export const FORK_DEBT_SYMBOL: Record<string, string> = {
   basedollar: BASEDOLLAR_DEBT,
   "liquity-v2": LIQUITY_V2_DEBT,
 };
+
+/** The scaling sentences behind a fork Trove's live collateral, debt and rate:
+ *  getLatestTroveData's own integers, as the call returns them. Undefined
+ *  where the lane did not deliver an integer. */
+export function forkLiveScaling(
+  raw: { entireCollRaw?: string; entireDebtRaw?: string; annualInterestRateRaw?: string; collDecimals?: number },
+  collSymbol: string,
+  debtSymbol: string,
+): { coll?: ProvScaling; debt?: ProvScaling; rate?: ProvScaling } {
+  const call = (s: ProvScaling | undefined) => (s ? { ...s, from: "call" as const } : undefined);
+  return {
+    coll:
+      raw.collDecimals != null
+        ? call(scalingOf(null, { scale: raw.collDecimals, raw: raw.entireCollRaw }, { token: collSymbol }))
+        : undefined,
+    debt: call(scalingOf(null, { scale: 18, raw: raw.entireDebtRaw }, { token: debtSymbol })),
+    rate: call(scalingOf(null, { scale: 16, raw: raw.annualInterestRateRaw }, "rate")),
+  };
+}
