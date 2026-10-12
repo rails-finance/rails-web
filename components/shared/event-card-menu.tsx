@@ -19,7 +19,20 @@ const WORDS = {
   heading: "Event",
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
+  members: "Its events",
 };
+
+/** One event of a collapsed group, as its row's ⋮ lists it. */
+export interface GroupMemberItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  href: string;
+}
+
+/** A collapsed group's events, newest first, for its row's ⋮
+ *  (rails-ops TO-DO-position-card 326). Null outside a group. */
+export const GroupMembersContext = createContext<GroupMemberItem[] | null>(null);
 
 /** The clipboard write for a text that arrives later (a fetch): a
  *  `ClipboardItem` holding the promise, created inside the click so Safari
@@ -81,6 +94,7 @@ export function EventCardMenu({
 }) {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
+  const members = useContext(GroupMembersContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
 
@@ -88,17 +102,38 @@ export function EventCardMenu({
     <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading}>
       {(close) =>
         groupShow ? (
-          <ToolsMenuItem
-            item="show-group"
-            expanded={false}
-            icon={<ChevronDown size={16} />}
-            title={groupShow.title}
-            subtitle={groupShow.subtitle}
-            onClick={() => {
-              close();
-              groupShow.show();
-            }}
-          />
+          <>
+            <ToolsMenuItem
+              item="show-group"
+              expanded={false}
+              icon={<ChevronDown size={16} />}
+              title={groupShow.title}
+              subtitle={groupShow.subtitle}
+              onClick={() => {
+                close();
+                groupShow.show();
+              }}
+            />
+            {members && members.length > 0 && (
+              <>
+                <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
+                <p className="px-4 pb-1 pt-1 text-xs font-semibold text-rb-500">{WORDS.members}</p>
+                <div className="max-h-72 overflow-y-auto" data-group-members="">
+                  {members.map((m) => (
+                    <ToolsMenuItem
+                      key={m.id}
+                      item="group-member"
+                      icon={<ArrowUpRight size={16} />}
+                      title={m.title}
+                      subtitle={m.subtitle}
+                      href={m.href}
+                      onClick={close}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <>
             {shareHref && !onEventPage && (

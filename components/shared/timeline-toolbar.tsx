@@ -263,7 +263,6 @@ export interface TimelineDisplayItem {
 /** The run-collapse toggle. Not part of any shared preset — ChainTruthTimeline
  *  appends it only on a page that groups in the browser (defines `runs`, and
  *  was not answered in folders — rails-ops decision 0021). */
-export const COLLAPSE_RUNS_ITEM: TimelineDisplayItem = { key: "collapseRuns", label: "Collapse like events" };
 
 /** The market-note items, under a rule after the rest (rails-ops TO-DO-ui-jobs
  *  item 118). ChainTruthTimeline appends them on a page that has notes. Notes
@@ -976,7 +975,7 @@ export function TimelineToolbar({
               </svg>
             </button>
           )}
-          <TimelineDisplayMenu items={displayItems} />
+          {displayItems.length > 0 && <TimelineDisplayMenu items={displayItems} />}
         </div>
       </div>
 
