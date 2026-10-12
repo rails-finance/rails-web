@@ -298,7 +298,7 @@ export function DolomitePositionCard({
   explanation,
   viewHref,
   captions,
-  disclosureKey,
+  positionSummary,
   risk,
 }: {
   v: DolomitePositionView;
@@ -306,7 +306,7 @@ export function DolomitePositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per account —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The third headline from the page's live core read: the margin ratio and
    *  its opened-layer lines. Omitted until the read lands, and on a listing. */
   risk?: { value: React.ReactNode; detail?: React.ReactNode };
@@ -329,7 +329,7 @@ export function DolomitePositionCard({
   const borrowsShown = splitDust(v.borrows, dustUsdOf(v)).shown;
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
 
   // Closed / liquidated: every par is back at zero, so the headline is what
   // each market lane held at its height — the highest recorded par (no USD:
@@ -348,7 +348,7 @@ export function DolomitePositionCard({
           liquidations: v.liquidations,
           liquidationCount: v.liquidationCount,
         })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -391,7 +391,7 @@ export function DolomitePositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={dolomitePositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

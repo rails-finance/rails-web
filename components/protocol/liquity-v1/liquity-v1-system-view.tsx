@@ -52,7 +52,7 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { liquityV1RedemptionContent } from "@/lib/shared/learn-more-content";
+import { liquityV1Modal } from "@/lib/liquity-v1/event-templates";
 import {
   systemLaneProv,
   systemPriceProv,
@@ -374,7 +374,7 @@ export function LiquityV1SystemView({ data }: { data: LiquityV1SystemChainRespon
       <section className="mt-8">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-foreground">Redemption</h2>
-          <LearnMore content={liquityV1RedemptionContent()} inline />
+          <LearnMore content={liquityV1Modal("redemption")} inline />
         </div>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           Anyone holding {DEBT_SYMBOL} can redeem it against Liquity V1 for {COLLATERAL_SYMBOL} at $1 face value — the

@@ -828,9 +828,12 @@ const WIDE_SIDE = 3;
  *
  *  RULE (ui-jobs 306): a wide side opens on the assets the event touched (an
  *  asset with a row for this event), with a line "Show all N reserves" in the
- *  manner of the dust line, which shows every asset; the timeline's asset
- *  filter narrows the rows to the assets it shows. The side's total stands
- *  over every asset either way. The choice is not kept per card. */
+ *  manner of the dust line, which shows every asset; a wide side the event
+ *  did not touch opens on its total and the line alone (Miles, 9 Oct 2026).
+ *  The state card of a day with no event (`moment`) lists every asset. The
+ *  timeline's asset filter narrows the rows to the assets it shows. The
+ *  side's total stands over every asset either way. The choice is not kept
+ *  per card. */
 export function AssetLedgers({
   side,
   assets,
@@ -841,6 +844,7 @@ export function AssetLedgers({
   usdShownFor,
   provsFor,
   assetWord = "reserves",
+  moment = false,
 }: {
   side: FlowSide;
   assets: Ledger[];
@@ -855,16 +859,21 @@ export function AssetLedgers({
   provsFor?: (l: Ledger) => LedgerProvs | undefined;
   /** What the side's assets are called in the "Show all" line. */
   assetWord?: string;
+  /** The state card of a day with no event: no asset was touched, and the
+   *  side lists every asset. */
+  moment?: boolean;
 }) {
   const filter = useContext(LedgerAssetFilterContext);
   const [all, setAll] = useState(false);
   const touched = assets.filter((a) => a.rows.some((r) => r.role === "event"));
   const narrowed = filter
     ? assets.filter((a) => a.symbol != null && filter.has(a.symbol))
-    : assets.length >= WIDE_SIDE && touched.length > 0
+    : assets.length >= WIDE_SIDE && !moment
       ? touched
       : assets;
-  const listed = all || narrowed.length === 0 ? assets : narrowed;
+  // A wide side the event did not touch opens on its total and the line.
+  const untouched = !filter && narrowed.length === 0;
+  const listed = all || (narrowed.length === 0 && !untouched) ? assets : narrowed;
   const hidden = assets.length - narrowed.length;
   const shown = listed.map((a) =>
     usdShownFor(a) ? a : { ...a, usd: null, rows: a.rows.filter((r) => r.tokens).map((r) => ({ ...r, usd: null })) },
@@ -926,8 +935,8 @@ export function AssetLedgers({
             provs={provsFor?.(a)}
           />
         ))}
-        {hidden > 0 && narrowed.length > 0 && (
-          <div className="col-span-full pt-2">
+        {hidden > 0 && (narrowed.length > 0 || untouched) && (
+          <div className={`col-span-full${shown.length > 0 ? " pt-2" : ""}`}>
             <button
               type="button"
               className="text-left text-xs text-rb-500 underline decoration-dotted underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
@@ -941,7 +950,9 @@ export function AssetLedgers({
               {all
                 ? filter
                   ? `Show the ${assetWord} the filter shows`
-                  : `Show the ${assetWord} this event touched`
+                  : untouched
+                    ? "Show the total only"
+                    : `Show the ${assetWord} this event touched`
                 : `Show all ${assets.length} ${assetWord}`}
             </button>
           </div>

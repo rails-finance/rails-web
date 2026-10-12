@@ -1,93 +1,176 @@
 "use client";
 
-// Plain-English explainer for an Aave V3 event — a layman PARAGRAPH (not
-// bullets), composed from state-keyed clauses in lib/aave-v3/explainer-clauses.tsx,
-// plus the per-event "Learn More" modal on the mechanic. The card shows the
-// paragraph's LEAD sentence as its teaser; this pane renders the REST (skipLead),
-// so the first sentence is never duplicated. Every figure here is the card's own
-// face value, Prov-echoed against the header / detail (and, on a liquidation, the
-// forensics block).
+// The Explanation pane (zone Z2) of an Aave V3 event, on Ethereum, Base and
+// Seamless: the generator's sentences (lib/aave-v3/event-prose.ts, its strings
+// in content/aave-v3/event-prose.yaml), one bullet each, under the three event
+// headings when two of them hold two or more bullets. Each figure the header
+// or the liquidation's legs also print echoes that receipt. The health factor
+// and rate sentences read the position state the open card reads, so the card
+// passes this pane as its body with no teaser.
 
 import type { AaveV3Context } from "@/lib/shared/types/protocols/aave-v3";
-import type { V3Coords } from "@/lib/aave-v3/event-provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
 import {
-  aaveV3SupplyWithdrawContent,
-  aaveV3BorrowRepayContent,
-  aaveV3LiquidationContent,
-  aaveV3BadDebtContent,
-  aaveV3TransferContent,
-  aaveV3EventFallbackContent,
-  aaveV3RepayWithCollateralContent,
-  aaveV3WithdrawAndSwapContent,
-  aaveV3CollateralSwapContent,
-  aaveV3DebtSwapContent,
-} from "@/lib/shared/learn-more-content";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { aaveV3EventSlots, v3StateRead } from "@/lib/aave-v3/explainer-clauses";
+  assetsDeltaProv,
+  debtRepaidProv,
+  seizedCollateralProv,
+  swapLegNet,
+  swapLegProv,
+  swapLegSign,
+  transferDeltaProv,
+  writtenOffDebtProv,
+  type V3Coords,
+} from "@/lib/aave-v3/event-provenance";
+import { aaveV3EventProse, aaveV3ExplanationRuns, type AaveV3EchoKey } from "@/lib/aave-v3/event-prose";
+import { v3StateRead } from "@/lib/aave-v3/event-state";
 import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import type { AaveV3Neighbours, AaveV3TimelineEvent } from "@/lib/aave-v3/event-neighbours";
 import { feeLiquidation } from "@/lib/aave-v3/liquidation-fee";
 import { useChainId } from "@/lib/shared/chain-context";
 import { useCaptureSource } from "@/lib/shared/capture-source";
 import { useV3Pool } from "@/lib/aave-v3/pool-context";
-import { v3Brand, v3Protocol, type V3Protocol } from "@/lib/aave-v3/protocol-name";
-import { LtvWeightingNote } from "./aave-v3-position-state";
+import { v3Protocol, type V3Protocol } from "@/lib/aave-v3/protocol-name";
+import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 export interface AaveV3EventExplainerProps {
   ctx: AaveV3Context;
   txHash?: string;
   blockNumber?: number;
-  /** The card shows the lead sentence as the teaser; render only the rest here. */
-  skipLead?: boolean;
-  /** The position's owner: the third-party line keys on it. */
+  /** The position's owner: the third-party sentences key on it. */
   owner?: string;
-  /** The Ethereum market key; with it the prose reads the position state the
-   *  open card reads (health factor, collateral flag), one shared request. */
+  /** The served market key; with it the pane reads the position state the
+   *  open card reads (health factor, collateral flag, rates). */
   market?: string;
   /** This transaction's rows (a liquidation and its fee transfer). */
   siblings?: AaveV3TimelineEvent[];
-  /** The previous transaction, to say how the health factor moved between events. */
+  /** The previous transaction. */
   previous?: AaveV3Neighbours["previous"];
-  /** The event's own time (unix seconds). */
+  /** The event's time (unix seconds). */
   timestamp?: number;
 }
 
-/** Mechanic modal content for this event — never-empty floor: every event type
- *  maps to a modal, the default falling back to the generic Aave V3 explainer.
- *  Used by the card composer, which renders the "?" trigger on the footer row
- *  (this pane renders prose only). `protocol` is the page's Pool's — Seamless
- *  gets the same mechanics under its own name. */
-export function aaveV3LearnMoreContent(ctx: AaveV3Context, protocol: V3Protocol = "Aave V3"): LearnMoreContent {
-  switch (ctx.eventType) {
-    case "supply":
-    case "withdraw":
-      return aaveV3SupplyWithdrawContent(ctx.eventType, protocol);
-    case "borrow":
-    case "repay":
-      return aaveV3BorrowRepayContent(ctx.eventType, protocol);
-    // (A liquidation's fee transfer passes its liquidation here.)
-    case "liquidation":
-      return aaveV3LiquidationContent(protocol);
-    case "bad_debt_written_off":
-      return aaveV3BadDebtContent(protocol);
-    case "transfer_in":
-    case "transfer_out":
-      return aaveV3TransferContent(protocol);
-    // Each swap kind has its own modal; the CoW Protocol routes of a
-    // collateral or debt swap read the same one under that venue.
-    case "swap":
-      if (ctx.swap?.kind === "collateral_swap")
-        return aaveV3CollateralSwapContent(ctx.swap.route === "paraswap" ? "paraswap" : "cow");
-      if (ctx.swap?.kind === "debt_swap")
-        return aaveV3DebtSwapContent(ctx.swap.route === "paraswap" ? "paraswap" : "cow");
-      if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "repay_with_collateral")
-        return aaveV3RepayWithCollateralContent();
-      if (ctx.swap?.route === "paraswap" && ctx.swap.kind === "withdraw_and_swap")
-        return aaveV3WithdrawAndSwapContent();
-      return aaveV3EventFallbackContent(protocol);
-    default:
-      return aaveV3EventFallbackContent(protocol);
+/** The event's "?" modal: it depends on the event's kind, a swap's venue and
+ *  the Pool's protocol. A liquidation's fee transfer passes its liquidation. */
+export function aaveV3LearnMoreContent(
+  ctx: AaveV3Context,
+  protocol: V3Protocol,
+  chainId: ChainId = MAINNET_CHAIN_ID,
+  siblings?: readonly AaveV3TimelineEvent[],
+): LearnMoreContent {
+  return aaveV3EventProse({ ctx, protocol, chainId, siblings }).L5.content;
+}
+
+/** The signed reserve delta this event moved, as the header signs it. */
+const signedDelta = (ctx: AaveV3Context): number => {
+  const mag = Math.abs(Number(ctx.amount ?? "0")) || 0;
+  const neg =
+    ctx.eventType === "withdraw" ||
+    ctx.eventType === "repay" ||
+    ctx.eventType === "transfer_out" ||
+    ctx.eventType === "bad_debt_written_off";
+  return (neg ? -1 : 1) * mag;
+};
+
+/** The receipt each echoed figure registers against: the header's delta, the
+ *  swap's legs, the liquidation's legs. */
+function echoFor(key: AaveV3EchoKey, ctx: AaveV3Context, coords: V3Coords): ProseEcho | null {
+  const sym = ctx.reserveSymbol ?? "";
+  const s = ctx.swap;
+  switch (key) {
+    case "amount": {
+      const side = ctx.eventType === "borrow" || ctx.eventType === "repay" ? "debt" : "supply";
+      return {
+        info: assetsDeltaProv(sym, side, coords, ctx.raw?.amount, ctx.origin?.amount),
+        value: chainTruthDeltaValue(signedDelta(ctx), false),
+        symbol: sym,
+      };
+    }
+    case "transfer":
+      return {
+        info: transferDeltaProv(sym, ctx.eventType === "transfer_in" ? "in" : "out", coords),
+        value: chainTruthDeltaValue(signedDelta(ctx), false),
+        symbol: sym,
+      };
+    case "written_off":
+      return {
+        info: writtenOffDebtProv(sym, coords, ctx.raw?.amount, ctx.origin?.amount),
+        value: chainTruthDeltaValue(-(Math.abs(Number(ctx.amount ?? "0")) || 0), false),
+        symbol: sym,
+      };
+    case "seized": {
+      const coll = ctx.collateralSymbol ?? "";
+      return {
+        info: seizedCollateralProv(
+          coll,
+          coords,
+          ctx.raw?.liquidatedCollateralAmount,
+          ctx.origin?.liquidatedCollateralAmount,
+        ),
+        value: chainTruthDeltaValue(-Number(ctx.liquidatedCollateralAmount), false),
+        symbol: coll,
+      };
+    }
+    case "cleared":
+      return {
+        info: debtRepaidProv(sym, coords, ctx.raw?.debtToCover, ctx.origin?.debtToCover),
+        value: chainTruthDeltaValue(-Number(ctx.debtToCover), false),
+        symbol: sym,
+      };
+    case "given":
+      if (!s) return null;
+      return {
+        info: swapLegProv(
+          sym,
+          s.givenAction,
+          coords,
+          ctx.raw?.amount,
+          ctx.origin?.amount,
+          s.kind,
+          swapLegNet(s, "given"),
+          s,
+        ),
+        value: chainTruthDeltaValue(swapLegSign(s.givenAction) * (Math.abs(Number(ctx.amount ?? "0")) || 0), false),
+        symbol: sym,
+      };
+    case "received": {
+      if (!s) return null;
+      const rSym = s.receivedSymbol ?? "";
+      return {
+        info: swapLegProv(
+          rSym,
+          s.receivedAction,
+          coords,
+          s.raw.receivedAmount,
+          s.receivedOrigin,
+          s.kind,
+          swapLegNet(s, "received"),
+          s,
+        ),
+        value: chainTruthDeltaValue(
+          swapLegSign(s.receivedAction, s.kind) * (Math.abs(Number(s.receivedAmount ?? "0")) || 0),
+          false,
+        ),
+        symbol: rSym,
+      };
+    }
+    case "back": {
+      const back = s?.events?.find((e) => e.leftover);
+      if (!back) return null;
+      return {
+        info: assetsDeltaProv(
+          back.symbol ?? sym,
+          back.action === "supply" ? "supply" : "debt",
+          coords,
+          back.raw,
+          back.origin,
+        ),
+        value: String(Math.abs(Number(back.amount ?? "0"))),
+        symbol: back.symbol,
+      };
+    }
   }
 }
 
@@ -95,7 +178,6 @@ export function AaveV3EventExplainer({
   ctx,
   txHash,
   blockNumber,
-  skipLead,
   owner,
   market,
   siblings,
@@ -103,13 +185,8 @@ export function AaveV3EventExplainer({
   timestamp,
 }: AaveV3EventExplainerProps) {
   const chainId = useChainId();
-  const coords: V3Coords = {
-    txHash,
-    blockNumber,
-    chainId,
-    source: useCaptureSource(),
-    pool: useV3Pool(),
-  };
+  const pool = useV3Pool();
+  const coords: V3Coords = { txHash, blockNumber, chainId, source: useCaptureSource(), pool };
   const feeOf = feeLiquidation(ctx, siblings, chainId);
   // The same reads the open card makes (module-scope cache, one request each):
   // around this transaction, and around the previous one.
@@ -130,13 +207,22 @@ export function AaveV3EventExplainer({
     here?.status === "ready" ? here.data : undefined,
     before?.status === "ready" ? before.data : undefined,
   );
-  const clauses = eventClauses(
-    aaveV3EventSlots(ctx, coords, { owner, siblings, state, previousEvent: previous?.event, timestamp }),
+  const prose = aaveV3EventProse({
+    ctx,
+    protocol: v3Protocol(pool),
+    chainId,
+    state,
+    owner,
+    siblings,
+    previousEvent: previous?.event,
+    timestamp,
+  });
+  const echo = (key: AaveV3EchoKey) => echoFor(key, ctx, coords);
+  const items = aaveV3ExplanationRuns(prose).flatMap((run) =>
+    run.sentences.map((s) => {
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      return run.heading ? { group: run.heading, node } : node;
+    }),
   );
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
-  // How the card's LTV and its limits are figured, where the account read landed.
-  if (here?.status === "ready" && here.data.account)
-    items.push(<LtvWeightingNote brand={v3Brand(v3Protocol(coords.pool))} />);
-
   return <ProseExplainer items={items} />;
 }

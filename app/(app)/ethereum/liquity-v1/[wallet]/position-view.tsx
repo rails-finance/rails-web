@@ -64,7 +64,8 @@ import { LiquityV1FlowsNote } from "@/lib/shared/liquity-flows-explanation";
 import { liquityV1FlowEvents, liquityV1FlowTxs } from "@/lib/liquity-v1/flows";
 import { useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { liquityV1RedemptionTotals } from "@/lib/liquity-v1/economics";
-import { liquityV1EconomicsContent, liquityV1RedemptionOutcome } from "@/lib/liquity-v1/economics-explanation";
+import { liquityV1RedemptionOutcome } from "@/lib/liquity-v1/economics-explanation";
+import { liquityV1Modal } from "@/lib/liquity-v1/event-templates";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import {
   useLiquityV1EventReads,
@@ -72,7 +73,6 @@ import {
   useLiquityV1FlowReads,
   useLiquityV1Surplus,
 } from "@/lib/liquity-v1/use-event-read";
-import { LiquityV1LivesLine, liquityV1Lives } from "@/components/protocol/liquity-v1/liquity-v1-lives-line";
 import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
@@ -391,8 +391,6 @@ export default function LiquityV1TroveView({
           ? (surplus?.surplus ?? redemptionSplit(lastRow.context.data)?.ethSurplus ?? null)
           : null;
 
-  // The wallet's other Trove lives, for the card's line linking them.
-  const lives = useMemo(() => (summaries.length > 1 ? liquityV1Lives(summaries, events) : []), [summaries, events]);
   // How the timeline's events divide: the owner's own rows, the redemptions,
   // the liquidation and the surplus claim. Only a page holding the whole
   // history can count them.
@@ -550,18 +548,13 @@ export default function LiquityV1TroveView({
                 surplus={surplus}
                 priceUsd={priceNow}
                 endedBy={lastRow ? endedBy : null}
-                lives={
-                  selectedEpoch != null ? (
-                    <LiquityV1LivesLine wallet={wallet} lives={lives} epoch={selectedEpoch} />
-                  ) : undefined
-                }
                 // Closed by default, remembered per viewer and Trove (ui-jobs
                 // 209). The collateral ratio from the live read is the third
                 // headline; the liquidation price, its bar, the redemption queue,
                 // the room to borrow and the system ratio sit in the opened
                 // layer, inside the card's receipts scope. Only for the open
                 // life with the read landed: they describe the CURRENT Trove.
-                disclosureKey={`liquity-v1:${wallet.toLowerCase()}`}
+                positionSummary
                 risk={
                   chain && view.status === "open" && liquityV1HasRisk(chain)
                     ? { value: <LiquityV1RiskHeadline chain={chain} />, detail: <LiquityV1RiskDetail chain={chain} /> }
@@ -623,7 +616,7 @@ export default function LiquityV1TroveView({
                     />
                   </div>
                 }
-                learnMore={liquityV1EconomicsContent()}
+                learnMore={liquityV1Modal("flows")}
                 outcome={liquityV1RedemptionOutcome(redemptions, priceNow)}
               />
             )}

@@ -18,13 +18,11 @@ export interface OpenPositionStatsColumn {
    *  When ANY column sets this, the leading `icons` slot is suppressed so the
    *  cluster sits next to the data it identifies. */
   assetIcons?: ReactNode;
-  /** On a disclosing card, whether the row's lines stand open before a
-   *  viewer moves them (ui-jobs 295). Default: the first two rows (the
-   *  position's assets) open, the rest closed. */
-  defaultOpen?: boolean;
 }
 
 export interface OpenPositionStatsProps {
+  /** The card's ⋮ menu, pinned to the top right of the header. */
+  menu?: ReactNode;
   /** `null` entries render as empty slots so callers can hold the grid open
    *  at a wider column count (e.g. supply-only spokes that want to line up
    *  with sibling cards that have Collateral / Debt / Ratio / Borrow Rate). */
@@ -46,9 +44,12 @@ export interface OpenPositionStatsProps {
    *  the settled grammar for the first consumer that forgot the prop. */
   statusPill: ReactNode;
   /** Below `sm`, one headline per row, value and asset icons side by side.
-   *  Opt-in: the closed card of ui-jobs 209, whose nine-digit headlines
+   *  Opt-in: the summary face (TO-DO-position-card 270), whose nine-digit headlines
    *  collide two to a row at 390px. */
   stackOnPhone?: boolean;
+  /** The inset panel (TO-DO-position-card 322, `PositionCardPanel`), beneath
+   *  the headline row and across its width. */
+  panel?: ReactNode;
 }
 
 const GRID_WITH_ICONS: Record<number, string> = {
@@ -61,7 +62,9 @@ const GRID_WITHOUT_ICONS: Record<number, string> = {
   1: "grid grid-cols-1 gap-4",
   2: "grid grid-cols-2 sm:grid-cols-2 gap-4",
   3: "grid grid-cols-2 sm:grid-cols-3 gap-4",
-  4: "grid grid-cols-2 sm:grid-cols-4 gap-4",
+  // Four headlines go two by two until lg: four large figures do not fit a
+  // row narrower than that.
+  4: "grid grid-cols-2 lg:grid-cols-4 gap-4",
 };
 
 export function OpenPositionStats({
@@ -71,6 +74,8 @@ export function OpenPositionStats({
   leadingIdentity,
   statusPill,
   stackOnPhone = false,
+  panel,
+  menu,
 }: OpenPositionStatsProps) {
   const count = columns.length;
   // When any column carries its own asset cluster, drop the leading icons
@@ -84,15 +89,19 @@ export function OpenPositionStats({
   const visibleCount = columns.filter(Boolean).length;
   return (
     <div>
-      <PositionCardHeader className="flex items-center justify-between gap-2 flex-wrap" spacing="mb-3" anatomy="C5">
-        {/* Wraps between pieces: at 390px the owner address used to break in
+      <PositionCardHeader className="flex items-start gap-2" spacing="mb-3" anatomy="C5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+          {/* Wraps between pieces: at 390px the owner address used to break in
             two beside a squeezed pair label. */}
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-          <PositionSummaryHeading />
-          {statusPill}
-          {leadingIdentity}
-        </span>
-        {identity}
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+            <PositionSummaryHeading />
+            {statusPill}
+            {leadingIdentity}
+          </span>
+          {identity}
+        </div>
+        {/* The card's ⋮ at the top right of the header, whatever wraps beside it. */}
+        {menu && <span className="-my-1 flex shrink-0 items-center">{menu}</span>}
       </PositionCardHeader>
       <PositionCardRegion className={gridClass} anatomy="C10">
         {useLeadingIcons && <div className="hidden sm:flex items-center self-stretch">{icons}</div>}
@@ -106,7 +115,6 @@ export function OpenPositionStats({
             <PositionCardRow
               key={col.label || `col-${i}`}
               index={i}
-              defaultOpen={col.defaultOpen ?? i < 2}
               label={col.label}
               labelTip={col.labelTip}
               headerIcon={col.headerIcon}
@@ -125,6 +133,7 @@ export function OpenPositionStats({
           );
         })}
       </PositionCardRegion>
+      {panel}
     </div>
   );
 }

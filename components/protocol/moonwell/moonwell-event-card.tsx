@@ -13,7 +13,6 @@ import { ownerPaidGas } from "@/components/shared/event-price-row";
 import { externalActor } from "@/lib/shared/external-actor";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
-import { moonwellExplainerTeaser } from "@/lib/moonwell/explainer-clauses";
 import { useMoonwellHeadSpec } from "./moonwell-event-header";
 import { useMoonwellCells } from "./moonwell-event-detail";
 import { MoonwellEventExplainer, moonwellLearnMoreContent } from "./moonwell-event-explainer";
@@ -130,7 +129,8 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
     spine,
     head,
     caption: event.actionLabel,
-    actor: { by: extBy ?? undefined },
+    // A transfer received: the sender acted (ui-jobs 304).
+    actor: { by: extBy ?? undefined, byOwner: kind === "transfer_in" ? false : undefined },
     cells,
     ledgers,
     notes,
@@ -143,12 +143,10 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
           blockNumber={event.blockNumber}
           wallet={event.wallet}
           externalBy={extBy ?? undefined}
-          skipLead
         />
       ),
-      first: moonwellExplainerTeaser(ctx, coords, extBy ?? undefined) ?? undefined,
     },
-    learnMore: <LearnMore inline content={moonwellLearnMoreContent(ctx, coords.chainId)} />,
+    learnMore: <LearnMore inline content={moonwellLearnMoreContent(ctx, coords)} />,
   };
 
   return <EventCard slots={slots} avatar={null} />;

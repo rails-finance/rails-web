@@ -87,6 +87,8 @@ export interface LiquityForkTroveChainResponse {
   entireDebt: number;
   entireCollRaw: string;
   entireColl: number;
+  /** The collateral token's decimals: the scale `entireCollRaw` is in. */
+  collDecimals: number;
   /** The split getLatestTroveData states: interest accrued since the recorded
    *  debt, and redistribution gains from liquidations. */
   accruedInterest: number;
@@ -102,6 +104,8 @@ export interface LiquityForkTroveChainResponse {
    *  the owner set; for a batch member getLatestTroveData serves the BATCH's
    *  current rate — the manager's choice, not the owner's. */
   annualInterestRatePct: number;
+  /** getLatestTroveData's annualInterestRate integer (18 places, 1 = 100%). */
+  annualInterestRateRaw: string;
   /** The branch's own oracle price, USD per whole collateral token. */
   priceUsd: number | null;
   /** True when the simulated fetchPrice failed and lastGoodPrice (which lags
@@ -146,12 +150,14 @@ function stub(cfg: LiquityForkConfig, b: LiquityForkBranchConfig, troveId: strin
     entireDebt: 0,
     entireCollRaw: "0",
     entireColl: 0,
+    collDecimals: b.decimals,
     accruedInterest: 0,
     accruedBatchManagementFee: 0,
     redistDebtGain: 0,
     redistCollGain: 0,
     recordedDebt: 0,
     annualInterestRatePct: 0,
+    annualInterestRateRaw: "0",
     priceUsd: null,
     priceStale: false,
     oracleDown: false,
@@ -324,12 +330,14 @@ export async function loadLiquityForkTroveFromChain(
       entireDebt,
       entireCollRaw: data.entireColl.toString(),
       entireColl,
+      collDecimals: b.decimals,
       accruedInterest: Number(data.accruedInterest) / debtScale,
       accruedBatchManagementFee: Number(data.accruedBatchManagementFee ?? BigInt(0)) / debtScale,
       redistDebtGain: Number(data.redistBoldDebtGain) / debtScale,
       redistCollGain: Number(data.redistCollGain) / collScale,
       recordedDebt: Number(data.recordedDebt) / debtScale,
       annualInterestRatePct: Number(data.annualInterestRate) / 1e16,
+      annualInterestRateRaw: data.annualInterestRate.toString(),
       priceUsd,
       priceStale,
       oracleDown: fetched != null ? fetched[1] : false,

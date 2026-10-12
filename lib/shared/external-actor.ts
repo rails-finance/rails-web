@@ -11,6 +11,8 @@
 // drawing delegated credit from the position — fail both (~0.5–1.5% of
 // events, measured on the index).
 
+import type { ChainId } from "@/lib/shared/chains";
+
 /** The display address for a third-party-acted event — the transaction sender
  *  (the party who signed) — or null when the owner acted (or the facts are
  *  absent, e.g. recipient-only rows, liquidations, or a pre-fact payload). */
@@ -19,6 +21,33 @@ export function externalActor(ctx: { txFrom?: string; poolCaller?: string }, wal
   const w = wallet.toLowerCase();
   if (ctx.txFrom === w || ctx.poolCaller === w) return null;
   return ctx.txFrom;
+}
+
+/** The facts the transaction-sender test reads. */
+export interface SentFacts {
+  txFrom?: string | null;
+  /** The event's party param, where its log names one. */
+  caller?: string | null;
+  owner?: string | null;
+  /** The owner is an account a key controls (no code, or an EIP-7702
+   *  delegation). A Safe or other contract owner never sends a transaction,
+   *  so without a caller the sender cannot judge it. */
+  ownerIsAccount?: boolean;
+  /** The chain the owner's code is read on; Ethereum where unset. */
+  chainId?: ChainId;
+}
+
+/** The transaction-sender test the event card's spine runs (rails-ops
+ *  ui-jobs 304): another account sent the transaction, and the event's
+ *  caller, where its log names one, is not the owner either. With a caller
+ *  it is `externalActor`'s verdict; without one the sender decides, and only
+ *  where the owner is a key-controlled account. Absent facts judge nothing. */
+export function sentByOther(f: SentFacts | undefined): boolean {
+  if (!f?.txFrom || !f.owner) return false;
+  const owner = f.owner.toLowerCase();
+  if (f.txFrom.toLowerCase() === owner) return false;
+  if (f.caller) return f.caller.toLowerCase() !== owner;
+  return f.ownerIsAccount === true;
 }
 
 /** Who has been acting on a position, across its whole history. */

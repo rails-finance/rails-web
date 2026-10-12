@@ -409,7 +409,7 @@ export default function LlamalendPositionView({
                 // axis sit under it in the opened layer, the converted amount
                 // under Collateral, all inside the card's receipts scope.
                 // Mounted only while the loan is live and the read landed.
-                disclosureKey={`llamalend:${controller.toLowerCase()}:${user.toLowerCase()}`}
+                positionSummary
                 risk={
                   chain && liveView.status === "open" && llamalendHasRisk(chain)
                     ? {

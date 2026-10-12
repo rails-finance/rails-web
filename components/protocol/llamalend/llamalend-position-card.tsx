@@ -142,7 +142,7 @@ export function LlamalendPositionCard({
   bodyExtra,
   viewHref,
   bands,
-  disclosureKey,
+  positionSummary,
   risk,
   collateralDetail,
 }: {
@@ -151,7 +151,7 @@ export function LlamalendPositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The third headline from the page's live read: the health and its
    *  opened-layer lines. Omitted until the read lands, and on a listing. */
   risk?: { value: React.ReactNode; detail?: React.ReactNode };
@@ -178,7 +178,7 @@ export function LlamalendPositionCard({
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>), and the converted amount
   // joins Collateral there in place of its own column.
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
 
   // Closed / liquidated: the last emitted absolutes are back at zero, so the
   // card states the outcome and its metadata (no USD: the oracle prices the
@@ -191,7 +191,7 @@ export function LlamalendPositionCard({
         explanation={explanation}
         viewHref={viewHref}
         learnMore={llamalendPositionContent({ status: v.status, liquidationCount: v.liquidationCount })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -425,7 +425,7 @@ export function LlamalendPositionCard({
       explanation={explanation}
       viewHref={viewHref}
       learnMore={llamalendPositionContent({ status: v.status, inSoftLiq: v.inSoftLiq ?? undefined, bands })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

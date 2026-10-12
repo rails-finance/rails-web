@@ -27,10 +27,7 @@ import {
 } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import {
-  PositionCardDisclosureProvider,
-  usePositionCardDisclosureState,
-} from "@/components/shared/position-card-disclosure";
+import { PositionSummaryProvider } from "@/components/shared/position-card-disclosure";
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
 
@@ -42,7 +39,7 @@ export function PositionCardShell({
   viewHref,
   explanationDefaultOpen,
   onExplanationToggle,
-  disclosureKey,
+  positionSummary,
   footerEnd,
   children,
 }: {
@@ -70,21 +67,16 @@ export function PositionCardShell({
   /** Fires when the Explanation section opens/closes — passed straight
    *  through, for a surface that persists that state. */
   onExplanationToggle?: (open: boolean) => void;
-  /** Opt in to progressive disclosure (ui-jobs 209, 295): one stable key per
-   *  position. The card then draws a "Position summary" heading and each
-   *  headline row opens on a chevron
-   *  (components/shared/position-card-disclosure.tsx). The rows' state and
-   *  the Explanation's are remembered under the key, so
-   *  `explanationDefaultOpen` / `onExplanationToggle` are not read with it.
-   *  Only meaningful with `receipts`: a listing row never discloses. */
-  disclosureKey?: string;
+  /** The summary face (TO-DO-position-card 270): a "Position summary"
+   *  heading over the headline rows (components/shared/position-card-disclosure.tsx).
+   *  Only meaningful with `receipts`. */
+  positionSummary?: boolean;
   /** The foot strip at the right of the Explanation row (ui-jobs 270:
    *  transactions, warnings and age). Only meaningful with `receipts`. */
   footerEnd?: ReactNode;
   children: ReactNode;
 }) {
   const registry = useReceiptRegistry();
-  const disclosure = usePositionCardDisclosureState(receipts ? disclosureKey : undefined);
   const frame = (
     // group-hover/listing-row: the blue navigation hover border when the card sits
     // inside a listing's row <Link> (which declares the group) — inert everywhere else.
@@ -114,9 +106,8 @@ export function PositionCardShell({
           explanation={explanation}
           learnMore={learnMore}
           viewHref={viewHref}
-          // A disclosing card remembers its Explanation with its open state.
-          explanationDefaultOpen={disclosure ? disclosure.explanationOpen : explanationDefaultOpen}
-          onExplanationToggle={disclosure ? disclosure.setExplanationOpen : onExplanationToggle}
+          explanationDefaultOpen={explanationDefaultOpen}
+          onExplanationToggle={onExplanationToggle}
           anatomy={CARD_ANATOMY}
         />
       )}
@@ -124,7 +115,7 @@ export function PositionCardShell({
   );
   return receipts ? (
     <ProvReceiptsScope registry={registry} scopeId={POSITION_CARD_SCOPE}>
-      <PositionCardDisclosureProvider value={disclosure}>{frame}</PositionCardDisclosureProvider>
+      <PositionSummaryProvider value={!!positionSummary}>{frame}</PositionSummaryProvider>
     </ProvReceiptsScope>
   ) : (
     <ProvUnscoped>{frame}</ProvUnscoped>

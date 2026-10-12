@@ -7,10 +7,7 @@
 //
 // Reads tolerate SSR (no `window`) and malformed JSON by returning an empty
 // map; the EventCard restores from this in a post-mount effect, matching the
-// rest of the app's localStorage pattern (no hydration mismatch). The
-// position card reads it through `subscribeCardOpen` and useSyncExternalStore
-// instead (components/shared/position-card-disclosure.tsx), so a write here
-// reaches every reader of the same key.
+// rest of the app's localStorage pattern (no hydration mismatch).
 
 const STORAGE_KEY = "rails-open-cards-v1";
 const MAX_ENTRIES = 800;
@@ -30,18 +27,6 @@ function writeMap(map: Record<string, true>): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
   } catch {}
-  for (const l of listeners) l();
-}
-
-const listeners = new Set<() => void>();
-
-/** Calls `onChange` after every write in this tab. Returns the unsubscribe,
- *  in the shape useSyncExternalStore takes. */
-export function subscribeCardOpen(onChange: () => void): () => void {
-  listeners.add(onChange);
-  return () => {
-    listeners.delete(onChange);
-  };
 }
 
 export function isCardOpen(key: string): boolean {

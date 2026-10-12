@@ -118,7 +118,7 @@ export function liquityHeadSpec(
     if (rate > 0) spec.ratePill = pill(op === "openTroveAndJoinBatch" ? "delegate" : undefined);
   } else if (op === "redeemCollateral") {
     // The word in the caution tone; the spine draws the legs as two nodes.
-    // With Timeline values off, or below sm, the legs follow the word: the
+    // On a pinned event page below sm, the legs follow the word: the
     // debt it cleared, then the collateral it reduced.
     spec.labelOnSpine = true;
     spec.deltas = [

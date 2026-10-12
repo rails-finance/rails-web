@@ -27,7 +27,7 @@ import {
 } from "@/lib/liquity-v1/event-provenance";
 import { entireCollateralProv, entireDebtProv } from "@/lib/liquity-v1/position-provenance";
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
-import { liquityV1PositionContent, type LiquityV1EndedBy } from "@/lib/liquity-v1/position-content";
+import { liquityV1PositionModal, type LiquityV1EndedBy } from "@/lib/liquity-v1/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
@@ -68,20 +68,17 @@ export function LiquityV1PositionCard({
   surplus,
   priceUsd,
   endedBy,
-  lives,
-  disclosureKey,
+  positionSummary,
   risk,
 }: {
   v: LiquityV1PositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The third headline from the page's live read: the collateral ratio and
    *  its opened-layer lines. Omitted until the read lands, and on a listing. */
   risk?: { value: React.ReactNode; detail?: React.ReactNode };
-  /** The line naming the wallet's other Trove lives, under the stats. */
-  lives?: React.ReactNode;
   receipts?: boolean;
   /** Context content riding the shell's heading-button row (the detail page
    *  passes the compact liquidation runway). */
@@ -110,7 +107,7 @@ export function LiquityV1PositionCard({
 }) {
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // The protocol name is redundant inside the Liquity V1 explorer, so the
   // wallet pill leads (facehash + copy + bookmark — buttons, not anchors, so
   // it lives safely inside the listing card's <Link>). The detail page draws
@@ -161,8 +158,8 @@ export function LiquityV1PositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={liquityV1PositionContent({ status: v.status, endedBy })}
-        disclosureKey={disclosureKey}
+        learnMore={liquityV1PositionModal(v.status, endedBy)}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header, the outcome and any
@@ -226,7 +223,6 @@ export function LiquityV1PositionCard({
             )
           }
         />
-        {lives}
       </PositionCardShell>
     );
   }
@@ -237,8 +233,8 @@ export function LiquityV1PositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={liquityV1PositionContent({ status: v.status })}
-      disclosureKey={disclosureKey}
+      learnMore={liquityV1PositionModal(v.status)}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}
@@ -310,7 +306,6 @@ export function LiquityV1PositionCard({
             : []),
         ]}
       />
-      {lives}
     </PositionCardShell>
   );
 }

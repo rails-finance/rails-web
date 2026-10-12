@@ -6,9 +6,8 @@
 // THE TRANSACTION ROW IS THE UNIT, NOT A COLLAPSE. Several of a position's logs
 // in one transaction draw one card, the way Liquity V2's `Open` is one card for
 // a deposit and a borrow. It rides the run machinery because that machinery is
-// what turns consecutive rows into one row, but it is `asOneEvent`: the
-// reader's "Collapse like events" choice does not reach it, because nothing is
-// being collapsed: the card IS the transaction.
+// what turns consecutive rows into one row, but it is `asOneEvent`: nothing is
+// being collapsed, the card IS the transaction.
 //
 // THE UNIT IS THE TRANSACTION AND THE READING BELONGS TO THE BLOCK, and those
 // are two different things. Measured against production on 2026-09-26: 3,248 of

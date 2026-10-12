@@ -218,8 +218,12 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     spine,
     head,
     caption: event.actionLabel,
-    // A batch manager moved the rate: not the owner's act.
-    actor: ctx.eventType === "setBatchManagerAnnualInterestRate" ? { byOwner: false } : undefined,
+    // A batch manager moved the rate, or the protocol applied pending debt:
+    // not the owner's act.
+    actor:
+      ctx.eventType === "setBatchManagerAnnualInterestRate" || ctx.eventType === "applyPendingDebt"
+        ? { byOwner: false }
+        : undefined,
     cells: cells.length > 0 ? cells : { none: "the batch row carries no figure of the Trove" },
     ledgers: {
       provider: (children) => (

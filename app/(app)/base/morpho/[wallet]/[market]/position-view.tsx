@@ -110,15 +110,7 @@ export default function MorphoBasePositionView({
   const liveCard = useMemo(() => {
     if (!liveClean) return null;
     const borrowerSide = morphoHasCollateralRaw(liveClean.collateralRaw) || morphoHasDebt(liveClean.borrowSharesRaw);
-    if (!borrowerSide)
-      return (
-        <MorphoLenderOpenCard
-          p={liveClean}
-          receipts
-          vault={vaultOwner}
-          disclosureKey={`morpho-base:${market}:${wallet.toLowerCase()}`}
-        />
-      );
+    if (!borrowerSide) return <MorphoLenderOpenCard p={liveClean} receipts vault={vaultOwner} positionSummary />;
     const v = { ...morphoListedViewFromLive(liveClean, wallet), vaultOwner };
     return (
       <MorphoPositionCard
@@ -128,7 +120,7 @@ export default function MorphoBasePositionView({
         listedReceipts={LIVE_RECEIPTS}
         // The same key as the swept card, so the opened state carries over
         // when the history lands (ui-jobs 209).
-        disclosureKey={`morpho-base:${market}:${wallet.toLowerCase()}`}
+        positionSummary
         risk={v.status === "open" ? morphoRiskColumn(liveClean, morphoHasDebt(liveClean.borrowSharesRaw)) : null}
         debtDetail={<MorphoBorrowRoom chain={liveClean} />}
       />

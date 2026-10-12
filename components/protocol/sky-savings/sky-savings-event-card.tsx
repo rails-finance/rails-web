@@ -344,6 +344,8 @@ export function SkySavingsEventCard({
     spine,
     head: spec,
     caption: LABEL[kind],
+    // A transfer received: the sender acted (ui-jobs 304).
+    actor: kind === "received" ? { byOwner: false } : undefined,
     cells,
     ledgers: { none: "no flows panel on Sky Savings" },
     notes,

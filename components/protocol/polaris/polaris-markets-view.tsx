@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { polarisCdpContent, polarisLiquidationContent } from "@/lib/shared/learn-more-content";
+import { polarisModal } from "@/lib/polaris/event-templates";
 import {
   liveCurvePriceProv,
   liveMcrProv,
@@ -86,7 +86,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         <span className="text-[11px] text-rb-500">
           mints {stable}, tracking {cfg.tracks}
         </span>
-        <LearnMore content={polarisCdpContent()} inline />
+        <LearnMore content={polarisModal("market")} inline />
       </div>
 
       {chain ? (
@@ -206,7 +206,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
       <div className="mt-3 border-t border-rb-200/60 pt-3 dark:border-rb-800/60">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold text-foreground">The book, as indexed</span>
-          <LearnMore content={polarisLiquidationContent()} inline />
+          <LearnMore content={polarisModal("liquidation")} inline />
         </div>
         {book ? (
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">

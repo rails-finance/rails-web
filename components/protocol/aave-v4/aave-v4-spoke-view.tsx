@@ -91,11 +91,9 @@ import { AAVE_V4_TIMELINE_RUNS } from "@/lib/aave-v4/timeline-runs";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { DetailBackButton, DetailTopRow } from "@/components/shared/detail-back-row";
-import { OVERLAY_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
+import { SECTION_HEADING, NAV_LINK, PILL_META, CTRL_GHOST } from "@/lib/shared/ui-grammar";
 import { ChevronDown } from "lucide-react";
-import { LifetimeFlowsIcon } from "@/components/shared/lifetime-flows-icon";
 import {
-  FlowsBasis,
   FlowsKey,
   FlowsKeyContext,
   FlowsLedgerNoteContext,
@@ -1128,10 +1126,7 @@ function AaveV4SpokeTowerBlock({
   const [flowsKey, setFlowsKey] = useState<FlowsKeyItems | null>(null);
   const ledgerShown = flowTimeline == null || ledgerOpen;
   const title = (
-    <span className={`${OVERLAY_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>
-      <LifetimeFlowsIcon size={14} />
-      Lifetime flows
-    </span>
+    <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>
   );
 
   // Figures mirrored in the breakdown legend render foreground-bold; the rest of
@@ -1195,7 +1190,6 @@ function AaveV4SpokeTowerBlock({
               for the breakdown figures. */}
           <ProvenanceInfoTabs
             label="Lifetime flows explanation"
-            rowExtra={flowTimeline != null && flowsKey?.basis ? <FlowsBasis text={flowsKey.basis} /> : undefined}
             explanation={
               <div className="space-y-2 text-sm text-rb-500">
                 {/* Value-bearing narration of the tower legend — a one-line lead
@@ -1274,10 +1268,18 @@ function AaveV4SpokeTowerBlock({
                     </span>
                   </div>
                 )}
-                {flowTimeline != null && flowsKey?.lines?.length ? (
-                  <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
-                ) : null}
+                {flowTimeline != null && flowsKey?.basis && (
+                  <div className="flex items-start gap-2 leading-relaxed" data-flow-basis="">
+                    <span className="select-none text-rb-500">•</span>
+                    <span>{flowsKey.basis}</span>
+                  </div>
+                )}
                 <LearnMore
+                  extra={
+                    flowTimeline != null && flowsKey?.lines?.length ? (
+                      <FlowsKey items={[]} outline={null} lines={flowsKey.lines} />
+                    ) : undefined
+                  }
                   content={aaveV4EconomicsContent({
                     supplyInterest: totals.supplyInterestUsd > 0.01,
                     liquidations: totals.liquidatedCollUsd > 0.01 || totals.liquidatedDebtUsd > 0.01,

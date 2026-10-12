@@ -520,7 +520,7 @@ export default function MoonwellPositionView({
                   // 209). The health factor, the room left to borrow and the
                   // distance bar come from the live Comptroller read, inside the
                   // card's receipts scope.
-                  disclosureKey={`moonwell:${wallet.toLowerCase()}`}
+                  positionSummary
                   risk={
                     liveView.status === "open" ? moonwellRiskColumn(chain ?? null, cardView.borrows.length > 0) : null
                   }
@@ -542,7 +542,6 @@ export default function MoonwellPositionView({
                       <MoonwellPositionExplanation
                         chain={chain}
                         captions={captions}
-                        txCount={liveView.txCount}
                         liquidationCount={liveView.liquidationCount}
                         externalActivity={externalActivity}
                       />

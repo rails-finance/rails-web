@@ -3,9 +3,8 @@
 // The Aave V3 family's account around an event's transaction, as it stood
 // immediately before the transaction and once it had run (rails-ops
 // TO-DO-ui-jobs §19, §213, §141): the figures and receipts the event card's
-// cells state (aave-family-cells.tsx). The paragraph on how
-// the weighted limits move is in the card's (i) (LtvWeightingNote, drawn by
-// the explainer).
+// cells state (aave-family-cells.tsx). How the weighted limits move is the
+// position and borrow modals' (content/aave-v3/event-prose.yaml).
 //
 // Balances are exact, interest included. USD is each balance at the oracle price
 // read at the block, behind the USD toggle. The account figures are Aave's own
@@ -170,20 +169,6 @@ function reserveUsdAfter(r: AaveV3PositionStateReserve, side: Side): number | nu
 /** Under a cent, priced, whatever the collateral flag (§52): the shared rule
  *  the position cards use (components/shared/dust-reserves.tsx). */
 export const isDustRow = (r: AaveV3PositionStateReserve, side: Side): boolean => isDustUsd(reserveUsdAfter(r, side));
-
-/** How the LTV and its limits are figured, for the card's (i): the
- *  explainer draws it where the account read landed. */
-export function LtvWeightingNote({ brand }: { brand: string }) {
-  return (
-    <>
-      <span data-ltv-weighting="">
-        LTV is the debt divided by the collateral. The maximum and the liquidation threshold are each collateral
-        asset&rsquo;s setting averaged by what it is worth, so they move when the mix of collateral changes; {brand}{" "}
-        governance changes the settings over time.
-      </span>
-    </>
-  );
-}
 
 /** The price chip's entries once the position read has landed: every reserve
  *  whose balance the card prices (a dust row hidden behind its count line

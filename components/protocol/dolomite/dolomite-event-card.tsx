@@ -113,7 +113,17 @@ export function DolomiteEventCard({ event, isLast, eventNumber, siblings, accoun
       flows: event.flows,
     }),
     caption: event.actionLabel,
-    actor: { by: extBy ?? undefined },
+    // A transfer received from another account: the sender acted. One from
+    // the owner's other Dolomite account, and any other kind, follows the
+    // transaction-sender test (ui-jobs 304).
+    actor: {
+      by: extBy ?? undefined,
+      byOwner:
+        ctx.eventType === "transfer_in" && ctx.counterparty?.toLowerCase() !== event.wallet?.toLowerCase()
+          ? false
+          : undefined,
+      sent: { txFrom: ctx.txFrom, caller: ctx.caller, owner: event.wallet },
+    },
     cells,
     ledgers,
     notes,

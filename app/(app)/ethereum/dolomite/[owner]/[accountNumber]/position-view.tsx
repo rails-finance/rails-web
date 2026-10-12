@@ -404,7 +404,7 @@ export default function DolomitePositionView({
                   // 209). The margin ratio from the core read is the third
                   // headline; its line and distance bar sit in the opened layer,
                   // inside the card's receipts scope.
-                  disclosureKey={`dolomite:${owner.toLowerCase()}:${accountNumber}`}
+                  positionSummary
                   risk={
                     chain && liveView.status === "open"
                       ? dolomiteHasRisk(chain)

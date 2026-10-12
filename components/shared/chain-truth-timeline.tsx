@@ -62,11 +62,10 @@
 // be genuinely slow and is designed for rather than against: the header has
 // already answered the question, so an open is an audit.
 //
-// ON A SERVED PAGE THE FOLDERS ARE NOT A READER'S CHOICE (rails-ops decision
-// 0021). "Collapse like events" is not offered there, and a stored
-// `collapseRuns: false` opens no folder. A folder opens when the reader opens
-// it, when a date filter leaves it standing, or when a permalink lands in it.
-// On a client-grouped page the flag still bypasses the run specs, as before.
+// THE FOLDERS ARE NOT A READER'S CHOICE (rails-ops decision 0021, and
+// TO-DO-position-card 326 for the client-grouped pages): like events always
+// collapse. A folder opens when the reader opens it, when a date filter leaves
+// it standing, or when a permalink lands in it.
 
 import { LedgerAssetFilterContext } from "@/components/shared/event-ledger";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
@@ -91,7 +90,6 @@ import { boundaryStateFromOldestRow } from "@/lib/shared/timeline-boundary-state
 import {
   TimelineToolbar,
   CHAIN_TRUTH_DISPLAY_ITEMS,
-  COLLAPSE_RUNS_ITEM,
   MARKET_NOTE_ITEMS,
   NARROWING_PILL,
   NARROWING_PILL_X,
@@ -287,9 +285,9 @@ export interface TimelineRunSpec {
   /** This spec's row IS one event's row, not a collapse of like rows: several
    *  logs of ONE TRANSACTION drawn as one card (Alchemix's opening: the NFT's
    *  mint, the deposit that funded it and the forwarding hop). Two things
-   *  follow. The reader's "Collapse like events" choice does not reach it,
-   *  because nothing is being hidden behind a click; and the row is wrapped the
-   *  way a single card is, with the day prefix, the share link and the `?at=`
+   *  follow. It has no folder, because nothing is being hidden behind a
+   *  click; and the row is wrapped the way a single card is, with the day
+   *  prefix, the share link and the `?at=`
    *  landing target all taken from the run's first member. A spec that leaves
    *  this off keeps the collapse behaviour unchanged. */
   asOneEvent?: boolean;
@@ -697,10 +695,7 @@ function ChainTruthTimelineBody({
   segments,
   spineKey,
 }: ChainTruthTimelineProps) {
-  // Run-collapse is a display preference: flag off ⇒ no run specs reach the
-  // rows memo, so it maps events straight to lone cards (the plain
-  // renderEventRow path already handles date prefixes and spine flags).
-  const { collapseRuns, showMarketNotes, openAllMarketNotes } = useTimelineDisplay();
+  const { showMarketNotes, openAllMarketNotes } = useTimelineDisplay();
   // Desktop list view: the notes opened from their markers (item 118). Each
   // opens on its own; turning "Open all market notes" off puts every note
   // back to its marker.
@@ -717,10 +712,7 @@ function ChainTruthTimelineBody({
       return next;
     });
   }, []);
-  // Turning the collapse off leaves the `asOneEvent` specs standing: they draw
-  // one transaction as one card and hide nothing, so there is nothing for the
-  // choice to give back.
-  const activeRuns = useMemo(() => (collapseRuns ? runs : runs?.filter((r) => r.asOneEvent)), [collapseRuns, runs]);
+  const activeRuns = runs;
   // The cut (lib/shared/flow-focus.ts): once the Lifetime flows chart's
   // "Show timeline to {date}" is pressed, the list holds every event up to that
   // day's close. What goes is the list's top, so the rows keep their order
@@ -980,13 +972,6 @@ function ChainTruthTimelineBody({
       : () => true;
     return settleRunRows(all, activeRuns, inRange);
   }, [events, activeRuns, servedRows, dateRange, tl.visibleEvents, cut]);
-  // Whether "Collapse like events" would change anything here: some spec that
-  // is a collapse forms a run on this list. Read with every spec on, whatever
-  // the toggle says, so turning it off does not take the toggle away.
-  const collapsible = useMemo(() => {
-    if (servedRows || !runs?.some((r) => !r.asOneEvent)) return false;
-    return settleRunRows(events, runs, () => true).some((r) => r.kind === "run" && !r.spec.asOneEvent);
-  }, [events, runs, servedRows]);
 
   // Market notes, attached by anchor event id — OUTSIDE the rows.
   //
@@ -1836,18 +1821,9 @@ function ChainTruthTimelineBody({
     );
   }
 
-  // Auto-append the collapse toggle only when this page defines runs — a page
-  // with none has nothing to collapse and must not show an inert toggle.
   // The market-note items follow under a rule on a page with notes (item 118;
   // they were a toolbar pill, "Market notes · N", until then).
-  // Never on a served page: its folders are not a reader's choice (decision
-  // 0021). `?folders=0` answers flat, so that page groups in the browser and
-  // keeps the toggle.
-  // An `asOneEvent` spec is not a collapse and does not earn the toggle on its
-  // own, and neither does a collapse spec that forms no run on this list: a
-  // page with only those would show one that changes nothing.
-  const baseItems = collapsible ? [...displayItems, COLLAPSE_RUNS_ITEM] : displayItems;
-  const items = marketNoteCount > 0 ? [...baseItems, ...MARKET_NOTE_ITEMS] : baseItems;
+  const items = marketNoteCount > 0 ? [...displayItems, ...MARKET_NOTE_ITEMS] : displayItems;
 
   /** The notes that sit beside one row: an event row's own, or the union over
    *  a collapsed run's members — a note whose anchor is inside a folder

@@ -10,12 +10,7 @@ import { EventPageAside, EventPageContext } from "@/components/shared/event-page
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
 import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/event-share-context";
-import {
-  INFO_PATH,
-  InfoDisclosure,
-  InfoTabsDisclosure,
-  type InfoDisclosureTab,
-} from "@/components/shared/info-disclosure";
+import { InfoDisclosure, InfoTabsDisclosure, type InfoDisclosureTab } from "@/components/shared/info-disclosure";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
@@ -34,6 +29,9 @@ import { useRowTarget } from "@/components/shared/row-target";
 import { ChainTruthRow, type ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
 import { EventPriceRow, hasPriceRow, type EventCardPrice } from "@/components/shared/event-price-row";
 import { EventCellGrid, type EventCells } from "@/components/shared/event-cells";
+import { sentByOther, type SentFacts } from "@/lib/shared/external-actor";
+import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 /** The Explanation of an event naming a token whose decimals did not load: its
  *  prose states amounts, so it waits for the chain in full. */
@@ -81,8 +79,13 @@ export interface EventCardActor {
    *  a queue fill). */
   byOwner?: boolean;
   /** Counterparty of a custody move: the caption reads "Sent to 0x…" or
-   *  "Received from 0x…". */
+   *  "Received from 0x…". A receipt draws the spine dotted: the sender
+   *  acted. */
   custody?: { dir: "to" | "from"; address: string };
+  /** The transaction's sender, the event's caller where its log names one,
+   *  and the owner it is judged against: the spine runs dotted where
+   *  another account sent it (`sentByOther`, rails-ops ui-jobs 304). */
+  sent?: SentFacts;
 }
 
 /** The family's ledgers (T2.1): the provider the opened cells read, or the
@@ -232,6 +235,7 @@ interface EventCardDrawn {
   by?: string;
   byOwner?: boolean;
   custody?: EventCardActor["custody"];
+  sent?: SentFacts;
 }
 
 export type EventCardProps = EventCardFrame & { slots: EventCardSlots };
@@ -276,13 +280,39 @@ function drawnOf(slots: EventCardSlots, pageMode: boolean): EventCardDrawn {
     by: actor?.by,
     byOwner: actor?.byOwner,
     custody: actor?.custody,
+    sent: actor?.sent,
   };
 }
 
-/** The (i) row's words, on every card. */
-const EXPLANATION_HEADING = "Event explanation";
-
 /* ── EventCard ───────────────────────────────────────────────────────── */
+
+/** Whether the owner the sender test judges against is a key-controlled
+ *  account, read from its code (one cached request per address) only where
+ *  the sender alone decides: no caller, and another address sent the
+ *  transaction. Undefined until known, which judges nothing. */
+function useOwnerIsAccount(sent: SentFacts | undefined): boolean | undefined {
+  const owner = sent?.owner?.toLowerCase();
+  const asks =
+    sent?.ownerIsAccount === undefined &&
+    !sent?.caller &&
+    !!owner &&
+    !!sent?.txFrom &&
+    sent.txFrom.toLowerCase() !== owner;
+  const chainId = sent?.chainId ?? MAINNET_CHAIN_ID;
+  const [kind, setKind] = useState<{ owner: string; account: boolean } | null>(null);
+  useEffect(() => {
+    if (!asks || !owner) return;
+    let live = true;
+    fetchAddressKind(owner, chainId).then((k) => {
+      if (live && k) setKind({ owner, account: k.kind === "account" || k.kind === "delegated" });
+    });
+    return () => {
+      live = false;
+    };
+  }, [asks, owner, chainId]);
+  if (sent?.ownerIsAccount !== undefined) return sent.ownerIsAccount;
+  return kind && kind.owner === owner ? kind.account : undefined;
+}
 
 export function EventCard(props: EventCardProps) {
   const {
@@ -320,6 +350,7 @@ export function EventCard(props: EventCardProps) {
     by,
     byOwner,
     custody,
+    sent,
   } = drawn;
   const { ledgers, onIntent, onOpen } = props.slots;
   const scale = useTimelineScale();
@@ -532,9 +563,11 @@ export function EventCard(props: EventCardProps) {
       ? () => ((isPhoneViewport() && inTimeline ? phoneToggles : showChevron) ? toggleDetail() : undefined)
       : null,
   );
-  // Not actioned by the owner (another actor named, or the card says so):
-  // the spine runs dotted below the node (mobile decision 18).
-  const actedByOwner = byOwner ?? !by;
+  // Not actioned by the owner (another actor named, a receipt from another
+  // account, a transaction another account sent, or the card says so): the
+  // spine runs dotted below the node (mobile decision 18; ui-jobs 304).
+  const ownerIsAccount = useOwnerIsAccount(sent);
+  const actedByOwner = byOwner ?? !(by || custody?.dir === "from" || sentByOther(sent && { ...sent, ownerIsAccount }));
   const rowSlot = useMemo(
     () => ({ legsId: inTimeline ? legsId : undefined, target: rowTarget, byOwner: actedByOwner }),
     [inTimeline, legsId, rowTarget, actedByOwner],
@@ -644,27 +677,19 @@ export function EventCard(props: EventCardProps) {
       {detail}
       {hasPriceRow(price) && <EventPriceRow price={price} />}
 
-      {/* ── Info sections: under a hairline, the (i) Explanation button
+      {/* ── Info sections: the (i) Explanation button
                at the bottom-left opens the pane beneath, drawn with no
                panel, with the footer metadata pinned below. A card
                without an explainer keeps the plain (i) for its footer. ── */}
       {(hasExplainer || txHash) && (
         <div className="px-4 pb-3 pt-1">
-          {/* The event page: the explanation stands open with no panel,
-              under a hairline and the (i) with its heading words, in the
-              foreground as the timeline's row is while open (ui-jobs 289). */}
+          {/* The event page: the explanation stands open with no panel and
+              no heading, in the foreground as the timeline's row is while
+              open (ui-jobs 289). */}
           {pageMode && infoTabs.length > 0 ? (
-            <div className="border-t border-rb-300 pt-3 dark:border-rb-700" data-anatomy="T3" data-prov-exempt="">
-              <div className="flex items-center gap-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground" data-t3-heading="">
-                  <svg className="h-5 w-5 text-foreground" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d={INFO_PATH} clipRule="evenodd" />
-                  </svg>
-                  {EXPLANATION_HEADING}
-                </h3>
-              </div>
+            <div data-anatomy="T3" data-prov-exempt="">
               {infoTabs.map((t) => (
-                <div key={t.key} className="pb-3 pt-5 text-sm">
+                <div key={t.key} className="pb-3 pt-2 text-sm">
                   {t.content}
                 </div>
               ))}
@@ -674,7 +699,7 @@ export function EventCard(props: EventCardProps) {
             <InfoTabsDisclosure
               bare
               anatomy="T3"
-              heading={EXPLANATION_HEADING}
+              rowToggle
               tabs={infoTabs}
               openTab={openInfoTab}
               onOpenTabChange={setOpenInfoTab}

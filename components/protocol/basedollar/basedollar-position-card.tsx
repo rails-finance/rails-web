@@ -26,7 +26,7 @@ export function BasedollarPositionCard({
   live,
   compact,
   surplus,
-  disclosureKey,
+  positionSummary,
   debtDetail,
   riskDetail,
 }: {
@@ -48,7 +48,7 @@ export function BasedollarPositionCard({
   surplus?: LiquityTroveSurplus | null;
   /** The closed/opened card (ui-jobs 209) and its opened-layer lines — see
    *  LiquityPositionCard. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   debtDetail?: React.ReactNode;
   riskDetail?: React.ReactNode;
 }) {
@@ -63,7 +63,7 @@ export function BasedollarPositionCard({
       live={live ? liveFromForkChain(live) : live}
       compact={compact}
       surplus={surplus}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
       debtDetail={debtDetail}
       riskDetail={riskDetail}
     />

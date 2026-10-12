@@ -1,39 +1,37 @@
 "use client";
 
-// Plain-English explainer for a SparkLend event — a layman PARAGRAPH (not
-// bullets), composed from state-keyed clauses in lib/spark/explainer-clauses.tsx,
-// plus the per-event "Learn More" modal on the mechanic. The near-clone of the
-// Aave V3 explainer (SparkLend is a V3 fork with the same single-Pool account
-// model), re-grounded in SparkLend's own semantics. The card shows the
-// paragraph's LEAD sentence as its teaser; this pane renders the REST (skipLead),
-// so the first sentence is never duplicated. Every figure here is the card's own
-// face value, Prov-echoed against the header / detail (and, on a liquidation, the
-// forensics block).
+// The Explanation pane (zone Z2) of a SparkLend event: the generator's
+// sentences (lib/spark/event-prose.ts, its strings in
+// content/spark/event-prose.yaml), one bullet each, under the three event
+// headings when two of them hold two or more bullets. Each figure the header
+// or the liquidation's forensics block also prints echoes that receipt. The
+// "?" modal is the generator's too (the event's kind picks it).
 
 import type { SparkContext } from "@/lib/shared/types/event-shape";
-import type { SparkCoords } from "@/lib/spark/event-provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import { ProseExplainer } from "@/lib/shared/explainer-prose";
+import { chainTruthDeltaValue } from "@/components/shared/chain-truth-event";
+import { ProseSentenceText, type ProseEcho } from "@/components/shared/prose-sentence-text";
+import { liquidationBonus, sparkEventProse, sparkExplanationRuns, type SparkEchoKey } from "@/lib/spark/event-prose";
+import { SPARK_WORDS, sparkModal } from "@/lib/spark/event-templates";
 import {
-  sparkSupplyWithdrawContent,
-  sparkBorrowRepayContent,
-  sparkLiquidationContent,
-  sparkTransferContent,
-  sparkEventFallbackContent,
-} from "@/lib/shared/learn-more-content";
-import { composeBullets, eventClauses, splitLead, ProseExplainer } from "@/lib/shared/explainer-prose";
-import { sparkEventSlots } from "@/lib/spark/explainer-clauses";
+  assetsDeltaProv,
+  debtRepaidProv,
+  liqPremiumProv,
+  seizedCollateralProv,
+  transferDeltaProv,
+  type SparkCoords,
+} from "@/lib/spark/event-provenance";
 import type { AaveV3Neighbours } from "@/lib/aave-v3/event-neighbours";
-import { isGatewayWithdrawal, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
+import { formatUsdValue } from "@/lib/utils/format";
+import { isGatewayWithdrawal, sparkLiquidationFee, type SparkTimelineEvent } from "@/lib/spark/liquidation-fee";
 import { useSparkEventState } from "./use-spark-event-state";
-import { LtvWeightingNote } from "@/components/protocol/aave-v3/aave-v3-position-state";
 
 export interface SparkEventExplainerProps {
   ctx: SparkContext;
   txHash?: string;
   blockNumber?: number;
-  /** The card shows the lead sentence as the teaser; render only the rest here. */
-  skipLead?: boolean;
-  /** The position's owner: the third-party clause keys on it. */
+  /** The position's owner: the third-party sentence keys on it. */
   owner?: string;
   /** With `market`, the prose reads the account state the open card reads
    *  (one shared request each, lib/spark/event-state). */
@@ -45,29 +43,68 @@ export interface SparkEventExplainerProps {
   previous?: AaveV3Neighbours<SparkTimelineEvent>["previous"];
 }
 
-/** Mechanic modal content for this event — never-empty floor: every event type
- *  maps to a modal, the default falling back to the generic SparkLend
- *  explainer. Used by the card composer, which renders the "?" trigger on the
- *  footer row (this pane renders prose only). */
+/** The event's "?" modal: every event type maps to one, the default falling
+ *  back to the generic SparkLend explainer. A withdrawal as ETH through the
+ *  gateway reads the withdraw modal. */
 export function sparkLearnMoreContent(ctx: SparkContext): LearnMoreContent {
   switch (ctx.eventType) {
     case "supply":
+      return sparkModal("supply");
     case "withdraw":
-      return sparkSupplyWithdrawContent(ctx.eventType, ctx.reserveSymbol);
+      return sparkModal("withdraw");
     case "borrow":
+      return sparkModal("borrow");
     case "repay":
-      return sparkBorrowRepayContent(ctx.eventType, ctx.reserveSymbol);
+      return sparkModal("repay");
     case "liquidation":
-      return sparkLiquidationContent();
+      return sparkModal("liquidation");
     case "transfer_out":
-      // A withdrawal as ETH through the gateway reads the withdraw modal.
-      return isGatewayWithdrawal(ctx)
-        ? sparkSupplyWithdrawContent("withdraw", ctx.reserveSymbol)
-        : sparkTransferContent();
+      return isGatewayWithdrawal(ctx) ? sparkModal("withdraw") : sparkModal("transfer");
     case "transfer_in":
-      return sparkTransferContent();
+      return sparkModal("transfer");
     default:
-      return sparkEventFallbackContent();
+      return sparkModal("fallback");
+  }
+}
+
+/** The receipt each echoed figure registers against: the header's delta, or the
+ *  liquidation forensics block's premium. */
+function echoFor(
+  key: SparkEchoKey,
+  ctx: SparkContext,
+  coords: SparkCoords,
+  siblings: SparkTimelineEvent[] | undefined,
+): ProseEcho | null {
+  const sym = ctx.reserveSymbol;
+  const collSym = ctx.collateralSymbol ?? sym;
+  const delta = chainTruthDeltaValue(Number(ctx.assetsDelta), false);
+  switch (key) {
+    case "amount":
+      return { info: assetsDeltaProv(sym, ctx.side, coords), value: delta, symbol: sym };
+    case "amount_in":
+      return { info: transferDeltaProv(sym, "in", coords), value: delta, symbol: sym };
+    case "amount_out":
+      return { info: transferDeltaProv(sym, "out", coords), value: delta, symbol: sym };
+    case "seized":
+      return { info: seizedCollateralProv(collSym, coords), value: delta, symbol: collSym };
+    case "cleared":
+      return {
+        info: debtRepaidProv(sym, coords),
+        value: chainTruthDeltaValue(Number(ctx.debtDelta), false),
+        symbol: sym,
+      };
+    case "premium": {
+      const b = liquidationBonus(ctx, sparkLiquidationFee(ctx, siblings));
+      if (!b) return null;
+      const text = `${b.premium >= 0 ? "+" : "−"}${(Math.abs(b.premium) * 100).toFixed(2)}%`;
+      return {
+        info: liqPremiumProv(coords, {
+          seizedUsd: formatUsdValue(b.seizedUsd),
+          clearedUsd: formatUsdValue(b.clearedUsd),
+        }),
+        value: text,
+      };
+    }
   }
 }
 
@@ -75,7 +112,6 @@ export function SparkEventExplainer({
   ctx,
   txHash,
   blockNumber,
-  skipLead,
   owner,
   market,
   reserveAddress,
@@ -84,15 +120,15 @@ export function SparkEventExplainer({
 }: SparkEventExplainerProps) {
   const coords: SparkCoords = { txHash, blockNumber };
   const read = useSparkEventState({ ctx, wallet: owner, market, blockNumber, txHash, reserveAddress, previous });
-  const clauses = eventClauses(
-    sparkEventSlots(ctx, coords, { owner, siblings, state: read.state, previousEvent: previous?.event }),
+  const prose = sparkEventProse({ ctx, owner, siblings, state: read.state });
+  const echo = (key: SparkEchoKey) => echoFor(key, ctx, coords, siblings);
+  const items = sparkExplanationRuns(prose).flatMap((run) =>
+    run.sentences.map((s) => {
+      const node = <ProseSentenceText key={s.sentence_id} s={s} echo={echo} />;
+      return run.heading ? { group: run.heading, node } : node;
+    }),
   );
-  const items = composeBullets(skipLead ? splitLead(clauses).rest : clauses);
-  // The health-factor bullet needs the account reads; say so when they failed.
-  if (read.status === "unavailable" && !read.lasting)
-    items.push(<>The health factor before and after this transaction was not read. Reload to try again.</>);
-  // How the card's LTV and its limits are figured, where the account read landed.
-  if (read.status === "ready") items.push(<LtvWeightingNote brand="Spark" />);
-
+  // The health factor sentences need the account reads; say so when they failed.
+  if (read.status === "unavailable" && !read.lasting) items.push(<>{SPARK_WORDS.unread}</>);
   return <ProseExplainer items={items} />;
 }

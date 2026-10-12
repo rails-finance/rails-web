@@ -91,6 +91,7 @@ import {
   marketNoteShareRateContent,
   marketNoteVaultTermsContent,
 } from "@/lib/shared/learn-more-content";
+import { polarisModal } from "@/lib/polaris/event-templates";
 import { aaveFamilyRateStepInterestProv, aaveFamilyRateStepProv } from "@/lib/aave-v3/market-note-provenance";
 import { aaveFamilyPriceGapProv } from "@/lib/aave-v3/liquidation-price-note-provenance";
 import { aaveV4PriceGapHealthProv, aaveV4PriceGapProv } from "@/lib/aave-v4/market-note-provenance";
@@ -1315,7 +1316,7 @@ function priceGapBody(note: PriceGapNote, links: NoteLinks, mode: RatioMode): No
       after: { text: f.toBlock, prov: priceProv(note, "blocks"), exact: String(note.to.block) },
     },
     stats,
-    learnMore: marketNotePriceGapContent(isPolaris ? "polaris" : fork ? "liquity-fork" : "liquity-v2"),
+    learnMore: isPolaris ? polarisModal("price_gap") : marketNotePriceGapContent(fork ? "liquity-fork" : "liquity-v2"),
     derivation,
   };
 }
@@ -1909,7 +1910,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     quantity: `primary rate, ${note.to.value >= note.from.value ? "up" : "down"} from ${f.fromRate}`,
     direction: false,
     ...liftTimeCells(stats),
-    learnMore: marketNoteRateStepContent("polaris"),
+    learnMore: polarisModal("rate_step"),
     derivation: note.live ? (
       <>
         This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the

@@ -492,6 +492,7 @@ export function FlowMomentCard({
     const ledger =
       built.length === 0 ? null : multi ? (
         <AssetLedgers
+          moment
           side={side}
           assets={built.map((b) => b.ledger)}
           usd={sideTotal}

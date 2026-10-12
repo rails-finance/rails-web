@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 // ── Content types ────────────────────────────────────────────────────────────
@@ -74,9 +74,13 @@ export function LearnMoreModal({
   content,
   onClose,
   anatomy,
+  extra,
 }: {
   content: LearnMoreContent;
   onClose: () => void;
+  /** A section after the details drawn from the page, not the shared text
+   *  (the Lifetime flows key for this position). */
+  extra?: ReactNode;
   /** The app-anatomy code of the "?" that opened it (rails-ops reference/app-anatomy.md). */
   anatomy?: string;
 }) {
@@ -199,6 +203,8 @@ export function LearnMoreModal({
               </>
             )}
 
+            {extra && <div className="mt-4">{extra}</div>}
+
             {content.video && (
               <div className="mt-4">
                 <p className="font-semibold  mb-2">Learn More</p>
@@ -268,9 +274,12 @@ export function LearnMore({
   label,
   anatomy,
   ariaLabel,
+  extra,
 }: {
   content: LearnMoreContent;
   inline?: boolean;
+  /** Passed to the modal (`LearnMoreModal`'s `extra`). */
+  extra?: ReactNode;
   /** The "?" button's accessible name, where "Learn more" would not tell two
    *  triggers on one panel apart. */
   ariaLabel?: string;
@@ -297,7 +306,7 @@ export function LearnMore({
         )}
         <LearnMoreButton onClick={() => setOpen(true)} ariaLabel={ariaLabel} />
       </div>
-      {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy} />}
+      {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy} extra={extra} />}
     </>
   );
 }

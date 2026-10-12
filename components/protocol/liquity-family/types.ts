@@ -89,6 +89,9 @@ export interface LiquityTroveLive {
   entireCollRaw?: string;
   entireDebtRaw?: string;
   annualInterestRateRaw?: string;
+  /** The collateral token's decimals, the scale of `entireCollRaw` (the forks'
+   *  lane; Liquity V2 reads its branch catalog). */
+  collDecimals?: number;
   priceUsd: number | null;
   /** The live collateral ratio as a PERCENT (the contract's own getCurrentICR
    *  × 100 on the forks; entire figures × oracle price on V2). Null when the

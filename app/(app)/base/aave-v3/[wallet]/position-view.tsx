@@ -47,7 +47,6 @@ import {
   AaveV3ClosedPositionExplanation,
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
-import { AaveV3PoolNotes } from "@/components/protocol/aave-v3/aave-v3-pool-notes";
 import { AaveV3RiskDetail } from "@/components/protocol/aave-v3/aave-v3-risk-slot";
 import { AaveV3BorrowRoom } from "@/components/protocol/aave-v3/aave-v3-ltv-card";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
@@ -651,7 +650,7 @@ export default function AaveV3BasePositionView({
                     // 209), as on Ethereum. The room left to borrow and the
                     // distance bar from the Pool read sit in the opened layer
                     // under Debt and Health factor, inside the card's receipts scope.
-                    disclosureKey={`aave-v3:base:${wallet.toLowerCase()}`}
+                    positionSummary
                     debtDetail={<AaveV3BorrowRoom chain={data} />}
                     riskDetail={<AaveV3RiskDetail chain={data} />}
                     // The Explanation is layman prose about the face figures,
@@ -660,24 +659,14 @@ export default function AaveV3BasePositionView({
                     // face deliberately does not carry.
                     explanation={
                       view.status !== "open" ? (
-                        <AaveV3ClosedPositionExplanation
-                          v={view}
-                          events={aaveEvents}
-                          folders={servedFolders}
-                          marketPhrase="Base market"
-                          countNote={countNote}
-                        />
+                        <AaveV3ClosedPositionExplanation v={view} events={aaveEvents} folders={servedFolders} />
                       ) : (
-                        <>
-                          <AaveV3PositionExplanation
-                            chain={data}
-                            captions={captions}
-                            view={view}
-                            externalActivity={externalActivity}
-                            countNote={countNote}
-                          />
-                          <AaveV3PoolNotes chain={data} collateralAccounting="v3.2+" />
-                        </>
+                        <AaveV3PositionExplanation
+                          chain={data}
+                          captions={captions}
+                          view={view}
+                          externalActivity={externalActivity}
+                        />
                       )
                     }
                   />

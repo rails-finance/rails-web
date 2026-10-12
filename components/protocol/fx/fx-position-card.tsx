@@ -559,14 +559,14 @@ export function FxPositionCard({
   inTxFunding,
   bodyExtra,
   listingPx,
-  disclosureKey,
+  positionSummary,
 }: {
   v: FxPositionView;
   receipts?: boolean;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Context content riding the shell's heading-button row. */
   rowExtra?: React.ReactNode;
   /** The card's Explanation section (narration describing the position NOW). */
@@ -591,7 +591,7 @@ export function FxPositionCard({
   const st = STATUS[v.status] ?? STATUS.unknown;
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   const Detail = disclosing ? PositionCardDetail : Fragment;
   const poolMeta = FX_POOLS[v.pool];
   const terms = useFxPoolTerms(receipts ? v.pool : null);
@@ -655,7 +655,7 @@ export function FxPositionCard({
           pool: poolMeta.tokenSymbol,
           terms,
         })}
-        disclosureKey={disclosureKey}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -727,7 +727,7 @@ export function FxPositionCard({
         colls: v.settled.colls,
         normalizedSymbol: v.normalizedSymbol,
       })}
-      disclosureKey={disclosureKey}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}
