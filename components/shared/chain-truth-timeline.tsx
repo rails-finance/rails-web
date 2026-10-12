@@ -65,11 +65,8 @@
 // THE FOLDERS ARE NOT A READER'S CHOICE (rails-ops decision 0021, and
 // TO-DO-position-card 326 for the client-grouped pages): like events always
 // collapse. A folder opens when the reader opens it, when a date filter leaves
-// it standing, or when a permalink lands in it; its ⋮ lists its events.
+// it standing, or when a permalink lands in it.
 
-import { formatDate } from "@/lib/date";
-import { formatTimestamp } from "@/lib/shared/format-event";
-import { GroupMembersContext, type GroupMemberItem } from "@/components/shared/event-card-menu";
 import { LedgerAssetFilterContext } from "@/components/shared/event-ledger";
 import { UnreadTokensProvider } from "@/components/shared/unread-tokens-context";
 import { useFlowFocus, useFlowFocusState, useRewindParam } from "@/components/shared/flow-focus-context";
@@ -288,8 +285,9 @@ export interface TimelineRunSpec {
   /** This spec's row IS one event's row, not a collapse of like rows: several
    *  logs of ONE TRANSACTION drawn as one card (Alchemix's opening: the NFT's
    *  mint, the deposit that funded it and the forwarding hop). Two things
-   *  follow. It has no folder and no ⋮ list, because nothing is being hidden
-   *  behind a click; and the row is wrapped the way a single card is, with the day prefix, the share link and the `?at=`
+   *  follow. It has no folder, because nothing is being hidden behind a
+   *  click; and the row is wrapped the way a single card is, with the day
+   *  prefix, the share link and the `?at=`
    *  landing target all taken from the run's first member. A spec that leaves
    *  this off keeps the collapse behaviour unchanged. */
   asOneEvent?: boolean;
@@ -1622,20 +1620,6 @@ function ChainTruthTimelineBody({
   // none.
   const shareHrefFor = (id: string) =>
     `${positionPath}/event/${encodeURIComponent(id)}${subjectQuery ? `?${subjectQuery}` : ""}`;
-  /** A collapsed run's events for its row's ⋮, newest first: each opens its
-   *  event page. */
-  const groupMembersOf = (evts: BaseActivityEvent[]): GroupMemberItem[] =>
-    [...evts]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .map((e) => {
-        const n = tl.eventNumberOf(e);
-        return {
-          id: e.id,
-          title: e.actionLabel,
-          subtitle: `${n ? `#${n} · ` : ""}${formatDate(e.timestamp)} ${formatTimestamp(e.timestamp)} UTC`,
-          href: shareHrefFor(e.id),
-        };
-      });
 
   /** An `asOneEvent` run row is one card for one transaction, so it takes the
    *  wrappers a single card takes: the day prefix from its place in the flat
@@ -2086,23 +2070,21 @@ function ChainTruthTimelineBody({
                       value={!liveHoldsTip && row.events.some((e) => e.id === tipEventId) ? tipSide : null}
                     >
                       <UnreadTokensProvider tokens={unreadTokensIn(row.events)}>
-                        <GroupMembersContext.Provider value={row.spec.asOneEvent ? null : groupMembersOf(row.events)}>
-                          {wrapRunRow(
-                            row,
-                            row.spec.render(row.events, {
-                              isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
-                              children: row.events.map((e, k) =>
-                                renderEventRow(e, row.flatIdx + k, {
-                                  inRun: true,
-                                  mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
-                                }),
-                              ),
-                              eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
-                              landingId: landingRunMember ?? undefined,
-                            }),
-                            marked,
-                          )}
-                        </GroupMembersContext.Provider>
+                        {wrapRunRow(
+                          row,
+                          row.spec.render(row.events, {
+                            isLast: row.flatIdx + row.events.length === events.length && !bottomTerminusTaken,
+                            children: row.events.map((e, k) =>
+                              renderEventRow(e, row.flatIdx + k, {
+                                inRun: true,
+                                mark: marked && !row.spec.asOneEvent && k === newestOf(row.events),
+                              }),
+                            ),
+                            eventNumbers: row.events.map((e) => tl.eventNumberOf(e)),
+                            landingId: landingRunMember ?? undefined,
+                          }),
+                          marked,
+                        )}
                       </UnreadTokensProvider>
                     </SpineTipContext.Provider>
                   );
