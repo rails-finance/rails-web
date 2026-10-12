@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type TimelineDisplayKey =
-  | "showTimelineValues"
   | "showTickerLabels"
   | "showInterestRates"
   | "showCollateralRatio"
@@ -13,10 +12,6 @@ export type TimelineDisplayKey =
   | "showTxHashes";
 
 export interface TimelineDisplayState {
-  /** When true, the SpineColumn surfaces flanking values along the timeline
-   * spine and event-card headers hide their amount on desktop to avoid
-   * duplication. When false, values move into the card header instead. */
-  showTimelineValues: boolean;
   /** When true, position-snapshot rows show the asset ticker text alongside
    * the icon. Off by default — the icon alone identifies the asset. */
   showTickerLabels: boolean;
@@ -47,7 +42,6 @@ export interface TimelineDisplayState {
 }
 
 const DEFAULTS = {
-  showTimelineValues: true,
   showTickerLabels: false,
   showInterestRates: false,
   showCollateralRatio: false,
@@ -66,7 +60,8 @@ const Ctx = createContext<TimelineDisplayState>({
   toggle: () => {},
 });
 
-/** A stored preference drops the retired switches: `showUsdValues`,
+/** A stored preference drops the retired switches: `showTimelineValues`
+ *  (the spine always carries the values), `showUsdValues`,
  *  `showChangeBars`, `showBalanceBars`, `showEventNumbers`, `showTimestamps`,
  *  `showUsdStable`, `showUsdOther` and `mobileSpine` (the phone's Timeline |
  *  List choice: the spine view is the only phone view). */
@@ -80,6 +75,7 @@ function migrate(
     showUsdStable?: boolean;
     showUsdOther?: boolean;
     mobileSpine?: boolean;
+    showTimelineValues?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -92,6 +88,7 @@ function migrate(
     showUsdStable,
     showUsdOther,
     mobileSpine,
+    showTimelineValues,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */

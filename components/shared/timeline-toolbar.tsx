@@ -282,13 +282,10 @@ export const TX_HASH_ITEM: TimelineDisplayItem = { key: "showTxHashes", label: "
 
 /** Display flags the chain-state timeline exposes: the ones with a render path
  *  on every family's cards (Morpho, MakerDAO, Aave V3 + Spark, the Liquity
- *  forks, Liquity V1). USD and timestamps always show, so Timeline values and
- *  Transaction hashes are the items. ChainTruthTimeline appends Collapse-runs
+ *  forks, Liquity V1). USD, timestamps and the spine's values always show, so
+ *  Transaction hashes is the item. ChainTruthTimeline appends Collapse-runs
  *  whenever the page passes `runs`. */
-export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimelineValues", label: "Timeline values" },
-  TX_HASH_ITEM,
-];
+export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [TX_HASH_ITEM];
 
 /** The Polaris CDP page's display menu: the chain-truth base plus the
  *  Collateral Ratio switch for the header's ratio chip, priced by the
@@ -296,7 +293,6 @@ export const CHAIN_TRUTH_DISPLAY_ITEMS: TimelineDisplayItem[] = [
  *  fixed. No collapse item: the CDP timeline passes no
  *  `runs` (rails-ops TO-DO-polaris-v2-parity §1.4, measured 2026-09-10). */
 export const POLARIS_DISPLAY_ITEMS: TimelineDisplayItem[] = [
-  { key: "showTimelineValues", label: "Timeline values" },
   { key: "showCollateralRatio", label: "Collateral Ratio" },
   TX_HASH_ITEM,
 ];

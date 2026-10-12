@@ -8,7 +8,6 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useTimelineScale, SpineVal, fmtSpine } from "@/components/shared/activity-timeline";
-import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
@@ -137,8 +136,7 @@ export interface SpineWarningLeg {
 }
 
 export interface SpineColumnProps {
-  /** icon="swap" only — the legs, drawn beside the node while Timeline values
-   *  are on (the header keeps them otherwise). */
+  /** icon="swap" only — the legs, drawn beside the node. */
   swapLegs?: SpineSwapLeg[];
   /** icon="swap" only — tints the glyph in the Lifetime flows tower's hues.
    *  Unset draws the mixed, two-tone glyph. */
@@ -748,17 +746,7 @@ function spokenWarningLegs(legs: SpineWarningLeg[], unreadOf: ReturnType<typeof 
  *  in the event's tone. Both point out of the position — the collateral left
  *  it and the debt was cleared — so a redemption reads as a withdraw plus a
  *  repay. */
-function WarningLegNodes({
-  legs,
-  tone,
-  showValues,
-  filterable,
-}: {
-  legs: SpineWarningLeg[];
-  tone: Tone;
-  showValues: boolean;
-  filterable: boolean;
-}) {
+function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; tone: Tone; filterable: boolean }) {
   const scale = useTimelineScale();
   const unreadOf = useUnreadTokenOf();
   return (
@@ -766,7 +754,7 @@ function WarningLegNodes({
       {legs.map((leg, i) => {
         // A token whose decimals did not load keeps its node and states no figure.
         const txt =
-          showValues && isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
+          isFinite(leg.value) && leg.value !== 0 && !unreadOf(leg.address, leg.symbol)
             ? fmtHeaderMagnitude(Math.abs(leg.value), leg.symbol)
             : "";
         return (
@@ -825,7 +813,6 @@ export function SpineColumn({
   const scale = useTimelineScale();
   const contextTip = useContext(SpineTipContext);
   const effectiveTip: SpineTip | null = tip !== undefined ? tip : contextTip;
-  const { showTimelineValues } = useTimelineDisplay();
   const unreadOf = useUnreadTokenOf();
   // The row: its controls take the legs for their name, and where the whole
   // row is the card's click target the token chips drop their filter click.
@@ -867,10 +854,6 @@ export function SpineColumn({
   // show. Only a row that is neither falls through to `no-change`.
   const effectiveIcon: SpineIcon | undefined =
     icon ?? (tokens?.length ? undefined : externalParty ? "external" : "no-change");
-  // Spine flanking values follow the "Timeline values" toggle in both views
-  // (interpreted and chain-state): the compact notation is the one-step
-  // readability leeway the tier allows (view-tiers.md).
-  const spineValues = showTimelineValues;
   // The node's halo takes the page's ground: the list's line (spine-line.tsx)
   // stops 4px short of every glyph.
   const ground = "var(--background)";
@@ -924,7 +907,7 @@ export function SpineColumn({
       case "warning": {
         // The legs as nodes; the triangle only where the event names none.
         const legs = adverseLegs?.length ? (
-          <WarningLegNodes legs={adverseLegs} tone={warningTone} showValues={spineValues} filterable={!rowTarget} />
+          <WarningLegNodes legs={adverseLegs} tone={warningTone} filterable={!rowTarget} />
         ) : (
           nodeRow(<WarningIcon size={T} color={SPINE_COLORS[warningTone]} />)
         );
@@ -934,19 +917,17 @@ export function SpineColumn({
         return nodeRow(
           <RateIcon size={T} />,
           rateSpan ? (
-            spineValues ? (
-              <span
-                className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
-                style={{ gridColumn: "4 / 6" }}
-                data-spine-rate=""
-              >
-                <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
-                <span className="px-1 font-normal text-rb-500" aria-hidden>
-                  &rarr;
-                </span>
-                {rateSpan[1].toFixed(2)}%
+            <span
+              className="justify-self-start whitespace-nowrap pl-1 text-base font-semibold tabular-nums"
+              style={{ gridColumn: "4 / 6" }}
+              data-spine-rate=""
+            >
+              <span className="font-normal text-rb-500">{rateSpan[0].toFixed(2)}%</span>
+              <span className="px-1 font-normal text-rb-500" aria-hidden>
+                &rarr;
               </span>
-            ) : undefined
+              {rateSpan[1].toFixed(2)}%
+            </span>
           ) : iconDirection ? (
             <>
               <DirectionArrow direction={iconDirection} size={Math.round(scale.arrowSize * 0.7)} />
@@ -983,7 +964,7 @@ export function SpineColumn({
       case "swap":
         return nodeRow(
           <SwapIcon size={T} axis={swapAxis} />,
-          spineValues && swapLegs?.length ? <SwapLegs legs={swapLegs} /> : undefined,
+          swapLegs?.length ? <SwapLegs legs={swapLegs} /> : undefined,
         );
       case "market":
       case "market-open":
@@ -1053,9 +1034,7 @@ export function SpineColumn({
         left={
           <>
             <SpineVal
-              value={
-                spineValues && row.direction === "left" && !unreadOf(row.address, row.symbol) ? row.value : undefined
-              }
+              value={row.direction === "left" && !unreadOf(row.address, row.symbol) ? row.value : undefined}
               side="left"
               onChange={row.direction === "left" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}
@@ -1095,9 +1074,7 @@ export function SpineColumn({
           <>
             {row.direction === "right" ? <ArrowFromDot direction="right" size={scale.arrowSize} /> : <span />}
             <SpineVal
-              value={
-                spineValues && row.direction === "right" && !unreadOf(row.address, row.symbol) ? row.value : undefined
-              }
+              value={row.direction === "right" && !unreadOf(row.address, row.symbol) ? row.value : undefined}
               side="right"
               onChange={row.direction === "right" ? row.onValueChange : undefined}
               decimals={row.valueDecimals}

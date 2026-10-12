@@ -588,8 +588,8 @@ export function ChainTruthRow({
    *  h1, the words and amounts large. */
   variant?: "row" | "page" | "title";
 }) {
-  // The moved amounts follow the shared header hide-class: on the spine (≥md,
-  // Timeline values on), hidden here; otherwise rendered here.
+  // The moved amounts follow the shared header hide-class: on the spine,
+  // hidden here; on a pinned page below sm, rendered here.
   // Timestamps gate inside <EventTime>. pl-5 pt-4 pb-3 insets the row from the
   // card edge and aligns it with the detail's px-5.
   const unreadOf = useUnreadTokenOf();
@@ -693,7 +693,7 @@ export function ChainTruthRow({
 
   const labelNode = adverse ? (
     // T1 reads the word in the event's tone (caution, or the critical red);
-    // the legs follow it with Timeline values off or below sm.
+    // the legs follow it on a pinned page below sm.
     <span
       className={`max-w-full shrink-0 ${sz.txt} ${WARNING_TONE_TEXT[spec.critical ? "critical" : "caution"]}`}
       data-adverse-word=""
