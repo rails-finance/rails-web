@@ -42,7 +42,7 @@ import {
   type CompoundCoords,
 } from "@/lib/compound/event-provenance";
 import { COMPOUND_INDEXED_VOCABULARY, type CompoundTowerVocabulary } from "@/lib/compound/economics";
-import { compoundPositionContent, type CompoundPositionDeployment } from "@/lib/compound/position-content";
+import { compoundPositionModal, type CompoundPositionDeployment } from "@/lib/compound/event-templates";
 import { EXPLORERS_WITHOUT_LISTING } from "@/lib/shared/coverage";
 import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
@@ -424,14 +424,14 @@ export function CompoundPositionCard({
   session = "compound",
   lane = {},
   peaks = true,
-  disclosureKey,
+  positionSummary,
   risk,
   debtDetail,
 }: {
   v: CompoundPositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The risk headline from the page's Comet read, with its opened layer
    *  (compoundRiskColumn). */
   risk?: CardRiskColumn | null;
@@ -467,7 +467,7 @@ export function CompoundPositionCard({
   const eff = effectiveBase(v);
   // The closed/opened card (ui-jobs 209): every line under a headline moves
   // into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // The "?" cell every state panel owns — the same content function serves
   // Compound V3 on Ethereum and on Base; only the deployment named by the
   // card's own session changes the prose.
@@ -529,8 +529,8 @@ export function CompoundPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment })}
-        disclosureKey={disclosureKey}
+        learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment })}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -620,8 +620,8 @@ export function CompoundPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={compoundPositionContent({ status: v.status, deployment: positionDeployment, side: eff.side })}
-      disclosureKey={disclosureKey}
+      learnMore={compoundPositionModal({ status: v.status, deployment: positionDeployment, side: eff.side })}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

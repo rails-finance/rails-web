@@ -9,6 +9,9 @@ import { useEffect, useState } from "react";
 import type { MorphoContext } from "@/lib/shared/types/event-shape";
 import type { MorphoMarketAtBlockResponse } from "@/lib/sources/chain/morpho-position";
 import { blockTimeText } from "@/lib/morpho/oracle-age";
+import { fmtMorphoAmount } from "@/lib/morpho/figure-format";
+
+export { fmtMorphoAmount };
 
 export type MorphoAtBlock =
   | { status: "loading" }
@@ -62,22 +65,6 @@ export function useMorphoAtBlock(marketId: string | undefined, block: number | u
 
 // ── figures ─────────────────────────────────────────────────────────────────
 
-/** A token amount on a Morpho event, at the timeline row's precision below
- *  1,000 (the spine's rule): two decimals from 1, four below 1, and a tiny
- *  non-zero amount at three significant digits, never "0". From 1,000 it keeps
- *  two decimals where the row abbreviates ("2.8K"), so a sum of event figures
- *  still adds up. */
-export function fmtMorphoAmount(v: number | string | undefined): string {
-  const n = typeof v === "string" ? Number(v) : (v ?? 0);
-  if (!Number.isFinite(n) || n === 0) return "0";
-  const a = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (a >= 1) return sign + a.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  if (a >= 0.0001) return sign + String(parseFloat(a.toFixed(4)));
-  if (a < 0.000001) return `${sign}<0.000001`;
-  return sign + a.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-}
-
 /** A part of a sum, at the precision of the sum it belongs to: two decimals
  *  when the total is 1 or more (so 127.80 + 0.14 = 127.94 reads as it adds),
  *  the amount's own precision below. */
@@ -95,7 +82,8 @@ export function fmtMorphoPart(n: number | string, total: number | string): strin
 export function subDecimal(a: string, b: string): string {
   const places = (s: string) => (s.includes(".") ? s.split(".")[1].length : 0);
   const d = Math.min(18, Math.max(places(a), places(b)));
-  return (Number(a) - Number(b)).toFixed(d).replace(/\.?0+$/, "") || "0";
+  const diff = (Number(a) - Number(b)).toFixed(d);
+  return (diff.includes(".") ? diff.replace(/\.?0+$/, "") : diff) || "0";
 }
 
 /** A health factor: a third decimal below 1.1, rounded down under 1 so a

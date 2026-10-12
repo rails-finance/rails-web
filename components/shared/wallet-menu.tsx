@@ -144,13 +144,7 @@ export function WalletMenu({
         >
           {label}
         </span>
-        {fav && (
-          <BookmarkCheck
-            data-wallet-bookmarked=""
-            className="h-3.5 w-3.5 shrink-0"
-            aria-hidden="true"
-          />
-        )}
+        {fav && <BookmarkCheck data-wallet-bookmarked="" className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden="true"

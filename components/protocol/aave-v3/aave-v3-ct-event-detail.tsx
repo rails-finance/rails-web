@@ -96,8 +96,6 @@ import {
 import { AmountText, ExactTip } from "@/components/shared/amount-text";
 import { fmtPositionAmount } from "@/components/shared/position-row";
 import { fmt2 } from "@/lib/aave-v3/liquidation-fee";
-import { v3Protocol } from "@/lib/aave-v3/protocol-name";
-import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE } from "@/lib/seamless/asset-catalog";
 
 export interface AaveV3CtEventDetailProps {
   ctx: AaveV3Context;
@@ -135,8 +133,6 @@ export interface AaveV3EventBody {
   notes?: ReactNode;
   /** The prices the cells' USD figures use. */
   prices: EventPriceChip[];
-  /** The rates behind the interest sub-lines, for the explanation. */
-  rateNote?: ReactNode;
   /** The read around the transaction, where it landed. */
   state?: AaveV3PositionState;
   stateCoords: V3Coords;
@@ -246,7 +242,6 @@ export function useAaveV3EventBody({
   const moved = new Set<"supply" | "debt">();
   // The balances whose interest line runs from the previous event: the note
   // under them states the reserve's rate at both ends.
-  const rated: { reserve: string; symbol: string; side: "supply" | "debt" }[] = [];
 
   /** Interest since the previous event, from the two position reads; where
    *  they are not in hand, the row's own figure, which runs from the last
@@ -257,8 +252,6 @@ export function useAaveV3EventBody({
     const since = ready ? sincePrevious(ready, prevReady, reserve, a.side) : undefined;
     // Interest under a millionth of a token is below what the line can show.
     if (since && Number(since.interest) < 1e-6) return undefined;
-    if (since && reserve && !rated.some((x) => x.reserve === reserve && x.side === a.side))
-      rated.push({ reserve, symbol: a.symbol, side: a.side });
     if (since)
       return {
         value: since.interest,
@@ -807,10 +800,6 @@ export function useAaveV3EventBody({
           : undefined,
     notes,
     prices: priceChips(pricePills),
-    rateNote:
-      ready && prevReady && rated.length > 0 ? (
-        <RateNote here={ready} prev={prevReady} rated={rated} seamless={v3Protocol(coords.pool) === "Seamless"} />
-      ) : undefined,
     state: ready,
     stateCoords,
   };
@@ -839,98 +828,3 @@ function EventRowLines({ rows }: { rows: ChainTruthStat[] }) {
   );
 }
 
-/** A reserve's yearly rate (ray) as a percentage. */
-const rayPct = (ray: string): number => (Number(BigInt(ray) / BigInt(10) ** BigInt(21)) / 1e6) * 100;
-/** Two decimals, or two significant figures under 0.1% so a small rate does not read 0.00%. */
-const pctText = (p: number): string =>
-  p > 0 && p < 0.1
-    ? `${p.toLocaleString("en-US", { maximumSignificantDigits: 2 })}%`
-    : `${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-
-/** The rate behind each interest line at both ends: the reserve's
- *  getReserveData rate once the previous event's block had run, and once this
- *  one's had. Interest accrues at each moment's rate, which moves with the
- *  share of the reserve on loan, so the two ends alone cannot explain the
- *  interest; the stretch's average from the reserve's own index at both reads
- *  can (index ratio − 1, per 365-day year). On Seamless, a stretch that spans
- *  the freeze says so, whichever way the rate went. */
-function RateNote({
-  here,
-  prev,
-  rated,
-  seamless,
-}: {
-  here: AaveV3PositionState;
-  prev: AaveV3PositionState;
-  rated: { reserve: string; symbol: string; side: "supply" | "debt" }[];
-  seamless: boolean;
-}) {
-  const seconds = here.blockTimestamp - prev.blockTimestamp;
-  const rows = rated.flatMap((x) => {
-    const h = here.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
-    const p = prev.reserves.find((r) => r.reserve.toLowerCase() === x.reserve.toLowerCase());
-    const hl = h ? (x.side === "debt" ? h.debt : h.supply) : null;
-    const pl = p ? (x.side === "debt" ? p.debt : p.supply) : null;
-    if (!hl?.rate || !pl?.rate) return [];
-    return [{ ...x, then: rayPct(pl.rate), now: rayPct(hl.rate), growth: indexGrowth(pl.index, hl.index) }];
-  });
-  // The at-block reads carry each reserve's getReserveData rate at the block;
-  // the index's rows carry the rate of the last reserve update, not the block's.
-  const atBlock = (s: AaveV3PositionState) => s.sources.balances === "chain-read-at-block";
-  if (rows.length === 0 || !atBlock(here) || !atBlock(prev)) return null;
-  const spansFreeze = seamless && prev.block < SEAMLESS_FREEZE_BLOCK && here.block >= SEAMLESS_FREEZE_BLOCK;
-  // An average over less than a day says nothing the two ends do not.
-  const days = seconds / 86400;
-  const averaged = days >= 1 ? rows.filter((r) => r.growth != null && r.growth >= 0) : [];
-  return (
-    <div className="px-5 pb-2 text-xs leading-relaxed text-rb-500" data-rate-note="">
-      <p>
-        {rows.map((r) => (
-          <span key={`${r.reserve}:${r.side}`}>
-            {r.symbol} {r.side === "debt" ? "borrow" : "supply"} rate: {pctText(r.then)} a year after the previous event
-            (block {prev.block.toLocaleString("en-US")}), {pctText(r.now)} at this block.{" "}
-          </span>
-        ))}
-        Interest accrues at each moment&rsquo;s rate, which rises and falls with the share of the reserve on loan.
-      </p>
-      {averaged.length > 0 && (
-        <p data-rate-average="">
-          Over the {Math.round(days).toLocaleString("en-US")} day{Math.round(days) === 1 ? "" : "s"} between the two,{" "}
-          {averaged.map((r, i) => {
-            const g = r.growth as number;
-            return (
-              <span key={`${r.reserve}:${r.side}:avg`}>
-                {i > 0 ? (i === averaged.length - 1 ? " and " : ", ") : null}
-                the {r.symbol} {r.side === "debt" ? "borrow" : "supply"} rate averaged{" "}
-                {pctText((g * 365 * 86400 * 100) / seconds)} a year ({r.side === "debt" ? "debt" : "supply"} index +
-                {pctText(g * 100)})
-              </span>
-            );
-          })}
-          .
-        </p>
-      )}
-      {spansFreeze && (
-        <p>
-          This stretch spans the freeze of every Seamless reserve on {SEAMLESS_FREEZE_DATE} (block{" "}
-          {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}), after which nothing could be supplied or borrowed; the
-          average covers the rates on both sides of it.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** The reserve index's growth between two reads (0.02728 = +2.728%), or null
- *  where either index is unread. */
-function indexGrowth(from: string, to: string): number | null {
-  try {
-    const a = BigInt(from);
-    const b = BigInt(to);
-    if (a <= BigInt(0)) return null;
-    // Twelve decimals of the ratio; the ray indexes carry 27.
-    return Number(((b - a) * BigInt(10) ** BigInt(12)) / a) / 1e12;
-  } catch {
-    return null;
-  }
-}

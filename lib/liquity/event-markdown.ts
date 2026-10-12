@@ -2,7 +2,8 @@
 // the event blocks of the test exports (BRIEF §3, §4). The context header,
 // then L1 to L5 and the footer, each level the generator's text
 // (lib/liquity/event-prose.ts) and the ledgers' rows (event-ledgers.ts), so a
-// string on the page comes out here character for character. Facts only.
+// string on the page comes out here character for character. Facts only. The
+// modal, L4 and heading forms are every family's (lib/shared/event-prose/markdown.ts).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/lib/liquity/event-prose";
 import { ledgerMarkdown, type LiquityEventLedger } from "@/lib/liquity/event-ledgers";
 import { COPY_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
+import { l4Markdown, l5Heading, learnMoreMarkdown as sharedLearnMore } from "@/lib/shared/event-prose/markdown";
 
 export interface LiquityEventLedgers {
   collateral: LiquityEventLedger | null;
@@ -21,33 +23,9 @@ export interface LiquityEventLedgers {
 }
 
 /** The "?" modal as Markdown, in the modal's order. */
-export function learnMoreMarkdown(c: LearnMoreContent): string[] {
-  const paras: string[] = [c.intro];
-  if (c.stepsHeading && c.steps) paras.push([c.stepsHeading, ...c.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n"));
-  for (const p of c.extraParagraphs ?? []) paras.push(p);
-  if (c.detailsHeading && c.details)
-    paras.push(
-      [
-        c.detailsHeading,
-        ...c.details.map(
-          (d) =>
-            `- **${d.bold}** — ${
-              d.sources?.length ? `${d.text.replace(/\.$/, "")} (${d.sources.map((s) => s.label).join("; ")}).` : d.text
-            }`,
-        ),
-      ].join("\n"),
-    );
-  if (c.video) paras.push(`${c.video.description} ${c.video.label}`);
-  const out = paras.join("\n\n").split("\n");
-  if (c.links?.length) out.push(`${COPY_WORDS.links} ${c.links.map((l) => l.label).join(" · ")}`);
-  return out;
-}
+export const learnMoreMarkdown = (c: LearnMoreContent): string[] => sharedLearnMore(c, COPY_WORDS.links);
 
-/** A group's heading in L4: "**L4 · What happened**". */
-export const l4Heading = (heading: string) => `**L4 · ${heading}**`;
-
-/** The L5 heading: "**L5 · How adjusting a trove works**". */
-export const l5Heading = (title: string) => `**L5 · ${title}**`;
+export { l5Heading };
 
 /** One event's block. `l5: "full"` prints the modal (a single-event copy);
  *  "ref" names it (a position export prints each once, at the end). */
@@ -68,8 +46,7 @@ export function liquityEventMarkdown(
   }
   // A grouped explanation heads each group's bullets "**L4 · What happened**",
   // the pane's heading (ui-jobs 282).
-  for (const run of explanationRuns(p))
-    out.push("", run.heading ? l4Heading(run.heading) : "**L4**", ...run.sentences.map((s) => `- ${s.text}`));
+  out.push(...l4Markdown(explanationRuns(p)));
   if (l5 === "full") out.push("", l5Heading(p.L5.content.title), ...learnMoreMarkdown(p.L5.content));
   else out.push("", `**L5** ${p.L5.content.title} ${COPY_WORDS.below}`);
   out.push("", `**${COPY_WORDS.footer}** ${footerLine(p)}`);

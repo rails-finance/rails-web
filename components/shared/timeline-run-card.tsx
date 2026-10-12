@@ -324,7 +324,7 @@ export function TimelineRunCard({
   const countMark = `(${count.toLocaleString("en-US")})`;
 
   /** The sums, verb by verb: the summary card's body, and T1's legs where
-   *  the spine does not carry them (Timeline values off, a pinned page). */
+   *  the spine does not carry them (a pinned page). */
   const sums = (hide: string, counts: boolean) =>
     aggregates?.map((agg, i) => {
       const unread = unreadOf(undefined, agg.symbol);

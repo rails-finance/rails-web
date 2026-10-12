@@ -21,7 +21,8 @@ import { formatUsd } from "@/lib/shared/format-event";
 // The position card's own formatter for this figure, so a $1.18 line reads
 // $1.18 in both places.
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
-import { FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
+import { FORK_DEBT_SYMBOL, forkLiveScaling, forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { Prov } from "@/components/shared/provenance";
 import { forkAmount, forkCollAmount, forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -189,6 +190,10 @@ export function LiquityForkPositionExplanation({
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return null;
   const debtSymbol = FORK_DEBT_SYMBOL[chain.protocol] ?? "debt";
   const reserve = forkLiquidationReserve(chain.protocol);
+  // The card's receipts, one per figure (the shared fork vocabulary).
+  const vocab = forkLiveVocab(chain.protocol);
+  const sym = chain.symbol;
+  const rateProv = vocab.liveRateProv(sym, isBatched, forkLiveScaling(chain, sym, debtSymbol).rate);
   const hasDebt = chain.entireDebt > 0;
   const dropPct =
     chain.priceUsd != null && chain.liqPriceUsd != null && chain.priceUsd > chain.liqPriceUsd
@@ -226,7 +231,11 @@ export function LiquityForkPositionExplanation({
   if (chain.priceUsd != null) {
     bullets.push(
       <span key="worth">
-        At the branch&rsquo;s own price, that collateral is worth <H>{formatUsd(chain.entireColl * chain.priceUsd)}</H>.
+        At the branch&rsquo;s own price, that collateral is worth{" "}
+        <Prov info={vocab.forkUsdProv("Collateral", sym)}>
+          <H>{formatUsd(chain.entireColl * chain.priceUsd)}</H>
+        </Prov>
+        .
       </span>,
     );
   }
@@ -246,8 +255,11 @@ export function LiquityForkPositionExplanation({
       isBatched ? (
         <span key="interest">
           Of that debt, <AmountText value={chain.accruedInterest} /> {debtSymbol} is interest built up at its
-          batch&rsquo;s <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate — the rate its interest-batch
-          manager sets for every member.
+          batch&rsquo;s{" "}
+          <Prov info={rateProv}>
+            <H>{chain.annualInterestRatePct.toFixed(2)}%</H>
+          </Prov>{" "}
+          annual rate — the rate its interest-batch manager sets for every member.
           {chain.accruedBatchManagementFee > 0 && (
             <>
               {" "}
@@ -262,7 +274,11 @@ export function LiquityForkPositionExplanation({
       ) : (
         <span key="interest">
           Of that debt, <AmountText value={chain.accruedInterest} /> {debtSymbol} is interest built up at the
-          Trove&rsquo;s own <H>{chain.annualInterestRatePct.toFixed(2)}%</H> annual rate.
+          Trove&rsquo;s own{" "}
+          <Prov info={rateProv}>
+            <H>{chain.annualInterestRatePct.toFixed(2)}%</H>
+          </Prov>{" "}
+          annual rate.
           {chain.status !== "zombie" && <> A higher rate also buys a later place in the redemption queue.</>}
         </span>
       ),
@@ -283,15 +299,22 @@ export function LiquityForkPositionExplanation({
   if (hasDebt && chain.icr != null) {
     bullets.push(
       <span key="icr">
-        Collateral ratio <H>{(chain.icr * 100).toFixed(1)}%</H>, against the branch&rsquo;s{" "}
-        <H>{(chain.mcr * 100).toFixed(0)}%</H> minimum. Below it, anyone can liquidate the Trove.
+        Collateral ratio{" "}
+        <Prov info={vocab.contractIcrProv(sym)}>
+          <H>{(chain.icr * 100).toFixed(1)}%</H>
+        </Prov>
+        , against the branch&rsquo;s <H>{(chain.mcr * 100).toFixed(0)}%</H> minimum. Below it, anyone can liquidate the
+        Trove.
       </span>,
     );
     if (dropPct != null && chain.liqPriceUsd != null) {
       bullets.push(
         <span key="drop">
-          {chain.symbol} can fall about <H>{dropPct}%</H> (to <H>{formatLiquidationPrice(chain.liqPriceUsd)}</H>) before
-          liquidation begins.
+          {chain.symbol} can fall about <H>{dropPct}%</H> (to{" "}
+          <Prov info={vocab.liqPriceProv(sym)}>
+            <H>{formatLiquidationPrice(chain.liqPriceUsd)}</H>
+          </Prov>
+          ) before liquidation begins.
         </span>,
       );
     }
@@ -346,8 +369,11 @@ export function LiquityForkPositionExplanation({
   } else if (hasDebt && chain.debtInFront != null) {
     bullets.push(
       <span key="queue">
-        <AmountText value={chain.debtInFront} /> {debtSymbol} of this branch&rsquo;s debt sits at the same or lower
-        interest rate, redeemed before this Trove when {debtSymbol} holders redeem at $1 face.
+        <Prov info={vocab.debtInFrontProv(sym)}>
+          <AmountText value={chain.debtInFront} />
+        </Prov>{" "}
+        {debtSymbol} of this branch&rsquo;s debt sits at the same or lower interest rate, redeemed before this Trove
+        when {debtSymbol} holders redeem at $1 face.
       </span>,
     );
   }

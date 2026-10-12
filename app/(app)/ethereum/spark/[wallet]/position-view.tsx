@@ -806,7 +806,7 @@ export default function SparkPositionDetail({
                 // 209). The room left to borrow and the distance bar from the
                 // Pool read sit in the opened layer under Debt and Health
                 // factor, inside the card's receipts scope.
-                disclosureKey={`spark:${wallet.toLowerCase()}`}
+                positionSummary
                 debtDetail={chain ? <SparkBorrowRoom chain={chain} /> : undefined}
                 riskDetail={chain ? <SparkRiskDetail chain={chain} /> : undefined}
                 // The Explanation is now pure layman prose about those same face

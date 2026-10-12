@@ -179,7 +179,7 @@ function Position({
         // Closed by default, remembered per viewer and position (ui-jobs 209).
         // The borrowing-limit headline, the room left to borrow and the
         // distance bar come from the live Comet read.
-        disclosureKey={`compound:${view.market}:${view.account.toLowerCase()}`}
+        positionSummary
         risk={view.status === "open" ? compoundRiskColumn(chain ?? null, compoundBorrowing(view)) : null}
         debtDetail={chain ? <CompoundBorrowRoom chain={chain} /> : undefined}
         // The Explanation is now pure layman prose about those same face

@@ -7,6 +7,7 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { LiquityFaceProvContext } from "@/components/protocol/liquity-family/types";
 import { formatNum, formatUsd } from "@/lib/shared/format-event";
+import { formatExact } from "@/lib/utils/format";
 import { stateOriginVia } from "@/lib/shared/trove-state-origin";
 import { scalingOf, TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
@@ -132,4 +133,20 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
     ],
   };
   return { coll: collProv, debt: debtProv, rate: rateProv, collUsd: collUsdProv, cr: crProv, liq: liqProv };
+}
+
+/** The yearly interest cost the card's panel and the (i) state: the debt at
+ *  the trove's last change times its annual rate. One receipt for both. */
+export function troveAnnualCostProv(recordedDebt: number, ratePct: number, live: boolean): Provenance {
+  const legNote = live ? "TroveManager.getLatestTroveData()" : "as of the trove's last change";
+  return {
+    kind: "derived",
+    summary:
+      "Estimated interest cost per year — the debt at the trove's last change multiplied by its annual interest rate. It is a year's interest at today's rate; the rate can change.",
+    formula: "recorded debt × rate ÷ 100",
+    inputs: [
+      { label: "recorded debt", value: `${formatExact(recordedDebt)} BOLD`, kind: "chain", note: legNote },
+      { label: "rate", value: `${formatExact(ratePct)}%`, kind: "chain", note: legNote },
+    ],
+  };
 }

@@ -1,40 +1,29 @@
 "use client";
 
 // RevealTip — the one gesture behind "show a compact form, reveal the exact
-// form on demand". Wraps any inline content; the `tip` shows on hover (pointer
-// devices) and on tap (touch devices). Used for both compact numbers (tip = the
-// exact value) and token glyphs (tip = the ticker) so the two read the same.
+// form on demand". Wraps any inline content; the `tip` opens on a click or a
+// tap, never on hover (Miles, 10 Oct 2026). A second click, Escape or a click
+// elsewhere closes it; a focusable tip opens on Enter or Space. Used for both
+// compact numbers (tip = the exact value) and token glyphs (tip = the ticker)
+// so the two read the same.
 // The bubble: rounded-2xl, p-3, medium-weight text on the tooltip tokens
 // (--rb-tooltip-bg / --rb-tooltip-border), with an arrow to the value.
 // `label` is the accessible name: screen readers get it in place of the
 // visible children (an amount's exact figure behind "<0.000001").
 //
 // Two collisions to respect on these cards:
-//   • the whole card is a <Link> — a touch tap must NOT navigate, so on touch
-//     the first tap reveals (preventDefault + stopPropagation) and a tap-away
-//     closes; a second tap on the element then falls through to the link.
+//   • the whole card is a <Link>: a click on a tip opens or closes it and
+//     never navigates (preventDefault + stopPropagation).
 //   • <Prov> arms a click-to-trace on the same value when the provenance
-//     inspector is on — that's pointer-click, which we leave untouched (we only
-//     intercept clicks on touch devices, where Prov tracing isn't the gesture).
+//     inspector is on: while it is armed a click is the trace's, and the tip
+//     leaves it alone.
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { provInspector } from "@/components/shared/provenance";
 
 /** Inside a tip that already answers a hover (the closed ledger cell's USD
  *  tip), a nested RevealTip shows its children and opens no second bubble. */
 export const QuietTipsContext = createContext(false);
-
-function useHasHover(): boolean {
-  const [hasHover, setHasHover] = useState(true);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(hover: hover)");
-    setHasHover(mq.matches);
-    const onChange = () => setHasHover(mq.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-  return hasHover;
-}
 
 export function RevealTip({
   tip,
@@ -48,17 +37,14 @@ export function RevealTip({
   children: ReactNode;
   className?: string;
   label?: string;
-  /** Put the wrapper in the tab order and show the tip on keyboard focus
-   *  (:focus-visible only, so a touch tap still reveals on the click and
-   *  leaves navigation to the second tap). Give it `role="img"`-style
-   *  semantics through `label`. */
+  /** Put the wrapper in the tab order as a button: Enter or Space opens the
+   *  tip. Its accessible name is `label`. */
   focusable?: boolean;
   /** Which edge of the content the bubble lines up with: "end" for content at
    *  the right of its row, so the bubble opens leftward. */
   align?: "start" | "end";
 }) {
   const [open, setOpen] = useState(false);
-  const hasHover = useHasHover();
   const quiet = useContext(QuietTipsContext);
   const ref = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
@@ -81,15 +67,22 @@ export function RevealTip({
     setShift(over > 0 ? Math.min(over, Math.max(room, 0)) : 0);
   }, [open, align]);
 
-  // Touch: dismiss when tapping elsewhere.
+  // A press elsewhere or Escape closes it.
   useEffect(() => {
-    if (!open || hasHover) return;
+    if (!open) return;
     const onDoc = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("pointerdown", onDoc);
-    return () => document.removeEventListener("pointerdown", onDoc);
-  }, [open, hasHover]);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   if (quiet)
     return (
@@ -112,30 +105,28 @@ export function RevealTip({
     <span
       ref={ref}
       data-reveal-tip=""
-      className={`relative inline-flex items-center ${className ?? ""}`}
-      onMouseEnter={hasHover ? () => setOpen(true) : undefined}
-      onMouseLeave={hasHover ? () => setOpen(false) : undefined}
+      className={`relative inline-flex cursor-pointer items-center ${className ?? ""}`}
       tabIndex={focusable ? 0 : undefined}
-      onFocus={
+      role={focusable ? "button" : undefined}
+      aria-expanded={focusable ? open : undefined}
+      onBlur={focusable ? () => setOpen(false) : undefined}
+      onKeyDown={
         focusable
           ? (e) => {
-              if (e.currentTarget.matches(":focus-visible")) setOpen(true);
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen((o) => !o);
             }
           : undefined
       }
-      onBlur={focusable ? () => setOpen(false) : undefined}
-      onClick={
-        hasHover
-          ? undefined
-          : (e) => {
-              // Touch: first tap reveals instead of following the card link.
-              if (!open) {
-                e.preventDefault();
-                e.stopPropagation();
-                setOpen(true);
-              }
-            }
-      }
+      onClick={(e) => {
+        // While the inspector is armed the click traces the value.
+        if (provInspector.getArmed()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen((o) => !o);
+      }}
     >
       {label ? (
         <>

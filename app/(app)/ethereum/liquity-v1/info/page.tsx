@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { liquityV1AboutContent } from "@/lib/shared/learn-more-content";
+import { liquityV1InfoModal } from "@/lib/liquity-v1/event-templates";
 
 export const metadata = infoMetadata("liquity-v1");
 
@@ -20,7 +20,7 @@ const intro = (
       all Troves together fall below 150%, the system enters Recovery Mode, where more Troves can be liquidated and
       borrowing is restricted.
     </p>
-    <LearnMore inline label="About Liquity V1: terms and sources" content={liquityV1AboutContent()} />
+    <LearnMore inline label="About Liquity V1: terms and sources" content={liquityV1InfoModal()} />
     <p>
       Each row of the listing is one Trove (a collateralised loan): its ETH collateral, its exact LUSD debt, and its
       status. Open Troves show by default — clearing the Status filter brings back six years of closed and liquidated

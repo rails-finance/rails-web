@@ -27,7 +27,7 @@ import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCardShell } from "@/components/shared/position-card-shell";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
-import { moonwellPositionContent, type MoonwellPositionDeployment } from "@/lib/moonwell/position-content";
+import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
 import { formatUsd } from "@/lib/shared/format-event";
 import { CARD_VOCAB, notRecordedNote } from "@/lib/shared/card-vocab";
@@ -301,14 +301,14 @@ export function MoonwellPositionCard({
   viewHref,
   captions,
   peaks = true,
-  disclosureKey,
+  positionSummary,
   risk,
   debtDetail,
 }: {
   v: MoonwellPositionView;
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** The risk headline from the page's Comptroller read, with its opened
    *  layer (moonwellRiskColumn). */
   risk?: CardRiskColumn | null;
@@ -337,10 +337,6 @@ export function MoonwellPositionCard({
   // headline's receipts.
   const dep = useMoonwellDeployment();
   const session = dep.session;
-  // The "?" cell every state panel owns — the same content function serves
-  // Moonwell on Ethereum and on Base; only the deployment named by the
-  // card's own session changes the prose (roster size, separate-deployment note).
-  const positionDeployment: MoonwellPositionDeployment = session === "moonwell-base" ? "base" : "ethereum";
   // The collateral column holds the entered markets; a supply the account
   // never entered is shown apart ("Supplied, not collateral").
   const vc: MoonwellPositionView = { ...v, supplies: v.supplies.filter((r) => isEntered(v, r.address)) };
@@ -364,7 +360,7 @@ export function MoonwellPositionCard({
   // The closed/opened card (ui-jobs 209): the per-side market chevrons give
   // way to the card's one header chevron, and every line under a headline
   // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // Dust lines (under a cent) leave the icon stack, its "+N" and the list
   // count; the lines put them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(vc.supplies, supplyLineUsd(v)).shown;
@@ -386,13 +382,8 @@ export function MoonwellPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={moonwellPositionContent({
-          status: v.status,
-          deployment: positionDeployment,
-          liquidations: v.liquidations,
-          liquidationCount: v.liquidationCount,
-        })}
-        disclosureKey={disclosureKey}
+        learnMore={moonwellPositionModal(v.status)}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -470,12 +461,8 @@ export function MoonwellPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={moonwellPositionContent({
-        status: v.status,
-        deployment: positionDeployment,
-        hasDebt: v.borrows.length > 0,
-      })}
-      disclosureKey={disclosureKey}
+      learnMore={moonwellPositionModal(v.status, v.borrows.length > 0)}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

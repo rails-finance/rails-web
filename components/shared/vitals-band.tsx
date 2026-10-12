@@ -37,6 +37,7 @@
 // them, so position is a property of the band rather than of each call site's
 // memory.
 
+import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 
 /** The canonical slots, in the order they always render. */
@@ -100,9 +101,7 @@ export function VitalsBand({ vitals, lead, aside, notes, className }: VitalsBand
   const figures = ordered.map((v) => (
     <div key={v.slot}>
       <dt className={LABEL}>{v.label}</dt>
-      <dd className={VALUE} title={v.title}>
-        {v.value}
-      </dd>
+      <dd className={VALUE}>{v.title ? <RevealTip tip={v.title}>{v.value}</RevealTip> : v.value}</dd>
     </div>
   ));
 

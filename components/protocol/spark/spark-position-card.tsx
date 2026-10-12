@@ -41,7 +41,7 @@ import {
 } from "@/lib/spark/event-provenance";
 import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark/position-provenance";
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
-import { sparkPositionContent } from "@/lib/spark/position-content";
+import { sparkPositionModal } from "@/lib/spark/event-templates";
 import { formatUsd } from "@/lib/shared/format-event";
 import { fmtLiqPrice, hfLabelV4 } from "@/lib/aave-v4/format";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
@@ -423,7 +423,7 @@ export function SparkPositionCard({
   outcomeAt,
   notCollateral,
   lives,
-  disclosureKey,
+  positionSummary,
   debtDetail,
   riskDetail,
 }: {
@@ -431,7 +431,7 @@ export function SparkPositionCard({
   /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
    *  forwarded to `PositionCardShell`. Closed, the card is its header and
    *  three headlines; opened, each headline's detail and the Explanation. */
-  disclosureKey?: string;
+  positionSummary?: boolean;
   /** Opened-layer lines under Debt from the page's Pool read (the room left
    *  to borrow). Only drawn on a disclosing card. */
   debtDetail?: React.ReactNode;
@@ -479,7 +479,7 @@ export function SparkPositionCard({
   // The closed/opened card (ui-jobs 209): the per-side reserve chevrons give
   // way to the card's one header chevron, and every line under a headline
   // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!disclosureKey;
+  const disclosing = receipts && !!positionSummary;
   // Value order for the cluster and the leg lines. Dust reserves (under a
   // cent) leave the icon stack, its "+N" and the list count; the lines put
   // them behind the "N dust reserves hidden" control.
@@ -502,8 +502,8 @@ export function SparkPositionCard({
         receipts={receipts}
         explanation={explanation}
         viewHref={viewHref}
-        learnMore={sparkPositionContent({ status: v.status })}
-        disclosureKey={disclosureKey}
+        learnMore={sparkPositionModal(v.status)}
+        positionSummary={positionSummary}
       >
         <ClosedPositionStats
           // A disclosing card's closed layer is the header and the outcome;
@@ -594,8 +594,8 @@ export function SparkPositionCard({
       rowExtra={rowExtra}
       explanation={explanation}
       viewHref={viewHref}
-      learnMore={sparkPositionContent({ status: v.status, hasDebt: v.borrows.length > 0 })}
-      disclosureKey={disclosureKey}
+      learnMore={sparkPositionModal(v.status, v.borrows.length > 0)}
+      positionSummary={positionSummary}
     >
       <OpenPositionStats
         stackOnPhone={disclosing}

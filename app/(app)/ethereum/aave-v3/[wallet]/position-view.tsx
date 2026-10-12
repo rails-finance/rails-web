@@ -778,7 +778,7 @@ export default function AaveV3PositionDetail({
                   // 209). The room left to borrow and the distance bar from the
                   // Pool read sit in the opened layer under Debt and Health
                   // factor, inside the card's receipts scope.
-                  disclosureKey={`aave-v3:${market}:${wallet.toLowerCase()}`}
+                  positionSummary
                   debtDetail={chain ? <AaveV3BorrowRoom chain={chain} /> : undefined}
                   riskDetail={chain ? <AaveV3RiskDetail chain={chain} /> : undefined}
                   // The Explanation is now pure layman prose about those same face
@@ -787,12 +787,7 @@ export default function AaveV3PositionDetail({
                   // view (where pool-wide rate context belongs).
                   explanation={
                     cardView.status !== "open" ? (
-                      <AaveV3ClosedPositionExplanation
-                        v={cardView}
-                        events={aaveEvents}
-                        folders={servedFolders}
-                        countNote={countNote}
-                      />
+                      <AaveV3ClosedPositionExplanation v={cardView} events={aaveEvents} folders={servedFolders} />
                     ) : (
                       // Passed before the Pool read lands (the Fluid treatment):
                       // the pane, and the copy-view link at its foot, mount with
@@ -802,8 +797,6 @@ export default function AaveV3PositionDetail({
                         captions={captions}
                         view={liveView}
                         externalActivity={externalActivity}
-                        marketName={MARKET_NAME[market] ?? "Core"}
-                        countNote={countNote}
                       />
                     )
                   }

@@ -3,20 +3,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type TimelineDisplayKey =
-  | "showTimelineValues"
   | "showTickerLabels"
   | "showInterestRates"
   | "showCollateralRatio"
-  | "collapseRuns"
   | "showMarketNotes"
   | "openAllMarketNotes"
   | "showTxHashes";
 
 export interface TimelineDisplayState {
-  /** When true, the SpineColumn surfaces flanking values along the timeline
-   * spine and event-card headers hide their amount on desktop to avoid
-   * duplication. When false, values move into the card header instead. */
-  showTimelineValues: boolean;
   /** When true, position-snapshot rows show the asset ticker text alongside
    * the icon. Off by default — the icon alone identifies the asset. */
   showTickerLabels: boolean;
@@ -26,10 +20,6 @@ export interface TimelineDisplayState {
   /** When true, Polaris event-card headers show the trailing collateral-ratio
    * chip. Off by default — surfaced on demand. */
   showCollateralRatio: boolean;
-  /** When true, consecutive passive/third-party events (liquidation bursts,
-   * auction slices, redemption touches) collapse into one expandable run row.
-   * On by default — flip it off to flatten runs back to individual cards. */
-  collapseRuns: boolean;
   /** "Market notes" in Display. When true, receipted market notes
    * (facts about the market observed between two of the account's own events)
    * stand on the spine between the events they bracket, each as a marker that
@@ -47,11 +37,9 @@ export interface TimelineDisplayState {
 }
 
 const DEFAULTS = {
-  showTimelineValues: true,
   showTickerLabels: false,
   showInterestRates: false,
   showCollateralRatio: false,
-  collapseRuns: true,
   showMarketNotes: true,
   openAllMarketNotes: false,
   showTxHashes: false,
@@ -66,7 +54,9 @@ const Ctx = createContext<TimelineDisplayState>({
   toggle: () => {},
 });
 
-/** A stored preference drops the retired switches: `showUsdValues`,
+/** A stored preference drops the retired switches: `collapseRuns` (like
+ *  events always collapse), `showTimelineValues`
+ *  (the spine always carries the values), `showUsdValues`,
  *  `showChangeBars`, `showBalanceBars`, `showEventNumbers`, `showTimestamps`,
  *  `showUsdStable`, `showUsdOther` and `mobileSpine` (the phone's Timeline |
  *  List choice: the spine view is the only phone view). */
@@ -80,6 +70,8 @@ function migrate(
     showUsdStable?: boolean;
     showUsdOther?: boolean;
     mobileSpine?: boolean;
+    showTimelineValues?: boolean;
+    collapseRuns?: boolean;
   },
 ): Partial<typeof DEFAULTS> {
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -92,6 +84,8 @@ function migrate(
     showUsdStable,
     showUsdOther,
     mobileSpine,
+    showTimelineValues,
+    collapseRuns,
     ...rest
   } = parsed;
   /* eslint-enable @typescript-eslint/no-unused-vars */

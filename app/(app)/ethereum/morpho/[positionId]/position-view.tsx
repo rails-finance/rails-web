@@ -472,7 +472,7 @@ export default function MorphoPositionView({
                 // Closed by default, remembered per viewer and position (ui-jobs
                 // 209). The LTV, the room left to borrow and the distance bar
                 // come from the live market read.
-                disclosureKey={`morpho:${positionId.toLowerCase()}`}
+                positionSummary
                 risk={
                   liveView.status === "open"
                     ? morphoRiskColumn(chain ?? null, morphoHasDebt(liveView.borrowSharesRaw))

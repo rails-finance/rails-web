@@ -494,7 +494,7 @@ export default function BasedollarTroveDetail({
                 // room to the branch minimum, the branch ratio and the
                 // redemption queue under Collateral ratio. Inside the card's
                 // receipts scope, so the Provenance list stays 1:1 with them.
-                disclosureKey={`basedollar:${collateralType.toLowerCase()}:${troveId}`}
+                positionSummary
                 debtDetail={liveRisk ? <LiquityForkDebtDetail chain={chain} /> : undefined}
                 riskDetail={liveRisk ? <LiquityForkRiskDetail chain={chain} /> : undefined}
                 // The Explanation is now pure prose about those same face figures.

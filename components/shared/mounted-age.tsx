@@ -19,7 +19,12 @@ export function MountedAge({
   suffix?: string;
 }) {
   const now = useMountedNow();
-  if (now == null) return <span className="invisible">{prefix}00 days{suffix}</span>;
+  if (now == null)
+    return (
+      <span className="invisible">
+        {prefix}00 days{suffix}
+      </span>
+    );
   return (
     <>
       {prefix}

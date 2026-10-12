@@ -115,5 +115,3 @@ export function normalizeCdpId(raw: string | null | undefined): string | null {
   const s = (raw ?? "").trim();
   return /^(0|[1-9][0-9]*)$/.test(s) ? s : null;
 }
-
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
