@@ -35,6 +35,7 @@ import { PositionCardPanel, type PositionPanelRow } from "@/components/shared/po
 import { LifecyclePill } from "@/components/shared/position-card-pills";
 import { StatValue, StatDash } from "@/components/shared/stat-value";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetPopover } from "@/components/shared/asset-popover";
 import { UsersGlyph } from "@/components/shared/rate-pill";
 import { HighlightableValue } from "@/components/transaction-timeline/explanation/HighlightableValue";
 import { FadeNumber } from "@/components/ui/FadeNumber";
@@ -43,7 +44,15 @@ import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { formatMonthDayYear } from "@/lib/date";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
-import { formatApproximate, formatPrice, formatUsdValue } from "@/lib/utils/format";
+import {
+  formatApproximate,
+  formatExactFromString,
+  formatPrice,
+  formatUnitsExact,
+  formatUsdValue,
+} from "@/lib/utils/format";
+import { getTokenAddress } from "@/lib/shared/token-addresses";
+import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { getLiquidationThreshold, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { LIQUITY_FORK_CARD_CONFIGS, type LiquityForkCardConfig } from "@/lib/shared/liquity-fork-card-config";
 import { liquityTroveFaceProv, trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-card-provenance";
@@ -81,6 +90,7 @@ import {
   resolveBranch as asymmetryResolveBranch,
   getAsymmetryTroveNftUrl,
   ASYMMETRY_BRANCHES,
+  DEBT_ADDRESS as ASYMMETRY_DEBT_ADDRESS,
 } from "@/lib/asymmetry/asset-catalog";
 import {
   indexZombie as ebisuIndexZombie,
@@ -88,6 +98,7 @@ import {
   resolveBranch as ebisuResolveBranch,
   getEbisuTroveNftUrl,
   EBISU_BRANCHES,
+  DEBT_ADDRESS as EBISU_DEBT_ADDRESS,
 } from "@/lib/ebisu/asset-catalog";
 import {
   indexZombie as basedollarIndexZombie,
@@ -95,6 +106,7 @@ import {
   resolveBranch as basedollarResolveBranch,
   getBasedollarTroveNftUrl,
   BASEDOLLAR_BRANCHES,
+  DEBT_ADDRESS as BASEDOLLAR_DEBT_ADDRESS,
 } from "@/lib/basedollar/asset-catalog";
 import { TroveIdentityRow } from "./trove-identity-row";
 import {
@@ -162,6 +174,10 @@ interface LiquityFamilyCardOps {
   peakCollateralProv: (v: LiquityTroveView) => Provenance;
   peakDebtProv: (v: LiquityTroveView) => Provenance;
   positionContent: (v: LiquityTroveView) => LearnMoreContent;
+  /** The branch's collateral token, for the headline icon's popover. */
+  collateralAddress: (collateralType: string) => string | undefined;
+  /** The deployment's stablecoin. */
+  debtAddress: string | undefined;
 }
 
 // ── V2 (the reference deployment) ────────────────────────────────────────
@@ -171,6 +187,8 @@ const v2Ops: LiquityFamilyCardOps = {
   faceProv: liquityTroveFaceProv,
   peakCollateralProv: () => trovePeakCollProv,
   peakDebtProv: () => trovePeakDebtProv,
+  collateralAddress: (ct) => LIQUITY_V2_BRANCHES[ct.toLowerCase()]?.collateralAddr,
+  debtAddress: getTokenAddress("BOLD") ?? undefined,
   positionContent: (v) =>
     liquityPositionContent({ collateralType: v.collateralType, status: v.status, isBatched: v.isBatched }),
 };
@@ -182,7 +200,9 @@ interface ForkCardDeps {
   shortId: (id: string) => string;
   resolveBranch: (
     collateralType: string | undefined | null,
-  ) => { priceFeed: string; mcr: number; mcrBefore?: readonly ForkMcrStep[] } | undefined;
+  ) => { priceFeed: string; collateralAddr: string; mcr: number; mcrBefore?: readonly ForkMcrStep[] } | undefined;
+  /** The deployment's stablecoin. */
+  debtAddress: string;
   /** Fallback PriceFeed address for the receipt's contract identity when the
    *  branch can't be resolved (mirrors each card's prior `?? BRANCHES.<default>`). */
   defaultPriceFeed: string;
@@ -226,6 +246,8 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   return {
     shortId: deps.shortId,
+    collateralAddress: (ct) => deps.resolveBranch(ct)?.collateralAddr,
+    debtAddress: deps.debtAddress,
     mcrPct: (ct) => {
       const mcr = deps.resolveBranch(ct)?.mcr;
       return mcr != null ? mcr * 100 : undefined;
@@ -322,6 +344,7 @@ const OPS: Record<LiquityFamilyId, LiquityFamilyCardOps> = {
   asymmetry: makeForkCardOps("asymmetry", {
     shortId: asymmetryShortId,
     resolveBranch: asymmetryResolveBranch,
+    debtAddress: ASYMMETRY_DEBT_ADDRESS,
     defaultPriceFeed: ASYMMETRY_BRANCHES.ysybold.priceFeed,
     positionCollateralProv: asymmetryPositionCollateralProv,
     positionDebtProv: asymmetryPositionDebtProv,
@@ -332,6 +355,7 @@ const OPS: Record<LiquityFamilyId, LiquityFamilyCardOps> = {
   ebisu: makeForkCardOps("ebisu", {
     shortId: ebisuShortId,
     resolveBranch: ebisuResolveBranch,
+    debtAddress: EBISU_DEBT_ADDRESS,
     defaultPriceFeed: EBISU_BRANCHES.weeth.priceFeed,
     positionCollateralProv: ebisuPositionCollateralProv,
     positionDebtProv: ebisuPositionDebtProv,
@@ -342,6 +366,7 @@ const OPS: Record<LiquityFamilyId, LiquityFamilyCardOps> = {
   basedollar: makeForkCardOps("basedollar", {
     shortId: basedollarShortId,
     resolveBranch: basedollarResolveBranch,
+    debtAddress: BASEDOLLAR_DEBT_ADDRESS,
     defaultPriceFeed: BASEDOLLAR_BRANCHES.weth.priceFeed,
     positionCollateralProv: basedollarPositionCollateralProv,
     positionDebtProv: basedollarPositionDebtProv,
@@ -528,6 +553,39 @@ export function LiquityPositionCard({
   const priceUsd = lv ? lv.priceUsd : (v.priceUsd ?? null);
   const collUsd = lv ? (lv.priceUsd != null ? lv.entireColl * lv.priceUsd : null) : (v.collateralUsd ?? null);
   const crPct = lv ? lv.icrPct : (v.collateralRatioPct ?? null);
+
+  // A headline's asset icon opens the asset's popover (ui-jobs 248): the exact
+  // figure, the contract, and for the collateral the branch's price where the
+  // card states one. A click on the figure stays the provenance inspector's.
+  const collAddress = ops.collateralAddress(ct);
+  const collPrice = priceUsd != null && priceUsd > 0 ? priceUsd : null;
+  // The exact figure: the contract's integer where the live read carries it
+  // (the float behind the face holds fewer digits), else the float's digits.
+  // A fork's collateral integer is read at the decimals its lane reports;
+  // Liquity V2's branches are all 18.
+  const collDecimals = lv?.collDecimals ?? (protocol === "liquity-v2" ? 18 : undefined);
+  const exactOf = (value: number, raw: string | undefined, decimals: number | undefined) =>
+    formatExactFromString(raw && decimals != null ? formatUnitsExact(raw, decimals) : null, value);
+  const collIcon = (value: number, withPrice: boolean, raw?: string) => (
+    <AssetPopover
+      symbol={ct}
+      address={collAddress}
+      figure={`${exactOf(value, raw, collDecimals)} ${ct}`}
+      price={withPrice && collPrice != null ? formatUsdValue(collPrice) : undefined}
+      priceSource={withPrice && collPrice != null ? `The ${ct} branch's PriceFeed` : undefined}
+    >
+      <TokenChipIcon symbol={ct} address={collAddress} size={28} filterable={false} untitled />
+    </AssetPopover>
+  );
+  const debtIcon = (value: number, raw?: string) => (
+    <AssetPopover
+      symbol={cfg.debtSymbol}
+      address={ops.debtAddress}
+      figure={`${exactOf(value, raw, 18)} ${cfg.debtSymbol}`}
+    >
+      <TokenChipIcon symbol={cfg.debtSymbol} address={ops.debtAddress} size={28} filterable={false} untitled />
+    </AssetPopover>
+  );
   const mcrPct = ops.mcrPct(ct);
   const liqPrice = debt > 0 && coll > 0 && mcrPct != null ? (debt * (mcrPct / 100)) / coll : null;
   const animate = !!receipts; // FadeNumber animateOnMount
@@ -730,8 +788,8 @@ export function LiquityPositionCard({
           }
           identity={set ? undefined : meta}
           menu={headerSet ? cardMenu : undefined}
-          collateralIcon={<TokenChipIcon symbol={ct} size={28} filterable={false} />}
-          debtIcon={<TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />}
+          collateralIcon={collIcon(v.peakCollateral, claimableUsd != null)}
+          debtIcon={debtIcon(v.peakDebt)}
           collateral={peakCollateralStat}
           outcomeFootnote={claimableFootnote}
           debt={peakDebtStat}
@@ -882,7 +940,7 @@ export function LiquityPositionCard({
                       />
                     </HighlightableValue>
                   </Prov>
-                  <TokenChipIcon symbol={ct} size={28} filterable={false} />
+                  {collIcon(coll, true, lv?.entireCollRaw)}
                 </span>
               </StatValue>
             ),
@@ -914,7 +972,7 @@ export function LiquityPositionCard({
                       />
                     </HighlightableValue>
                   </Prov>
-                  <TokenChipIcon symbol={cfg.debtSymbol} size={28} filterable={false} />
+                  {debtIcon(debt, lv?.entireDebtRaw)}
                 </span>
               </StatValue>
             ),
