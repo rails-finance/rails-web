@@ -362,12 +362,11 @@ function OpenNote({
         </span>
         <span aria-hidden className="hidden h-4 w-4 shrink-0 sm:block" />
       </button>
-      <div className="relative sm:hidden" style={{ height: TARGET }}>
-        <span
-          aria-hidden
-          className="absolute whitespace-nowrap text-xs leading-5 text-foreground"
-          style={{ left: "calc(50% + 44px)", top: 12 }}
-        >
+      {/* The caption beside the diamond wraps inside the row on a phone: a
+          long one ("5 market notes since the last event") takes a second line
+          and the slot grows to hold it. */}
+      <div className="sm:hidden" style={{ minHeight: TARGET, paddingTop: 12, paddingLeft: "calc(50% + 44px)" }}>
+        <span aria-hidden className="block text-xs leading-5 text-foreground">
           {tip}
         </span>
       </div>

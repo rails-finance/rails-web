@@ -335,12 +335,17 @@ const GROUP_ID = "live-notes:head";
   const card = page.locator("[data-live-note-group]:visible");
   const n = await card.locator('[data-market-note$="-head"]').count();
   const headRows = await page.locator('[data-market-note$="-head"]:visible').count();
+  const swOpen = await page.evaluate(() => document.documentElement.scrollWidth);
   check(
     "15. the phone list view rests the live notes as one marker, and opening it draws one card",
     atRest && (await card.count()) === 1 && n >= 2 && headRows === n,
     `marker at rest ${atRest}, ${await card.count()} card(s), ${n} lines, ${headRows} live rows`,
   );
-  check("15b. no horizontal scroll at 390", sw <= 390, `scrollWidth ${sw}`);
+  check(
+    "15b. no horizontal scroll at 390, at rest and with the card open",
+    sw <= 390 && swOpen <= 390,
+    `scrollWidth ${sw} at rest, ${swOpen} open`,
+  );
   await ctx.close();
 }
 
