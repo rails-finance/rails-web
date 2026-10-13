@@ -143,6 +143,8 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     reserveAddress,
     previous,
     eventTs: event.timestamp,
+    eventId: event.id,
+    label: event.actionLabel,
   });
 
   const slots: EventCardSlots = {
@@ -169,6 +171,7 @@ export function SparkEventCard({ event, isLast, eventNumber, market, siblings, p
     // A transfer received: the sender acted (ui-jobs 304).
     actor: { by: extBy ?? undefined, byOwner: isTransfer && kind === "transfer_in" ? false : undefined },
     cells: body.cells,
+    sheet: body.sheet,
     cellsData: body.cellsData,
     ledgers: stateMarket
       ? {

@@ -250,6 +250,77 @@ words:
     redemption
   redemption_many: |-
     redemptions
+  # T2's balance sheet (ui-jobs 330): the rows an event names, the Risk and
+  # Limits labels and the states a figure can be in.
+  sheet_reduced: |-
+    Reduced
+  sheet_surplus: |-
+    Surplus
+  sheet_borrowing_fee: |-
+    Borrowing fee
+  sheet_reserve: |-
+    Liquidation reserve
+  sheet_closed: |-
+    Closed
+  sheet_no_price: |-
+    No price at this block
+  sheet_unread: |-
+    Not read on this page
+  sheet_pts: |-
+    pts
+  sheet_collateral_ratio: |-
+    Collateral ratio
+  sheet_liquidates_at: |-
+    Liquidates at
+  sheet_debt_in_front: |-
+    Debt in front
+  sheet_to_minimum: |-
+    LUSD to the minimum
+  sheet_minimum_ratio: |-
+    Minimum ratio
+  sheet_recovery_ratio: |-
+    Recovery-mode ratio
+  # The sheet's read-more, one per row: what the figure is and where it is read.
+  tip_coll_before: |-
+    The Trove's ETH just before this event, from the previous TroveUpdated log, at Liquity's ETH price at this block.
+  tip_coll_event: |-
+    The ETH this event moved: the Trove's ETH after, from the TroveManager's log, less the ETH before, at Liquity's ETH price at this block.
+  tip_coll_seized: |-
+    The ETH the liquidation took from the Trove, its whole balance before the event, at Liquity's ETH price at this block.
+  tip_coll_reduced: |-
+    The ETH the redeemer took, worth the LUSD it cancelled at Liquity's ETH price at this block.
+  tip_coll_surplus: |-
+    The ETH a full redemption left over after paying the redeemer, held in the CollSurplusPool for the owner to claim.
+  tip_coll_total: |-
+    The Trove's collateral after this event in dollars: its ETH from the TroveManager's log times Liquity's ETH price at this block.
+  tip_debt_before: |-
+    The Trove's debt just before this event, from the previous TroveUpdated log, at $1 per LUSD.
+  tip_debt_event: |-
+    The debt this event moved: the debt after, from the TroveManager's log, less the debt before, at $1 per LUSD.
+  tip_debt_received: |-
+    The LUSD the owner received: the debt added less the one-time borrowing fee and, on an open, the liquidation reserve.
+  tip_debt_repaid: |-
+    The LUSD the owner repaid to close: the debt less the 200 LUSD liquidation reserve.
+  tip_debt_cleared: |-
+    The debt this event cancelled, from the TroveManager's log, at $1 per LUSD.
+  tip_debt_fee: |-
+    A one-off borrowing fee this draw added to the Trove's debt, from BorrowerOperations' log.
+  tip_debt_reserve: |-
+    The 200 LUSD liquidation reserve: added to the debt when a Trove opens, burned when it closes or is fully redeemed.
+  tip_debt_total: |-
+    The Trove's debt after this event, from the TroveManager's log, at $1 per LUSD.
+  tip_cr: |-
+    The collateral's dollar value divided by the debt after this event, at Liquity's ETH price at this block.
+  tip_liquidates_at: |-
+    The ETH price at which the Trove's collateral ratio meets the 110% minimum: the debt times the minimum ratio, divided by the collateral.
+  tip_debt_in_front: |-
+    The debt of the Troves that would be redeemed against before this one, read from the redemption queue at the latest block.
+  tip_to_minimum: |-
+    The LUSD the debt after this event stands above the 2,000 LUSD minimum a Trove must keep.
+  tip_minimum_ratio: |-
+    The collateral ratio below which a Trove can be liquidated, a constant of the TroveManager.
+  tip_recovery_ratio: |-
+    The system-wide collateral ratio below which Recovery Mode starts, a constant of the TroveManager.
 
 # ── The position card's explanation (zone Z1): an unheaded lead, then bullets
 # under Holdings, Risk and History when two of them hold two or more bullets
