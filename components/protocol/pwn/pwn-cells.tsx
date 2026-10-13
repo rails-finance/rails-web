@@ -16,7 +16,9 @@ import type { ChainTruthStat } from "@/components/shared/chain-truth-event";
 import { StatNotes, useChainTruthCells, type ChainTruthCellStat } from "@/components/shared/chain-truth-cells";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
-import { usePwnLedgerPending, usePwnLedgerSides } from "./pwn-ledger";
+import { usePwnLedgerPending, usePwnLedgerSides, usePwnSheetSides } from "./pwn-ledger";
+import { pwnSheet } from "./pwn-sheet";
+import type { EventSheet } from "@/components/shared/event-sheet";
 import {
   flowCellBeforeProv,
   flowCellProv,
@@ -91,6 +93,7 @@ const STATE_LABEL: Record<CollateralState, string> = {
 export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = [], eventId }: PwnCellsProps): {
   cells: EventCellSpec[];
   notes: ReactNode;
+  sheet?: EventSheet | null;
 } {
   const coords: PwnCoords = { txHash, blockNumber, loanId: ctx.loanId, version: ctx.version };
   const isNft = ctx.collateralCategory === "ERC721" || ctx.collateralCategory === "ERC1155";
@@ -321,5 +324,19 @@ export function usePwnCells({ ctx, txHash, blockNumber, timestamp, siblings = []
     else notes.push(st);
   }
   const cells = useChainTruthCells(cellStats);
-  return { cells, notes: notes.length > 0 ? <StatNotes stats={notes} /> : undefined };
+  // T2 as a balance sheet (ui-jobs 330): the creation, a repayment and the
+  // default claim draw it once the loan's replay has run (the cells
+  // placeholders stand until then), and the sheet states every figure the notes
+  // held. The note's mint and burn, an extension and a non-default claim keep
+  // the cells.
+  const sheetSides = usePwnSheetSides(eventId ?? "");
+  const sheetKind = ctx.eventType === "created" || ctx.eventType === "paid_back" || seized;
+  const sheet: EventSheet | null | undefined = !sheetKind
+    ? undefined
+    : sheetSides
+      ? pwnSheet({ ctx, coords, sides: sheetSides, timestamp })
+      : ledgerPending
+        ? null
+        : undefined;
+  return { cells, sheet, notes: notes.length > 0 && !sheet ? <StatNotes stats={notes} /> : undefined };
 }
