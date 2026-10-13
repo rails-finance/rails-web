@@ -15,12 +15,9 @@
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { cache } from "react";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
-import { readSkyFlowsDaily, readSkyPosition, readSkyRates, readSkyTimeline } from "@/lib/sources/api/sky-savings";
-import { withSkyDrip } from "@/lib/sources/chain/sky-savings-drip";
+import { loadSkyPosition } from "@/lib/sky-savings/position-page-data";
 import { skyPositionHref } from "@/lib/sky-savings/constants";
 import { skyDaysFromEvents } from "@/lib/sky-savings/flows";
 import { gateRefusal } from "@/lib/sky-savings/types";
@@ -30,34 +27,11 @@ import { SkyGateRefusal } from "@/components/protocol/sky-savings/sky-savings-ga
 
 export const dynamic = "force-dynamic";
 
-/** The newest events the page draws. The whole life's figures (the card, the
- *  flows) come from the position row and the day rows, so a longer history is
- *  stated as a count and drawn to this many rows. */
-const TIMELINE_ROWS = 1000;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 interface Props {
   params: Promise<{ holder: string }>;
 }
-
-const load = cache(async (holder: string) => {
-  const readerIp = await readerIpFromHeaders();
-  const position = await readSkyPosition(holder, readerIp);
-  if (!position) return null;
-  const [timeline, days, rates, asOf] = await Promise.all([
-    readSkyTimeline(holder, { limit: TIMELINE_ROWS }, readerIp),
-    readSkyFlowsDaily(holder, readerIp),
-    readSkyRates(readerIp).catch(() => null),
-    withSkyDrip(position.asOf),
-  ]);
-  // A history longer than the drawn window: the first event's time, for the
-  // timeline header's tenure, from one oldest-first row.
-  const first =
-    timeline.total > timeline.events.length && position.data.activity.firstTimestamp == null
-      ? await readSkyTimeline(holder, { limit: 1, order: "asc" }, readerIp).catch(() => null)
-      : null;
-  return { position, timeline, days, rates, asOf, firstAt: first?.events[0]?.timestamp ?? null };
-});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { holder } = await params;
@@ -82,7 +56,7 @@ export default async function SkySavingsPositionPage({ params }: Props) {
   const holder = typed.toLowerCase();
   // One URL per position: the lowercase address.
   if (typed !== holder) redirect(skyPositionHref(holder));
-  const data = await load(holder);
+  const data = await loadSkyPosition(holder);
   if (!data) notFound();
 
   const refusal = gateRefusal(data.position);
