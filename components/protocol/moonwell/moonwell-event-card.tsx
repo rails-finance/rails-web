@@ -1,10 +1,11 @@
 "use client";
 
 // Composer: fills the shared event card's slots (components/shared/
-// event-card.tsx; ui-jobs 309) from a Moonwell event: the head, the account's
-// Collateral and Debt ledger cells with the market's cells after them, the
-// forensics and the Comptroller's lines as notes, the price row and the
-// explanation.
+// event-card.tsx; ui-jobs 309) from a Moonwell event: the head, the balance
+// sheet (ui-jobs 330; moonwell-event-sheet.tsx) where the page replays the
+// account, else the account's Collateral and Debt ledger cells with the
+// market's cells after them, the forensics and the Comptroller's lines as
+// notes, the price row and the explanation.
 
 import type { BaseActivityEvent, MoonwellContext } from "@/lib/shared/types/event-shape";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
@@ -15,6 +16,7 @@ import { soleFlowAddress } from "@/lib/shared/format-event";
 import { useMoonwellCoords } from "@/lib/moonwell/deployment-context";
 import { useMoonwellHeadSpec } from "./moonwell-event-header";
 import { useMoonwellCells } from "./moonwell-event-detail";
+import { useMoonwellSheet } from "./moonwell-event-sheet";
 import { MoonwellEventExplainer, moonwellLearnMoreContent } from "./moonwell-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 
@@ -116,6 +118,7 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
     eventId: event.id,
     eventTs: event.timestamp,
   });
+  const sheet = useMoonwellSheet({ ctx, eventId: event.id, label: event.actionLabel, coords });
 
   const slots: EventCardSlots = {
     event: {
@@ -132,6 +135,7 @@ export function MoonwellEventCard({ event, isLast, eventNumber }: MoonwellEventC
     // A transfer received: the sender acted (ui-jobs 304).
     actor: { by: extBy ?? undefined, byOwner: kind === "transfer_in" ? false : undefined },
     cells,
+    sheet,
     ledgers,
     notes,
     price: { gas: ownerPaidGas(event, ctx.txFrom), prices },
