@@ -124,6 +124,7 @@ const Z1_STRINGS = {
   "liquity-v1": { section: "position_words", ids: null, figures: "placeholders" },
   morpho: { section: "position_words", ids: null, figures: "placeholders" },
   "aave-v3": { section: "position_words", ids: null, figures: "placeholders" },
+  "aave-v4": { section: "position_words", ids: null, figures: "placeholders" },
   compound: { section: "position_words", ids: null, figures: "placeholders" },
   "compound-v2": { section: "position_words", ids: null, figures: "placeholders" },
   polaris: { section: "position_words", ids: null, figures: "placeholders" },

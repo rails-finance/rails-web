@@ -33,8 +33,4 @@ export const AAVE_FAQ_URLS = {
   BORROWING: "https://aave.com/help/borrowing",
   V4_POSITIONS: "https://aave.com/docs/aave-v4/positions",
   V4_LIQUIDATIONS: "https://aave.com/docs/aave-v4/positions/liquidations",
-  // Hub/spoke architecture — used by the /aave-v4/hubs comparison surface.
-  V4_DOCS: "https://aave.com/docs/aave-v4",
-  V4_LIQUIDITY_MODEL: "https://aave.com/docs/aave-v4/liquidity",
-  V4_ARCHITECTURE: "https://aave.com/blog/understanding-aave-v4s-architecture",
 } as const;

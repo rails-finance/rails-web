@@ -9,7 +9,7 @@ import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import { formatDate, formatMonthDay } from "@/lib/date";
 import { compoundAmount } from "@/lib/compound/row-facts";
 import { formatNumber, formatTinyNonZero, formatUsdValue } from "@/lib/utils/format";
-import { hfLabelV4 } from "@/lib/aave-v4/format";
+import { fmtV4Amount, hfLabelV4 } from "@/lib/aave-v4/format";
 import { collAmount } from "@/lib/makerdao/price-format";
 import type { ProseValue, Rounding } from "./types";
 
@@ -137,4 +137,5 @@ export const ROUNDING: Record<Rounding, (v: ProseValue, name: string, env: FmtEn
   pct_plain: (v) => `${num(v) < 0 ? "−" : ""}${Number((Math.abs(num(v)) * 100).toFixed(2))}%`,
   hf: (v) => hfLabelV4(num(v)),
   coll_amount: (v) => collAmount(Math.abs(num(v))),
+  spoke_amount: (v) => fmtV4Amount(Math.abs(num(v))),
 };

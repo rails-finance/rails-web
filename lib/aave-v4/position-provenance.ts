@@ -484,22 +484,6 @@ export const BLENDED_LT_PROV: Provenance = {
   ],
 };
 
-export const DEBT_CEILING_PROV = calcProv("The LT-weighted debt ceiling", {
-  formula: "Σ(collateral × liquidation threshold)",
-  inputs: [
-    { label: "collateral", kind: "chain", pclass: "state", note: "per-asset supply balances (spoke read)" },
-    {
-      label: "liquidation threshold",
-      kind: "chain",
-      pclass: "state",
-      note: "the threshold the spoke reports per asset",
-    },
-  ],
-});
-export const LIQ_PRICE_PROV = calcProv("The liquidation price", {
-  formula: "price ÷ health factor",
-  inputs: [{ label: "health factor", kind: "chain", pclass: "state", note: "spoke getUserAccountData" }],
-});
 export const LIQ_DROP_PROV = calcProv("The drop to liquidation", {
   formula: "price → liquidation price · 1 − 1 ÷ health factor",
   inputs: [
@@ -672,3 +656,88 @@ export function usdProvOnchain(what: string): Provenance {
     ],
   };
 }
+
+// ── The position card's receipts ────────────────────────────────────────────
+// One receipt per figure, read by the card's cells and footnotes
+// (components/protocol/aave-v4/aave-v4-spoke-card.tsx,
+// aave-v4-liquidation-footnote.tsx) and by its explanation
+// (aave-v4-position-explanation.tsx), so a figure printed in both places opens
+// the same receipt.
+
+export const COLL_USD_PROV = usdProv("Current collateral", { amountLabel: "collateral balance", amountKind: "chain" });
+export const DEBT_USD_PROV = usdProv("Current debt", { amountLabel: "debt balance", amountKind: "chain" });
+export const SUPPLY_USD_PROV = usdProv("Currently supplied", { amountLabel: "supply balance", amountKind: "chain" });
+export const NONCOLL_USD_PROV = usdProv("Supplied, not collateral", {
+  amountLabel: "supply balance",
+  amountKind: "chain",
+});
+
+/** The latest borrow rate, accumulated over this spoke's indexed event stream. */
+export const BORROW_RATE_PROV = accumProv("The latest borrow rate recorded on this spoke", {
+  formula: "most recent on-chain borrow index → APR",
+});
+
+/** What the debt costs in a year at the latest borrow rate. */
+export const YEARLY_COST_PROV: Provenance = {
+  kind: "derived",
+  summary:
+    "What the debt costs in a year at the latest borrow rate — the debt as it stands now times that rate. The rate moves with the hub, so this is today's pace.",
+  via: "debt balance × latest borrow rate",
+  formula: "debt × borrowRate",
+};
+
+const PEAK_PRICE_INPUT: ProvInput = {
+  label: "price",
+  kind: "offchain",
+  note: "each event at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value of the day",
+};
+export const PEAK_COLL_PROV = accumProv("The peak collateral this position has held", {
+  formula: "max(Σ collateral × price)",
+  inputs: [
+    {
+      label: "collateral",
+      kind: "chain",
+      pclass: "indexed",
+      note: "the position's balance at each event, from the indexed stream",
+    },
+    PEAK_PRICE_INPUT,
+  ],
+});
+export const PEAK_DEBT_PROV = accumProv("The peak debt this position has carried", {
+  formula: "max(Σ debt × price)",
+  inputs: [
+    {
+      label: "debt",
+      kind: "chain",
+      pclass: "indexed",
+      note: "the position's balance at each event, from the indexed stream",
+    },
+    PEAK_PRICE_INPUT,
+  ],
+});
+
+/** The single collateral's liquidation price: the current market price over
+ *  the health factor. The off-chain price leg makes it a derived read. */
+export const LIQ_PRICE_PROV: Provenance = {
+  kind: "derived",
+  summary:
+    "Liquidation price for this collateral — the price at which the position becomes liquidatable. Derived from the current off-chain market price and the health factor.",
+  via: "current price ÷ health factor",
+  formula: "currentPrice ÷ HF",
+};
+
+/** The collateral's price in the debt asset at which the position becomes
+ *  liquidatable, where the debt moves with the collateral. */
+export function liqRatioProv(collSymbol: string, debtSymbol: string): Provenance {
+  return {
+    kind: "derived",
+    summary: `The ${collSymbol} price, in ${debtSymbol}, at which the position becomes liquidatable. The debt moves with the collateral, so the price between the two is the one that matters.`,
+    via: "collateral price ÷ debt price ÷ health factor",
+    formula: "(collateralPrice ÷ debtPrice) ÷ HF",
+  };
+}
+
+// The explanation's interest bullet reads the position's lifetime interest
+// (interestPnl), a figure the card does not print; these are its receipts.
+export const SUPPLY_INTEREST_PROV = interestProv("Accrued supply interest");
+export const BORROW_INTEREST_PROV = interestProv("Accrued borrow interest");

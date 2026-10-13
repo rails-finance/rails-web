@@ -1,0 +1,1165 @@
+# Aave V4 event prose: every string the Aave V4 family prints in an event's
+# explanation (Z2), the position card's explanation (Z1) and the "?" modals
+# (Z4): the event modals, the position card's spoke modal and the two hub
+# pages, on Aave V4 Ethereum and Aave V4 Base. Read by
+# lib/aave-v4/event-templates.ts (the loader) and lib/aave-v4/event-prose.ts
+# (the generator). Every string is one line; `{name}` is a value the code
+# supplies, `{name|rounding}` the same value at another rounding. A modal's
+# `intro_<spoke>` / `text_<spoke>` is its wording on that spoke (the spoke's
+# slug, `-` written `_`). Limits: rails-ops standards/prose-limits-and-zones.md.
+
+roundings:
+  spoke_amount: |-
+    A token amount as an Aave V4 event's header prints it: whole from 1,000, four places from 0.0001.
+  hf: |-
+    A health factor as the card prints it: four places below 1.1, two above.
+  ratio_frac: |-
+    A fraction as a percentage with two places.
+  pct_plain: |-
+    A fraction as a percentage to two places, trailing zeros dropped.
+  pct_whole: |-
+    A fraction as a whole percentage.
+  usd: |-
+    Whole dollars.
+  count: |-
+    A whole number with thousands separators.
+  text: |-
+    A name or a word, printed as given.
+  address: |-
+    An address, shortened and linked to the explorer.
+
+placeholders:
+  # ── Z2: the event ──
+  amount:
+    rounding: spoke_amount
+    means: |-
+      The amount the event moved, as its header prints it.
+  symbol:
+    rounding: text
+    means: |-
+      The event's reserve symbol.
+  where:
+    rounding: text
+    means: |-
+      The spoke the event ran on, named where the row names it.
+  hub:
+    rounding: text
+    means: |-
+      The hub a borrow came from or a repayment went back to.
+  manager:
+    rounding: address
+    means: |-
+      The position manager that called the spoke for the owner.
+  sibling_acts:
+    rounding: text
+    means: |-
+      What the transaction's other events did, by verb and asset.
+  hf_after:
+    rounding: hf
+    means: |-
+      The health factor at the end of the event's block.
+  rate_then:
+    rounding: ratio_frac
+    means: |-
+      The asset's borrow rate the previous event recorded, a year.
+  rate_now:
+    rounding: ratio_frac
+    means: |-
+      The asset's borrow rate at this event, a year.
+  life_interest:
+    rounding: spoke_amount
+    means: |-
+      The interest a cleared debt accrued over its life.
+  other_debt:
+    rounding: text
+    means: |-
+      The debt assets left after this event.
+  cleared:
+    rounding: spoke_amount
+    means: |-
+      The debt a liquidator repaid.
+  seized:
+    rounding: spoke_amount
+    means: |-
+      The collateral a liquidator took.
+  debt_symbol:
+    rounding: text
+    means: |-
+      The debt asset a liquidation repaid.
+  coll_symbol:
+    rounding: text
+    means: |-
+      The collateral asset a liquidation took, or the one collateral of a position.
+  seized_usd:
+    rounding: usd
+    means: |-
+      The collateral taken, at its price at the block.
+  cleared_usd:
+    rounding: usd
+    means: |-
+      The debt repaid, at its price at the block.
+  bonus:
+    rounding: pct_plain
+    means: |-
+      How much more the collateral taken was worth than the debt repaid.
+  liquidator:
+    rounding: address
+    means: |-
+      The account that sent the liquidation.
+  event_type:
+    rounding: text
+    means: |-
+      The kind the row records, for an event with no template.
+  # ── Z1: the position card (drawn as nodes; the rounding marks a figure) ──
+  spoke:
+    rounding: text
+    means: |-
+      The spoke's name.
+  supply_usd:
+    rounding: usd
+    means: |-
+      What the supply is worth now.
+  coll_usd:
+    rounding: usd
+    means: |-
+      What the collateral is worth now.
+  debt_usd:
+    rounding: usd
+    means: |-
+      What the debt is worth now.
+  supply_assets:
+    rounding: text
+    means: |-
+      The supplied assets.
+  coll_assets:
+    rounding: text
+    means: |-
+      The supplied assets.
+  debt_assets:
+    rounding: text
+    means: |-
+      The borrowed assets.
+  earned_usd:
+    rounding: usd
+    means: |-
+      The supply interest earned, at today's prices.
+  paid_usd:
+    rounding: usd
+    means: |-
+      The borrow interest accrued, at today's prices.
+  hf:
+    rounding: hf
+    means: |-
+      The health factor now.
+  liq_symbol:
+    rounding: text
+    means: |-
+      The one collateral asset.
+  against_symbol:
+    rounding: text
+    means: |-
+      The one debt asset, when it moves with the collateral.
+  drop:
+    rounding: pct_whole
+    means: |-
+      The fall that takes the health factor to 1.
+  liq_price:
+    rounding: usd
+    means: |-
+      The collateral's price at which the health factor reaches 1.
+  liq_ratio:
+    rounding: count
+    means: |-
+      The collateral's price in the debt asset at which the health factor reaches 1.
+  capacity:
+    rounding: usd
+    means: |-
+      The debt that could be added before the health factor reaches 1.
+  rate:
+    rounding: pct_plain
+    means: |-
+      The latest borrow rate recorded on the spoke.
+  rate_symbol:
+    rounding: text
+    means: |-
+      The asset the latest borrow rate is for.
+  yearly:
+    rounding: spoke_amount
+    means: |-
+      A year's interest on the debt at that rate, with its symbol.
+  gone_assets:
+    rounding: text
+    means: |-
+      The debt assets owed earlier and owed no more.
+  peak_supply:
+    rounding: usd
+    means: |-
+      The highest supply the record holds.
+  peak_debt:
+    rounding: usd
+    means: |-
+      The highest debt the record holds.
+  tx_count:
+    rounding: count
+    means: |-
+      The position's transactions, liquidations left out.
+  liq_count:
+    rounding: count
+    means: |-
+      The liquidations in the record.
+  external:
+    rounding: count
+    means: |-
+      The events a position manager sent.
+  total:
+    rounding: count
+    means: |-
+      The events recorded on this spoke.
+  actor:
+    rounding: text
+    means: |-
+      The one position manager, by name or address.
+  cf:
+    rounding: pct_whole
+    means: |-
+      The one collateral's collateral factor.
+  cf_list:
+    rounding: text
+    means: |-
+      Each collateral with its collateral factor.
+
+group_words:
+  happened: |-
+    What happened
+  adds_up: |-
+    How it adds up
+  leaves: |-
+    Where it leaves the position
+
+# Words the generator puts into a sentence.
+words:
+  and: |-
+    and
+  spoke_named: |-
+    the {spoke} spoke
+  spoke_unnamed: |-
+    this spoke
+  act_supply: |-
+    supplied {symbol}
+  act_withdraw: |-
+    withdrew {symbol}
+  act_borrow: |-
+    borrowed {symbol}
+  act_repay: |-
+    repaid {symbol}
+
+position_words:
+  heading_holdings: |-
+    Holdings
+  heading_risk: |-
+    Risk
+  heading_rate: |-
+    Rate
+  heading_history: |-
+    History
+  # ── An open position ──
+  lead_supply: |-
+    This position supplies {supply_usd} across {supply_assets} with no debt drawn.
+  lead_supply_bare: |-
+    This position supplies {supply_usd} with no debt drawn.
+  lead: |-
+    This position holds {coll_usd} of collateral in {coll_assets} against {debt_usd} of debt in {debt_assets}.
+  lead_bare: |-
+    This position holds {coll_usd} of collateral against {debt_usd} of debt.
+  interest_both: |-
+    Interest so far: {earned_usd} earned on the supply and {paid_usd} paid on the debt.
+  interest_paid: |-
+    Interest so far: {paid_usd} on the debt, already part of it.
+  interest_earned: |-
+    Interest so far: {earned_usd} earned, already part of the supply.
+  interest_both_part: |-
+    Leaving out the part opened through a swap aggregator, interest so far is {earned_usd} earned and {paid_usd} paid.
+  interest_paid_part: |-
+    Leaving out the part opened through a swap aggregator, the debt has accrued {paid_usd} of interest.
+  interest_earned_part: |-
+    Leaving out the part opened through a swap aggregator, the supply has earned {earned_usd} of interest.
+  interest_unknown: |-
+    The position was opened through a swap aggregator, so its interest cannot be worked out.
+  no_debt: |-
+    With nothing borrowed, the position cannot be liquidated.
+  capacity_no_debt: |-
+    This collateral could carry up to {capacity} of debt before the health factor reaches 1.
+  hf_only: |-
+    Health factor {hf}: below 1 the position can be liquidated.
+  at_line: |-
+    At the liquidation line: a small fall in {liq_symbol}'s price or added interest takes it below 1.
+  at_line_against: |-
+    At the liquidation line: a small fall in {liq_symbol} against {against_symbol} or added interest takes it below 1.
+  at_line_basket: |-
+    At the liquidation line: a small fall in the collateral's value or added interest takes it below 1.
+  liq_single: |-
+    If {liq_symbol} falls about {drop} to {liq_price}, the position can be liquidated.
+  liq_against: |-
+    If {liq_symbol} falls about {drop} against {against_symbol}, to {liq_ratio}, the position can be liquidated.
+  liq_basket: |-
+    The collateral can fall about {drop} in value before liquidation.
+  capacity: |-
+    About {capacity} more could be borrowed before the health factor reaches 1.
+  rate: |-
+    The latest borrow rate recorded here is {rate}, about {yearly} a year on the debt as it stands.
+  rate_plain: |-
+    The latest borrow rate recorded here is {rate}.
+  rate_sym: |-
+    The latest {rate_symbol} borrow rate recorded here is {rate}.
+  rate_sym_yearly: |-
+    The latest {rate_symbol} borrow rate recorded here is {rate}, about {yearly} a year on the debt.
+  peaks_both: |-
+    At their highest, the supply reached {peak_supply} and the debt {peak_debt}.
+  peaks_supply: |-
+    At its highest, the supply reached {peak_supply}.
+  peaks_debt: |-
+    At its highest, the debt reached {peak_debt}.
+  record: |-
+    The position has recorded {tx_count} transactions.
+  record_one: |-
+    The position has recorded one transaction.
+  record_liq: |-
+    Its record holds {tx_count} transactions and {liq_count} liquidations.
+  record_liq_one: |-
+    Its record holds {tx_count} transactions and one liquidation.
+  debt_mix: |-
+    Its earlier {gone_assets} debt was cleared; the {debt_assets} debt is what remains.
+  operators: |-
+    Of the {total} events here, {external} were executed by an address other than the owner's, all through position managers.
+  operators_one: |-
+    Of the {total} events here, {external} were executed by an address other than the owner's, position manager {actor}.
+  # ── A closed position ──
+  closed_lead_seized: |-
+    Liquidation ended this position on the {spoke} spoke, and no balances remain.
+  closed_lead_after_liq: |-
+    This position on the {spoke} spoke closed after liquidations, its last balances withdrawn.
+  closed_lead_owner: |-
+    The owner closed this position on the {spoke} spoke, repaying the debt and withdrawing the collateral.
+  closed_lead_owner_supply: |-
+    The owner closed this supply-only position on the {spoke} spoke.
+  seizures: |-
+    Liquidators seized its collateral {liq_count} times.
+  seizure_one: |-
+    Liquidators seized its collateral once.
+  cf_then: |-
+    While it was open, {coll_symbol} counted at {cf} of its value here.
+  cf_then_many: |-
+    While it was open, its collateral counted at these shares of its value: {cf_list}.
+  cf_now: |-
+    Today {coll_symbol} counts at {cf} of its value here; the share while it was open could not be read.
+  cf_item: |-
+    {symbol} at {cf}
+  cf_now_many: |-
+    Today its collateral counts at these shares of its value: {cf_list}; the shares then could not be read.
+
+# Sentences more than one template says.
+shared_sentences:
+  by_manager:
+    when: |-
+      the owner signed the transaction and a position manager called the spoke
+    text: |-
+      The owner sent it through position manager {manager}, a contract acting for the owner.
+  by_manager_alone:
+    when: |-
+      a position manager called the spoke and the owner did not sign
+    text: |-
+      Position manager {manager} sent it on the owner's behalf, with the owner's approval.
+  sibling:
+    when: |-
+      the transaction holds other supplies, withdrawals, borrows or repayments, and no position manager sent it
+    text: |-
+      The same transaction also {sibling_acts}.
+  hf.at_line:
+    when: |-
+      the health factor after is from 1 to 1.01
+    text: |-
+      At {hf_after} the position is at the liquidation line: any fall below 1 lets it be liquidated.
+  hf.close:
+    when: |-
+      the health factor after is from 1.01 to 1.05
+    text: |-
+      At {hf_after} the position is close to the liquidation line at 1.
+  hf.cleared:
+    when: |-
+      the event left no debt where there was some, and supply remains
+    text: |-
+      With no debt left, the position cannot be liquidated.
+  closed:
+    when: |-
+      the event left nothing supplied and nothing owed on the spoke
+    text: |-
+      Nothing is supplied or owed on this spoke now: the position is closed.
+  rate.moved:
+    when: |-
+      the asset's borrow rate moved by half or more since the previous event
+    text: |-
+      The {symbol} borrow rate moved from {rate_then} at the previous event to {rate_now}.
+
+templates:
+  - id: aave4.supply
+    title: |-
+      Supply
+    when: |-
+      supply
+    L5: supply
+    variants:
+      default: |-
+        a supply to the spoke
+      enabled: |-
+        a supply that also enabled the asset as collateral
+    sentences:
+      supply.what:
+        when: |-
+          default
+        text: |-
+          Supplied {amount} {symbol} to {where}.
+      supply.enabled:
+        when: |-
+          enabled
+        text: |-
+          Supplied {amount} {symbol} to {where} and enabled it as collateral.
+      coll.on:
+        when: |-
+          the asset counts as collateral after the event and did not before
+        text: |-
+          {symbol} now backs the position's borrows, so it can be seized in a liquidation.
+      coll.was_on:
+        when: |-
+          the asset counted as collateral before the event
+        text: |-
+          {symbol} was already collateral, so the new {symbol} backs the borrows at once.
+      coll.off:
+        when: |-
+          the asset is not collateral after the event
+        text: |-
+          {symbol} is not collateral: it earns interest and backs no borrow.
+    order: [supply.what, supply.enabled, by_manager, by_manager_alone, sibling, coll.on, coll.was_on, coll.off, hf.at_line, hf.close]
+    groups:
+      happened: [supply.what, supply.enabled, by_manager, by_manager_alone, sibling]
+      leaves: [coll.on, coll.was_on, coll.off, hf.at_line, hf.close]
+    alternates:
+      - [supply.what, supply.enabled]
+      - [by_manager, by_manager_alone, sibling]
+      - [coll.on, coll.was_on, coll.off]
+      - [hf.at_line, hf.close]
+
+  - id: aave4.withdraw
+    title: |-
+      Withdraw
+    when: |-
+      withdraw
+    L5: withdraw
+    variants:
+      default: |-
+        a withdrawal from the spoke
+    sentences:
+      withdraw.what:
+        when: |-
+          every withdrawal
+        text: |-
+          Withdrew {amount} {symbol} to the wallet.
+      withdraw.all:
+        when: |-
+          the withdrawal took the whole supply of the asset and the position stays open
+        text: |-
+          That was the whole {symbol} supply on this spoke.
+    order: [withdraw.what, by_manager, by_manager_alone, sibling, withdraw.all, closed, hf.at_line, hf.close]
+    groups:
+      happened: [withdraw.what, by_manager, by_manager_alone, sibling, withdraw.all]
+      leaves: [closed, hf.at_line, hf.close]
+    alternates:
+      - [by_manager, by_manager_alone, sibling]
+      - [closed, hf.at_line, hf.close]
+
+  - id: aave4.borrow
+    title: |-
+      Borrow
+    when: |-
+      borrow
+    L5: borrow
+    variants:
+      default: |-
+        a borrow from the spoke
+      first: |-
+        the position's first debt in the asset
+    sentences:
+      borrow.what:
+        when: |-
+          default, the hub not named
+        text: |-
+          Borrowed {amount} {symbol}.
+      borrow.what_hub:
+        when: |-
+          default, on a spoke that borrows from more than one hub
+        text: |-
+          Borrowed {amount} {symbol} from the {hub} hub.
+      borrow.first:
+        when: |-
+          first, the hub not named
+        text: |-
+          Borrowed {amount} {symbol}, the position's first {symbol} debt here.
+      borrow.first_hub:
+        when: |-
+          first, on a spoke that borrows from more than one hub
+        text: |-
+          Borrowed {amount} {symbol} from the {hub} hub, the position's first {symbol} debt here.
+    order: [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub, by_manager, by_manager_alone, sibling, hf.at_line, hf.close, rate.moved]
+    groups:
+      happened: [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub, by_manager, by_manager_alone, sibling]
+      leaves: [hf.at_line, hf.close, rate.moved]
+    alternates:
+      - [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub]
+      - [by_manager, by_manager_alone, sibling]
+      - [hf.at_line, hf.close]
+
+  - id: aave4.repay
+    title: |-
+      Repay
+    when: |-
+      repay
+    L5: repay
+    variants:
+      default: |-
+        a repayment that leaves some of the asset's debt
+      cleared: |-
+        a repayment that cleared the asset's debt
+      dust: |-
+        a repayment too small to move the debt
+    sentences:
+      repay.what:
+        when: |-
+          default or dust, the hub not named
+        text: |-
+          Repaid {amount} {symbol}.
+      repay.what_hub:
+        when: |-
+          default or dust, on a spoke that borrows from more than one hub
+        text: |-
+          Repaid {amount} {symbol} to the {hub} hub.
+      repay.all:
+        when: |-
+          cleared, the hub not named
+        text: |-
+          Repaid {amount} {symbol}, clearing the {symbol} debt in full.
+      repay.all_hub:
+        when: |-
+          cleared, on a spoke that borrows from more than one hub
+        text: |-
+          Repaid {amount} {symbol} to the {hub} hub, clearing the {symbol} debt in full.
+      repay.dust:
+        when: |-
+          dust
+        text: |-
+          The amount is dust and leaves the debt where it was.
+      repay.life:
+        when: |-
+          cleared, the debt's lifetime interest read
+        text: |-
+          Over its life this {symbol} debt accrued {life_interest} {symbol} of interest.
+      repay.other:
+        when: |-
+          cleared, other debt remains
+        text: |-
+          The {other_debt} debt remains.
+    order: [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust, repay.life, repay.other, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
+    groups:
+      happened: [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust]
+      adds_up: [repay.life]
+      leaves: [repay.other, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
+    alternates:
+      - [repay.what, repay.what_hub, repay.all, repay.all_hub]
+      - [by_manager, by_manager_alone, sibling]
+      - [repay.dust, repay.life, rate.moved]
+      - [closed, hf.cleared, hf.at_line, hf.close]
+
+  - id: aave4.liquidation
+    title: |-
+      Liquidation
+    when: |-
+      liquidation
+    L5: liquidation
+    variants:
+      default: |-
+        a liquidation on the spoke
+    sentences:
+      liq.what:
+        when: |-
+          both legs read
+        text: |-
+          A liquidator repaid {cleared} {debt_symbol} of the debt and took {seized} {coll_symbol} of collateral.
+      liq.what_cleared:
+        when: |-
+          only the debt leg read
+        text: |-
+          A liquidator repaid {cleared} {debt_symbol} of the debt.
+      liq.what_seized:
+        when: |-
+          only the collateral leg read
+        text: |-
+          A liquidator took {seized} {coll_symbol} of collateral.
+      liq.by:
+        when: |-
+          the row names the liquidator
+        text: |-
+          Liquidator {liquidator} sent the transaction.
+      liq.value:
+        when: |-
+          both legs priced at the block
+        text: |-
+          The collateral taken was worth {seized_usd}, against {cleared_usd} of debt repaid.
+      liq.bonus:
+        when: |-
+          both legs priced, the collateral worth more
+        text: |-
+          The difference, {bonus}, is the liquidator's bonus.
+      liq.cleared_only:
+        when: |-
+          the liquidation cleared the debt asset, and no other debt remains
+        text: |-
+          This cleared the {debt_symbol} debt, the position's only debt.
+      liq.cleared_one:
+        when: |-
+          the liquidation cleared the debt asset, and other debt remains
+        text: |-
+          This cleared the {debt_symbol} debt; the {other_debt} debt remains.
+      liq.again:
+        when: |-
+          some of the debt asset remains
+        text: |-
+          Debt remains, so the position can be liquidated again while its health factor is below 1.
+    order: [liq.what, liq.what_cleared, liq.what_seized, liq.by, liq.value, liq.bonus, liq.cleared_only, liq.cleared_one, liq.again]
+    groups:
+      happened: [liq.what, liq.what_cleared, liq.what_seized, liq.by]
+      adds_up: [liq.value, liq.bonus]
+      leaves: [liq.cleared_only, liq.cleared_one, liq.again]
+    alternates:
+      - [liq.what, liq.what_cleared, liq.what_seized]
+      - [liq.cleared_only, liq.cleared_one, liq.again]
+
+  - id: aave4.toggle
+    title: |-
+      Collateral
+    when: |-
+      collateral_toggle
+    L5: collateral_toggle
+    variants:
+      enabled: |-
+        the asset enabled as collateral
+      disabled: |-
+        the asset disabled as collateral
+    sentences:
+      toggle.on:
+        when: |-
+          enabled
+        text: |-
+          Enabled {symbol} as collateral on {where}.
+      toggle.off:
+        when: |-
+          disabled
+        text: |-
+          Disabled {symbol} as collateral on {where}.
+      toggle.backs:
+        when: |-
+          enabled
+        text: |-
+          {symbol} now backs the borrows and adds to the room to borrow, so it can be seized in a liquidation.
+      toggle.freed:
+        when: |-
+          disabled
+        text: |-
+          {symbol} no longer backs the borrows: it cannot be seized, and the room to borrow falls.
+    order: [toggle.on, toggle.off, by_manager, by_manager_alone, toggle.backs, toggle.freed]
+    groups:
+      happened: [toggle.on, toggle.off, by_manager, by_manager_alone]
+      leaves: [toggle.backs, toggle.freed]
+    alternates:
+      - [toggle.on, toggle.off]
+      - [by_manager, by_manager_alone]
+      - [toggle.backs, toggle.freed]
+
+  - id: aave4.fallback
+    title: |-
+      Event
+    when: |-
+      any other row
+    L5: fallback
+    variants:
+      default: |-
+        an event with no template
+    sentences:
+      fallback.what:
+        when: |-
+          every event with no template
+        text: |-
+          The spoke recorded this {event_type} event for the position.
+    order: [fallback.what]
+    groups:
+      happened: [fallback.what]
+
+# Every Quick Link's page, with its anchor. A row in rails-ops
+# reference/official-docs/aave-v4.md backs each.
+doc_urls:
+  POSITIONS: https://aave.com/docs/aave-v4/positions#user-positions
+  HF: https://aave.com/docs/aave-v4/positions#health-factor
+  RISK_PREMIUM: https://aave.com/docs/aave-v4/positions#user-risk-premium
+  SPOKE_ISOLATION: https://aave.com/docs/aave-v4/positions#cross-spoke-strategies-spoke-isolation
+  SUPPLY: https://aave.com/docs/aave-v4/positions/supply#supply-assets
+  COLLATERAL: https://aave.com/docs/aave-v4/positions/supply#collateral-management
+  WITHDRAW: https://aave.com/docs/aave-v4/positions/withdraw#withdraw-assets
+  WITHDRAW_POSITION: https://aave.com/docs/aave-v4/positions/withdraw#withdrawing-identify-the-supply-position
+  BORROW: https://aave.com/docs/aave-v4/positions/borrow#borrowing
+  REPAY: https://aave.com/docs/aave-v4/positions/repay#repay-loans
+  LIQUIDATIONS: https://aave.com/docs/aave-v4/positions/liquidations#liquidations
+  LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-debt-position
+  LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-collateral-position
+  MANAGERS: https://aave.com/docs/aave-v4/positions/managers#how-they-work
+  DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#built-in-position-managers-delegation-managers
+  DYNAMIC_CONFIG: https://aave.com/docs/aave-v4/positions/conditions#dynamic-risk-configuration
+  LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity#liquidity-model
+  HUBS: https://aave.com/docs/aave-v4/liquidity#liquidity-hubs
+  SPOKES: https://aave.com/docs/aave-v4/liquidity#spokes
+  RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#hub-assets-interest-rate-model
+  HUB_SPOKE_CONFIGS: https://aave.com/docs/aave-v4/liquidity/hubs#hub-spoke-configs
+  RESERVE_DATA: https://aave.com/docs/aave-v4/liquidity/reserves#reserve-data-structure
+
+L5:
+  supply:
+    title: |-
+      How supplying works
+    intro: |-
+      Supplying deposits an asset into a spoke's reserve, where it earns interest. Enabled as collateral, it backs borrowing on that spoke.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Supplied balance
+        text: |-
+          the deposit is held as reserve shares that grow with interest, and it can be withdrawn at any time.
+      - bold: |-
+          Collateral on or off
+        text: |-
+          each supply is enabled or disabled as collateral; only an enabled supply backs borrows and can be seized in a liquidation.
+      - bold: |-
+          Risk premium
+        text: |-
+          the collateral enabled sets the position's risk premium, so riskier collateral raises the rate its debt pays.
+      - bold: |-
+          Position managers
+        text: |-
+          contracts governance registers and the owner approves to act for the position; one that supplies for the owner pays with its funds.
+    links:
+      - label: |-
+          Supplying on Aave V4
+        doc: SUPPLY
+      - label: |-
+          Collateral status
+        doc: COLLATERAL
+      - label: |-
+          Position managers
+        doc: MANAGERS
+
+  withdraw:
+    title: |-
+      How withdrawing works
+    intro: |-
+      Withdrawing takes supplied assets, with the interest they have earned, out of a spoke and back to the wallet.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Health factor
+        text: |-
+          with a borrow open, the spoke allows a withdrawal only while the health factor stays at or above 1.
+      - bold: |-
+          Supply with no debt against it
+        text: |-
+          a supply that is not collateral, or backs no borrow, can be withdrawn in full.
+      - bold: |-
+          Risk premium
+        text: |-
+          withdrawing collateral with a borrow open updates the position's risk premium and the collateral factors it holds.
+      - bold: |-
+          Paused reserves
+        text: |-
+          a reserve that governance has paused cannot be withdrawn from until it is unpaused.
+      - bold: |-
+          Position managers
+        text: |-
+          an approved manager can withdraw for the owner; the tokens go to it, so it also needs the owner's allowance for that asset.
+    links:
+      - label: |-
+          Withdrawing on Aave V4
+        doc: WITHDRAW
+      - label: |-
+          Collateral and paused reserves
+        doc: WITHDRAW_POSITION
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Allowances for managers
+        doc: DELEGATION_MANAGERS
+
+  borrow:
+    title: |-
+      How borrowing works
+    intro: |-
+      Borrowing draws an asset from a spoke against the collateral supplied to that spoke. The debt accrues interest until it is repaid.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral factor
+        text: |-
+          each collateral counts at a share of its value; that one figure is both the borrowing limit and the liquidation line.
+      - bold: |-
+          Health factor
+        text: |-
+          the collateral counted that way divided by the debt; borrowing lowers it, and below 1 the position can be liquidated.
+      - bold: |-
+          Borrow rate
+        text: |-
+          the lending hub sets one rate for the whole debt from the share of the asset borrowed, so every borrow or repayment moves it.
+      - bold: |-
+          Risk premium
+        text: |-
+          a per-position addition to the hub's rate, set by the collateral's risk and recalculated on each borrow and withdrawal.
+      - bold: |-
+          Position managers
+        text: |-
+          an approved manager can borrow for the owner; the tokens go to it, so it also needs the owner's allowance for that asset.
+    links:
+      - label: |-
+          Borrowing on Aave V4
+        doc: BORROW
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Risk premium
+        doc: RISK_PREMIUM
+      - label: |-
+          Interest rate model
+        doc: RATE_MODEL
+
+  repay:
+    title: |-
+      How repaying works
+    intro: |-
+      Repaying returns borrowed tokens to the spoke. The debt falls, the health factor rises, and collateral is freed for withdrawal or more borrowing.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Partial or full
+        text: |-
+          any amount can be repaid at any time; repaying the whole balance clears that asset's debt, interest included.
+      - bold: |-
+          Interest
+        text: |-
+          debt grows with interest every block, so more is owed at repayment than was borrowed.
+      - bold: |-
+          Repaying for someone else
+        text: |-
+          an approved position manager can repay the owner's debt with its tokens and needs no allowance.
+      - bold: |-
+          Token approval
+        text: |-
+          the repaying account first approves the spoke to take the tokens, in a separate transaction or with a signed permit.
+    links:
+      - label: |-
+          Repaying on Aave V4
+        doc: REPAY
+      - label: |-
+          Position managers
+        doc: DELEGATION_MANAGERS
+
+  collateral_toggle:
+    title: |-
+      How collateral works
+    intro: |-
+      Each supplied asset can be enabled or disabled as collateral. Only enabled assets back borrows and count toward the health factor.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Enabling
+        text: |-
+          the asset backs borrows and raises the room to borrow, and it can be seized in a liquidation.
+      - bold: |-
+          Disabling
+        text: |-
+          the asset backs nothing and cannot be seized; the spoke refuses it while the health factor would fall below 1.
+      - bold: |-
+          One spoke
+        text: |-
+          collateral backs only borrows on the same spoke; positions on other spokes do not touch its health factor.
+      - bold: |-
+          Collateral factors
+        text: |-
+          disabling collateral updates the collateral factors the position holds, and enabling updates that asset's.
+    links:
+      - label: |-
+          Collateral status
+        doc: COLLATERAL
+      - label: |-
+          Spoke isolation
+        doc: SPOKE_ISOLATION
+      - label: |-
+          Collateral factors held
+        doc: DYNAMIC_CONFIG
+
+  liquidation:
+    title: |-
+      How liquidations work
+    intro: |-
+      A position can be liquidated once its health factor falls below 1. Anyone can do it, and automated bots usually do.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidation bonus
+        text: |-
+          the liquidator repays debt and takes collateral worth more; the lower the health factor, the higher the bonus, up to the spoke's maximum.
+      - bold: |-
+          How much one call takes
+        text: |-
+          enough debt to bring the health factor back to the spoke's target, or all of it when under $1,000 would remain.
+      - bold: |-
+          One pair
+        text: |-
+          each liquidation repays one debt reserve and takes one collateral reserve, only from supplies enabled as collateral.
+      - bold: |-
+          After it
+        text: |-
+          collateral counts only up to its collateral factor, so taking it lowers the cover less than clearing the debt raises it.
+      - bold: |-
+          One spoke
+        text: |-
+          a liquidation touches only this spoke's collateral and debt; positions on other spokes are unaffected.
+    links:
+      - label: |-
+          Liquidations in Aave V4
+        doc: LIQUIDATIONS
+      - label: |-
+          The $1,000 rule
+        doc: LIQ_DEBT
+      - label: |-
+          Collateral and bonus
+        doc: LIQ_COLLATERAL
+      - label: |-
+          Health factor
+        doc: HF
+
+  fallback:
+    title: |-
+      How Aave V4 positions work
+    intro: |-
+      Aave V4 lets a wallet supply assets and borrow against them inside a spoke, where one health factor covers the whole position.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Supply and collateral
+        text: |-
+          supplied assets earn interest and, when enabled as collateral, back borrowing.
+      - bold: |-
+          Health factor
+        text: |-
+          the collateral counted at its collateral factors divided by the debt; below 1 the position can be liquidated.
+      - bold: |-
+          Hub and spoke
+        text: |-
+          hubs hold the pooled tokens; each spoke is a separate market with a separate health factor.
+    links:
+      - label: |-
+          Aave V4 positions
+        doc: POSITIONS
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Liquidity model
+        doc: LIQUIDITY_MODEL
+
+  # The position card's "?": the spoke's modal. The loader passes the spoke's
+  # form (its slug), and `liquidated` for a position liquidators touched.
+  position:
+    title: |-
+      How Aave V4 spokes work
+    intro: |-
+      Aave V4 splits lending in two: a hub holds the pooled tokens and sets their rates, and a spoke is where a position lives.
+    intro_main: |-
+      Main is Aave V4's general-purpose spoke on the Core hub: its collateral and the tokens it lends both sit in Core.
+    intro_bluechip: |-
+      Bluechip keeps its collateral, WETH, wstETH, WBTC and cbBTC, in the Prime hub. It borrows from Prime, and from the Core hub over a credit line.
+    intro_forex: |-
+      Forex takes USDC, USDT or EURC as collateral and lends the Core hub's stablecoins. Currencies that move together let collateral back more debt than on Main.
+    intro_gold: |-
+      Gold takes XAUt, Tether Gold, as collateral against the Core hub's stablecoins. Its settings are the most conservative of the launch spokes.
+    intro_ethena_correlated: |-
+      Ethena Correlated takes USDe, sUSDe and their Pendle principal tokens as collateral and lends only USDe, all on the Plus hub.
+    intro_ethena_ecosystem: |-
+      Ethena Ecosystem takes the same Ethena collateral and borrows USDe, USDC, USDT and GHO from the Plus hub. It borrows stablecoins from the Core hub too, over a capped credit line.
+    intro_etherfi: |-
+      EtherFi takes weETH as collateral and lends only WETH, on the Core hub: one collateral and one borrowable asset.
+    intro_kelp: |-
+      Kelp takes rsETH as collateral against WETH on the Core hub. Governance has frozen both reserves, so it takes no new supply or borrowing.
+    intro_lido: |-
+      Lido takes wstETH as collateral and lends only WETH, on the Core hub.
+    intro_lombard: |-
+      Lombard BTC takes LBTC, Lombard's staked BTC, as collateral and lends WBTC and cbBTC from the Core hub.
+    intro_stablecoin_correlated: |-
+      Stablecoin Correlated sits on the Global Dollar hub. It takes a Pendle principal token on USDG as collateral, borrows stablecoins there, and borrows USDG from Core.
+    intro_mag7: |-
+      Mag7 is Aave V4's one market on Base. Seven Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Hub and spoke
+        text: |-
+          a hub holds pooled tokens and sets rates; a spoke has a separate collateral list, risk settings and health factor, drawing from hubs within limits.
+      - bold: |-
+          Collateral factor
+        text: |-
+          each collateral counts at a share of its value set by the spoke; the event cards' collateral ratio times this factor is the health factor.
+      - bold: |-
+          Health factor
+        text: |-
+          the counted collateral divided by the debt; a borrow or withdrawal must leave it at or above 1, and below 1 liquidation starts.
+        text_liquidated: |-
+          below 1 a liquidator repays one debt reserve and takes one collateral reserve, only from supplies enabled as collateral.
+      - bold: |-
+          Risk premium
+        text: |-
+          the borrow rate is the hub's base rate plus a premium set per position from its collateral's risk.
+        text_bluechip: |-
+          every Bluechip collateral carries a collateral risk of 0%, so its borrowers pay the hub's base rate.
+        text_lido: |-
+          Lido's collateral carries a collateral risk of 0%, so its borrowers pay the hub's base rate with no premium.
+      - bold: |-
+          This spoke
+        text: |-
+          each spoke sets its collateral list, factors and limits, so the same assets can count differently on another spoke.
+        text_main: |-
+          a broad collateral list borrowing from the hub it sits on, with rates that follow how much of Core is lent.
+        text_bluechip: |-
+          its collateral factors run higher than Main's for the same assets, so the same collateral and debt give a higher health factor here.
+        text_forex: |-
+          EURC is its non-dollar leg, and its liquidation settings are tuned to the narrow moves between the currencies.
+        text_gold: |-
+          gold is not a crypto asset, so after a liquidation the spoke restores the health factor further than a crypto spoke does.
+        text_ethena_correlated: |-
+          lending only USDe against USDe-based collateral earns its tight settings; it has no credit line to Core.
+        text_ethena_ecosystem: |-
+          the cap on Core's credit line limits how much Core liquidity Ethena strategies can draw, and each hub's solvency stays separate.
+        text_etherfi: |-
+          one collateral and one borrowable asset keep its factor, bonus, oracle and caps adjustable without touching the wider hub.
+        text_kelp: |-
+          rsETH counts at 0% for a position on the current terms; positions that took their terms before the change keep 95%.
+        text_lido: |-
+          a venue for borrowing WETH against staked ETH, kept apart from the rest of the Core hub.
+        text_lombard: |-
+          the spoke keeps Babylon staking exposure inside its limits, apart from the hub's wider collateral.
+        text_stablecoin_correlated: |-
+          the principal token is priced by a discount-rate oracle that rises to par at maturity; later maturities join the same spoke.
+        text_mag7: |-
+          stock prices are Chainlink feeds that publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise.
+    links:
+      - label: |-
+          Hubs and spokes
+        doc: LIQUIDITY_MODEL
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Risk premium
+        doc: RISK_PREMIUM
+      - label: |-
+          Collateral factors held
+        doc: DYNAMIC_CONFIG
+
+  # The Ethereum hubs page's "?".
+  hubs:
+    title: |-
+      How hubs and spokes work
+    intro: |-
+      Aave V4 splits lending into hubs, the shared pools that hold supplied assets and set rates, and spokes, the markets people use. A spoke draws from a hub over a credit line.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidity hub
+        text: |-
+          the pool that holds supplied assets and backs borrowing; Core, Plus, Prime and Global Dollar keep their liquidity apart.
+      - bold: |-
+          Spoke
+        text: |-
+          a market drawing from one hub or more; Bluechip keeps its collateral in Prime and borrows from Prime and Core.
+      - bold: |-
+          Credit line and utilisation
+        text: |-
+          the cap a hub grants a spoke to draw an asset; utilisation is how much of that line is drawn.
+      - bold: |-
+          Liquidation threshold (LT)
+        text: |-
+          the share of an asset's value that counts as collateral on a spoke, shown as a range where spokes set it differently.
+    links:
+      - label: |-
+          Liquidity model
+        doc: LIQUIDITY_MODEL
+      - label: |-
+          Liquidity hubs
+        doc: HUBS
+      - label: |-
+          Spokes
+        doc: SPOKES
+      - label: |-
+          Caps per hub and spoke
+        doc: HUB_SPOKE_CONFIGS
+
+  # The Base hub page's "?".
+  base_hub:
+    title: |-
+      How the Equities hub works
+    intro: |-
+      Aave V4 on Base has one hub, Equities, holding one USDC reserve, and one spoke, Mag7. Seven Coinbase tokenized stocks back USDC borrowing there and cannot be borrowed.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Collateral factor
+        text: |-
+          the share of a stock's value that counts toward the health factor; below a health factor of 1 the position can be liquidated.
+      - bold: |-
+          Supply cap and credit line
+        text: |-
+          the hub caps how much of each asset the spoke may add, and how much USDC it may draw, in whole tokens.
+      - bold: |-
+          Stock prices
+        text: |-
+          Chainlink feeds publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise, so a weekend price can be days old.
+      - bold: |-
+          Paused reserve
+        text: |-
+          a split or similar corporate action pauses the stock's reserve until the token's multiplier is updated; dividends are reinvested into the token.
+      - bold: |-
+          Registry pause
+        text: |-
+          Coinbase can pause a stock at its token registry, holding its price; the spoke does not read that flag and stays open.
+    links:
+      - label: |-
+          Caps and credit lines
+        doc: HUB_SPOKE_CONFIGS
+      - label: |-
+          Health factor
+        doc: HF
+      - label: |-
+          Reserve settings and pauses
+        doc: RESERVE_DATA

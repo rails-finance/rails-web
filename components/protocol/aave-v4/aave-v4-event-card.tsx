@@ -18,7 +18,7 @@ import { aaveV4Label } from "@/lib/aave-v4/event-label";
 import { useAaveV4Cells } from "./aave-v4-event-detail";
 import { AaveV4EventExplainer, aaveV4LearnMoreContent } from "./aave-v4-event-explainer";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { aaveV4ExplainerTeaser, coordsFor, type AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
+import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 
 export interface AaveV4EventCardProps {
   event: AaveV4Event;
@@ -126,6 +126,8 @@ export function AaveV4EventCard({
     cells,
     ledgers: { none: "no flows panel on Aave V4 yet" },
     price: { gas: eventGas(event.gas), prices },
+    // The explanation reads the position state the card opens with, so the
+    // pane is the body alone, with no teaser.
     explainer: {
       body: (
         <AaveV4EventExplainer
@@ -134,10 +136,8 @@ export function AaveV4EventCard({
           siblings={siblings ?? [event]}
           previousRate={previousRate}
           debtLifeInterest={debtLifeInterest}
-          skipLead
         />
       ),
-      first: aaveV4ExplainerTeaser(ctx, coordsFor(event), siblings ?? [event], event),
     },
     learnMore: <LearnMore inline content={aaveV4LearnMoreContent(ctx)} />,
   };

@@ -2,4 +2,4 @@
 // See aave-v3.ts in this directory for why these are re-exports and not
 // declarations: there is ONE declaration, in event-shape.ts.
 
-export type { AaveV4EventType, AaveV4Context, AaveV4PriceSource } from "../event-shape";
+export type { AaveV4Context, AaveV4PriceSource } from "../event-shape";

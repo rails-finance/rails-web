@@ -45,7 +45,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import { AaveV4EventCard } from "@/components/protocol/aave-v4/aave-v4-event-card";
 import type { AaveV4TxGroup } from "@/components/protocol/aave-v4/aave-v4-head";
-import type { AaveV4Event } from "@/lib/aave-v4/explainer-clauses";
+import type { AaveV4Event } from "@/lib/aave-v4/event-prose";
 import { AaveV4SpokeCardSelector } from "@/components/protocol/aave-v4/aave-v4-spoke-card";
 import { AaveV4RiskSlot } from "@/components/protocol/aave-v4/aave-v4-risk-slot";
 import { LearnMore } from "@/components/shared/learn-more-modal";

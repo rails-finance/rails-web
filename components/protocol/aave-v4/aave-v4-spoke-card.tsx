@@ -27,60 +27,25 @@ import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import {
-  usdProv,
   usdProvOnchain,
-  accumProv,
   healthFactorProv,
   interestSinceZeroProv,
+  BORROW_RATE_PROV,
+  COLL_USD_PROV,
+  DEBT_USD_PROV,
+  NONCOLL_USD_PROV,
+  PEAK_COLL_PROV,
+  PEAK_DEBT_PROV,
+  SUPPLY_USD_PROV,
+  YEARLY_COST_PROV,
 } from "@/lib/aave-v4/position-provenance";
 import { listSymbols, NO_PRICE_HINT, PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 
-// The borrow-rate / peak / interest figures are accumulated over this spoke's
-// indexed event stream.
-const borrowRateProv = () =>
-  accumProv("The latest borrow rate recorded on this spoke", { formula: "most recent on-chain borrow index → APR" });
+// The interest figures are added since each balance last started from zero.
 const supplyInterestProv = () => interestSinceZeroProv("Supply interest inside the collateral");
 const borrowInterestProv = () => interestSinceZeroProv("Borrow interest inside the debt");
-const peakCollProv = () =>
-  accumProv("The peak collateral this position has held", {
-    formula: "max(Σ collateral × price)",
-    inputs: [
-      {
-        label: "collateral",
-        kind: "chain",
-        pclass: "indexed",
-        note: "the position's balance at each event, from the indexed stream",
-      },
-      {
-        label: "price",
-        kind: "offchain",
-        note: "each event at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value of the day",
-      },
-    ],
-  });
-const peakDebtProv = () =>
-  accumProv("The peak debt this position has carried", {
-    formula: "max(Σ debt × price)",
-    inputs: [
-      {
-        label: "debt",
-        kind: "chain",
-        pclass: "indexed",
-        note: "the position's balance at each event, from the indexed stream",
-      },
-      {
-        label: "price",
-        kind: "offchain",
-        note: "each event at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value of the day",
-      },
-    ],
-  });
-const COLL_USD_PROV = usdProv("Current collateral", { amountLabel: "collateral balance", amountKind: "chain" });
-const DEBT_USD_PROV = usdProv("Current debt", { amountLabel: "debt balance", amountKind: "chain" });
-const SUPPLY_USD_PROV = usdProv("Currently supplied", { amountLabel: "supply balance", amountKind: "chain" });
-const NONCOLL_USD_PROV = usdProv("Supplied, not collateral", { amountLabel: "supply balance", amountKind: "chain" });
 
 /**
  * A headline USD stat (collateral / debt / supplied) that tells the truth in
@@ -179,14 +144,6 @@ function SupplyInterestFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
   );
 }
 
-const YEARLY_COST_PROV: Provenance = {
-  kind: "derived",
-  summary:
-    "What the debt costs in a year at the latest borrow rate — the debt as it stands now times that rate. The rate moves with the hub, so this is today's pace.",
-  via: "debt balance × latest borrow rate",
-  formula: "debt × borrowRate",
-};
-
 /** Debt-stat footnote: the accrued borrow interest (when non-dust), then the
  *  latest borrow rate with what it costs a year at this debt. Accrued interest
  *  GREW the debt, so it reads "incl. $X interest" directly under the
@@ -209,7 +166,7 @@ function DebtFootnote({ spoke }: { spoke: AaveSpokeCardInfo }) {
       )}
       {rate !== null && (
         <div>
-          <Prov info={borrowRateProv()}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
+          <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov> {rateSymbolLabel(spoke)}borrow rate
           {yearly && yearly.amount > 0 && (
             <>
               {" "}
@@ -366,7 +323,7 @@ function AaveV4SpokeCard({
               const v = fmtUsd(spoke.peakSupplyUsd);
               return (
                 <StatValue color="text-rb-500" title={v.title}>
-                  <Prov info={peakCollProv()}>{v.display}</Prov>
+                  <Prov info={PEAK_COLL_PROV}>{v.display}</Prov>
                 </StatValue>
               );
             })()}
@@ -377,7 +334,7 @@ function AaveV4SpokeCard({
                     const v = fmtUsd(spoke.peakDebtUsd);
                     return (
                       <StatValue color="text-rb-500" title={v.title}>
-                        <Prov info={peakDebtProv()}>{v.display}</Prov>
+                        <Prov info={PEAK_DEBT_PROV}>{v.display}</Prov>
                       </StatValue>
                     );
                   })()

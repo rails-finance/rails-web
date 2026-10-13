@@ -1,28 +1,14 @@
 /**
- * Editorial metadata for Aave V4 spokes.
+ * Structural metadata for Aave V4 spokes: the URL slugs, each spoke's kind,
+ * the hub that holds its collateral and the hubs it borrows from, and the
+ * spokes' contract addresses. What each spoke is, in words, is the position
+ * card's "?" (content/aave-v4/event-prose.yaml, `L5.position`, a form per
+ * spoke).
  *
- * The position card shows numbers; this file carries the *narrative* — what
- * archetype each spoke is, which Hub holds collateral, which Hub backs the
- * borrow, and a plain-English description users can read without already
- * knowing V4's Hub/Spoke architecture.
- *
- * Architectural reality (current understanding):
- *   - Hubs are unified-liquidity tiers (Core / Plus / Prime).
- *   - Spokes are modular interfaces with rules. Most spokes pool collateral
- *     and borrows within a single Hub; some — like Bluechip — keep collateral
- *     in one Hub and borrow from it and from another over a cross-hub credit
- *     line. The borrow rate is the Hub's base rate plus a risk premium that
- *     Aave sets per user, from the collateral risk the Spoke assigns each
- *     collateral asset (aave.com/docs/aave-v4/positions).
- *
- * The narratives below are verified against the V4 activation ARFC
- * (governance.aave.com/t/…/24293), the Global Dollar Hub Direct-to-AIP
- * (…/24942), and aave.com/docs (2026-07-14). The hub lines each Spoke
- * borrows over, and Bluechip's collateral factors and collateral risk, were
- * re-read against the hubs table and the Spoke contracts' getReserve /
- * getDynamicReserveConfig on 2026-09-28. Numbers that drift with
- * governance (caps, LTVs) are deliberately not hard-coded here — narratives
- * state structure (hubs, asset scope, credit lines), not live parameters.
+ * The hub lines each spoke borrows over were re-read against the hubs table
+ * and the spoke contracts' getReserve / getDynamicReserveConfig on
+ * 2026-09-28. Numbers that drift with governance (caps, factors) are not
+ * written here.
  */
 
 import type { HubTier } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
@@ -128,21 +114,7 @@ export interface SpokeMeta {
   /** The Hubs the Spoke borrows from, home Hub first. More than one only on
    *  spokes with a cross-hub credit line. */
   borrowHubs: HubTier[];
-  /** Plain-English narrative, rendered as a stack of sentences in the
-   *  SpokeNarrativeBand. Keep each entry to one or two sentences. */
-  narrative: string[];
-  /** Optional structural disclosure about rate composition: Hub base rate
-   *  plus the per-user risk premium. */
-  rateNote?: string;
-  /** Further reading for the spoke's learn-more modal, official sources only. */
-  links?: { label: string; url: string }[];
 }
-
-/** Official sources every Ethereum spoke's modal cites. */
-export const SPOKE_DOC_LINKS: { label: string; url: string }[] = [
-  { label: "Aave V4 positions: health factor and risk premium", url: "https://aave.com/docs/aave-v4/positions" },
-  { label: "Aave V4 docs", url: "https://aave.com/docs/aave-v4" },
-];
 
 // Keyed by the canonical spoke slug (see SPOKE_SLUG_TO_NAME). Look up via
 // getSpokeMeta(), which normalizes an API display name to its slug first —
@@ -153,23 +125,12 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     archetype: "standard",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Aave V4's general-purpose Spoke on the Core Hub.",
-      "Collateral and borrows share the same Hub; rates respond to Core Hub utilization.",
-    ],
   },
   bluechip: {
     name: "Bluechip",
     archetype: "cross-hub-credit",
     collateralHub: "Prime",
     borrowHubs: ["Prime", "Core"],
-    narrative: [
-      "Bluechip is a Prime Hub Spoke: its collateral (WETH, wstETH, WBTC and cbBTC) sits in Prime. It borrows USDC, USDT and GHO from Prime, and USDC, USDT, USDG, frxUSD and EURC from the Core Hub over a cross-hub credit line.",
-      "Its collateral factors are higher than the Main Spoke's for the same assets (WETH 86% against 83%, WBTC and cbBTC 84.5% against 78%, wstETH 85.5% against 80%), so the same collateral and debt give a higher health factor here.",
-      "Liquidation parameters and the recovery health factor are set per Spoke, and each Hub caps how much liquidity the Spoke can draw from it.",
-    ],
-    rateNote:
-      "The borrow rate is the lending Hub's base rate plus the borrower's risk premium. Aave sets that premium per user, from the collateral risk of the assets that cover their debt; every Bluechip collateral asset carries a collateral risk of 0%, so Bluechip borrowers pay the base rate.",
   },
   forex: {
     name: "Forex",
@@ -178,91 +139,54 @@ export const SPOKE_META: Record<string, SpokeMeta> = {
     archetype: "correlated",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Collateral is USDC, USDT or EURC; it borrows any stablecoin the Core hub lends (USDT, USDC, USDG, RLUSD, frxUSD, GHO, EURC).",
-      "EURC is the venue's non-USD leg; tight correlation between the currencies carries higher borrowing power than the same assets earn on the Main Spoke, with liquidation tuned to a narrow volatility profile.",
-    ],
   },
   gold: {
     name: "Gold",
     archetype: "isolation",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Tokenized-gold Spoke on the Core Hub: XAUt (Tether Gold) collateral against the Hub's stablecoin roster.",
-      "Parameters are the most conservative of the launch Spokes — non-crypto collateral gets a deeper post-liquidation restoration than any crypto venue.",
-    ],
   },
   "ethena-correlated": {
     name: "Ethena Correlated",
     archetype: "correlated",
     collateralHub: "Plus",
     borrowHubs: ["Plus"],
-    narrative: [
-      "Correlated Spoke on the Plus Hub: the Ethena basket — USDe, sUSDe and their Pendle principal tokens — borrowing USDe only.",
-      "The USDe-only borrow side is what earns the tight correlated parameter set, with PT collateral carrying the Hub's highest borrowing power; the Spoke connects to the Plus Hub alone, with no Core credit line.",
-    ],
   },
   "ethena-ecosystem": {
     name: "Ethena Ecosystem",
     archetype: "ecosystem",
     collateralHub: "Plus",
     borrowHubs: ["Plus", "Core"],
-    narrative: [
-      "Ethena ecosystem Spoke on the Plus Hub: the same collateral basket as the Ethena Correlated Spoke (USDe, sUSDe, Pendle PTs), borrowing USDe, USDC, USDT and GHO from the Plus Hub.",
-      "USDC, USDT and frxUSD also arrive from the Core Hub over a capped credit line, which limits how much Core liquidity Ethena strategies can draw while each Hub keeps its own solvency boundary.",
-    ],
   },
   etherfi: {
     name: "EtherFi",
     archetype: "ecosystem",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "EtherFi Spoke on the Core Hub: weETH collateral borrowing wETH only — a single-pair restaking-loop venue.",
-      "The one-collateral, one-borrow scope keeps LTV, liquidation bonus, oracle scope and caps independently adjustable for the LRT without touching the wider Hub.",
-    ],
   },
   kelp: {
     name: "Kelp",
     archetype: "ecosystem",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Kelp Spoke on the Core Hub, built as a single-pair restaking loop like the EtherFi and Lido Spokes: rsETH collateral borrowing wETH.",
-      "Governance has frozen both of its reserves: the Spoke takes no new supply or borrowing, wETH is no longer borrowable, and rsETH's collateral factor is 0% for any position that takes the current terms. Positions that took their terms before the change keep rsETH at 95%.",
-    ],
   },
   lido: {
     name: "Lido",
     archetype: "ecosystem",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Lido Spoke on the Core Hub: wstETH collateral borrowing wETH only — the dedicated LST looping venue.",
-      "Its collateral carries a collateral risk of 0%, so Lido borrowers pay no risk premium on top of the Hub's base rate.",
-    ],
   },
   lombard: {
     name: "Lombard BTC",
     archetype: "ecosystem",
     collateralHub: "Core",
     borrowHubs: ["Core"],
-    narrative: [
-      "Lombard BTC Spoke on the Core Hub: LBTC — Lombard's Babylon-staked BTC — borrowing wBTC and cbBTC.",
-      "The dedicated Spoke keeps Babylon-protocol exposure inside its own bounded perimeter rather than in the Hub-wide collateral pool.",
-    ],
   },
   "stablecoin-correlated": {
     name: "Stablecoin Correlated",
     archetype: "ecosystem",
     collateralHub: "Paxos",
     borrowHubs: ["Paxos", "Core"],
-    narrative: [
-      "The Stablecoin Correlated Spoke on the Global Dollar Hub — Aave V4's fourth Hub, built for the Global Dollar (USDG) ecosystem and live since 1 Jul 2026.",
-      "Collateral is PT-USDG-24SEP2026, a Pendle principal token maturing 24 Sep 2026; against it the Spoke borrows USDC, USDT and USDG from the Global Dollar Hub, and more USDG from the Core Hub over a cross-hub credit line.",
-      "The PT is priced by a linear discount-rate oracle (a zero-coupon-bond model), so collateral value converges to par at maturity; later PT-USDG maturities join the same Spoke as rollover destinations.",
-    ],
   },
 };
 
@@ -276,16 +200,6 @@ SPOKE_META.mag7 = {
   archetype: "isolation",
   collateralHub: "Equities",
   borrowHubs: ["Equities"],
-  narrative: [
-    "The Mag7 Spoke is the one lending market of Aave V4 on Base: its Equities Hub holds one USDC reserve, and this Spoke pools seven Coinbase tokenized stocks (AAPLc, AMZNc, GOOGLc, METAc, MSFTc, NVDAc, TSLAc) as collateral against it.",
-    "The stocks are collateral only; USDC is the one asset that can be borrowed. Each stock's price is a Chainlink feed that publishes from Sunday 20:00 ET to Friday 20:00 ET and holds its last value outside those hours, so a price read at the weekend can be days old.",
-    "A corporate action such as a split pauses the affected reserve until the token's multiplier is updated; dividends are reinvested into the token rather than paid out.",
-  ],
-  links: [
-    { label: "Coinbase tokenized stocks on Aave V4", url: "https://aave.com/blog/coinbase-tokenized-stocks" },
-    { label: "Aave V4 docs", url: "https://aave.com/docs/aave-v4" },
-    { label: "ARFC: deploy Aave V4 on Base", url: "https://governance.aave.com/t/arfc-deploy-aave-v4-on-base/25427" },
-  ],
 };
 
 /** Look up a spoke's editorial metadata by API display name ("Lombard BTC"),
@@ -345,24 +259,6 @@ export const BASE_SPOKE_ADDRESSES = new Set<string>(["0x17905db0e4a3514467539956
 export function chainIdForSpokeAddress(address?: string | null): 1 | 8453 {
   return address && BASE_SPOKE_ADDRESSES.has(address.toLowerCase()) ? 8453 : 1;
 }
-
-/** One plain sentence per spoke kind, opening the spoke's learn-more modal. */
-export const ARCHETYPE_GLOSS: Record<SpokeArchetype, string> = {
-  standard: "A general-purpose spoke: a broad list of collateral, borrowing from the hub it sits on.",
-  "cross-hub-credit":
-    "A spoke with credit lines to more than one hub, so it can lend tokens pooled in a hub other than the one holding its collateral.",
-  correlated:
-    "A spoke for assets whose prices move closely together. Because a sharp gap between them is unlikely, each unit of collateral can back more debt here than on a general-purpose spoke.",
-  isolation:
-    "A spoke with a short asset list and tight limits, so the risk of that collateral stays inside this one market.",
-  ecosystem:
-    "A spoke built around one asset family, with settings tuned to that family and kept apart from the rest of the hub.",
-};
-
-// A former `ARCHETYPE_ACCENT` map (per-archetype amber/violet/cyan/fuchsia tints)
-// lived here but was never consumed — the archetype renders as a plain sentence
-// via ARCHETYPE_GLOSS. It was removed to keep off-grammar color references out of
-// the code; the archetype is identity, not a status, so it carries no color.
 
 // Display-name → server spoke-key map. Mirrors SPOKE_BY_KEY in
 // rails-server-onboarding/api/src/config/aave-v4-spokes.ts. Translates the
