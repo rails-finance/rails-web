@@ -15,12 +15,16 @@ import { AAVE_V3_PAGE_WORDS, PROSE } from "@/lib/aave-v3/event-templates";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-export type AaveV3Deployment = "ethereum" | "base";
+/** Seamless draws through this adapter: an Aave V3 fork on Base with a separate listing. */
+export type AaveV3Deployment = "ethereum" | "base" | "seamless";
+
+const chainOf = (d: AaveV3Deployment) => (d === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID);
+const listingOf = (d: AaveV3Deployment) => (d === "ethereum" ? "aave-v3" : d === "base" ? "aave-v3-base" : "seamless");
 
 type SiblingRows = Parameters<typeof feeLiquidation>[1];
 
 export interface AaveV3EventPageInput extends EventPageSlot {
-  /** The Pool's name: Core, Prime, EtherFi, or Base. */
+  /** The Pool's name: Core, Prime, EtherFi, Base, or Seamless. */
   market: string;
   wallet: string;
   deployment: AaveV3Deployment;
@@ -35,17 +39,23 @@ export function aaveV3EventHeading(
   siblings?: SiblingRows,
 ): string {
   if (!isAaveV3Event(event)) return event.actionLabel;
-  const chainId = deployment === "base" ? BASE_CHAIN_ID : MAINNET_CHAIN_ID;
+  const chainId = chainOf(deployment);
   return aaveV3CtLabel(event.context.data, !!feeLiquidation(event.context.data, siblings, chainId), chainId);
 }
 
 /** The page's metadata description, also read on the server. */
-export function aaveV3EventPageDescription(market: string, wallet: string, timestamp: number): string {
-  const text = PROSE.fillText(AAVE_V3_PAGE_WORDS.description, {
-    market,
-    account: short(wallet),
-    day: formatDateLong(timestamp),
-  });
+export function aaveV3EventPageDescription(
+  market: string,
+  wallet: string,
+  timestamp: number,
+  deployment?: AaveV3Deployment,
+): string {
+  const account = short(wallet);
+  const day = formatDateLong(timestamp);
+  const text =
+    deployment === "seamless"
+      ? PROSE.fillText(AAVE_V3_PAGE_WORDS.description_seamless, { account, day })
+      : PROSE.fillText(AAVE_V3_PAGE_WORDS.description, { market, account, day });
   return `${text} ${AAVE_V3_PAGE_WORDS.timeline_link}`;
 }
 
@@ -53,7 +63,10 @@ export const aaveV3Explorer: ExplorerAdapter<AaveV3EventPageInput> = {
   eventPage: ({ market, wallet, deployment, siblings, event, ...slot }) => ({
     heading: aaveV3EventHeading(event, deployment, siblings),
     words: {
-      paragraph: PROSE.fillText(AAVE_V3_PAGE_WORDS.paragraph, { market }),
+      paragraph:
+        deployment === "seamless"
+          ? AAVE_V3_PAGE_WORDS.paragraph_seamless
+          : PROSE.fillText(AAVE_V3_PAGE_WORDS.paragraph, { market }),
       timelineLink: AAVE_V3_PAGE_WORDS.timeline_link,
       timelineHint: AAVE_V3_PAGE_WORDS.timeline_hint,
     },
@@ -65,14 +78,14 @@ export const aaveV3Explorer: ExplorerAdapter<AaveV3EventPageInput> = {
         value: wallet,
         mono: true,
         copy: AAVE_V3_PAGE_WORDS.copy_account,
-        href: listingHrefForWallet(deployment === "base" ? "aave-v3-base" : "aave-v3", wallet) ?? undefined,
+        href: listingHrefForWallet(listingOf(deployment), wallet) ?? undefined,
       },
     ],
     ...slot,
     blockNumber: event.blockNumber,
     txHash: event.txHash,
     eventId: event.id,
-    description: aaveV3EventPageDescription(market, wallet, event.timestamp),
+    description: aaveV3EventPageDescription(market, wallet, event.timestamp, deployment),
   }),
   eventMarkdown: { missing: "no Markdown route serves this family's events yet (ui-jobs 236)" },
 };
