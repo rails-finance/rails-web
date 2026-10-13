@@ -53,8 +53,8 @@ const DOT_COLORS: Record<"default" | Tone, string> = {
 };
 
 /** The tone a warning leg's magnitude takes, and the T1 word with it
- *  (color-grammar.md §5). The arrows stay grey and the token icons keep their
- *  colours. */
+ *  (color-grammar.md §5). The flank triangle takes the tone too (ui-jobs 331);
+ *  the token icons keep their colours. */
 export const WARNING_TONE_TEXT: Record<Tone, string> = {
   caution: "text-tone-caution",
   critical: "text-tone-critical",
@@ -775,7 +775,11 @@ function WarningLegNodes({ legs, tone, filterable }: { legs: SpineWarningLeg[]; 
             ) : (
               <TokenChipIcon symbol={leg.symbol} address={leg.address} size={scale.tokenSize} filterable={filterable} />
             )}
-            {leg.locked ? <span /> : <ArrowFromDot direction="right" size={scale.arrowSize} />}
+            {leg.locked ? (
+              <span />
+            ) : (
+              <ArrowFromDot direction="right" size={scale.arrowSize} color={SPINE_COLORS[tone]} />
+            )}
             {txt && !leg.locked ? (
               <span
                 className={`text-base font-semibold whitespace-nowrap justify-self-start pl-5 ${WARNING_TONE_TEXT[tone]}`}
