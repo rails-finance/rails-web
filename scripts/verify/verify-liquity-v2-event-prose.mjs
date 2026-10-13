@@ -21,7 +21,7 @@
 //       (ui-jobs 282).
 //   P3  L2 ON THE PAGE — every figure of the block's L2 lines is in the
 //       opened card, in order; a Collateral or Debt line by its after figures, which
-//       close the open ledger.
+//       close the sheet's side.
 //   P4  L1 ON THE PAGE — the L1 line's words and figures are on the event's
 //       row (the header and the spine; on the event page, the header).
 //
@@ -163,8 +163,14 @@ try {
     await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
     const card = page.locator('[data-anatomy="T2"]').first();
     await card.waitFor({ timeout: 60_000 });
-    // The ledgers land with the flows panel: the copy waits for the cells.
-    await page.waitForTimeout(3000);
+    // T2 is the event sheet (ui-jobs 330), its breakdown on on the event
+    // page: the copy waits for its layers.
+    await card
+      .locator('[data-sheet][data-sheet-breakdown="on"] [data-sheet-layer]')
+      .first()
+      .waitFor({ state: "attached", timeout: 60_000 })
+      .catch(() => {});
+    await page.waitForTimeout(500);
     // The event page's T3 stands open with no button; a card with a closed
     // (i) button is opened here.
     const t3 = page.locator('[data-anatomy="T2"] button[data-anatomy="T3"]').first();
@@ -173,8 +179,13 @@ try {
     // column's title (ui-jobs 291).
     const copyBtn = page.locator('[data-event-page-actions] [data-menu-item="copy-for-llm"]').first();
     await copyBtn.waitFor({ timeout: 30_000 });
-    await copyBtn.click();
-    await page.locator('[data-menu-item="copy-for-llm"][data-copied]').first().waitFor({ timeout: 5_000 });
+    // A press before hydration is lost: pressed until the copy confirms.
+    const copied = page.locator('[data-menu-item="copy-for-llm"][data-copied]').first();
+    for (let i = 0; i < 6 && !(await copied.count()); i++) {
+      await copyBtn.click();
+      await copied.waitFor({ timeout: 5_000 }).catch(() => {});
+    }
+    await copied.waitFor({ timeout: 5_000 });
     const copy = await page.evaluate(() => navigator.clipboard.readText());
 
     // P0
@@ -210,9 +221,9 @@ try {
     check(`${label}: its L5 = the export's L5 for "${title}"`, title !== "" && appendix.includes(l5), l5.slice(0, 120));
 
     // P2
-    // The event page's Collateral and Debt ledgers stand open with no toggle
-    // (ui-jobs 236): each closes on the after figures, so P3 reads a ledger
-    // line of L2 from its after side.
+    // The event page's sheet stands with its breakdown on and no switch
+    // (ui-jobs 330): each side closes on its total after the event, so P3
+    // reads a Collateral or Debt line of L2 from its after side.
     const t2 = await card.innerText();
     const l4 = l4Runs(copy);
     const bullets = l4.flatMap((r) => r.bullets);

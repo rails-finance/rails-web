@@ -34,6 +34,12 @@
 // states itself, and the boundary card survives where the cut still binds.
 // That section SKIPS, loudly, wherever the backend cannot answer `?group=1`.
 //
+// And THE EVENT SHEET (ui-jobs 330) on Liquity V2 and Aave V3, whose opened
+// card's T2 is a balance sheet (components/shared/event-sheet.tsx): pinned
+// events, each opened on its timeline and on its event page, read by the
+// sheet's attributes. Every other family draws cells, and its pinned page is
+// checked to draw no sheet.
+//
 // Subjects are read live off each family's listing (`/ethereum/aave-v3`,
 // `/ethereum/spark`, `/ethereum/liquity-v2`) rather than hard-coded — the
 // first row's own href, so nothing here goes stale when a wallet/trove goes
@@ -131,6 +137,9 @@ const EXPLANATION_FROM_FIRST_PAINT = new Set([
   // Retired for liquity-v1 (ui-jobs 236): its event route is the event's page,
   // which draws no position card, so no Explanation pane carries the link.
 ]);
+
+/** Families whose opened card's T2 is the event sheet (ui-jobs 330). */
+const SHEET_FAMILIES = new Set(["liquity-v2", "aave-v3", "aave-v3-base"]);
 
 let failures = 0;
 /** Families whose run threw once and was retried — named in the verdict. */
@@ -287,6 +296,18 @@ async function verifyPinnedPage(label, url, expectedId, positionPath, width) {
     await copyView.waitFor({ state: "attached", timeout: 5000 }).catch(() => {});
     check(`${label} @${width}: the card's Explanation pane carries the copy-view link`, (await copyView.count()) > 0);
   }
+  // A cells family's opened card draws its cells and no sheet (ui-jobs 330);
+  // the sheet families are read in THE EVENT SHEET below.
+  if (!SHEET_FAMILIES.has(label)) {
+    await page
+      .locator('[data-anatomy~="T2"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 20000 })
+      .catch(() => {});
+    const t2 = await page.locator('[data-anatomy~="T2"]').count();
+    const sheets = await page.locator("[data-sheet]").count();
+    check(`${label} @${width}: a cells family's card draws no event sheet`, sheets === 0, `${sheets} sheet, ${t2} T2`);
+  }
   return { ctx, page };
 }
 
@@ -397,6 +418,413 @@ async function waitForCardInViewport(page, eventId) {
     .catch(() => false);
   const box = await page.locator(`[data-event-id="${eventId}"]`).first().boundingBox();
   return { inView, box };
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// THE EVENT SHEET (ui-jobs 330) — Liquity V2 and Aave V3
+// ══════════════════════════════════════════════════════════════════════════
+//
+// The opened card's T2 on these families is a balance sheet: `data-sheet`
+// with `data-sheet-breakdown`, the controls row (`data-sheet-switch`, and on
+// phones the asset | USD group `data-sheet-column`), the sides
+// (`data-sheet-side`, `data-sheet-touched`), the breakdown's layers
+// (`data-sheet-layer`), rows (`data-sheet-row`, `total` the side's total,
+// `event…` the event's rows), columns (`data-sheet-col`), the Risk and Limits
+// panels (`data-sheet-panel`) and the values that swap to their change
+// (`data-swap-value`). The checks count what they find and fail on a missing
+// attribute or a state that did not follow a press, never on a figure's value.
+// The words (the switch's label, "Not changed by this event", the panels'
+// rows) are verify-disclosure-grammar.mjs's.
+//
+// The events are pinned by id (a chain coordinate), so a wallet that keeps
+// acting does not move them; each is opened by its `?at=` landing. `event` is
+// one with a previous event (its values swap, its breakdown has a carry
+// layer), `second` another card on the same page, opened beside it, and
+// `first` an event with no previous one, whose values are plain.
+const SHEET_SUBJECTS = {
+  "liquity-v2": [
+    {
+      label: "Trove …545773770",
+      path: "/ethereum/liquity-v2/trove/WETH/29779854367542649123526514384205099621162281315544372345570836626121545773770",
+      event: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1", // #3, a Borrow
+      second: "0x46fb24cd6c2b19b143699504bfa3ed11b08a2bb8af11c96953a39cef053eb33c_17", // #1, the open
+      first: "0x46fb24cd6c2b19b143699504bfa3ed11b08a2bb8af11c96953a39cef053eb33c_17",
+    },
+  ],
+  "aave-v3": [
+    {
+      label: "0xc593…5948",
+      path: "/ethereum/aave-v3/0xc593352eefa7c45863525a3194870929fd6f5948",
+      // 5 Oct 2026, Repay with collateral WETH → USDC: both sides touched.
+      event:
+        "transfer_out:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0x7e796baa18541a2018cb7c06f7079bcea2b9591f0ffd00232bad7cc847c4da2e:28",
+      second:
+        "withdraw:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x790a10a9b287a9ad6ee5ed4582bcd1dde5a129e7784bd6b412c540683de7ed04:4",
+    },
+    {
+      label: "0x9ff6…0de5",
+      path: "/ethereum/aave-v3/0x9ff679ef5e663a223c5ef07fd191e9e7eda90de5",
+      // 6 Oct 2026, a WETH Borrow: the collateral side untouched.
+      event:
+        "borrow:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x2b82089ec595c4609440e634572811db526179653f67dea0bb4c324b0511f417:4",
+      // The account's first event.
+      first:
+        "supply:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x1e69dafd5a2ca3310edf6fa7f9e39cf48edd998396fdb40063b16935c21ac222:6",
+    },
+  ],
+};
+
+const cardSel = (id) => `[data-event-id="${id}"]`;
+const sheetSel = (id) => `${cardSel(id)} [data-anatomy~="T2"] [data-sheet]`;
+/** A press by the element's click(): a Playwright click times out on an
+ *  element a layer hides, and the sheet's controls sit in the card's body. */
+const press = (page, sel) =>
+  page
+    .locator(sel)
+    .first()
+    .evaluate((el) => el.click())
+    .then(() => true)
+    .catch(() => false);
+
+/** The sheet's state, read off its attributes. */
+const readSheet = (page, id) =>
+  page
+    .locator(sheetSel(id))
+    .first()
+    .evaluate((s) => {
+      const vis = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+      const rowsOf = (el) => [...el.querySelectorAll("[data-sheet-row]")].map((r) => r.getAttribute("data-sheet-row"));
+      return {
+        breakdown: s.getAttribute("data-sheet-breakdown"),
+        controls: s.querySelectorAll("[data-sheet-controls]").length,
+        switches: s.querySelectorAll("[data-sheet-switch]").length,
+        layers: [...s.querySelectorAll("[data-sheet-layer]")].map((e) => e.getAttribute("data-sheet-layer")),
+        sides: [...s.querySelectorAll("[data-sheet-side]")].map((e) => {
+          const rows = rowsOf(e);
+          return {
+            side: e.getAttribute("data-sheet-side"),
+            touched: e.getAttribute("data-sheet-touched"),
+            totals: rows.filter((r) => r === "total").length,
+            events: rows.filter((r) => /^event/.test(r)).length,
+          };
+        }),
+        panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
+          panel: e.getAttribute("data-sheet-panel"),
+          rows: rowsOf(e).length,
+        })),
+        swaps: s.querySelectorAll("[data-swap-value]").length,
+        swapButtons: s.querySelectorAll("button[data-swap-value]").length,
+        cols: [
+          ...new Set(
+            [...s.querySelectorAll("[data-sheet-col]")].filter(vis).map((e) => e.getAttribute("data-sheet-col")),
+          ),
+        ],
+        market: s.querySelectorAll('[data-sheet-row="market"]').length,
+        marketReceipt: s.querySelectorAll('[data-sheet-row="market"] .prov-locate-box').length,
+      };
+    })
+    .catch(() => null);
+
+/** The sheet's figures, each with whether it sits in a receipt box (the
+ *  `<Prov>` span inside the card's receipts scope). A figure is a visible value
+ *  cell, a side's total or a panel value with a digit in it; the repaid
+ *  assets' row states a zero of no receipt and is left out. */
+const sheetFigures = (page, id) =>
+  page
+    .locator(sheetSel(id))
+    .first()
+    .evaluate((s) => {
+      const vis = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+      const out = [];
+      s.querySelectorAll(
+        '[data-sheet-col], [data-sheet-row="total"] [role="group"], [data-sheet-panel] [data-swap-value]',
+      ).forEach((el) => {
+        if (!vis(el) || el.closest('[data-sheet-row="repaid"]')) return;
+        const text = el.textContent.replace(/\s+/g, " ").trim();
+        if (!/\d/.test(text)) return;
+        out.push({
+          row: el.closest("[data-sheet-row]")?.getAttribute("data-sheet-row") ?? "?",
+          text,
+          receipt: !!el.querySelector(".prov-locate-box"),
+        });
+      });
+      return out;
+    })
+    .catch(() => []);
+
+/** Wait for the card's sheet; the Aave sheet stands once the block read lands. */
+const waitSheet = (page, id, timeout = 120000) =>
+  page
+    .locator(sheetSel(id))
+    .first()
+    .waitFor({ state: "attached", timeout })
+    .then(() => true)
+    .catch(() => false);
+
+/** Open a card on the timeline by its row control (the header from 640px, the
+ *  spine's segment under it), pressed until it reads open. */
+async function openCardById(page, id) {
+  const card = page.locator(cardSel(id)).first();
+  if (!(await card.count())) return false;
+  const control = card
+    .locator('[data-spine-toggle], [data-anatomy~="T1"] [data-row-control][role="button"]')
+    .locator("visible=true")
+    .first();
+  for (let i = 0; i < 8; i++) {
+    if ((await card.locator('[data-anatomy~="T2"]').count()) > 0) return true;
+    await control.evaluate((el) => el.click()).catch(() => {});
+    await card
+      .locator('[data-anatomy~="T2"]')
+      .first()
+      .waitFor({ state: "attached", timeout: 8000 })
+      .catch(() => {});
+  }
+  return (await card.locator('[data-anatomy~="T2"]').count()) > 0;
+}
+
+/** Wait for the sheet's breakdown attribute to read `want`. */
+const waitBreakdown = (page, id, want) =>
+  page
+    .waitForFunction(
+      ([sel, want]) => document.querySelector(sel)?.getAttribute("data-sheet-breakdown") === want,
+      [sheetSel(id), want],
+      { timeout: 10000 },
+    )
+    .then(() => true)
+    .catch(() => false);
+
+/** One subject's sheet checks. */
+async function verifySheetSubject(name, s) {
+  const tag = `${name} sheet ${s.label}`;
+  const landing = (id) => `${BASE}${s.path}?at=${encodeURIComponent(id)}`;
+
+  // ── 1280, the timeline: the sheet on open, the switch, the sides, the
+  // panels, the swap, the receipts ──
+  {
+    const { ctx, page, errors } = await open(1280, landing(s.event));
+    const drawn = await waitSheet(page, s.event);
+    if (!check(`${tag} @1280: the opened card's T2 draws data-sheet`, drawn)) {
+      await ctx.close();
+      return;
+    }
+    const at = await readSheet(page, s.event);
+    check(`${tag} @1280: the breakdown is off on open`, at?.breakdown === "off", at?.breakdown);
+    check(`${tag} @1280: no data-sheet-layer is drawn off`, at?.layers.length === 0, JSON.stringify(at?.layers));
+    check(
+      `${tag} @1280: the controls row holds one data-sheet-switch`,
+      at?.controls === 1 && at?.switches === 1,
+      `${at?.controls} row, ${at?.switches} switch`,
+    );
+    const sides = at?.sides ?? [];
+    check(
+      `${tag} @1280: the sides are Collateral and Debt`,
+      JSON.stringify(sides.map((x) => x.side)) === JSON.stringify(["collateral", "debt"]),
+      JSON.stringify(sides.map((x) => x.side)),
+    );
+    check(
+      `${tag} @1280: each side has one total row`,
+      sides.length > 0 && sides.every((x) => x.totals === 1),
+      JSON.stringify(sides),
+    );
+    check(
+      `${tag} @1280: a touched side has the event's row, an untouched side none`,
+      sides.length > 0 &&
+        sides.every((x) => (x.touched === "true" ? x.events > 0 : x.touched === "false" && x.events === 0)),
+      JSON.stringify(sides),
+    );
+    check(
+      `${tag} @1280: the Risk and Limits panels, each with rows`,
+      JSON.stringify(at?.panels.map((p) => p.panel)) === JSON.stringify(["risk", "limits"]) &&
+        at.panels.every((p) => p.rows > 0),
+      JSON.stringify(at?.panels),
+    );
+    check(
+      `${tag} @1280: amount and usd columns, no phone column`,
+      JSON.stringify([...(at?.cols ?? [])].sort()) === JSON.stringify(["amount", "usd"]),
+      JSON.stringify(at?.cols),
+    );
+
+    // A second card on the page, opened beside it.
+    let second = s.second ?? null;
+    if (second && !(await page.locator(cardSel(second)).count())) second = null;
+    if (!second)
+      second = await page
+        .$$eval(
+          "[data-event-id]",
+          (els, id) => els.map((e) => e.getAttribute("data-event-id")).find((x) => x !== id),
+          s.event,
+        )
+        .catch(() => null);
+    const secondOpen = second ? (await openCardById(page, second)) && (await waitSheet(page, second, 60000)) : false;
+    check(`${tag} @1280: a second card opens to its sheet`, secondOpen, second ?? "no other card");
+    const secondAt = secondOpen ? await readSheet(page, second) : null;
+    if (secondOpen) check(`${tag} @1280: the second card's breakdown is off on open`, secondAt?.breakdown === "off");
+
+    // The switch: on, the layers drawn, the second card unchanged; off again.
+    await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+    const on = await waitBreakdown(page, s.event, "on");
+    const atOn = await readSheet(page, s.event);
+    check(`${tag} @1280: a press on the switch turns the breakdown on`, on, atOn?.breakdown);
+    check(
+      `${tag} @1280: with the breakdown on, its layers are drawn`,
+      (atOn?.layers.length ?? 0) > 0 && atOn.layers.includes("carry"),
+      JSON.stringify(atOn?.layers),
+    );
+    if (secondOpen) {
+      const other = await readSheet(page, second);
+      check(
+        `${tag} @1280: only that card changed (the second stays off, no layer)`,
+        other?.breakdown === "off" && other.layers.length === 0,
+        JSON.stringify({ breakdown: other?.breakdown, layers: other?.layers }),
+      );
+    }
+    check(
+      // A sheet leaves the row out where the prices moved nothing.
+      `${tag} @1280: a Market move row, where drawn, carries a receipt`,
+      !!atOn && atOn.marketReceipt >= atOn.market,
+      `${atOn?.market} row, ${atOn?.marketReceipt} receipt`,
+    );
+    const figs = await sheetFigures(page, s.event);
+    const bare = figs.filter((f) => !f.receipt);
+    check(
+      `${tag} @1280: every figure in the sheet carries a receipt (${figs.length})`,
+      figs.length > 0 && bare.length === 0,
+      JSON.stringify(bare.slice(0, 4)),
+    );
+    await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+    const off = await waitBreakdown(page, s.event, "off");
+    const atOff = await readSheet(page, s.event);
+    check(
+      `${tag} @1280: a second press turns it off, no layer drawn`,
+      off && atOff?.layers.length === 0,
+      JSON.stringify({ breakdown: atOff?.breakdown, layers: atOff?.layers }),
+    );
+
+    // The swap: a press shows the change, a second the level again.
+    const swap = `${sheetSel(s.event)} button[data-swap-value]`;
+    const swaps = await page.locator(swap).count();
+    if (check(`${tag} @1280: a value swaps to its change (${swaps})`, swaps > 0)) {
+      const read = () =>
+        page
+          .locator(swap)
+          .first()
+          .evaluate((el) => ({ face: el.getAttribute("data-swap-value"), text: el.textContent.trim() }))
+          .catch(() => null);
+      const level = await read();
+      await press(page, swap);
+      await page
+        .waitForFunction((sel) => document.querySelector(sel)?.getAttribute("data-swap-value") === "change", swap, {
+          timeout: 5000,
+        })
+        .catch(() => {});
+      const change = await read();
+      await press(page, swap);
+      await page
+        .waitForFunction((sel) => document.querySelector(sel)?.getAttribute("data-swap-value") === "level", swap, {
+          timeout: 5000,
+        })
+        .catch(() => {});
+      const back = await read();
+      check(
+        `${tag} @1280: a press swaps the level for its change, a second press swaps back`,
+        level?.face === "level" &&
+          change?.face === "change" &&
+          change.text !== level.text &&
+          back?.face === "level" &&
+          back.text === level.text,
+        JSON.stringify([level, change, back]),
+      );
+    }
+    check(`${tag} @1280: no page error`, errors.length === 0, errors.join("; "));
+    await ctx.close();
+  }
+
+  // ── An event with no previous one: its values are plain. Read on its event
+  // page: a served Aave page's `?at=` landing does not reach an account's
+  // oldest event. ──
+  if (s.first) {
+    const { ctx, page } = await open(1280, `${BASE}${s.path}/event/${encodeURIComponent(s.first)}`);
+    if (check(`${tag} first event, event page: the card draws its sheet`, await waitSheet(page, s.first))) {
+      const at = await readSheet(page, s.first);
+      check(
+        `${tag} first event, event page: with no previous event the values are plain (no swap control)`,
+        (at?.swaps ?? 0) > 0 && at.swapButtons === 0,
+        `${at?.swaps} values, ${at?.swapButtons} swap controls`,
+      );
+    }
+    await ctx.close();
+  }
+
+  // ── 390: the phone column, the asset | USD toggle, no overflow ──
+  {
+    const { ctx, page } = await open(390, landing(s.event));
+    if (check(`${tag} @390: the opened card draws its sheet`, await waitSheet(page, s.event))) {
+      const at = await readSheet(page, s.event);
+      check(
+        `${tag} @390: only phone columns are visible`,
+        JSON.stringify(at?.cols) === JSON.stringify(["phone"]),
+        JSON.stringify(at?.cols),
+      );
+      const phone = () =>
+        page.$$eval(`${sheetSel(s.event)} [data-sheet-col="phone"]`, (els) => els.map((e) => e.textContent.trim()));
+      const pressed = () =>
+        page.$$eval(`${sheetSel(s.event)} [data-sheet-column] button`, (els) =>
+          els.map((e) => e.getAttribute("aria-pressed")),
+        );
+      const before = { cells: await phone(), pressed: await pressed() };
+      const idle = before.pressed.indexOf("false");
+      if (
+        check(
+          `${tag} @390: the controls row holds the asset | USD group and the switch`,
+          before.pressed.length === 2 && idle >= 0 && at?.switches === 1,
+          JSON.stringify({ group: before.pressed, switches: at?.switches }),
+        )
+      ) {
+        await press(page, `${sheetSel(s.event)} [data-sheet-column] button:nth-child(${idle + 1})`);
+        await page.waitForTimeout(300);
+        const after = { cells: await phone(), pressed: await pressed() };
+        check(
+          `${tag} @390: the asset | USD toggle changes what the phone column shows`,
+          after.pressed[idle] === "true" && after.cells.some((c, i) => c !== before.cells[i]),
+          `${before.cells.filter((c, i) => c !== after.cells[i]).length} of ${before.cells.length} cells changed`,
+        );
+      }
+      const width = () => page.evaluate(() => document.documentElement.scrollWidth);
+      const offWidth = await width();
+      await press(page, `${sheetSel(s.event)} [data-sheet-switch]`);
+      await waitBreakdown(page, s.event, "on");
+      await page.waitForTimeout(300);
+      const onWidth = await width();
+      check(
+        `${tag} @390: scrollWidth is 390 with the breakdown off and on`,
+        offWidth === 390 && onWidth === 390,
+        `${offWidth} off, ${onWidth} on`,
+      );
+    }
+    await ctx.close();
+  }
+
+  // ── The event page: the breakdown always on, no switch ──
+  {
+    const { ctx, page, errors } = await open(1280, `${BASE}${s.path}/event/${encodeURIComponent(s.event)}`);
+    if (check(`${tag} event page: the card draws its sheet`, await waitSheet(page, s.event))) {
+      const at = await readSheet(page, s.event);
+      check(
+        `${tag} event page: the breakdown is on, its layers drawn, no data-sheet-switch`,
+        at?.breakdown === "on" && at.layers.length > 0 && at.switches === 0,
+        JSON.stringify({ breakdown: at?.breakdown, layers: at?.layers, switches: at?.switches }),
+      );
+    }
+    check(`${tag} event page: no page error`, errors.length === 0, errors.join("; "));
+    await ctx.close();
+  }
+}
+
+/** The sheet checks of one family, gated by FAMILIES like the sweep. */
+async function verifySheet(name) {
+  if (FAMILIES_FILTER && !FAMILIES_FILTER.has(name)) return;
+  console.log(`\n── ${name}: the event sheet (ui-jobs 330) ──────────────`);
+  for (const s of SHEET_SUBJECTS[name] ?? []) await verifySheetSubject(name, s);
 }
 
 /** Every family, run once, with the run retried whole if it THROWS.
@@ -1051,6 +1479,7 @@ await verifyFamily("aave-v3", {
   listingPath: "/ethereum/aave-v3",
   rowHrefRe: /^\/ethereum\/aave-v3\/0x[0-9a-fA-F]{40}/,
 });
+await verifySheet("aave-v3");
 await verifyFamily("spark", {
   listingPath: "/ethereum/spark",
   rowHrefRe: /^\/ethereum\/spark\/0x[0-9a-fA-F]{40}/,
@@ -1062,6 +1491,7 @@ const liquityV2Subject = await verifyFamily("liquity-v2", {
   // page opens from the row's ⋮, as on every family.
 });
 await verifyLiquityMarkdown(liquityV2Subject);
+await verifySheet("liquity-v2");
 
 /** Liquity V2's raw Markdown per event (ui-jobs 287): `<event page>.md`
  *  answers 200 `text/markdown`, `noindex`, the page as its canonical `Link`,

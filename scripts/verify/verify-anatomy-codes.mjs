@@ -99,7 +99,11 @@ const FAMILIES = [
 // Keyed by family, then code. Only the shared codes above are read from here.
 const NO_FLOWS_CHART = "the page is not tied to a Lifetime flows chart (`dates` stays on in its view), so no day mark";
 const NO_LEDGER = "the family's cells carry no ledger (`ledgers: { none }`, no flows panel), so no cell opens into one";
+const NO_LEDGER_SHEET =
+  "the opened card's T2 is the event sheet (ui-jobs 330), whose sides and panels hold no cell, so no cell opens into a ledger; verify-event-share.mjs reads the sheet";
 const NA = {
+  "liquity-v2": { "T2.1": NO_LEDGER_SHEET },
+  "aave-v3": { "T2.1": NO_LEDGER_SHEET },
   // The pinned positions' first (newest) cards are rows that move no position
   // flow; the family draws ledgers on its flow rows.
   pwn: {

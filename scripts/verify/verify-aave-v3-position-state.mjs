@@ -612,7 +612,10 @@ for (const fx of FIXTURES) {
       `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct, ${retried.size} retried after a refusal that can change`,
     );
 
-    if (fx.deep) {
+    // The ledger checks read cells; a card whose T2 is the event sheet
+    // (ui-jobs 330) draws none, and verify-event-share.mjs reads the sheet.
+    const onSheet = (await card.locator("[data-sheet]").count()) > 0;
+    if (fx.deep && !onSheet) {
       // A closed cell that opens into a ledger states no dollars after its
       // tokens: the ledger's USD column does (ui-jobs 289). A cell with no
       // ledger keeps them.

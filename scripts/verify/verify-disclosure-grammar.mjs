@@ -12,8 +12,8 @@
 // by default, the ratio closed, remembered per row, the card-wide key of 209
 // dropped on read); the Lifetime flows header's chevron after its heading and
 // its ⋮ at the right end; the Repay #148 card's chevron after "Repay", the
-// number pill last on the line and no ⋮; T2's rows and T3's row with the
-// chevron after the words. Aave V3: the event ⋮ in the header before the pill,
+// number pill last on the line and no ⋮; T2's breakdown switch at its row's
+// right end and T3's row with the chevron after the words. Aave V3: the event ⋮ in the header before the pill,
 // a press on it opening the menu (rows unchanged) and leaving the card closed,
 // and T6 holding the "?" alone.
 //
@@ -23,6 +23,14 @@
 // the chevron appears 0.5 s after the pointer enters the header and hides at
 // once on leave, keyboard focus shows it at once, the position card's rows keep
 // the instant reveal.
+//
+// ui-jobs 330: the event sheet's words on Liquity V2 and Aave V3, read by
+// counting: the switch's label in both states, the side and panel headings,
+// "Not changed by this event" on an untouched side and never on a touched
+// one, the breakdown's carry-forward names, and the Risk and Limits rows the
+// family's sheet builder names (components/protocol/liquity/liquity-cells.tsx
+// and content/liquity-v2/event-prose.yaml; components/protocol/aave-v3/
+// aave-family-sheet.tsx).
 //
 // Run:  BASE=http://localhost:3109 node scripts/verify/verify-disclosure-grammar.mjs
 
@@ -216,7 +224,11 @@ const headerLayout = (card) =>
 
   // The ratio row opens to the risk strip, and stays open across a reload;
   // the card-wide key of 209 is dropped on read.
-  await page.locator('[data-card-row-toggle="2"]').click();
+  // A missing row fails 1h below; it does not end the run.
+  await page
+    .locator('[data-card-row-toggle="2"]')
+    .click({ timeout: 10000 })
+    .catch(() => {});
   const liq = await page
     .locator('[data-card-row="2"]', { hasText: "Liquidates at" })
     .waitFor({ timeout: 5000 })
@@ -332,32 +344,29 @@ const headerLayout = (card) =>
     `${restOp} → ${hoverOp}`,
   );
   await head.click({ position: { x: 200, y: 20 } });
+  // 2g (ui-jobs 330): the opened card's T2 is the event sheet, which draws no
+  // ledger cell, so the Collateral and Debt rows' chevrons are gone with it;
+  // its one disclosure is the breakdown switch, at the right end of the row
+  // above the panels.
   await card
-    .locator("[data-ledger-toggle]")
+    .locator("[data-sheet-switch]")
     .first()
-    .waitFor({ timeout: 30000 })
+    .waitFor({ state: "attached", timeout: 60000 })
     .catch(() => {});
-  for (const side of ["collateral", "debt"]) {
-    const cell = card.locator(`[data-ledger-cell="${side}"]`).first();
-    const place = await cell
-      .evaluate((c) => {
-        const toggle = c.querySelector("[data-ledger-toggle]");
-        const first = c.querySelector("[data-ledger-row]");
-        const name = first?.querySelector("span");
-        if (!toggle || !name) return null;
-        const figures = first.lastElementChild?.getBoundingClientRect();
-        return {
-          inName: name.contains(toggle),
-          rightOfFigures: figures ? Math.round(c.getBoundingClientRect().right - figures.right) : null,
-        };
-      })
-      .catch(() => null);
-    check(
-      `2g. #148: the ${side} row's chevron follows its name, the figure far right`,
-      !!place && place.inName && place.rightOfFigures != null && place.rightOfFigures <= 20,
-      JSON.stringify(place),
-    );
-  }
+  const switchPlace = await card
+    .locator("[data-sheet-controls]")
+    .first()
+    .evaluate((row) => {
+      const b = row.querySelector("[data-sheet-switch]");
+      if (!b) return null;
+      return { rightGap: Math.round(row.getBoundingClientRect().right - b.getBoundingClientRect().right) };
+    })
+    .catch(() => null);
+  check(
+    "2g. #148: the sheet's breakdown switch stands at the right end of its row",
+    !!switchPlace && switchPlace.rightGap >= 0 && switchPlace.rightGap <= 2,
+    JSON.stringify(switchPlace),
+  );
   const t3 = card.locator("[data-t3-toggle]").first();
   const t3Gap = await chevGap(t3, "[data-t3-heading]");
   const t3Name = await t3.getAttribute("aria-label").catch(() => null);
@@ -704,6 +713,146 @@ for (const [name, path, strict] of [
     );
   }
   check("5r. no page error", errors.length === 0, errors.join("; "));
+  await ctx.close();
+}
+
+// ── 6. ui-jobs 330: the event sheet's words ──────────────────────────────
+// Each subject is an event opened by its `?at=` landing; `rows` are the Risk
+// and Limits rows in order, `params` the breakdown's rows, `optional` the rows
+// a sheet draws only where they apply (a batch's delegate fee, eMode).
+const SHEET_WORDS_SUBJECTS = [
+  {
+    name: "Liquity V2 Trove …545773770 #3",
+    path: "/ethereum/liquity-v2/trove/WETH/29779854367542649123526514384205099621162281315544372345570836626121545773770",
+    id: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1",
+    risk: ["Collateral Ratio", "Liquidates at"],
+    limits: ["Interest Rate"],
+    params: ["Minimum ratio", "Critical ratio"],
+    optional: ["Delegate's fee"],
+  },
+  {
+    name: "Aave V3 0x9ff6…0de5 Borrow",
+    path: "/ethereum/aave-v3/0x9ff679ef5e663a223c5ef07fd191e9e7eda90de5",
+    id: "borrow:0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2:0x2b82089ec595c4609440e634572811db526179653f67dea0bb4c324b0511f417:4",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["LTV", "Still borrowable"],
+    params: ["Max LTV", "Liquidation threshold"],
+    optional: ["eMode"],
+  },
+  {
+    name: "Aave V3 0xc593…5948 Repay with collateral",
+    path: "/ethereum/aave-v3/0xc593352eefa7c45863525a3194870929fd6f5948",
+    id: "transfer_out:0x4d5f47fa6a74757f35c14fd3a6ef8e3c9bc514e8:0x7e796baa18541a2018cb7c06f7079bcea2b9591f0ffd00232bad7cc847c4da2e:28",
+    risk: ["Health factor", "Collateral can fall"],
+    limits: ["LTV", "Still borrowable"],
+    params: ["Max LTV", "Liquidation threshold"],
+    optional: ["eMode"],
+  },
+];
+const UNTOUCHED = "Not changed by this event";
+
+/** The sheet's words, read off its attributes. */
+const sheetWords = (sheet) =>
+  sheet.evaluate((s) => {
+    const label = (r) => r.firstElementChild?.textContent.replace(/\s+/g, " ").trim() ?? "";
+    const sw = s.querySelector("[data-sheet-switch]");
+    return {
+      switch: sw ? { label: sw.getAttribute("aria-label"), title: sw.getAttribute("title") } : null,
+      sides: [...s.querySelectorAll("[data-sheet-side]")].map((e) => ({
+        side: e.getAttribute("data-sheet-side"),
+        touched: e.getAttribute("data-sheet-touched"),
+        heading: e.querySelector("h3")?.textContent.trim() ?? "",
+        untouched: e.textContent.split("Not changed by this event").length - 1,
+        carry: [...e.querySelectorAll('[data-sheet-layer="carry"] [data-sheet-row]')].map(label),
+        before: [...e.querySelectorAll('[data-sheet-row="before"]')].map(label),
+      })),
+      panels: [...s.querySelectorAll("[data-sheet-panel]")].map((e) => ({
+        panel: e.getAttribute("data-sheet-panel"),
+        heading: e.querySelector("h3")?.textContent.trim() ?? "",
+        rows: [...e.querySelectorAll("[data-sheet-row]")].filter((r) => !r.closest("[data-sheet-layer]")).map(label),
+        params: [...e.querySelectorAll('[data-sheet-layer="parameters"] [data-sheet-row]')].map(label),
+      })),
+    };
+  });
+
+/** `got` is `want` in order, then only rows from `optional`. */
+const rowsRead = (got, want, optional) =>
+  JSON.stringify(got.slice(0, want.length)) === JSON.stringify(want) &&
+  got.slice(want.length).every((r) => optional.includes(r));
+
+for (const s of SHEET_WORDS_SUBJECTS) {
+  const { ctx, page, errors } = await open(1280, `${s.path}?at=${encodeURIComponent(s.id)}`);
+  const sheet = page.locator(`[data-event-id="${s.id}"] [data-anatomy~="T2"] [data-sheet]`).first();
+  const drawn = await sheet
+    .waitFor({ state: "attached", timeout: 180000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!check(`6. ${s.name}: the opened card draws the sheet`, drawn)) {
+    await ctx.close();
+    continue;
+  }
+  const off = await sheetWords(sheet).catch(() => null);
+  check(
+    `6a. ${s.name}: the switch reads Show breakdown (label and title)`,
+    off?.switch?.label === "Show breakdown" && off.switch.title === "Show breakdown",
+    JSON.stringify(off?.switch),
+  );
+  check(
+    `6b. ${s.name}: the sides read Collateral and Debt, the panels Risk and Limits`,
+    JSON.stringify(off?.sides.map((x) => x.heading)) === JSON.stringify(["Collateral", "Debt"]) &&
+      JSON.stringify(off?.panels.map((x) => x.heading)) === JSON.stringify(["Risk", "Limits"]),
+    JSON.stringify({ sides: off?.sides.map((x) => x.heading), panels: off?.panels.map((x) => x.heading) }),
+  );
+  const sides = off?.sides ?? [];
+  const untouched = sides.filter((x) => x.touched === "false");
+  check(
+    `6c. ${s.name}: an untouched side reads "${UNTOUCHED}" once, a touched side never (${untouched.length} untouched of ${sides.length})`,
+    sides.length > 0 && sides.every((x) => x.untouched === (x.touched === "false" ? 1 : 0)),
+    JSON.stringify(sides.map((x) => [x.side, x.touched, x.untouched])),
+  );
+  const risk = off?.panels.find((p) => p.panel === "risk");
+  const limits = off?.panels.find((p) => p.panel === "limits");
+  check(
+    `6d. ${s.name}: Risk reads ${s.risk.join(", ")}`,
+    !!risk && rowsRead(risk.rows, s.risk, []),
+    JSON.stringify(risk?.rows),
+  );
+  check(
+    `6e. ${s.name}: Limits reads ${s.limits.join(", ")}`,
+    !!limits && rowsRead(limits.rows, s.limits, s.optional),
+    JSON.stringify(limits?.rows),
+  );
+  await sheet
+    .locator("[data-sheet-switch]")
+    .evaluate((el) => el.click())
+    .catch(() => {});
+  await page
+    .waitForFunction((el) => el?.getAttribute("data-sheet-breakdown") === "on", await sheet.elementHandle(), {
+      timeout: 10000,
+    })
+    .catch(() => {});
+  const on = await sheetWords(sheet).catch(() => null);
+  check(
+    `6f. ${s.name}: pressed, the switch reads Hide breakdown (label and title)`,
+    on?.switch?.label === "Hide breakdown" && on.switch.title === "Hide breakdown",
+    JSON.stringify(on?.switch),
+  );
+  const onLimits = on?.panels.find((p) => p.panel === "limits");
+  check(
+    `6g. ${s.name}: with the breakdown on, Limits adds ${s.params.join(", ")}`,
+    !!onLimits && rowsRead(onLimits.params, s.params, s.optional),
+    JSON.stringify(onLimits?.params),
+  );
+  const carried = (on?.sides ?? []).filter((x) => x.carry.length > 0);
+  check(
+    `6h. ${s.name}: each side's carry layer opens on Last event and closes on Before this event (${carried.length} sides)`,
+    carried.length === (on?.sides.length ?? -1) &&
+      carried.every(
+        (x) => x.carry[0] === "Last event" && JSON.stringify(x.before) === JSON.stringify(["Before this event"]),
+      ),
+    JSON.stringify(on?.sides.map((x) => [x.side, x.carry, x.before])),
+  );
+  check(`6i. ${s.name}: no page error`, errors.length === 0, errors.join("; "));
   await ctx.close();
 }
 
