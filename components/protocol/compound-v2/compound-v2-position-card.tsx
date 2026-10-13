@@ -1,8 +1,10 @@
 "use client";
 
-// Compound V2 position card — the original of the Compound-v2 family, through
-// the SAME shared grammar (OpenPositionStats + StatValue) as the Moonwell and
-// Compound V3 cards so it lines up with the other explorers.
+// Compound V2 position card: a slot builder for the shared position card
+// (components/shared/position-card.tsx). `useCompoundV2CardSlots` turns the
+// account's view and the page's live Comptroller read into one
+// `PositionCardSlots`; the shell draws the frame, the tag, the ⋮, the
+// headlines, the panel, the (i) and the counters.
 //
 // A Compound V2 account is cross-collateralised through the Comptroller: one
 // wallet supplies and borrows across the twenty listed markets. The two sides
@@ -27,22 +29,31 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
-import { OpenPositionStats } from "@/components/shared/open-position-stats";
-import { ClosedPositionStats } from "@/components/shared/closed-position-stats";
-import { PositionCardMeta } from "@/components/shared/position-card-meta";
-import { StatValue, StatDash } from "@/components/shared/stat-value";
+import { type ReactNode, useState } from "react";
+import { Check, Copy, Link2 } from "lucide-react";
+import {
+  PositionCard,
+  type PositionCardExports,
+  type PositionCardHead,
+  type PositionCardMenu,
+  type PositionCardOutcome,
+  type PositionCardSlots,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatCompact } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
+import { formatUsd } from "@/lib/shared/format-event";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TipLabel } from "@/components/shared/tip-label";
 import {
   DEPRECATED_CONDITIONS,
   DEPRECATED_CONSEQUENCE,
   isCompoundV2Deprecated,
 } from "@/lib/compound-v2/deprecated-markets";
-import { PositionCardShell } from "@/components/shared/position-card-shell";
 import {
   positionSupplyCurrentProv,
   positionSupplyPrincipalProv,
@@ -55,16 +66,11 @@ import {
   peakDebtProv,
 } from "@/lib/compound-v2/event-provenance";
 import { compoundV2LiveDebtProv } from "@/lib/compound-v2/position-provenance";
+import type { CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
 import type { CompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { compoundV2PositionModal } from "@/lib/compound-v2/event-templates";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { LifecyclePill, UsdHeadline } from "@/components/shared/position-card-pills";
-import {
-  useReserveDisclosure,
-  ReserveDisclosureToggle,
-  ReserveDisclosureList,
-} from "@/components/shared/reserve-disclosure";
 import type {
   CompoundV2PositionSummary,
   CompoundV2SupplyAmount,
@@ -74,8 +80,7 @@ import type {
 import { ExactSpan } from "@/components/shared/amount-text";
 import type { LiquidationStory } from "@/lib/shared/ctoken-liquidation-story";
 import { splitDust, useDustLines } from "@/components/shared/dust-reserves";
-import { PositionCardDetail, riskColumns, type CardRiskColumn } from "@/components/shared/position-card-disclosure";
-import { ShareLine, ShareLines } from "@/components/shared/share-bar";
+import { compoundV2LineRows, compoundV2RiskHead } from "./compound-v2-risk-slot";
 
 export interface CompoundV2PositionView {
   wallet: string;
@@ -171,34 +176,6 @@ function FixedPriceFlag({ symbol }: { symbol: string }) {
   );
 }
 
-/** Per-market token amounts, demoted beneath the USD headline — still the
- *  strict chain reads (each line traced, exact figure on hover). The exact hover
- *  figure is the lane the line's provenance asserts: the raw cToken balance on
- *  a current-value line, the raw principal on a principal line. Lines are
- *  keyed by MARKET (two markets share WBTC's underlying address). */
-function SupplyFootnoteLines({ v, total }: { v: CompoundV2PositionView; total?: number }) {
-  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
-  if (v.supplies.length === 0) return null;
-  const usdOf = supplyLineUsd(v);
-  return (
-    <ShareLines total={total} control={control}>
-      {lines.map((r) => {
-        const exact = r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal);
-        return (
-          <ShareLine key={r.market} share={total ? (usdOf(r) ?? 0) / total : null} side="collateral">
-            <Prov info={supplyProv(r)}>
-              <ExactSpan exact={exact} symbol={r.current != null ? r.cSymbol : r.symbol}>
-                {formatCompact(supplyAmount(r))} {r.symbol}
-              </ExactSpan>
-            </Prov>
-            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-          </ShareLine>
-        );
-      })}
-    </ShareLines>
-  );
-}
-
 /** A debt line read from the last borrow, repay or liquidation event's
  *  accountBorrows, without the interest since. */
 function StaleDebtNote() {
@@ -213,108 +190,13 @@ function StaleDebtNote() {
   );
 }
 
-function BorrowFootnoteLines({ v, total }: { v: CompoundV2PositionView; total?: number }) {
-  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
-  if (v.borrows.length === 0) return null;
-  const usdOf = borrowLineUsd(v);
-  return (
-    <ShareLines total={total} control={control}>
-      {lines.map((r) => {
-        const exact = formatUnitsExact(r.amountRaw, r.decimals);
-        return (
-          <ShareLine key={r.market} share={total ? (usdOf(r) ?? 0) / total : null} side="debt">
-            <Prov info={borrowProv(r)}>
-              <ExactSpan exact={exact} symbol={r.symbol}>
-                {formatCompact(r.amount)} {r.symbol}
-              </ExactSpan>
-            </Prov>
-            {!r.live && <StaleDebtNote />}
-            {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
-          </ShareLine>
-        );
-      })}
-    </ShareLines>
-  );
-}
-
-/** "X% borrow rate" — the live per-block rate (annualized on the market's own
- *  model) on the single borrowed market, or the debt-USD-weighted average. */
-function BorrowRateCaption({ rate }: { rate: CompoundV2CardCaptions["borrowRate"] | undefined }) {
-  if (!rate) return null;
-  return (
-    <div className="text-xs mt-0.5 text-rb-500">
-      <Prov info={rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>{" "}
-      {rate.avg ? "avg borrow rate" : "borrow rate"}
-    </div>
-  );
-}
-
-/** A vertical stack of the wallet's supplied markets, each traced. */
-function SupplyStack({ v }: { v: CompoundV2PositionView }) {
-  const { lines, control } = useDustLines(v.supplies, supplyLineUsd(v));
-  if (v.supplies.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.market}>
-          <Prov info={supplyProv(r)}>
-            <AssetAmount
-              value={supplyAmount(r)}
-              symbol={r.symbol}
-              exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
-              {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
-            />
-          </Prov>
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-function BorrowStack({ v }: { v: CompoundV2PositionView }) {
-  const { lines, control } = useDustLines(v.borrows, borrowLineUsd(v));
-  if (v.borrows.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.market}>
-          <Prov info={borrowProv(r)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-          {!r.live && <StaleDebtNote />}
-        </StatValue>
-      ))}
-      {control}
-    </div>
-  );
-}
-
-/** A vertical stack of per-market PEAK amounts (highest recorded), each traced
- *  to its own lane's maximum (the supply balance at a row on supply, emitted
- *  accountBorrows on debt); no USD — the token amount only. */
-function PeakStack({ lines, side }: { lines: CompoundV2PeakAmount[]; side: "supply" | "debt" }) {
-  if (lines.length === 0) return <StatDash />;
-  return (
-    <div className="flex flex-col gap-1">
-      {lines.map((r) => (
-        <StatValue key={r.market}>
-          <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
-          </Prov>
-        </StatValue>
-      ))}
-    </div>
-  );
-}
-
 /** A borrow in a deprecated market can be repaid in full by any liquidator,
  *  however healthy the account (lib/compound-v2/deprecated-markets.ts). */
 function DeprecatedBorrowNote({ v }: { v: CompoundV2PositionView }) {
   const hit = v.borrows.filter((b) => isCompoundV2Deprecated(b.market));
   if (hit.length === 0) return null;
   return (
-    <div className="text-xs mt-1 text-amber-700 dark:text-amber-400" data-compound-v2-deprecated-borrow="">
+    <div className="text-xs mb-3 text-amber-700 dark:text-amber-400" data-compound-v2-deprecated-borrow="">
       <TipLabel
         text={`${hit.map((b) => b.symbol).join(" and ")} market deprecated`}
         tip={`A deprecated market has ${DEPRECATED_CONDITIONS}: ${DEPRECATED_CONSEQUENCE}.`}
@@ -324,39 +206,107 @@ function DeprecatedBorrowNote({ v }: { v: CompoundV2PositionView }) {
   );
 }
 
-export function CompoundV2PositionCard({
+/** The unpriced side's token amounts, one under another, at most three: a
+ *  partial USD total is never asserted, so the amounts stand in the headline
+ *  and the panel lists them all. */
+function TokenStack({ lines }: { lines: ReactNode[] }) {
+  const shown = lines.slice(0, 3);
+  return (
+    <div className="flex flex-col gap-1">
+      {shown}
+      {lines.length > shown.length && <span className="text-xs text-rb-500">+{lines.length - shown.length} more</span>}
+    </div>
+  );
+}
+
+/** A side's USD headline, its full figure on hover. */
+function UsdFigure({ usd, info }: { usd: number; info: Provenance }) {
+  return (
+    <span title={"$" + usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}>
+      <Prov info={info}>{formatUsd(usd)}</Prov>
+    </span>
+  );
+}
+
+/** One market's peak amounts (highest recorded), each traced to the lane's
+ *  maximum (the supply balance at a row on supply, emitted accountBorrows on
+ *  debt); no USD, the token amount only. Null where nothing was recorded. */
+function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): ReactNode | null {
+  if (lines.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      {lines.map((r) => (
+        <div key={r.market}>
+          <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
+            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          </Prov>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const shareText = (share: number): string =>
+  share > 0 && share < 0.01 ? "under 1%" : `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`;
+
+/** The account's ID and its page on the card's ⋮: the wallet address with a
+ *  copy, and the link to this position. */
+function CompoundV2MenuRows({ wallet }: { wallet: string }) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (key: string, value: string) => {
+    void navigator.clipboard.writeText(value).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  };
+  return (
+    <>
+      <ToolsMenuItem
+        icon={copied === "id" ? <Check size={16} /> : <Copy size={16} />}
+        title={`Wallet ${wallet.slice(0, 6)}…${wallet.slice(-4)}`}
+        subtitle={copied === "id" ? "Copied" : "Copy the wallet address"}
+        onClick={() => copy("id", wallet)}
+      />
+      <ToolsMenuItem
+        icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
+        title="Link to this position"
+        subtitle={copied === "link" ? "Copied" : "Copy the page's address"}
+        onClick={() => copy("link", `${window.location.origin}/ethereum/compound-v2/${wallet}`)}
+      />
+    </>
+  );
+}
+
+/** What a Compound V2 page or listing hands the card. */
+export interface CompoundV2PositionCardProps {
+  v: CompoundV2PositionView;
+  /** `detail` on the account's page (receipts, panel, (i)); `listing` in a row. */
+  surface?: "detail" | "listing";
+  /** The detail page's live Comptroller read; null until it lands. */
+  chain?: CompoundV2ChainResponse | null;
+  /** Detail-page captions (the borrow rate), computed from the per-market chain
+   *  read (computeCompoundV2CardCaptions). Listing cards omit them. */
+  captions?: CompoundV2CardCaptions;
+  /** The (i) pane's prose (narration describing the position NOW). */
+  explanation?: ReactNode;
+  /** The pane's copy-this-view link: the page's `useTimelineEvents().viewHref`. */
+  viewHref?: () => string;
+  /** The ⋮'s export shapes (`compoundV2Exports`). Absent: the ⋮ holds the
+   *  account's rows and the provenance row alone. */
+  exports?: PositionCardExports;
+}
+
+/** The Compound V2 slots for the shared position card. */
+export function useCompoundV2CardSlots({
   v,
-  receipts = false,
-  rowExtra,
+  surface = "listing",
+  chain = null,
+  captions,
   explanation,
   viewHref,
-  captions,
-  positionSummary,
-  risk,
-  debtDetail,
-}: {
-  v: CompoundV2PositionView;
-  /** Opt in to the closed/opened card (ui-jobs 209), keyed per position —
-   *  forwarded to `PositionCardShell`. */
-  positionSummary?: boolean;
-  /** The risk headline from the page's Comptroller read, with its opened
-   *  layer (compoundV2RiskColumn). */
-  risk?: CardRiskColumn | null;
-  /** Opened-layer lines under Debt from the same read (the room to borrow). */
-  debtDetail?: React.ReactNode;
-  receipts?: boolean;
-  /** Context content riding the shell's heading-button row. */
-  rowExtra?: React.ReactNode;
-  /** The card's Explanation section (narration describing the position NOW). */
-  explanation?: React.ReactNode;
-  /** Copy-this-view control, forwarded straight through to `PositionCardShell`
-   *  — the page's `useTimelineEvents().viewHref`. */
-  viewHref?: () => string;
-  /** Detail-page stat captions (accrued interest, borrow rate) — computed from
-   *  the event stream + the per-market chain read
-   *  (computeCompoundV2CardCaptions). Listing cards omit them. */
-  captions?: CompoundV2CardCaptions;
-}) {
+  exports,
+}: CompoundV2PositionCardProps): PositionCardSlots {
+  const detail = surface === "detail";
   const collUsd = totalUsd(
     v,
     v.supplies.map((r) => ({ market: r.market, amount: supplyAmount(r) })),
@@ -365,208 +315,227 @@ export function CompoundV2PositionCard({
     v,
     v.borrows.map((r) => ({ market: r.market, amount: r.amount })),
   );
-  // `receipts` is the render-site switch (listing defaults false; only the
-  // detail page passes it) — computed here (not just below) because the
-  // reserve-list disclosure hooks must run on every render, before the
-  // closed/liquidated early return. A priced side's list only exists on the
-  // detail page (the footnote lines); an unpriced side's list is the
-  // headline itself and collapses on every surface.
-  const isDetail = receipts;
-  // The closed/opened card (ui-jobs 209): the per-side market chevrons give
-  // way to the card's one header chevron, and every line under a headline
-  // moves into the opened layer (<PositionCardDetail>).
-  const disclosing = receipts && !!positionSummary;
-  // Dust lines (under a cent) leave the icon stack, its "+N" and the list
-  // count; the lines put them behind the "N dust reserves hidden" control.
+  // Dust lines (under a cent) leave the icon cluster and the panel's list; the
+  // panel puts them behind the "N dust reserves hidden" control.
   const suppliesShown = splitDust(v.supplies, supplyLineUsd(v)).shown;
   const borrowsShown = splitDust(v.borrows, borrowLineUsd(v)).shown;
-  const supplyListCount = collUsd == null ? suppliesShown.length : isDetail ? suppliesShown.length : 0;
-  const debtListCount = debtUsd == null ? borrowsShown.length : isDetail ? borrowsShown.length : 0;
-  const supplyDisclosure = useReserveDisclosure(supplyListCount);
-  const debtDisclosure = useReserveDisclosure(debtListCount);
+  const supplyLines = useDustLines(v.supplies, supplyLineUsd(v));
+  const borrowLines = useDustLines(v.borrows, borrowLineUsd(v));
+
+  const status: PositionCardStatus | null =
+    v.status === "liquidated"
+      ? { word: "Liquidated", tone: "danger" }
+      : v.status === "closed"
+        ? { word: "Closed", tone: "muted" }
+        : null;
+
+  const counters = {
+    lastActivityAt: v.lastActivityAt,
+    eventCount: v.txCount,
+    eventTotal: v.eventTotal,
+    countNote: txCountNote(v.liquidationCount),
+    liquidationCount: v.liquidationCount,
+    // The foot strip reads transactions, warnings, then the age.
+    ...(detail ? { order: "age-last" as const } : {}),
+  };
+
+  // The listing names the wallet; the detail page's wallet row does.
+  const identity = detail ? undefined : (
+    <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
+  );
+
+  const ended = v.status === "closed" || v.status === "liquidated";
+  const common = { status, identity, counters };
+  const menu: PositionCardMenu = {
+    leading: () => <CompoundV2MenuRows wallet={v.wallet} />,
+    exports: exports ?? null,
+  };
+  const detailCommon = {
+    surface: "detail" as const,
+    explainer: { body: explanation ?? null, viewHref },
+    learnMore: compoundV2PositionModal({ status: v.status, hasDebt: v.borrows.length > 0 }),
+    menu,
+  };
 
   // Closed / liquidated: the wallet holds no open markets, so the headline is
-  // what each asset held at its height — highest recorded per-market supply +
-  // debt (replayed MAX over the wallet's life, per asset; no USD). The
-  // LIQUIDATED outcome appears only here: an open survivor never reaches this
-  // branch, however many liquidations its meta cluster counts.
-  if (v.status === "closed" || v.status === "liquidated") {
-    return (
-      <PositionCardShell
-        receipts={receipts}
-        explanation={explanation}
-        viewHref={viewHref}
-        learnMore={compoundV2PositionModal({ status: v.status })}
-        positionSummary={positionSummary}
-      >
-        <ClosedPositionStats
-          // A disclosing card's closed layer is the header and the outcome;
-          // the highest recorded balances are its opened layer.
-          detailGate={disclosing ? PositionCardDetail : undefined}
-          outcome={v.status}
-          leadingIdentity={
-            receipts ? undefined : (
-              <WalletPill
-                wallet={v.wallet}
-                ensName={null}
-                filterProtocol="compound-v2"
-                bookmarkProtocol="compound-v2"
-              />
-            )
-          }
-          identity={
-            <PositionCardMeta
-              lastActivityAt={v.lastActivityAt}
-              eventCount={v.txCount}
-              eventTotal={v.eventTotal}
-              countNote={txCountNote(v.liquidationCount)}
-              liquidationCount={v.liquidationCount}
-            />
-          }
-          closedAt={v.lastActivityAt}
-          outcomeDates={outcomeDates(v)}
-          collateral={<PeakStack lines={v.peakSupplies} side="supply" />}
-          debt={<PeakStack lines={v.peakBorrows} side="debt" />}
-        />
-      </PositionCardShell>
-    );
+  // what each asset held at its height: the highest recorded per-market supply
+  // and debt (replayed MAX over the wallet's life, per asset; no USD). The
+  // liquidated outcome appears only here: an open survivor never reaches this
+  // branch, however many liquidations its counters show.
+  if (ended) {
+    const heads: PositionCardHead[] = [
+      { id: "peak-collateral", label: CARD_VOCAB.peakCollateral, value: peakValue(v.peakSupplies, "supply") },
+      { id: "peak-debt", label: CARD_VOCAB.peakDebt, value: peakValue(v.peakBorrows, "debt") },
+    ];
+    const outcome: PositionCardOutcome = {
+      word: v.status === "liquidated" ? "Liquidated" : "Closed",
+      dates: outcomeDates(v) ?? [{ at: v.lastActivityAt }],
+    };
+    if (!detail) return { ...common, heads, outcome, surface: "listing", menu: null };
+    return { ...common, ...detailCommon, heads, outcome };
   }
 
-  // Detail render (receipts): a neutral mode-word pill (what the account is
-  // doing NOW), plus the wallet pill. The LISTING render keeps the lifecycle
-  // pill; the wallet pill (facehash + copy + bookmark) renders on both surfaces.
-  const modeWord = v.borrows.length > 0 ? "Borrowing" : "Supply only";
-  // `isDetail` (== `receipts`) doubles as the surface discriminator: the
-  // listing omits the per-leg lines (V4 spoke-card parity — USD headline +
-  // capped cluster only), the detail page keeps the full traced list.
-
-  return (
-    <PositionCardShell
-      receipts={receipts}
-      rowExtra={rowExtra}
-      explanation={explanation}
-      viewHref={viewHref}
-      learnMore={compoundV2PositionModal({ status: v.status, hasDebt: v.borrows.length > 0 })}
-      positionSummary={positionSummary}
-    >
-      <OpenPositionStats
-        stackOnPhone={disclosing}
-        statusPill={
-          receipts ? (
-            <span className="font-bold px-2 py-0.5 rounded-sm text-xs bg-rb-300 dark:bg-rb-700 text-foreground/80 dark:text-foreground/60">
-              {modeWord}
-            </span>
-          ) : (
-            <LifecyclePill status={v.status} />
-          )
-        }
-        leadingIdentity={
-          receipts ? undefined : (
-            <WalletPill wallet={v.wallet} ensName={null} filterProtocol="compound-v2" bookmarkProtocol="compound-v2" />
-          )
-        }
-        identity={
-          <PositionCardMeta
-            lastActivityAt={v.lastActivityAt}
-            eventCount={v.txCount}
-            eventTotal={v.eventTotal}
-            countNote={txCountNote(v.liquidationCount)}
-            liquidationCount={v.liquidationCount}
-          />
-        }
-        columns={[
-          // ONE oracle-USD figure leads each side (the asset cluster carries
-          // the identities), the per-market token amounts demote to traced
-          // footnote lines. When any contributing market is unpriced the token
-          // stack stays the headline — a partial USD total is never asserted.
-          {
-            label: CARD_VOCAB.collateral,
-            assetIcons:
-              v.supplies.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle disclosure={supplyDisclosure} count={suppliesShown.length} />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              collUsd != null ? (
-                <UsdHeadline usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
-              ) : supplyDisclosure.collapsible && !disclosing ? null : (
-                <SupplyStack v={v} />
-              ),
-            footnote: disclosing ? (
-              <PositionCardDetail>
-                {collUsd != null && <SupplyFootnoteLines v={v} total={collUsd.usd} />}
-              </PositionCardDetail>
-            ) : (
-              <>
-                {collUsd == null && supplyDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyStack v={v} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && collUsd != null && (
-                  <ReserveDisclosureList disclosure={supplyDisclosure}>
-                    <SupplyFootnoteLines v={v} />
-                  </ReserveDisclosureList>
-                )}
-              </>
-            ),
-          },
-          {
-            label: CARD_VOCAB.debt,
-            assetIcons:
-              v.borrows.length > 0 ? (
-                <span className="inline-flex items-center gap-1">
-                  <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} />
-                  {disclosing ? null : (
-                    <ReserveDisclosureToggle disclosure={debtDisclosure} count={borrowsShown.length} />
-                  )}
-                </span>
-              ) : undefined,
-            value:
-              debtUsd != null ? (
-                <UsdHeadline usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
-              ) : debtDisclosure.collapsible && !disclosing ? null : (
-                <BorrowStack v={v} />
-              ),
-            footnote: disclosing ? (
-              <>
-                <PositionCardDetail>
-                  {debtUsd != null && <BorrowFootnoteLines v={v} total={debtUsd.usd} />}
-                  <BorrowRateCaption rate={captions?.borrowRate} />
-                  {debtDetail}
-                </PositionCardDetail>
-                {/* A state the owner must act on stays in view. */}
-                <DeprecatedBorrowNote v={v} />
-              </>
-            ) : (
-              <>
-                {debtUsd == null && debtDisclosure.collapsible && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <BorrowStack v={v} />
-                  </ReserveDisclosureList>
-                )}
-                {isDetail && debtUsd != null && (
-                  <ReserveDisclosureList disclosure={debtDisclosure}>
-                    <BorrowFootnoteLines v={v} />
-                  </ReserveDisclosureList>
-                )}
-                <BorrowRateCaption rate={captions?.borrowRate} />
-                <DeprecatedBorrowNote v={v} />
-              </>
-            ),
-          },
-          // The risk headline rides the detail page's live Comptroller read
-          // (compoundV2RiskColumn); the listing snapshot carries none, so a
-          // listing card asserts no risk column (never dashed, never staled).
-          ...riskColumns(risk, disclosing),
-        ]}
-      />
-    </PositionCardShell>
+  const supplyUnit = (r: CompoundV2SupplyAmount) => (
+    <div key={r.market}>
+      <Prov info={supplyProv(r)}>
+        <AssetAmount
+          value={supplyAmount(r)}
+          symbol={r.symbol}
+          exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
+          {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
+        />
+      </Prov>
+    </div>
   );
+  const borrowUnit = (r: CompoundV2BorrowAmount) => (
+    <div key={r.market}>
+      <Prov info={borrowProv(r)}>
+        <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+      </Prov>
+    </div>
+  );
+
+  // ONE oracle-USD figure leads each side (the asset cluster carries the
+  // identities). When any contributing market is unpriced the token amounts
+  // stand in the headline: a partial USD total is never asserted.
+  const heads: PositionCardHead[] = [
+    {
+      id: "collateral",
+      label: CARD_VOCAB.collateral,
+      value:
+        v.supplies.length === 0 ? null : collUsd != null ? (
+          <UsdFigure usd={collUsd.usd} info={compoundV2UsdProvOnchain("Collateral", collUsd.fixed)} />
+        ) : (
+          <TokenStack lines={suppliesShown.map(supplyUnit)} />
+        ),
+      assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+    },
+    {
+      id: "debt",
+      label: CARD_VOCAB.debt,
+      value:
+        v.borrows.length === 0 ? null : debtUsd != null ? (
+          <UsdFigure usd={debtUsd.usd} info={compoundV2UsdProvOnchain("Borrowed", debtUsd.fixed)} />
+        ) : (
+          <TokenStack lines={borrowsShown.map(borrowUnit)} />
+        ),
+      assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+    },
+  ];
+  // The risk headline rides the detail page's live Comptroller read; the
+  // listing snapshot carries none, so a listing card asserts no risk column.
+  const risk = detail ? compoundV2RiskHead(chain, v.borrows.length > 0) : null;
+  if (risk) heads.push(risk);
+
+  // A state the owner must act on stays in view.
+  const notice = <DeprecatedBorrowNote v={v} />;
+  const withNotice = {
+    ...common,
+    notice: v.borrows.some((b) => isCompoundV2Deprecated(b.market)) ? notice : undefined,
+  };
+  if (!detail) return { ...withNotice, heads, surface: "listing", menu: null };
+
+  // The panel: the supplied markets and the liquidation line on the left; the
+  // borrowed markets, the rate, the room to borrow and the drop on the right.
+  const lineRows = compoundV2LineRows(chain);
+  const supplyRows: PositionPanelRow[] = supplyLines.lines.map((r) => {
+    const share =
+      collUsd && collUsd.usd > 0 && v.supplies.length > 1
+        ? (lineUsd(v, r.market, supplyAmount(r)) ?? 0) / collUsd.usd
+        : null;
+    return {
+      id: `supply-${r.market}`,
+      label: `${r.symbol} supplied`,
+      value: (
+        <>
+          <Prov info={supplyProv(r)}>
+            <ExactSpan
+              exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
+              symbol={r.current != null ? r.cSymbol : r.symbol}
+            >
+              {formatCompact(supplyAmount(r))} {r.symbol}
+            </ExactSpan>
+          </Prov>
+          {share != null && <span className="text-rb-500"> · {shareText(share)}</span>}
+          {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
+        </>
+      ),
+      tip:
+        (r.current != null
+          ? `The ${r.symbol} supplied to this market with its interest: the ${r.cSymbol} balance times the market's exchange rate, read from the chain.`
+          : `The ${r.symbol} deposited to this market without its interest: deposits less withdrawals, replayed from the account's events.`) +
+        (share != null ? " The percentage is its share of the collateral's dollar value." : ""),
+    };
+  });
+  if (supplyLines.control)
+    supplyRows.push({
+      id: "supply-dust",
+      label: "Dust",
+      value: supplyLines.control,
+      tip: "Supplied balances worth under a cent at the oracle price, kept out of the list. The control shows them.",
+    });
+  const borrowRows: PositionPanelRow[] = borrowLines.lines.map((r) => {
+    const share =
+      debtUsd && debtUsd.usd > 0 && v.borrows.length > 1 ? (lineUsd(v, r.market, r.amount) ?? 0) / debtUsd.usd : null;
+    return {
+      id: `borrow-${r.market}`,
+      label: `${r.symbol} borrowed`,
+      value: (
+        <>
+          <Prov info={borrowProv(r)}>
+            <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
+              {formatCompact(r.amount)} {r.symbol}
+            </ExactSpan>
+          </Prov>
+          {!r.live && <StaleDebtNote />}
+          {share != null && <span className="text-rb-500"> · {shareText(share)}</span>}
+          {isFixed(v, r.market) && <FixedPriceFlag symbol={r.symbol} />}
+        </>
+      ),
+      tip:
+        (r.live
+          ? `The ${r.symbol} owed now, interest included: the market's borrowBalanceStored, read from the chain at the latest block.`
+          : `The ${r.symbol} owed at the account's last borrow, repay or liquidation: the accountBorrows that event recorded, without the interest since.`) +
+        (share != null ? " The percentage is its share of the debt's dollar value." : ""),
+    };
+  });
+  if (borrowLines.control)
+    borrowRows.push({
+      id: "borrow-dust",
+      label: "Dust",
+      value: borrowLines.control,
+      tip: "Borrowed balances worth under a cent at the oracle price, kept out of the list. The control shows them.",
+    });
+  const rate = captions?.borrowRate;
+  const rateRows: PositionPanelRow[] = rate
+    ? [
+        {
+          id: "borrow-rate",
+          label: rate.avg ? "Average borrow rate" : "Borrow rate",
+          value: (
+            <Prov info={rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>
+          ),
+          tip: rate.avg
+            ? "The borrowed markets' current variable rates, averaged by each debt's dollar value at Compound's oracle prices."
+            : `The ${rate.symbol ?? "market"} market's current variable borrow rate: its borrowRatePerBlock, read from the chain and annualised on the market's interest rate model.`,
+        },
+      ]
+    : [];
+  return {
+    ...withNotice,
+    ...detailCommon,
+    heads,
+    outcome: undefined,
+    panel: [
+      [...supplyRows, ...lineRows.collateral],
+      [...borrowRows, ...rateRows, ...lineRows.debt],
+    ],
+  };
+}
+
+/** The Compound V2 account card: its slots, drawn by the shared card. */
+export function CompoundV2PositionCard(props: CompoundV2PositionCardProps) {
+  return <PositionCard slots={useCompoundV2CardSlots(props)} />;
 }
 
 /** Why the transaction count and the event count differ. */

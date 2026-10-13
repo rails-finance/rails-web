@@ -13,12 +13,12 @@
 // the same rules about what a partial sweep may and may not claim.
 
 import { useCallback, useMemo } from "react";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 
 import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
-import { MorphoBorrowRoom, morphoRiskColumn } from "@/components/protocol/morpho/morpho-risk-slot";
+import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -41,15 +41,6 @@ import { fetchTimelineFolderMembers } from "@/lib/api/fetch-timeline-folder";
 import type { ServedFolder } from "@/lib/shared/timeline-folder";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, as on the Ethereum position page. The
-// serializer is the Ethereum one — a Base position is the same (market,
-// wallet) pair in the same units, so the document it writes is the same.
-const MorphoExportMenu = dynamic(
-  () => import("@/components/protocol/morpho/morpho-export-menu").then((m) => m.MorphoExportMenu),
-  { ssr: false },
-);
 
 /** The receipts the live card cites while the sweep is in flight: the head
  *  read of the singleton this page makes, not a listing row. Module-level so
@@ -110,19 +101,15 @@ export default function MorphoBasePositionView({
   const liveCard = useMemo(() => {
     if (!liveClean) return null;
     const borrowerSide = morphoHasCollateralRaw(liveClean.collateralRaw) || morphoHasDebt(liveClean.borrowSharesRaw);
-    if (!borrowerSide) return <MorphoLenderOpenCard p={liveClean} receipts vault={vaultOwner} positionSummary />;
+    if (!borrowerSide) return <MorphoLenderOpenCard p={liveClean} surface="detail" vault={vaultOwner} />;
     const v = { ...morphoListedViewFromLive(liveClean, wallet), vaultOwner };
     return (
       <MorphoPositionCard
         v={v}
-        receipts
+        surface="detail"
         session="morpho-base"
         listedReceipts={LIVE_RECEIPTS}
-        // The same key as the swept card, so the opened state carries over
-        // when the history lands (ui-jobs 209).
-        positionSummary
-        risk={v.status === "open" ? morphoRiskColumn(liveClean, morphoHasDebt(liveClean.borrowSharesRaw)) : null}
-        debtDetail={<MorphoBorrowRoom chain={liveClean} />}
+        live={liveClean}
       />
     );
   }, [liveClean, wallet, vaultOwner, market]);
@@ -159,6 +146,21 @@ export default function MorphoBasePositionView({
     all.sort((a, b) => a.blockNumber - b.blockNumber || a.id.localeCompare(b.id));
     return { events: all, missing: pos?.omitted?.count ?? 0 };
   }, [exportEvents, folders, wallet, market, pos]);
+
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). The serializer is the
+  // Ethereum one: a Base position is the same (market, wallet) pair in the
+  // same units.
+  const exports = exportView
+    ? morphoExports({
+        view: exportView,
+        chain: live,
+        events: exportEvents,
+        history: markdownHistoryScope(undefined, exportEvents, folders),
+        scopeNote: exportScopeNote(undefined, exportEvents, "this position's whole history", folders),
+        fetchAllEvents: folders && folders.length > 0 ? fetchAllHistory : undefined,
+        csvFilename: `morpho-base-${market.slice(0, 10)}-${wallet.slice(0, 10)}-activity.csv`,
+      })
+    : null;
 
   // The top row's price dropdown — the Ethereum page's treatment on the Base
   // singleton: the market's own oracle prices the collateral in the market's
@@ -227,18 +229,11 @@ export default function MorphoBasePositionView({
           priceReason={ORACLE_USD_REASON["morpho-base"]}
           closed={closed}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={pinnedRoute}
         >
-          {exportView && (
-            <MorphoExportMenu
-              view={exportView}
-              chain={live}
-              events={exportEvents}
-              history={markdownHistoryScope(undefined, exportEvents, folders)}
-              scopeNote={exportScopeNote(undefined, exportEvents, "this position's whole history", folders)}
-              fetchAllEvents={folders && folders.length > 0 ? fetchAllHistory : undefined}
-              csvFilename={`morpho-base-${market.slice(0, 10)}-${wallet.slice(0, 10)}-activity.csv`}
-            />
-          )}
+          {pinnedRoute && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {/* A segment that is not a market id never reaches here: the server
@@ -277,6 +272,7 @@ export default function MorphoBasePositionView({
                     coverage={timeline.coverage}
                     sweptClean={sweptClean}
                     vaultOwner={vaultOwner}
+                    exports={exports}
                     // Rows only when the answer is this position's grouping.
                     grouped={timeline.grouped && timeline.market === market ? timeline : null}
                   />

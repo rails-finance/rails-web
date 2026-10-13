@@ -25,7 +25,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isDolomiteEvent } from "@/lib/shared/types/event-shape";
@@ -58,12 +57,9 @@ import {
   DolomiteClosedPositionExplanation,
 } from "@/components/protocol/dolomite/dolomite-position-explanation";
 import { dolomiteLiquidationStories, withTokenPeaks } from "@/lib/dolomite/closed-record";
-import {
-  DolomiteRiskDetail,
-  DolomiteRiskHeadline,
-  dolomiteHasRisk,
-} from "@/components/protocol/dolomite/dolomite-risk-slot";
-import { StatValue } from "@/components/shared/stat-value";
+import { ExportMenu } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
+import { dolomitePositionToMarkdown } from "@/lib/dolomite/position-to-markdown";
 import { computeDolomiteCardCaptions } from "@/lib/dolomite/economics";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -77,13 +73,6 @@ import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const DolomiteExportMenu = dynamic(
-  () => import("@/components/protocol/dolomite/dolomite-export-menu").then((m) => m.DolomiteExportMenu),
-  { ssr: false },
-);
 
 /** How the account cells' receipts name a market's balance. */
 const LEDGER_WORDS: CTokenLedgerData["words"] = {
@@ -143,6 +132,8 @@ export default function DolomitePositionView({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
   const [chain, setChain] = useState<DolomiteChainResponse | null>(null);
+  // The core read is in flight: the card's margin ratio waits behind a pulsing bar.
+  const [chainPending, setChainPending] = useState(true);
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
 
@@ -211,12 +202,15 @@ export default function DolomitePositionView({
   useEffect(() => {
     if (!owner || accountNumber == null) return;
     let cancelled = false;
+    setChainPending(true);
     (async () => {
       try {
         const data = await fetchDolomiteChainPosition({ owner, accountNumber });
         if (!cancelled && !data.chainStale) setChain(data);
       } catch {
         // Index-derived surfaces already render; the risk layer just stays off.
+      } finally {
+        if (!cancelled) setChainPending(false);
       }
     })();
     return () => {
@@ -346,6 +340,27 @@ export default function DolomitePositionView({
 
   const captions = liveView ? computeDolomiteCardCaptions(liveView) : null;
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
+  // draws no card, keeps them in the wallet row's Tools.
+  const exports: PositionCardExports | null = liveView
+    ? {
+        buildMarkdown: () =>
+          dolomitePositionToMarkdown({
+            owner,
+            accountNumber,
+            view: cardView ?? liveView,
+            chain,
+            events: dolomiteEvents,
+            history: markdownHistoryScope(historyWindow, dolomiteEvents),
+            generatedAt: new Date(),
+          }),
+        events: dolomiteEvents,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        csvFilename: `dolomite-${owner.slice(0, 10)}-${accountNumber.slice(0, 8)}-activity.csv`,
+        scopeNote: exportScopeNote(historyWindow, dolomiteEvents, "this account's whole history"),
+      }
+    : null;
+
   // The top row's price dropdown: the core's own oracle price of each
   // market the account currently touches, deduped by token.
   const stripAssets = useMemo<PriceStripAsset[]>(() => {
@@ -379,20 +394,11 @@ export default function DolomitePositionView({
             owner={{ wallet: owner }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
+            // The exports ride the card's ⋮; the event route, which draws no card,
+            // keeps them in the wallet row's Tools.
+            tools={onEventPage}
           >
-            {liveView && (
-              <DolomiteExportMenu
-                owner={owner}
-                accountNumber={accountNumber}
-                view={cardView ?? liveView}
-                chain={chain}
-                events={dolomiteEvents}
-                csvFilename={`dolomite-${owner.slice(0, 10)}-${accountNumber.slice(0, 8)}-activity.csv`}
-                fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-                history={markdownHistoryScope(historyWindow, dolomiteEvents)}
-                scopeNote={exportScopeNote(historyWindow, dolomiteEvents, "this account's whole history")}
-              />
-            )}
+            {onEventPage && exports && <ExportMenu {...exports} />}
           </DetailTopRow>
 
           {loading ? (
@@ -402,26 +408,14 @@ export default function DolomitePositionView({
               {!onEventPage && liveView && cardView && (
                 <DolomitePositionCard
                   v={cardView}
-                  receipts
+                  surface="detail"
                   viewHref={tl.viewHref}
                   captions={captions ?? undefined}
-                  // Closed by default, remembered per viewer and account (ui-jobs
-                  // 209). The margin ratio from the core read is the third
-                  // headline; its line and distance bar sit in the opened layer,
-                  // inside the card's receipts scope.
-                  positionSummary
-                  risk={
-                    chain && liveView.status === "open"
-                      ? dolomiteHasRisk(chain)
-                        ? {
-                            value: <DolomiteRiskHeadline chain={chain} />,
-                            detail: <DolomiteRiskDetail chain={chain} />,
-                          }
-                        : !chain.chainStale && cardView.borrows.length === 0
-                          ? { value: <StatValue color="text-rb-400">No debt</StatValue> }
-                          : undefined
-                      : undefined
-                  }
+                  // The margin ratio from the core read is the third headline;
+                  // its line and the fall to it are panel rows.
+                  chain={chain}
+                  chainPending={chainPending}
+                  exports={exports}
                   // The Explanation is layman prose about the face figures; it
                   // states the adjusted debt and the borrow capacity. The
                   // per-market rates live on the market view.

@@ -25,7 +25,6 @@ import { useParams } from "next/navigation";
 import { llamalendExplorer } from "@/lib/llamalend/explorer";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isLlamalendEvent } from "@/lib/shared/types/event-shape";
 import { fetchLlamalendPositions } from "@/lib/api/fetch-llamalend-positions";
@@ -52,12 +51,9 @@ import {
   type LlamalendPositionView,
 } from "@/components/protocol/llamalend/llamalend-position-card";
 import { LlamalendPositionExplanation } from "@/components/protocol/llamalend/llamalend-position-explanation";
-import {
-  LlamalendConvertedDetail,
-  LlamalendRiskDetail,
-  LlamalendRiskHeadline,
-  llamalendHasRisk,
-} from "@/components/protocol/llamalend/llamalend-risk-slot";
+import { ExportMenu } from "@/components/shared/export-menu";
+import type { PositionCardExports } from "@/components/shared/position-card";
+import { llamalendPositionToMarkdown } from "@/lib/llamalend/position-to-markdown";
 import {
   llamalendLifetimeWithOpening,
   llamalendLostToSoftLiq,
@@ -80,13 +76,6 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle.
-const LlamalendExportMenu = dynamic(
-  () => import("@/components/protocol/llamalend/llamalend-export-menu").then((m) => m.LlamalendExportMenu),
-  { ssr: false },
-);
 
 interface LlamalendPositionViewProps {
   /** The market's own Controller, normalised by the server route — anything
@@ -353,6 +342,27 @@ export default function LlamalendPositionView({
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
+  // draws no card, keeps them in the wallet row's Tools.
+  const exports: PositionCardExports | null = liveView
+    ? {
+        buildMarkdown: () =>
+          llamalendPositionToMarkdown({
+            controller,
+            user,
+            view: liveView,
+            chain,
+            events: llamalendEvents,
+            history: markdownHistoryScope(historyWindow, llamalendEvents),
+            generatedAt: new Date(),
+          }),
+        events: llamalendEvents,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        csvFilename: `llamalend-${controller.slice(0, 10)}-${user.slice(0, 10)}-activity.csv`,
+        scopeNote: exportScopeNote(historyWindow, llamalendEvents, "this position's whole history"),
+      }
+    : null;
+
   // The top row's price dropdown: the AMM's own oracle price of the
   // collateral — only where the borrowed token is crvUSD (~$1); a WETH-
   // denominated price is not a dollar and never renders as one.
@@ -382,20 +392,11 @@ export default function LlamalendPositionView({
           owner={{ wallet: user }}
           assets={stripAssets}
           closed={liveView != null && liveView.status !== "open"}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {liveView && (
-            <LlamalendExportMenu
-              controller={controller}
-              user={user}
-              view={liveView}
-              chain={chain}
-              events={llamalendEvents}
-              csvFilename={`llamalend-${controller.slice(0, 10)}-${user.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, llamalendEvents)}
-              scopeNote={exportScopeNote(historyWindow, llamalendEvents, "this position's whole history")}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -405,32 +406,20 @@ export default function LlamalendPositionView({
             {!onEventPage && liveView && (
               <LlamalendPositionCard
                 v={liveView}
-                bands={chain?.hasLoan ? chain.bands : null}
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). The health from the live read is the third headline;
-                // the soft-liquidation multiple, what the AMM sold and the band
-                // axis sit under it in the opened layer, the converted amount
-                // under Collateral, all inside the card's receipts scope.
-                // Mounted only while the loan is live and the read landed.
-                positionSummary
-                risk={
-                  chain && liveView.status === "open" && llamalendHasRisk(chain)
-                    ? {
-                        value: <LlamalendRiskHeadline chain={chain} />,
-                        detail: <LlamalendRiskDetail chain={chain} lost={lost} sold={soldInBands} />,
-                      }
-                    : undefined
-                }
-                collateralDetail={
-                  chain && liveView.status === "open" ? <LlamalendConvertedDetail chain={chain} /> : undefined
-                }
-                // Passed whatever the status and before the chain read lands:
-                // the pane, and the copy-view link at its foot, mount with the
-                // card. A closed account, a read still pending or a read with no
-                // loan narrates nothing.
-                bodyExtra={
+                // The health from the live read is the third headline; the
+                // converted amount, the soft-liquidation multiple, what the AMM
+                // sold and lost and the band figures are panel rows, all inside
+                // the card's receipts scope.
+                chain={chain}
+                chainPending={!chainSettled}
+                lost={lost}
+                sold={soldInBands}
+                exports={exports}
+                // Passed whatever the status: a position with several loans
+                // states them, a liquidated one states the owner's outcome.
+                foot={
                   loans.length > 1 ? (
                     <LlamalendLoansLine
                       loans={loans}
@@ -445,6 +434,10 @@ export default function LlamalendPositionView({
                     />
                   ) : undefined
                 }
+                // Passed whatever the status and before the chain read lands:
+                // the pane, and the copy-view link at its foot, mount with the
+                // card. A closed account, a read still pending or a read with no
+                // loan narrates nothing.
                 explanation={
                   <LlamalendPositionExplanation
                     chain={liveView.status === "open" ? chain : null}

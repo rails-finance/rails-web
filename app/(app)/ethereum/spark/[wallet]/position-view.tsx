@@ -24,7 +24,6 @@
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isSparkEvent } from "@/lib/shared/types/event-shape";
@@ -75,8 +74,8 @@ import {
   SparkClosedPositionExplanation,
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
-import { SparkRiskDetail } from "@/components/protocol/spark/spark-risk-slot";
-import { SparkBorrowRoom } from "@/components/protocol/spark/spark-ltv-card";
+import { sparkExports } from "@/components/protocol/spark/spark-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
@@ -108,13 +107,6 @@ import {
 import { loadAaveFamilyReserveRates, type ReserveRateLookup } from "@/lib/api/fetch-aave-family-reserve-rates";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 import type { MarketNote } from "@/lib/shared/market-note";
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const SparkExportMenu = dynamic(
-  () => import("@/components/protocol/spark/spark-export-menu").then((m) => m.SparkExportMenu),
-  { ssr: false },
-);
 
 interface SparkPositionDetailProps {
   wallet: string;
@@ -758,6 +750,28 @@ export default function SparkPositionDetail({
     return out;
   }, [view]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? sparkExports({
+        wallet,
+        view,
+        chain,
+        captions,
+        events: sparkEvents,
+        notes,
+        liveNotes,
+        csvFilename: `spark-${wallet.slice(0, 10)}-activity.csv`,
+        fetchAllEvents: historyWindow.state === "whole" ? undefined : fetchAllHistory,
+        queued: {
+          protocol: "spark",
+          params: { wallet },
+          totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
+        },
+        history: markdownHistoryScope(historyWindow, sparkEvents, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, sparkEvents, "this wallet's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
@@ -767,27 +781,11 @@ export default function SparkPositionDetail({
           owner={{ wallet }}
           assets={stripAssets}
           closed={liveView != null && liveView.status !== "open"}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <SparkExportMenu
-              wallet={wallet}
-              view={view}
-              chain={chain}
-              captions={captions}
-              events={sparkEvents}
-              notes={notes}
-              liveNotes={liveNotes}
-              csvFilename={`spark-${wallet.slice(0, 10)}-activity.csv`}
-              fetchAllEvents={historyWindow.state === "whole" ? undefined : fetchAllHistory}
-              queued={{
-                protocol: "spark",
-                params: { wallet },
-                totalEvents: lifetimeFiguresKnown(historyWindow) ? tl.totalCount : null,
-              }}
-              history={markdownHistoryScope(historyWindow, sparkEvents, servedFolders)}
-              scopeNote={exportScopeNote(historyWindow, sparkEvents, "this wallet's whole history", servedFolders)}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -797,23 +795,17 @@ export default function SparkPositionDetail({
             {!onEventPage && liveView && (
               <SparkPositionCard
                 v={cardView ?? liveView}
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
                 outcomeAt={lastLiquidationAt}
                 notCollateral={notCollateral}
                 lives={lives}
                 captions={captions ?? undefined}
-                // Closed by default, remembered per viewer and position (ui-jobs
-                // 209). The room left to borrow and the distance bar from the
-                // Pool read sit in the opened layer under Debt and Health
-                // factor, inside the card's receipts scope.
-                positionSummary
-                debtDetail={chain ? <SparkBorrowRoom chain={chain} /> : undefined}
-                riskDetail={chain ? <SparkRiskDetail chain={chain} /> : undefined}
-                // The Explanation is now pure layman prose about those same face
-                // figures — no secondary figure-strips. The LTV strip is absorbed
-                // into the risk slot above; the reserve rates live on the market
-                // view (where pool-wide rate context belongs).
+                // The room left to borrow, from the Pool read, is a panel row.
+                chain={chain}
+                exports={exports}
+                // The Explanation is layman prose about the card's figures; the
+                // reserve rates live on the market view.
                 explanation={
                   liveView.status !== "open" ? (
                     // Terminal accounts need no live Pool read — the pane
