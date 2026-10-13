@@ -15,7 +15,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
-import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
 import { makerdaoExplorer } from "@/lib/makerdao/explorer";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -52,7 +51,8 @@ import {
   viewFromSummary,
   type MakerVaultView,
 } from "@/components/protocol/makerdao/makerdao-vault-card";
-import { MakerdaoRiskDetail } from "@/components/protocol/makerdao/makerdao-risk-slot";
+import { makerdaoExports } from "@/components/protocol/makerdao/makerdao-export-menu";
+import { ExportMenu } from "@/components/shared/export-menu";
 import {
   MakerdaoPositionExplanation,
   MakerdaoClosedPositionExplanation,
@@ -96,13 +96,6 @@ const ILK_AT_PAGE_LIMIT = 60;
 /** How many of the vault's newest non-ownership transactions the page reads
  *  for their sender (one route call each). */
 const TX_CONTEXT_LIMIT = 40;
-
-// Lazy: the export path (dropdown UX + Markdown serializer + CSV builder) is
-// one chunk off the initial bundle, mirroring the V4 spoke page.
-const MakerdaoExportMenu = dynamic(
-  () => import("@/components/protocol/makerdao/makerdao-export-menu").then((m) => m.MakerdaoExportMenu),
-  { ssr: false },
-);
 
 /** Merge the live chain state (authoritative ink/art/debt) with the replay
  *  summary (status / liquidated flag, which the slot read can't infer). */
@@ -630,6 +623,23 @@ export default function MakerVaultDetailView({
     });
   }, [view, makerEvents]);
 
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
+  const exports = view
+    ? makerdaoExports({
+        // The card's view: it carries the principal the fee split needs.
+        view: cardView ?? view,
+        events: makerEvents,
+        notes,
+        liveNotes,
+        csvFilename: `makerdao-${vault}-activity.csv`,
+        // A folder's members are not in `makerEvents`, so a grouped page
+        // reads the whole history for the CSV as a windowed one does.
+        fetchAllEvents: historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory,
+        history: markdownHistoryScope(historyWindow, makerEvents, servedFolders),
+        scopeNote: exportScopeNote(historyWindow, makerEvents, "this vault's whole history", servedFolders),
+      })
+    : null;
+
   return (
     <FlowFocusContext.Provider value={flows.focus}>
       <div className="py-8 space-y-6">
@@ -655,22 +665,11 @@ export default function MakerVaultDetailView({
           }
           closed={view != null && view.status !== "open"}
           closing={closing}
+          // The exports ride the card's ⋮; the event route, which draws no card,
+          // keeps them in the wallet row's Tools.
+          tools={onEventPage}
         >
-          {view && (
-            <MakerdaoExportMenu
-              // The card's view: it carries the principal the fee split needs.
-              view={cardView ?? view}
-              events={makerEvents}
-              notes={notes}
-              liveNotes={liveNotes}
-              csvFilename={`makerdao-${vault}-activity.csv`}
-              // A folder's members are not in `makerEvents`, so a grouped page
-              // reads the whole history for the CSV as a windowed one does.
-              fetchAllEvents={historyWindow.state === "whole" && !servedFolders?.length ? undefined : fetchAllHistory}
-              history={markdownHistoryScope(historyWindow, makerEvents, servedFolders)}
-              scopeNote={exportScopeNote(historyWindow, makerEvents, "this vault's whole history", servedFolders)}
-            />
-          )}
+          {onEventPage && exports && <ExportMenu {...exports} />}
         </DetailTopRow>
 
         {loading ? (
@@ -680,18 +679,9 @@ export default function MakerVaultDetailView({
             {!onEventPage && cardView && (
               <MakerVaultCard
                 v={cardView}
-                receipts
+                surface="detail"
                 viewHref={tl.viewHref}
-                // Closed by default, remembered per viewer and vault (ui-jobs
-                // 209). The price bar and the room to the ilk's minimum sit in
-                // the opened layer under Collateral ratio, inside the card's
-                // receipts scope, once the live overlay landed.
-                positionSummary
-                riskDetail={
-                  cardView.source === "chain" && cardView.status === "open" ? (
-                    <MakerdaoRiskDetail v={cardView} />
-                  ) : undefined
-                }
+                exports={exports ?? undefined}
                 // A terminal vault narrates from the replay + the timeline
                 // already on the page (no chain overlay needed); the open pane
                 // still needs the live overlay for the ilk parameters and
@@ -736,7 +726,7 @@ export default function MakerVaultDetailView({
                   ...slot,
                   vault,
                   ilk: ilk ?? "",
-                  owner: (cardView?.owner ?? view?.owner) ?? null,
+                  owner: cardView?.owner ?? view?.owner ?? null,
                 })
               }
               closed={view?.status !== "open"}
